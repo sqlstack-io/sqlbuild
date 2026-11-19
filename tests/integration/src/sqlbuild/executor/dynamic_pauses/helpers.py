@@ -86,6 +86,20 @@ class PausingDuckDbAdapter(DuckDbAdapter):
         return ("SELECT 1",)
 
 
+class TokenPausingDuckDbAdapter(PausingDuckDbAdapter):
+    """Also reads a table's change token, as Snowflake does without a running warehouse."""
+
+    def read_relation_change_token(
+        self, *, connection: Any, database: str | None, schema: str, name: str
+    ) -> str | None:
+        del database
+        row: tuple[Any, ...] = connection.execute(
+            f"SELECT COUNT(*) || '/' || COALESCE(CAST(MAX(recorded_at) AS VARCHAR), '') "
+            f"FROM {schema}.{name}"
+        ).fetchone()
+        return str(row[0])
+
+
 def lease_project_case(
     *,
     orders_query: str,

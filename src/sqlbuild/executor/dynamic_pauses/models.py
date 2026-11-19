@@ -28,3 +28,11 @@ class OpenHold:
     relation: CompiledRelationLocation
     idle_seconds: float
     paused_at: datetime
+
+
+@dataclass(frozen=True)
+class ResumeOutcome:
+    """The holds one pass resumed, and the pause table's change token when it left none open."""
+
+    resumed: tuple[OpenHold, ...]
+    quiet_token: str | None

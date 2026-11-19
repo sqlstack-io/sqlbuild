@@ -1,6 +1,7 @@
 pub(crate) mod changed_build;
 pub(crate) mod execution;
 pub(crate) mod held_copy;
+pub(crate) mod dynamic_resume;
 pub(crate) mod plan_document;
 pub(crate) mod plan_request;
 pub(crate) mod plan_reuse;

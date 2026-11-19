@@ -85,6 +85,20 @@ pub(super) fn one_location() -> Vec<WarehouseStateLocation> {
     }]
 }
 
+/// A location in `directory` served by an unreachable server.
+pub(super) fn location_options(directory: &Path) -> LocationServe {
+    LocationServe {
+        project_dir: directory.to_path_buf(),
+        server_url: "http://127.0.0.1:1".into(),
+        location_id: Uuid::nil(),
+        target: "development".into(),
+        image_id: None,
+        metadata_reconcile_seconds: 3600,
+        safety_sync_seconds: 1800,
+        dev_events: false,
+    }
+}
+
 /// A location in `directory` whose `sqb debug` reports `wakes_compute` and whose every history read fails, published to an unreachable server: its options, script, work channel and the sync the publication starts.
 pub(super) fn published_location(
     directory: &Path,
@@ -107,16 +121,7 @@ pub(super) fn published_location(
     let mut permissions = std::fs::metadata(&script).expect("metadata").permissions();
     std::os::unix::fs::PermissionsExt::set_mode(&mut permissions, 0o755);
     std::fs::set_permissions(&script, permissions).expect("executable");
-    let options = LocationServe {
-        project_dir: directory.to_path_buf(),
-        server_url: "http://127.0.0.1:1".into(),
-        location_id: Uuid::nil(),
-        target: "development".into(),
-        image_id: None,
-        metadata_reconcile_seconds: 3600,
-        safety_sync_seconds: 1800,
-        dev_events: false,
-    };
+    let options = location_options(directory);
     let client = connect_location_work((&options.server_url, "token"), options.location_id)
         .expect("work client");
     let poll = LocationWorkPoll {

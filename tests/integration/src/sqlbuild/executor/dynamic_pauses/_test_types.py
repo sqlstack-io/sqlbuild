@@ -128,3 +128,13 @@ class SyncDuringTakeoverTestCase:
     description: str
     expected_operations: tuple[tuple[str, str], ...]
     expected_states: dict[str, str]
+
+
+@dataclass(frozen=True)
+class QuietTokenTestCase:
+    description: str
+    holds: tuple[tuple[str, str, int], ...]
+    tokens: bool
+    quiet: bool
+    expected_resumed: tuple[tuple[str, str], ...]
+    expected_quiet: bool
