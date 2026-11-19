@@ -33,6 +33,21 @@ struct JobScope {
 thread_local! {
     /// Per thread, since a command resolves its selectors on the thread that dispatches it.
     static JOB_SCOPE: RefCell<Option<JobScope>> = const { RefCell::new(None) };
+    /// The settings the running command's own command line gives, which replace named jobs'.
+    static GIVEN_SETTINGS: RefCell<BTreeSet<String>> = const { RefCell::new(BTreeSet::new()) };
+}
+
+/// Run one command whose command line gives `given` settings, restoring the enclosing ones after.
+pub(crate) fn with_given_settings<T>(given: BTreeSet<String>, run: impl FnOnce() -> T) -> T {
+    let previous = GIVEN_SETTINGS.with(|current| current.replace(given));
+    let result: T = run();
+    GIVEN_SETTINGS.with(|current| *current.borrow_mut() = previous);
+    result
+}
+
+/// The settings the running command's command line gives.
+pub(crate) fn given_settings() -> BTreeSet<String> {
+    GIVEN_SETTINGS.with(|current| current.borrow().clone())
 }
 
 /// Run one command with jobs selectable from `project_dir`, restoring the enclosing scope after.

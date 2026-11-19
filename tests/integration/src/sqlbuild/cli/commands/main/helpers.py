@@ -1500,8 +1500,9 @@ def _job_file(name: str, select: str, warehouse: str) -> str:
 
 def write_job_warehouse_project(*, project_dir: Path) -> None:
     """A Snowflake chain stg -> orders -> orders_daily -> refunds -> summary and a task, with jobs
-    on their own warehouses: orders_wh_job, refunds_wh_job, refunds_alt_job (also refunds),
-    tasks_wh_job and bad_wh_job, whose warehouse is not an identifier."""
+    on their own warehouses: orders_wh_job, orders_copy_job (orders_daily on the same warehouse),
+    refunds_wh_job, refunds_alt_job (also refunds), tasks_wh_job and bad_wh_job, whose warehouse
+    is not an identifier."""
 
     write_snowflake_warehouse_project(
         project_dir=project_dir,
@@ -1525,6 +1526,9 @@ def write_job_warehouse_project(*, project_dir: Path) -> None:
             ),
             "orchestration/jobs/refunds_wh_job.toml": _job_file(
                 "refunds_wh_job", "refunds", "REFUNDS_WH"
+            ),
+            "orchestration/jobs/orders_copy_job.toml": _job_file(
+                "orders_copy_job", "orders_daily", "ORDERS_WH"
             ),
             "orchestration/jobs/refunds_alt_job.toml": _job_file(
                 "refunds_alt_job", "refunds", "ALT_WH"
@@ -1571,3 +1575,83 @@ def run_cli_exit_code(argv: tuple[str, ...], project_dir: Path) -> int:
         return int(main(["--no-color", "--project-dir", str(project_dir), *argv]) or 0)
     except SystemExit as exited:
         return int(exited.code or 0)
+
+
+_PARITY_PROJECT_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": (
+        'name = "demo"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+        '[connection]\ndatabase = "demo.duckdb"\n\n[targets.dev]\n'
+    ),
+    "functions/sql/udf__band.sql": (
+        "FUNCTION (description 'Band.', arguments (amount INT), returns VARCHAR);\n"
+        "CASE WHEN amount >= 20 THEN 'large' ELSE 'small' END\n"
+    ),
+    "models/parity_lookup.sql": (
+        "MODEL (description 'Lookup.', materialized table, "
+        "columns (id (type INTEGER, audits [not_null])));\nSELECT CAST(NULL AS INTEGER) AS id\n"
+    ),
+    "models/parity_events.sql": (
+        "MODEL (description 'Events.', materialized incremental, incremental_strategy append);\n"
+        'SELECT 1 AS event_id, __udf("udf__band")(5) AS band\n'
+    ),
+    "tests/unit/test_parity_events.sql": (
+        "TEST();\n\nWITH\n__ref__parity_lookup AS (SELECT 1 AS id),\n"
+        "__expected__parity_events AS (SELECT 99 AS event_id, 'x' AS band)\nSELECT 1\n"
+    ),
+    "audits/singular/events_have_lookups.sql": (
+        'AUDIT (name "events_have_lookups", severity error);\n'
+        'SELECT e.event_id FROM __ref("parity_events") e '
+        'LEFT JOIN __ref("parity_lookup") l ON e.event_id = l.id WHERE l.id IS NULL\n'
+    ),
+    "orchestration/jobs/parity_job.toml": (
+        'name = "parity_job"\ndescription = "Parity."\n'
+        'select = "udf__band parity_lookup parity_events"\n\n'
+        "[settings]\nfull_refresh = true\nrun_tests = false\nignore_audit_failures = true\n"
+    ),
+}
+PARITY_NODES: tuple[str, ...] = ("udf__band", "parity_lookup", "parity_events")
+
+
+def job_flag_parity_outcome(
+    *,
+    project_dir: Path,
+    args: tuple[tuple[str, ...], tuple[str, ...]],
+    capsys: pytest.CaptureFixture[str],
+) -> tuple[object, ...]:
+    """Build a parity project once without its job, then plan and build it with `args`: the
+    function reasons, full-refresh count, exit code, summary and ignored audits they report."""
+
+    plan_args, build_args = args
+
+    write_project_files(project_dir=project_dir, files=_PARITY_PROJECT_FILES)
+    base: list[str] = ["--no-color", "--project-dir", str(project_dir)]
+    main(
+        [
+            *base,
+            "build",
+            "--no-job-settings",
+            "--no-tests",
+            "--ignore-audit-failures",
+            "--select",
+            *PARITY_NODES,
+        ]
+    )
+    capsys.readouterr()
+    main([*base, "plan", *plan_args])
+    plan: str = capsys.readouterr().out
+    exit_code: int = main([*base, "build", *build_args])
+    build: str = capsys.readouterr().out
+    return (
+        tuple(re.findall(r"^  (\S+) +sql udf\n +reason: (.*)$", plan, re.M)),
+        tuple(re.findall(r"^Full refresh \((\d+)\)$", plan, re.M)),
+        exit_code,
+        tuple(re.findall(r"Completed [^\n]*?TOTAL=\d+", build)),
+        tuple(re.findall(r"audit .+ returned \d+ rows? \(ignored\)", build)),
+    )
+
+
+def unit_test_sql(*models: str) -> str:
+    """A unit test mocking orders_daily that expects one row from each of `models`."""
+
+    expected: str = ",\n".join(f"__expected__{model} AS (SELECT 1 AS id)" for model in models)
+    return f"TEST();\n\nWITH\n__ref__orders_daily AS (SELECT 1 AS id),\n{expected}\nSELECT 1\n"

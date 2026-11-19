@@ -6,6 +6,7 @@ import threading
 import time
 from collections import deque
 from queue import Queue
+from types import SimpleNamespace
 from typing import Any, cast
 
 from sqlbuild._native import CompiledObjectKey, CompiledResourceType
@@ -15,6 +16,7 @@ from sqlbuild.executor.build.models import BuildRuntimeParams, NodeCompletion
 from sqlbuild.executor.run.models import ModelExecutionResult
 from sqlbuild.executor.scheduling.classes.session_warehouses import SessionWarehouses
 from sqlbuild.executor.scheduling.types import ExecutionStatus
+from sqlbuild.executor.testing.types import SqlTestOutcome
 from tests.unit.src.sqlbuild.executor.build.classes._test_types import (
     JobLimitedBuildTestCase,
     SubworkerReservationTestCase,
@@ -157,6 +159,29 @@ def reserve_subworkers(test_case: SubworkerReservationTestCase) -> tuple[int, tu
         for _ in test_case.expected_reservations
     )
     return scheduler._microbatch_coordinator_demand, reservations
+
+
+def node_key(*, resource_type: CompiledResourceType, name: str) -> CompiledObjectKey:
+    """The key of node `name` of `resource_type`."""
+
+    return CompiledObjectKey(resource_type=resource_type, name=name)
+
+
+def failed_node_result(result: Any) -> bool:
+    """Whether a node result of any kind reports failure."""
+
+    return (
+        getattr(result, "status", None) == ExecutionStatus.FAILED
+        or getattr(result, "outcome", None) == SqlTestOutcome.ERROR
+    )
+
+
+def source_plan(name: str) -> SimpleNamespace:
+    """A plan with only source `name`'s entry, as a failed load result reads it."""
+
+    return SimpleNamespace(
+        source_map={name: SimpleNamespace(name=name, loader=None, table=None, meta={})}
+    )
 
 
 def warehouse_scheduler(adapter: RecordingWarehouseAdapter) -> Any:

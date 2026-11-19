@@ -60,13 +60,11 @@ WAREHOUSE_REFUSAL: str = (
             expected_reason=WAREHOUSE_REFUSAL,
             expected_statements=False,
             expected_customers_tables=0,
-            # DuckDB has no session warehouse, so the build refuses the job's warehouse: the
-            # published job reached the build instead of being refused by the worker.
+            # DuckDB has no session warehouse, so the CLI refuses the job's warehouse: the
+            # published job reached the CLI instead of being refused by the worker.
             job_settings='\n[settings]\nwarehouse = "ANALYST_XS"\n',
             expected_scheduled_status="failed",
-            expected_worker_log=(
-                "sets warehouse ANALYST_XS, but the 'duckdb' adapter has no warehouse to select"
-            ),
+            expected_worker_log="error[C260]: --warehouse ANALYST_XS was given",
         ),
     ],
     ids=lambda case: case.description,

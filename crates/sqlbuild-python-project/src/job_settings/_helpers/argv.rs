@@ -51,44 +51,38 @@ fn project_dir(namespace: &Bound<'_, PyDict>) -> PyResult<PathBuf> {
     std::fs::canonicalize(&raw).or_else(|_| std::path::absolute(&raw).map_err(os_error))
 }
 
-/// `argv` plus the flags it leaves out of its named jobs' build-wide settings; `None` if unchanged.
+/// The settings `argv` gives, and `argv` plus its named jobs' other build-wide flags, if any.
 pub(crate) fn named_job_argv(
     py: Python<'_>,
     argv: &[String],
     namespace: &Bound<'_, PyDict>,
-) -> PyResult<Option<Vec<String>>> {
+) -> PyResult<(BTreeSet<String>, Option<Vec<String>>)> {
+    let none = |given: BTreeSet<String>| Ok((given, None));
     let Some(command): Option<String> = argument(namespace, "command")? else {
-        return Ok(None);
+        return none(BTreeSet::new());
     };
     let job_settings: bool = argument(namespace, "job_settings")?.unwrap_or(false);
     if !JOB_SETTING_COMMANDS.contains(&command.as_str()) || !job_settings {
-        return Ok(None);
-    }
-    let selectors: Vec<String> = selectors(namespace)?;
-    if !selectors.iter().any(|selector| could_name_job(selector)) {
-        return Ok(None);
-    }
-    let directory: PathBuf = project_dir(namespace)?;
-    if !Path::new(&directory).join(ORCHESTRATION_DIRECTORY).is_dir() {
-        return Ok(None);
-    }
-    let target: Option<String> = argument(namespace, "target")?;
-    let settings: BTreeMap<String, Value> =
-        named_job_build_settings(py, &selectors, (&directory, target))?;
-    if settings.is_empty() {
-        return Ok(None);
+        return none(BTreeSet::new());
     }
     let given: BTreeSet<String> = given_setting_dests(argv).ok_or_else(|| {
         PyRuntimeError::new_err("cannot tell which settings the command line gives")
     })?;
-    let silent: BTreeMap<String, Value> = settings
-        .into_iter()
-        .filter(|(name, _)| !given.contains(name))
-        .collect();
+    let selectors: Vec<String> = selectors(namespace)?;
+    if !selectors.iter().any(|selector| could_name_job(selector)) {
+        return none(given);
+    }
+    let directory: PathBuf = project_dir(namespace)?;
+    if !Path::new(&directory).join(ORCHESTRATION_DIRECTORY).is_dir() {
+        return none(given);
+    }
+    let target: Option<String> = argument(namespace, "target")?;
+    let settings: BTreeMap<String, Value> =
+        named_job_build_settings(py, (&selectors, &given), (&directory, target))?;
     let flags: Vec<String> =
-        accepted_settings_arguments(&command, &silent).map_err(PyValueError::new_err)?;
+        accepted_settings_arguments(&command, &settings).map_err(PyValueError::new_err)?;
     if flags.is_empty() {
-        return Ok(None);
+        return none(given);
     }
     let terminator: usize = argv
         .iter()
@@ -96,7 +90,7 @@ pub(crate) fn named_job_argv(
         .unwrap_or(argv.len());
     let mut job_argv: Vec<String> = argv.to_vec();
     job_argv.splice(terminator..terminator, flags);
-    Ok(Some(job_argv))
+    Ok((given, Some(job_argv)))
 }
 
 /// Whether the command meets `error` again, and reports it, when it runs.

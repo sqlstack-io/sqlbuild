@@ -26,6 +26,7 @@ use crate::bindings::_helpers::cli::failure_cause::take_failure_cause;
 use sqlbuild_python_base::cli::main::offer_launch_record::offer_launch_record;
 use crate::bindings::_helpers::cli::machine_output::take_machine_output_written;
 use sqlbuild_python_project::job_settings::main::job_settings_argv::job_settings_argv;
+use sqlbuild_python_project::job_settings::main::with_given_settings::with_given_settings;
 use crate::bindings::_helpers::cli::observability::{
     CliObservabilityScope, cli_observability_scope,
 };
@@ -821,11 +822,8 @@ fn parsed_invocation<'py>(
         };
     }
     let mut namespace: Bound<'py, PyDict> = namespace_of(&args)?;
-    if let Some(job_argv) = job_settings_argv(argv, &namespace)? {
-        let job_argv: Vec<Bound<'py, PyString>> = job_argv
-            .iter()
-            .map(|argument| PyString::new(py, argument))
-            .collect();
+    let (given, job_argv) = job_settings_argv(argv, &namespace)?;
+    if let Some(job_argv) = job_argv {
         args = native_field(&parse_cli_invocation(py, job_argv, use_color)?, "args")?;
         if args.is_none() {
             return exit(py, 1);
@@ -847,7 +845,9 @@ fn parsed_invocation<'py>(
             execute_parsed_invocation(args, handlers, identity, use_color)
         });
     }
-    execute_parsed_invocation(args, handlers, identity, use_color)
+    with_given_settings(given, || {
+        execute_parsed_invocation(args, handlers, identity, use_color)
+    })
 }
 
 /// Runtime stream routing must cover extension discovery, invocation scopes and their teardown.

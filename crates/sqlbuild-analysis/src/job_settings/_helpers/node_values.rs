@@ -7,7 +7,7 @@ use serde_json::Value as Json;
 use crate::assembly::project::types::ObjectKey;
 use crate::definition_changes::constants::PYTHON_NODE_KINDS;
 use crate::job_settings::constants::{
-    CONFLICT_HELP, NODE_SETTINGS, PYTHON_NODE_SETTINGS, RETRY_SETTING,
+    NODE_CONFLICT_HELP, NODE_SETTINGS, PYTHON_NODE_SETTINGS, RETRY_CONFLICT_HELP, RETRY_SETTING,
 };
 use crate::job_settings::errors::JobSettingConflict;
 use crate::job_settings::models::{DeclaredRun, JobRetry};
@@ -27,7 +27,11 @@ fn conflict(
              ({} and {})",
             key.0, key.1, values.0, values.1
         ),
-        help: CONFLICT_HELP,
+        help: if setting == RETRY_SETTING {
+            RETRY_CONFLICT_HELP
+        } else {
+            NODE_CONFLICT_HELP
+        },
     }
 }
 

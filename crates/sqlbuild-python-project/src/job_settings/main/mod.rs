@@ -1,6 +1,7 @@
 pub mod declared_jobs;
 pub mod frozen_run_flags;
 pub mod frozen_selectors;
+pub mod given_settings;
 pub mod graph_with_jobs;
 pub mod job_declarations;
 pub mod job_names;
@@ -12,4 +13,5 @@ pub mod named_jobs;
 pub mod needed_jobs;
 pub mod triggered_jobs;
 pub mod with_frozen_job;
+pub mod with_given_settings;
 pub mod with_job_scope;

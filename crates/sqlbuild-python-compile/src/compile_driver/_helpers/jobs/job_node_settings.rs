@@ -10,17 +10,19 @@ use serde_json::Value;
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::definition_changes::constants::PYTHON_NODE_KINDS;
 use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
-use sqlbuild_analysis::job_settings::constants::{CONFLICT_HELP, WAREHOUSE_SETTING};
+use sqlbuild_analysis::job_settings::constants::{NODE_CONFLICT_HELP, WAREHOUSE_SETTING};
 use sqlbuild_analysis::job_settings::errors::{JobSettingConflict, NodeJobSettingsError};
 use sqlbuild_analysis::job_settings::main::build_job_settings::build_job_settings;
 use sqlbuild_analysis::job_settings::main::named_jobs::named_jobs;
 use sqlbuild_analysis::job_settings::main::node_job_settings::node_job_settings;
+use sqlbuild_analysis::job_settings::main::without_given_settings::without_given_settings;
 use sqlbuild_analysis::job_settings::models::{DeclaredRun, NodeJobSettings};
 use sqlbuild_config::command_connection::errors::CommandConnectionError;
 use sqlbuild_config::command_connection::main::check_job_warehouse::check_job_warehouse;
 use sqlbuild_config::command_connection::main::unsupported_job_warehouse::unsupported_job_warehouse;
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_project::job_settings::main::given_settings::given_settings;
 
 use crate::compile_driver::main::setup::project_graph::project_graph;
 use crate::compile_driver::models::PlannedJobSettings;
@@ -32,6 +34,7 @@ use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::reso
 use sqlbuild_python_project::compiled_project::constants::{
     JOB_FULL_REFRESH_KEY, JOB_IGNORED_AUDIT_FAILURES_KEY, JOB_WAREHOUSES_KEY,
 };
+use sqlbuild_python_project::compiled_views::main::project::audits::audits;
 use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_python_project::graph::models::KeyCache;
@@ -42,8 +45,13 @@ use sqlbuild_python_project::job_settings::main::job_declarations::job_declarati
 use sqlbuild_python_project::job_settings::main::job_scope_project_dir::job_scope_project_dir;
 use sqlbuild_python_project::job_settings::main::job_selector_error::job_selector_error;
 use sqlbuild_python_project::job_settings::main::job_setting_conflict::job_setting_conflict;
+use sqlbuild_python_project::resource_views::main::audit_reads::attached_target_kind::attached_target_kind;
+use sqlbuild_python_project::resource_views::main::audit_reads::attached_target_name::attached_target_name;
+use sqlbuild_python_project::resource_views::main::audit_reads::key::key as audit_key;
+use sqlbuild_python_project::resource_views::main::audit_reads::scope_deps::scope_deps;
 
 const MODEL_KIND: &str = "model";
+const FUNCTION_KINDS: [&str; 2] = ["udf", "table_fn"];
 const FULL_REFRESH: &str = "full_refresh";
 const RUN_TESTS: &str = "run_tests";
 const IGNORE_AUDIT_FAILURES: &str = "ignore_audit_failures";
@@ -112,11 +120,11 @@ fn job_warehouses(
 fn jobs_setting(
     settings: &NodeJobSettings,
     declared: &BTreeMap<String, DeclaredRun>,
-    (setting, kind): (&str, Option<&str>),
+    (setting, kinds): (&str, Option<&[&str]>),
 ) -> Vec<String> {
     let mut jobs: BTreeSet<String> = BTreeSet::new();
     for (key, node_jobs) in &settings.node_jobs {
-        if is_python(key) || kind.is_some_and(|kind| key.0 != kind) {
+        if is_python(key) || kinds.is_some_and(|kinds| !kinds.contains(&key.0.as_str())) {
             continue;
         }
         for job in node_jobs {
@@ -128,6 +136,25 @@ fn jobs_setting(
         }
     }
     jobs.into_iter().collect()
+}
+
+/// The nodes each audit attached to no node reads, by the audit's key.
+fn unattached_audit_reads(
+    project: &Bound<'_, PyAny>,
+) -> PyResult<BTreeMap<ObjectKey, Vec<ObjectKey>>> {
+    let mut reads: BTreeMap<ObjectKey, Vec<ObjectKey>> = BTreeMap::new();
+    for audit in audits(project)?.try_iter()? {
+        let audit: Bound<'_, PyAny> = audit?;
+        if !attached_target_kind(&audit)?.is_none() && !attached_target_name(&audit)?.is_none() {
+            continue;
+        }
+        let deps: Vec<ObjectKey> = scope_deps(&audit)?
+            .try_iter()?
+            .map(|dep| native_key(&dep?))
+            .collect::<PyResult<_>>()?;
+        reads.insert(native_key(&audit_key(&audit)?)?, deps);
+    }
+    Ok(reads)
 }
 
 fn strings(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
@@ -151,16 +178,14 @@ pub(crate) fn planned_job_settings(
         return Ok(None);
     }
     let exclude: Vec<String> = strings(&native_field(options, "exclude")?)?;
-    let Some(mut declared): Option<BTreeMap<String, DeclaredRun>> = job_declarations(py)? else {
+    let Some(declared): Option<BTreeMap<String, DeclaredRun>> = job_declarations(py)? else {
         return Ok(None);
     };
+    let mut given: BTreeSet<String> = given_settings();
     if cli_warehouse {
-        for run in declared.values_mut() {
-            if let DeclaredRun::Job { settings, .. } = run {
-                settings.remove(WAREHOUSE_SETTING);
-            }
-        }
+        given.insert(WAREHOUSE_SETTING.to_owned());
     }
+    let declared: BTreeMap<String, DeclaredRun> = without_given_settings(declared, &given);
     let named: Vec<String> = named_jobs(&select, &declared);
     if named.is_empty() {
         return Ok(None);
@@ -187,8 +212,16 @@ pub(crate) fn planned_job_settings(
     match resolved {
         Ok(settings) => Ok(Some(PlannedJobSettings {
             ignoring_jobs: jobs_setting(&settings, &declared, (IGNORE_AUDIT_FAILURES, None)),
-            refreshing_jobs: jobs_setting(&settings, &declared, (FULL_REFRESH, Some(MODEL_KIND))),
+            refreshing_jobs: jobs_setting(
+                &settings,
+                &declared,
+                (
+                    FULL_REFRESH,
+                    Some(&[MODEL_KIND, FUNCTION_KINDS[0], FUNCTION_KINDS[1]]),
+                ),
+            ),
             job_warehouses: job_warehouses((project, discovered), &settings, &declared)?,
+            unattached_audit_reads: unattached_audit_reads(project)?,
             settings,
         })),
         Err(NodeJobSettingsError::Selector(failure)) => Err(job_selector_error(py, &failure)),
@@ -204,18 +237,32 @@ impl PlannedJobSettings {
             .and_then(|values| values.get(setting))
     }
 
-    /// The models the named jobs rebuild from scratch.
-    pub fn full_refresh_models<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyFrozenSet>> {
+    /// The names of the nodes of `kinds` the named jobs rebuild from scratch.
+    fn refreshed<'py>(&self, py: Python<'py>, kinds: &[&str]) -> PyResult<Bound<'py, PyFrozenSet>> {
         let names: Vec<&String> = self
             .settings
             .values
             .iter()
             .filter(|(key, values)| {
-                key.0 == MODEL_KIND && values.get(FULL_REFRESH) == Some(&Value::Bool(true))
+                kinds.contains(&key.0.as_str())
+                    && values.get(FULL_REFRESH) == Some(&Value::Bool(true))
             })
             .map(|(key, _)| &key.1)
             .collect();
         PyFrozenSet::new(py, names)
+    }
+
+    /// The models the named jobs rebuild from scratch.
+    pub fn full_refresh_models<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyFrozenSet>> {
+        self.refreshed(py, &[MODEL_KIND])
+    }
+
+    /// The functions the named jobs recreate.
+    pub fn full_refresh_functions<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyFrozenSet>> {
+        self.refreshed(py, &FUNCTION_KINDS)
     }
 
     /// Each job's limit and each planned node's limited jobs; none under `--concurrency`.
@@ -276,7 +323,7 @@ impl PlannedJobSettings {
         self.value(key, WAREHOUSE_SETTING).and_then(Value::as_str)
     }
 
-    /// Each SQL node's job warehouse, tests on their models' agreed one, and Python nodes' by name.
+    /// Each SQL node's job warehouse, a test's only if all its nodes share it, and Python nodes'.
     pub(crate) fn node_warehouses<'py>(
         &self,
         plan: &Bound<'py, PyAny>,
@@ -295,12 +342,15 @@ impl PlannedJobSettings {
         }
         for entry in native_field(plan, "test_entries")?.try_iter()? {
             let entry: Bound<'py, PyAny> = entry?;
-            let mut covered: BTreeSet<&str> = BTreeSet::new();
+            let mut covered: BTreeSet<Option<&str>> = BTreeSet::new();
             for dep in native_field(&entry, "scope_deps")?.try_iter()? {
-                covered.extend(self.warehouse(&native_key(&dep?)?));
+                covered.insert(self.warehouse(&native_key(&dep?)?));
             }
-            if let [warehouse] = covered.into_iter().collect::<Vec<_>>().as_slice() {
-                nodes.set_item(native_field(&entry, "key")?, *warehouse)?;
+            let key: Bound<'py, PyAny> = native_field(&entry, "key")?;
+            match covered.into_iter().collect::<Vec<_>>().as_slice() {
+                [Some(warehouse)] => nodes.set_item(key, *warehouse)?,
+                _ if nodes.contains(&key)? => nodes.del_item(key)?,
+                _ => {}
             }
         }
         for key in self.settings.values.keys().filter(|key| is_python(key)) {
@@ -433,7 +483,7 @@ impl PlannedJobSettings {
                                  run_tests differently ({earlier} and {value})",
                                 test.1
                             ),
-                            help: CONFLICT_HELP,
+                            help: NODE_CONFLICT_HELP,
                         },
                     ));
                 }
@@ -444,12 +494,27 @@ impl PlannedJobSettings {
         Ok(seen.is_some_and(|(_, value)| value == &Value::Bool(false)))
     }
 
-    /// The `ignore_audit_failures` the audited node's job sets, if any.
+    /// The audited node's `ignore_audit_failures`, or for a singular audit, every read node's.
     fn audit_ignores(&self, entry: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
         let kind: Bound<'_, PyAny> = native_field(entry, "attached_target_kind")?;
         let name: Bound<'_, PyAny> = native_field(entry, "attached_target_name")?;
         if kind.is_none() || name.is_none() {
-            return Ok(None);
+            let audit: ObjectKey = native_key(&native_field(entry, "key")?)?;
+            let mut ignored: Option<bool> = None;
+            for key in self
+                .unattached_audit_reads
+                .get(&audit)
+                .into_iter()
+                .flatten()
+            {
+                if let Some(value) = self
+                    .value(key, IGNORE_AUDIT_FAILURES)
+                    .and_then(Value::as_bool)
+                {
+                    ignored = Some(ignored.unwrap_or(true) && value);
+                }
+            }
+            return Ok(ignored);
         }
         let kind: String = native_field(&kind, "value")?.extract()?;
         let key: ObjectKey = (kind, name.extract()?);

@@ -2,6 +2,9 @@
 
 from dataclasses import dataclass
 
+from sqlbuild._native import CompiledResourceType
+from sqlbuild.executor.run.models import ModelExecutionResult
+
 
 @dataclass(frozen=True)
 class MicrobatchBoundedFutureTestCase:
@@ -85,3 +88,5 @@ class NodeWarehouseFailureTestCase:
     description: str
     node_warehouse: str | None
     expected_message: str
+    resource_type: CompiledResourceType = CompiledResourceType.MODEL
+    expected_result_type: type = ModelExecutionResult

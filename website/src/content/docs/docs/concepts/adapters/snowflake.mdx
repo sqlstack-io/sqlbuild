@@ -107,12 +107,17 @@ A job can run its nodes on a warehouse of its own:
 warehouse = "ORDERS_WH"
 ```
 
-When a build names the job, as `sqb build --select job:nightly_orders_job` or a server run of it,
-each of the job's nodes runs on `ORDERS_WH`. Its models' audits, its SQL tests, microbatch batches,
-source loads and Python nodes go with them, and loaders and Python code that open their own
-connections from the context's `connection_config` get `ORDERS_WH` there too. A SQL test runs on
-its models' job warehouse when they agree on one. Everything else in the build, including nodes
-selected without naming a job and the build's own bookkeeping, stays on the `build` warehouse.
+A server run of the job, and a build whose named jobs all set the same warehouse, such as
+`sqb build --select job:nightly_orders_job`, runs entirely on `ORDERS_WH`, as if passed
+`--warehouse ORDERS_WH`: setup, planning and bookkeeping included. Nodes the build selects outside
+the named jobs, such as upstream models in `--select +job:nightly_orders_job`, run there too.
+
+When the named jobs set different warehouses, or only some set one, each job's nodes run on its
+own warehouse. Its models' audits, its SQL tests, microbatch batches, source loads and Python nodes
+go with them, and loaders and Python code that open their own connections from the context's
+`connection_config` get the job's warehouse there too. A SQL test runs on a job warehouse only
+when every node it covers runs there. Everything else in the build, including nodes selected
+without naming a job and the build's own bookkeeping, stays on the `build` warehouse.
 
 The connection running a node switches with `USE WAREHOUSE` only when the node needs a different
 warehouse than the connection is on, and switches back before it runs a node outside the job.
