@@ -25,7 +25,7 @@ use crate::bindings::_helpers::cli::dispatch::{command_facts, dispatch_command};
 use crate::bindings::_helpers::cli::failure_cause::take_failure_cause;
 use sqlbuild_python_base::cli::main::offer_launch_record::offer_launch_record;
 use crate::bindings::_helpers::cli::machine_output::take_machine_output_written;
-use crate::bindings::_helpers::cli::named_job_settings::job_settings_argv;
+use sqlbuild_python_project::job_settings::main::job_settings_argv::job_settings_argv;
 use crate::bindings::_helpers::cli::observability::{
     CliObservabilityScope, cli_observability_scope,
 };

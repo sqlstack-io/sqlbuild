@@ -1,6 +1,6 @@
 //! The project directory of the running command's job scope.
 
-use crate::compiled_project::_helpers::job_catalog;
+use crate::job_settings::_helpers::job_catalog;
 use std::path::PathBuf;
 
 /// The project directory of the running command's job scope, if it has one.

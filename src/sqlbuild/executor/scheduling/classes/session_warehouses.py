@@ -16,7 +16,7 @@ _UNSET_PREFIX: str = "<none"
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-def configured_warehouse(connection_config: Mapping[str, object]) -> str | None:
+def configured_warehouse(*, connection_config: Mapping[str, object]) -> str | None:
     """The warehouse a connection opened with `connection_config` starts on, if it names one."""
 
     value: object | None = connection_config.get(_CONNECTION_WAREHOUSE_KEY)
@@ -29,7 +29,7 @@ def configured_warehouse(connection_config: Mapping[str, object]) -> str | None:
 
 
 def with_session_warehouse(
-    connection_config: dict[str, object], warehouse: str | None
+    *, connection_config: dict[str, object], warehouse: str | None
 ) -> dict[str, object]:
     """`connection_config` for code that opens its own connections on `warehouse`."""
 
@@ -38,7 +38,7 @@ def with_session_warehouse(
     return {**connection_config, _CONNECTION_WAREHOUSE_KEY: warehouse}
 
 
-def _same_warehouse(first: str, second: str) -> bool:
+def _same_warehouse(*, first: str, second: str) -> bool:
     """Unquoted warehouse names match case-insensitively, as Snowflake resolves them."""
 
     if first.startswith('"') or second.startswith('"'):
@@ -54,8 +54,6 @@ class SessionWarehouses:
         self._home: str | None = home
         self._home_known: bool = home is not None
         self._lock: threading.Lock = threading.Lock()
-        # Connections away from the build's warehouse: id -> (connection, warehouse). Holding the
-        # connection keeps its id from being reused by another while it is listed.
         self._away: dict[int, tuple[Any, str]] = {}
 
     def use(self, *, connection: Any, warehouse: str | None) -> None:
@@ -65,10 +63,16 @@ class SessionWarehouses:
             entry: tuple[Any, str] | None = self._away.get(id(connection))
         current: str | None = None if entry is None or entry[0] is not connection else entry[1]
         target: str | None = warehouse
-        if target is not None and self._home is not None and _same_warehouse(target, self._home):
+        if (
+            target is not None
+            and self._home is not None
+            and _same_warehouse(first=target, second=self._home)
+        ):
             target = None
         if current == target or (
-            current is not None and target is not None and _same_warehouse(current, target)
+            current is not None
+            and target is not None
+            and _same_warehouse(first=current, second=target)
         ):
             return
         if target is None:
@@ -78,7 +82,7 @@ class SessionWarehouses:
             return
         if current is None:
             self._learn_home(connection)
-            if self._home is not None and _same_warehouse(target, self._home):
+            if self._home is not None and _same_warehouse(first=target, second=self._home):
                 return
         self._adapter.use_session_warehouse(connection=connection, warehouse=target)
         with self._lock:

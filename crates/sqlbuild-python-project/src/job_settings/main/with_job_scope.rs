@@ -1,6 +1,6 @@
 //! Run one command with jobs selectable from `project_dir`, restoring the enclosing scope after.
 
-use crate::compiled_project::_helpers::job_catalog;
+use crate::job_settings::_helpers::job_catalog;
 use std::path::PathBuf;
 
 /// Run one command with jobs selectable from `project_dir`, restoring the enclosing scope after.

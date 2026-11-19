@@ -84,5 +84,4 @@ class SubworkerWarehouseTestCase:
 class NodeWarehouseFailureTestCase:
     description: str
     node_warehouse: str | None
-    failing: str
     expected_message: str

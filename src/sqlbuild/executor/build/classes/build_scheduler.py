@@ -250,7 +250,9 @@ class BuildScheduler:
         self._init_job_limits(runtime)
         self._node_warehouses: Mapping[CompiledObjectKey, str] = runtime.node_warehouses
         self._session_warehouses: SessionWarehouses | None = (
-            SessionWarehouses(adapter=adapter, home=configured_warehouse(connection_config))
+            SessionWarehouses(
+                adapter=adapter, home=configured_warehouse(connection_config=connection_config)
+            )
             if runtime.node_warehouses
             else None
         )
@@ -568,10 +570,7 @@ class BuildScheduler:
             )
 
     def _init_job_limits(self, runtime: BuildRuntimeParams) -> None:
-        """Job limits, each node's jobs, and a lock over how many of each job's nodes run.
-
-        Coordinators reserve microbatch sub-work from worker threads, so the counts take a lock.
-        """
+        """Job limits, each node's jobs, and the lock coordinator threads take to count them."""
 
         self._job_limits: Mapping[str, int] = runtime.job_limits
         self._node_jobs: Mapping[CompiledObjectKey, tuple[str, ...]] = runtime.node_jobs
@@ -605,7 +604,7 @@ class BuildScheduler:
 
         return all(self._job_running.get(job, 0) < self._job_limits[job] for job in jobs)
 
-    def _add_job_running(self, jobs: tuple[str, ...], *, change: int) -> None:
+    def _add_job_running(self, *, jobs: tuple[str, ...], change: int) -> None:
         """Count `change` more running nodes in each of `jobs`; the caller holds `_job_lock`."""
 
         job: str
@@ -615,14 +614,14 @@ class BuildScheduler:
     def _start_in_flight(self, key: CompiledObjectKey) -> None:
         self._in_flight.add(key)
         with self._job_lock:
-            self._add_job_running(self._node_jobs.get(key, ()), change=1)
+            self._add_job_running(jobs=self._node_jobs.get(key, ()), change=1)
 
     def _finish_in_flight(self, key: CompiledObjectKey) -> None:
         if key not in self._in_flight:
             return
         self._in_flight.discard(key)
         with self._job_lock:
-            self._add_job_running(self._node_jobs.get(key, ()), change=-1)
+            self._add_job_running(jobs=self._node_jobs.get(key, ()), change=-1)
 
     def _report_scheduler_state(self) -> None:
         callback: Callable[[SchedulerState], None] | None = self._callbacks.on_scheduler_state
@@ -846,7 +845,7 @@ class BuildScheduler:
             with self._job_lock:
                 if not self._jobs_have_room(jobs):
                     return False
-                self._add_job_running(jobs, change=1)
+                self._add_job_running(jobs=jobs, change=1)
             self._microbatch_subworkers += 1
             return True
 
@@ -854,7 +853,7 @@ class BuildScheduler:
         with self._microbatch_coordinator_lock:
             self._microbatch_subworkers -= 1
             with self._job_lock:
-                self._add_job_running(jobs, change=-1)
+                self._add_job_running(jobs=jobs, change=-1)
 
     def _cancel_microbatch_subworker(
         self, *, future: Future[MicrobatchPhaseOutcome], jobs: tuple[str, ...]
@@ -1114,7 +1113,8 @@ class BuildScheduler:
             loader_ref_entries=self._loader_ref_entries,
             adapter=self._adapter,
             connection_config=with_session_warehouse(
-                self._connection_config, self._node_warehouses.get(key)
+                connection_config=self._connection_config,
+                warehouse=self._node_warehouses.get(key),
             ),
             connection=connection,
             runtime=self._runtime,

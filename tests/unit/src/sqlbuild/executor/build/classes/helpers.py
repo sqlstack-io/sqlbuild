@@ -6,17 +6,20 @@ import threading
 import time
 from collections import deque
 from queue import Queue
-from typing import Any
+from typing import Any, cast
 
 from sqlbuild._native import CompiledObjectKey, CompiledResourceType
+from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.executor.build.classes.build_scheduler import BuildScheduler
 from sqlbuild.executor.build.models import BuildRuntimeParams, NodeCompletion
 from sqlbuild.executor.run.models import ModelExecutionResult
+from sqlbuild.executor.scheduling.classes.session_warehouses import SessionWarehouses
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 from tests.unit.src.sqlbuild.executor.build.classes._test_types import (
     JobLimitedBuildTestCase,
     SubworkerReservationTestCase,
 )
+from tests.unit.src.sqlbuild.executor.scheduling.classes.helpers import RecordingWarehouseAdapter
 
 # How long each stub node runs, long enough for the loop to start every node it may.
 _NODE_SECONDS: float = 0.05
@@ -154,3 +157,20 @@ def reserve_subworkers(test_case: SubworkerReservationTestCase) -> tuple[int, tu
         for _ in test_case.expected_reservations
     )
     return scheduler._microbatch_coordinator_demand, reservations
+
+
+def warehouse_scheduler(adapter: RecordingWarehouseAdapter) -> Any:
+    """A scheduler with only the state warehouse switching and sub-worker slots read."""
+
+    scheduler: Any = object.__new__(BuildScheduler)
+    scheduler._session_warehouses = SessionWarehouses(
+        adapter=cast(BaseAdapter, adapter), home="BUILD_WH"
+    )
+    scheduler._node_warehouses = {}
+    scheduler._microbatch_coordinator_lock = threading.Lock()
+    scheduler._job_lock = threading.Lock()
+    scheduler._job_limits = {}
+    scheduler._job_running = {}
+    scheduler._microbatch_subworkers = 1
+    scheduler._connection_pool = Queue()
+    return scheduler

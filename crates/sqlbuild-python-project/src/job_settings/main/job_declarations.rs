@@ -1,6 +1,6 @@
 //! Each job's `[settings]` and `[retry]` and each group's jobs declared for the command's target.
 
-use crate::compiled_project::_helpers::job_catalog;
+use crate::job_settings::_helpers::job_catalog;
 use pyo3::prelude::{PyResult, Python};
 use sqlbuild_analysis::job_settings::models::DeclaredRun;
 use std::collections::BTreeMap;

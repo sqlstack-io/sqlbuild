@@ -1,11 +1,10 @@
 //! Declared jobs and groups, and the settings a selection gives its nodes.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use serde_json::Value as Json;
 
 use crate::assembly::project::types::ObjectKey;
-use crate::graph::errors::SelectorError;
 
 /// A job's `[retry]`: at most `attempts` runs in all, each rerun `delay_seconds` after the last.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,9 +35,6 @@ pub enum SettingScope {
     /// The whole build.
     Build,
 }
-
-/// The nodes one selector token selects, less those `--exclude` removes, as the build resolves them.
-pub type TokenNodes<'r> = &'r dyn Fn(&str, &[String]) -> Result<BTreeSet<ObjectKey>, SelectorError>;
 
 /// What the jobs a selection names give each of its nodes.
 #[derive(Clone, Debug, Default, PartialEq)]

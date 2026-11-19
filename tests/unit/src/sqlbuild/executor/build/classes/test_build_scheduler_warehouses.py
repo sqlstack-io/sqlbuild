@@ -2,40 +2,25 @@
 
 from __future__ import annotations
 
-import threading
-from queue import Queue
-from typing import Any, cast
+from typing import Any
 
 import pytest
 
-from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.executor.build.classes.build_scheduler import BuildScheduler
 from sqlbuild.executor.run.models import BatchWindow, ModelExecutionResult
-from sqlbuild.executor.scheduling.classes.session_warehouses import SessionWarehouses
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 from tests.unit.src.sqlbuild.executor.build.classes._test_types import (
     NodeWarehouseFailureTestCase,
     SubworkerWarehouseTestCase,
 )
-from tests.unit.src.sqlbuild.executor.build.classes.helpers import model_key
+from tests.unit.src.sqlbuild.executor.build.classes.helpers import (
+    model_key,
+    warehouse_scheduler,
+)
 from tests.unit.src.sqlbuild.executor.scheduling.classes.helpers import (
+    MissingWarehouseAdapter,
     RecordingWarehouseAdapter,
 )
-
-
-def _scheduler(adapter: RecordingWarehouseAdapter) -> Any:
-    scheduler: Any = object.__new__(BuildScheduler)
-    scheduler._session_warehouses = SessionWarehouses(
-        adapter=cast(BaseAdapter, adapter), home="BUILD_WH"
-    )
-    scheduler._node_warehouses = {}
-    scheduler._microbatch_coordinator_lock = threading.Lock()
-    scheduler._job_lock = threading.Lock()
-    scheduler._job_limits = {}
-    scheduler._job_running = {}
-    scheduler._microbatch_subworkers = 1
-    scheduler._connection_pool = Queue()
-    return scheduler
 
 
 @pytest.mark.parametrize(
@@ -66,7 +51,7 @@ def test_given_a_coordinator_warehouse_when_a_subworker_runs_a_batch_then_its_co
     test_case: SubworkerWarehouseTestCase,
 ) -> None:
     adapter: RecordingWarehouseAdapter = RecordingWarehouseAdapter(session_warehouse=None)
-    scheduler: Any = _scheduler(adapter)
+    scheduler: Any = warehouse_scheduler(adapter)
     pooled: object = object()
     scheduler._session_warehouses.use(connection=pooled, warehouse=test_case.earlier_warehouse)
     scheduler._connection_pool.put(pooled)
@@ -98,7 +83,6 @@ def test_given_a_coordinator_warehouse_when_a_subworker_runs_a_batch_then_its_co
         NodeWarehouseFailureTestCase(
             description="a job warehouse the session cannot use fails the node with the reason",
             node_warehouse="MISSING_WH",
-            failing="MISSING_WH",
             expected_message=(
                 "cannot run on warehouse MISSING_WH: Object does not exist: warehouse MISSING_WH"
             ),
@@ -109,10 +93,8 @@ def test_given_a_coordinator_warehouse_when_a_subworker_runs_a_batch_then_its_co
 def test_given_an_unusable_job_warehouse_when_a_node_starts_then_it_fails_naming_the_warehouse(
     test_case: NodeWarehouseFailureTestCase,
 ) -> None:
-    adapter: RecordingWarehouseAdapter = RecordingWarehouseAdapter(
-        session_warehouse=None, failing=test_case.failing
-    )
-    scheduler: Any = _scheduler(adapter)
+    adapter: MissingWarehouseAdapter = MissingWarehouseAdapter(session_warehouse=None)
+    scheduler: Any = warehouse_scheduler(adapter)
     scheduler._node_warehouses = {model_key("orders"): test_case.node_warehouse}
 
     result: ModelExecutionResult | None = BuildScheduler._enter_node_warehouse(

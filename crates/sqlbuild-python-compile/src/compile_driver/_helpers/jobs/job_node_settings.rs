@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use pyo3::IntoPyObject;
+use pyo3::PyErr;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use serde_json::Value;
@@ -15,55 +16,52 @@ use sqlbuild_analysis::job_settings::main::build_job_settings::build_job_setting
 use sqlbuild_analysis::job_settings::main::named_jobs::named_jobs;
 use sqlbuild_analysis::job_settings::main::node_job_settings::node_job_settings;
 use sqlbuild_analysis::job_settings::models::{DeclaredRun, NodeJobSettings};
+use sqlbuild_config::command_connection::errors::CommandConnectionError;
 use sqlbuild_config::command_connection::main::check_job_warehouse::check_job_warehouse;
 use sqlbuild_config::command_connection::main::unsupported_job_warehouse::unsupported_job_warehouse;
+use sqlbuild_python_base::records::main::construct::new_error::new_error;
+use sqlbuild_python_base::records::types::ErrorId;
 
-use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
-use crate::bindings::_helpers::command_runtime::warehouses::command_scope;
-use crate::bindings::_helpers::compiled_project::job_settings::{
-    job_selector_error, job_setting_conflict,
-};
+use crate::compile_driver::main::setup::project_graph::project_graph;
+use crate::compile_driver::models::PlannedJobSettings;
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::replaced::replaced;
-use sqlbuild_python_compile::compile_driver::main::setup::project_graph::project_graph;
 use sqlbuild_python_front::compile_driver::main::session_warehouse_support::session_warehouse_support;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_project::compiled_project::constants::{
     JOB_FULL_REFRESH_KEY, JOB_IGNORED_AUDIT_FAILURES_KEY, JOB_WAREHOUSES_KEY,
 };
-use sqlbuild_python_project::compiled_project::main::job_declarations::job_declarations;
-use sqlbuild_python_project::compiled_project::main::job_scope_project_dir::job_scope_project_dir;
 use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_python_project::graph::models::KeyCache;
 use sqlbuild_python_project::graph::models::{
     CompiledProjectGraph, NativeProjectGraph, PythonAwareSelection,
 };
+use sqlbuild_python_project::job_settings::main::job_declarations::job_declarations;
+use sqlbuild_python_project::job_settings::main::job_scope_project_dir::job_scope_project_dir;
+use sqlbuild_python_project::job_settings::main::job_selector_error::job_selector_error;
+use sqlbuild_python_project::job_settings::main::job_setting_conflict::job_setting_conflict;
 
 const MODEL_KIND: &str = "model";
 const FULL_REFRESH: &str = "full_refresh";
 const RUN_TESTS: &str = "run_tests";
 const IGNORE_AUDIT_FAILURES: &str = "ignore_audit_failures";
 
-/// What the planned build takes from its named jobs, or nothing when it names none.
-pub(crate) struct PlannedJobSettings {
-    settings: NodeJobSettings,
-    /// The named jobs that set `ignore_audit_failures = true` for nodes they select.
-    ignoring_jobs: Vec<String>,
-    /// The named jobs that set `full_refresh = true` for models they select.
-    refreshing_jobs: Vec<String>,
-    /// Each named job whose `warehouse` its own nodes run on, and that warehouse; `--warehouse`
-    /// leaves the jobs' warehouses out before they are resolved.
-    job_warehouses: BTreeMap<String, String>,
+/// The `CliUserError` of a job warehouse that cannot be used.
+fn cli_error(py: Python<'_>, error: &CommandConnectionError) -> PyErr {
+    let (code, help) = match error {
+        CommandConnectionError::User { code, help, .. } => (*code, help.as_deref()),
+        CommandConnectionError::ProjectConfig(_) => (None, None),
+    };
+    new_error(py, ErrorId::CliUser, error.message(), (code, help))
 }
 
 fn is_python(key: &ObjectKey) -> bool {
     PYTHON_NODE_KINDS.contains(&key.0.as_str())
 }
 
-/// The named jobs whose `warehouse` some selected node runs on, checked as `--warehouse` would be:
-/// a valid name (`C261`) on an adapter with a session warehouse (`C260`).
+/// The jobs whose `warehouse` a node runs on, checked like `--warehouse` (`C261`, `C260`).
 fn job_warehouses(
     (project, discovered): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
     settings: &NodeJobSettings,
@@ -86,8 +84,8 @@ fn job_warehouses(
             if let Some(DeclaredRun::Job { settings, .. }) = declared.get(job)
                 && let Some(value) = settings.get(WAREHOUSE_SETTING)
             {
-                let name: String =
-                    check_job_warehouse(job, value.as_str()).map_err(|error| raised(py, error))?;
+                let name: String = check_job_warehouse(job, value.as_str())
+                    .map_err(|error| cli_error(py, &error))?;
                 warehouses.insert(job.clone(), name);
             }
         }
@@ -102,9 +100,9 @@ fn job_warehouses(
     let project_dir: Bound<'_, PyAny> = job_scope_project_dir().into_pyobject(py)?.into_any();
     if !session_warehouse_support(py, &adapter_name, &project_dir)? {
         let adapter: String = adapter_name.str()?.extract()?;
-        return Err(raised(
+        return Err(cli_error(
             py,
-            unsupported_job_warehouse(job, warehouse, &adapter),
+            &unsupported_job_warehouse(job, warehouse, &adapter),
         ));
     }
     Ok(warehouses)
@@ -139,7 +137,7 @@ fn strings(value: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
 /// The named jobs' settings per selected node; `None` when ignored, unnamed or unselectable.
 pub(crate) fn planned_job_settings(
     (project, discovered): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
-    options: &Bound<'_, PyAny>,
+    (options, cli_warehouse): (&Bound<'_, PyAny>, bool),
 ) -> PyResult<Option<PlannedJobSettings>> {
     let py: Python<'_> = project.py();
     if !native_field(options, "job_settings")?.is_truthy()? {
@@ -156,7 +154,7 @@ pub(crate) fn planned_job_settings(
     let Some(mut declared): Option<BTreeMap<String, DeclaredRun>> = job_declarations(py)? else {
         return Ok(None);
     };
-    if command_scope(py)?.cli_warehouse.is_some() {
+    if cli_warehouse {
         for run in declared.values_mut() {
             if let DeclaredRun::Job { settings, .. } = run {
                 settings.remove(WAREHOUSE_SETTING);
@@ -207,10 +205,7 @@ impl PlannedJobSettings {
     }
 
     /// The models the named jobs rebuild from scratch.
-    pub(crate) fn full_refresh_models<'py>(
-        &self,
-        py: Python<'py>,
-    ) -> PyResult<Bound<'py, PyFrozenSet>> {
+    pub fn full_refresh_models<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyFrozenSet>> {
         let names: Vec<&String> = self
             .settings
             .values
@@ -281,8 +276,7 @@ impl PlannedJobSettings {
         self.value(key, WAREHOUSE_SETTING).and_then(Value::as_str)
     }
 
-    /// Each planned SQL node's job warehouse, and each Python node's by name; a SQL test runs on
-    /// the warehouse its models' jobs give when they agree. Empty under `--warehouse`.
+    /// Each SQL node's job warehouse, tests on their models' agreed one, and Python nodes' by name.
     pub(crate) fn node_warehouses<'py>(
         &self,
         plan: &Bound<'py, PyAny>,

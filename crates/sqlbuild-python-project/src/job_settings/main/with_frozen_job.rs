@@ -1,6 +1,6 @@
 //! Run one command with only one job declared, as its frozen run pins it.
 
-use crate::compiled_project::_helpers::job_catalog;
+use crate::job_settings::_helpers::job_catalog;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::PathBuf;

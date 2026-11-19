@@ -151,9 +151,7 @@ class PythonNodeRuntime:
     providers: ProviderContainer | None = None
     result_store: Any | None = None
     persist_node_results: bool = True
-    # The warehouse each Python node runs on when its named job sets one, by node name.
     node_warehouses: Mapping[str, str] = field(default_factory=dict)
-    # Switches `connection` between node warehouses; set whenever `node_warehouses` is not empty.
     session_warehouses: SessionWarehouses | None = None
 
     def __post_init__(self) -> None:
@@ -162,7 +160,8 @@ class PythonNodeRuntime:
                 self,
                 "session_warehouses",
                 SessionWarehouses(
-                    adapter=self.adapter, home=configured_warehouse(self.connection_config)
+                    adapter=self.adapter,
+                    home=configured_warehouse(connection_config=self.connection_config),
                 ),
             )
 
