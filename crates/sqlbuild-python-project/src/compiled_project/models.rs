@@ -58,6 +58,7 @@ use pyo3::pymethods;
 use pyo3::types::PyDict;
 use pyo3::types::PyDictMethods;
 use pyo3::types::PyString;
+use pyo3::types::PyTuple;
 use sqlbuild_analysis::compiled_project::main::project_models::project_models;
 use sqlbuild_analysis::compiled_project::main::record_model_analysis::record_model_analysis;
 use sqlbuild_analysis::compiled_project::main::record_skipped_analysis::record_skipped_analysis;
@@ -75,6 +76,7 @@ use sqlbuild_python_base::cache::models::SqlTestScanStore;
 use sqlbuild_python_front::render::models::ConstantRendering;
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::sync::{Arc, OnceLock};
 
 /// A function's paths, stem, discovered file, header values, body and SQL file contents.
 #[derive(Debug)]
@@ -579,9 +581,16 @@ pub struct NativeCompiledProject {
     pub(crate) inferred_column_projections: Mutex<HashMap<InferredRow, Py<PyAny>>>,
     /// The model loop and its constant rendering, which attach the project's other resources.
     pub(crate) attachment: Option<(Py<PyAny>, Py<ConstantRendering>)>,
+    /// Every SQL test's plan result for a location's previews, set once; `None` when planning failed.
+    pub(crate) held_sql_test_results: Arc<OnceLock<Option<Py<PyTuple>>>>,
 }
 
 impl NativeCompiledProject {
+    /// Every SQL test's plan result for a location's previews, planned once per published project.
+    pub fn held_sql_test_results(&self) -> Arc<OnceLock<Option<Py<PyTuple>>>> {
+        Arc::clone(&self.held_sql_test_results)
+    }
+
     /// The facts recorded so far, for native consumers such as the rules request.
     pub fn facts(&self) -> &CompiledProjectFacts {
         &self.project.facts

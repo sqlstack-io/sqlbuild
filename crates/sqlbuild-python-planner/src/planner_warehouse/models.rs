@@ -566,6 +566,10 @@ impl SyncedReads {
 }
 
 impl WarehouseReads for SyncedReads {
+    fn preview(&self) -> bool {
+        true
+    }
+
     fn relations<'py>(
         &self,
         py: Python<'py>,

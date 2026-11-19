@@ -32,6 +32,11 @@ pub trait CursorProgress<'py> {
 
 /// Everything a plan reads from the warehouse, live or from a synced state that may answer unknown.
 pub trait WarehouseReads: Send + Sync + std::fmt::Debug {
+    /// Whether these reads answer a location's preview from its synced state.
+    fn preview(&self) -> bool {
+        false
+    }
+
     /// The listed relations of `database` narrowed to `schemas` and `names`, as `RelationInfo`s.
     fn relations<'py>(
         &self,
