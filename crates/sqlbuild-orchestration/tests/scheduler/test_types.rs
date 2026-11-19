@@ -8,3 +8,8 @@ pub(crate) struct LeadershipTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_epoch: i64,
 }
+
+pub(crate) struct StoredConcurrencySourceTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+}

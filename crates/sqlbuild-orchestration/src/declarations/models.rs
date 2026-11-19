@@ -181,28 +181,11 @@ pub struct WaitReason {
     pub to_node: String,
 }
 
-/// The layer that set a run's concurrency.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ConcurrencySource {
-    /// The job's own `[settings] concurrency`.
-    Job,
-    /// The target's `concurrency` in `[targets.<name>]`.
-    Target,
-    /// `[settings] concurrency` in the location's `sqlbuild_local.toml`.
-    Local,
-    /// `[settings] concurrency` in `sqlbuild_project.toml`.
-    Project,
-    /// SQLBuild's built-in default.
-    Default,
-}
-
-/// The models a run builds at once on its target, and the layer that set it.
+/// The most of a job's nodes a run of it builds at once on its target.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ResolvedConcurrency {
     pub limit: u64,
-    pub source: ConcurrencySource,
 }
 
 /// How many slots of a pool a job takes, and the pool's limit on the job's target.

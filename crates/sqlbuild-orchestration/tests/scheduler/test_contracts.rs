@@ -2,6 +2,8 @@
 
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
+#[path = "test_concurrency_source.rs"]
+mod test_concurrency_source;
 #[path = "test_contract.rs"]
 mod test_contract;
 #[path = "test_types.rs"]

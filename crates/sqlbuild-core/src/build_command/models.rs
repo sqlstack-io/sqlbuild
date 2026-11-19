@@ -179,8 +179,6 @@ pub struct RunContextFacts {
     /// The warehouse and where it came from.
     pub warehouse: Option<(String, String)>,
     pub concurrency: i64,
-    /// The configuration layer the concurrency came from.
-    pub concurrency_source: String,
     pub full_refresh: bool,
     /// The named jobs whose own models the build rebuilds from scratch.
     pub full_refresh_jobs: Vec<String>,
