@@ -240,7 +240,7 @@ class SnowflakeAdapter(
     max_identifier_length: ClassVar[int] = 255
     supports_session_warehouse: ClassVar[bool] = True
     connection_routing_keys: ClassVar[frozenset[str]] = frozenset(
-        {"source", "profile", "target", "project_dir", "profiles_dir"}
+        {"source", "profile", "target", "project_dir", "profiles_dir", "configured_warehouse"}
     )
     _snapshot_sql_dialect: ClassVar[SnapshotSqlDialect] = SnapshotSqlDialect(
         timestamp_type="TIMESTAMP",

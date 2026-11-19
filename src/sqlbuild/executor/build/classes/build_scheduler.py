@@ -120,6 +120,7 @@ from sqlbuild.executor.scheduling.classes.session_warehouses import (
     configured_warehouse,
     with_session_warehouse,
 )
+from sqlbuild.executor.scheduling.constants import CONFIGURED_WAREHOUSE_KEY
 from sqlbuild.executor.scheduling.main._run_worker import run_worker_with_completion
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 from sqlbuild.executor.seed.constants import SEED_ENTRY_MISSING_CODE
@@ -167,6 +168,20 @@ def _resource_result_failed(result: object) -> bool:
     return getattr(result, "status", None) == ExecutionStatus.FAILED
 
 
+def _split_configured_warehouse(
+    connection_config: dict[str, object],
+) -> tuple[dict[str, object], tuple[bool, object]]:
+    """The connection config without the recorded build warehouse, and whether it had one."""
+
+    return (
+        {key: value for key, value in connection_config.items() if key != CONFIGURED_WAREHOUSE_KEY},
+        (
+            CONFIGURED_WAREHOUSE_KEY in connection_config,
+            connection_config.get(CONFIGURED_WAREHOUSE_KEY),
+        ),
+    )
+
+
 class BuildScheduler:
     """DAG-aware scheduler that dispatches nodes as their dependencies complete."""
 
@@ -194,7 +209,9 @@ class BuildScheduler:
             entry.model_name: entry for entry in plan.table_type_entries
         }
         self._adapter: BaseAdapter = adapter
-        self._connection_config: dict[str, object] = connection_config
+        self._connection_config, self._configured_warehouse = _split_configured_warehouse(
+            connection_config
+        )
         self._connections: tuple[Any, ...] = connections
         self._scheduler_connection: Any = scheduler_connection
         self._schema_prepared: bool = schema_prepared
@@ -1084,6 +1101,16 @@ class BuildScheduler:
             error_message=f"unknown executable resource type '{key.resource_type}'",
         )
 
+    def _build_warehouse(self, connection: Any) -> str | None:
+        """The target's build warehouse, whichever job's or `--warehouse` `connection` is on now."""
+
+        overridden, configured = self._configured_warehouse
+        if overridden:
+            return configured if isinstance(configured, str) else None
+        if self._session_warehouses is None:
+            return self._adapter.session_warehouse(connection=connection)
+        return self._session_warehouses.build_warehouse(connection=connection)
+
     def _enter_node_warehouse(
         self, *, key: CompiledObjectKey, connection: Any
     ) -> (
@@ -1460,6 +1487,7 @@ class BuildScheduler:
                             bound_views=bound_views,
                             fingerprint_writes=self._fingerprint_writes,
                             dynamic_hold=self._runtime.dynamic_hold,
+                            build_warehouse=self._build_warehouse,
                         ),
                         promotion_mode=self._promotion_mode,
                         snapshots=self._snapshots,

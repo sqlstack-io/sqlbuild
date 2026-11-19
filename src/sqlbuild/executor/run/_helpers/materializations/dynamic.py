@@ -77,14 +77,18 @@ def _create(
     entry: ModelPlanEntry = context.entry
     adapter: BaseAdapter = context.adapter
     connection: Any = context.connection
-    warehouse: str | None = entry.refresh_warehouse or adapter.session_warehouse(
-        connection=connection
+    build_warehouse: Callable[[Any], str | None] = context.build_warehouse or (
+        lambda session: adapter.session_warehouse(connection=session)
     )
+    warehouse: str | None = entry.refresh_warehouse or build_warehouse(connection)
     if warehouse is None:
         raise AdapterUserError(
             f"dynamic model '{entry.name}' has no warehouse to refresh it",
             code=_NO_WAREHOUSE_CODE,
-            help="set refresh_warehouse on the model, or a warehouse on the target's connection",
+            help=(
+                "set refresh_warehouse on the model, or the target's build warehouse; a job's "
+                "warehouse never refreshes a dynamic model"
+            ),
         )
     statements: tuple[str, ...] = adapter.render_create_dynamic(
         destination=destination,

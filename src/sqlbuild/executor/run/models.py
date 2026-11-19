@@ -335,6 +335,7 @@ class ModelMaterializationContext:
     bound_views: BoundViewGuard = field(default_factory=BoundViewGuard)
     fingerprint_writes: FingerprintWrites | None = None
     dynamic_hold: DynamicHold | None = None
+    build_warehouse: Callable[[Any], str | None] | None = None
 
 
 @dataclass(frozen=True, kw_only=True, init=False)

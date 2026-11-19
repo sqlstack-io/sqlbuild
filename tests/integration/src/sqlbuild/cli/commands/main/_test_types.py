@@ -1552,3 +1552,12 @@ class JobFlagParityTestCase:
     expected_function_reasons: tuple[tuple[str, str], ...]
     expected_full_refresh_counts: tuple[str, ...]
     expected_exit_code: int
+
+
+@dataclass(frozen=True)
+class DynamicRefreshWarehouseTestCase:
+    """A build of a dynamic model through jobs, and the warehouse its refreshes are given."""
+
+    description: str
+    argv: tuple[str, ...]
+    expected_refresh_warehouses: tuple[str, ...]

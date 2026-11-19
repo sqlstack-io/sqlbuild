@@ -31,7 +31,7 @@ for the grants and change tracking they need.
 |-------|---------|-------------|
 | `refresh (lag <duration>)` | none | How far behind its inputs the model may fall: a fixed duration such as `5m`, `1h` or `1d`, at least `1m` on Snowflake and no shorter than the lag of a dynamic model it reads. Without it, the model refreshes when a dynamic model that reads it refreshes |
 | `refresh_mode` | `incremental` | `incremental`, `full`, `auto` or `adaptive`. Snowflake rejects `incremental` for a query it can't refresh incrementally; use `full` for that query |
-| `refresh_warehouse` | the connection's warehouse | Warehouse the scheduled refreshes run on |
+| `refresh_warehouse` | the target's build warehouse | Warehouse the scheduled refreshes run on; a job's `warehouse` never sets it |
 | `refresh_on_build` | `false` | Refresh the model in every build that selects it, not only on its schedule |
 
 ## What the plan shows

@@ -8,8 +8,8 @@ use toml::de::DeTable;
 
 use crate::orchestration_files::_helpers::raw::{RawRetry, RawRun, RawSchedule};
 use crate::orchestration_files::constants::{
-    ATTEMPTS_RANGE, CONCURRENCY_KEY, MAX_POOL_AMOUNT, RETRY_ATTEMPTS_KEY, RETRY_DELAY_KEY,
-    RETRY_DELAY_RANGE, RETRY_TABLE, SUGGESTION_CUTOFF,
+    ATTEMPTS_RANGE, CONCURRENCY_KEY, MAX_POOL_AMOUNT, REMOVED_RETRY_TABLE, RETRY_ATTEMPTS_KEY,
+    RETRY_DELAY_KEY, RETRY_DELAY_RANGE, RETRY_TABLE, SUGGESTION_CUTOFF,
 };
 use crate::orchestration_files::errors::FileError;
 use crate::orchestration_files::models::{
@@ -63,6 +63,8 @@ pub(crate) fn check_keys(text: &str, allowed: &[&str], kind: &str) -> Result<(),
         }
         let help: String = if name == CONCURRENCY_KEY {
             format!("move it under [settings] as `{CONCURRENCY_KEY} = ...`")
+        } else if name == REMOVED_RETRY_TABLE.0 {
+            REMOVED_RETRY_TABLE.1.to_owned()
         } else if let Some(nearest) = close_matches(name, allowed, 1, SUGGESTION_CUTOFF).first() {
             format!("did you mean '{nearest}'?")
         } else {

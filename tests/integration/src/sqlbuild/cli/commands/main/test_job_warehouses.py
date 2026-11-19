@@ -8,14 +8,17 @@ import pytest
 from _pytest.capture import CaptureResult
 
 from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
+    DynamicRefreshWarehouseTestCase,
     JobWarehouseOutputTestCase,
     JobWarehouseSwitchTestCase,
 )
 from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
+    dynamic_refresh_warehouses,
     install_writable_offline_snowflake,
     run_cli_exit_code,
     unit_test_sql,
     warehouse_switches,
+    write_dynamic_job_project,
     write_job_warehouse_project,
     write_project_files,
 )
@@ -175,3 +178,37 @@ def test_given_named_jobs_with_warehouses_when_planning_or_building_then_output_
         test_case.expected_exit_code,
         True,
     ), output
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DynamicRefreshWarehouseTestCase(
+            description="a job switching its nodes to its warehouse leaves refreshes on the build's",
+            argv=("build", "--select", "stg", "job:orders_wh_job", "job:dynamic_wh_job"),
+            expected_refresh_warehouses=("BUILD_WH",),
+        ),
+        DynamicRefreshWarehouseTestCase(
+            description="a single job's warehouse, the whole build's, still refreshes on the build's",
+            argv=("build", "--select", "job:dynamic_wh_job"),
+            expected_refresh_warehouses=("BUILD_WH",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_dynamic_model_built_through_a_job_when_created_then_it_refreshes_on_the_build_s(
+    test_case: DynamicRefreshWarehouseTestCase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_dynamic_job_project(project_dir=tmp_path)
+    _, executed_sql = install_writable_offline_snowflake(monkeypatch)
+
+    exit_code: int = run_cli_exit_code(test_case.argv, tmp_path)
+
+    captured: CaptureResult[str] = capsys.readouterr()
+    assert (exit_code, dynamic_refresh_warehouses(executed_sql)) == (
+        0,
+        test_case.expected_refresh_warehouses,
+    ), captured.out + captured.err

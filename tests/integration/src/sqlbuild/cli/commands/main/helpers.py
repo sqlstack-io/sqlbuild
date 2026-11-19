@@ -1655,3 +1655,31 @@ def unit_test_sql(*models: str) -> str:
 
     expected: str = ",\n".join(f"__expected__{model} AS (SELECT 1 AS id)" for model in models)
     return f"TEST();\n\nWITH\n__ref__orders_daily AS (SELECT 1 AS id),\n{expected}\nSELECT 1\n"
+
+
+_DYNAMIC_FILES: dict[str, str] = {
+    "models/daily_orders.sql": (
+        "MODEL (description 'Daily orders.', materialized dynamic, refresh (lag 1h));\n"
+        "SELECT 1 AS id\n"
+    ),
+    "orchestration/jobs/dynamic_wh_job.toml": (
+        'name = "dynamic_wh_job"\ndescription = "Runs daily_orders."\nselect = "daily_orders"\n\n'
+        '[settings]\nwarehouse = "DYNAMIC_WH"\n'
+    ),
+}
+
+
+def write_dynamic_job_project(*, project_dir: Path) -> None:
+    """The job warehouse project plus dynamic model daily_orders, run by job dynamic_wh_job."""
+
+    write_job_warehouse_project(project_dir=project_dir)
+    write_project_files(project_dir=project_dir, files=_DYNAMIC_FILES)
+
+
+def dynamic_refresh_warehouses(executed_sql: list[str]) -> tuple[str, ...]:
+    """The warehouse each created dynamic table is given for its refreshes."""
+
+    statements: str = "\n".join(executed_sql)
+    return tuple(
+        re.findall(r"CREATE OR REPLACE DYNAMIC TABLE .*?WAREHOUSE = (\S+)", statements, re.S)
+    )

@@ -168,6 +168,16 @@ fn given_invalid_job_files_when_reading_then_reports_message_position_and_help()
             expected_help: Some("move it under [settings] as `concurrency = ...`"),
         },
         FileErrorTestCase {
+            description: "the removed on_failure table names its replacement",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\n\n[on_failure]\nretries = 2\n",
+            expected_message: "unknown job key 'on_failure'",
+            expected_position: at(5, 2),
+            expected_help: Some(
+                "`[on_failure]` is now `[retry]`; `attempts = retries + 1`, \
+                 `delay_seconds = retry_delay_seconds`",
+            ),
+        },
+        FileErrorTestCase {
             description: "a pool amount of zero",
             text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\npools = { supplier_api = 0 }\n",
             expected_message: "pools.supplier_api must take a whole number of slots from 1 to 10000, such as supplier_api = 1",

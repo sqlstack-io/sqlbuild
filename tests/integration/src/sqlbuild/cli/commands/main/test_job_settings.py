@@ -117,6 +117,12 @@ _FAIL_FAST_FILES: dict[str, str] = {
         'name = "fail_job_group"\ndescription = "Fails."\njobs = ["events_job", "fast_fail_job"]\n'
     ),
 }
+_GRACE_FILES: dict[str, str] = {
+    "orchestration/jobs/grace_job.toml": (
+        'name = "grace_job"\ndescription = "Takes over."\nselect = "customers"\n\n'
+        "[settings]\nignore_dynamic_grace = true\n"
+    ),
+}
 _LENIENT_PAIR_FILES: dict[str, str] = {
     "models/lenient_peer.sql": (
         "MODEL (description 'Lenient peer.', materialized table);\nSELECT 1 AS id\n"
@@ -249,6 +255,15 @@ def test_given_a_named_job_when_building_then_its_settings_apply_below_the_comma
                 "pass --fail-fast to make it true for all, or build with --no-job-settings"
             ),
             extra_files=_FAIL_FAST_FILES,
+        ),
+        JobSettingsConflictTestCase(
+            description="a job ignoring the dynamic grace needs the project to allow it",
+            command_args=("compile",),
+            expected_fragment=(
+                "orchestration/jobs/grace_job.toml:6:24: ignore_dynamic_grace needs [dynamic] "
+                "allow_ignore_grace = true in sqlbuild_project.toml"
+            ),
+            extra_files=_GRACE_FILES,
         ),
         JobSettingsConflictTestCase(
             description="two named jobs giving one node different full_refresh conflict",
@@ -574,6 +589,18 @@ def test_given_a_job_concurrency_when_building_then_its_nodes_never_exceed_it(
             expected_present=("audit lenient_pair returned 1 row (ignored)",),
             expected_absent=(),
             extra_files=_LENIENT_PAIR_FILES,
+        ),
+        JobOutputTestCase(
+            description="a job may ignore the dynamic grace where the project allows it",
+            command_args=("compile",),
+            expected_exit_code=0,
+            expected_present=("Project compiled",),
+            expected_absent=("ignore_dynamic_grace",),
+            extra_files={
+                **_GRACE_FILES,
+                "sqlbuild_project.toml": _PROJECT_FILES["sqlbuild_project.toml"]
+                + "\n[dynamic]\nallow_ignore_grace = true\n",
+            },
         ),
         JobOutputTestCase(
             description="a command-line option beats a job option it excludes",

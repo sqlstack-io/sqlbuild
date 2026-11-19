@@ -88,6 +88,15 @@ class SessionWarehouses:
         with self._lock:
             self._away[id(connection)] = (connection, target)
 
+    def build_warehouse(self, *, connection: Any) -> str | None:
+        """The build's own warehouse: the configured one, else the one connections start on."""
+
+        with self._lock:
+            entry: tuple[Any, str] | None = self._away.get(id(connection))
+        if entry is None or entry[0] is not connection:
+            self._learn_home(connection)
+        return self._home
+
     def restore(self) -> None:
         """Return every connection still on a node's warehouse to the build's warehouse."""
 

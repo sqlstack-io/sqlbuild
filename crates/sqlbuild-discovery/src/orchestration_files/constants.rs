@@ -44,6 +44,12 @@ pub const RETRY_DELAY_RANGE: (u32, u32) = (0, 86_400);
 pub(crate) const RETRY_TABLE: &str = "retry";
 pub(crate) const RETRY_ATTEMPTS_KEY: &str = "attempts";
 pub(crate) const RETRY_DELAY_KEY: &str = "delay_seconds";
+/// The removed retry table, and how to write it as `[retry]`.
+pub(crate) const REMOVED_RETRY_TABLE: (&str, &str) = (
+    "on_failure",
+    "`[on_failure]` is now `[retry]`; `attempts = retries + 1`, \
+     `delay_seconds = retry_delay_seconds`",
+);
 /// The job setting that moved under `[settings]`.
 pub(crate) const CONCURRENCY_KEY: &str = "concurrency";
 /// The most slots a job or job group may take of one pool.
