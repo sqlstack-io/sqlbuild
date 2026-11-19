@@ -51,8 +51,8 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     NewestVersionsTestCase,
     PageBytesTestCase,
     ReadFailureTestCase,
-    StateEventsTestCase,
     ServedResumeTestCase,
+    StateEventsTestCase,
     SyncPacingTestCase,
     WarehouseHistoryTestCase,
 )
@@ -1094,7 +1094,9 @@ def test_given_a_build_that_stopped_heartbeating_when_a_served_location_syncs_th
 ) -> None:
     project: Path = tmp_path / "project"
     fixture: dict[str, Any] = json.loads(
-        Path("benchmarks/duckshop/edge_cases/orchestration/maintained_expired_hold.json").read_text()
+        Path(
+            "benchmarks/duckshop/edge_cases/orchestration/maintained_expired_hold.json"
+        ).read_text()
     )
     adapter: Any
     connection: Any

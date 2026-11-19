@@ -11,13 +11,12 @@ import pytest
 from sqlbuild.executor.build.models import BuildExecutionResult, BuildRuntimeParams
 from sqlbuild.executor.build.types import BuildStatus
 from sqlbuild.executor.maintained_pauses._helpers.resume import resume_holds
-from sqlbuild.executor.maintained_pauses._helpers.sql import read_open_holds
+from sqlbuild.executor.maintained_pauses._helpers.sql import read_open_holds, setup_statements
 from sqlbuild.executor.maintained_pauses.classes.maintained_hold import MaintainedHold
 from sqlbuild.executor.maintained_pauses.main.hold_maintained_models import (
     hold_maintained_models,
 )
 from sqlbuild.executor.maintained_pauses.main.resume_expired_holds import resume_expired_holds
-from sqlbuild.executor.maintained_pauses._helpers.sql import setup_statements
 from sqlbuild.executor.maintained_pauses.models import OpenHold, ResumeOutcome
 from tests.integration.src.sqlbuild.executor.maintained_pauses._test_types import (
     DoubleCloseTestCase,
@@ -29,15 +28,15 @@ from tests.integration.src.sqlbuild.executor.maintained_pauses._test_types impor
 from tests.integration.src.sqlbuild.executor.maintained_pauses.helpers import (
     LeaseProject,
     PausingDuckDbAdapter,
+    TokenPausingDuckDbAdapter,
     build_lease_project,
     lease_project_case,
+    no_token,
     pause_event_ids,
     pause_events,
     pause_table_names,
-    plan_lease_project,
-    TokenPausingDuckDbAdapter,
-    no_token,
     pause_table_token,
+    plan_lease_project,
     same_token,
     seed_hold,
 )
@@ -335,9 +334,7 @@ def test_given_a_sync_resuming_mid_takeover_when_the_build_holds_then_it_pauses_
         yield_to_earlier(hold, connection=connection, location=location)
         adapter.states["daily_totals"] = "ACTIVE"
 
-    monkeypatch.setattr(
-        MaintainedHold, "_yield_to_earlier", resumed_by_a_sync_after_the_takeover
-    )
+    monkeypatch.setattr(MaintainedHold, "_yield_to_earlier", resumed_by_a_sync_after_the_takeover)
 
     result: BuildExecutionResult = build_lease_project(
         adapter=adapter,
