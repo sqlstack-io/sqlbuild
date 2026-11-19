@@ -82,8 +82,7 @@ impl<'document> PlanRows<'document> {
         Self { document, runs }
     }
 
-    /// The migration steps: every migration, column migration, table type change and retention change
-    /// but the renamed models' own migrations (`is_rename`), which their Renamed rows already say.
+    /// The migration steps: every migration-like row except renamed models' own migrations.
     pub(crate) fn migration_steps(&self) -> usize {
         let migrations = self
             .list("migrations")
@@ -362,8 +361,7 @@ fn model_section(model: &Value) -> PlanPageSection {
         .map_or(PlanPageSection::RoutineModels, |(_, section)| *section)
 }
 
-/// The name a row is found by: a renamed model by its new and old names, a retention change by its
-/// models and the table or schema it sets, a warning by its model and message.
+/// The name a row is found by; renames match old names and retention changes their models.
 pub(crate) fn row_name(section: PlanPageSection, row: &Value) -> String {
     match section {
         PlanPageSection::Renamed => {

@@ -338,14 +338,25 @@ def planned_migrations(plan: dict[str, Any]) -> tuple[tuple[str | None, str, str
     )
 
 
+def is_renamed_model(model: dict[str, Any]) -> bool:
+    """Return whether the plan builds this model under a new name."""
+
+    return model["reason"] == "renamed"
+
+
+def is_rename_migration(migration: dict[str, Any]) -> bool:
+    """Return whether this migration is a renamed model's own."""
+
+    return bool(migration["is_rename"])
+
+
 def renamed_models(plan: dict[str, Any]) -> tuple[tuple[str, str], ...]:
     """Return sorted (origin_model, name) for every model the plan builds under a new name."""
 
     return tuple(
         sorted(
             (model["origin_model"], model["name"])
-            for model in plan["models"]
-            if model["reason"] == "renamed"
+            for model in filter(is_renamed_model, plan["models"])
         )
     )
 
@@ -356,8 +367,7 @@ def rename_migrations(plan: dict[str, Any]) -> tuple[tuple[str, str], ...]:
     return tuple(
         sorted(
             (migration["origin_model"], migration["model"])
-            for migration in plan["migrations"]
-            if migration["is_rename"]
+            for migration in filter(is_rename_migration, plan["migrations"])
         )
     )
 
@@ -366,9 +376,7 @@ def renamed_old_names(plan: dict[str, Any]) -> dict[str, Any]:
     """Return each renamed model's old_name, by model, as its own row carries it."""
 
     return {
-        model["name"]: model.get("old_name")
-        for model in plan["models"]
-        if model["reason"] == "renamed"
+        model["name"]: model.get("old_name") for model in filter(is_renamed_model, plan["models"])
     }
 
 
@@ -377,8 +385,7 @@ def rename_migration_old_names(plan: dict[str, Any]) -> dict[str, Any]:
 
     return {
         migration["model"]: migration["old_name"]
-        for migration in plan["migrations"]
-        if migration["is_rename"]
+        for migration in filter(is_rename_migration, plan["migrations"])
     }
 
 

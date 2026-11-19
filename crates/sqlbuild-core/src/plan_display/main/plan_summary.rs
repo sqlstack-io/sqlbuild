@@ -6,8 +6,7 @@ use crate::plan_display::_helpers::plan_pages::PlanRows;
 use crate::plan_display::_helpers::plan_sections::{emptied, section_counts, with_warning_groups};
 use crate::plan_display::constants::MIGRATION_STEPS_FIELD;
 
-/// The document with every row list emptied, each section counted and its warnings grouped, and its
-/// migration steps counted without the renamed models' own migrations; a failure report is returned unchanged.
+/// The document with its row lists emptied and counted by section; a failure report is unchanged.
 pub fn plan_summary(document: &Value) -> Value {
     let Some(fields) = document
         .as_object()

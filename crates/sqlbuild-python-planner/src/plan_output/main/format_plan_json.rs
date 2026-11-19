@@ -15,7 +15,8 @@ use crate::plan_output::_helpers::plan_json::table_type_json;
 use crate::plan_output::_helpers::plan_json::warning_json;
 use crate::plan_output::_helpers::values::mapped;
 use crate::plan_output::constants::{
-    CHANGED_KEY, FULL_REFRESH_JOBS_KEY, IGNORE_AUDIT_FAILURES_JOBS_KEY, WAREHOUSE_JOBS_KEY,
+    CHANGED_KEY, FULL_REFRESH_JOBS_KEY, IGNORE_AUDIT_FAILURES_JOBS_KEY, RENAMED_REASON,
+    WAREHOUSE_JOBS_KEY,
 };
 use crate::plan_output::main::any::any;
 use crate::plan_output::main::dict::dict;
@@ -151,12 +152,7 @@ pub fn format_plan_json(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> P
     indented_json(result.as_any())
 }
 
-/// The reason of a model built under a new name.
-const RENAMED_REASON: &str = "renamed";
-
-/// Marks each migration that is a renamed model's own (`is_rename`), and puts on each renamed model's
-/// row the model it was renamed from (`origin_model`) and what stays at its old name (`old_name`), so a
-/// reader can list renames apart from the other migration steps without joining the two lists.
+/// Marks renamed models' own migrations and copies their origin and old name onto the model rows.
 fn mark_renames(result: &Bound<'_, PyDict>) -> PyResult<()> {
     let (Some(models), Some(migrations)) =
         (result.get_item("models")?, result.get_item("migrations")?)

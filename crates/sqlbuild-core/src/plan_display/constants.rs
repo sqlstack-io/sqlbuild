@@ -55,8 +55,7 @@ pub const ORIGIN_MODEL_FIELD: &str = "origin_model";
 pub const OLD_NAME_FIELD: &str = "old_name";
 /// The migration row field saying the migration is a renamed model's own.
 pub const IS_RENAME_FIELD: &str = "is_rename";
-/// The summary field counting migration steps: migrations other than renames, column migrations,
-/// table type changes and retention changes.
+/// The summary field counting migration steps other than renamed models' own migrations.
 pub(crate) const MIGRATION_STEPS_FIELD: &str = "migration_steps";
 /// The plan document field of per-model metadata, which a summary leaves out.
 pub(crate) const METADATA_FIELD: &str = "metadata";
