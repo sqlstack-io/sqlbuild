@@ -10,8 +10,9 @@ use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use sqlbuild_orchestration::dev_events::main::emit_dev_event::emit_dev_event;
 use sqlbuild_orchestration::dev_events::main::generation_failed::generation_failed;
 use sqlbuild_orchestration::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
+use sqlbuild_orchestration::warehouse_metadata::constants::MAINTAINED_RESUME_REQUEST;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryFailure, WarehouseHistoryKind, WarehouseHistoryRead,
+    MaintainedResumeReply, WarehouseHistoryFailure, WarehouseHistoryKind, WarehouseHistoryRead,
 };
 
 use crate::bindings::_helpers::location_command::command::location_arguments;
@@ -19,6 +20,7 @@ use crate::bindings::_helpers::location_command::command::publish_location;
 use crate::bindings::_helpers::location_command::constants::DUCKDB_LOCK_CONFLICT;
 use crate::bindings::_helpers::location_command::constants::PLAN_REQUEST;
 use crate::bindings::_helpers::location_command::runtime_plan::runtime_plan;
+use crate::bindings::_helpers::location_command::runtime_resume::runtime_resume;
 use crate::bindings::_helpers::location_command::types::HeldProject;
 use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
 use crate::bindings::_helpers::native_host::warehouse_metadata::close_history_session;
@@ -76,6 +78,18 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     }))
                 } else if let Some(plan) = request.get(PLAN_REQUEST) {
                     serde_json::to_string(&runtime_plan(py, held.as_ref(), plan)?)
+                } else if let Some(locations) = request.get(MAINTAINED_RESUME_REQUEST) {
+                    serde_json::to_string(&match runtime_resume(py, &options, locations) {
+                        Ok(resumed) => MaintainedResumeReply::Resumed(resumed),
+                        Err(error) => {
+                            let reason = failure_reason(&error);
+                            write_stderr(
+                                py,
+                                &format!("Resuming expired maintained holds failed: {reason}\n"),
+                            )?;
+                            MaintainedResumeReply::Failed(reason)
+                        }
+                    })
                 } else if let Some(kind) = WarehouseHistoryKind::ALL
                     .iter()
                     .find(|kind| request.get(kind.as_str()).is_some())

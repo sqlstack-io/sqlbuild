@@ -1,6 +1,9 @@
 use crate::native_commands::_helpers::command::paths::location_watch;
 use crate::native_commands::_helpers::location::execution::metadata_sync;
 use crate::native_commands::_helpers::location::execution::{
+    finish_metadata_page, open_location_runtime,
+};
+use crate::native_commands::_helpers::location::execution::{
     history_request, read_metadata_page, safety_sync_setting,
 };
 use crate::native_commands::_helpers::location::sync_outcomes::failed_read;
@@ -11,10 +14,11 @@ use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_SAFETY_
 use crate::native_commands::main::_location_metadata::sync_location_metadata;
 use crate::native_commands::models::{LocationMetadataPage, LocationServe, ReadFailure};
 use crate::native_commands::tests::helpers::{
-    acknowledge_complete_pages, one_location, published_location,
+    acknowledge_complete_pages, location_options, one_location, published_location,
 };
 use crate::native_commands::tests::test_types::BilledDeferralTestCase;
 use crate::native_commands::tests::test_types::FastClockScanTestCase;
+use crate::native_commands::tests::test_types::MaintainedResumeTestCase;
 use crate::native_commands::tests::test_types::{
     FailedReadHealthTestCase, NewestVersionsTestCase, ReadFailureTestCase,
 };
@@ -1225,6 +1229,140 @@ fn given_a_fast_location_clock_when_scanning_then_a_ddl_after_the_page_read_is_s
             ),
             (true, test_case.expected_described_live),
             "{}: the scan started at {scan_started}, the page was read at {page_read_at}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_completed_sync_when_finishing_then_its_reader_resumes_expired_holds_once_before_closing()
+{
+    const UNTOKENED: &str = r#"{"maintained_resume":[{"location":{"database":"analytics","schema":"state"},"quiet_token":null}]}"#;
+    const TOKENED: &str = r#"{"maintained_resume":[{"location":{"database":"analytics","schema":"state"},"quiet_token":"7/12:00"}]}"#;
+    let test_cases = [
+        MaintainedResumeTestCase {
+            description: "a completed sync sends the locations it read, then closes the reader",
+            idle: true,
+            halted: false,
+            quiet_token: None,
+            reply: r#"{"resumed":{"holds":[{"run_id":"run-1","relation":"analytics.marts.orders"}],"quiet_tokens":[null]}}"#,
+            expected_requests: &[UNTOKENED],
+            expected_reader_open: false,
+            expected_quiet_token: None,
+        },
+        MaintainedResumeTestCase {
+            description: "a pass that leaves no hold open keeps its token for the next sync",
+            idle: true,
+            halted: false,
+            quiet_token: None,
+            reply: r#"{"resumed":{"holds":[],"quiet_tokens":["7/12:00"]}}"#,
+            expected_requests: &[UNTOKENED],
+            expected_reader_open: false,
+            expected_quiet_token: Some("7/12:00"),
+        },
+        MaintainedResumeTestCase {
+            description: "a kept token is sent, and a pass that finds a hold drops it",
+            idle: true,
+            halted: false,
+            quiet_token: Some("7/12:00"),
+            reply: r#"{"resumed":{"holds":[],"quiet_tokens":[null]}}"#,
+            expected_requests: &[TOKENED],
+            expected_reader_open: false,
+            expected_quiet_token: None,
+        },
+        MaintainedResumeTestCase {
+            description: "a failed resume only warns, keeps the token, and the reader still closes",
+            idle: true,
+            halted: false,
+            quiet_token: Some("7/12:00"),
+            reply: r#"{"failed":"permission denied"}"#,
+            expected_requests: &[TOKENED],
+            expected_reader_open: false,
+            expected_quiet_token: Some("7/12:00"),
+        },
+        MaintainedResumeTestCase {
+            description: "an unreadable reply only warns, and the reader still closes",
+            idle: true,
+            halted: false,
+            quiet_token: None,
+            reply: "not json",
+            expected_requests: &[UNTOKENED],
+            expected_reader_open: false,
+            expected_quiet_token: None,
+        },
+        MaintainedResumeTestCase {
+            description: "a sync stopped by failed reads writes nothing",
+            idle: true,
+            halted: true,
+            quiet_token: None,
+            reply: r#"{"resumed":{"holds":[],"quiet_tokens":["7/12:00"]}}"#,
+            expected_requests: &[],
+            expected_reader_open: false,
+            expected_quiet_token: None,
+        },
+        MaintainedResumeTestCase {
+            description: "a sync with scans left neither resumes nor closes its reader",
+            idle: false,
+            halted: false,
+            quiet_token: None,
+            reply: r#"{"resumed":{"holds":[],"quiet_tokens":["7/12:00"]}}"#,
+            expected_requests: &[],
+            expected_reader_open: true,
+            expected_quiet_token: None,
+        },
+    ];
+    for test_case in test_cases {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let requests = directory.path().join("requests");
+        let script = directory.path().join("location");
+        std::fs::write(
+            &script,
+            format!(
+                "#!/bin/sh\nwhile read line; do echo \"$line\" >> '{}'; echo '{}'; done\n",
+                requests.display(),
+                test_case.reply
+            ),
+        )
+        .expect("location script");
+        let mut permissions = std::fs::metadata(&script).expect("metadata").permissions();
+        std::os::unix::fs::PermissionsExt::set_mode(&mut permissions, 0o755);
+        std::fs::set_permissions(&script, permissions).expect("executable");
+        let options = location_options(directory.path());
+        let state = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime")
+            .block_on(async {
+                let mut state = metadata_sync((one_location(), 1), (3600, 1800));
+                state.idle = test_case.idle;
+                state.halted = test_case.halted;
+                if let Some(token) = test_case.quiet_token {
+                    state
+                        .maintained_quiet_tokens
+                        .insert(one_location().remove(0), token.to_owned());
+                }
+                state.reader =
+                    Some(open_location_runtime(&options, &script, Vec::new()).expect("runtime"));
+                finish_metadata_page(state).await
+            })
+            .expect("no control error")
+            .expect("not stopped");
+        let received = std::fs::read_to_string(&requests).unwrap_or_default();
+        assert_eq!(
+            (
+                received.lines().collect::<Vec<_>>(),
+                state.reader.is_some(),
+                state
+                    .maintained_quiet_tokens
+                    .get(&one_location().remove(0))
+                    .map(String::as_str),
+            ),
+            (
+                test_case.expected_requests.to_vec(),
+                test_case.expected_reader_open,
+                test_case.expected_quiet_token,
+            ),
+            "{}",
             test_case.description
         );
     }

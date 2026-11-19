@@ -721,6 +721,39 @@ pub struct WarehouseHistoryFailure {
     pub page_size: bool,
 }
 
+/// A maintained model a completed sync resumed: the run whose hold expired, and its dotted relation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResumedHold {
+    pub run_id: String,
+    pub relation: String,
+}
+
+/// One state location a completed sync resumes holds in, and its pause table's token when the last pass left no hold open.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MaintainedResumeLocation {
+    pub location: WarehouseStateLocation,
+    /// A pause table whose change token still equals this is not read, so a quiet sync wakes no compute.
+    pub quiet_token: Option<String>,
+}
+
+/// The holds a pass closed, and each requested location's new quiet token, in request order.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MaintainedResumed {
+    pub holds: Vec<ResumedHold>,
+    pub quiet_tokens: Vec<Option<String>>,
+}
+
+/// A location runtime's reply to a maintained resume: what it closed, or its redacted error.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MaintainedResumeReply {
+    Resumed(MaintainedResumed),
+    Failed(String),
+}
+
 /// Typed import columns are selected by code, never from location-supplied field names.
 #[derive(Debug)]
 pub(crate) struct StateEventImport {

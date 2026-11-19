@@ -315,3 +315,19 @@ pub(super) struct FastClockScanTestCase {
     /// Whether a table altered a second after the page read is still described live.
     pub(super) expected_described_live: bool,
 }
+
+pub(super) struct MaintainedResumeTestCase {
+    pub(super) description: &'static str,
+    /// Whether the synchronization completed, and whether failed reads stopped it.
+    pub(super) idle: bool,
+    pub(super) halted: bool,
+    /// The pause table token the location's last quiet pass left, before this sync finishes.
+    pub(super) quiet_token: Option<&'static str>,
+    /// The runtime's reply line to any request.
+    pub(super) reply: &'static str,
+    /// The request lines the runtime received, and whether the sync still holds its reader.
+    pub(super) expected_requests: &'static [&'static str],
+    pub(super) expected_reader_open: bool,
+    /// The token the next sync sends for the location.
+    pub(super) expected_quiet_token: Option<&'static str>,
+}

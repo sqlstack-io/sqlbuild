@@ -6,9 +6,10 @@ from typing import Any
 
 from sqlbuild._native import MAINTAINED_PAUSES_TABLE_NAME
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
+from sqlbuild.adapter.relations.types import RelationChangeTokenReader
 from sqlbuild.executor.maintained_pauses._helpers.resume import resume_holds
 from sqlbuild.executor.maintained_pauses._helpers.sql import read_open_holds
-from sqlbuild.executor.maintained_pauses.models import OpenHold
+from sqlbuild.executor.maintained_pauses.models import OpenHold, ResumeOutcome
 from sqlbuild.executor.maintained_pauses.types import StateLocation
 
 
@@ -19,8 +20,13 @@ def resume_expired_holds(
     location: StateLocation,
     grace_seconds: float,
     recorded_by: str,
-) -> tuple[OpenHold, ...]:
-    """Close holds silent for `grace_seconds` on models no run holds live; return them."""
+    quiet_token: str | None,
+) -> ResumeOutcome:
+    """Close holds silent for `grace_seconds` on models no run holds live.
+
+    A pause table whose change token is still `quiet_token` is not read, so a quiet sync starts no
+    warehouse compute.
+    """
 
     if not adapter.relation_exists(
         connection=connection,
@@ -28,7 +34,19 @@ def resume_expired_holds(
         schema=location[1],
         name=MAINTAINED_PAUSES_TABLE_NAME,
     ):
-        return ()
+        return ResumeOutcome(resumed=(), quiet_token=None)
+    token: str | None = (
+        adapter.read_relation_change_token(
+            connection=connection,
+            database=location[0],
+            schema=location[1],
+            name=MAINTAINED_PAUSES_TABLE_NAME,
+        )
+        if isinstance(adapter, RelationChangeTokenReader)
+        else None
+    )
+    if token is not None and token == quiet_token:
+        return ResumeOutcome(resumed=(), quiet_token=token)
     holds: tuple[OpenHold, ...] = read_open_holds(
         adapter=adapter, connection=connection, location=location
     )
@@ -50,4 +68,4 @@ def resume_expired_holds(
         holds=expired,
         recorded_by=recorded_by,
     )
-    return expired
+    return ResumeOutcome(resumed=expired, quiet_token=None if holds else token)
