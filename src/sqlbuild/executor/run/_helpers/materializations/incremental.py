@@ -689,7 +689,7 @@ def _prepare_incremental_delta_types(
             staging_schema=inputs.target_schema,
             staging_table=inputs.delta_table,
             declared_columns=tuple(desired_columns),
-            table_type=TableType.TRANSIENT,
+            table_config={"table_type": TableType.TRANSIENT, "physical_storage": {}},
             statement_recorder=statement_recorder,
         )
 

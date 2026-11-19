@@ -14123,6 +14123,7 @@ class ModelPlanEntry(NativeRecord):
     target_lag: str | None
     refresh_mode: str | None
     refresh_warehouse: str | None
+    change_tracking: bool
     def __init__(
         self,
         key: CompiledObjectKey,
@@ -14216,6 +14217,7 @@ class ModelPlanEntry(NativeRecord):
         target_lag: str | None = ...,
         refresh_mode: str | None = ...,
         refresh_warehouse: str | None = ...,
+        change_tracking: bool = ...,
     ) -> None: ...
 
 class CloneSourcePlanEntry(NativeRecord):

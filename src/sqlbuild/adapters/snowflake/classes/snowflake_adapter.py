@@ -1161,10 +1161,11 @@ class SnowflakeAdapter(
         )
 
     def _render_create_table_as_type(
-        self, *, destination: str, sql: str, table_type: str
+        self, *, destination: str, sql: str, table_type: str, change_tracking: bool = False
     ) -> tuple[str, ...]:
         table_kind: str = "TABLE" if table_type == TableType.PERMANENT else "TRANSIENT TABLE"
-        return (f"CREATE OR REPLACE {table_kind} {destination} AS {sql}",)
+        tracking: str = " CHANGE_TRACKING = TRUE" if change_tracking else ""
+        return (f"CREATE OR REPLACE {table_kind} {destination}{tracking} AS {sql}",)
 
     def render_create_view_as(self, *, destination: str, sql: str) -> tuple[str, ...]:
         return (f"CREATE OR REPLACE VIEW {destination} AS {sql}",)
@@ -1332,7 +1333,10 @@ class SnowflakeAdapter(
     ) -> None:
         table_type: str = str((config or {}).get("table_type", "transient"))
         statements: tuple[str, ...] = self._render_create_table_as_type(
-            destination=destination, sql=sql, table_type=table_type
+            destination=destination,
+            sql=sql,
+            table_type=table_type,
+            change_tracking=bool((config or {}).get("change_tracking", False)),
         )
         statement_recorder.record_many(statements)
         stmt: str

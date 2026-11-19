@@ -484,3 +484,10 @@ class SnowflakeMaintainedOperationTestCase:
     description: str
     operation: MaintainedOperation
     expected_sql: str
+
+
+@dataclass(frozen=True)
+class SnowflakeChangeTrackingTestCase:
+    description: str
+    config: dict[str, object]
+    expected_sql: str

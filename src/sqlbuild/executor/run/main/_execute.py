@@ -246,8 +246,11 @@ def _staged_lifecycle(
                     staging_schema=targets.target_schema,
                     staging_table=targets.staging_table,
                     declared_columns=declared_columns,
-                    table_type=entry.table_type,
-                    physical_storage=entry.physical_storage,
+                    table_config={
+                        "table_type": entry.table_type,
+                        "physical_storage": entry.physical_storage,
+                        "change_tracking": entry.change_tracking,
+                    },
                     statement_recorder=statement_recorder,
                 )
         except Exception as exc:

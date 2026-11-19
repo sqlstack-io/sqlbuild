@@ -2,17 +2,20 @@
 
 use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_phases::models::ModelEntryResults;
+use crate::planner_strategy::main::strategy::materialization_of::materialization_of;
 use crate::planner_strategy::main::values::text::text;
 use crate::planner_warehouse::models::{AdapterRead, PlannerReads, Read};
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::PyString;
+use pyo3::types::{PyBool, PyString};
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::maintained_refresh::main::maintained_settings_drift::maintained_settings_drift;
 use sqlbuild_analysis::maintained_refresh::main::reinitialised_readers::reinitialised_readers;
 use sqlbuild_analysis::maintained_refresh::main::render_target_lag::render_target_lag;
 use sqlbuild_analysis::maintained_refresh::models::{
     LiveDynamicTable, MaintainedRead, MaintainedSettings, RefreshLag,
 };
+use sqlbuild_analysis::planner_scope::constants::MODEL;
 use sqlbuild_model_config::model_validation::main::fixed_duration_seconds::fixed_duration_seconds;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -33,36 +36,49 @@ const DEFAULT_REFRESH_MODE: &str = "incremental";
 /// Actions that recreate the relation, which reinitialises every dynamic table reading it.
 const REPLACING_ACTIONS: [&str; 3] = ["create_table", "create_view", "create_maintained"];
 
-/// Alter drifted maintained models, set their `target_lag`, and mark kept readers of a replaced upstream.
+/// Plan maintained refresh settings and reinitialised readers, and track changes on what they read.
 pub(crate) fn plan_maintained_refresh<'py>(
     runtime: &Bound<'py, PyAny>,
     execution_scope: &Bound<'py, PyAny>,
     results: ModelEntryResults<'py>,
 ) -> PyResult<ModelEntryResults<'py>> {
-    let mut maintained: Vec<bool> = Vec::with_capacity(results.entries.len());
-    for entry in &results.entries {
-        maintained.push(text(&native_field(entry, "materialization_type")?)? == MAINTAINED);
-    }
-    if !maintained.contains(&true) {
-        return Ok(results);
-    }
     let py: Python<'py> = runtime.py();
     let scope = scope_data(execution_scope)?;
-    let mut upstream: HashMap<&(String, String), Vec<String>> = HashMap::new();
+    let mut upstream: HashMap<&ObjectKey, Vec<String>> = HashMap::new();
     for (key, deps) in &scope.upstream {
         upstream.insert(key, deps.iter().map(|(_, name)| name.clone()).collect());
     }
+    let downstream: HashMap<&ObjectKey, &Vec<ObjectKey>> = scope
+        .downstream
+        .iter()
+        .map(|(key, readers)| (key, readers))
+        .collect();
     let models = ModelLookup::Native(scope.clone());
     let reads = runtime_reads(runtime)?;
+    let mut maintained_models: HashMap<String, bool> = HashMap::new();
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::with_capacity(results.entries.len());
     let mut rows: Vec<MaintainedRead> = Vec::with_capacity(results.entries.len());
-    for (entry, is_maintained) in results.entries.into_iter().zip(maintained) {
+    for entry in results.entries {
+        let key: ObjectKey = native_key(&native_field(&entry, "key")?)?;
+        let is_maintained: bool =
+            text(&native_field(&entry, "materialization_type")?)? == MAINTAINED;
         let entry = if is_maintained {
             with_refresh_settings(entry, &models, &reads)?
+        } else if read_by_maintained(
+            py,
+            downstream.get(&key).copied(),
+            (&models, &mut maintained_models),
+        )? {
+            replaced(
+                &entry,
+                &[(
+                    "change_tracking",
+                    PyBool::new(py, true).to_owned().into_any(),
+                )],
+            )?
         } else {
             entry
         };
-        let key = native_key(&native_field(&entry, "key")?)?;
         let action: String = text(&native_field(&entry, "action")?)?;
         rows.push(MaintainedRead {
             name: key.1.clone(),
@@ -85,6 +101,36 @@ pub(crate) fn plan_maintained_refresh<'py>(
         entries,
         warnings: results.warnings,
     })
+}
+
+/// Whether any model reading the entry is maintained, checking each reader once per plan.
+fn read_by_maintained(
+    py: Python<'_>,
+    readers: Option<&Vec<ObjectKey>>,
+    (models, maintained_models): (&ModelLookup, &mut HashMap<String, bool>),
+) -> PyResult<bool> {
+    let Some(readers) = readers else {
+        return Ok(false);
+    };
+    for (kind, name) in readers {
+        if kind != MODEL {
+            continue;
+        }
+        let maintained: bool = match maintained_models.get(name) {
+            Some(maintained) => *maintained,
+            None => {
+                let model = models.get(py, name)?;
+                let maintained: bool =
+                    !model.is_none() && text(&materialization_of(&model)?)? == MAINTAINED;
+                maintained_models.insert(name.clone(), maintained);
+                maintained
+            }
+        };
+        if maintained {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// The entry with its `target_lag`; a kept one alters on drift, or creates when no dynamic table holds its name.

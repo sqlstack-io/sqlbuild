@@ -670,6 +670,7 @@ const R_MODEL_PLAN_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("target_lag", FieldDefault::None),
         FieldSpec::new("refresh_mode", FieldDefault::None),
         FieldSpec::new("refresh_warehouse", FieldDefault::None),
+        FieldSpec::new("change_tracking", FieldDefault::False),
     ],
 };
 const R_CLONE_SOURCE_PLAN_ENTRY: RecordSpec = RecordSpec {
