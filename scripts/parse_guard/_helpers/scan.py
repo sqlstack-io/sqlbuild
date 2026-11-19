@@ -1,4 +1,4 @@
-"""Find native SQL parses that fall back to a library's default function-call depth."""
+"""Find Polyglot and SQLQuack shared or Snowflake parses that use a library default depth."""
 
 from __future__ import annotations
 

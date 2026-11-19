@@ -92,10 +92,7 @@ pub(super) fn validation_result(request: ValidationRequest) -> Result<Validation
     })?;
     let request = ValidationRequest {
         options: SchemaValidationOptions {
-            complexity_guard: request
-                .options
-                .complexity_guard
-                .or(Some(polyglot_complexity_guard())),
+            complexity_guard: Some(polyglot_complexity_guard()),
             ..request.options
         },
         ..request

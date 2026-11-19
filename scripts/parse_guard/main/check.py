@@ -7,13 +7,13 @@ from scripts.root_check.main.run_root_check import run_root_check
 
 
 def run_parse_guard_check(argv: list[str] | None = None) -> int:
-    """Fail when a native SQL parse uses a library's default function-call depth."""
+    """Fail when a Polyglot or SQLQuack shared or Snowflake parse uses a library default depth."""
     return run_root_check(
         argv=argv,
         description=__doc__,
         errors_under=get_parse_guard_errors,
         messages=(
             "Parse with sqlbuild_analysis::parse_guard's options, not a library default:",
-            "Every native SQL parse uses the shared parse guard.",
+            "Polyglot and SQLQuack's shared and Snowflake parsers all use the shared guard.",
         ),
     )

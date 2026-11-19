@@ -76,12 +76,9 @@ fn analysed(input: &EnrichmentInput<'_>) -> Result<Enrichment, String> {
     if let Some(schema) = analysis_schema(input) {
         options.insert("schema".to_owned(), schema);
     }
-    options.insert(
-        "complexityGuard".to_owned(),
-        serde_json::to_value(polyglot_complexity_guard()).map_err(|error| error.to_string())?,
-    );
-    let options: AnalyzeQueryOptions = serde_json::from_value(Value::Object(options))
+    let mut options: AnalyzeQueryOptions = serde_json::from_value(Value::Object(options))
         .map_err(|error| format!("query analysis options: {error}"))?;
+    options.complexity_guard = Some(polyglot_complexity_guard());
     let analysis = match analyze_query(&cleaned, options) {
         Ok(analysis) => analysis,
         Err(_) => return legacy(input, &cleaned),

@@ -15,12 +15,6 @@ use crate::lineage::models::{
     FastLineageOutcome, LineageColumn, LineageConfidence, LineageResourceType, LineageSource,
     LineageTransformKind,
 };
-use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
-
-/// The parse options SQLBuild's Polyglot proxy gives `parse_one`, decoded as the wheel does.
-pub(crate) fn proxy_parse_options() -> Result<ParseOptions, serde_json::Error> {
-    Ok(polyglot_parse_options())
-}
 
 pub(crate) struct ParsedModel<'a> {
     pub(crate) query_sql: &'a str,
@@ -28,7 +22,7 @@ pub(crate) struct ParsedModel<'a> {
     pub(crate) schema: &'a HashMap<String, Vec<String>>,
     /// The parser dialect, or the dialect name Polyglot does not know.
     pub(crate) dialect: Result<DialectType, &'a str>,
-    pub(crate) options: &'a Result<ParseOptions, serde_json::Error>,
+    pub(crate) options: &'a ParseOptions,
 }
 
 /// The model's lineage outcome; fails on a tree the lineage walk cannot read.
@@ -37,10 +31,7 @@ pub(crate) fn parsed_model_lineage(model: &ParsedModel<'_>) -> Result<FastLineag
         Ok(dialect) => dialect,
         Err(name) => return Ok(FastLineageOutcome::UnknownDialect(name.to_owned())),
     };
-    let options: &ParseOptions = model
-        .options
-        .as_ref()
-        .map_err(|_| "the parse options do not build".to_owned())?;
+    let options: &ParseOptions = model.options;
     let physical = physical_resources(model.query_sql);
     let sql = normalized_sql(model.query_sql);
     let mut statements = match Dialect::get(dialect).parse_with_options(&sql, options) {

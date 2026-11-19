@@ -40,11 +40,34 @@ _REPOSITORY_ROOT: Path = Path(__file__).resolve().parents[5]
             expected_sites=("x.rs:1 AnalyzeQueryOptions {",),
         ),
         UnguardedSiteTestCase(
+            description="Polyglot parse options that fill the rest from the default",
+            text="fn h() { let o = ParseOptions { ..Default::default() }; }",
+            expected_sites=("x.rs:1 ParseOptions {",),
+        ),
+        UnguardedSiteTestCase(
+            description="a data type parse without options",
+            text="fn i() { Dialect::get(d).parse_data_type(spelling) }",
+            expected_sites=(r"x.rs:1 \bparse_data_type\(",),
+        ),
+        UnguardedSiteTestCase(
+            description=(
+                "SQLQuack's per-dialect parsers are excluded: they take no options and keep their "
+                "own depth limits until SQLQuack accepts options for them"
+            ),
+            text=(
+                "fn k() { sqlquack_syntax_postgres::parse_strict(sql) }\n"
+                "fn l() { sqlquack_syntax_bigquery::parse_type(spelling) }\n"
+                "fn m(parser: &dyn NativeDialect) { parser.parse(sql) }\n"
+            ),
+            expected_sites=(),
+        ),
+        UnguardedSiteTestCase(
             description="the shared options and constant",
             text=(
                 "fn e() -> AnalyzeQueryOptions { AnalyzeQueryOptions { complexity_guard: g } }\n"
                 "fn f() { Dialect::get(d).parse_with_options(sql, &polyglot_parse_options()); }\n"
                 "fn g() { R { max_function_call_depth: Some(MAX_FUNCTION_CALL_DEPTH) } }\n"
+                "fn j() { d.parse_data_type_with_options(t, &ParseOptions { complexity_guard: g }) }\n"
             ),
             expected_sites=(),
         ),

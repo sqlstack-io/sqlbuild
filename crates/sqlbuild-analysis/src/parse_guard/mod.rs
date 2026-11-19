@@ -1,4 +1,4 @@
-//! The one function-call depth every SQL parse in SQLBuild allows, for Polyglot and SQLQuack alike.
+//! One call depth for Polyglot and SQLQuack's shared and Snowflake parsers, not per-dialect ones.
 
 pub mod constants;
 pub mod main;
