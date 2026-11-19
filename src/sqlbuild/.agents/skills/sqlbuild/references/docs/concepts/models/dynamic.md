@@ -68,9 +68,11 @@ whether it succeeds or fails.
   both fail this way; run one of them again.
 - **A stopped build leaves its models suspended.** A build killed before it resumes them, for
   example by `SIGKILL`, can't resume them itself.
-- **The next build resumes them.** The next build that pauses dynamic models on the target
-  resumes them once the stopped build has been silent for `[dynamic] heartbeat_grace`, 30
-  minutes by default; see [Dynamic](../project-configuration.md#dynamic).
+- **The next build or sync resumes them.** Once the stopped build has been silent for
+  `[dynamic] heartbeat_grace`, 30 minutes by default, the next build that pauses dynamic
+  models on the target resumes them, and so does the next completed sync of a
+  [code location](../../cli/server.md#follow-a-sync) serving the target; see
+  [Dynamic](../project-configuration.md#dynamic).
 - **Taking over at once.** Run `sqb build --ignore-dynamic-grace` to take the models over
   without waiting. It needs `[dynamic] allow_ignore_grace = true`; without it the flag fails
   with `A719`. You can also resume the models in Snowflake by hand.

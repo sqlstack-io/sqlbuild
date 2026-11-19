@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from sqlbuild.executor.dynamic_pauses.types import DynamicPauseEventType
+from tests.integration.src.sqlbuild.executor.dynamic_pauses.helpers import (
+    PausingDuckDbAdapter,
+)
 
 
 @dataclass(frozen=True)
@@ -106,3 +110,44 @@ class TakenOverPauseTestCase:
     expected_rival: str
     expected_states: dict[str, str]
     expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class SyncResumeTestCase:
+    description: str
+    holds: tuple[tuple[str, str, int], ...]
+    hand_suspended: tuple[str, ...]
+    expected_resumed: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]
+    expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class NoPauseTableTestCase:
+    description: str
+    suspended: str
+    expected_states: dict[str, str]
+
+
+@dataclass(frozen=True)
+class QuietTokenTestCase:
+    description: str
+    holds: tuple[tuple[str, str, int], ...]
+    adapter: Callable[[], PausingDuckDbAdapter]
+    sent_token: Callable[[str], str | None]
+    expected_resumed: tuple[tuple[str, str], ...]
+    expected_token: Callable[[str], str | None]
+
+
+@dataclass(frozen=True)
+class DoubleCloseTestCase:
+    description: str
+    closers: tuple[str, ...]
+    expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class SyncDuringTakeoverTestCase:
+    description: str
+    expected_operations: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]

@@ -1,4 +1,4 @@
-//! Read-only warehouse adapter edge; never compile declarations or write warehouse state.
+//! Warehouse adapter edge of a location sync: read-only history sessions, and the writable session its dynamic resume uses; never compile declarations.
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
@@ -67,8 +67,8 @@ const FINGERPRINT_IDENTITY_COLUMNS: [&str; 5] = [
 
 /// One read-only adapter session serves every page of one synchronization.
 pub(crate) struct HistorySession<'py> {
-    adapter: Bound<'py, PyAny>,
-    connection: Bound<'py, PyAny>,
+    pub(crate) adapter: Bound<'py, PyAny>,
+    pub(crate) connection: Bound<'py, PyAny>,
     /// A local database file, whose read-only connection would block other processes' writers.
     pub(crate) local: bool,
 }
@@ -110,9 +110,11 @@ fn report_sync_warehouse(py: Python<'_>, connection_config: &Bound<'_, PyAny>) -
     )
 }
 
+/// A read-only session on the catalog connection; `writable` opens the writer's connection instead.
 pub(crate) fn open_history_session<'py>(
     py: Python<'py>,
     arguments: &KeywordArguments<'py>,
+    writable: bool,
 ) -> PyResult<HistorySession<'py>> {
     let ProjectAdapter {
         project_dir,
@@ -127,14 +129,14 @@ pub(crate) fn open_history_session<'py>(
         &discovered,
         (&project_dir, &arguments.value("selected_target")?),
         (&py.None().into_bound(py), true),
-        true,
+        !writable,
     )?;
     report_sync_warehouse(py, &connection_config)?;
     let adapter_name: String = adapter.getattr("adapter_name")?.extract()?;
     let local_path_key = LOCAL_DATABASE_PATH_KEYS
         .iter()
         .find(|(name, _)| *name == adapter_name);
-    if let Some((_, path_key)) = local_path_key {
+    if let Some((_, path_key)) = local_path_key.filter(|_| !writable) {
         let config = connection_config.cast::<PyDict>()?;
         let path: Option<String> = config
             .get_item(path_key)?

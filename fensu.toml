@@ -428,6 +428,11 @@ symbols = ["leftover_review_schemas"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
+modules = ["sqlbuild.executor.dynamic_pauses.main.resume_expired_holds"]
+symbols = ["resume_expired_holds"]
+reason = "Native code resolves these through the sqlbuild._native_host name table."
+
+[[targets.python.dead_code.roots]]
 modules = ["sqlbuild.executor.diff.exceptions"]
 symbols = ["FullDiffSizeGuardError"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
@@ -1657,12 +1662,12 @@ select = [
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/Cargo.toml"]
-thresholds = { max_crate_code_lines = 51200 }
-reason = "The Python bindings crate is above the code-line limit; this caps it near its current size until it is split into crates by area. The location and plan bindings of the large-project server work and #1560 grew it to 51,122; moving them out would need new cross-crate imports or a policy exception. Lower the cap as code moves out."
+thresholds = { max_crate_code_lines = 50899 }
+reason = "The Python bindings crate is above the code-line limit; this caps it near its current size until it is split into crates by area. The location and plan bindings of the large-project server work and #1560 grew it to 51,122; moving them out would need new cross-crate imports or a policy exception. The dbt event stream moved to sqlbuild-python-output (50,864); location-sync resume of dynamic holds adds 35 (50,899). Lower the cap as code moves out."
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/src/bindings/_helpers"]
-thresholds = { max_helpers_container_buckets = 93 }
+thresholds = { max_helpers_container_buckets = 92 }
 reason = "The bindings helpers container is above the bucket limit; this caps it at its current bucket count until cohesive groups move into their own modules or crates. Lower the cap as buckets move out."
 
 [targets.rust.rule_options.XSB076]
@@ -2758,7 +2763,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_command/init.rs=7",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_command/init_project.rs=26",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_command/support.rs=6",
-    "crates/sqlbuild-python/src/bindings/_helpers/dbt_events/stream.rs=0",
+    "crates/sqlbuild-python-output/src/dbt_events/models.rs=0",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/cli.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/event_stream.rs=14",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/execution.rs=1",
@@ -3065,7 +3070,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/dagster_invocation/arguments.rs=1",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_command/command.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_command/init_project.rs=2",
-    "crates/sqlbuild-python/src/bindings/_helpers/dbt_events/stream.rs=2",
+    "crates/sqlbuild-python-output/src/dbt_events/models.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/event_stream.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/graph.rs=1",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/manifest.rs=4",
@@ -3138,7 +3143,6 @@ module_layers = [
     "dag_artifact=registry",
     "dagster_invocation=commands",
     "dbt_command=commands",
-    "dbt_events=commands",
     "dbt_interop=commands",
     "debug_command=commands",
     "diagnostics=registry",
@@ -3564,7 +3568,7 @@ paths = ["crates/sqlbuild-python-base/src/boundary/_helpers/python_calls.rs", "c
 reason = "Each passes its own keyword set to its own Python callable; only building the keyword dict is alike."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-base/src/compile_context/_helpers/input_reads.rs", "crates/sqlbuild-python-front/src/discovery/main/project/register_project_files.rs", "crates/sqlbuild-python-front/src/discovery/main/snapshots/register_snapshot.rs", "crates/sqlbuild-python/src/bindings/_helpers/dbt_events/stream.rs"]
+paths = ["crates/sqlbuild-python-base/src/compile_context/_helpers/input_reads.rs", "crates/sqlbuild-python-front/src/discovery/main/project/register_project_files.rs", "crates/sqlbuild-python-front/src/discovery/main/snapshots/register_snapshot.rs", "crates/sqlbuild-python-output/src/dbt_events/models.rs"]
 reason = "Each registers its own module's Python functions; only the add-function calls are alike."
 
 [[dupes.allowlist]]
@@ -3976,7 +3980,7 @@ paths = ["crates/sqlbuild-python-compile/src/rules/_helpers/lint/lint_sql_bodies
 reason = "Each reads its own record's fields from its own Python object; only the field-read shape is alike."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-output/src/build_progress/models.rs", "crates/sqlbuild-python/src/bindings/_helpers/dbt_events/stream.rs"]
+paths = ["crates/sqlbuild-python-output/src/build_progress/models.rs", "crates/sqlbuild-python-output/src/dbt_events/models.rs"]
 reason = "Each Python constructor reads its own keyword set into its own fields; only the keyword parsing is alike."
 
 [[dupes.allowlist]]

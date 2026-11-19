@@ -2,6 +2,7 @@ pub mod column_name;
 pub mod configured_changes;
 pub mod configured_dynamic;
 pub mod configured_git_base_ref;
+pub mod configured_heartbeat_grace;
 pub mod configured_review;
 pub mod discover_configured_providers;
 pub mod discover_connection_configuration;
