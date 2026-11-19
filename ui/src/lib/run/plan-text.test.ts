@@ -50,6 +50,12 @@ describe('plan text, as sqb plan prints it', () => {
 		expect(routine.entries).toEqual([{ name: 'daily_totals', value: 'maintained', detail: ['recomputes in full: orders is rebuilt'] }]);
 	});
 
+	it('says a kept maintained model is paused when the warehouse lists it as suspended', () => {
+		const kept = model('daily_totals', { materialization_type: 'maintained', action: 'keep_maintained', paused: true });
+		const [routine] = planSections(plan([kept]));
+		expect(routine.entries).toEqual([{ name: 'daily_totals', value: 'maintained', detail: ['paused: scheduled refreshes are suspended'] }]);
+	});
+
 	it('puts each change in its own section in reason order, then the routine models, and leaves skipped ones out', () => {
 		const sections = planSections(
 			plan([

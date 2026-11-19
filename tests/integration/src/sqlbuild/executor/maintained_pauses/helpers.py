@@ -7,7 +7,11 @@ from pathlib import Path
 from typing import Any
 
 from sqlbuild._native import PlanOutput
-from sqlbuild.adapter.contract.types import MaintainedOperation, TablePromotionMode
+from sqlbuild.adapter.contract.types import (
+    MaintainedListing,
+    MaintainedOperation,
+    TablePromotionMode,
+)
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.executor.build.main._execute import execute_build_plan
 from sqlbuild.executor.build.models import BuildExecutionResult, BuildRuntimeParams
@@ -40,24 +44,21 @@ class PausingDuckDbAdapter(DuckDbAdapter):
     def __init__(self) -> None:
         super().__init__()
         self.states: dict[str, str] = {}
-        self.listed: dict[str, tuple[str, str]] = {}
         self.operations: list[tuple[str, str]] = []
 
     def session_warehouse(self, *, connection: Any) -> str | None:
         del connection
         return "SESSION_WH"
 
-    def maintained_refresh_settings(
+    def maintained_listing(
         self, *, connection: Any, database: str | None, schema: str | None, name: str
-    ) -> tuple[str, str] | None:
+    ) -> MaintainedListing | None:
         del connection, database, schema
-        return self.listed.get(name)
-
-    def maintained_scheduling_state(
-        self, *, connection: Any, database: str | None, schema: str | None, name: str
-    ) -> str | None:
-        del connection, database, schema
-        return self.states.get(name)
+        listings: dict[str, MaintainedListing] = {
+            listed: MaintainedListing("1 hour", "TRANSFORM_WH", state)
+            for listed, state in self.states.items()
+        }
+        return listings.get(name)
 
     def render_create_maintained(
         self, *, destination: str, sql: str, target_lag: str, refresh_mode: str, warehouse: str
@@ -65,7 +66,6 @@ class PausingDuckDbAdapter(DuckDbAdapter):
         del target_lag, refresh_mode, warehouse
         name: str = destination.rsplit(".", 1)[-1]
         self.states[name] = _CREATED_STATE
-        self.listed[name] = ("1 hour", "TRANSFORM_WH")
         self.operations.append(("create", name))
         return (f"CREATE OR REPLACE TABLE {destination} AS {sql}",)
 

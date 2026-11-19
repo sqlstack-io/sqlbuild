@@ -7,6 +7,7 @@ from sqlbuild._native import (
     PlanReason,
     WarningSeverity,
 )
+from sqlbuild.adapter.contract.types import MaintainedListing
 from sqlbuild.compiler.compile.types import FunctionLanguage
 
 
@@ -210,13 +211,14 @@ class SyncedScanTestCase:
 @dataclass(frozen=True)
 class MaintainedRefreshPlanTestCase:
     description: str
-    listed_settings: tuple[str, str] | None
+    listed_settings: MaintainedListing | None
     upstream_query: str
     expected_upstream_action: PlanAction
     expected_action: PlanAction
     expected_reason: PlanReason
     expected_reinitialised_by: str | None
     expected_read_names: tuple[str, ...]
+    expected_paused: bool = False
 
 
 @dataclass(frozen=True)

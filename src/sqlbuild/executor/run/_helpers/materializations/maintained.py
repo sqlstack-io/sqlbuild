@@ -9,7 +9,7 @@ from sqlbuild._native import CompiledRelationLocation, ModelPlanEntry, PlanActio
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
-from sqlbuild.adapter.contract.types import MaintainedOperation, RelationType
+from sqlbuild.adapter.contract.types import MaintainedListing, MaintainedOperation, RelationType
 from sqlbuild.adapter.relations.main.cached_relation_type import cached_relation_type
 from sqlbuild.executor.maintained_pauses.classes.maintained_hold import MaintainedHold
 from sqlbuild.executor.run._helpers.materializations.view import execute_in_place_entry
@@ -117,7 +117,7 @@ def _former_relation(
     )
     if existing is None:
         return None
-    listed: tuple[str, str] | None = adapter.maintained_refresh_settings(
+    listed: MaintainedListing | None = adapter.maintained_listing(
         connection=connection,
         database=location.database,
         schema=location.schema,

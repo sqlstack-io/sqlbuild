@@ -10,7 +10,7 @@ from typing import Any
 from sqlbuild._native import CompiledRelationLocation
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
-from sqlbuild.adapter.contract.types import MaintainedOperation
+from sqlbuild.adapter.contract.types import MaintainedListing, MaintainedOperation
 from sqlbuild.executor.maintained_pauses._helpers.sql import (
     insert_sql,
     open_holds,
@@ -215,13 +215,9 @@ class MaintainedHold:
         return taken
 
     def _resume_found(self, *, connection: Any, relation: CompiledRelationLocation) -> None:
-        state: str | None = self._adapter.maintained_scheduling_state(
-            connection=connection,
-            database=relation.database,
-            schema=relation.schema,
-            name=relation.name,
-        )
-        if state == SUSPENDED_STATE:
+        if _scheduling_state(adapter=self._adapter, connection=connection, relation=relation) == (
+            SUSPENDED_STATE
+        ):
             self._run(
                 connection=connection,
                 destination=self._destination(relation),
@@ -247,12 +243,8 @@ class MaintainedHold:
                 )
 
     def _state(self, *, connection: Any, name: str) -> str | None:
-        location: CompiledRelationLocation = self._held[name]
-        return self._adapter.maintained_scheduling_state(
-            connection=connection,
-            database=location.database,
-            schema=location.schema,
-            name=location.name,
+        return _scheduling_state(
+            adapter=self._adapter, connection=connection, relation=self._held[name]
         )
 
     def _operate(self, *, connection: Any, name: str, operation: MaintainedOperation) -> None:
@@ -332,6 +324,18 @@ class MaintainedHold:
     def _warn(self, message: str) -> None:
         if self._on_progress is not None:
             self._on_progress(f"Warning: {message}")
+
+
+def _scheduling_state(
+    *, adapter: BaseAdapter, connection: Any, relation: CompiledRelationLocation
+) -> str | None:
+    listing: MaintainedListing | None = adapter.maintained_listing(
+        connection=connection,
+        database=relation.database,
+        schema=relation.schema,
+        name=relation.name,
+    )
+    return None if listing is None else listing.scheduling_state
 
 
 def _key(location: CompiledRelationLocation) -> _RelationKey:

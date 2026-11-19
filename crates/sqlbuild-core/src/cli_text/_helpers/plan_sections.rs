@@ -633,6 +633,9 @@ pub(crate) fn routine_model_lines(
         if let Some(upstream) = &model.reinitialised_by {
             lines.push(format!("    recomputes in full: {upstream} is rebuilt"));
         }
+        if model.paused {
+            lines.push("    paused: scheduled refreshes are suspended".to_owned());
+        }
         lines
     })
 }

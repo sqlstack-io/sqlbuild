@@ -33,6 +33,7 @@ from sqlbuild.adapter.contract.models import (
 from sqlbuild.adapter.contract.types import (
     FrameworkType,
     LoaderLogicalType,
+    MaintainedListing,
     MaintainedOperation,
     PromotionStrategy,
     StatementSizeLimit,
@@ -359,18 +360,10 @@ class StrictAdapter(
             help="materialized maintained needs an adapter whose warehouse refreshes it",
         )
 
-    def maintained_refresh_settings(
+    def maintained_listing(
         self, *, connection: Any, database: str | None, schema: str | None, name: str
-    ) -> tuple[str, str] | None:
-        """Optional: a maintained model's listed target lag and refresh warehouse, or None."""
-
-        del connection, database, schema, name
-        return None
-
-    def maintained_scheduling_state(
-        self, *, connection: Any, database: str | None, schema: str | None, name: str
-    ) -> str | None:
-        """Optional: a maintained model's `ACTIVE` or `SUSPENDED` state, or None when unlisted."""
+    ) -> MaintainedListing | None:
+        """Optional: how the warehouse lists a maintained model, or None when it lists none."""
 
         del connection, database, schema, name
         return None

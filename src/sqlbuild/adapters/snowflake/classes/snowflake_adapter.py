@@ -99,6 +99,7 @@ from sqlbuild.adapter.contract.types import (
     HistoricalSnapshotCloseStyle,
     HistoricalSnapshotInsertStyle,
     LoaderLogicalType,
+    MaintainedListing,
     MaintainedOperation,
     MigrationTransfer,
     PromotionStrategy,
@@ -3716,25 +3717,21 @@ class SnowflakeAdapter(
             return warehouse
         return '"' + warehouse.replace('"', '""') + '"'
 
-    def maintained_refresh_settings(
+    def maintained_listing(
         self, *, connection: Any, database: str | None, schema: str | None, name: str
-    ) -> tuple[str, str] | None:
-        """The dynamic table's target lag and warehouse from SHOW DYNAMIC TABLES, or None."""
+    ) -> MaintainedListing | None:
+        """The dynamic table's lag, warehouse and scheduling state from SHOW DYNAMIC TABLES."""
 
         row: dict[str, object] | None = self._listed_dynamic_table(
             connection=connection, database=database, schema=schema, name=name
         )
-        return None if row is None else (str(row.get("target_lag")), str(row.get("warehouse")))
-
-    def maintained_scheduling_state(
-        self, *, connection: Any, database: str | None, schema: str | None, name: str
-    ) -> str | None:
-        """The dynamic table's scheduling state from SHOW DYNAMIC TABLES, or None."""
-
-        row: dict[str, object] | None = self._listed_dynamic_table(
-            connection=connection, database=database, schema=schema, name=name
+        if row is None:
+            return None
+        return MaintainedListing(
+            target_lag=str(row.get("target_lag")),
+            warehouse=str(row.get("warehouse")),
+            scheduling_state=str(row.get("scheduling_state")),
         )
-        return None if row is None else str(row.get("scheduling_state"))
 
     def _listed_dynamic_table(
         self, *, connection: Any, database: str | None, schema: str | None, name: str

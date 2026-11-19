@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from sqlbuild._native import PlanAction
+from sqlbuild.adapter.contract.types import MaintainedListing
 from sqlbuild.executor.run.main._execute import execute_maintained_entry
 from sqlbuild.executor.run.models import ModelExecutionResult
 from sqlbuild.executor.scheduling.types import ExecutionStatus
@@ -116,7 +117,7 @@ def test_given_maintained_entry_when_executing_then_settings_reach_the_warehouse
             description="a failed create never drops a relation listed as a dynamic table",
             setup_sql=("CREATE VIEW staging.daily_totals AS SELECT 1 AS orders",),
             session_warehouse="SESSION_WH",
-            listed_settings=("1 hour", "SESSION_WH"),
+            listed_settings=MaintainedListing("1 hour", "SESSION_WH", "ACTIVE"),
             expected_error_code="R002",
             expected_listed_types=(("VIEW",),),
         ),

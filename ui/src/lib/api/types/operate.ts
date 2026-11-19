@@ -658,6 +658,8 @@ export type PlanModel = {
 	changed_functions?: string[];
 	/** The rebuilt upstream that makes this kept maintained model recompute in full. */
 	reinitialised_by?: string;
+	/** Whether the warehouse lists this kept maintained model as suspended. */
+	paused?: boolean;
 	cursor_type?: string;
 	cursor?: { requested_bounds: { start: string | null; end: string | null }; resolved_bounds: { start: string | null; end: string | null } | null } | null;
 	/** Unified diff lines of the query since the model's last build, as `sqb plan` prints them. */

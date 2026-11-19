@@ -15,6 +15,7 @@ from sqlbuild._native import (
     PlanReason,
 )
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
+from sqlbuild.adapter.contract.types import MaintainedListing
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.executor.run.models import ModelMaterializationContext
 
@@ -25,11 +26,11 @@ class MaintainedDuckDbAdapter(DuckDbAdapter):
     """Builds a maintained model as a table that, like a dynamic table, replaces nothing else."""
 
     def __init__(
-        self, *, session_warehouse: str | None, listed_settings: tuple[str, str] | None = None
+        self, *, session_warehouse: str | None, listed_settings: MaintainedListing | None = None
     ) -> None:
         super().__init__()
         self.warehouse: str | None = session_warehouse
-        self.listed_settings: tuple[str, str] | None = listed_settings
+        self.listed_settings: MaintainedListing | None = listed_settings
         self.created: list[tuple[str, str, str]] = []
         self.altered: list[tuple[str, str | None]] = []
 
@@ -37,9 +38,9 @@ class MaintainedDuckDbAdapter(DuckDbAdapter):
         del connection
         return self.warehouse
 
-    def maintained_refresh_settings(
+    def maintained_listing(
         self, *, connection: Any, database: str | None, schema: str | None, name: str
-    ) -> tuple[str, str] | None:
+    ) -> MaintainedListing | None:
         del connection, database, schema, name
         return self.listed_settings
 
