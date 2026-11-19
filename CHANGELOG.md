@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.251.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.250.0...v0.251.0) (2026-11-19)
+
+
+### Features
+
+* maintained models on Snowflake as dynamic tables, paused safely during builds ([#1591](https://github.com/sqlstack-io/sqlbuild/issues/1591)) ([7733deb](https://github.com/sqlstack-io/sqlbuild/commit/7733deb20532a17e4cf402a0a85a83310a70ec72))
+
 ## [0.250.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.249.1...v0.250.0) (2026-11-19)
 
 
