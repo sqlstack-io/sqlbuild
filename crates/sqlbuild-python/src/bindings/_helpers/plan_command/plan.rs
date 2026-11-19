@@ -129,7 +129,7 @@ pub(crate) enum PlanProject<'a, 'py> {
 
 /// A location preview's reads over the synced `state`, never deferring; other plans read live.
 fn preview<'py>(
-    request: &Bound<'py, PyAny>,
+    (request, project): (&Bound<'py, PyAny>, PlanProject<'_, 'py>),
     state: Option<&Arc<WarehouseState>>,
 ) -> PyResult<Option<SyncedPlan<'py>>> {
     let py: Python<'py> = request.py();
@@ -146,7 +146,8 @@ fn preview<'py>(
             },
         ));
     }
-    let synced: Arc<SyncedReads> = Arc::new(SyncedReads::new(Arc::clone(state)));
+    let held_project: bool = matches!(project, PlanProject::Held { .. });
+    let synced: Arc<SyncedReads> = Arc::new(SyncedReads::new(Arc::clone(state), held_project));
     let reads: Bound<'py, PlannerReads> = Bound::new(py, PlannerReads::new(synced.clone()))?;
     Ok(Some(SyncedPlan { synced, reads }))
 }
@@ -225,7 +226,7 @@ fn resolve_invocation<'py>(
     } else {
         requested_load
     };
-    let preview: Option<SyncedPlan<'py>> = preview(request, state)?;
+    let preview: Option<SyncedPlan<'py>> = preview((request, project), state)?;
     Ok(PlanInvocation {
         project_dir,
         discovered,

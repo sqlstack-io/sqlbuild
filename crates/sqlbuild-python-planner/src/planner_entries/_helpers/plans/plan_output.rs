@@ -8,6 +8,7 @@ use crate::planner_entries::models::PlanOutputInputs;
 use crate::planner_resolution::main::references::resolve_function_sql::resolve_function_sql;
 use crate::planner_strategy::main::audit_entries::build_selected_audit_entries::build_selected_audit_entries;
 use crate::planner_strategy::main::model_entries::extract_seed_columns::extract_seed_columns;
+use pyo3::exceptions::PyException;
 use pyo3::prelude::Py;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
@@ -15,6 +16,7 @@ use pyo3::types::PyTupleMethods;
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyList, PyTuple};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::main::write_console::write_console;
 use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -43,6 +45,9 @@ use sqlbuild_python_project::resource_views::main::seed_reads::seed_file::seed_f
 use sqlbuild_python_project::sql_test_glue::main::assemble_sql_test_plans::assemble_sql_test_plans;
 use sqlbuild_python_project::sql_test_glue::models::SqlTestAssembly;
 use std::sync::{Arc, OnceLock};
+
+/// The stream a location's log reads, told once per publication how planning every SQL test went.
+const STDERR: &str = "stderr";
 
 const LOADER_CONSUMER: &str = "loader";
 const HOOK_CONSUMER: &str = "hook";
@@ -595,8 +600,28 @@ fn held_selected_test_entries<'py>(
         held.bind(py).borrow().held_sql_test_results();
     if results.get().is_none() {
         let planned: Option<Py<PyTuple>> = match test_plan_results((project, dialect), &tests) {
-            Ok(planned) => Some(planned.unbind()),
-            Err(_) => None,
+            Ok(planned) => {
+                write_console(
+                    py,
+                    STDERR,
+                    &format!(
+                        "Planned the publication's {} SQL tests once for previews.\n",
+                        tests.len()
+                    ),
+                )?;
+                Some(planned.unbind())
+            }
+            Err(error) if error.is_instance_of::<PyException>(py) => {
+                write_console(
+                    py,
+                    STDERR,
+                    &format!(
+                        "Planning the publication's SQL tests once failed, so each preview plans its own: {error}\n"
+                    ),
+                )?;
+                None
+            }
+            Err(error) => return Err(error),
         };
         drop(results.set(planned));
     }

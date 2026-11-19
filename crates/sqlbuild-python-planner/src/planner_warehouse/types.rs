@@ -32,8 +32,8 @@ pub trait CursorProgress<'py> {
 
 /// Everything a plan reads from the warehouse, live or from a synced state that may answer unknown.
 pub trait WarehouseReads: Send + Sync + std::fmt::Debug {
-    /// Whether these reads answer a location's preview from its synced state.
-    fn preview(&self) -> bool {
+    /// Whether the plan uses the compiled project a location holds for its published generation.
+    fn held_project(&self) -> bool {
         false
     }
 

@@ -231,7 +231,7 @@ pub(crate) fn start_scope_planning<'py>(
             dialect: dialect.unbind(),
             selected_keys: native_field(scope, "selected_keys")?.unbind(),
             sql_test_selection: native_field(scope, "sql_test_selection")?.unbind(),
-            held: reads.get().reads().preview(),
+            held: reads.get().reads().held_project(),
         },
         enabled,
     )

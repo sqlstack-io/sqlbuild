@@ -536,6 +536,7 @@ class HeldPlanTestCase:
     expected_runs: tuple[tuple[str, ...], ...]
     expected_compiles: int
     expected_held_plans: int
+    expected_held_test_plannings: int
     expected_reused: tuple[bool, ...]
 
 

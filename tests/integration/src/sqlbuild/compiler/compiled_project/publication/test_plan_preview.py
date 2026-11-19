@@ -145,6 +145,12 @@ _UNKNOWN: list[str] = [
     "recorded migrations",
 ]
 _HELD: str = "Planning from the published compiled project."
+_HELD_TESTS: str = "Planned the publication's 1 SQL tests once for previews."
+_REFUNDS_TEST: str = (
+    "TEST ();\n\nWITH\n"
+    "__source__raw_refunds AS (SELECT 1 AS refund_id, 100 AS amount_cents),\n"
+    "__expected__refunds AS (SELECT 1 AS refund_id, 100 AS amount_cents)\n"
+)
 _SYNCED_READING: str = "Reading the synced warehouse state..."
 _REPLAYED: str = (
     "cursor window of daily_orders (the run starts it away from the last build's cursor)"
@@ -468,6 +474,7 @@ def test_given_a_served_location_when_syncs_complete_then_it_replans_only_after_
             expected_runs=((), ("model:order_count",), (), ()),
             expected_compiles=1,
             expected_held_plans=3,
+            expected_held_test_plannings=1,
             expected_reused=(False, False, False, True),
         ),
     ],
@@ -482,6 +489,7 @@ def test_given_plan_requests_when_the_location_plans_them_then_only_variables_co
         "models/order_count.sql": _PROJECT_FILES["models/order_count.sql"].replace(
             "AS order_count", "AS order_count, @@batch AS batch"
         ),
+        "tests/unit/test_refunds.sql": _REFUNDS_TEST,
     }
     write_files(project_dir=project, files=files)
     built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
@@ -497,6 +505,8 @@ def test_given_plan_requests_when_the_location_plans_them_then_only_variables_co
     assert tuple("reused_from" in plan["timings"] for plan in plans) == test_case.expected_reused
     assert log.count("Compiling project...") == test_case.expected_compiles, log
     assert log.count(_HELD) == test_case.expected_held_plans, log
+    # Only the published project plans every SQL test, once; the plan with variables plans its own.
+    assert log.count(_HELD_TESTS) == test_case.expected_held_test_plannings, log
     assert log.count(_SYNCED_READING) == test_case.expected_held_plans + 1, log
     assert "Warehouse connected" not in log, "a synced copy opens no warehouse connection"
 
