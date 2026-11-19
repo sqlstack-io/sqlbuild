@@ -1,5 +1,6 @@
-//! Committed change signals mark held views stale; a lost signal or a resync refreshes every held view and pushes only what changed, since clients refetch on `all`.
+//! Committed change signals refresh the views change streams watch and drop the others, which the next read loads again; a lost signal or a resync covers every held view, and only what changed is pushed, since clients refetch on `all`.
 
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use tokio::sync::broadcast;
@@ -43,11 +44,11 @@ pub(crate) fn start_node_states(
                         target_hash,
                         topic: ChangeTopic::NodeStatus | ChangeTopic::Snapshot,
                     }) => (
-                        held_targets(&cache, Some((location_id, &target_hash))),
+                        watched_targets(&cache, Some((location_id, &target_hash))),
                         true,
                     ),
                     Ok(ChangeMessage::Resync) | Err(broadcast::error::RecvError::Lagged(_)) => {
-                        (held_targets(&cache, None), false)
+                        (watched_targets(&cache, None), false)
                     }
                     Ok(_) => continue,
                     Err(broadcast::error::RecvError::Closed) => {
@@ -69,19 +70,26 @@ pub(crate) fn start_node_states(
     (cache, task)
 }
 
-/// The held targets a signal names, or every held target.
-fn held_targets(
+/// The watched targets a signal names, or every watched target; the unwatched ones it names are dropped once no refresh is pending or due, since one still pushes the old entry's versions.
+fn watched_targets(
     cache: &NodeStateCache,
     scope: Option<(Uuid, &str)>,
 ) -> Vec<((Uuid, String), Arc<TargetCache>)> {
-    let targets = cache.targets.lock().unwrap_or_else(PoisonError::into_inner);
+    let mut targets = cache.targets.lock().unwrap_or_else(PoisonError::into_inner);
+    let named = |(location_id, _): &(Uuid, String), entry: &TargetCache| {
+        scope.is_none_or(|(location, target_hash)| {
+            *location_id == location && entry.target_hash == target_hash
+        })
+    };
+    targets.retain(|key, entry| {
+        !named(key, entry)
+            || entry.watchers.load(Ordering::SeqCst) > 0
+            || entry.dirty.load(Ordering::SeqCst)
+            || entry.scheduled.load(Ordering::SeqCst)
+    });
     targets
         .iter()
-        .filter(|((location_id, _), entry)| {
-            scope.is_none_or(|(location, target_hash)| {
-                *location_id == location && entry.target_hash == target_hash
-            })
-        })
-        .map(|(scope, entry)| (scope.clone(), entry.clone()))
+        .filter(|(key, entry)| named(key, entry))
+        .map(|(key, entry)| (key.clone(), entry.clone()))
         .collect()
 }

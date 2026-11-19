@@ -29,6 +29,8 @@ use crate::api::_helpers::resources::{
     person_operations::recent_runs,
     person_operations::acknowledge,
     person_operations::acknowledgements,
+    person_operations::acknowledge_attention,
+    person_operations::attention_acknowledgements,
     person_reads::run_nodes,
     person_reads::nodes,
     person_reads::node_states,
@@ -51,7 +53,6 @@ use crate::api::_helpers::resources::{
     person_reads::sensor_state,
     person_reads::snapshots,
     person_reads::health,
-    person_reads::mirrored_totals,
     person_reads::problems,
     person_reads::platform_events,
     person_operations::catalog,
@@ -112,7 +113,6 @@ use crate::api::_helpers::resources::{
     warehouse_metadata::preview_copy,
     changed_builds::report,
     warehouse_metadata::statistics_due,
-    warehouse_metadata::retention,
     warehouse_metadata::sync_due,
     warehouse_metadata::watermark
 ))]
@@ -577,6 +577,8 @@ pub(crate) struct ChangeStream {
     pub(crate) receiver: tokio::sync::broadcast::Receiver<crate::store::models::ChangeMessage>,
     pub(crate) updates:
         tokio::sync::broadcast::Receiver<crate::node_states::models::NodeStatusUpdate>,
+    /// Keeps the target's node states refreshed while the stream is open.
+    pub(crate) _watch: crate::node_states::models::NodeStatesWatch,
     pub(crate) stopped: tokio::sync::watch::Receiver<bool>,
     pub(crate) keepalive: tokio::time::Interval,
     pub(crate) initial: bool,
@@ -617,6 +619,8 @@ pub struct ServerFacts {
     pub state_history: crate::warehouse_metadata::models::StateHistoryRetention,
     /// Each launcher's `pool_caps`; empty where this server runs no launcher.
     pub pool_caps: crate::declarations::models::ServerPoolCaps,
+    /// How long an acknowledged attention condition stays hidden while unchanged.
+    pub attention_snooze: crate::acknowledgements::models::AttentionSnooze,
 }
 
 /// The server's version, storage, sign-in and retention, for administrators.

@@ -13,7 +13,7 @@ pub fn preview_state_parts(copy: PreviewCopy, has_consumption: bool) -> Warehous
     WarehouseStateParts {
         provenance: SyncedProvenance {
             synced_at: copy.synced_at,
-            version: copy.version,
+            version: Some(copy.version),
         },
         relations: copy.relations.into_iter().map(relation).collect(),
         fingerprints: copy

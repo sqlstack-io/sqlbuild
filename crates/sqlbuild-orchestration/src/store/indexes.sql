@@ -12,3 +12,4 @@ CREATE INDEX IF NOT EXISTS sqb_warehouse_catalog_received ON sqb_warehouse_catal
 CREATE INDEX IF NOT EXISTS sqb_warehouse_fingerprints_received ON sqb_warehouse_fingerprints(location_id, target, received_at);
 CREATE INDEX IF NOT EXISTS sqb_warehouse_consumption_received ON sqb_warehouse_consumption(location_id, target, received_at);
 CREATE INDEX IF NOT EXISTS sqb_warehouse_observations_received ON sqb_warehouse_observations(location_id, target, received_at);
+CREATE INDEX IF NOT EXISTS sqb_security_audit_attention ON sqb_security_audit((scope_json ->> 'location_id'), (scope_json ->> 'target'), (scope_json ->> 'key'), storage_id) WHERE action IN ('attention.acknowledged', 'attention.acknowledgement_withdrawn');

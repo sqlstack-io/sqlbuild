@@ -8,7 +8,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{Change, ControlStore, ControlTransaction, Parameter, TransactionMode};
 use crate::warehouse_metadata::constants::{
-    IGNORED_KEY, MAX_HISTORY_PAGE_RECORDS, MAX_HISTORY_RECORDS,
+    CATALOG_MIRROR, IGNORED_KEY, MAX_HISTORY_PAGE_RECORDS, MAX_HISTORY_RECORDS,
 };
 use crate::warehouse_metadata::models::{
     MetadataBatch, MetadataScan, WarehouseHistoryKind, WarehouseSyncResponse,
@@ -80,21 +80,30 @@ pub(crate) async fn next_ingestion_chunk(
     .await
 }
 
-/// Delivered rows take the scan's id; a complete scan deletes every row it did not deliver.
+/// Delivered rows take the scan's id and catalog rows their receipt time; a complete scan deletes the rest, and a last page counts `table`'s mirror.
 pub(crate) async fn commit_ingestion(
     mut transaction: ControlTransaction,
     (table, location_id, target): (&str, Uuid, &str),
-    (scan, keys): (Option<&MetadataScan>, &[Uuid]),
+    (scan, keys, last_page): (Option<&MetadataScan>, &[Uuid], bool),
     mut applied: bool,
 ) -> Result<WarehouseSyncResponse, ControlError> {
     if let Some(scan) = scan {
         if !keys.is_empty() {
             let mut parameters = vec![Parameter::Id(scan.scan_id)];
+            let received: &str = if table == CATALOG_MIRROR {
+                parameters.push(Parameter::Time(transaction.now));
+                ",received_at=$2"
+            } else {
+                ""
+            };
+            let first_key: usize = parameters.len() + 1;
             parameters.extend(keys.iter().copied().map(Parameter::Id));
-            let placeholders = Parameter::placeholders(2..=parameters.len());
+            let placeholders = Parameter::placeholders(first_key..=parameters.len());
             (transaction, _) = query(
                 transaction,
-                &format!("UPDATE {table} SET scan_id=$1 WHERE event_id IN ({placeholders})"),
+                &format!(
+                    "UPDATE {table} SET scan_id=$1{received} WHERE event_id IN ({placeholders})"
+                ),
                 parameters,
             )
             .await?;
@@ -126,13 +135,27 @@ pub(crate) async fn commit_ingestion(
             applied |= !removed.is_empty();
         }
     }
+    let mut mirrored_records: Option<u64> = None;
+    if last_page {
+        let counted;
+        (transaction, counted) = query(
+            transaction,
+            &format!("SELECT COUNT(*) AS records FROM {table} WHERE location_id=$1 AND target=$2"),
+            vec![Parameter::Id(location_id), Parameter::Text(target.into())],
+        )
+        .await?;
+        mirrored_records = counted[0]["records"].as_u64();
+    }
     if applied {
         transaction
             .changes
             .insert(Change::NodeStatus(location_id, target.into()));
     }
     commit(transaction).await?;
-    Ok(WarehouseSyncResponse { applied })
+    Ok(WarehouseSyncResponse {
+        applied,
+        mirrored_records,
+    })
 }
 
 /// Every record of a scan page must come from the scanned physical namespace.

@@ -9,6 +9,8 @@ import type { LocalChangeBus } from '../signals';
 import { memberLinks, pairKey } from '$lib/lineage/member-graph';
 import type {
 	Acknowledgement,
+	AttentionAcknowledgement,
+	ConditionShape,
 	CatalogNode,
 	WaitReason,
 	AdhocPermission,
@@ -57,6 +59,7 @@ import type {
 	TriggerState,
 	TriggerStateEvent
 } from '../types';
+import { newRequestId } from '$lib/browser/request-id';
 import {
 	serverLimitOf,
 	IMAGE_ID,
@@ -846,8 +849,24 @@ export class MockOperate {
 
 	/** Problem runs marked handled, by run ID. */
 	#acknowledgements = new Map<string, Acknowledgement>();
+	#conditionAcks = new Map<string, AttentionAcknowledgement>();
 	acknowledgement(runId: string): Acknowledgement | null {
 		return this.#acknowledgements.get(runId) ?? null;
+	}
+	/** Conditions' latest acknowledgements, as the server lists them. */
+	conditionAcknowledgements(): AttentionAcknowledgement[] {
+		return [...this.#conditionAcks.values()];
+	}
+	/** As the server: holds for 24 hours, and acknowledging the same shape again while it holds changes nothing. */
+	acknowledgeCondition(key: string, shape: ConditionShape, acknowledged: boolean, by: string, withdraws?: string): void {
+		if (!acknowledged) {
+			if (withdraws === undefined || this.#conditionAcks.get(key)?.eventId === withdraws) this.#conditionAcks.delete(key);
+			return;
+		}
+		const held = this.#conditionAcks.get(key);
+		const now = Date.now();
+		if (held && JSON.stringify(held.shape) === JSON.stringify(shape) && (held.until === null || now < Date.parse(held.until))) return;
+		this.#conditionAcks.set(key, { eventId: newRequestId(), key, shape, by, at: new Date(now).toISOString(), until: new Date(now + 86_400_000).toISOString() });
 	}
 	acknowledgeRun(runId: string, acknowledged: boolean, by: string): void {
 		if (acknowledged) this.#acknowledgements.set(runId, { by, at: new Date().toISOString() });

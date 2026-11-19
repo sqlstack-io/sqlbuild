@@ -340,6 +340,63 @@ pub(crate) struct AcknowledgementTestCase {
     pub(crate) expected_acknowledged_by: &'static str,
 }
 
+pub(crate) struct AttentionAcknowledgementTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Statuses of: acknowledge, retry, reused event ID, same shape again, empty key, array shape, large shape.
+    pub(crate) expected_statuses: [u16; 7],
+    /// Whether each of acknowledge, retry, same shape, worse shape, other key, withdraw, again applied.
+    pub(crate) expected_applied: [bool; 7],
+    pub(crate) expected_acknowledged_by: &'static str,
+    pub(crate) expected_snooze_hours: i64,
+    /// Listed keys after the worse shape and another condition, then after withdrawing the first.
+    pub(crate) expected_keys: (&'static [&'static str], &'static [&'static str]),
+}
+
+pub(crate) struct AttentionSnoozeTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) snooze: crate::acknowledgements::models::AttentionSnooze,
+    pub(crate) expected_snooze_seconds: serde_json::Value,
+    pub(crate) expected_until_seconds: Option<i64>,
+    pub(crate) expected_same_shape_applies_after_a_wait: bool,
+}
+
+pub(crate) struct SnoozeParseTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) text: &'static str,
+    /// The snooze in seconds (none for no time limit), or part of the error message.
+    pub(crate) expected_seconds: Result<Option<i64>, &'static str>,
+}
+
+pub(crate) struct AutomaticWithdrawalTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Whether the first and the second viewer's identical withdrawal applied.
+    pub(crate) expected_applied: [bool; 2],
+    pub(crate) expected_reason: &'static str,
+    pub(crate) expected_withdrawals: usize,
+}
+
+pub(crate) struct NamedWithdrawalTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Statuses of: acknowledge, re-acknowledge, stale withdrawal, acknowledge naming one, current withdrawal.
+    pub(crate) expected_statuses: [u16; 5],
+    /// Whether the withdrawal naming the first and then the second acknowledgement applied.
+    pub(crate) expected_applied: [bool; 2],
+    pub(crate) expected_standing_after_stale: &'static str,
+}
+
+pub(crate) struct ListingPlanTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// How the backend shows a plan.
+    pub(crate) explain: &'static str,
+    pub(crate) expected_index: &'static str,
+    /// Plan lines that would mean the whole audit log is read.
+    pub(crate) expected_full_scans: &'static [&'static str],
+}
+
 pub(crate) struct ProvidersTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
@@ -356,6 +413,15 @@ pub(crate) struct ChangedBuildTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) expected_before_plan: serde_json::Value,
+}
+
+pub(crate) struct HeldTargetTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) watched: bool,
+    /// A refresh is due and one is scheduled, as when signals arrived while the target was watched.
+    pub(crate) pending: (bool, bool),
+    /// Whether the target is still held after the signal, and whether the signal refreshed it.
+    pub(crate) expected_held_and_refreshed: (bool, bool),
 }
 
 pub(crate) struct PushedStatesTestCase {

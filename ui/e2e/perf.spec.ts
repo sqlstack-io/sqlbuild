@@ -187,3 +187,63 @@ test('the plan page switches sections and shows more quickly on a slow computer'
 	console.info(`plan page, CPU slowed 6×: ${steps.join('; ')}`);
 	expect(over, `steps over ${PLAN_STEP_MS} ms`).toEqual([]);
 });
+
+// The Overview and the catalog's folder view on a project of about 10,000 nodes (`?mock&huge`), on a slow
+// computer: the pages open within the list budget, opening folders shows their rows within a second, the
+// whole opened tree scrolls at the frame budget, and acknowledging an item takes it off the list as fast.
+test('the Overview and the folder view stay quick on a 10,000-node project', async ({ page }) => {
+	test.setTimeout(240_000);
+	await page.setViewportSize({ width: 1600, height: 1000 });
+	await page.goto('/?mock&huge');
+	await page.locator('section.health .issue').first().waitFor({ timeout: 60_000 });
+	await settle(page);
+	const cdp = await page.context().newCDPSession(page);
+	await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+	const timed = async (act: () => Promise<void>, done: () => Promise<boolean>) => {
+		const start = Date.now();
+		await act();
+		await expect.poll(done, { timeout: 20_000, intervals: [10] }).toBe(true);
+		return Date.now() - start;
+	};
+	const results: string[] = [];
+	const over: string[] = [];
+	const judge = (step: string, ms: number, budget: number) => {
+		results.push(`${step} ${ms} ms`);
+		if (ms > budget) over.push(`${step}: ${ms} ms > ${budget}`);
+	};
+	const rows = page.getByTestId('folder-tree').locator('tbody tr[data-path], tbody tr.leaf');
+
+	judge('open the folder view', await timed(() => page.getByTestId('all-folders').click(), async () => (await rows.count()) >= 20), 2000);
+	await settle(page);
+	judge('expand all', await timed(() => page.getByRole('button', { name: 'Expand all' }).click(), async () => (await page.getByTestId('folder-more').count()) > 0 || (await page.locator('tbody tr.leaf').count()) > 0), 1000);
+	await page.getByRole('button', { name: 'Collapse all' }).click();
+	await settle(page);
+	const toggle = page.getByTestId('folder-toggle').first();
+	judge('open one folder', await timed(() => toggle.click(), async () => (await toggle.getAttribute('aria-expanded')) === 'true'), 1000);
+	await page.getByRole('button', { name: 'Expand all' }).click();
+	await settle(page);
+	const box = (await page.getByTestId('folder-tree').locator('tbody').boundingBox())!;
+	await page.mouse.move(box.x + box.width / 2, Math.min(box.y + 200, 900));
+	const scroll = async () => {
+		for (let i = 0; i < 20; i++) {
+			await page.mouse.wheel(0, i < 10 ? 400 : -400);
+			await page.waitForTimeout(30);
+		}
+	};
+	// PERF.md sets no budget for scrolling a list; the opened tree is reported beside the node list of the
+	// same project, which the shared table windows the same way, so a tree row that costs more shows.
+	const tree = await medianRun(page, scroll);
+	await page.getByRole('tab', { name: 'Nodes', exact: true }).click();
+	await page.locator('table.catalog tbody tr').first().waitFor();
+	await settle(page);
+	const list = await medianRun(page, scroll);
+	results.push(`scroll the opened tree: p90 ${Math.round(tree.p90)} ms, max ${Math.round(tree.max)} ms (node list: p90 ${Math.round(list.p90)} ms, max ${Math.round(list.max)} ms)`);
+
+	judge('back to the Overview', await timed(() => page.locator('nav a', { hasText: 'Overview' }).first().click(), async () => (await page.locator('section.health .issue').count()) > 0), 2000);
+	await settle(page);
+	const stale = page.locator('section.health .issues .issue', { hasText: 'out of date' });
+	judge('acknowledge nodes out of date', await timed(() => stale.getByRole('button', { name: 'Acknowledge' }).click(), async () => (await stale.count()) === 0), 1000);
+
+	console.info(`10,000 nodes, CPU slowed 6×: ${results.join('; ')}`);
+	expect(over, 'steps over budget').toEqual([]);
+});

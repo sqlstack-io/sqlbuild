@@ -560,29 +560,10 @@ fn given_a_plan_whose_document_left_diffs_out_when_read_then_pages_count_them_an
                     "config_diff": ["-a", "+b"]}),
                 ])
                 .collect();
-            let (detached_plan, detached) =
-                detach_model_diffs(json!({"models": models[..451].to_vec(), "warnings": []}));
-            let document = json!({
-                "models": detached_plan["models"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .chain([&models[451]])
-                    .collect::<Vec<_>>(),
-                "warnings": [],
-            });
-            let diffs: BTreeMap<String, PlanModelDiff> = detached
-                .into_iter()
-                .map(|(model, diff)| {
-                    (
-                        model,
-                        PlanModelDiff {
-                            query_diff: diff.query_diff,
-                            config_diff: diff.config_diff,
-                        },
-                    )
-                })
-                .collect();
+            let (document, detached) =
+                detach_model_diffs(json!({"models": models, "warnings": []}));
+            let diffs: BTreeMap<String, PlanModelDiff> =
+                serde_json::from_value(json!(detached)).expect("diffs");
             let result = LocationWorkResult {
                 claim_id: claimed.claim_id,
                 session_id: poll.session_id,
@@ -629,7 +610,7 @@ fn given_a_plan_whose_document_left_diffs_out_when_read_then_pages_count_them_an
             let detached_diff = read_person_plan_diff(store, reader, (plan, "orders_123"))
                 .await
                 .expect("diff");
-            let inline_diff = read_person_plan_diff(store, reader, (plan, "customers"))
+            let config_diff = read_person_plan_diff(store, reader, (plan, "customers"))
                 .await
                 .expect("diff");
             let missing = read_person_plan_diff(store, reader, (plan, "nowhere"))
@@ -649,7 +630,7 @@ fn given_a_plan_whose_document_left_diffs_out_when_read_then_pages_count_them_an
                     ),
                     (found.total, found.section_total),
                     detached_diff.map(|read| read.diff.query_diff),
-                    inline_diff.map(|read| read.diff.config_diff),
+                    config_diff.map(|read| read.diff.config_diff),
                     missing,
                     stored.result_json.map(|result| matches!(
                         result.outcome,
@@ -674,7 +655,7 @@ fn given_a_plan_whose_document_left_diffs_out_when_read_then_pages_count_them_an
                     None,
                     Some(true),
                 ),
-                "{}: pages count the left-out diffs, each diff reads from the document or apart from it, \
+                "{}: pages count the left-out diffs, each diff reads from where it was stored apart, \
                  and the stored plan never carries them",
                 test_case.description
             );
@@ -693,7 +674,7 @@ fn given_a_plan_whose_document_left_diffs_out_when_read_then_pages_count_them_an
                     (json!("totals"), Some(json!("full_refresh true → false"))),
                     (json!("customers"), None),
                 ],
-                "{}: a short config change reads in words whether its diff was detached or not",
+                "{}: a short config change reads in words without its diff",
                 test_case.description
             );
             execute(

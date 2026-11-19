@@ -148,6 +148,11 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
                 .post(crate::api::_helpers::resources::person_operations::acknowledge),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/attention-acknowledgements",
+            get(crate::api::_helpers::resources::person_operations::attention_acknowledgements)
+                .post(crate::api::_helpers::resources::person_operations::acknowledge_attention),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes",
             get(crate::api::_helpers::resources::person_reads::run_nodes),
         )
@@ -194,10 +199,6 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
         .route(
             "/api/control/locations/{location_id}/targets/{target}/health",
             get(crate::api::_helpers::resources::person_reads::health),
-        )
-        .route(
-            "/api/control/locations/{location_id}/targets/{target}/mirrored-totals",
-            get(crate::api::_helpers::resources::person_reads::mirrored_totals),
         )
         .route(
             "/api/control/platform/problems",

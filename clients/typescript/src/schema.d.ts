@@ -274,6 +274,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/attention-acknowledgements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAttentionAcknowledgements"];
+        put?: never;
+        post: operations["acknowledgeAttention"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/catalog": {
         parameters: {
             query?: never;
@@ -522,22 +538,6 @@ export interface paths {
             cookie?: never;
         };
         get: operations["readPersonMicrobatchCoverage"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/control/locations/{location_id}/targets/{target}/mirrored-totals": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["readPersonMirroredTotals"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1234,23 +1234,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/locations/{location_id}/targets/{target}/metadata/retention": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** How much state history a full read delivers; older servers answer 404 and the location reads it all. */
-        get: operations["read_metadata_retention"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/locations/{location_id}/targets/{target}/metadata/statistics-due": {
         parameters: {
             query?: never;
@@ -1631,6 +1614,51 @@ export interface components {
             decision_id?: string | null;
             error: string;
         };
+        /** @description A condition whose latest acknowledgement event marks it handled. */
+        AttentionAcknowledgement: {
+            /** Format: date-time */
+            acknowledged_at: string;
+            /** @description The person's name, or the audit actor when the person no longer exists. */
+            acknowledged_by: string;
+            /**
+             * Format: uuid
+             * @description The acknowledging audit event, which a withdrawal can name.
+             */
+            event_id: string;
+            key: string;
+            shape: unknown;
+            /**
+             * Format: date-time
+             * @description When the acknowledgement lapses even if the condition never changes; none without a time limit.
+             */
+            until?: string | null;
+        };
+        /** @description Marks an ongoing condition handled as it looks now, or withdraws that; an event ID applies once. */
+        AttentionAcknowledgementRequest: {
+            acknowledged: boolean;
+            /** Format: uuid */
+            event_id: string;
+            /** @description The condition's kind and subject, stable while it lasts, such as `stale_sources`. */
+            key: string;
+            /** @description Why, when it isn't a person's own choice, such as a withdrawal once the condition cleared. */
+            reason?: string | null;
+            /** @description What the condition looks like, as a JSON object of at most 8 KiB that later states are compared with. */
+            shape: unknown;
+            /**
+             * Format: uuid
+             * @description For a withdrawal, the acknowledgement event it withdraws: it applies only while that is still the latest.
+             */
+            withdraws?: string | null;
+        };
+        /** @description A target's condition acknowledgements, and how long one lasts while its condition is unchanged. */
+        AttentionAcknowledgements: {
+            acknowledgements: components["schemas"]["AttentionAcknowledgement"][];
+            /**
+             * Format: int64
+             * @description The server's `attention_snooze` in seconds; none when acknowledgements have no time limit.
+             */
+            snooze_seconds?: number | null;
+        };
         AuthenticationDenial: {
             error: string;
             /** Format: uuid */
@@ -1683,7 +1711,7 @@ export interface components {
             run_id?: string | null;
             status: string;
         };
-        /** @description A current snapshot node's declared metadata and latest build, without SQL, source or config. */
+        /** @description A current snapshot node's declared metadata and latest build, which the node listing leaves to node-states. */
         CatalogNodeRecord: {
             /** @description The checks on the node by their newest result. */
             checks: components["schemas"]["CatalogNodeChecks"];
@@ -1765,7 +1793,7 @@ export interface components {
         ChangedBuildReport: {
             changed: string[];
             downstream: string[];
-            /** @description Why the plan failed, sent with empty lists; only newer servers accept it. */
+            /** @description Why the plan failed, sent with empty lists. */
             failing?: string | null;
             /** Format: int64 */
             generation: number;
@@ -2221,6 +2249,11 @@ export interface components {
             kind: "warehouse_sync";
             location: components["schemas"]["WarehouseStateLocation"];
             /**
+             * Format: int64
+             * @description On the report of a table's last delivered page, the records the server then mirrored of that table across the target's state locations.
+             */
+            mirrored_records?: number | null;
+            /**
              * Format: date-time
              * @description On the report that completes or stops a sync, when the next safety sync is due unless a run ends first; absent otherwise, where no timed sync follows, and from older locations.
              */
@@ -2303,7 +2336,7 @@ export interface components {
             kind: "sensor_evaluation";
             outcome: components["schemas"]["CustomSensorOutcome"];
         } | {
-            /** @description Model diff text the document left out to stay under its cap; stored apart, never read back here. */
+            /** @description Model diff text, which the document never carries; stored apart, never read back here. */
             diffs?: {
                 [key: string]: components["schemas"]["PlanModelDiff"];
             };
@@ -2421,6 +2454,8 @@ export interface components {
             /** Format: int64 */
             generation: number;
             kind: components["schemas"]["WarehouseHistoryKind"];
+            /** @description The table's read ends with this page, so the reply counts the records mirrored of it. */
+            last_page?: boolean;
             records: Record<string, never>[];
             scan?: null | components["schemas"]["MetadataScan"];
             /** Format: uuid */
@@ -2451,12 +2486,6 @@ export interface components {
             model: string;
             physical_generation_id: string;
             target_name: string;
-        };
-        /** @description How many records the server holds for one mirrored state table of a target. */
-        MirroredTotal: {
-            /** Format: int64 */
-            records: number;
-            table: components["schemas"]["WarehouseHistoryKind"];
         };
         MutationResponse: {
             applied: boolean;
@@ -2771,7 +2800,7 @@ export interface components {
             /** @enum {string} */
             status: "unavailable";
         };
-        /** @description A planned model's diff text, from the plan document or, where the document left it out, apart from it. */
+        /** @description A planned model's diff text, stored beside its plan document. */
         PlanDiffRead: components["schemas"]["PlanModelDiff"] & {
             model: string;
         };
@@ -2955,12 +2984,12 @@ export interface components {
             synced_at?: string | null;
             /** @description Set when the mirror is still at the read's known version: the records are left out. */
             unchanged?: boolean;
-            /** @description The mirror version these records were read at; sent only to a versioned read. */
-            version?: string | null;
+            /** @description The mirror version these records were read at. */
+            version: string;
         };
         /** @description A location asks for the mirrored copy a plan preview plans from, as its fenced reader. */
         PreviewCopyRead: {
-            /** @description Whether the copy carries consumption history; sent only when set, as older servers reject it. */
+            /** @description Whether the copy carries consumption history. */
             consumption?: boolean;
             /** Format: int64 */
             generation: number;
@@ -2968,8 +2997,6 @@ export interface components {
             known_version?: string | null;
             /** Format: uuid */
             session_id: string;
-            /** @description Whether the location holds copies by mirror version; sent only when set, as older servers reject it. */
-            versioned?: boolean;
         };
         /** @description The newest successful build of a node, which a `cursor_max` observation must come from. */
         PreviewLatestRun: {
@@ -4103,9 +4130,6 @@ export interface components {
         /** @description What went wrong reading one page, without the warehouse's message, which may name hosts or users. */
         WarehouseReadFailure: {
             /** @enum {string} */
-            kind: "reader_start";
-        } | {
-            /** @enum {string} */
             kind: "read_error";
         } | {
             /** @enum {string} */
@@ -4150,11 +4174,6 @@ export interface components {
             warehouse_size: string;
             warehouse_type?: string | null;
         };
-        /** @description The newest versions per node or check a full read of state history needs to deliver. */
-        WarehouseRetention: {
-            /** Format: int32 */
-            state_history_versions: number;
-        };
         /** @description Physical namespace of SQLBuild's source-freshness state table, never a source query. */
         WarehouseStateLocation: {
             database?: string | null;
@@ -4180,6 +4199,11 @@ export interface components {
             now: string;
             /** Format: date-time */
             runs_ended_at?: string | null;
+            /**
+             * Format: int32
+             * @description The newest versions per node or check a full read of state history needs to deliver.
+             */
+            state_history_versions: number;
         };
         /** @description A registered reader asks whether a run ended since its last synchronization began. */
         WarehouseSyncDueRead: {
@@ -4222,6 +4246,11 @@ export interface components {
         };
         WarehouseSyncResponse: {
             applied: boolean;
+            /**
+             * Format: int64
+             * @description Records the server mirrors of this table for the target, counted after a read's last page.
+             */
+            mirrored_records?: number | null;
         };
         /** @description Derive progress from committed mirror rows, scoped to the active physical reader. */
         WarehouseWatermarkRead: {
@@ -4888,6 +4917,95 @@ export interface operations {
                 };
             };
             /** @description The run is not in this location and target, or the event ID was reused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    listAttentionAcknowledgements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Conditions marked handled within two snoozes, lapsed ones included, and the snooze */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttentionAcknowledgements"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    acknowledgeAttention: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttentionAcknowledgementRequest"];
+            };
+        };
+        responses: {
+            /** @description Whether the condition's acknowledgement changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description The key, shape or reason is invalid, or the event ID was reused */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -5586,44 +5704,6 @@ export interface operations {
             };
         };
     };
-    readPersonMirroredTotals: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                location_id: string;
-                target: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Records the server mirrors of each state table of this target, in sync order */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MirroredTotal"][];
-                };
-            };
-            /** @description Session rejected */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-        };
-    };
     readPersonNodeStates: {
         parameters: {
             query?: never;
@@ -5713,7 +5793,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description An ETag from an earlier response; 304 when the snapshot and state version are unchanged */
+                /** @description An ETag from an earlier response; 304 when the snapshot is unchanged */
                 "If-None-Match"?: string | null;
             };
             path: {
@@ -5724,10 +5804,10 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Every node of the current snapshot; empty before the first publication */
+            /** @description Every node of the current snapshot without its state, which node-states serves; empty before the first publication */
             200: {
                 headers: {
-                    /** @description "<snapshot_id>:<state_version>"; absent before the first publication */
+                    /** @description "<snapshot_id>"; absent before the first publication */
                     ETag?: string;
                     [name: string]: unknown;
                 };
@@ -7592,42 +7672,6 @@ export interface operations {
             };
             /** @description Reader generation fenced */
             409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    read_metadata_retention: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                location_id: string;
-                target: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WarehouseRetention"];
-                };
-            };
-            /** @description Invalid credential */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Location not authorized */
-            403: {
                 headers: {
                     [name: string]: unknown;
                 };

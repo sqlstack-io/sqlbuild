@@ -471,9 +471,9 @@ pub(crate) fn cache_id(number: u8) -> Uuid {
     Uuid::from_u128(u128::from(number) + 1)
 }
 
-/// The cached value of `snapshot` in target `scope`, built as the snapshot's number, and whether this lookup built it.
+/// The cached publication of `snapshot` in target `scope`, built as `marked(snapshot)`, its mark, and whether this lookup built it.
 pub(crate) async fn cache_lookup(
-    slots: &std::sync::Mutex<crate::runs::models::SnapshotSlots<u8>>,
+    slots: &std::sync::Mutex<crate::runs::models::SnapshotSlots>,
     (scope, snapshot): (u8, u8),
 ) -> (u8, bool) {
     let built = std::cell::Cell::new(false);
@@ -483,12 +483,32 @@ pub(crate) async fn cache_lookup(
         (),
         |()| async {
             built.set(true);
-            Ok(((), snapshot))
+            Ok(((), marked(snapshot)))
         },
     )
     .await
     .expect("cached value");
-    (*value, built.get())
+    (mark(&value), built.get())
+}
+
+/// An empty publication whose only node key is `mark`, so a lookup shows which build it got.
+pub(crate) fn marked(mark: u8) -> crate::runs::models::CachedPublication {
+    use crate::runs::types::CommandPlanner;
+    crate::runs::models::CachedPublication {
+        prepared: crate::runs::tests::test_types::ExactKeyPlanner
+            .prepare(Vec::new(), Default::default()),
+        writers: std::collections::BTreeMap::new(),
+        node_keys: std::iter::once(mark.to_string()).collect(),
+    }
+}
+
+/// The mark `marked` gave a publication.
+pub(crate) fn mark(publication: &crate::runs::models::CachedPublication) -> u8 {
+    publication
+        .node_keys
+        .first()
+        .and_then(|key| key.parse().ok())
+        .expect("a marked publication")
 }
 
 /// A selection evaluation as `(count, page, next offset, refusal message)`.

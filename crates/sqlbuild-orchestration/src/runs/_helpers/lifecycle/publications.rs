@@ -102,16 +102,16 @@ pub(crate) async fn cached_publication(
     .await
 }
 
-/// The value cached for `snapshot_id`, built once with `build` while concurrent callers wait; a failed build caches nothing.
-pub(crate) async fn cached<T, S, F, Fut>(
-    slots: &Mutex<SnapshotSlots<T>>,
+/// The publication cached for `snapshot_id`, built once with `build` while concurrent callers wait; a failed build caches nothing.
+pub(crate) async fn cached<S, F, Fut>(
+    slots: &Mutex<SnapshotSlots>,
     key: ((Uuid, String), Uuid),
     state: S,
     build: F,
-) -> Result<(S, Arc<T>), ControlError>
+) -> Result<(S, Arc<CachedPublication>), ControlError>
 where
     F: FnOnce(S) -> Fut,
-    Fut: Future<Output = Result<(S, T), ControlError>>,
+    Fut: Future<Output = Result<(S, CachedPublication), ControlError>>,
 {
     let cell = slot(slots, key);
     let mut state = Some(state);
@@ -132,10 +132,10 @@ where
 }
 
 /// The snapshot's cell, marked most recently used; adding one evicts its scope's least recently used beyond the limit.
-fn slot<T>(
-    slots: &Mutex<SnapshotSlots<T>>,
+fn slot(
+    slots: &Mutex<SnapshotSlots>,
     (scope, snapshot_id): ((Uuid, String), Uuid),
-) -> Arc<OnceCell<Arc<T>>> {
+) -> Arc<OnceCell<Arc<CachedPublication>>> {
     let mut state = slots.lock().unwrap_or_else(PoisonError::into_inner);
     state.clock += 1;
     let now = state.clock;

@@ -2,7 +2,6 @@ use serde_json::{Value, json};
 
 use crate::plan_display::_helpers::diff_lines::diff_stats;
 use crate::plan_display::main::detach_model_diffs::detach_model_diffs;
-use crate::plan_display::main::plan_model_diff::plan_model_diff;
 use crate::plan_display::main::plan_section_page::plan_section_page;
 use crate::plan_display::main::plan_summary::plan_summary;
 use crate::plan_display::models::{DiffStats, PlanPageSection};
@@ -591,20 +590,28 @@ fn given_a_document_whose_diffs_were_detached_when_paged_then_counts_remain_and_
         let page = |document: &Value| {
             plan_section_page(document, PlanPageSection::QueryChanged, ((0, 50), None)).rows
         };
+        let model_diff = |document: &Value| {
+            document["models"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .find(|row| row["name"] == test_case.model)
+                .and_then(|row| row.get("query_diff").cloned())
+        };
         assert_eq!(
             (
                 page(&detached),
                 diffs
                     .get(test_case.model)
-                    .and_then(|diff| diff.query_diff.clone()),
-                plan_model_diff(&detached, test_case.model),
-                plan_model_diff(&original, test_case.model).and_then(|diff| diff.query_diff),
+                    .and_then(|diff| diff.get("query_diff").cloned()),
+                model_diff(&detached),
+                model_diff(&original),
             ),
             (
                 page(&original),
-                test_case.expected_detached.map(owned),
+                test_case.expected_detached.map(|lines| json!(lines)),
                 None,
-                test_case.expected_detached.map(owned),
+                test_case.expected_detached.map(|lines| json!(lines)),
             ),
             "{}: pages read the same counts, and the text leaves the document whole",
             test_case.description

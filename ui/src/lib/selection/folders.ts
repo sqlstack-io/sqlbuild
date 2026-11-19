@@ -7,6 +7,27 @@ import { topFolder } from '$lib/lineage/catalog-graph';
 
 const dirOf = (path: string) => (path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
 
+/** The project folders a `path:` selector can start at; any other, such as `seeds/`, is an error (S012). */
+const PATH_ROOTS = ['models', 'python'];
+export const canSelectByPath = (dir: string) => PATH_ROOTS.some((root) => dir.startsWith(`${root}/`));
+
+/**
+ * Of `dirs`, those a `path:` selector would over-select: a node sits somewhere under one but doesn't
+ * `belong` to it, such as another group's node, or a source declared in a .yml file there. One pass
+ * over the nodes, plus one per folder depth.
+ */
+export function inexactDirs(nodes: readonly CatalogNode[], dirs: ReadonlySet<string>, belongs: (n: CatalogNode, dir: string) => boolean): Set<string> {
+	const inexact = new Set<string>();
+	for (const n of nodes) {
+		const parts = dirOf(n.path).split('/');
+		for (let i = 1; i <= parts.length; i++) {
+			const dir = parts.slice(0, i).join('/');
+			if (dirs.has(dir) && !belongs(n, dir)) inexact.add(dir);
+		}
+	}
+	return inexact;
+}
+
 /** The longest folder every one of `dirs` is in, or `''`. */
 function commonDir(dirs: string[]): string {
 	let common = dirs[0]?.split('/') ?? [];
@@ -36,25 +57,20 @@ export function folderSelections(nodes: readonly CatalogNode[]): Map<string, str
 	const groupAt = new Map<string, string>();
 	for (const [g, list] of groups) {
 		const dir = commonDir(list.map((n) => dirOf(n.path)));
-		// A bare root such as `models` holds every model; it never stands for one group.
-		if (!dir.includes('/') || groupAt.has(dir)) continue;
+		// A bare root such as `models` holds every model; it never stands for one group. Nor can a folder
+		// outside the roots a path selector accepts.
+		if (!canSelectByPath(dir) || groupAt.has(dir)) continue;
 		folderOf.set(g, dir);
 		groupAt.set(dir, g);
 	}
 	// A folder is exact only when no other group's node sits anywhere under it.
-	const inexact = new Set<string>();
-	for (const n of nodes) {
-		const own = topFolder(n);
-		const parts = dirOf(n.path).split('/');
-		for (let i = 1; i <= parts.length; i++) {
-			const g = groupAt.get(parts.slice(0, i).join('/'));
-			if (g !== undefined && g !== own) inexact.add(g);
-		}
-	}
+	// Sources are left out of the folders' counts, so one under a folder makes a path select more than counted.
+	const inexact = inexactDirs(nodes, new Set(groupAt.keys()), (n, dir) => n.kind !== 'source' && groupAt.get(dir) === topFolder(n));
 	const out = new Map<string, string>();
 	for (const [g, list] of groups) {
 		const dir = folderOf.get(g);
-		out.set(g, dir && !inexact.has(g) ? `path:${dir}` : [...new Set(list.map((n) => shortName(n.key)))].join(' '));
+		const counted = list.filter((n) => n.kind !== 'source');
+		out.set(g, dir && !inexact.has(dir) ? `path:${dir}` : [...new Set((counted.length ? counted : list).map((n) => shortName(n.key)))].join(' '));
 	}
 	return out;
 }

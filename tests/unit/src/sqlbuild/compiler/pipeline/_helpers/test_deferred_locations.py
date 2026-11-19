@@ -2,17 +2,35 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
-from sqlbuild._native import CompiledRelationLocation, TargetConfig, build_deferred_locations
+from sqlbuild._native import (
+    CompiledRelationLocation,
+    TargetConfig,
+    build_deferred_locations,
+    gather_deferred_relations,
+)
+from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
+from sqlbuild.adapter.contract.models import RelationInfo
 from sqlbuild.adapters.bigquery.classes.bigquery_adapter import BigQueryAdapter
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
 from tests.unit.src.sqlbuild.compiler.pipeline._helpers._test_types import (
+    DeferredListingTestCase,
     DeferredTargetTestCase,
 )
 from tests.unit.src.sqlbuild.compiler.pipeline._helpers.helpers import (
+    ListingAdapter,
     build_single_model_project,
+    deferred_location,
+)
+
+_DEFERRED_RELATIONS: tuple[RelationInfo, ...] = (
+    RelationInfo(database="analytics", schema="prod", name="orders", relation_type="table"),
+    RelationInfo(database="archive", schema="prod", name="order_history", relation_type="table"),
+    RelationInfo(database="archive", schema="audit", name="refunds", relation_type="table"),
 )
 
 
@@ -147,3 +165,43 @@ def test_given_deferred_target_config_when_building_targets_then_resolves_expect
     assert result.schema == test_case.expected_schema
     assert result.database == test_case.expected_database
     assert result.qualified_name == test_case.expected_qualified_name
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DeferredListingTestCase(
+            description="locations in two databases are listed in each database",
+            locations=(
+                ("analytics", "prod", "orders"),
+                ("archive", "prod", "order_history"),
+                ("archive", "audit", "refunds"),
+            ),
+            expected_listings=[("analytics", ("prod",)), ("archive", ("audit", "prod"))],
+            expected_names=["order_history", "orders", "refunds"],
+        ),
+        DeferredListingTestCase(
+            description="locations in one database are listed once",
+            locations=(("archive", "prod", "order_history"), ("archive", "audit", "refunds")),
+            expected_listings=[("archive", ("audit", "prod"))],
+            expected_names=["order_history", "refunds"],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_deferred_locations_when_gathering_relations_then_lists_every_database(
+    test_case: DeferredListingTestCase,
+) -> None:
+    adapter: ListingAdapter = ListingAdapter(relations=_DEFERRED_RELATIONS)
+
+    relations: dict[str, RelationInfo] = gather_deferred_relations(
+        adapter=cast(BaseAdapter, adapter),
+        connection=None,
+        deferred_locations={
+            name: deferred_location(database=database, schema=schema, name=name)
+            for database, schema, name in test_case.locations
+        },
+    )
+
+    assert adapter.listed == test_case.expected_listings
+    assert sorted(relations) == test_case.expected_names

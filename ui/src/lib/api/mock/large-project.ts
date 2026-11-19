@@ -77,6 +77,17 @@ export function largeProject(client: ApiClient): ApiClient {
 					return planModelDiff(doc, model);
 				};
 			}
+			// Folder links select `path:<folder>`, which the large project answers from its own nodes.
+			if (prop === 'evaluateSelection') {
+				return async (...[scope, request]: Parameters<ApiClient['evaluateSelection']>) => {
+					const paths = request.select.split(/\s+/).filter((t) => t.startsWith('path:')).map((t) => t.slice(5).replace(/\/$/, ''));
+					if (!paths.length || request.select.split(/\s+/).some((t) => t && !t.startsWith('path:')) || request.exclude.trim()) return target.evaluateSelection(scope, request);
+					const real = await target.listCatalogNodes(scope);
+					const template = real.find((n) => n.kind === 'table') ?? real[0];
+					const keys = largeProjectNodes(template).filter((n) => paths.some((p) => n.path.startsWith(`${p}/`))).map((n) => n.key).sort();
+					return { snapshotId: null, count: keys.length, keys, nextOffset: null, error: null };
+				};
+			}
 			if (prop !== 'listCatalogNodes') return typeof value === 'function' ? value.bind(target) : value;
 			return async (...args: Parameters<ApiClient['listCatalogNodes']>) => {
 				const real = await target.listCatalogNodes(...args);

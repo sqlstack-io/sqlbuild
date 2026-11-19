@@ -37,6 +37,10 @@ const SQLITE_CHECKSUMS: &[(i64, &str)] = &[
         2,
         "4d4e3aa56b3a39d8550f691ae12fe463187b4f4cdeacc66ca94803701cab5e0a",
     ),
+    (
+        3,
+        "734163e22863ff86fbcf1329540736f279806d4ce5ea04f6d6ecb1703b3468c8",
+    ),
 ];
 const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
     (
@@ -46,6 +50,10 @@ const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
     (
         2,
         "99e13d88687d6e590e47149200a0d1cb03c0ff285a95339da40b76cba99e2a21",
+    ),
+    (
+        3,
+        "b1250935a5adf1d4691836a2125bb57360c1ff0a2a296a77e4d11bf6a80a99d9",
     ),
 ];
 /// A version 1 store mid-run: a child run holding a concurrency slot, a jobs document and an audit result.
@@ -170,13 +178,13 @@ fn given_a_version_1_store_with_live_work_when_migrating_then_rows_default_and_r
             description: "SQLite store",
             dialect: &SQLITE_STORE,
             foreign_key_check: "SELECT \"table\" || ' ' || parent AS item FROM pragma_foreign_key_check",
-            expected_version: 2,
+            expected_version: current_version(MIGRATIONS),
         },
         LiveWorkUpgradeTestCase {
             description: "PostgreSQL store",
             dialect: &POSTGRES_STORE,
             foreign_key_check: "SELECT 'enforced' AS item WHERE FALSE",
-            expected_version: 2,
+            expected_version: current_version(MIGRATIONS),
         },
     ];
     for test_case in test_cases {

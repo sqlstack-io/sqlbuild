@@ -98,6 +98,8 @@ pub(crate) enum Change {
     Trigger(Uuid),
     Snapshot(Uuid, String),
     NodeStatus(Uuid, String),
+    /// A condition was acknowledged or withdrawn; the Overview reloads on the runs topic.
+    Attention(Uuid, String),
     Credentials,
 }
 

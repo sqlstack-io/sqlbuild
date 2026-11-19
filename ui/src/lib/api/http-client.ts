@@ -2,7 +2,8 @@ import createFetch from 'openapi-fetch';
 import { shortName } from '$lib/build-area/labels';
 import { isActiveRun } from '$lib/status';
 import type { components, paths } from '$control/schema.d.ts';
-import { ApiError, type ApiClient } from './client';
+import { ApiError, isUnsupported, type ApiClient } from './client';
+import { applyNodeStates } from './node-states';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
 import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage, toNodeStates, toNodeStatusDelta } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
@@ -21,7 +22,7 @@ import { toSelectionEvaluation, toSelectionVocabulary } from './http-selection';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
-import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage } from './types/build';
+import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape, AutomaticWithdrawal } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 import { newRequestId } from '$lib/browser/request-id';
 
@@ -51,6 +52,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listRunOutput',
 	'getRunNodeError',
 	'acknowledgeRun',
+	'acknowledgeCondition',
 	'cancelRun',
 	'cancelMatchingRuns',
 	'rerunRun',
@@ -291,7 +293,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 	const errorRefused = new Set<string>();
 	// Targets whose health the person may not read; each refusal is audited, so Connections asks once per page load.
 	const healthRefused = new Set<string>();
-	// The node listing per location with the server's ETag; the server answers a repeat with 304 until the snapshot or states change.
+	// The node listing per location with the server's ETag; the server answers a repeat with 304 until the snapshot changes.
 	const listings = new Map<string, { etag: string; nodes: CatalogNode[] }>();
 	// Statistics samples per relation, oldest first, with the cursor after the newest; a refresh reads only newer samples.
 	const samples = new Map<string, { records: Wire['WarehouseStatisticsRecord'][]; after: Wire['WarehouseMirrorCursor'] }>();
@@ -504,6 +506,15 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const { error, response } = await http.POST('/api/control/locations/{location_id}/targets/{target}/acknowledgements', {
 				body: { event_id: newRequestId(), run_id: runId, acknowledged },
+				params: { path: { location_id: locationId, target }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+		},
+		async acknowledgeCondition(scope: Scope, key: string, shape: ConditionShape, acknowledged: boolean, automatic?: AutomaticWithdrawal): Promise<void> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { error, response } = await http.POST('/api/control/locations/{location_id}/targets/{target}/attention-acknowledgements', {
+				body: { event_id: automatic?.eventId ?? newRequestId(), key, shape, acknowledged, ...(automatic ? { reason: automatic.reason, withdraws: automatic.withdraws } : {}) },
 				params: { path: { location_id: locationId, target }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
 			});
 			if (response.status === 401) onUnauthorized();
@@ -752,13 +763,9 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const locations = (await bootstrapLocations()).filter((l) => !healthRefused.has(l.id));
 			const read = await Promise.all(
 				locations.map(async (location) => {
-					const { locationId, target } = parseLocationKey(location.id);
-					const [[{ data, response }, snapshot], totals] = await Promise.all([
-						locationHealth(location.id),
-						http.GET('/api/control/locations/{location_id}/targets/{target}/mirrored-totals', { params: { path: { location_id: locationId, target } } })
-					]);
+					const [{ data, response }, snapshot] = await locationHealth(location.id);
 					if (response.status === 403) healthRefused.add(location.id);
-					return data ? [toWarehouseConnection(location, data, snapshot, totals.data ?? null)] : [];
+					return data ? [toWarehouseConnection(location, data, snapshot)] : [];
 				})
 			);
 			return read.flat();
@@ -807,7 +814,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		disableAccount: (name: string): Promise<Account> => changePerson(name, 'disable'),
 		enableAccount: (name: string): Promise<Account> => changePerson(name, 'enable'),
 		async getColumnLineage(scope: Scope, ref: string, listing?: CatalogNode[]): Promise<ColumnLineage | null> {
-			const nodes = listing ?? (await implemented.listCatalogNodes(scope));
+			const nodes = listing ?? (await listingWithStates(scope));
 			const node = findNode(nodes, ref);
 			if (!node) return null;
 			const { locationId, target } = parseLocationKey(scope.locationId);
@@ -819,7 +826,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			return toColumnLineage(data, nodes);
 		},
 		async getCatalogNode(scope: Scope, ref: string, listing?: CatalogNode[]): Promise<CatalogNodeDetail | null> {
-			const nodes = listing ?? (await implemented.listCatalogNodes(scope));
+			const nodes = listing ?? (await listingWithStates(scope));
 			const node = findNode(nodes, ref);
 			if (!node) return null;
 			const { locationId, target } = parseLocationKey(scope.locationId);
@@ -857,10 +864,11 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const reads = Promise.all([
 				recentRuns(scope),
 				implemented.listChecks(scope),
-				listing ?? implemented.listCatalogNodes(scope),
+				listing ?? listingWithStates(scope),
 				implemented.listSnapshotChanges(scope, { limit: 100 }),
 				implemented.listPlatformEvents(),
-				acknowledgementsOf(scope)
+				acknowledgementsOf(scope),
+				attentionAcknowledgementsOf(scope)
 			]);
 			// Every listing needs view on all of the target, so a partial viewer gets no counts at all.
 			const read = await reads.catch((error: unknown) => {
@@ -868,8 +876,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				throw error;
 			});
 			if (!read) return null;
-			const [runs, checks, nodes, changes, events, acknowledgements] = read;
-			return overviewOf({ runs, checks, nodes, changes, events, acknowledgements, now: Date.now() });
+			const [runs, checks, nodes, changes, events, acknowledgements, conditions] = read;
+			return overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now: Date.now(), scopeKey: scope.locationId });
 		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
@@ -965,6 +973,16 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		const started: Promise<T> = load().finally(() => inFlight.get(key) === started && inFlight.delete(key));
 		inFlight.set(key, started);
 		return started;
+	}
+
+	/** The listing with its node states, for reads not given the catalog feed's nodes; a recording without the states read lists them itself. The states are read only after the listing is allowed, so a partial viewer is refused once. */
+	async function listingWithStates(scope: Scope): Promise<CatalogNode[]> {
+		const nodes = await implemented.listCatalogNodes(scope);
+		const states = await implemented.listNodeStates(scope).catch((reason: unknown) => {
+			if (isUnsupported(reason)) return null;
+			throw reason;
+		});
+		return states ? applyNodeStates(nodes, states.states) : nodes;
 	}
 
 	/** Sends the held listing's ETag, so an unchanged listing comes back as a 304 and is not sent or converted again. */
@@ -1134,6 +1152,21 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		if (response.status === 401) onUnauthorized();
 		if (!data) throw new ApiError(errorText(error, response), response.status);
 		return new Map(data.map((a) => [a.run_id, { by: a.acknowledged_by, at: a.acknowledged_at }]));
+	}
+
+	/** Conditions marked handled within two snoozes, lapsed ones included, and the snooze; none from a server or recording without them. */
+	async function attentionAcknowledgementsOf(scope: Scope): Promise<{ snoozeSeconds: number | null | undefined; acknowledgements: AttentionAcknowledgement[] }> {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/attention-acknowledgements', {
+			params: { path: { location_id: locationId, target } }
+		});
+		if (response.status === 401) onUnauthorized();
+		if (response.status === 404) return { snoozeSeconds: undefined, acknowledgements: [] };
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return {
+			snoozeSeconds: data.snooze_seconds ?? null,
+			acknowledgements: data.acknowledgements.map((a) => ({ eventId: a.event_id, key: a.key, shape: a.shape as ConditionShape, by: a.acknowledged_by, at: a.acknowledged_at, until: a.until ?? null }))
+		};
 	}
 
 	/** Triggers with their latest tick and the newest listed run each started. */

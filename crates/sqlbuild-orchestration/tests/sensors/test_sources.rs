@@ -135,6 +135,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                         generation: 1,
                         records: records[..1].iter().map(|record| json!(record)).collect(),
                         scan: None,
+                        last_page: false,
                     }
                 )
                 .await
@@ -159,6 +160,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                     generation: 1,
                     records: page.iter().map(|record| json!(record)).collect(),
                     scan: None,
+                    last_page: false,
                 };
                 assert!(
                     ingest_source_freshness(store, (location, "development"), &batch)
@@ -252,6 +254,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 generation: 1,
                 records: vec![json!(late)],
                 scan: None,
+                last_page: false,
             };
             ingest_source_freshness(store, (location, "development"), &batch)
                 .await
@@ -289,6 +292,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                         generation: 1,
                         records: page.iter().map(|record| json!(record)).collect(),
                         scan: None,
+                        last_page: false,
                     },
                 )
                 .await
@@ -422,6 +426,7 @@ fn given_a_source_version_that_returns_after_a_complete_scan_prunes_history_when
                         generation: 1,
                         records: vec![json!(record)],
                         scan,
+                        last_page: false,
                     },
                 )
                 .await
@@ -591,6 +596,7 @@ fn given_timestamp_observations_when_age_crosses_the_boundary_then_scoped_pages_
                 generation: 1,
                 records: records.iter().map(|record| json!(record)).collect(),
                 scan: None,
+                last_page: false,
             };
             ingest_source_freshness(store, (location, "development"), &batch)
                 .await

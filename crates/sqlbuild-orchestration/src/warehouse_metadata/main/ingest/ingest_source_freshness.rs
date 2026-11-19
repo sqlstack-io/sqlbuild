@@ -78,7 +78,7 @@ pub async fn ingest_source_freshness(
     commit_ingestion(
         transaction,
         ("sqb_warehouse_freshness", location_id, target),
-        (batch.scan.as_ref(), &keys),
+        (batch.scan.as_ref(), &keys, batch.last_page),
         applied,
     )
     .await

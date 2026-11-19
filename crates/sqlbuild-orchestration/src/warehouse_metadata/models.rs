@@ -475,6 +475,8 @@ pub struct WarehouseSyncDueRead {
 pub struct WarehouseSyncDue {
     pub runs_ended_at: Option<DateTime<Utc>>,
     pub now: DateTime<Utc>,
+    /// The newest versions per node or check a full read of state history needs to deliver.
+    pub state_history_versions: u16,
 }
 
 /// A location asks for the mirrored copy a plan preview plans from, as its fenced reader.
@@ -483,12 +485,9 @@ pub struct WarehouseSyncDue {
 pub struct PreviewCopyRead {
     pub session_id: Uuid,
     pub generation: i64,
-    /// Whether the copy carries consumption history; sent only when set, as older servers reject it.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    /// Whether the copy carries consumption history.
+    #[serde(default)]
     pub consumption: bool,
-    /// Whether the location holds copies by mirror version; sent only when set, as older servers reject it.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub versioned: bool,
     /// The mirror version of the copy the location holds; an unchanged mirror returns no records.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub known_version: Option<String>,
@@ -526,9 +525,8 @@ pub struct PreviewCopy {
     /// Every mirrored consumption row when asked for; omitted otherwise, as older locations reject it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub consumption: Vec<WarehouseConsumptionRecord>,
-    /// The mirror version these records were read at; sent only to a versioned read.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub version: Option<String>,
+    /// The mirror version these records were read at.
+    pub version: String,
     /// Set when the mirror is still at the read's known version: the records are left out.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub unchanged: bool,
@@ -579,6 +577,9 @@ pub struct WarehouseMirrorCursor {
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct WarehouseSyncResponse {
     pub applied: bool,
+    /// Records the server mirrors of this table for the target, counted after a read's last page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mirrored_records: Option<u64>,
 }
 
 /// One bounded page of one state table from the registered reader of a published generation.
@@ -592,6 +593,9 @@ pub struct MetadataBatch {
     pub records: Vec<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scan: Option<MetadataScan>,
+    /// The table's read ends with this page, so the reply counts the records mirrored of it.
+    #[serde(default)]
+    pub last_page: bool,
 }
 
 /// A full scan's complete page removes the namespace's rows that the scan did not deliver.
@@ -978,14 +982,7 @@ impl StateHistoryRetention {
     }
 }
 
-/// The newest versions per node or check a full read of state history needs to deliver.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct WarehouseRetention {
-    pub state_history_versions: u16,
-}
-
-/// A current snapshot node's declared metadata and latest build, without SQL, source or config.
+/// A current snapshot node's declared metadata and latest build, which the node listing leaves to node-states.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CatalogNodeRecord {
     pub node_key: String,

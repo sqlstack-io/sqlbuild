@@ -19,7 +19,7 @@ pub(crate) struct ServerConfig {
     pub(crate) launchers: Launchers,
 }
 
-/// The listener, control database variable, password sign-in, default role and scheduler.
+/// The listener, control database variable, password sign-in, default role, scheduler and attention snooze.
 #[derive(Debug, Default, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ServerSection {
@@ -29,6 +29,7 @@ pub(crate) struct ServerSection {
     pub(crate) password_origin: Option<String>,
     pub(crate) default_role: Option<String>,
     pub(crate) scheduler: Option<bool>,
+    pub(crate) attention_snooze: Option<String>,
 }
 
 /// How long the server keeps statistics, audit records, snapshots, run logs and state history.

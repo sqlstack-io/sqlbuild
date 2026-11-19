@@ -1,17 +1,15 @@
 import type { ApiClient, CatalogNode, ChangedBuild, ChangedSignal, NodeState, NodeStatusDelta, Scope } from '$lib/api';
-import { ApiError, isRefusal } from '$lib/api';
+import { isRefusal, isUnsupported } from '$lib/api';
 import { applyNodeStates, deltaAction } from '$lib/api/node-states';
 
 /** How long a burst of signals may last before one read starts. */
 const SIGNAL_PAUSE_MS = 300;
 
 /** `changedBuild` comes with the node states; null until they are read, or when the server has none. */
-export type CatalogView = { nodes: CatalogNode[] | undefined; error: string | null; loading: boolean; changedBuild: ChangedBuild | null };
+/** `scopeKey` is the location key the view holds nodes for, so a reader can tell them from another target's. */
+export type CatalogView = { nodes: CatalogNode[] | undefined; error: string | null; loading: boolean; changedBuild: ChangedBuild | null; scopeKey?: string | null };
 
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason));
-
-/** A server or recording without the node-states read; the listing then carries the states itself. */
-const unsupported = (reason: unknown) => reason instanceof ApiError && (reason.status === 404 || reason.status === 405 || reason.status === 501);
 
 /**
  * The selected location's catalog nodes, shared by every page. The listing is read once per
@@ -21,8 +19,9 @@ const unsupported = (reason: unknown) => reason instanceof ApiError && (reason.s
  * nothing changed. `runs` and `checks` signals read nothing: their effect on nodes arrives as a
  * `node_status` change.
  *
- * Against a server without the node-states read, or one whose `node_status` signals carry no
- * states, a `node_status` signal reads the listing again, as pages did before.
+ * The listing carries no states, so the held states stay applied while both are read again. Against
+ * a recording without the node-states read, whose listing carries the states, or signals that carry
+ * no states, a `node_status` signal reads the listing again.
  */
 export class CatalogFeed {
 	#view: CatalogView = { nodes: undefined, error: null, loading: false, changedBuild: null };
@@ -98,7 +97,7 @@ export class CatalogFeed {
 	}
 
 	#set(view: Partial<CatalogView>) {
-		this.#view = { ...this.#view, ...view };
+		this.#view = { ...this.#view, ...view, scopeKey: this.#scope?.locationId ?? null };
 		this.publish(this.#view);
 	}
 
@@ -118,8 +117,6 @@ export class CatalogFeed {
 		if (!scope) return;
 		const epoch = this.#epoch;
 		if (states && !this.#statesUnsupported && this.client().supports('listNodeStates')) {
-			// Both read together: the listing's own states are at least as new as the overlay was.
-			if (listing) this.#overlay = {};
 			this.#readStates(scope, epoch);
 		} else if (states) this.#statesUnsupported = true;
 		if (listing) this.#readListing(scope, epoch);
@@ -173,7 +170,7 @@ export class CatalogFeed {
 					this.#version = null;
 					this.#queued = [];
 					// The listing carries the states, so from now on a change reads it again.
-					if (unsupported(reason)) this.#statesUnsupported = true;
+					if (isUnsupported(reason)) this.#statesUnsupported = true;
 				}
 			);
 	}

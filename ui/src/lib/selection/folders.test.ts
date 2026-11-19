@@ -12,7 +12,8 @@ describe('folder selections', () => {
 			node('model:stg_a', 'models/staging/shop/stg_a.sql'),
 			node('model:stg_b', 'models/staging/crm/stg_b.sql')
 		]);
-		expect(out.get('marts')).toBe('path:models/marts');
+		// A source in the folder isn't counted, so its path would select more: the nodes are named instead.
+		expect(out.get('marts')).toBe('orders');
 		expect(out.get('staging')).toBe('path:models/staging');
 	});
 
@@ -20,6 +21,11 @@ describe('folder selections', () => {
 		const out = folderSelections([node('seed:codes', 'seeds/codes.csv', 'seed'), node('model:top', 'models/top.sql'), node('model:orders', 'models/marts/orders.sql')]);
 		expect(out.get('seeds')).toBe('codes');
 		expect(out.get('models')).toBe('top');
+	});
+
+	it('names the nodes of a folder outside models/ and python/, which a path selector rejects', () => {
+		const out = folderSelections([node('seed:codes', 'seeds/lookups/codes.csv', 'seed'), node('seed:regions', 'seeds/lookups/regions.csv', 'seed')]);
+		expect(out.get('seeds')).toBe('codes regions');
 	});
 
 	it('names the nodes when another group shares the folder', () => {

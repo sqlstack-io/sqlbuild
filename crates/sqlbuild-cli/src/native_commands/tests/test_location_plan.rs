@@ -9,17 +9,20 @@ use crate::native_commands::tests::helpers::plan_output;
 use crate::native_commands::tests::test_types::{PlanDocumentTestCase, WorkCheckTestCase};
 
 #[test]
-fn given_plan_output_when_reading_it_on_a_location_then_only_oversized_diffs_leave_the_document() {
+fn given_plan_output_when_reading_it_on_a_location_then_diffs_always_travel_beside_the_document() {
     let test_cases = [
         PlanDocumentTestCase {
-            description: "a plan under the cap keeps its diffs",
+            description: "a small plan's diffs leave the document with their counts too",
             output: plan_output("+SELECT 2", 2),
             planned: true,
-            expected_first_model: json!({"name": "model_0", "reason": "query_changed", "query_diff": ["+SELECT 2"], "config_diff": ["+a"]}),
-            expected_diffs: (0, None),
+            expected_first_model: json!({"name": "model_0", "reason": "query_changed", "diff_stats": {
+                "query": {"added": 1, "removed": 0, "whitespace_only": false},
+                "config": {"added": 1, "removed": 0, "whitespace_only": false},
+            }}),
+            expected_diffs: (2, Some(vec!["+SELECT 2".to_owned()])),
         },
         PlanDocumentTestCase {
-            description: "diffs over the cap leave the document with their counts and travel beside it",
+            description: "a plan over the document cap keeps every diff beside it",
             output: plan_output(
                 &format!("+{}", "x".repeat(1024)),
                 PLAN_DOCUMENT_BYTES / 1024 + 1,

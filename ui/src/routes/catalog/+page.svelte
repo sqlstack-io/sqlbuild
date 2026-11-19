@@ -25,6 +25,7 @@
 	import { folderOf } from '$lib/lineage/catalog-graph';
 	import { app } from '$lib/state/app.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
+	import FolderTree from '$lib/components/build-area/folder-tree.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { formatAgo, formatStamp } from '$lib/format/time';
@@ -40,7 +41,25 @@
 	const params = page.url.searchParams;
 	let query = $state(params.get('q') ?? '');
 	let kindFilter = $state<'all' | KindTab>(parseKindTab(params.get('kind')) ?? 'all');
-	let statusFilter = $state<StatusFilter[]>(params.get('stale') ? ['stale'] : []);
+	const STATUS_FILTERS: StatusFilter[] = ['stale', 'changed', 'behind', 'failed', 'warn'];
+	// `?status=` comes from links such as a folder's failed count; `?stale=1` from older ones.
+	let statusFilter = $state<StatusFilter[]>([...(params.get('stale') ? ['stale' as const] : []), ...STATUS_FILTERS.filter((s) => params.getAll('status').includes(s))]);
+	// The nodes grouped by folder, as a tree, or listed; kept in `?view=`.
+	let byFolder = $state(params.get('view') === 'folders');
+	async function showFolders(on: boolean) {
+		byFolder = on;
+		const url = new URL(page.url);
+		if (on) url.searchParams.set('view', 'folders');
+		else url.searchParams.delete('view');
+		await goto(url, { replaceState: true, noScroll: true, keepFocus: true });
+	}
+	/** Opens a folder's nodes, or its nodes of one status, in the list. The view leaves the URL first, so the
+	 *  selection bar then writes its selection onto that URL, after it, not at the same time. */
+	async function openFolder(select: string, status: string | null) {
+		statusFilter = status ? [status as StatusFilter] : [];
+		await showFolders(false);
+		selection.select = select;
+	}
 	// What `sqb build -s … --exclude …` selects, kept in the URL; Status only changes the view.
 	const selection = createSelection({ url: true, replaces: ['group'] });
 	// Older links name top-level folders with `?group=`: once the nodes are known, each becomes its selection.
@@ -140,6 +159,7 @@
 		: []}
 >
 	{#snippet filters()}
+		{#if showBuildState}<SegmentedFilter label="Show" value={byFolder ? 'folders' : 'nodes'} options={[{ value: 'nodes', label: 'Nodes' }, { value: 'folders', label: 'By folder' }]} onselect={(v) => showFolders(v === 'folders')} />{/if}
 		{#if picked.size}<Button variant="outline" size="sm" class="mr-1.5" onclick={clearPicked} title="Show every node">{picked.size} picked<XIcon /></Button>{/if}
 		<SegmentedFilter loading={catalog.data === undefined}
 			bind:value={kindFilter}
@@ -148,6 +168,9 @@
 	{/snippet}
 </ListToolbar>
 
+{#if byFolder && showBuildState}
+	<FolderTree nodes={filtered} {linksNodes} onopen={openFolder} />
+{:else}
 <DataTable class="catalog" columns={tableColumns} rows={filtered} key={(n) => n.key} rowHeight={ROW_H} resource={catalog} empty={all.length ? 'No nodes match the filter.' : 'Nothing deployed yet.'}>
 	{#snippet row(n)}
 				{@const Glyph = nodeIcon[nodeIconKey(n)] ?? nodeIcon.table}
@@ -188,6 +211,7 @@
 				</tr>
 	{/snippet}
 </DataTable>
+{/if}
 
 <style>
 	:global(.catalog) .cell-name a,

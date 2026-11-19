@@ -14,7 +14,7 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
     MetadataBatch, StatisticsRead, WarehouseHistoryFailure, WarehouseHistoryKind,
     WarehouseHistoryPage, WarehouseStateLocation,
 };
-use uuid::Uuid;
+use uuid::{NoContext, Timestamp, Uuid};
 
 use crate::argv::models::Namespace;
 use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_POLL_SECONDS};
@@ -162,8 +162,6 @@ pub(crate) struct LocationServe {
     pub(crate) metadata_reconcile_seconds: u32,
     /// Seconds between safety syncs of an idle location; `0` turns them off.
     pub(crate) safety_sync_seconds: u64,
-    /// A flag, the environment or the project set the interval, rather than the default.
-    pub(crate) safety_sync_explicit: bool,
     /// `sqb dev` reads events on stdout and sends control lines on stdin.
     pub(crate) dev_events: bool,
 }
@@ -265,8 +263,6 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) safety_seconds: u64,
     /// When an idle location syncs even though no run ended and nobody asked.
     pub(crate) safety_at: tokio::time::Instant,
-    /// The last read found the warehouse file held by another process, such as a DuckDB build.
-    pub(crate) busy: bool,
     /// Failed reads in a row that did not shrink the page; a delivered page resets it.
     pub(crate) failed_reads: u32,
     /// Failed reads in a row stopped the sync; it rests idle until a run, a request, a publish or a safety sync.
@@ -281,16 +277,12 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) mirror_holds_rows: bool,
     /// One warm runtime interpreter and warehouse session serve every page of a synchronization.
     pub(crate) reader: Option<LocationCompiler>,
-    /// The server's state-history limit, read as each synchronization begins; `None` from older servers.
+    /// The server's state-history limit, read as each synchronization begins; `None` before the first.
     pub(crate) state_history_versions: Option<u16>,
-    /// Seconds a state-table or catalog page may take before the read counts as failed.
-    pub(crate) page_seconds: u64,
     /// Progress of the current synchronization, for its per-table lines and summary.
     pub(crate) progress: SyncProgress,
     /// The adapter's history reads start or wake billed compute, as the publication's connection check reports.
     pub(crate) reads_wake_compute: bool,
-    /// Someone set the safety interval, so it applies even where reads wake compute.
-    pub(crate) safety_explicit: bool,
     /// The server applied a delivered page of the current synchronization, so the synced copy changed.
     pub(crate) applied: bool,
     /// The generation was published after the last plan of what changed, which waits for this sync.
@@ -306,6 +298,8 @@ pub(crate) struct SyncProgress {
     pub(crate) scan_rows: u64,
     /// The current table's change token showed it unchanged, so nothing was read.
     pub(crate) scan_unchanged: bool,
+    /// Records the server mirrors of the current table, as it counted after the table's last page.
+    pub(crate) scan_mirrored: Option<u64>,
 }
 
 impl SyncProgress {
@@ -317,6 +311,7 @@ impl SyncProgress {
             sync_rows: 0,
             scan_rows: 0,
             scan_unchanged: false,
+            scan_mirrored: None,
         }
     }
 }
@@ -358,8 +353,7 @@ impl ReadFailure {
     pub(crate) fn cause(&self) -> Option<WarehouseReadFailure> {
         match self {
             Self::Busy => None,
-            Self::ReaderStart(_) => Some(WarehouseReadFailure::ReaderStart {}),
-            Self::Read(_) => Some(WarehouseReadFailure::ReadError {}),
+            Self::ReaderStart(_) | Self::Read(_) => Some(WarehouseReadFailure::ReadError {}),
             Self::TimedOut(seconds) => Some(WarehouseReadFailure::TimedOut { seconds: *seconds }),
         }
     }
@@ -383,6 +377,8 @@ pub(crate) struct ScanToken {
     pub(crate) reconciled: bool,
     /// The read delivered rows or read on top of mirrored rows, so an empty mirror lost rows.
     pub(crate) delivered: bool,
+    /// The server's newest count of this kind's mirror over every state location, which a skipped read repeats.
+    pub(crate) mirrored: Option<u64>,
 }
 
 impl LocationMetadataSync {
@@ -422,15 +418,28 @@ impl LocationMetadataSync {
 
     /// Whether an idle location skips interval syncs because history reads wake billed compute.
     pub(crate) fn defers_safety_sync(&self) -> bool {
-        self.reads_wake_compute && !self.safety_explicit
+        self.reads_wake_compute
     }
 
-    /// Start the sync `sync_due` asked for at server time `now`; a stopped sync restarts its pass.
+    /// A scan id timed by the server's clock: a synced plan trusts a record as of its scan's start, never after a read.
+    pub(crate) fn server_scan_id(&self) -> Uuid {
+        let now: DateTime<Utc> = Utc::now() + self.server_offset;
+        let seconds: u64 = u64::try_from(now.timestamp()).unwrap_or_default();
+        Uuid::new_v7(Timestamp::from_unix(
+            NoContext,
+            seconds,
+            now.timestamp_subsec_nanos(),
+        ))
+    }
+
+    /// Start the sync `sync_due` asked for at server time `now`; a stopped sync restarts its pass with a fresh failure count.
     pub(crate) fn begin_sync(&mut self, now: DateTime<Utc>) {
+        self.server_offset = now - Utc::now();
+        self.scan_id = self.server_scan_id();
         if std::mem::take(&mut self.halted) {
+            self.failed_reads = 0;
             self.index = 0;
             self.source_after = None;
-            self.scan_id = Uuid::now_v7();
             self.observed_since = None;
             self.watermark_loaded = false;
             self.statistics = None;
@@ -441,7 +450,6 @@ impl LocationMetadataSync {
             self.applied = false;
         }
         self.idle = false;
-        self.server_offset = now - Utc::now();
         self.progress = SyncProgress::new();
         self.cycle_started_at = Some(now);
         self.next_at = tokio::time::Instant::now();
@@ -470,7 +478,7 @@ impl LocationMetadataSync {
         if statistics {
             self.index -= 1;
             self.source_after = None;
-            self.scan_id = Uuid::now_v7();
+            self.scan_id = self.server_scan_id();
             self.observed_since = None;
             self.watermark_loaded = false;
         }
@@ -507,6 +515,15 @@ impl LocationMetadataSync {
     pub(crate) fn reconciling(&self) -> bool {
         self.kind() != WarehouseHistoryKind::Statistics
             && (self.reconcile || self.kind() == WarehouseHistoryKind::Catalog)
+    }
+
+    /// Skip a table unchanged since its recorded read, reporting the newest mirrored count of its kind again.
+    pub(crate) fn skip_unchanged(&mut self) {
+        self.progress.scan_unchanged = true;
+        self.progress.scan_mirrored = self
+            .change_tokens
+            .get(&self.index)
+            .and_then(|recorded| recorded.mirrored);
     }
 
     /// The recorded token a scan may skip on, given whether it reconciles and the mirror holds rows.

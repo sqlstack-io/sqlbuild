@@ -29,8 +29,8 @@ use crate::warehouse_metadata::main::location_reads::read_sync_due::read_sync_du
 use crate::warehouse_metadata::main::location_reads::read_watermark::read_watermark;
 use crate::warehouse_metadata::models::{
     MetadataBatch, PreviewCopy, PreviewCopyRead, StatisticsDueRead, StatisticsRead,
-    WarehouseHistoryKind, WarehouseRetention, WarehouseSyncDue, WarehouseSyncDueRead,
-    WarehouseSyncResponse, WarehouseWatermarkRead,
+    WarehouseHistoryKind, WarehouseSyncDue, WarehouseSyncDueRead, WarehouseSyncResponse,
+    WarehouseWatermarkRead,
 };
 
 #[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata", operation_id = "report_metadata",
@@ -105,23 +105,6 @@ pub(crate) async fn watermark(
     ))
 }
 
-/// How much state history a full read delivers; older servers answer 404 and the location reads it all.
-#[utoipa::path(get, path = "/api/locations/{location_id}/targets/{target}/metadata/retention", operation_id = "read_metadata_retention",
-    params(("location_id" = Uuid, Path), ("target" = String, Path)),
-    responses((status = 200, body = WarehouseRetention),
-        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),
-    security(("bearer" = [])))]
-pub(crate) async fn retention(
-    (State(store), Extension(facts)): (State<ControlStore>, Extension<ServerFacts>),
-    Extension(identity): Extension<TokenIdentity>,
-    Path((location_id, _target)): Path<(Uuid, String)>,
-) -> Result<Json<WarehouseRetention>, ApiError> {
-    require_location(&identity, location_id)?;
-    Ok(Json(WarehouseRetention {
-        state_history_versions: facts.state_history.kept_versions(&store),
-    }))
-}
-
 #[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/sync-due",
     params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = WarehouseSyncDueRead,
     responses((status = 200, body = WarehouseSyncDue), (status = 400, body = crate::api::models::ApiErrorBody),
@@ -129,14 +112,15 @@ pub(crate) async fn retention(
         (status = 409, description = "Reader generation fenced")),
     security(("bearer" = [])))]
 pub(crate) async fn sync_due(
-    State(store): State<ControlStore>,
+    (State(store), Extension(facts)): (State<ControlStore>, Extension<ServerFacts>),
     Extension(identity): Extension<TokenIdentity>,
     Path((location_id, target)): Path<(Uuid, String)>,
     Json(request): Json<WarehouseSyncDueRead>,
 ) -> Result<Json<WarehouseSyncDue>, ApiError> {
     require_location(&identity, location_id)?;
+    let versions: u16 = facts.state_history.kept_versions(&store);
     Ok(Json(
-        read_sync_due(&store, (location_id, &target), &request).await?,
+        read_sync_due(&store, (location_id, &target), (&request, versions)).await?,
     ))
 }
 

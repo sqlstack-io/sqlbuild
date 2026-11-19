@@ -16,6 +16,8 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			kind: 'scheduler_no_leader',
 			severity: 'critical',
 			occurredAt: problems.scheduler_lease_expires_at ?? new Date(now).toISOString(),
+			// The lease that ran out tells one leaderless outage from the next.
+			occurrence: problems.scheduler_lease_expires_at ?? undefined,
 			active: true,
 			locationId: null,
 			subject: null,
@@ -28,6 +30,8 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			kind: 'location_broken',
 			severity: 'critical',
 			occurredAt: location.last_seen_at,
+			// Its last check-in tells one outage from the next.
+			occurrence: location.last_seen_at,
 			active: true,
 			locationId: keyOf(location.location_id, location.target),
 			subject: placeOf(location.location_name, location.target),
@@ -47,6 +51,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			kind: 'tick_overdue',
 			severity: 'warning',
 			occurredAt: oldest.scheduled_for,
+			members: [...new Set(ticks.map((t) => t.trigger_id))].sort(),
 			active: true,
 			locationId: key,
 			subject: place,
@@ -68,6 +73,7 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			kind: 'calendar_horizon_low',
 			severity: 'warning',
 			occurredAt: ends(soonest),
+			members: [...new Set(calendars.map((c) => c.trigger_id))].sort(),
 			active: true,
 			locationId: key,
 			subject: place,

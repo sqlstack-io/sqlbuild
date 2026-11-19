@@ -12,8 +12,7 @@ use crate::platform::models::{
 };
 use crate::warehouse_metadata::models::{
     MetadataBatch, PreviewCopy, PreviewCopyRead, StatisticsDueRead, StatisticsRead,
-    WarehouseRetention, WarehouseSyncDue, WarehouseSyncDueRead, WarehouseSyncResponse,
-    WarehouseWatermarkRead,
+    WarehouseSyncDue, WarehouseSyncDueRead, WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 impl LocationWorkClient {
@@ -52,33 +51,6 @@ impl LocationWorkClient {
     ) -> Result<Option<chrono::DateTime<chrono::Utc>>, ClientError> {
         self.post_metadata((target, Some("watermark")), request)
             .await
-    }
-
-    /// The server's state-history limit; `None` from a server too old to have one.
-    pub async fn metadata_retention(
-        &self,
-        target: &str,
-    ) -> Result<Option<WarehouseRetention>, ClientError> {
-        let location_id = self.location_id.to_string();
-        let endpoint = self.connection.endpoint(&[
-            "api",
-            "locations",
-            &location_id,
-            "targets",
-            target,
-            "metadata",
-            "retention",
-        ])?;
-        match client_response(self.connection.client.get(endpoint)).await {
-            Ok(retention) => Ok(Some(retention)),
-            Err(ClientError::Rejected(status))
-                if status == reqwest::StatusCode::NOT_FOUND
-                    || status == reqwest::StatusCode::METHOD_NOT_ALLOWED =>
-            {
-                Ok(None)
-            }
-            Err(error) => Err(error),
-        }
     }
 
     pub async fn metadata_sync_due(

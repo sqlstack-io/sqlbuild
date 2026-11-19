@@ -43,3 +43,13 @@ class CloneTargetSchemaTestCase:
 class CloneConnectionInjectionTestCase:
     description: str
     expected_connection: dict[str, object]
+
+
+@dataclass(frozen=True)
+class DeferredListingTestCase:
+    """Deferred locations across databases, and what the deferred target is asked to list."""
+
+    description: str
+    locations: tuple[tuple[str | None, str, str], ...]
+    expected_listings: list[tuple[str | None, tuple[str, ...]]]
+    expected_names: list[str]
