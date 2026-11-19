@@ -31,6 +31,8 @@ use std::collections::HashMap;
 
 const MAINTAINED: &str = "maintained";
 const KEEP_MAINTAINED: &str = "keep_maintained";
+/// The scheduling state Snowflake lists for a dynamic table whose refreshes are paused.
+const SUSPENDED: &str = "SUSPENDED";
 /// The refresh mode of a maintained model that declares none, so Snowflake never picks one quietly.
 const DEFAULT_REFRESH_MODE: &str = "incremental";
 /// Actions that recreate the relation, which reinitialises every dynamic table reading it.
@@ -164,26 +166,34 @@ fn with_refresh_settings<'py>(
         ),
         (
             "refresh_on_build",
-            PyBool::new(py, config_value(py, &values, "refresh_on_build")?.is_truthy()?)
-                .to_owned()
-                .into_any(),
+            PyBool::new(
+                py,
+                config_value(py, &values, "refresh_on_build")?.is_truthy()?,
+            )
+            .to_owned()
+            .into_any(),
         ),
     ];
     if text(&native_field(&entry, "action")?)? == KEEP_MAINTAINED {
-        if let Some((action, reason)) = live_action(&entry, &desired, reads)? {
+        let (action, paused) = live_action(&entry, &desired, reads)?;
+        if let Some((action, reason)) = action {
             changes.push(("action", enum_member(py, RecordId::PlanAction, action)?));
             changes.push(("reason", enum_member(py, RecordId::PlanReason, reason)?));
         }
+        changes.push((
+            "maintained_paused",
+            PyBool::new(py, paused).to_owned().into_any(),
+        ));
     }
     replaced(&entry, &changes)
 }
 
-/// The action and reason replacing a kept model's, or `None` when its listed settings match or are unknown.
+/// The action and reason replacing a kept model's, `None` when its listing matches or is unknown, and whether it is suspended.
 fn live_action(
     entry: &Bound<'_, PyAny>,
     desired: &MaintainedSettings,
     reads: &Bound<'_, PlannerReads>,
-) -> PyResult<Option<(&'static str, &'static str)>> {
+) -> PyResult<(Option<(&'static str, &'static str)>, bool)> {
     let destination = native_field(entry, "destination")?;
     let read = reads.get().reads().adapter_read(
         entry.py(),
@@ -194,18 +204,20 @@ fn live_action(
         ]),
     )?;
     let listed = match read {
-        Read::Unknown(_) => return Ok(None),
+        Read::Unknown(_) => return Ok((None, false)),
         Read::Known(listed) => listed,
     };
     if listed.is_none() {
-        return Ok(Some(("CREATE_MAINTAINED", "FIRST_RUN")));
+        return Ok((Some(("CREATE_MAINTAINED", "FIRST_RUN")), false));
     }
-    let (target_lag, warehouse): (String, String) = listed.extract()?;
+    let (target_lag, warehouse, state): (String, String, String) = listed.extract()?;
     let live = LiveDynamicTable {
         target_lag,
         warehouse,
     };
-    Ok(maintained_settings_drift(desired, &live).then_some(("ALTER_MAINTAINED", "CONFIG_CHANGED")))
+    let action =
+        maintained_settings_drift(desired, &live).then_some(("ALTER_MAINTAINED", "CONFIG_CHANGED"));
+    Ok((action, state == SUSPENDED))
 }
 
 /// The model's declared lag and refresh warehouse, or `None` when its lag does not read.

@@ -439,7 +439,7 @@ impl WarehouseReads for LiveReads {
                 vec![("destination", destination)],
             ),
             AdapterRead::MaintainedRefresh([database, schema, name]) => (
-                "maintained_refresh_settings",
+                "maintained_listing",
                 vec![("database", database), ("schema", schema), ("name", name)],
             ),
         };

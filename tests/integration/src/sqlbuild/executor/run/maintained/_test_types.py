@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from sqlbuild._native import PlanAction
-from sqlbuild.adapter.contract.types import TablePromotionMode
+from sqlbuild.adapter.contract.types import MaintainedListing, TablePromotionMode
 
 
 @dataclass(frozen=True)
@@ -22,7 +22,7 @@ class MaintainedFailureTestCase:
     description: str
     setup_sql: tuple[str, ...]
     session_warehouse: str | None
-    listed_settings: tuple[str, str] | None
+    listed_settings: MaintainedListing | None
     expected_error_code: str
     expected_listed_types: tuple[tuple[str], ...]
 

@@ -56,7 +56,12 @@ from sqlbuild._native import (
     run_compile_pipeline,
     write_fingerprint,
 )
-from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo, RelationReadProbe
+from sqlbuild.adapter.contract.models import (
+    ColumnInfo,
+    RelationInfo,
+    RelationReadProbe,
+)
+from sqlbuild.adapter.contract.types import MaintainedListing
 from sqlbuild.adapter.relations.classes.inspection_catalog import InspectionCatalog
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.compile.types import (
@@ -838,16 +843,16 @@ _MAINTAINED: dict[str, object] = {
 
 
 class ListingDuckDbAdapter(DuckDbAdapter):
-    """DuckDB that lists one dynamic table's refresh settings, as Snowflake's SHOW would."""
+    """DuckDB that lists every dynamic table the same way, as Snowflake's SHOW would."""
 
-    def __init__(self, listed: tuple[str, str] | None) -> None:
+    def __init__(self, listed: MaintainedListing | None) -> None:
         super().__init__()
-        self.listed: tuple[str, str] | None = listed
+        self.listed: MaintainedListing | None = listed
         self.read_names: list[str] = []
 
-    def maintained_refresh_settings(
+    def maintained_listing(
         self, *, connection: Any, database: str | None, schema: str | None, name: str
-    ) -> tuple[str, str] | None:
+    ) -> MaintainedListing | None:
         del connection, database, schema
         self.read_names.append(name)
         return self.listed

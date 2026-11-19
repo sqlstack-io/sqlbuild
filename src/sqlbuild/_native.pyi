@@ -14128,6 +14128,7 @@ class ModelPlanEntry(NativeRecord):
     refresh_warehouse: str | None
     refresh_on_build: bool
     maintained_readers: tuple[str, ...]
+    maintained_paused: bool
     def __init__(
         self,
         key: CompiledObjectKey,
@@ -14223,6 +14224,7 @@ class ModelPlanEntry(NativeRecord):
         refresh_warehouse: str | None = ...,
         refresh_on_build: bool = ...,
         maintained_readers: tuple[str, ...] = ...,
+        maintained_paused: bool = ...,
     ) -> None: ...
 
 class CloneSourcePlanEntry(NativeRecord):

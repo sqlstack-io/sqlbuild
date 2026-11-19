@@ -1,7 +1,7 @@
 import pytest
 
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
-from sqlbuild.adapter.contract.types import MaintainedOperation
+from sqlbuild.adapter.contract.types import MaintainedListing, MaintainedOperation
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from tests.unit.src.sqlbuild.adapters.helpers import MetadataConnection, execute_through_cursor
 from tests.unit.src.sqlbuild.adapters.snowflake._test_types import (
@@ -10,24 +10,27 @@ from tests.unit.src.sqlbuild.adapters.snowflake._test_types import (
     SnowflakeMaintainedCreateTestCase,
     SnowflakeMaintainedOperationTestCase,
     SnowflakeMaintainedRefreshTestCase,
-    SnowflakeMaintainedStateTestCase,
 )
 
-_SHOW_DYNAMIC_TABLES_COLUMNS: tuple[str, ...] = ("name", "target_lag", "warehouse")
-_SCHEDULING_COLUMNS: tuple[str, ...] = ("name", "scheduling_state")
+_SHOW_DYNAMIC_TABLES_COLUMNS: tuple[str, ...] = (
+    "name",
+    "target_lag",
+    "warehouse",
+    "scheduling_state",
+)
 
 
 @pytest.mark.parametrize(
     "test_case",
     [
         SnowflakeMaintainedRefreshTestCase(
-            description="a dynamic table lists its lag and refresh warehouse",
-            rows=(("DAILY_TOTALS", "1 hour", "TRANSFORM_WH"),),
-            expected_settings=("1 hour", "TRANSFORM_WH"),
+            description="a dynamic table lists its lag, refresh warehouse and schedule state",
+            rows=(("DAILY_TOTALS", "1 hour", "TRANSFORM_WH", "SUSPENDED"),),
+            expected_settings=MaintainedListing("1 hour", "TRANSFORM_WH", "SUSPENDED"),
         ),
         SnowflakeMaintainedRefreshTestCase(
             description="a neighbour matched by the LIKE wildcard is not the model",
-            rows=(("DAILY_TOTALS_ARCHIVE", "DOWNSTREAM", "TRANSFORM_WH"),),
+            rows=(("DAILY_TOTALS_ARCHIVE", "DOWNSTREAM", "TRANSFORM_WH", "ACTIVE"),),
             expected_settings=None,
         ),
         SnowflakeMaintainedRefreshTestCase(
@@ -38,7 +41,7 @@ _SCHEDULING_COLUMNS: tuple[str, ...] = ("name", "scheduling_state")
     ],
     ids=lambda case: case.description,
 )
-def test_given_dynamic_table_listing_when_reading_refresh_settings_then_reads_one_show(
+def test_given_dynamic_table_listing_when_reading_it_then_reads_one_show(
     test_case: SnowflakeMaintainedRefreshTestCase, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     adapter: SnowflakeAdapter = SnowflakeAdapter()
@@ -47,7 +50,7 @@ def test_given_dynamic_table_listing_when_reading_refresh_settings_then_reads_on
     )
     monkeypatch.setattr(adapter, "execute", execute_through_cursor)
 
-    settings: tuple[str, str] | None = adapter.maintained_refresh_settings(
+    settings: MaintainedListing | None = adapter.maintained_listing(
         connection=connection, database="ANALYTICS", schema="MARTS", name="daily_totals"
     )
 
@@ -56,37 +59,6 @@ def test_given_dynamic_table_listing_when_reading_refresh_settings_then_reads_on
     assert connection.executed[0].startswith(
         'SHOW DYNAMIC TABLES LIKE \'DAILY_TOTALS\' IN SCHEMA "ANALYTICS"."MARTS"'
     )
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        SnowflakeMaintainedStateTestCase(
-            description="a suspended dynamic table reads as suspended",
-            rows=(("DAILY_TOTALS", "SUSPENDED"),),
-            expected_state="SUSPENDED",
-        ),
-        SnowflakeMaintainedStateTestCase(
-            description="a neighbour matched by the LIKE wildcard is not the model",
-            rows=(("DAILY_TOTALS_ARCHIVE", "ACTIVE"),),
-            expected_state=None,
-        ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_dynamic_table_listing_when_reading_scheduling_state_then_reads_its_row(
-    test_case: SnowflakeMaintainedStateTestCase, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    adapter: SnowflakeAdapter = SnowflakeAdapter()
-    connection: MetadataConnection = MetadataConnection(test_case.rows, _SCHEDULING_COLUMNS)
-    monkeypatch.setattr(adapter, "execute", execute_through_cursor)
-
-    state: str | None = adapter.maintained_scheduling_state(
-        connection=connection, database="ANALYTICS", schema="MARTS", name="daily_totals"
-    )
-
-    assert state == test_case.expected_state
-    assert connection.executed[0].startswith("SHOW DYNAMIC TABLES LIKE 'DAILY_TOTALS'")
 
 
 @pytest.mark.parametrize(

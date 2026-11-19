@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from sqlbuild._native import ModelPlanEntry, PlanAction, PlanOutput, PlanReason
+from sqlbuild.adapter.contract.types import MaintainedListing
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.executor.run._helpers.reuse.fingerprinting import try_write_fingerprint
 from tests.integration.src.sqlbuild.compiler.planner.main._test_types import (
@@ -28,7 +29,7 @@ from tests.integration.src.sqlbuild.compiler.planner.main.helpers import (
     [
         MaintainedRefreshPlanTestCase(
             description="listed settings that match keep both models",
-            listed_settings=("60 minutes", "TRANSFORM_WH"),
+            listed_settings=MaintainedListing("60 minutes", "TRANSFORM_WH", "ACTIVE"),
             upstream_query=CLEAN_ORDERS_QUERY,
             expected_upstream_action=PlanAction.KEEP_MAINTAINED,
             expected_action=PlanAction.KEEP_MAINTAINED,
@@ -37,8 +38,19 @@ from tests.integration.src.sqlbuild.compiler.planner.main.helpers import (
             expected_read_names=("clean_orders", "daily_totals"),
         ),
         MaintainedRefreshPlanTestCase(
+            description="a kept model listed as suspended is reported as paused",
+            listed_settings=MaintainedListing("60 minutes", "TRANSFORM_WH", "SUSPENDED"),
+            upstream_query=CLEAN_ORDERS_QUERY,
+            expected_upstream_action=PlanAction.KEEP_MAINTAINED,
+            expected_action=PlanAction.KEEP_MAINTAINED,
+            expected_reason=PlanReason.NO_CHANGE,
+            expected_reinitialised_by=None,
+            expected_read_names=("clean_orders", "daily_totals"),
+            expected_paused=True,
+        ),
+        MaintainedRefreshPlanTestCase(
             description="a lag changed outside the project is altered in place",
-            listed_settings=("2 hours", "TRANSFORM_WH"),
+            listed_settings=MaintainedListing("2 hours", "TRANSFORM_WH", "ACTIVE"),
             upstream_query=CLEAN_ORDERS_QUERY,
             expected_upstream_action=PlanAction.ALTER_MAINTAINED,
             expected_action=PlanAction.ALTER_MAINTAINED,
@@ -58,7 +70,7 @@ from tests.integration.src.sqlbuild.compiler.planner.main.helpers import (
         ),
         MaintainedRefreshPlanTestCase(
             description="a recreated upstream marks the kept reader as recomputing in full",
-            listed_settings=("1 hour", "TRANSFORM_WH"),
+            listed_settings=MaintainedListing("1 hour", "TRANSFORM_WH", "ACTIVE"),
             upstream_query="SELECT 2 AS order_id",
             expected_upstream_action=PlanAction.CREATE_MAINTAINED,
             expected_action=PlanAction.KEEP_MAINTAINED,
@@ -106,6 +118,7 @@ def test_given_built_maintained_models_when_replanning_then_live_settings_and_re
     assert entries["daily_totals"].action == test_case.expected_action
     assert entries["daily_totals"].reason == test_case.expected_reason
     assert entries["daily_totals"].reinitialised_by == test_case.expected_reinitialised_by
+    assert entries["daily_totals"].maintained_paused == test_case.expected_paused
     assert entries["clean_orders"].reinitialised_by is None
     assert entries["daily_totals"].target_lag == "'1 hour'"
     assert entries["daily_totals"].refresh_mode == "incremental"

@@ -89,7 +89,7 @@ def test_given_first_class_adapters_when_checking_contract_then_no_method_comes_
                 {
                     "create_sql_test_output",
                     "drop_sql_test_output",
-                    "maintained_refresh_settings",
+                    "maintained_listing",
                     "render_alter_maintained",
                     "render_create_maintained",
                     "render_create_temporary_function",

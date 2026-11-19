@@ -258,6 +258,17 @@ fn given_plan_report_when_rendering_then_groups_models_by_reason() {
             expected_completion: "\u{2713} Plan complete  2 selected",
         },
         PlanTextTestCase {
+            description: "a kept maintained model that is suspended is reported as paused",
+            report: plan_report(vec![ModelPlanText {
+                action: "keep_maintained".to_owned(),
+                materialization_label: "maintained".to_owned(),
+                paused: true,
+                ..table_model("daily_totals", "no_change")
+            }]),
+            expected_text: "Plan ready  1 selected\n\nModels (1)\n\u{2514}\u{2500}\u{2500} daily_totals         maintained\n    \u{2514}\u{2500}\u{2500} paused  scheduled refreshes are suspended",
+            expected_completion: "\u{2713} Plan complete  1 selected",
+        },
+        PlanTextTestCase {
             description: "every active model is a full refresh",
             report: plan_report(vec![
                 table_model("orders", "full_refresh"),

@@ -757,7 +757,7 @@ impl WarehouseReads for SyncedReads {
                 return Ok(unknown(self, "column rename support"));
             }
             AdapterRead::MaintainedRefresh(_) => {
-                return Ok(unknown(self, "maintained refresh settings"));
+                return Ok(unknown(self, "maintained model listings"));
             }
         };
         let unavailable =
