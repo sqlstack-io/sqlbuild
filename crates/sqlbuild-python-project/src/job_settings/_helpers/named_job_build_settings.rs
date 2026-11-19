@@ -7,10 +7,9 @@ use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use serde_json::Value;
 use sqlbuild_analysis::job_settings::constants::WAREHOUSE_SETTING;
-use sqlbuild_analysis::job_settings::main::build_job_settings::build_job_settings;
-use sqlbuild_analysis::job_settings::main::named_jobs::named_jobs;
-use sqlbuild_analysis::job_settings::main::without_given_settings::without_given_settings;
-use sqlbuild_analysis::job_settings::models::DeclaredRun;
+use sqlbuild_analysis::job_settings::errors::NodeJobSettingsError;
+use sqlbuild_analysis::job_settings::main::resolve_job_settings::resolve_job_settings;
+use sqlbuild_analysis::job_settings::models::ResolvedJobSettings;
 use sqlbuild_config::command_connection::main::check_job_warehouse::check_job_warehouse;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::compile_driver::main::session_warehouse_support::session_warehouse_support;
@@ -19,37 +18,28 @@ use sqlbuild_python_front::discovery::main::project::discover_project_configurat
 
 use crate::job_settings::_helpers::job_run_settings::job_run_settings;
 use crate::job_settings::main::job_declarations::job_declarations;
+use crate::job_settings::main::job_selector_error::job_selector_error;
 use crate::job_settings::main::job_setting_conflict::job_setting_conflict;
 use crate::job_settings::main::with_job_scope::with_job_scope;
 
-/// The warehouse every named job sets, when they all set the same usable one.
-fn shared_warehouse(
+/// Whether whole-run `name` = `value` suits a whole build: a valid warehouse the adapter can use.
+fn applies_to_whole_run(
     py: Python<'_>,
-    named: &[String],
-    (declared, directory): (&BTreeMap<String, DeclaredRun>, &Bound<'_, PyAny>),
-) -> PyResult<Option<Value>> {
-    let mut warehouses = named.iter().map(|job| match declared.get(job) {
-        Some(DeclaredRun::Job { settings, .. }) => settings.get(WAREHOUSE_SETTING),
-        _ => None,
-    });
-    let Some(Some(warehouse)) = warehouses.next() else {
-        return Ok(None);
-    };
-    if warehouses.any(|other| other != Some(warehouse)) {
-        return Ok(None);
-    }
-    if check_job_warehouse("", warehouse.as_str()).is_err() {
-        return Ok(None);
+    (name, value): (&str, &Value),
+    directory: &Bound<'_, PyAny>,
+) -> PyResult<bool> {
+    if name != WAREHOUSE_SETTING || check_job_warehouse("", value.as_str()).is_err() {
+        return Ok(false);
     }
     let discovered: Bound<'_, PyAny> = discover_project_configuration(py, directory)?;
     let adapter_name: Bound<'_, PyAny> = resolve_effective_adapter_name(
         &native_field(&discovered, "project_config")?,
         &native_field(&discovered, "local_config")?,
     )?;
-    Ok(session_warehouse_support(py, &adapter_name, directory)?.then(|| (*warehouse).clone()))
+    session_warehouse_support(py, &adapter_name, directory)
 }
 
-/// The named jobs' build-wide settings, a shared warehouse included, less `given`; or `S027`.
+/// The named jobs' build-wide and shared whole-run settings, less `given`; or `S027`.
 pub(crate) fn named_job_build_settings(
     py: Python<'_>,
     (selectors, given): (&[String], &BTreeSet<String>),
@@ -59,16 +49,22 @@ pub(crate) fn named_job_build_settings(
     let Some(declared) = with_job_scope(scope, || job_declarations(py))? else {
         return Ok(BTreeMap::new());
     };
-    let declared: BTreeMap<String, DeclaredRun> = without_given_settings(declared, given);
-    let named: Vec<String> = named_jobs(selectors, &declared);
-    if named.is_empty() {
-        return Ok(BTreeMap::new());
-    }
-    let mut agreed: BTreeMap<String, Value> = build_job_settings(&named, &declared)
-        .map_err(|conflict| job_setting_conflict(py, &conflict))?;
+    let resolved: ResolvedJobSettings =
+        match resolve_job_settings(declared, (selectors, given), None) {
+            Ok(resolved) => resolved,
+            Err(NodeJobSettingsError::Conflict(conflict)) => {
+                return Err(job_setting_conflict(py, &conflict));
+            }
+            Err(NodeJobSettingsError::Selector(failure)) => {
+                return Err(job_selector_error(py, &failure));
+            }
+        };
     let directory: Bound<'_, PyAny> = directory.into_pyobject(py)?.into_any();
-    if let Some(warehouse) = shared_warehouse(py, &named, (&declared, &directory))? {
-        agreed.insert(WAREHOUSE_SETTING.to_owned(), warehouse);
+    let mut agreed: BTreeMap<String, Value> = resolved.build;
+    for (name, value) in resolved.whole_run {
+        if applies_to_whole_run(py, (&name, &value), &directory)? {
+            agreed.insert(name, value);
+        }
     }
     job_run_settings(&directory, agreed)
 }

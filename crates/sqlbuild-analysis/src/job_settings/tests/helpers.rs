@@ -7,8 +7,10 @@ use crate::graph::main::attach_jobs::attach_jobs;
 use crate::graph::main::build_project_graph::build_project_graph;
 use crate::graph::main::resolve_selector_tokens::resolve_selector_tokens;
 use crate::graph::models::{GraphResource, JobSelection, ProjectGraph};
+use crate::job_settings::_helpers::node_job_settings::node_job_settings;
+use crate::job_settings::_helpers::node_values::node_values;
 use crate::job_settings::errors::NodeJobSettingsError;
-use crate::job_settings::main::node_job_settings::node_job_settings;
+use crate::job_settings::main::resolve_job_settings::resolve_job_settings;
 use crate::job_settings::models::{DeclaredRun, JobRetry, NodeJobSettings};
 
 fn key(kind: &str, name: &str) -> ObjectKey {
@@ -176,4 +178,59 @@ pub(super) fn resolved_settings(
         &declared(),
         &token_nodes,
     )
+}
+
+/// Jobs `a_job`, `b_job` and `c_job` setting `name` to each of `values`, unset where `None`.
+pub(super) fn jobs_setting(name: &str, values: [Option<Json>; 3]) -> BTreeMap<String, DeclaredRun> {
+    ["a_job", "b_job", "c_job"]
+        .into_iter()
+        .zip(values)
+        .map(|(job, value)| {
+            let settings: BTreeMap<String, Json> = value
+                .map(|value| (name.to_owned(), value))
+                .into_iter()
+                .collect();
+            (
+                job.to_owned(),
+                DeclaredRun::Job {
+                    settings,
+                    retry: None,
+                },
+            )
+        })
+        .collect()
+}
+
+/// The `job:` selectors of `jobs`.
+pub(super) fn job_selectors(jobs: &[&str]) -> Vec<String> {
+    jobs.iter().map(|job| format!("job:{job}")).collect()
+}
+
+/// Whether naming `named`, `given` on the command line, conflicts on `name`, and the build takes it.
+pub(super) fn resolves_build_wide(name: &str, named: &[&str], given: &[&str]) -> (bool, bool) {
+    let declared = jobs_setting(name, [Some(json!("first")), Some(json!("second")), None]);
+    let given: BTreeSet<String> = given.iter().map(|setting| (*setting).to_owned()).collect();
+    resolve_job_settings(declared, (&job_selectors(named), &given), None)
+        .map_or((true, false), |resolved| {
+            (false, resolved.build.contains_key(name))
+        })
+}
+
+/// Whether `a_job` and `b_job` giving one model `first` and `second` for `name` conflict.
+pub(super) fn conflicts_on_a_node(name: &str) -> bool {
+    let declared = jobs_setting(name, [Some(json!("first")), Some(json!("second")), None]);
+    let model: ObjectKey = key("model", "orders");
+    node_values(&model, &["a_job".to_owned(), "b_job".to_owned()], &declared).is_err()
+}
+
+/// The whole-run value of `name` when `a_job` and `b_job` set it to `values`.
+pub(super) fn whole_run_value(name: &str, values: [Option<Json>; 3]) -> Option<Json> {
+    let declared = jobs_setting(name, values);
+    resolve_job_settings(
+        declared,
+        (&job_selectors(&["a_job", "b_job"]), &BTreeSet::new()),
+        None,
+    )
+    .ok()
+    .and_then(|resolved| resolved.whole_run.get(name).cloned())
 }

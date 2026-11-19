@@ -7,10 +7,10 @@ use serde_json::Value as Json;
 use crate::assembly::project::types::ObjectKey;
 use crate::definition_changes::constants::PYTHON_NODE_KINDS;
 use crate::job_settings::constants::{
-    NODE_CONFLICT_HELP, NODE_SETTINGS, PYTHON_NODE_SETTINGS, RETRY_CONFLICT_HELP, RETRY_SETTING,
+    JOB_SETTINGS, NODE_CONFLICT_HELP, RETRY_CONFLICT_HELP, RETRY_SETTING,
 };
 use crate::job_settings::errors::JobSettingConflict;
-use crate::job_settings::models::{DeclaredRun, JobRetry};
+use crate::job_settings::models::{DeclaredRun, JobRetry, SettingScope};
 
 /// One node's settings, and its retry, each from whichever of its jobs sets it.
 pub(crate) type NodeValues = (BTreeMap<String, Json>, Option<JobRetry>);
@@ -49,11 +49,11 @@ pub(crate) fn node_values(
     declared: &BTreeMap<String, DeclaredRun>,
 ) -> Result<NodeValues, JobSettingConflict> {
     let python: bool = PYTHON_NODE_KINDS.contains(&key.0.as_str());
-    let node_settings: &[&str] = if python {
-        &PYTHON_NODE_SETTINGS
-    } else {
-        &NODE_SETTINGS
-    };
+    let node_settings: Vec<&str> = JOB_SETTINGS
+        .iter()
+        .filter(|spec| spec.scope == SettingScope::Node && (spec.python_nodes || !python))
+        .map(|spec| spec.name)
+        .collect();
     let mut values: BTreeMap<String, (&String, &Json)> = BTreeMap::new();
     let mut retry: Option<(&String, JobRetry)> = None;
     for job in jobs {
@@ -64,7 +64,7 @@ pub(crate) fn node_values(
         else {
             continue;
         };
-        for &setting in node_settings {
+        for &setting in &node_settings {
             let Some(value) = settings.get(setting) else {
                 continue;
             };

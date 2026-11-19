@@ -95,3 +95,18 @@ pub(super) struct JobRunArgumentsTestCase {
     pub(super) settings: serde_json::Value,
     pub(super) expected_arguments: &'static [&'static str],
 }
+
+/// A command's parser and the job setting table rows it must match.
+pub(super) struct JobSettingTableTestCase {
+    pub(super) description: &'static str,
+    pub(super) command: &'static str,
+    pub(super) expected_rows: Vec<(String, Vec<String>)>,
+}
+
+/// The job settings of some scopes, each of which must render as one of its listed options.
+pub(super) struct RenderedSettingTestCase {
+    pub(super) description: &'static str,
+    pub(super) scope: sqlbuild_analysis::job_settings::models::SettingScope,
+    pub(super) whole_run: bool,
+    pub(super) expected_unrendered: Vec<&'static str>,
+}

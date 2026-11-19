@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use serde_json::json;
 
-use crate::job_settings::main::build_job_settings::build_job_settings;
-use crate::job_settings::main::named_jobs::named_jobs;
+use crate::job_settings::_helpers::build_job_settings::build_job_settings;
+use crate::job_settings::_helpers::named_jobs::named_jobs;
 use crate::job_settings::tests::helpers::{declared, strings};
 use crate::job_settings::tests::test_types::BuildJobSettingsTestCase;
 

@@ -7,7 +7,10 @@ use crate::job_settings::models::DeclaredRun;
 
 /// The jobs `selectors` name, each once in the order first named.
 #[must_use]
-pub fn named_jobs(selectors: &[String], declared: &BTreeMap<String, DeclaredRun>) -> Vec<String> {
+pub(crate) fn named_jobs(
+    selectors: &[String],
+    declared: &BTreeMap<String, DeclaredRun>,
+) -> Vec<String> {
     let mut jobs: Vec<String> = Vec::new();
     for token in selectors
         .iter()

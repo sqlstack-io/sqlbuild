@@ -39,3 +39,24 @@ pub(super) struct BuildJobSettingsTestCase {
     pub(super) expected_named: Vec<&'static str>,
     pub(super) expected_settings: Result<BTreeMap<&'static str, Json>, &'static str>,
 }
+
+/// How a setting of one scope merges across two named jobs and against the command line.
+pub(super) struct JobSettingScopeTestCase {
+    pub(super) description: &'static str,
+    pub(super) scope: crate::job_settings::models::SettingScope,
+    /// Whether two named jobs giving different values fail as a build-wide conflict.
+    pub(super) expected_build_conflict: bool,
+    /// Whether a named job leaving it unset fails against one that sets it.
+    pub(super) expected_unset_conflict: bool,
+    /// Whether a single named job's value becomes the build's.
+    pub(super) expected_build_value: bool,
+    /// Whether two jobs giving one SQL node different values conflict on that node.
+    pub(super) expected_node_conflict: bool,
+}
+
+/// A whole-run setting's values in two named jobs, and the build's value.
+pub(super) struct WholeRunTestCase {
+    pub(super) description: &'static str,
+    pub(super) values: [Option<Json>; 3],
+    pub(super) expected_value: Option<Json>,
+}

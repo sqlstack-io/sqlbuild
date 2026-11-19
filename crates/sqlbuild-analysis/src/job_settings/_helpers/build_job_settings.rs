@@ -24,7 +24,7 @@ fn shown(value: Option<&Json>) -> String {
 }
 
 /// The named jobs' build-wide settings, which must agree; unset differs from set.
-pub fn build_job_settings(
+pub(crate) fn build_job_settings(
     named: &[String],
     declared: &BTreeMap<String, DeclaredRun>,
 ) -> Result<BTreeMap<String, Json>, JobSettingConflict> {
