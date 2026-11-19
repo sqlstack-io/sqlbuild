@@ -1,8 +1,8 @@
 //! The keys one parsed selector matches before `+` graph expansion.
 
-use crate::compiled_project::main::graph_with_jobs::graph_with_jobs;
 use crate::graph::models::GraphViewMappings;
 use crate::graph::models::NativeProjectGraph;
+use crate::job_settings::main::graph_with_jobs::graph_with_jobs;
 use crate::planner_selection::_helpers::selectors::graph_names;
 use crate::planner_selection::_helpers::selectors::selected;
 use crate::planner_selection::_helpers::selectors::view_graph;

@@ -8,6 +8,7 @@ use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
 use crate::planner_phases::_helpers::inputs::runtime::warehouse_field;
 use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::models::ChangeReconciliation;
+use crate::planner_phases::models::FullRefreshRequest;
 use crate::planner_phases::models::ModelEntryResults;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyFrozenSet;
@@ -120,7 +121,7 @@ pub(crate) fn build_planner_entry_results<'py>(
         relations,
         resolved_models: native_field(&reconciliation.resolved_actions, "models")?,
         cursor_overrides: native_field(overrides, "cursor_overrides")?,
-        full_refresh: native_field(overrides, "full_refresh")?.is_truthy()?,
+        full_refresh: FullRefreshRequest::of(overrides)?,
         build_inputs,
         concurrency,
     })

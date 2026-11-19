@@ -24,6 +24,7 @@ from sqlbuild.executor.node_results.types import NodeResultStatus
 from sqlbuild.executor.python_nodes._helpers.fingerprinting import (
     try_write_python_node_identity_fingerprint,
 )
+from sqlbuild.executor.python_nodes._helpers.node_warehouse import node_runtime
 from sqlbuild.executor.python_nodes._helpers.relation_guard import build_python_node_relation_guard
 from sqlbuild.executor.python_nodes._helpers.results import normalize_python_check_return
 from sqlbuild.executor.python_nodes.models import (
@@ -134,6 +135,18 @@ def _execute_one_python_check(
     result_store: Any | None,
     callbacks: PythonCheckCallbacks,
 ) -> PythonCheckExecutionResult:
+    if blocked is None:
+        runtime, warehouse_failure = node_runtime(runtime=runtime, name=check_function.name)
+        blocked = (
+            None
+            if warehouse_failure is None
+            else PythonCheckExecutionResult(
+                node_name=check_function.name,
+                passed=False,
+                severity=PythonCheckSeverity.ERROR,
+                error_message=warehouse_failure,
+            )
+        )
     adapter: BaseAdapter = runtime.adapter
     providers: ProviderContainer | None = runtime.providers
     with (

@@ -34,13 +34,6 @@ pub struct RetryPolicy {
     pub delay_seconds: u32,
 }
 
-/// A deprecated name a file still uses, where it is written and what replaces it.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Deprecation {
-    pub message: String,
-    pub position: FilePosition,
-}
-
 /// When a group member starts: once the jobs it reads from end (`job`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum WaitFor {
@@ -116,10 +109,7 @@ pub struct RunFile {
     /// Each pool the run takes, with how many of its slots.
     pub pools: BTreeMap<String, u32>,
     pub schedule: Option<ScheduleFile>,
-    /// `[retry]`, or the deprecated `[on_failure]` it replaces.
     pub retry: Option<RetryPolicy>,
-    /// Deprecated names the file uses, in file order.
-    pub deprecations: Vec<Deprecation>,
 }
 
 /// One `orchestration/jobs/**.toml` file.

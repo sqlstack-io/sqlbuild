@@ -111,3 +111,9 @@ pub const WRITING: &str = "Writing the plan";
 
 /// Time inside the plan that no step covers.
 pub const OTHER: &str = "Other";
+/// The planner override asking every model to rebuild from scratch.
+pub const FULL_REFRESH_KEY: &str = "full_refresh";
+/// The planner override naming the models the named jobs rebuild from scratch.
+pub const FULL_REFRESH_MODELS_KEY: &str = "full_refresh_models";
+/// The planner override naming the functions the named jobs recreate.
+pub const FULL_REFRESH_FUNCTIONS_KEY: &str = "full_refresh_functions";

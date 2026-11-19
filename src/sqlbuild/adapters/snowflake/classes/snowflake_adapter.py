@@ -200,6 +200,7 @@ _SCHEMA_OBJECTS_REUSE_SECONDS: float = 60.0
 _SHOW_OBJECT_RELATION_TYPES: dict[str, str] = {"TABLE": "base table", "VIEW": "view"}
 _COST_LOGIN_TIMEOUT_SECONDS: int = 5
 _COST_NETWORK_TIMEOUT_SECONDS: int = 15
+_UNQUOTED_WAREHOUSE: re.Pattern[str] = re.compile(r"[A-Z_][A-Z0-9_$]*")
 _SHOW_COLUMN_KIND: str = "COLUMN"
 _SHOW_COLUMN_KINDS: frozenset[str] = frozenset({_SHOW_COLUMN_KIND, "VIRTUAL_COLUMN"})
 _UNRESOLVED: object = object()
@@ -239,7 +240,7 @@ class SnowflakeAdapter(
     max_identifier_length: ClassVar[int] = 255
     supports_session_warehouse: ClassVar[bool] = True
     connection_routing_keys: ClassVar[frozenset[str]] = frozenset(
-        {"source", "profile", "target", "project_dir", "profiles_dir"}
+        {"source", "profile", "target", "project_dir", "profiles_dir", "configured_warehouse"}
     )
     _snapshot_sql_dialect: ClassVar[SnapshotSqlDialect] = SnapshotSqlDialect(
         timestamp_type="TIMESTAMP",
@@ -1322,6 +1323,20 @@ class SnowflakeAdapter(
 
     def render_current_warehouse_user(self) -> str | None:
         return "CURRENT_USER()"
+
+    def use_session_warehouse(self, *, connection: Any, warehouse: str) -> None:
+        self.execute(connection=connection, sql=f"USE WAREHOUSE {warehouse}")
+
+    def current_session_warehouse(self, *, connection: Any) -> str | None:
+        rows: tuple[tuple[object, ...], ...] = self.query(
+            connection=connection, sql="SELECT CURRENT_WAREHOUSE()", limit=None
+        ).rows
+        name: object = rows[0][0] if rows else None
+        if not isinstance(name, str) or not name:
+            return None
+        if _UNQUOTED_WAREHOUSE.fullmatch(name):
+            return name
+        return '"' + name.replace('"', '""') + '"'
 
     def create_table_as(
         self,

@@ -245,3 +245,24 @@ class PythonIdentityFingerprintWriteTestCase:
     expected_sql_count: int
     expected_fragments: tuple[str, ...]
     unexpected_fragments: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class IngressWarehouseFailureTestCase:
+    """An ingress node whose job warehouse the session cannot use, and what the run records."""
+
+    description: str
+    missing_warehouse_node: str
+    expected_python: tuple[tuple[str, PythonNodeStatus, str | None], ...]
+    expected_loads: tuple[tuple[str, str, str | None], ...]
+    expected_call_order: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CheckWarehouseFailureTestCase:
+    """A check on a job warehouse the session cannot use, after an upstream of some status."""
+
+    description: str
+    upstream_status: PythonNodeStatus
+    expected_error_message: str | None
+    expected_switch_attempts: int

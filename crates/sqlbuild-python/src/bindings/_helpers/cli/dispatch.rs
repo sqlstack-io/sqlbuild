@@ -56,7 +56,7 @@ use sqlbuild_python_base::records::main::construct::record_class::record_class;
 use sqlbuild_python_compile::compile_command::main::invocation::run_compile::run_compile;
 use sqlbuild_python_front::discovery::models::MissingSecretsScope;
 use sqlbuild_python_output::recall::models::InvocationRecall;
-use sqlbuild_python_project::compiled_project::main::with_job_scope::with_job_scope;
+use sqlbuild_python_project::job_settings::main::with_job_scope::with_job_scope;
 
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;

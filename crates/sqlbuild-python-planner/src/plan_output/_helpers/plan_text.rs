@@ -13,6 +13,7 @@ use sqlbuild_core::cli_text::models::{
     SeedPlanText, SourceFreshnessText, SourceLoadPlanText,
 };
 use sqlbuild_core::plan_display::main::format_query_diff::format_query_diff;
+use std::collections::BTreeMap;
 
 use crate::plan_output::_helpers::cursor_details::CursorDetails;
 use crate::plan_output::_helpers::cursor_details::DEFERRED;
@@ -34,6 +35,9 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::cursor::main::scalars::sentinel_to_token::sentinel_to_token;
+use sqlbuild_python_project::compiled_project::constants::{
+    JOB_IGNORED_AUDIT_FAILURES_KEY, JOB_WAREHOUSES_KEY,
+};
 
 const SKIP_ACTION: &str = "skip";
 const QUERY_CHANGED: &str = "query_changed";
@@ -388,6 +392,18 @@ fn provider_usages(
     Ok(usages)
 }
 
+/// The plan metadata's named jobs and the warehouses their nodes run on.
+pub(crate) fn job_warehouses(metadata: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
+    let value: Bound<'_, PyAny> = mapping_get(metadata, JOB_WAREHOUSES_KEY)?;
+    if value.is_none() {
+        return Ok(Vec::new());
+    }
+    Ok(value
+        .extract::<BTreeMap<String, String>>()?
+        .into_iter()
+        .collect())
+}
+
 /// `str(item)` of a metadata tuple or list, else nothing.
 fn metadata_names(value: Option<Bound<'_, PyAny>>) -> PyResult<Vec<String>> {
     match value {
@@ -529,5 +545,10 @@ pub(crate) fn report(arguments: &KeywordArguments<'_>) -> PyResult<PlanTextRepor
         pruned_models: pruned_models(&metadata)?,
         pre_build_lines: pre_build,
         ignore_audit_failures: native_field(&plan, "ignore_audit_failures")?.is_truthy()?,
+        ignore_audit_failure_jobs: metadata_names(Some(mapping_get(
+            &metadata,
+            JOB_IGNORED_AUDIT_FAILURES_KEY,
+        )?))?,
+        job_warehouses: job_warehouses(&metadata)?,
     })
 }

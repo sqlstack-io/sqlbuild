@@ -2,13 +2,13 @@
 
 use std::collections::BTreeMap;
 
-use crate::compiled_project::main::declared_jobs::declared_jobs;
 use crate::graph::_helpers::python_nodes::python_node_graph::explicit_python_node_graph;
 use crate::graph::_helpers::python_nodes::python_selection::{
     allows_round_trips, project_sources, selection_graph,
 };
 use crate::graph::_helpers::python_nodes::set_dependencies::dependants;
 use crate::graph::models::NativeProjectGraph;
+use crate::job_settings::main::declared_jobs::declared_jobs;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_analysis::graph::models::JobSelection;
 use sqlbuild_analysis::node_set_dependencies::main::resolve_node_set_dependencies::resolve_node_set_dependencies;

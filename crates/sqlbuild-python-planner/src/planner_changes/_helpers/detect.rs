@@ -1,5 +1,7 @@
 //! Detect how each selected model and function changed since its recorded build.
 
+use std::collections::HashSet;
+
 use crate::planner_changes::main::native_enum::native_enum;
 use crate::planner_changes::main::planner_enum::planner_enum;
 use crate::planner_changes::models::ModelPass;
@@ -85,7 +87,7 @@ pub(crate) fn detect_changes_of<'py>(
             &arguments.value("scope")?,
             &arguments.value("snapshot")?,
         ),
-        arguments.flag("full_refresh")?,
+        (arguments.flag("full_refresh")?, &HashSet::new()),
         (
             arguments.value("expected_version_hashes")?,
             arguments.value("expected_metadata_jsons")?,
@@ -93,10 +95,10 @@ pub(crate) fn detect_changes_of<'py>(
     )
 }
 
-/// Selected model and function changes against expected version hashes and metadata JSON.
+/// Selected model and function changes; functions in `refreshed_functions` are recreated too.
 pub(crate) fn detect_changes<'py>(
     (project, scope, snapshot): (&Bound<'py, PyAny>, &Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    full_refresh: bool,
+    (full_refresh, refreshed_functions): (bool, &HashSet<String>),
     expected: (Bound<'py, PyAny>, Bound<'py, PyAny>),
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = project.py();
@@ -124,7 +126,9 @@ pub(crate) fn detect_changes<'py>(
         if selected.selected.contains(
             &sqlbuild_python_project::graph::main::nodes::native_key::native_key(&key(&function)?)?,
         ) {
-            let reason: &str = if full_refresh {
+            let reason: &str = if full_refresh
+                || refreshed_functions.contains(&name.extract::<String>()?)
+            {
                 "full_refresh"
             } else {
                 let fingerprint: Bound<'py, PyAny> = mapping_get(&recorded, &name)?;

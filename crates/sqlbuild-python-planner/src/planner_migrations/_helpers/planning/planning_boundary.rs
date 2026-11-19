@@ -7,6 +7,7 @@ use crate::planner_phases::main::inputs::runtime_field::runtime_field;
 use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_phases::main::rebuilds::effective_target_config::effective_target_config;
 use crate::planner_phases::main::rebuilds::effectively_full_refreshed_model_names::effectively_full_refreshed_model_names;
+use crate::planner_phases::models::FullRefreshRequest;
 use crate::planner_warehouse::main::inspection::gather_redirected_cursor_snapshots::gather_redirected_cursor_snapshots;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -60,10 +61,8 @@ pub(crate) fn redirected_cursor_snapshots<'py>(
             ),
         ],
     )?;
-    let full_refresh = effectively_full_refreshed_model_names(
-        &project,
-        native_field(overrides, "full_refresh")?.is_truthy()?,
-    )?;
+    let full_refresh =
+        effectively_full_refreshed_model_names(&project, &FullRefreshRequest::of(overrides)?)?;
     gather_redirected_cursor_snapshots(
         py,
         Some(keywords(

@@ -13,8 +13,6 @@ pub(super) struct JobReadTestCase {
     pub(super) expected_overlap: Overlap,
     pub(super) expected_pools: &'static [(&'static str, u32)],
     pub(super) expected_retry: Option<RetryPolicy>,
-    /// Each deprecation message with its line and column.
-    pub(super) expected_deprecations: Vec<(&'static str, FilePosition)>,
     pub(super) expected_schedule: Option<ScheduleFile>,
     pub(super) expected_cpus: Option<serde_json::Value>,
     pub(super) expected_settings: BTreeMap<String, serde_json::Value>,

@@ -340,6 +340,11 @@ fn compile_pipeline<'py>(
         "ignore_audit_failures",
         resolve_ignore_audit_failures(request, &invocation.discovered, &planned_target)?,
     )?;
+    options.set_item(
+        "cli_ignore_audit_failures",
+        native_field(request, "ignore_audit_failures")?,
+    )?;
+    options.set_item("job_settings", native_field(request, "job_settings")?)?;
     let pipeline_options: Bound<'py, PyAny> =
         new_record(py, RecordId::CompilePipelineOptions, (), Some(&options))?;
     let adapter: Bound<'py, PyAny> = native_field(&invocation.context, "adapter")?;

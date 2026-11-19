@@ -23,8 +23,8 @@ overlap = "skip"
 pools = { warehouse = 2, supplier_api = 1 }
 schedule = { calendar = "trading_days_calendar", timezone = "Europe/London", default_status = "paused" }
 
-[on_failure]
-retries = 2
+[retry]
+attempts = 3
 
 [resources]
 memory = "2g"
@@ -50,16 +50,6 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
                 attempts: 3,
                 delay_seconds: 0,
             }),
-            expected_deprecations: vec![
-                (
-                    "`[on_failure]` is deprecated; rename it to `[retry]`",
-                    at(11, 1),
-                ),
-                (
-                    "`retries` is deprecated; rename it to `attempts`",
-                    at(12, 11),
-                ),
-            ],
             expected_schedule: Some(ScheduleFile {
                 source: ScheduleSource::Calendar(written("trading_days_calendar", 9, 25)),
                 timezone: written("Europe/London", 9, 61),
@@ -81,7 +71,6 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
             expected_overlap: Overlap::Queue,
             expected_pools: &[],
             expected_retry: None,
-            expected_deprecations: Vec::new(),
             expected_schedule: None,
             expected_cpus: None,
             expected_settings: BTreeMap::new(),
@@ -98,33 +87,6 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
                 attempts: 3,
                 delay_seconds: 900,
             }),
-            expected_deprecations: Vec::new(),
-            expected_schedule: None,
-            expected_cpus: None,
-            expected_settings: BTreeMap::new(),
-        },
-        JobReadTestCase {
-            description: "a retry table may still use the deprecated key names",
-            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\nretry = { retries = 1, retry_delay_seconds = 60 }\n",
-            expected_name: written("a_job", 1, 8),
-            expected_select: written("orders", 3, 10),
-            expected_exclude: None,
-            expected_overlap: Overlap::Queue,
-            expected_pools: &[],
-            expected_retry: Some(RetryPolicy {
-                attempts: 2,
-                delay_seconds: 60,
-            }),
-            expected_deprecations: vec![
-                (
-                    "`retries` is deprecated; rename it to `attempts`",
-                    at(4, 21),
-                ),
-                (
-                    "`retry_delay_seconds` is deprecated; rename it to `delay_seconds`",
-                    at(4, 46),
-                ),
-            ],
             expected_schedule: None,
             expected_cpus: None,
             expected_settings: BTreeMap::new(),
@@ -169,16 +131,6 @@ fn given_job_files_when_reading_then_types_every_field_and_keeps_positions() {
             test_case.description
         );
         assert_eq!(
-            job.run
-                .deprecations
-                .iter()
-                .map(|deprecation| (deprecation.message.as_str(), deprecation.position))
-                .collect::<Vec<_>>(),
-            test_case.expected_deprecations,
-            "{}",
-            test_case.description
-        );
-        assert_eq!(
             job.run.schedule, test_case.expected_schedule,
             "{}",
             test_case.description
@@ -216,6 +168,16 @@ fn given_invalid_job_files_when_reading_then_reports_message_position_and_help()
             expected_help: Some("move it under [settings] as `concurrency = ...`"),
         },
         FileErrorTestCase {
+            description: "the removed on_failure table names its replacement",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\n\n[on_failure]\nretries = 2\n",
+            expected_message: "unknown job key 'on_failure'",
+            expected_position: at(5, 2),
+            expected_help: Some(
+                "`[on_failure]` is now `[retry]`; `attempts = retries + 1`, \
+                 `delay_seconds = retry_delay_seconds`",
+            ),
+        },
+        FileErrorTestCase {
             description: "a pool amount of zero",
             text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\npools = { supplier_api = 0 }\n",
             expected_message: "pools.supplier_api must take a whole number of slots from 1 to 10000, such as supplier_api = 1",
@@ -244,17 +206,10 @@ fn given_invalid_job_files_when_reading_then_reports_message_position_and_help()
             expected_help: None,
         },
         FileErrorTestCase {
-            description: "retries out of range",
-            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\non_failure = { retries = 0 }\n",
-            expected_message: "on_failure retries must be a whole number from 1 to 10",
-            expected_position: at(4, 26),
-            expected_help: None,
-        },
-        FileErrorTestCase {
             description: "retry delay beyond a day",
-            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\non_failure = { retries = 1, retry_delay_seconds = 86401 }\n",
-            expected_message: "on_failure retry_delay_seconds must be a whole number from 0 to 86400",
-            expected_position: at(4, 51),
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\nretry = { attempts = 2, delay_seconds = 86401 }\n",
+            expected_message: "retry delay_seconds must be a whole number from 0 to 86400",
+            expected_position: at(4, 41),
             expected_help: None,
         },
         FileErrorTestCase {
@@ -279,23 +234,16 @@ fn given_invalid_job_files_when_reading_then_reports_message_position_and_help()
             expected_help: None,
         },
         FileErrorTestCase {
-            description: "a key and its deprecated name together",
-            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\nretry = { attempts = 1, retries = 2 }\n",
-            expected_message: "retry sets both `attempts` and its deprecated name `retries`; keep only `attempts`",
-            expected_position: at(4, 35),
-            expected_help: None,
-        },
-        FileErrorTestCase {
-            description: "the retry table and its deprecated name together",
-            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\nretry = { attempts = 1 }\non_failure = { retries = 2 }\n",
-            expected_message: "`[retry]` and its deprecated name `[on_failure]` are both set; keep only `[retry]`",
-            expected_position: at(5, 14),
+            description: "the removed retry key names fail",
+            text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\nretry = { retries = 2 }\n",
+            expected_message: "unknown field `retries`, expected `attempts` or `delay_seconds`",
+            expected_position: at(4, 11),
             expected_help: None,
         },
         FileErrorTestCase {
             description: "unknown retry key",
             text: "name = \"a_job\"\ndescription = \"d\"\nselect = \"orders\"\nretry = { attempts = 1, delay = 5 }\n",
-            expected_message: "unknown field `delay`, expected one of `attempts`, `retries`, `delay_seconds`, `retry_delay_seconds`",
+            expected_message: "unknown field `delay`, expected `attempts` or `delay_seconds`",
             expected_position: at(4, 25),
             expected_help: None,
         },

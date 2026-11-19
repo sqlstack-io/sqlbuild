@@ -98,6 +98,54 @@ cpus = 2
 A job's `[settings]` cannot set `select` or `exclude`: the job's own selection is the run's
 selection.
 
+### Settings when a build names a job
+
+A build or plan whose selection names a job, as `job:nightly_orders_job`, the bare name or a
+`job:` pattern such as `job:nightly_*`, takes the job's `[settings]`. Selecting the same nodes some other way, such as by tag, takes none of them.
+Naming a group names each of its jobs. The first value set wins:
+
+1. A flag on the command line, such as `--vars` or `--concurrency`
+2. The named job's setting
+3. The target's setting
+4. The project's setting
+
+A command-line flag replaces every named job's setting rather than merging with it, so it also
+settles named jobs that disagree: `--vars` replaces the job's whole `vars`, `--full-refresh`
+rebuilds every selected model, and `--warehouse` puts every node on its warehouse. An option that rules another out counts as setting both, so `--reload` wins
+over a job's `load_sources = false`. Any `--concurrency` sets the build's limit and turns off the
+per-job limits. `SQLBUILD_CONCURRENCY` is not a command-line flag: it sets the build's limit as a
+configured one does, and the named jobs' limits still apply. The job's settings are added before a `--` on the command line, so selectors after
+it still name jobs. `--no-job-settings` leaves out every job's settings.
+
+Some settings apply to the job's own nodes only, so a build that names two jobs can treat their
+nodes differently:
+
+| Setting | Applies to |
+| --- | --- |
+| `full_refresh` | The job's incremental models, rebuilt from scratch, and its functions, recreated |
+| `run_tests` | The SQL unit tests of the job's models |
+| `ignore_audit_failures` | The audits of the job's nodes, and singular audits that read them; a singular audit is ignored only when every node it reads ignores failures, by its job's setting or else the build's |
+| `warehouse` | The Snowflake warehouse the job's nodes run on, Python nodes included; see [A job's own warehouse](adapters/snowflake.md#a-jobs-own-warehouse) |
+| `concurrency` | How many of the job's nodes build at once, and a node in two named jobs fits within both. The build's own limit becomes the larger of the configured limit and the named jobs' limits added together |
+| `[retry]` | The job's nodes |
+
+A job's settings reach only the nodes its own selection holds. `--select job:nightly_orders_job,orders`
+gives them to `orders` alone, and `+job:nightly_orders_job` builds the job's upstream nodes without
+them.
+
+Every other setting, such as `vars`, `changed` or `fail_fast`, applies to the whole build, so every
+named job must set it the same way; a job that leaves it unset disagrees with one that sets it.
+Pass the flag to settle a disagreement. When every named job sets the same `warehouse`, it is the
+whole build's warehouse, as if passed as `--warehouse`; see
+[A job's own warehouse](adapters/snowflake.md#a-jobs-own-warehouse).
+
+Each job in a group still runs as its own build, so a group's jobs must agree only on `vars` and
+`changed`, which change the compiled SQL. A group whose jobs set either differently on a target
+that declares them together fails to compile, with the error a build of the group would give.
+
+Two named jobs that give one node different values of the same setting fail the build with `S027`,
+naming the node, both jobs and the setting. A setting only one of them sets is no conflict.
+
 Select a pipeline by its folder or a tag rather than listing its nodes. Rule `SQBRORCHESTRATION101`
 reports a job or sensor `select` that names more than three nodes one by one; see
 [Orchestration Rules](rules/orchestration-rules.md).
@@ -283,6 +331,7 @@ Every problem with an orchestration file is a `D017` error at its file, line and
 | `job nightly_orders_job resources: cpus must be a positive number` | Set `cpus` above zero |
 | `job 'nightly_orders_job' uses pool 'warehouse_hevy', which [pools] in sqlbuild_project.toml does not declare` | Fix the name, or declare the pool in [`[pools]`](project-configuration.md#pools) |
 | `job 'nightly_orders_job' takes 2 slots of pool 'supplier_api', more than its limit of 1 on target 'production'` | Take fewer slots, or raise the limit in `[targets.production.pools]` |
+| `jobs orders_job and crm_job set vars differently ({"amount":"5"} and {"amount":"9"}); a build applies vars to everything it runs; group daily_job_group builds its jobs together` | Give the group's jobs the same `vars` and `changed`, or move one job to another group |
 | `sensor 'orders_sensor' is declared here, but importing the module does not define it` | Assign the sensor to a module-level name or list, not a dictionary or function body |
 | `group dependencies contain a cycle in job group daily_orders_job_group: orders_marts_job waits for staging_orders_job (model:orders reads model:stg_orders); staging_orders_job waits for orders_marts_job (model:stg_orders reads seed:regions)` | Move each node to one job, and give seeds and nodes that several members read their own job that runs first |
 
@@ -292,6 +341,11 @@ Details:
   a job selector never imports a calendar or sensor module.
 - A job or group declared with `targets` is selectable only when the command's target is one of
   them, as on the server.
+- Job settings that cannot apply together fail the build or plan with `S027`, such as `model:orders
+  is selected through jobs orders_job and finance_job, which set run_tests differently (false and
+  true)`. The help names the way out: make the jobs agree, set a node setting in only one of
+  them, or use `--no-job-settings`. It offers a flag only for the value the flag gives, such as
+  `--no-tests` to turn tests off for all; no flag turns them back on.
 - Selectors are checked for syntax at compile. A selector that names a node the project does not
   have fails when a location publishes, such as `job nightly_orders_job: unknown selector name
   'order_total'`.

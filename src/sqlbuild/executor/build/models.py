@@ -107,6 +107,9 @@ class BuildRuntimeParams:
     allow_ignore_dynamic_grace: bool = False
     ignore_dynamic_grace: bool = False
     dynamic_hold: DynamicHold | None = None
+    job_limits: Mapping[str, int] = field(default_factory=dict)
+    node_jobs: Mapping[CompiledObjectKey, tuple[str, ...]] = field(default_factory=dict)
+    node_warehouses: Mapping[CompiledObjectKey, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

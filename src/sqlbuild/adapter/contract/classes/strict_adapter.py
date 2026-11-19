@@ -329,6 +329,20 @@ class StrictAdapter(
         del connection
         return None
 
+    def use_session_warehouse(self, *, connection: Any, warehouse: str) -> None:
+        """Optional: run the session's next statements on `warehouse`, where the adapter has one."""
+
+        del connection, warehouse
+        raise AdapterUserError(
+            f"the '{self.adapter_name}' adapter has no warehouse to select", code="C260"
+        )
+
+    def current_session_warehouse(self, *, connection: Any) -> str | None:
+        """Optional: the session's warehouse, as an identifier `use_session_warehouse` accepts."""
+
+        del connection
+        return None
+
     def render_create_dynamic(
         self, *, destination: str, sql: str, target_lag: str, refresh_mode: str, warehouse: str
     ) -> tuple[str, ...]:

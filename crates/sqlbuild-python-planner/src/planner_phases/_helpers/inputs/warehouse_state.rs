@@ -12,6 +12,7 @@ use crate::planner_phases::_helpers::inputs::runtime::runtime_field;
 use crate::planner_phases::main::inputs::runtime_dialect::runtime_dialect;
 use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_phases::main::rebuilds::effectively_full_refreshed_model_names::effectively_full_refreshed_model_names;
+use crate::planner_phases::models::FullRefreshRequest;
 use crate::planner_phases::models::{PlannerRuntime, PlannerWarehouseState};
 use crate::planner_warehouse::main::inspection::warehouse_snapshot::warehouse_snapshot;
 use crate::planner_warehouse::models::MigrationFingerprintCache;
@@ -51,7 +52,7 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
     .into_any();
     progress(runtime, "Inspecting warehouse state...")?;
     let selected_scope = class_field(scopes, |s: &PlannerScopeResolution| &s.selected_scope)?;
-    let full_refresh: bool = native_field(overrides, "full_refresh")?.extract()?;
+    let full_refresh: FullRefreshRequest = FullRefreshRequest::of(overrides)?;
     let config = runtime_field(runtime, |runtime| &runtime.project_config)?;
     let cursor_scope = native(
         py,
@@ -102,7 +103,7 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
         reads: reads.clone(),
         selected_keys: stale_keys,
         full_refresh: false,
-        full_refresh_model_names: effectively_full_refreshed_model_names(&project, full_refresh)?,
+        full_refresh_model_names: effectively_full_refreshed_model_names(&project, &full_refresh)?,
         on_progress: runtime_field(runtime, |runtime| &runtime.on_progress)?,
         deferred_locations: native_field(deferral, "deferred_locations")?,
         cursor_scope,
@@ -155,7 +156,7 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
         &ColumnMigrationInputs {
             full_refresh_model_names: effectively_full_refreshed_model_names(
                 &project,
-                full_refresh,
+                &full_refresh,
             )?,
             physical_relations: physical.into_any(),
             source_columns: native_field(&inspection_relations, "source_warehouse_columns")?,

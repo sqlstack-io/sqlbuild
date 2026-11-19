@@ -25,6 +25,8 @@ use crate::bindings::_helpers::cli::dispatch::{command_facts, dispatch_command};
 use crate::bindings::_helpers::cli::failure_cause::take_failure_cause;
 use sqlbuild_python_base::cli::main::offer_launch_record::offer_launch_record;
 use crate::bindings::_helpers::cli::machine_output::take_machine_output_written;
+use sqlbuild_python_project::job_settings::main::job_settings_argv::job_settings_argv;
+use sqlbuild_python_project::job_settings::main::with_given_settings::with_given_settings;
 use crate::bindings::_helpers::cli::observability::{
     CliObservabilityScope, cli_observability_scope,
 };
@@ -797,6 +799,11 @@ fn external_context(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     }
 }
 
+/// The attributes a parse set on its namespace.
+fn namespace_of<'py>(args: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
+    Ok(args.getattr("__dict__")?.cast_into::<PyDict>()?)
+}
+
 fn parsed_invocation<'py>(
     argv: &Bound<'py, PyAny>,
     handlers: Option<Bound<'py, PyAny>>,
@@ -805,7 +812,7 @@ fn parsed_invocation<'py>(
     let py: Python<'py> = argv.py();
     let use_color: bool = !argv.contains(NO_COLOR_OPTION)? && stdout_supports_color(py)?;
     let parsed: Bound<'py, PyAny> = parse_cli_invocation(py, argv.extract()?, use_color)?;
-    let args: Bound<'py, PyAny> = native_field(&parsed, "args")?;
+    let mut args: Bound<'py, PyAny> = native_field(&parsed, "args")?;
     if args.is_none() {
         let exit_code: Bound<'py, PyAny> = native_field(&parsed, "exit_code")?;
         return if exit_code.is_none() {
@@ -814,7 +821,15 @@ fn parsed_invocation<'py>(
             Ok(exit_code)
         };
     }
-    let namespace = args.getattr("__dict__")?.cast_into::<PyDict>()?;
+    let mut namespace: Bound<'py, PyDict> = namespace_of(&args)?;
+    let (given, job_argv) = job_settings_argv(argv, &namespace)?;
+    if let Some(job_argv) = job_argv {
+        args = native_field(&parse_cli_invocation(py, job_argv, use_color)?, "args")?;
+        if args.is_none() {
+            return exit(py, 1);
+        }
+        namespace = namespace_of(&args)?;
+    }
     let command: Option<String> = namespace
         .get_item("command")?
         .map(|value| value.extract::<Option<String>>())
@@ -830,7 +845,9 @@ fn parsed_invocation<'py>(
             execute_parsed_invocation(args, handlers, identity, use_color)
         });
     }
-    execute_parsed_invocation(args, handlers, identity, use_color)
+    with_given_settings(given, || {
+        execute_parsed_invocation(args, handlers, identity, use_color)
+    })
 }
 
 /// Runtime stream routing must cover extension discovery, invocation scopes and their teardown.

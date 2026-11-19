@@ -20,6 +20,7 @@ pub mod fingerprint_storage;
 pub mod graph;
 pub mod identifier_fitting;
 pub mod janitor_planning;
+pub mod job_settings;
 pub mod lineage;
 pub mod lineage_command;
 pub mod lineage_graph;

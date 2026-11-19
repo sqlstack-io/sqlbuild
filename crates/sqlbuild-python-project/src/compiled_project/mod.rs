@@ -1,4 +1,4 @@
-//! The compiled project: its rows, attachment inputs, schema facts, values and job catalog.
+//! The compiled project: its rows, attachment inputs, schema facts, and values.
 
 pub(crate) mod _helpers;
 pub mod constants;
