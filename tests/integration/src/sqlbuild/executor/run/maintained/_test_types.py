@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from sqlbuild._native import PlanAction
+from sqlbuild.adapter.contract.types import TablePromotionMode
 
 
 @dataclass(frozen=True)
@@ -24,3 +25,12 @@ class MaintainedFailureTestCase:
     listed_settings: tuple[str, str] | None
     expected_error_code: str
     expected_listed_types: tuple[tuple[str], ...]
+
+
+@dataclass(frozen=True)
+class ChangeTrackingTableTestCase:
+    description: str
+    change_tracking: bool
+    promotion_mode: TablePromotionMode
+    declared_columns: tuple[tuple[str, str], ...]
+    expected_tracking: tuple[bool, ...]

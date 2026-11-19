@@ -1,9 +1,11 @@
 import pytest
 
+from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.types import MaintainedOperation
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from tests.unit.src.sqlbuild.adapters.helpers import MetadataConnection, execute_through_cursor
 from tests.unit.src.sqlbuild.adapters.snowflake._test_types import (
+    SnowflakeChangeTrackingTestCase,
     SnowflakeMaintainedAlterTestCase,
     SnowflakeMaintainedCreateTestCase,
     SnowflakeMaintainedOperationTestCase,
@@ -171,3 +173,42 @@ def test_given_operation_when_rendering_then_one_alter_dynamic_table_statement(
     )
 
     assert statements == (test_case.expected_sql,)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnowflakeChangeTrackingTestCase(
+            description="a table a maintained model reads tracks changes from creation",
+            config={"table_type": "transient", "change_tracking": True},
+            expected_sql=(
+                "CREATE OR REPLACE TRANSIENT TABLE ANALYTICS.STAGING.ORDERS "
+                "CHANGE_TRACKING = TRUE AS SELECT 1 AS order_id"
+            ),
+        ),
+        SnowflakeChangeTrackingTestCase(
+            description="a permanent table read by none keeps the plain form",
+            config={"table_type": "permanent", "change_tracking": False},
+            expected_sql=(
+                "CREATE OR REPLACE TABLE ANALYTICS.STAGING.ORDERS AS SELECT 1 AS order_id"
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_table_config_when_creating_table_then_change_tracking_follows_it(
+    test_case: SnowflakeChangeTrackingTestCase, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adapter: SnowflakeAdapter = SnowflakeAdapter()
+    connection: MetadataConnection = MetadataConnection(())
+    monkeypatch.setattr(adapter, "execute", execute_through_cursor)
+
+    adapter.create_table_as(
+        connection=connection,
+        destination="ANALYTICS.STAGING.ORDERS",
+        sql="SELECT 1 AS order_id",
+        config=test_case.config,
+        statement_recorder=StatementRecorder(),
+    )
+
+    assert [sql.removesuffix(" ()") for sql in connection.executed] == [test_case.expected_sql]

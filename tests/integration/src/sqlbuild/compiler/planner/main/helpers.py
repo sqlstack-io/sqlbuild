@@ -870,3 +870,27 @@ def maintained_project_case(upstream_query: str) -> BuildExecutionPlanTestCase:
         expected_action={},
         expected_reason={},
     )
+
+
+def change_tracking_project_case() -> BuildExecutionPlanTestCase:
+    """Orders and customers tables; daily totals is maintained from orders alone."""
+
+    return BuildExecutionPlanTestCase(
+        description="tables that a maintained model reads, and one it does not",
+        setup_sql=(),
+        model_locations={"orders": "staging", "customers": "staging", "daily_totals": "staging"},
+        model_configs={
+            "orders": {"materialized": "table"},
+            "customers": {"materialized": "table"},
+            "daily_totals": {"materialized": "maintained", "refresh": {"lag": "1h"}},
+        },
+        model_queries={
+            "orders": "SELECT 1 AS order_id",
+            "customers": "SELECT 1 AS customer_id",
+            "daily_totals": "SELECT count(*) AS orders FROM staging.orders",
+        },
+        model_deps={"daily_totals": ("orders",)},
+        full_refresh=False,
+        expected_action={},
+        expected_reason={},
+    )

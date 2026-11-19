@@ -7,8 +7,10 @@ from typing import Any
 import pytest
 
 from sqlbuild._native import ModelPlanEntry, PlanAction, PlanOutput, PlanReason
+from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.executor.run._helpers.reuse.fingerprinting import try_write_fingerprint
 from tests.integration.src.sqlbuild.compiler.planner.main._test_types import (
+    ChangeTrackingPlanTestCase,
     MaintainedRefreshPlanTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.planner.main.helpers import (
@@ -16,6 +18,7 @@ from tests.integration.src.sqlbuild.compiler.planner.main.helpers import (
     ListingDuckDbAdapter,
     build_execution_plan_from_kwargs,
     build_project_from_test_case,
+    change_tracking_project_case,
     maintained_project_case,
 )
 
@@ -109,3 +112,33 @@ def test_given_built_maintained_models_when_replanning_then_live_settings_and_re
     assert entries["daily_totals"].refresh_warehouse == "transform_wh"
     assert tuple(sorted(adapter.read_names)) == test_case.expected_read_names
     adapter.close(connection)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ChangeTrackingPlanTestCase(
+            description="a table a maintained model reads is built with change tracking",
+            select=(),
+            expected_change_tracking={"orders": True, "customers": False, "daily_totals": False},
+        ),
+        ChangeTrackingPlanTestCase(
+            description="the reader need not be selected for its upstream to be tracked",
+            select=("orders", "customers"),
+            expected_change_tracking={"orders": True, "customers": False},
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_table_read_by_maintained_model_when_planning_then_it_is_built_with_change_tracking(
+    test_case: ChangeTrackingPlanTestCase, adapter: DuckDbAdapter, connection: Any
+) -> None:
+    plan: PlanOutput = build_execution_plan_from_kwargs(
+        project=build_project_from_test_case(change_tracking_project_case()),
+        adapter=adapter,
+        connection=connection,
+        select=test_case.select,
+    )
+
+    tracked: dict[str, bool] = {entry.name: entry.change_tracking for entry in plan.model_entries}
+    assert tracked == test_case.expected_change_tracking

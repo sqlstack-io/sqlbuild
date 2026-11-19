@@ -217,3 +217,10 @@ class MaintainedRefreshPlanTestCase:
     expected_reason: PlanReason
     expected_reinitialised_by: str | None
     expected_read_names: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ChangeTrackingPlanTestCase:
+    description: str
+    select: tuple[str, ...]
+    expected_change_tracking: dict[str, bool]

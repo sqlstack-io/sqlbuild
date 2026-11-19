@@ -14,6 +14,7 @@ from sqlbuild._native import (
     PlanAction,
     PlanReason,
 )
+from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.executor.run.models import ModelMaterializationContext
 
@@ -106,3 +107,29 @@ def listed_types(*, connection: Any) -> list[tuple[Any, ...]]:
         "SELECT table_type FROM information_schema.tables "
         "WHERE table_schema = 'staging' AND table_name = 'daily_totals'"
     ).fetchall()
+
+
+class TrackingDuckDbAdapter(DuckDbAdapter):
+    """Records whether each table it creates was asked to track changes."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.tracking: list[bool] = []
+
+    def create_table_as(
+        self,
+        *,
+        connection: Any,
+        destination: str,
+        sql: str,
+        config: dict[str, Any] | None = None,
+        statement_recorder: StatementRecorder,
+    ) -> None:
+        self.tracking.append(bool((config or {}).get("change_tracking")))
+        super().create_table_as(
+            connection=connection,
+            destination=destination,
+            sql=sql,
+            config=config,
+            statement_recorder=statement_recorder,
+        )
