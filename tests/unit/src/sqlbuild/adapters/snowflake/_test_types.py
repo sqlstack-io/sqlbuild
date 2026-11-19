@@ -9,8 +9,8 @@ from sqlbuild.adapter.contract.models import (
     SchemaDiffResult,
 )
 from sqlbuild.adapter.contract.types import (
-    MaintainedListing,
-    MaintainedOperation,
+    DynamicListing,
+    DynamicOperation,
     TableFreshnessStatus,
 )
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
@@ -464,14 +464,14 @@ class SnowflakeWarehouseUserTestCase:
 
 
 @dataclass(frozen=True)
-class SnowflakeMaintainedRefreshTestCase:
+class SnowflakeDynamicRefreshTestCase:
     description: str
     rows: tuple[tuple[object, ...], ...]
-    expected_settings: MaintainedListing | None
+    expected_settings: DynamicListing | None
 
 
 @dataclass(frozen=True)
-class SnowflakeMaintainedCreateTestCase:
+class SnowflakeDynamicCreateTestCase:
     description: str
     target_lag: str
     refresh_mode: str
@@ -480,7 +480,7 @@ class SnowflakeMaintainedCreateTestCase:
 
 
 @dataclass(frozen=True)
-class SnowflakeMaintainedAlterTestCase:
+class SnowflakeDynamicAlterTestCase:
     description: str
     target_lag: str
     warehouse: str | None
@@ -488,9 +488,9 @@ class SnowflakeMaintainedAlterTestCase:
 
 
 @dataclass(frozen=True)
-class SnowflakeMaintainedOperationTestCase:
+class SnowflakeDynamicOperationTestCase:
     description: str
-    operation: MaintainedOperation
+    operation: DynamicOperation
     expected_sql: str
 
 

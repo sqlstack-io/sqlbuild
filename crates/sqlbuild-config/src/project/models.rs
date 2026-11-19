@@ -91,12 +91,12 @@ pub struct ChangesConfig {
     pub reach: Option<String>,
 }
 
-/// `[maintained]` of `sqlbuild_project.toml`: when a build may take over paused maintained models.
+/// `[dynamic]` of `sqlbuild_project.toml`: when a build may take over paused dynamic models.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MaintainedConfig {
+pub struct DynamicConfig {
     /// Seconds a pausing build's heartbeat may be silent before another build resumes its models.
     pub heartbeat_grace_seconds: u64,
-    /// Whether `sqb build --ignore-maintained-grace` may take over within the grace.
+    /// Whether `sqb build --ignore-dynamic-grace` may take over within the grace.
     pub allow_ignore_grace: bool,
 }
 

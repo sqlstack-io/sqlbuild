@@ -44,8 +44,8 @@ pub const OBSERVATIONS_TABLE_NAME: &str = "_sqlbuild_observations";
 pub const RESOURCE_COSTS_TABLE_NAME: &str = "_sqlbuild_resource_costs";
 /// State table of each build's start and end, which shows runs the control plane did not start.
 pub const RUNS_TABLE_NAME: &str = "_sqlbuild_runs";
-/// State table of the maintained models a build paused, and its heartbeats while it holds them.
-pub const MAINTAINED_PAUSES_TABLE_NAME: &str = "_sqlbuild_maintained_pauses";
+/// State table of the dynamic models a build paused, and its heartbeats while it holds them.
+pub const DYNAMIC_PAUSES_TABLE_NAME: &str = "_sqlbuild_dynamic_pauses";
 /// Every state table SQLBuild writes in a target's state schema.
 pub const STATE_TABLE_NAMES: [&str; 14] = [
     FINGERPRINT_TABLE_NAME,
@@ -61,7 +61,7 @@ pub const STATE_TABLE_NAMES: [&str; 14] = [
     OBSERVATIONS_TABLE_NAME,
     RESOURCE_COSTS_TABLE_NAME,
     RUNS_TABLE_NAME,
-    MAINTAINED_PAUSES_TABLE_NAME,
+    DYNAMIC_PAUSES_TABLE_NAME,
 ];
 /// A zero-length cursor duration.
 pub const ZERO_DAY_DURATION: &str = "0d";

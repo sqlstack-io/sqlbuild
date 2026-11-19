@@ -192,7 +192,7 @@ MICROBATCH_TABLE_NAME: str
 NODE_RESULTS_TABLE_NAME: str
 OBSERVATIONS_TABLE_NAME: str
 RUNS_TABLE_NAME: str
-MAINTAINED_PAUSES_TABLE_NAME: str
+DYNAMIC_PAUSES_TABLE_NAME: str
 AUDIT_RESULTS_TABLE_NAME: str
 JANITOR_EVENTS_TABLE_NAME: str
 COLUMN_NODE_TYPE: str
@@ -6593,7 +6593,7 @@ class BuildCommandRequest(NativeRecord):
     allow_retention_decrease: bool
     allow_missing_migration_origin: bool
     allow_snapshot_schema_change: bool
-    ignore_maintained_grace: bool
+    ignore_dynamic_grace: bool
     concurrency: int | None
     select: tuple[str, ...]
     exclude: tuple[str, ...]
@@ -6638,7 +6638,7 @@ class BuildCommandRequest(NativeRecord):
         allow_retention_decrease: bool = False,
         allow_missing_migration_origin: bool = False,
         allow_snapshot_schema_change: bool = False,
-        ignore_maintained_grace: bool = False,
+        ignore_dynamic_grace: bool = False,
         concurrency: int | None = None,
         select: tuple[str, ...] = (),
         exclude: tuple[str, ...] = (),
@@ -12018,7 +12018,7 @@ class TargetConfig(NativeRecord):
     catalog_connection: str | None
     ignore_audit_failures: bool | None
     plan_from: str | None
-    pause_maintained: bool | None
+    pause_dynamic: bool | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -12045,7 +12045,7 @@ class TargetConfig(NativeRecord):
         catalog_connection: str | None = ...,
         ignore_audit_failures: bool | None = ...,
         plan_from: str | None = ...,
-        pause_maintained: bool | None = ...,
+        pause_dynamic: bool | None = ...,
     ) -> None: ...
 
 class LocalTargetConfig(NativeRecord):
@@ -12075,7 +12075,7 @@ class LocalTargetConfig(NativeRecord):
     catalog_connection: str | None
     ignore_audit_failures: bool | None
     plan_from: str | None
-    pause_maintained: bool | None
+    pause_dynamic: bool | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -12103,7 +12103,7 @@ class LocalTargetConfig(NativeRecord):
         catalog_connection: str | None = ...,
         ignore_audit_failures: bool | None = ...,
         plan_from: str | None = ...,
-        pause_maintained: bool | None = ...,
+        pause_dynamic: bool | None = ...,
     ) -> None: ...
 
 class SettingsConfig(NativeRecord):
@@ -13530,9 +13530,9 @@ class PlanAction(StrEnum):
     LOAD_SEED = "load_seed"
     SKIP = "skip"
     CUSTOM = "custom"
-    CREATE_MAINTAINED = "create_maintained"
-    ALTER_MAINTAINED = "alter_maintained"
-    KEEP_MAINTAINED = "keep_maintained"
+    CREATE_DYNAMIC = "create_dynamic"
+    ALTER_DYNAMIC = "alter_dynamic"
+    KEEP_DYNAMIC = "keep_dynamic"
 
 class PlanReason(StrEnum):
     FIRST_RUN = "first_run"
@@ -13600,7 +13600,7 @@ class MaterializationType(StrEnum):
     SNAPSHOT = "snapshot"
     SEED = "seed"
     CUSTOM = "custom"
-    MAINTAINED = "maintained"
+    DYNAMIC = "dynamic"
     @classmethod
     def is_table_backed(cls, *, materialized: object | None) -> bool: ...
 
@@ -14127,8 +14127,8 @@ class ModelPlanEntry(NativeRecord):
     refresh_mode: str | None
     refresh_warehouse: str | None
     refresh_on_build: bool
-    maintained_readers: tuple[str, ...]
-    maintained_paused: bool
+    dynamic_readers: tuple[str, ...]
+    dynamic_paused: bool
     def __init__(
         self,
         key: CompiledObjectKey,
@@ -14223,8 +14223,8 @@ class ModelPlanEntry(NativeRecord):
         refresh_mode: str | None = ...,
         refresh_warehouse: str | None = ...,
         refresh_on_build: bool = ...,
-        maintained_readers: tuple[str, ...] = ...,
-        maintained_paused: bool = ...,
+        dynamic_readers: tuple[str, ...] = ...,
+        dynamic_paused: bool = ...,
     ) -> None: ...
 
 class CloneSourcePlanEntry(NativeRecord):

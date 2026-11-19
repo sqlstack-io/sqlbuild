@@ -82,8 +82,8 @@ class RetentionChangePhase(StrEnum):
     FINALIZE = "finalize"
 
 
-class MaintainedOperation(StrEnum):
-    """What a build does to a maintained model's scheduled refreshes."""
+class DynamicOperation(StrEnum):
+    """What a build does to a dynamic model's scheduled refreshes."""
 
     SUSPEND = "suspend"
     RESUME = "resume"
@@ -174,8 +174,8 @@ class HistoricalSnapshotInsertStyle(StrEnum):
     TSQL = "tsql"
 
 
-class MaintainedListing(NamedTuple):
-    """A maintained model as the warehouse lists it: lag, refresh warehouse and schedule state."""
+class DynamicListing(NamedTuple):
+    """A dynamic model as the warehouse lists it: lag, refresh warehouse and schedule state."""
 
     target_lag: str
     warehouse: str

@@ -27,8 +27,8 @@ from sqlbuild.cost.models import StatementExecutionTelemetry
 from sqlbuild.executor.auditing.models import AuditExecutionResult
 from sqlbuild.executor.build.types import BeforeNodeWriteCallback, BuildStatus
 from sqlbuild.executor.custom.models import MaterializationResult
+from sqlbuild.executor.dynamic_pauses.classes.dynamic_hold import DynamicHold
 from sqlbuild.executor.load.models import LoadExecutionResult
-from sqlbuild.executor.maintained_pauses.classes.maintained_hold import MaintainedHold
 from sqlbuild.executor.python_nodes.types import PythonIdentityRecorder
 from sqlbuild.executor.run.models import MicrobatchBatchProgress, ModelExecutionResult
 from sqlbuild.executor.scheduling.types import ExecutionStatus
@@ -102,11 +102,11 @@ class BuildRuntimeParams:
     microbatch_lease_check: Callable[[], None] | None = None
     project_relations: Mapping[SqlResourceRef, str] | None = None
     test_timeouts: RunItemTimeouts | None = None
-    pause_maintained: bool = False
-    maintained_heartbeat_grace_seconds: int = 1800
-    allow_ignore_maintained_grace: bool = False
-    ignore_maintained_grace: bool = False
-    maintained_hold: MaintainedHold | None = None
+    pause_dynamic: bool = False
+    dynamic_heartbeat_grace_seconds: int = 1800
+    allow_ignore_dynamic_grace: bool = False
+    ignore_dynamic_grace: bool = False
+    dynamic_hold: DynamicHold | None = None
 
 
 @dataclass(frozen=True)

@@ -234,7 +234,7 @@ pub(crate) fn model_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, 
     if !reinitialised_by.is_none() {
         model.set_item("reinitialised_by", reinitialised_by)?;
     }
-    if native_field(entry, "maintained_paused")?.is_truthy()? {
+    if native_field(entry, "dynamic_paused")?.is_truthy()? {
         model.set_item("paused", true)?;
     }
     let qualified: Bound<'py, PyAny> =

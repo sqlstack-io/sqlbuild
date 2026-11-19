@@ -240,9 +240,9 @@ pub(crate) const TARGET_FIELDS: &[TargetField] = &[
     },
     TargetField {
         group: None,
-        name: "pause_maintained",
+        name: "pause_dynamic",
         rule: MergeRule::Overlay {
-            decided_by: &["pause_maintained"],
+            decided_by: &["pause_dynamic"],
         },
     },
 ];

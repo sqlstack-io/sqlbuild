@@ -12,7 +12,7 @@ Online: https://sqlbuild.com/docs/concepts/models/materializations/
 - Table
 - Incremental
 - Snapshot
-- Maintained
+- Dynamic
 - Custom
 - When a build fails
 
@@ -84,19 +84,19 @@ FROM __source("customers")
 
 See [Snapshots](../snapshots.md) for timestamp and check strategies, historical inputs, and full-refresh policies.
 
-## Maintained
+## Dynamic
 
 The warehouse keeps the model up to date on a schedule you set, and builds pause it while they change its inputs:
 
 ```sql
-MODEL (description "One row per customer per order date", materialized maintained, refresh (lag 1h));
+MODEL (description "One row per customer per order date", materialized dynamic, refresh (lag 1h));
 
 SELECT customer_id, CAST(ordered_at AS DATE) AS order_date, SUM(amount) AS revenue
 FROM __ref("stg_orders")
 GROUP BY customer_id, CAST(ordered_at AS DATE)
 ```
 
-See [Maintained models](maintained.md) for its settings, what the plan shows and what happens when a build dies.
+See [Dynamic models](dynamic.md) for its settings, what the plan shows and what happens when a build dies.
 
 ## Custom
 
@@ -135,5 +135,5 @@ The custom function owns staging, runtime type or contract enforcement, audit ti
 | Table (`immediate`) | The new table. Audits run after it is replaced. |
 | Incremental | The old table if a delta audit fails. Rows already written stay if a final audit or a later microbatch fails. |
 | Microbatch full rebuild | A partly rebuilt table; the old one was dropped first. |
-| Maintained | The created or altered dynamic table, resumed. Audits run after it changes. |
+| Dynamic | The created or altered dynamic table, resumed. Audits run after it changes. |
 | Custom | Whatever the custom materialization does. |

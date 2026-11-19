@@ -7,7 +7,7 @@ from sqlbuild._native import (
     PlanReason,
     WarningSeverity,
 )
-from sqlbuild.adapter.contract.types import MaintainedListing
+from sqlbuild.adapter.contract.types import DynamicListing
 from sqlbuild.compiler.compile.types import FunctionLanguage
 
 
@@ -209,9 +209,9 @@ class SyncedScanTestCase:
 
 
 @dataclass(frozen=True)
-class MaintainedRefreshPlanTestCase:
+class DynamicRefreshPlanTestCase:
     description: str
-    listed_settings: MaintainedListing | None
+    listed_settings: DynamicListing | None
     upstream_query: str
     expected_upstream_action: PlanAction
     expected_action: PlanAction
@@ -226,5 +226,5 @@ class MaintainedRefreshPlanTestCase:
 class ChangeTrackingPlanTestCase:
     description: str
     select: tuple[str, ...]
-    expected_maintained_readers: dict[str, tuple[str, ...]]
+    expected_dynamic_readers: dict[str, tuple[str, ...]]
     expected_refresh_on_build: dict[str, bool]

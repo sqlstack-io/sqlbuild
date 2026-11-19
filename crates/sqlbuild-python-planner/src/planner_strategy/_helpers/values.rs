@@ -55,7 +55,7 @@ pub(crate) fn materialization_value(materialization: MaterializationType) -> &'s
         MaterializationType::Snapshot => "snapshot",
         MaterializationType::Seed => "seed",
         MaterializationType::Custom => "custom",
-        MaterializationType::Maintained => "maintained",
+        MaterializationType::Dynamic => "dynamic",
     }
 }
 
