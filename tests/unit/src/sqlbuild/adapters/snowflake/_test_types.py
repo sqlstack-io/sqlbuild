@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlbuild._native import InferredNullability
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.models import FunctionInfo, RelationUsageReport, SchemaDiffResult
-from sqlbuild.adapter.contract.types import TableFreshnessStatus
+from sqlbuild.adapter.contract.types import MaintainedOperation, TableFreshnessStatus
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.cost.types import CostStatus
 from tests.unit.src.sqlbuild.adapters.snowflake.inspection.helpers import FakeRelation
@@ -460,3 +460,27 @@ class SnowflakeMaintainedRefreshTestCase:
     description: str
     rows: tuple[tuple[object, ...], ...]
     expected_settings: tuple[str, str] | None
+
+
+@dataclass(frozen=True)
+class SnowflakeMaintainedCreateTestCase:
+    description: str
+    target_lag: str
+    refresh_mode: str
+    warehouse: str
+    expected_sql: str
+
+
+@dataclass(frozen=True)
+class SnowflakeMaintainedAlterTestCase:
+    description: str
+    target_lag: str
+    warehouse: str | None
+    expected_sql: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SnowflakeMaintainedOperationTestCase:
+    description: str
+    operation: MaintainedOperation
+    expected_sql: str

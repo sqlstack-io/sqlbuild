@@ -6,6 +6,7 @@ import csv
 import json
 import logging
 import os
+import re
 import time
 from collections.abc import Callable
 from dataclasses import replace
@@ -98,6 +99,7 @@ from sqlbuild.adapter.contract.types import (
     HistoricalSnapshotCloseStyle,
     HistoricalSnapshotInsertStyle,
     LoaderLogicalType,
+    MaintainedOperation,
     MigrationTransfer,
     PromotionStrategy,
     RelationReadStatus,
@@ -204,6 +206,7 @@ _RELATION_LISTING_COLUMNS: str = (
     "table_name, table_schema, table_type, is_transient, created, last_altered, retention_time"
 )
 _BULK_COLUMN_RELATION_CHUNK_SIZE: int = 2_000
+_PLAIN_WAREHOUSE_NAME: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_$]*")
 _RELATION_CHANGE_COLUMNS: str = (
     "table_name, table_schema, table_type, is_transient, created, last_altered, last_ddl, "
     "retention_time"
@@ -3664,6 +3667,50 @@ class SnowflakeAdapter(
     def column_rename_unavailable_reason(self, *, connection: Any, destination: str) -> str | None:
         del connection, destination
         return None
+
+    def session_warehouse(self, *, connection: Any) -> str | None:
+        """The session's warehouse, which refreshes a maintained model that names none."""
+
+        rows: tuple[tuple[object, ...], ...] = self.query(
+            connection=connection, sql="SELECT CURRENT_WAREHOUSE()", limit=None
+        ).rows
+        return None if not rows or rows[0][0] is None else str(rows[0][0])
+
+    def render_create_maintained(
+        self, *, destination: str, sql: str, target_lag: str, refresh_mode: str, warehouse: str
+    ) -> tuple[str, ...]:
+        """A dynamic table with an explicit mode and ON_CREATE, so it is readable at once."""
+
+        return (
+            f"CREATE OR REPLACE DYNAMIC TABLE {destination} TARGET_LAG = {target_lag} "
+            f"WAREHOUSE = {self._warehouse_name(warehouse)} "
+            f"REFRESH_MODE = {refresh_mode.upper()} INITIALIZE = ON_CREATE AS {sql}",
+        )
+
+    def render_alter_maintained(
+        self, *, destination: str, target_lag: str, warehouse: str | None
+    ) -> tuple[str, ...]:
+        """The lag, and a declared warehouse, set in place."""
+
+        statements: list[str] = [f"ALTER DYNAMIC TABLE {destination} SET TARGET_LAG = {target_lag}"]
+        if warehouse is not None:
+            statements.append(
+                f"ALTER DYNAMIC TABLE {destination} "
+                f"SET WAREHOUSE = {self._warehouse_name(warehouse)}"
+            )
+        return tuple(statements)
+
+    def render_maintained_operation(
+        self, *, destination: str, operation: MaintainedOperation
+    ) -> tuple[str, ...]:
+        return (f"ALTER DYNAMIC TABLE {destination} {operation.value.upper()}",)
+
+    def _warehouse_name(self, warehouse: str) -> str:
+        """A plain warehouse name as written, resolved without case; any other quoted exactly."""
+
+        if _PLAIN_WAREHOUSE_NAME.fullmatch(warehouse):
+            return warehouse
+        return '"' + warehouse.replace('"', '""') + '"'
 
     def maintained_refresh_settings(
         self, *, connection: Any, database: str | None, schema: str | None, name: str

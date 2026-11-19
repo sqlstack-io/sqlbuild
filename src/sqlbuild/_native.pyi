@@ -14121,6 +14121,8 @@ class ModelPlanEntry(NativeRecord):
     max_duration_source: str | None
     reinitialised_by: str | None
     target_lag: str | None
+    refresh_mode: str | None
+    refresh_warehouse: str | None
     def __init__(
         self,
         key: CompiledObjectKey,
@@ -14212,6 +14214,8 @@ class ModelPlanEntry(NativeRecord):
         max_duration_source: str | None = ...,
         reinitialised_by: str | None = ...,
         target_lag: str | None = ...,
+        refresh_mode: str | None = ...,
+        refresh_warehouse: str | None = ...,
     ) -> None: ...
 
 class CloneSourcePlanEntry(NativeRecord):

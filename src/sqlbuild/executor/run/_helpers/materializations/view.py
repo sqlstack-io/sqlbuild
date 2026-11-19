@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from sqlbuild._native import (
@@ -44,6 +44,29 @@ def execute_view_entry(
     context: ModelMaterializationContext,
 ) -> ModelExecutionResult:
     """Execute one view model through its full materialization lifecycle."""
+
+    def materialize(*, target_qualified: str, statement_recorder: StatementRecorder) -> None:
+        _create_view_replacing_table(
+            adapter=context.adapter,
+            connection=context.connection,
+            entry=context.entry,
+            target_qualified=target_qualified,
+            statement_recorder=statement_recorder,
+        )
+
+    return execute_in_place_entry(
+        context=context, materialize=materialize, action_name="create_view", built="view creation"
+    )
+
+
+def execute_in_place_entry(
+    *,
+    context: ModelMaterializationContext,
+    materialize: Callable[..., None],
+    action_name: str,
+    built: str,
+) -> ModelExecutionResult:
+    """Hooks, schema, `materialize` on the destination, final audits and the fingerprint."""
 
     entry: ModelPlanEntry = context.entry
     adapter: BaseAdapter = context.adapter
@@ -112,14 +135,8 @@ def execute_view_entry(
                 schema=target_schema,
                 statement_recorder=statement_recorder,
             )
-        with diagnostics_context(sqlbuild_phase="materialize", sqlbuild_action_name="create_view"):
-            _create_view_replacing_table(
-                adapter=adapter,
-                connection=connection,
-                entry=entry,
-                target_qualified=target_qualified,
-                statement_recorder=statement_recorder,
-            )
+        with diagnostics_context(sqlbuild_phase="materialize", sqlbuild_action_name=action_name):
+            materialize(target_qualified=target_qualified, statement_recorder=statement_recorder)
     except Exception as exc:
         return build_failed_result(
             entry=entry,
@@ -154,8 +171,7 @@ def execute_view_entry(
             entry=entry,
             phase=ExecutionPhase.AUDIT,
             error=(
-                f"final audit for '{entry.name}' failed after view creation "
-                "with severity level: error"
+                f"final audit for '{entry.name}' failed after {built} with severity level: error"
             ),
             promoted_relation=target_qualified,
             warnings=warnings,

@@ -668,6 +668,8 @@ const R_MODEL_PLAN_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("max_duration_source", FieldDefault::None),
         FieldSpec::new("reinitialised_by", FieldDefault::None),
         FieldSpec::new("target_lag", FieldDefault::None),
+        FieldSpec::new("refresh_mode", FieldDefault::None),
+        FieldSpec::new("refresh_warehouse", FieldDefault::None),
     ],
 };
 const R_CLONE_SOURCE_PLAN_ENTRY: RecordSpec = RecordSpec {

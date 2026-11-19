@@ -82,6 +82,14 @@ class RetentionChangePhase(StrEnum):
     FINALIZE = "finalize"
 
 
+class MaintainedOperation(StrEnum):
+    """What a build does to a maintained model's scheduled refreshes."""
+
+    SUSPEND = "suspend"
+    RESUME = "resume"
+    REFRESH = "refresh"
+
+
 class RelationType(StrEnum):
     TABLE = "table"
     VIEW = "view"

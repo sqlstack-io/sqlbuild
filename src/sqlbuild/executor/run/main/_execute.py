@@ -44,6 +44,9 @@ from sqlbuild.executor.run._helpers.materializations.custom import (
 from sqlbuild.executor.run._helpers.materializations.incremental import (
     execute_incremental_entry as execute_incremental_entry,
 )
+from sqlbuild.executor.run._helpers.materializations.maintained import (
+    execute_maintained_entry as execute_maintained_entry,
+)
 from sqlbuild.executor.run._helpers.materializations.microbatch import (
     execute_microbatch_entry as execute_microbatch_entry,
 )

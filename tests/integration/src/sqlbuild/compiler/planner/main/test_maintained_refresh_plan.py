@@ -105,5 +105,7 @@ def test_given_built_maintained_models_when_replanning_then_live_settings_and_re
     assert entries["daily_totals"].reinitialised_by == test_case.expected_reinitialised_by
     assert entries["clean_orders"].reinitialised_by is None
     assert entries["daily_totals"].target_lag == "'1 hour'"
+    assert entries["daily_totals"].refresh_mode == "incremental"
+    assert entries["daily_totals"].refresh_warehouse == "transform_wh"
     assert tuple(sorted(adapter.read_names)) == test_case.expected_read_names
     adapter.close(connection)

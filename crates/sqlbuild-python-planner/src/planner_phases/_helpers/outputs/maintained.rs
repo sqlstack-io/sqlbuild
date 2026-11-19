@@ -4,6 +4,7 @@ use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_phases::models::ModelEntryResults;
 use crate::planner_strategy::main::values::text::text;
 use crate::planner_warehouse::models::{AdapterRead, PlannerReads, Read};
+use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyString;
 use sqlbuild_analysis::maintained_refresh::main::maintained_settings_drift::maintained_settings_drift;
@@ -27,6 +28,8 @@ use std::collections::HashMap;
 
 const MAINTAINED: &str = "maintained";
 const KEEP_MAINTAINED: &str = "keep_maintained";
+/// The refresh mode of a maintained model that declares none, so Snowflake never picks one quietly.
+const DEFAULT_REFRESH_MODE: &str = "incremental";
 /// Actions that recreate the relation, which reinitialises every dynamic table reading it.
 const REPLACING_ACTIONS: [&str; 3] = ["create_table", "create_view", "create_maintained"];
 
@@ -95,10 +98,22 @@ fn with_refresh_settings<'py>(
     let Some(desired) = declared_settings(&model)? else {
         return Ok(entry);
     };
-    let mut changes: Vec<(&str, Bound<'py, PyAny>)> = vec![(
-        "target_lag",
-        PyString::new(py, &render_target_lag(desired.lag)).into_any(),
-    )];
+    let values = model_values(&model)?;
+    let mode: String = match config_text_object(py, &values, "refresh_mode")? {
+        Some(mode) => mode.extract()?,
+        None => DEFAULT_REFRESH_MODE.to_owned(),
+    };
+    let mut changes: Vec<(&str, Bound<'py, PyAny>)> = vec![
+        (
+            "target_lag",
+            PyString::new(py, &render_target_lag(desired.lag)).into_any(),
+        ),
+        ("refresh_mode", PyString::new(py, &mode).into_any()),
+        (
+            "refresh_warehouse",
+            desired.warehouse.as_deref().into_pyobject(py)?.into_any(),
+        ),
+    ];
     if text(&native_field(&entry, "action")?)? == KEEP_MAINTAINED {
         if let Some((action, reason)) = live_action(&entry, &desired, reads)? {
             changes.push(("action", enum_member(py, RecordId::PlanAction, action)?));

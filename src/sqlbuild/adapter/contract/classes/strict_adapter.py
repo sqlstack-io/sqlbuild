@@ -33,6 +33,7 @@ from sqlbuild.adapter.contract.models import (
 from sqlbuild.adapter.contract.types import (
     FrameworkType,
     LoaderLogicalType,
+    MaintainedOperation,
     PromotionStrategy,
     StatementSizeLimit,
     TablePromotionMode,
@@ -319,6 +320,43 @@ class StrictAdapter(
             f"the {self.adapter_name} adapter cannot drop schema '{schema}' with its contents",
             code="A714",
             help="sqb review needs a warehouse that can drop a schema it created",
+        )
+
+    def session_warehouse(self, *, connection: Any) -> str | None:
+        """Optional: the warehouse the session runs on, or None when the adapter has none."""
+
+        del connection
+        return None
+
+    def render_create_maintained(
+        self, *, destination: str, sql: str, target_lag: str, refresh_mode: str, warehouse: str
+    ) -> tuple[str, ...]:
+        """Optional: SQL that creates or replaces a maintained model; unsupported by default."""
+
+        del sql, target_lag, refresh_mode, warehouse
+        raise self._maintained_unsupported(destination)
+
+    def render_alter_maintained(
+        self, *, destination: str, target_lag: str, warehouse: str | None
+    ) -> tuple[str, ...]:
+        """Optional: SQL that changes a maintained model's refresh settings in place."""
+
+        del target_lag, warehouse
+        raise self._maintained_unsupported(destination)
+
+    def render_maintained_operation(
+        self, *, destination: str, operation: MaintainedOperation
+    ) -> tuple[str, ...]:
+        """Optional: SQL that suspends, resumes or refreshes a maintained model."""
+
+        del operation
+        raise self._maintained_unsupported(destination)
+
+    def _maintained_unsupported(self, destination: str) -> AdapterUserError:
+        return AdapterUserError(
+            f"the {self.adapter_name} adapter cannot build maintained model '{destination}'",
+            code="A716",
+            help="materialized maintained needs an adapter whose warehouse refreshes it",
         )
 
     def maintained_refresh_settings(
