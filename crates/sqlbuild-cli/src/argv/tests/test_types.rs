@@ -110,3 +110,10 @@ pub(super) struct RenderedSettingTestCase {
     pub(super) whole_run: bool,
     pub(super) expected_unrendered: Vec<&'static str>,
 }
+
+/// Settings whose table row disagrees with the parser, or leaks into a job run's arguments.
+pub(super) struct JobSettingFaultsTestCase {
+    pub(super) description: &'static str,
+    pub(super) faults: fn() -> Vec<&'static str>,
+    pub(super) expected_faults: Vec<&'static str>,
+}

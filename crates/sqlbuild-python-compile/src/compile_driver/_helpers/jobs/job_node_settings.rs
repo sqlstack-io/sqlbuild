@@ -10,10 +10,14 @@ use serde_json::Value;
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::definition_changes::constants::PYTHON_NODE_KINDS;
 use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
-use sqlbuild_analysis::job_settings::constants::{NODE_CONFLICT_HELP, WAREHOUSE_SETTING};
+use sqlbuild_analysis::job_settings::constants::WAREHOUSE_SETTING;
 use sqlbuild_analysis::job_settings::errors::{JobSettingConflict, NodeJobSettingsError};
+use sqlbuild_analysis::job_settings::main::conflict_help::conflict_help;
+use sqlbuild_analysis::job_settings::main::consumed_setting::consumed_setting;
 use sqlbuild_analysis::job_settings::main::resolve_job_settings::resolve_job_settings;
-use sqlbuild_analysis::job_settings::models::{DeclaredRun, NodeJobSettings, ResolvedJobSettings};
+use sqlbuild_analysis::job_settings::models::{
+    DeclaredRun, NodeConsumer, NodeJobSettings, ResolvedJobSettings,
+};
 use sqlbuild_config::command_connection::errors::CommandConnectionError;
 use sqlbuild_config::command_connection::main::check_job_warehouse::check_job_warehouse;
 use sqlbuild_config::command_connection::main::unsupported_job_warehouse::unsupported_job_warehouse;
@@ -49,12 +53,10 @@ use sqlbuild_python_project::resource_views::main::audit_reads::scope_deps::scop
 
 const MODEL_KIND: &str = "model";
 const FUNCTION_KINDS: [&str; 2] = ["udf", "table_fn"];
-/// The node setting the planner's `full_refresh_models` and `full_refresh_functions` apply.
-pub(crate) const FULL_REFRESH: &str = "full_refresh";
-/// The node setting that drops a job's SQL tests from the plan.
-pub(crate) const RUN_TESTS: &str = "run_tests";
-/// The node setting each audit entry's `ignore_failure` takes.
-pub(crate) const IGNORE_AUDIT_FAILURES: &str = "ignore_audit_failures";
+/// The node setting `consumer` applies, as the job setting table names it.
+pub(crate) fn node_setting(consumer: NodeConsumer) -> &'static str {
+    consumed_setting(consumer).unwrap_or_default()
+}
 
 /// The `CliUserError` of a job warehouse that cannot be used.
 fn cli_error(py: Python<'_>, error: &CommandConnectionError) -> PyErr {
@@ -81,7 +83,7 @@ fn job_warehouses(
         if !settings
             .values
             .get(key)
-            .is_some_and(|values| values.contains_key(WAREHOUSE_SETTING))
+            .is_some_and(|values| values.contains_key(node_setting(NodeConsumer::NodeWarehouses)))
         {
             continue;
         }
@@ -90,7 +92,7 @@ fn job_warehouses(
                 continue;
             }
             if let Some(DeclaredRun::Job { settings, .. }) = declared.get(job)
-                && let Some(value) = settings.get(WAREHOUSE_SETTING)
+                && let Some(value) = settings.get(node_setting(NodeConsumer::NodeWarehouses))
             {
                 let name: String = check_job_warehouse(job, value.as_str())
                     .map_err(|error| cli_error(py, &error))?;
@@ -136,6 +138,18 @@ fn jobs_setting(
         }
     }
     jobs.into_iter().collect()
+}
+
+/// Whether every read node ignores, by job value or else `build_ignores`; `None` without job values.
+pub(crate) fn singular_audit_ignores(
+    job_values: impl Iterator<Item = Option<bool>>,
+    build_ignores: bool,
+) -> Option<bool> {
+    let values: Vec<Option<bool>> = job_values.collect();
+    values
+        .iter()
+        .any(Option::is_some)
+        .then(|| values.iter().all(|value| value.unwrap_or(build_ignores)))
 }
 
 /// The nodes each audit attached to no node reads, by the audit's key.
@@ -207,12 +221,16 @@ pub(crate) fn planned_job_settings(
             declared,
             ..
         }) => Ok(Some(PlannedJobSettings {
-            ignoring_jobs: jobs_setting(&settings, &declared, (IGNORE_AUDIT_FAILURES, None)),
+            ignoring_jobs: jobs_setting(
+                &settings,
+                &declared,
+                (node_setting(NodeConsumer::AuditEntries), None),
+            ),
             refreshing_jobs: jobs_setting(
                 &settings,
                 &declared,
                 (
-                    FULL_REFRESH,
+                    node_setting(NodeConsumer::RefreshOverrides),
                     Some(&[MODEL_KIND, FUNCTION_KINDS[0], FUNCTION_KINDS[1]]),
                 ),
             ),
@@ -242,7 +260,8 @@ impl PlannedJobSettings {
             .iter()
             .filter(|(key, values)| {
                 kinds.contains(&key.0.as_str())
-                    && values.get(FULL_REFRESH) == Some(&Value::Bool(true))
+                    && values.get(node_setting(NodeConsumer::RefreshOverrides))
+                        == Some(&Value::Bool(true))
             })
             .map(|(key, _)| &key.1)
             .collect();
@@ -317,7 +336,8 @@ impl PlannedJobSettings {
         if self.job_warehouses.is_empty() {
             return None;
         }
-        self.value(key, WAREHOUSE_SETTING).and_then(Value::as_str)
+        self.value(key, node_setting(NodeConsumer::NodeWarehouses))
+            .and_then(Value::as_str)
     }
 
     /// Each SQL node's job warehouse, a test's only if all its nodes share it, and Python nodes'.
@@ -362,7 +382,7 @@ impl PlannedJobSettings {
     pub(crate) fn apply_to_plan<'py>(
         &self,
         plan: &Bound<'py, PyAny>,
-        cli_ignore_audit_failures: &Bound<'py, PyAny>,
+        (cli_ignore_audit_failures, build_ignores): (&Bound<'py, PyAny>, bool),
     ) -> PyResult<Bound<'py, PyAny>> {
         let py: Python<'py> = plan.py();
         let mut skipped: BTreeSet<ObjectKey> = BTreeSet::new();
@@ -397,7 +417,7 @@ impl PlannedJobSettings {
             let mut changed = false;
             for entry in native_field(plan, "audit_entries")?.try_iter()? {
                 let entry = entry?;
-                match self.audit_ignores(&entry)? {
+                match self.audit_ignores(&entry, build_ignores)? {
                     Some(ignored)
                         if native_field(&entry, "ignore_failure")?.is_truthy()? != ignored =>
                     {
@@ -461,7 +481,7 @@ impl PlannedJobSettings {
         }
         let mut seen: Option<(&String, &Value)> = None;
         for key in &keys {
-            let Some(value) = self.value(key, RUN_TESTS) else {
+            let Some(value) = self.value(key, node_setting(NodeConsumer::TestEntries)) else {
                 continue;
             };
             let job: &String = self
@@ -480,7 +500,7 @@ impl PlannedJobSettings {
                                  run_tests differently ({earlier} and {value})",
                                 test.1
                             ),
-                            help: NODE_CONFLICT_HELP,
+                            help: conflict_help(node_setting(NodeConsumer::TestEntries)),
                         },
                     ));
                 }
@@ -491,32 +511,32 @@ impl PlannedJobSettings {
         Ok(seen.is_some_and(|(_, value)| value == &Value::Bool(false)))
     }
 
-    /// The audited node's `ignore_audit_failures`, or for a singular audit, every read node's.
-    fn audit_ignores(&self, entry: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
+    /// The audited node's `ignore_audit_failures`, or for a singular audit, its read nodes' together.
+    fn audit_ignores(
+        &self,
+        entry: &Bound<'_, PyAny>,
+        build_ignores: bool,
+    ) -> PyResult<Option<bool>> {
         let kind: Bound<'_, PyAny> = native_field(entry, "attached_target_kind")?;
         let name: Bound<'_, PyAny> = native_field(entry, "attached_target_name")?;
         if kind.is_none() || name.is_none() {
             let audit: ObjectKey = native_key(&native_field(entry, "key")?)?;
-            let mut ignored: Option<bool> = None;
-            for key in self
+            let reads: &[ObjectKey] = self
                 .unattached_audit_reads
                 .get(&audit)
-                .into_iter()
-                .flatten()
-            {
-                if let Some(value) = self
-                    .value(key, IGNORE_AUDIT_FAILURES)
-                    .and_then(Value::as_bool)
-                {
-                    ignored = Some(ignored.unwrap_or(true) && value);
-                }
-            }
-            return Ok(ignored);
+                .map_or(&[], Vec::as_slice);
+            return Ok(singular_audit_ignores(
+                reads.iter().map(|key| {
+                    self.value(key, node_setting(NodeConsumer::AuditEntries))
+                        .and_then(Value::as_bool)
+                }),
+                build_ignores,
+            ));
         }
         let kind: String = native_field(&kind, "value")?.extract()?;
         let key: ObjectKey = (kind, name.extract()?);
         Ok(self
-            .value(&key, IGNORE_AUDIT_FAILURES)
+            .value(&key, node_setting(NodeConsumer::AuditEntries))
             .and_then(Value::as_bool))
     }
 }

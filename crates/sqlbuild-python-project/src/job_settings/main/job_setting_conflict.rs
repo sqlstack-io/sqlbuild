@@ -13,6 +13,9 @@ pub fn job_setting_conflict(py: Python<'_>, conflict: &JobSettingConflict) -> Py
         py,
         ErrorId::CliUser,
         &conflict.message,
-        (Some(JOB_SETTING_CONFLICT_CODE), Some(conflict.help)),
+        (
+            Some(JOB_SETTING_CONFLICT_CODE),
+            Some(conflict.help.as_str()),
+        ),
     )
 }

@@ -6,7 +6,7 @@ use crate::graph::errors::SelectorError;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct JobSettingConflict {
     pub message: String,
-    pub help: &'static str,
+    pub help: String,
 }
 
 /// A selector token that names jobs, and why it failed to select their nodes.

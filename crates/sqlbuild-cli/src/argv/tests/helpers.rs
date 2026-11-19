@@ -2,10 +2,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value as Json, json};
 use sqlbuild_analysis::job_settings::constants::JOB_SETTINGS;
-use sqlbuild_analysis::job_settings::models::SettingScope;
+use sqlbuild_analysis::job_settings::models::{CommandLineValues, SettingScope};
 
 use crate::argv::_helpers::table::command_parser;
 use crate::argv::main::command_settings_arguments::command_settings_arguments;
+use crate::argv::main::job_run_arguments::job_run_arguments;
 use crate::argv::main::parse_cli_arguments::parse_cli_arguments;
 use crate::argv::models::{ActionKind, ActionSpec, Nargs};
 use crate::argv::models::{ArgvOutcome, ArgvSettings, Value};
@@ -127,4 +128,57 @@ fn rendered_option(name: &str) -> Option<String> {
         .first()
         .and_then(|argument| argument.split('=').next())
         .map(str::to_owned)
+}
+
+/// The job settings whose `command_line` disagrees with what the build parser's options give.
+pub(super) fn command_line_mismatches() -> Vec<&'static str> {
+    let actions: Vec<&ActionSpec> = command_parser("build")
+        .map(|parser| parser.actions.iter().collect())
+        .unwrap_or_default();
+    JOB_SETTINGS
+        .iter()
+        .filter(|spec| {
+            let kinds: Vec<ActionKind> = actions
+                .iter()
+                .filter(|action| action.dest.as_deref() == Some(spec.name))
+                .map(|action| action.kind)
+                .collect();
+            let only =
+                |kind: ActionKind| !kinds.is_empty() && kinds.iter().all(|seen| *seen == kind);
+            let expected: CommandLineValues = [
+                (only(ActionKind::StoreTrue), CommandLineValues::OnlyTrue),
+                (only(ActionKind::StoreFalse), CommandLineValues::OnlyFalse),
+            ]
+            .into_iter()
+            .find_map(|(applies, values)| applies.then_some(values))
+            .unwrap_or(CommandLineValues::Any);
+            spec.command_line != expected
+        })
+        .map(|spec| spec.name)
+        .collect()
+}
+
+/// The node settings that are not whole-run but still reach a job run's build arguments.
+pub(super) fn job_run_leaks() -> Vec<&'static str> {
+    let parser = command_parser("build").ok();
+    JOB_SETTINGS
+        .iter()
+        .filter(|spec| spec.scope == SettingScope::Node && !spec.whole_run)
+        .filter(|spec| {
+            let value: Json = parser
+                .and_then(|parser| {
+                    parser
+                        .actions
+                        .iter()
+                        .find(|action| action.dest.as_deref() == Some(spec.name))
+                })
+                .map(sample)
+                .unwrap_or_default();
+            let settings = BTreeMap::from([(spec.name.to_owned(), value)]);
+            job_run_arguments("orders_job", &settings).map_or(true, |arguments| {
+                arguments != ["--select", "job:orders_job"]
+            })
+        })
+        .map(|spec| spec.name)
+        .collect()
 }
