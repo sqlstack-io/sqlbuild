@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.254.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.253.0...v0.254.0) (2026-11-19)
+
+
+### Features
+
+* **plan:** will-run / won't-run summary and a clearer Renames section ([#1602](https://github.com/sqlstack-io/sqlbuild/issues/1602)) ([d715c7e](https://github.com/sqlstack-io/sqlbuild/commit/d715c7ebd6f33577b287fff99a67b26aa003cd3f))
+
 ## [0.253.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.252.1...v0.253.0) (2026-11-19)
 
 
