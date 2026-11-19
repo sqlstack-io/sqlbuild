@@ -13,6 +13,7 @@ use sqlbuild_core::cli_text::models::{
     SeedPlanText, SourceFreshnessText, SourceLoadPlanText,
 };
 use sqlbuild_core::plan_display::main::format_query_diff::format_query_diff;
+use std::collections::BTreeMap;
 
 use crate::plan_output::_helpers::cursor_details::CursorDetails;
 use crate::plan_output::_helpers::cursor_details::DEFERRED;
@@ -394,13 +395,13 @@ fn provider_usages(
 /// The plan metadata's named jobs and the warehouses their nodes run on.
 pub(crate) fn job_warehouses(metadata: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
     let value: Bound<'_, PyAny> = mapping_get(metadata, JOB_WAREHOUSES_KEY)?;
-    let Ok(warehouses) = value.cast::<PyDict>() else {
+    if value.is_none() {
         return Ok(Vec::new());
-    };
-    warehouses
-        .iter()
-        .map(|(job, warehouse)| Ok((job.extract()?, warehouse.extract()?)))
-        .collect()
+    }
+    Ok(value
+        .extract::<BTreeMap<String, String>>()?
+        .into_iter()
+        .collect())
 }
 
 /// `str(item)` of a metadata tuple or list, else nothing.

@@ -3,6 +3,7 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
+use std::thread::LocalKey;
 
 use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
@@ -37,12 +38,21 @@ thread_local! {
     static GIVEN_SETTINGS: RefCell<BTreeSet<String>> = const { RefCell::new(BTreeSet::new()) };
 }
 
+/// Run `run` with `slot` holding `value`, restoring what it held before.
+fn swapped<S: 'static, T>(
+    slot: &'static LocalKey<RefCell<S>>,
+    value: S,
+    run: impl FnOnce() -> T,
+) -> T {
+    let previous: S = slot.with(|current| current.replace(value));
+    let result: T = run();
+    slot.with(|current| *current.borrow_mut() = previous);
+    result
+}
+
 /// Run one command whose command line gives `given` settings, restoring the enclosing ones after.
 pub(crate) fn with_given_settings<T>(given: BTreeSet<String>, run: impl FnOnce() -> T) -> T {
-    let previous = GIVEN_SETTINGS.with(|current| current.replace(given));
-    let result: T = run();
-    GIVEN_SETTINGS.with(|current| *current.borrow_mut() = previous);
-    result
+    swapped(&GIVEN_SETTINGS, given, run)
 }
 
 /// The settings the running command's command line gives.
@@ -94,10 +104,7 @@ pub(crate) fn with_frozen_job<T>(
 }
 
 fn within_job_scope<T>(scope: JobScope, run: impl FnOnce() -> T) -> T {
-    let previous = JOB_SCOPE.with(|current| current.replace(Some(scope)));
-    let result: T = run();
-    JOB_SCOPE.with(|current| *current.borrow_mut() = previous);
-    result
+    swapped(&JOB_SCOPE, Some(scope), run)
 }
 
 /// The jobs `selectors` name, as `job:<name>` or as a bare job name.
