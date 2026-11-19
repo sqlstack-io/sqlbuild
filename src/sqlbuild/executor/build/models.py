@@ -125,7 +125,7 @@ class BuildCallbacks:
     python_identity_recorder: PythonIdentityRecorder | None = None
     on_scheduler_state: Callable[[SchedulerState], None] | None = None
     on_statement_complete: Callable[[StatementExecutionTelemetry], None] | None = None
-    on_migration_progress: Callable[[str], None] | None = None
+    on_lifecycle_progress: Callable[[str], None] | None = None
 
 
 @dataclass(frozen=True)

@@ -21,6 +21,7 @@ RUNTIME_CONTRACT_TYPE_MISMATCH_CODE: str = "K010"
 SNAPSHOT_ALL_CHECK_COLUMNS: tuple[str, ...] = ("*",)
 
 STAGING_RELATION_SUFFIX: str = "__staging"
+REPLACED_RELATION_SUFFIX: str = "__replaced"
 TYPE_ENFORCEMENT_RELATION_SUFFIX: str = "__enforced"
 DELTA_RELATION_SUFFIX: str = "__delta"
 SNAPSHOT_DELTA_RELATION_SUFFIX: str = "__snapshot_delta"

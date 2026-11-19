@@ -878,15 +878,23 @@ def maintained_project_case(upstream_query: str) -> BuildExecutionPlanTestCase:
 
 
 def change_tracking_project_case() -> BuildExecutionPlanTestCase:
-    """Orders and customers tables; daily totals is maintained from orders alone."""
+    """Daily totals is maintained from orders, and from payments through a view; not customers."""
 
     return BuildExecutionPlanTestCase(
-        description="tables that a maintained model reads, and one it does not",
+        description="tables a maintained model reads, directly or via a view, and one it does not",
         setup_sql=(),
-        model_locations={"orders": "staging", "customers": "staging", "daily_totals": "staging"},
+        model_locations={
+            "orders": "staging",
+            "customers": "staging",
+            "payments": "staging",
+            "settled_payments": "staging",
+            "daily_totals": "staging",
+        },
         model_configs={
             "orders": {"materialized": "table"},
             "customers": {"materialized": "table"},
+            "payments": {"materialized": "table"},
+            "settled_payments": {"materialized": "view"},
             "daily_totals": {
                 "materialized": "maintained",
                 "refresh": {"lag": "1h"},
@@ -896,9 +904,17 @@ def change_tracking_project_case() -> BuildExecutionPlanTestCase:
         model_queries={
             "orders": "SELECT 1 AS order_id",
             "customers": "SELECT 1 AS customer_id",
-            "daily_totals": "SELECT count(*) AS orders FROM staging.orders",
+            "payments": "SELECT 1 AS order_id",
+            "settled_payments": "SELECT order_id FROM staging.payments",
+            "daily_totals": (
+                "SELECT count(*) AS orders FROM staging.orders "
+                "JOIN staging.settled_payments USING (order_id)"
+            ),
         },
-        model_deps={"daily_totals": ("orders",)},
+        model_deps={
+            "daily_totals": ("orders", "settled_payments"),
+            "settled_payments": ("payments",),
+        },
         full_refresh=False,
         expected_action={},
         expected_reason={},

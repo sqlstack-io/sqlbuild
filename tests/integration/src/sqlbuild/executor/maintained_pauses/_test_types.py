@@ -45,6 +45,21 @@ class FirstBuildTestCase:
 
 
 @dataclass(frozen=True)
+class TakenOverReleaseTestCase:
+    description: str
+    expected_release_operations: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]
+    expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class LifecycleLineTestCase:
+    description: str
+    states_before_second: dict[str, str]
+    expected_line: str
+
+
+@dataclass(frozen=True)
 class HeartbeatTestCase:
     description: str
     heartbeat_seconds: float

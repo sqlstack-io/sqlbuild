@@ -27,9 +27,11 @@ use sqlbuild_python_front::model_config::main::config::model_values::model_value
 use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
 use sqlbuild_python_project::native_host::models::ModelLookup;
 use sqlbuild_python_project::planner_scope::main::scope_data::scope_data;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 const MAINTAINED: &str = "maintained";
+/// Views pass reads through, so a maintained model reading a view reads the view's inputs.
+const VIEW: &str = "view";
 const KEEP_MAINTAINED: &str = "keep_maintained";
 /// The scheduling state Snowflake lists for a dynamic table whose refreshes are paused.
 const SUSPENDED: &str = "SUSPENDED";
@@ -57,7 +59,11 @@ pub(crate) fn plan_maintained_refresh<'py>(
         .collect();
     let models = ModelLookup::Native(scope.clone());
     let reads = runtime_reads(runtime)?;
-    let mut maintained_models: HashMap<String, bool> = HashMap::new();
+    let mut known = KnownReaders {
+        models: &models,
+        materializations: HashMap::new(),
+        through_view: HashMap::new(),
+    };
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::with_capacity(results.entries.len());
     let mut rows: Vec<MaintainedRead> = Vec::with_capacity(results.entries.len());
     for entry in results.entries {
@@ -69,11 +75,7 @@ pub(crate) fn plan_maintained_refresh<'py>(
         } else {
             entry
         };
-        let readers: Vec<String> = maintained_readers(
-            py,
-            downstream.get(&key).copied(),
-            (&models, &mut maintained_models),
-        )?;
+        let readers: Vec<String> = known.maintained_readers(py, &key, &downstream)?;
         let entry = if readers.is_empty() {
             entry
         } else {
@@ -106,36 +108,64 @@ pub(crate) fn plan_maintained_refresh<'py>(
     })
 }
 
-/// The maintained models reading the entry, selected or not, checking each reader once per plan.
-fn maintained_readers(
-    py: Python<'_>,
-    readers: Option<&Vec<ObjectKey>>,
-    (models, maintained_models): (&ModelLookup, &mut HashMap<String, bool>),
-) -> PyResult<Vec<String>> {
-    let Some(readers) = readers else {
-        return Ok(Vec::new());
-    };
-    let mut found: Vec<String> = Vec::new();
-    for (kind, name) in readers {
-        if kind != MODEL {
-            continue;
-        }
-        let maintained: bool = match maintained_models.get(name) {
-            Some(maintained) => *maintained,
-            None => {
-                let model = models.get(py, name)?;
-                let maintained: bool =
-                    !model.is_none() && text(&materialization_of(&model)?)? == MAINTAINED;
-                maintained_models.insert(name.clone(), maintained);
-                maintained
+/// Per-plan lookups: each model's materialization, and the maintained readers behind each view.
+struct KnownReaders<'a> {
+    models: &'a ModelLookup,
+    materializations: HashMap<String, String>,
+    through_view: HashMap<String, Vec<String>>,
+}
+
+impl KnownReaders<'_> {
+    /// The maintained models reading the entry directly or through views, selected or not.
+    fn maintained_readers(
+        &mut self,
+        py: Python<'_>,
+        key: &ObjectKey,
+        downstream: &HashMap<&ObjectKey, &Vec<ObjectKey>>,
+    ) -> PyResult<Vec<String>> {
+        let mut found: BTreeSet<String> = BTreeSet::new();
+        for reader in downstream
+            .get(key)
+            .into_iter()
+            .flat_map(|readers| readers.iter())
+        {
+            let (kind, name) = reader;
+            if kind != MODEL {
+                continue;
             }
-        };
-        if maintained {
-            found.push(name.clone());
+            match self.materialization(py, name)?.as_str() {
+                MAINTAINED => {
+                    found.insert(name.clone());
+                }
+                VIEW => {
+                    if !self.through_view.contains_key(name) {
+                        let through: Vec<String> =
+                            self.maintained_readers(py, reader, downstream)?;
+                        self.through_view.insert(name.clone(), through);
+                    }
+                    found.extend(self.through_view[name].iter().cloned());
+                }
+                _ => {}
+            }
         }
+        Ok(found.into_iter().collect())
     }
-    found.sort();
-    Ok(found)
+
+    /// A model's materialization, looked up once per plan.
+    fn materialization(&mut self, py: Python<'_>, name: &str) -> PyResult<String> {
+        if let Some(materialization) = self.materializations.get(name) {
+            return Ok(materialization.clone());
+        }
+        let model = self.models.get(py, name)?;
+        let materialization: String = if model.is_none() {
+            String::new()
+        } else {
+            text(&materialization_of(&model)?)?
+        };
+        self.materializations
+            .insert(name.to_owned(), materialization.clone());
+        Ok(materialization)
+    }
 }
 
 /// The entry with its `target_lag`; a kept one alters on drift, or creates when no dynamic table holds its name.

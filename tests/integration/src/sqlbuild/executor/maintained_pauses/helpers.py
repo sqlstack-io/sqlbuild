@@ -14,7 +14,11 @@ from sqlbuild.adapter.contract.types import (
 )
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.executor.build.main._execute import execute_build_plan
-from sqlbuild.executor.build.models import BuildExecutionResult, BuildRuntimeParams
+from sqlbuild.executor.build.models import (
+    BuildCallbacks,
+    BuildExecutionResult,
+    BuildRuntimeParams,
+)
 from tests.integration.src.sqlbuild.compiler.planner.main._test_types import (
     BuildExecutionPlanTestCase,
 )
@@ -134,8 +138,9 @@ def build_lease_project(
     runtime: BuildRuntimeParams,
     database_path: Path,
     select: tuple[str, ...] = (),
+    callbacks: BuildCallbacks | None = None,
 ) -> BuildExecutionResult:
-    """Plan the selected models, then build them with `runtime`."""
+    """Plan the selected models, then build them with `runtime` and `callbacks`."""
 
     return execute_build_plan(
         plan=plan_lease_project(adapter=adapter, connection=connection, case=case, select=select),
@@ -147,6 +152,7 @@ def build_lease_project(
             runtime,
             promotion_mode=TablePromotionMode(adapter.default_table_promotion_mode()),
         ),
+        callbacks=callbacks,
     )
 
 

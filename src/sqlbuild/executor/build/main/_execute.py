@@ -69,7 +69,7 @@ def execute_build_plan(
         if hold is None
         else hold.holding(
             connection=scheduler_connection,
-            on_progress=None if callbacks is None else callbacks.on_progress,
+            on_progress=None if callbacks is None else callbacks.on_lifecycle_progress,
         )
     )
     with relation_metadata_cache_scope(adapter=adapter), held:
@@ -125,14 +125,14 @@ def _execute_build_plan(
         adapter=adapter,
         connection=scheduler_connection,
         run_id=runtime.run_id,
-        on_progress=resolved_callbacks.on_migration_progress,
+        on_progress=resolved_callbacks.on_lifecycle_progress,
     )
     _ = apply_column_migrations(
         plan=plan,
         adapter=adapter,
         connection=scheduler_connection,
         run_id=runtime.run_id,
-        on_progress=resolved_callbacks.on_migration_progress,
+        on_progress=resolved_callbacks.on_lifecycle_progress,
     )
     _ = apply_retention_phase(
         plan=plan,
