@@ -21,7 +21,7 @@ def model_table_config(entry: ModelPlanEntry) -> dict[str, object]:
 
     return {
         "table_type": entry.table_type,
-        "change_tracking": entry.change_tracking,
+        "change_tracking": bool(entry.maintained_readers),
         "physical_storage": entry.physical_storage,
         **model_output_config(entry),
     }

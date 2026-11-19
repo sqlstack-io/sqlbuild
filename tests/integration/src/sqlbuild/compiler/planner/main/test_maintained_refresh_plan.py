@@ -120,17 +120,23 @@ def test_given_built_maintained_models_when_replanning_then_live_settings_and_re
         ChangeTrackingPlanTestCase(
             description="a table a maintained model reads is built with change tracking",
             select=(),
-            expected_change_tracking={"orders": True, "customers": False, "daily_totals": False},
+            expected_maintained_readers={
+                "orders": ("daily_totals",),
+                "customers": (),
+                "daily_totals": (),
+            },
+            expected_refresh_on_build={"orders": False, "customers": False, "daily_totals": True},
         ),
         ChangeTrackingPlanTestCase(
             description="the reader need not be selected for its upstream to be tracked",
             select=("orders", "customers"),
-            expected_change_tracking={"orders": True, "customers": False},
+            expected_maintained_readers={"orders": ("daily_totals",), "customers": ()},
+            expected_refresh_on_build={"orders": False, "customers": False},
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_table_read_by_maintained_model_when_planning_then_it_is_built_with_change_tracking(
+def test_given_table_read_by_maintained_model_when_planning_then_it_names_its_maintained_readers(
     test_case: ChangeTrackingPlanTestCase, adapter: DuckDbAdapter, connection: Any
 ) -> None:
     plan: PlanOutput = build_execution_plan_from_kwargs(
@@ -140,5 +146,11 @@ def test_given_table_read_by_maintained_model_when_planning_then_it_is_built_wit
         select=test_case.select,
     )
 
-    tracked: dict[str, bool] = {entry.name: entry.change_tracking for entry in plan.model_entries}
-    assert tracked == test_case.expected_change_tracking
+    readers: dict[str, tuple[str, ...]] = {
+        entry.name: entry.maintained_readers for entry in plan.model_entries
+    }
+    assert readers == test_case.expected_maintained_readers
+    assert {
+        entry.name: entry.refresh_on_build for entry in plan.model_entries
+    } == test_case.expected_refresh_on_build
+    assert plan.model_locations["daily_totals"].name == "daily_totals"

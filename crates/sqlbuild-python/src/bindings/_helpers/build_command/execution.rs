@@ -49,6 +49,7 @@ use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_front::cost_context::models::CostContext;
 use sqlbuild_python_front::cursor::main::overrides::cursor_integer::cursor_integer;
 use sqlbuild_python_front::cursor::main::overrides::cursor_timestamp::cursor_timestamp;
+use sqlbuild_python_front::discovery::main::project::configured_maintained::configured_maintained;
 use sqlbuild_python_front::native_host::main::recorder_callbacks::recorder_callbacks;
 use sqlbuild_python_output::build_progress::main::batch_complete_callback::batch_complete_callback;
 use sqlbuild_python_output::build_progress::main::check_callback::check_callback;
@@ -336,77 +337,71 @@ pub(crate) fn execute_build_plan<'py>(
     let lifecycle: &DirectPythonLifecycle = preparation.lifecycle.get();
     let [start_ts, end_ts, start_int, end_int] = &preparation.cursors;
     let request = |name: &str| native_field(&context.request, name);
-    let target_config: TargetSettingsValues = project_target_settings(
-        &context.get("discovered_inputs")?,
-        &project,
-        (&connection_config, &adapter),
-    )?;
+    let discovered: Bound<'py, PyAny> = context.get("discovered_inputs")?;
+    let project_dir: Bound<'py, PyAny> = context.get("effective_project_dir")?;
+    let target_config: TargetSettingsValues =
+        project_target_settings(&discovered, &project, (&connection_config, &adapter))?;
     let (default_database, default_schema) = target_config.node_locations(&adapter)?;
+    let maintained = configured_maintained(&discovered, &context.request, &project_dir)?;
     let runtime: Bound<'py, PyAny> = call_with(
         &host_entry(py, ExecutorHost::BuildRuntimeParams)?,
         &[
-            ("run_id", native_field(&project, "run_id")?),
-            (
-                "runtime_dir",
-                joined(&context.get("effective_project_dir")?, &["target"])?,
-            ),
-            (
-                "snapshots",
-                context
-                    .get("discovered_inputs")?
-                    .getattr("project_config")?
-                    .getattr("snapshots")?,
-            ),
-            (
-                "allow_snapshot_schema_change",
-                request("allow_snapshot_schema_change")?,
-            ),
-            ("run_tests", request("run_tests")?),
-            ("run_audits", request("run_audits")?),
-            ("fail_fast", request("fail_fast")?),
-            (
-                "max_concurrency",
-                preparation.concurrency.into_pyobject(py)?.into_any(),
-            ),
-            ("loader_is_reload", request("reload_sources")?),
-            ("target_config", target_config.record(py)?),
-            ("default_database", default_database),
-            ("default_schema", default_schema),
-            ("start_cursor_ts", start_ts.clone()),
-            ("end_cursor_ts", end_ts.clone()),
-            ("start_cursor_int", start_int.clone()),
-            ("end_cursor_int", end_int.clone()),
-            ("use_color", boolean(py, context.use_color)),
-            ("providers", providers.clone()),
-            (
-                "test_timeouts",
-                timeout_record(
-                    py,
-                    &resolve_run_timeout(
-                        (&project, &context.get("discovered_inputs")?),
-                        request("test_timeout")?.extract()?,
-                        TimeoutKind::Test,
-                    )?,
-                )?,
-            ),
-            (
-                "project_relations",
-                build_project_relation_targets(
-                    py,
-                    Some(keywords(
+            &maintained[..],
+            &[
+                ("run_id", native_field(&project, "run_id")?),
+                ("runtime_dir", joined(&project_dir, &["target"])?),
+                (
+                    "snapshots",
+                    discovered.getattr("project_config")?.getattr("snapshots")?,
+                ),
+                (
+                    "allow_snapshot_schema_change",
+                    request("allow_snapshot_schema_change")?,
+                ),
+                ("run_tests", request("run_tests")?),
+                ("run_audits", request("run_audits")?),
+                ("fail_fast", request("fail_fast")?),
+                (
+                    "max_concurrency",
+                    preparation.concurrency.into_pyobject(py)?.into_any(),
+                ),
+                ("loader_is_reload", request("reload_sources")?),
+                ("target_config", target_config.record(py)?),
+                ("default_database", default_database),
+                ("default_schema", default_schema),
+                ("start_cursor_ts", start_ts.clone()),
+                ("end_cursor_ts", end_ts.clone()),
+                ("start_cursor_int", start_int.clone()),
+                ("end_cursor_int", end_int.clone()),
+                ("use_color", boolean(py, context.use_color)),
+                ("providers", providers.clone()),
+                (
+                    "test_timeouts",
+                    timeout_record(
                         py,
-                        &[("adapter", adapter.clone()), ("plan_output", plan.clone())],
-                    )?),
-                )
-                .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?,
-            ),
-        ],
+                        &resolve_run_timeout(
+                            (&project, &discovered),
+                            request("test_timeout")?.extract()?,
+                            TimeoutKind::Test,
+                        )?,
+                    )?,
+                ),
+                (
+                    "project_relations",
+                    build_project_relation_targets(
+                        py,
+                        Some(keywords(
+                            py,
+                            &[("adapter", adapter.clone()), ("plan_output", plan.clone())],
+                        )?),
+                    )
+                    .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?,
+                ),
+            ],
+        ]
+        .concat(),
     )?;
-    let policy: Option<ChangedPolicy> = changed_policy(
-        &context.get("effective_project_dir")?,
-        &context.request,
-        &project,
-    )?;
+    let policy: Option<ChangedPolicy> = changed_policy(&project_dir, &context.request, &project)?;
     let prepared: Prepared<'py> = prepare_consumption(
         (&plan, &project),
         (&adapter, &connection_config),

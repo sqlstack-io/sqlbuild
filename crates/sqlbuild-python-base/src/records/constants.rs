@@ -255,6 +255,7 @@ const BUILD_COMMAND_REQUEST: RecordSpec = RecordSpec {
         FieldSpec::new("allow_retention_decrease", FieldDefault::False),
         FieldSpec::new("allow_missing_migration_origin", FieldDefault::False),
         FieldSpec::new("allow_snapshot_schema_change", FieldDefault::False),
+        FieldSpec::new("ignore_maintained_grace", FieldDefault::False),
         FieldSpec::new("concurrency", FieldDefault::None),
         FieldSpec::new("select", FieldDefault::EmptyTuple),
         FieldSpec::new("exclude", FieldDefault::EmptyTuple),

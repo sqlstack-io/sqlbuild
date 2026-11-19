@@ -9,8 +9,9 @@ from sqlbuild._native import CompiledRelationLocation, ModelPlanEntry, PlanActio
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
-from sqlbuild.adapter.contract.types import RelationType
+from sqlbuild.adapter.contract.types import MaintainedOperation, RelationType
 from sqlbuild.adapter.relations.main.cached_relation_type import cached_relation_type
+from sqlbuild.executor.maintained_pauses.classes.maintained_hold import MaintainedHold
 from sqlbuild.executor.run._helpers.materializations.view import execute_in_place_entry
 from sqlbuild.executor.run.models import ModelExecutionResult, ModelMaterializationContext
 
@@ -18,13 +19,17 @@ _NO_WAREHOUSE_CODE: str = "A717"
 
 
 def execute_maintained_entry(*, context: ModelMaterializationContext) -> ModelExecutionResult:
-    """Create, alter or keep one maintained model, then run its audits and hooks."""
+    """Create, alter or keep one maintained model, refresh a kept one when asked, then audit it."""
 
     def materialize(*, target_qualified: str, statement_recorder: StatementRecorder) -> None:
         entry: ModelPlanEntry = context.entry
+        hold: MaintainedHold | None = context.maintained_hold
         if entry.action == PlanAction.CREATE_MAINTAINED:
             _create(context=context, destination=target_qualified, recorder=statement_recorder)
-        elif entry.action == PlanAction.ALTER_MAINTAINED:
+            if hold is not None:
+                hold.after_create(connection=context.connection, name=entry.name)
+            return
+        if entry.action == PlanAction.ALTER_MAINTAINED:
             _run(
                 adapter=context.adapter,
                 connection=context.connection,
@@ -32,6 +37,15 @@ def execute_maintained_entry(*, context: ModelMaterializationContext) -> ModelEx
                     destination=target_qualified,
                     target_lag=str(entry.target_lag),
                     warehouse=entry.refresh_warehouse,
+                ),
+                recorder=statement_recorder,
+            )
+        if entry.refresh_on_build or (hold is not None and hold.refreshes(name=entry.name)):
+            _run(
+                adapter=context.adapter,
+                connection=context.connection,
+                statements=context.adapter.render_maintained_operation(
+                    destination=target_qualified, operation=MaintainedOperation.REFRESH
                 ),
                 recorder=statement_recorder,
             )

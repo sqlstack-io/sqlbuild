@@ -1,4 +1,4 @@
-//! Maintained models whose live refresh settings drifted, and kept ones a replaced upstream reinitialises.
+//! Maintained models whose live refresh settings drifted, kept ones a replaced upstream reinitialises, and who reads what.
 
 use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_phases::models::ModelEntryResults;
@@ -7,7 +7,7 @@ use crate::planner_strategy::main::values::text::text;
 use crate::planner_warehouse::models::{AdapterRead, PlannerReads, Read};
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyBool, PyString};
+use pyo3::types::{PyBool, PyString, PyTuple};
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::maintained_refresh::main::maintained_settings_drift::maintained_settings_drift;
 use sqlbuild_analysis::maintained_refresh::main::reinitialised_readers::reinitialised_readers;
@@ -36,7 +36,7 @@ const DEFAULT_REFRESH_MODE: &str = "incremental";
 /// Actions that recreate the relation, which reinitialises every dynamic table reading it.
 const REPLACING_ACTIONS: [&str; 3] = ["create_table", "create_view", "create_maintained"];
 
-/// Plan maintained refresh settings and reinitialised readers, and track changes on what they read.
+/// Plan maintained refresh settings and reinitialised readers, and name the maintained readers of each entry.
 pub(crate) fn plan_maintained_refresh<'py>(
     runtime: &Bound<'py, PyAny>,
     execution_scope: &Bound<'py, PyAny>,
@@ -64,20 +64,21 @@ pub(crate) fn plan_maintained_refresh<'py>(
             text(&native_field(&entry, "materialization_type")?)? == MAINTAINED;
         let entry = if is_maintained {
             with_refresh_settings(entry, &models, &reads)?
-        } else if read_by_maintained(
+        } else {
+            entry
+        };
+        let readers: Vec<String> = maintained_readers(
             py,
             downstream.get(&key).copied(),
             (&models, &mut maintained_models),
-        )? {
+        )?;
+        let entry = if readers.is_empty() {
+            entry
+        } else {
             replaced(
                 &entry,
-                &[(
-                    "change_tracking",
-                    PyBool::new(py, true).to_owned().into_any(),
-                )],
+                &[("maintained_readers", PyTuple::new(py, readers)?.into_any())],
             )?
-        } else {
-            entry
         };
         let action: String = text(&native_field(&entry, "action")?)?;
         rows.push(MaintainedRead {
@@ -103,15 +104,16 @@ pub(crate) fn plan_maintained_refresh<'py>(
     })
 }
 
-/// Whether any model reading the entry is maintained, checking each reader once per plan.
-fn read_by_maintained(
+/// The maintained models reading the entry, selected or not, checking each reader once per plan.
+fn maintained_readers(
     py: Python<'_>,
     readers: Option<&Vec<ObjectKey>>,
     (models, maintained_models): (&ModelLookup, &mut HashMap<String, bool>),
-) -> PyResult<bool> {
+) -> PyResult<Vec<String>> {
     let Some(readers) = readers else {
-        return Ok(false);
+        return Ok(Vec::new());
     };
+    let mut found: Vec<String> = Vec::new();
     for (kind, name) in readers {
         if kind != MODEL {
             continue;
@@ -127,10 +129,11 @@ fn read_by_maintained(
             }
         };
         if maintained {
-            return Ok(true);
+            found.push(name.clone());
         }
     }
-    Ok(false)
+    found.sort();
+    Ok(found)
 }
 
 /// The entry with its `target_lag`; a kept one alters on drift, or creates when no dynamic table holds its name.
@@ -158,6 +161,12 @@ fn with_refresh_settings<'py>(
         (
             "refresh_warehouse",
             desired.warehouse.as_deref().into_pyobject(py)?.into_any(),
+        ),
+        (
+            "refresh_on_build",
+            PyBool::new(py, config_value(py, &values, "refresh_on_build")?.is_truthy()?)
+                .to_owned()
+                .into_any(),
         ),
     ];
     if text(&native_field(&entry, "action")?)? == KEEP_MAINTAINED {

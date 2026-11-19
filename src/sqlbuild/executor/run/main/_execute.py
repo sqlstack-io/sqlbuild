@@ -249,7 +249,7 @@ def _staged_lifecycle(
                     table_config={
                         "table_type": entry.table_type,
                         "physical_storage": entry.physical_storage,
-                        "change_tracking": entry.change_tracking,
+                        "change_tracking": bool(entry.maintained_readers),
                     },
                     statement_recorder=statement_recorder,
                 )
