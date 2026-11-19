@@ -89,7 +89,7 @@ GROUP BY customer_id, CAST(ordered_at AS DATE)
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `refresh (lag <duration>)` | none | How far behind its inputs the model may fall: a fixed duration such as `5m`, `1h` or `1d`, at least `1m` on Snowflake. Without it, the model refreshes when a maintained model that reads it refreshes |
+| `refresh (lag <duration>)` | none | How far behind its inputs the model may fall: a fixed duration such as `5m`, `1h` or `1d`, at least `1m` on Snowflake and no shorter than the lag of a maintained model it reads. Without it, the model refreshes when a maintained model that reads it refreshes |
 | `refresh_mode` | `incremental` | `incremental`, `full`, `auto` or `adaptive`. Snowflake rejects `incremental` for a query it can't refresh incrementally; use `full` for that query |
 | `refresh_warehouse` | the connection's warehouse | Warehouse the scheduled refreshes run on |
 | `refresh_on_build` | `false` | Refresh the model in every build that selects it, not only on its schedule |
