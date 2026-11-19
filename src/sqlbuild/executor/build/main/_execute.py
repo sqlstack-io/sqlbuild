@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import replace
 from typing import Any
 
@@ -35,6 +36,10 @@ from sqlbuild.executor.build.models import (
 )
 from sqlbuild.executor.build.types import BuildStatus
 from sqlbuild.executor.load.models import LoadExecutionResult
+from sqlbuild.executor.maintained_pauses.classes.maintained_hold import MaintainedHold
+from sqlbuild.executor.maintained_pauses.main.hold_maintained_models import (
+    hold_maintained_models,
+)
 from sqlbuild.executor.migrations.main._apply import apply_model_migrations
 from sqlbuild.executor.migrations.main._apply_columns import apply_column_migrations
 from sqlbuild.executor.run.models import ModelExecutionResult
@@ -54,16 +59,27 @@ def execute_build_plan(
     initial_state: BuildInitialState | None = None,
     schema_prepared: bool = False,
 ) -> BuildExecutionResult:
-    """Execute a full build plan using the DAG scheduler."""
+    """Execute a build plan with the DAG scheduler, holding the maintained models it touches."""
 
-    with relation_metadata_cache_scope(adapter=adapter):
+    hold: MaintainedHold | None = hold_maintained_models(
+        plan=plan, adapter=adapter, runtime=runtime, connection_config=connection_config
+    )
+    held: AbstractContextManager[object] = (
+        nullcontext()
+        if hold is None
+        else hold.holding(
+            connection=scheduler_connection,
+            on_progress=None if callbacks is None else callbacks.on_progress,
+        )
+    )
+    with relation_metadata_cache_scope(adapter=adapter), held:
         return _execute_build_plan(
             plan=plan,
             adapter=adapter,
             connection_config=connection_config,
             connections=connections,
             scheduler_connection=scheduler_connection,
-            runtime=runtime,
+            runtime=replace(runtime, maintained_hold=hold),
             callbacks=callbacks,
             customizations=customizations,
             initial_state=initial_state,

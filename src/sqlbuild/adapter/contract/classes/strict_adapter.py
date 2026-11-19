@@ -367,6 +367,14 @@ class StrictAdapter(
         del connection, database, schema, name
         return None
 
+    def maintained_scheduling_state(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> str | None:
+        """Optional: a maintained model's `ACTIVE` or `SUSPENDED` state, or None when unlisted."""
+
+        del connection, database, schema, name
+        return None
+
     @abstractmethod
     def render_create_table_as(self, *, destination: str, sql: str) -> tuple[str, ...]:
         """Render SQL statements that create or replace a table from a query."""

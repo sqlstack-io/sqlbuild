@@ -882,7 +882,11 @@ def change_tracking_project_case() -> BuildExecutionPlanTestCase:
         model_configs={
             "orders": {"materialized": "table"},
             "customers": {"materialized": "table"},
-            "daily_totals": {"materialized": "maintained", "refresh": {"lag": "1h"}},
+            "daily_totals": {
+                "materialized": "maintained",
+                "refresh": {"lag": "1h"},
+                "refresh_on_build": True,
+            },
         },
         model_queries={
             "orders": "SELECT 1 AS order_id",

@@ -3721,6 +3721,24 @@ class SnowflakeAdapter(
     ) -> tuple[str, str] | None:
         """The dynamic table's target lag and warehouse from SHOW DYNAMIC TABLES, or None."""
 
+        row: dict[str, object] | None = self._listed_dynamic_table(
+            connection=connection, database=database, schema=schema, name=name
+        )
+        return None if row is None else (str(row.get("target_lag")), str(row.get("warehouse")))
+
+    def maintained_scheduling_state(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> str | None:
+        """The dynamic table's scheduling state from SHOW DYNAMIC TABLES, or None."""
+
+        row: dict[str, object] | None = self._listed_dynamic_table(
+            connection=connection, database=database, schema=schema, name=name
+        )
+        return None if row is None else str(row.get("scheduling_state"))
+
+    def _listed_dynamic_table(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> dict[str, object] | None:
         stored_name: str = self._information_schema_identifier(name)
         if schema is None:
             return None
@@ -3738,7 +3756,7 @@ class SnowflakeAdapter(
         row: dict[str, object]
         for row in rows:
             if str(row.get("name")) == stored_name:
-                return (str(row.get("target_lag")), str(row.get("warehouse")))
+                return row
         return None
 
     def widen_target_nullability(

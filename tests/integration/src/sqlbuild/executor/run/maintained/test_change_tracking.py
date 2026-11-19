@@ -27,21 +27,21 @@ from tests.integration.src.sqlbuild.executor.run.maintained.helpers import Track
     [
         ChangeTrackingTableTestCase(
             description="a staged build tracks changes on the stage it swaps in",
-            change_tracking=True,
+            maintained_readers=("daily_totals",),
             promotion_mode=TablePromotionMode.STAGED,
             declared_columns=(),
             expected_tracking=(True,),
         ),
         ChangeTrackingTableTestCase(
             description="type enforcement rebuilds the stage with change tracking too",
-            change_tracking=True,
+            maintained_readers=("daily_totals",),
             promotion_mode=TablePromotionMode.STAGED,
             declared_columns=(("order_id", "BIGINT"),),
             expected_tracking=(True, True),
         ),
         ChangeTrackingTableTestCase(
             description="a table no maintained model reads is created as before",
-            change_tracking=False,
+            maintained_readers=(),
             promotion_mode=TablePromotionMode.STAGED,
             declared_columns=(("order_id", "BIGINT"),),
             expected_tracking=(False, False),
@@ -61,7 +61,7 @@ def test_given_table_read_by_maintained_model_when_building_then_every_create_tr
             target_name="orders",
             type_enforcement=bool(test_case.declared_columns),
         ),
-        change_tracking=test_case.change_tracking,
+        maintained_readers=test_case.maintained_readers,
     )
 
     result: ModelExecutionResult = execute_table_entry(

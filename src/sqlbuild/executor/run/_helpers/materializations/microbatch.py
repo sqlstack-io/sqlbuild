@@ -3057,7 +3057,7 @@ def _apply_microbatch_dml(
                     config={
                         "table_type": context.entry.table_type,
                         "physical_storage": context.entry.physical_storage,
-                        "change_tracking": context.entry.change_tracking,
+                        "change_tracking": bool(context.entry.maintained_readers),
                     },
                     statement_recorder=state.statement_recorder,
                 )

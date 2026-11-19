@@ -192,6 +192,7 @@ MICROBATCH_TABLE_NAME: str
 NODE_RESULTS_TABLE_NAME: str
 OBSERVATIONS_TABLE_NAME: str
 RUNS_TABLE_NAME: str
+MAINTAINED_PAUSES_TABLE_NAME: str
 AUDIT_RESULTS_TABLE_NAME: str
 JANITOR_EVENTS_TABLE_NAME: str
 COLUMN_NODE_TYPE: str
@@ -6592,6 +6593,7 @@ class BuildCommandRequest(NativeRecord):
     allow_retention_decrease: bool
     allow_missing_migration_origin: bool
     allow_snapshot_schema_change: bool
+    ignore_maintained_grace: bool
     concurrency: int | None
     select: tuple[str, ...]
     exclude: tuple[str, ...]
@@ -6636,6 +6638,7 @@ class BuildCommandRequest(NativeRecord):
         allow_retention_decrease: bool = False,
         allow_missing_migration_origin: bool = False,
         allow_snapshot_schema_change: bool = False,
+        ignore_maintained_grace: bool = False,
         concurrency: int | None = None,
         select: tuple[str, ...] = (),
         exclude: tuple[str, ...] = (),
@@ -14123,7 +14126,8 @@ class ModelPlanEntry(NativeRecord):
     target_lag: str | None
     refresh_mode: str | None
     refresh_warehouse: str | None
-    change_tracking: bool
+    refresh_on_build: bool
+    maintained_readers: tuple[str, ...]
     def __init__(
         self,
         key: CompiledObjectKey,
@@ -14217,7 +14221,8 @@ class ModelPlanEntry(NativeRecord):
         target_lag: str | None = ...,
         refresh_mode: str | None = ...,
         refresh_warehouse: str | None = ...,
-        change_tracking: bool = ...,
+        refresh_on_build: bool = ...,
+        maintained_readers: tuple[str, ...] = ...,
     ) -> None: ...
 
 class CloneSourcePlanEntry(NativeRecord):

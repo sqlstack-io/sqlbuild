@@ -223,4 +223,5 @@ class MaintainedRefreshPlanTestCase:
 class ChangeTrackingPlanTestCase:
     description: str
     select: tuple[str, ...]
-    expected_change_tracking: dict[str, bool]
+    expected_maintained_readers: dict[str, tuple[str, ...]]
+    expected_refresh_on_build: dict[str, bool]

@@ -491,3 +491,10 @@ class SnowflakeChangeTrackingTestCase:
     description: str
     config: dict[str, object]
     expected_sql: str
+
+
+@dataclass(frozen=True)
+class SnowflakeMaintainedStateTestCase:
+    description: str
+    rows: tuple[tuple[str, str], ...]
+    expected_state: str | None

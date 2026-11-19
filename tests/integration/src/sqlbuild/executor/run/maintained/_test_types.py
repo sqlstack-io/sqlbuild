@@ -30,7 +30,7 @@ class MaintainedFailureTestCase:
 @dataclass(frozen=True)
 class ChangeTrackingTableTestCase:
     description: str
-    change_tracking: bool
+    maintained_readers: tuple[str, ...]
     promotion_mode: TablePromotionMode
     declared_columns: tuple[tuple[str, str], ...]
     expected_tracking: tuple[bool, ...]
