@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlbuild._native import CompiledRelationLocation
+from sqlbuild._native import DYNAMIC_PAUSES_TABLE_NAME, CompiledRelationLocation
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.types import DynamicListing, DynamicOperation
-from sqlbuild.executor.dynamic_pauses._helpers.sql import insert_sql
+from sqlbuild.adapter.relations.types import RelationChangeTokenReader
+from sqlbuild.executor.dynamic_pauses._helpers.sql import insert_sql, read_open_holds
 from sqlbuild.executor.dynamic_pauses.constants import SUSPENDED_STATE
-from sqlbuild.executor.dynamic_pauses.models import DynamicPauseEvent, OpenHold
+from sqlbuild.executor.dynamic_pauses.models import DynamicPauseEvent, OpenHold, ResumeOutcome
 from sqlbuild.executor.dynamic_pauses.types import DynamicPauseEventType, StateLocation
 
 
@@ -41,9 +42,7 @@ def run_dynamic_operation(
             database=relation.database, schema=relation.schema, name=relation.name
         )
     )
-    for statement in adapter.render_dynamic_operation(
-        destination=destination, operation=operation
-    ):
+    for statement in adapter.render_dynamic_operation(destination=destination, operation=operation):
         adapter.execute(connection=connection, sql=statement)
 
 
@@ -86,3 +85,59 @@ def resume_holds(
             ),
         ),
     )
+
+
+def resume_expired(
+    *,
+    adapter: BaseAdapter,
+    connection: Any,
+    location: StateLocation,
+    holds_after: tuple[float, str],
+    quiet_token: str | None,
+) -> ResumeOutcome:
+    """Resume holds silent past the grace seconds unless the pause table still has `quiet_token`."""
+
+    grace_seconds: float
+    recorded_by: str
+    grace_seconds, recorded_by = holds_after
+    if not adapter.relation_exists(
+        connection=connection,
+        database=location[0],
+        schema=location[1],
+        name=DYNAMIC_PAUSES_TABLE_NAME,
+    ):
+        return ResumeOutcome(resumed=(), quiet_token=None)
+    token: str | None = (
+        adapter.read_relation_change_token(
+            connection=connection,
+            database=location[0],
+            schema=location[1],
+            name=DYNAMIC_PAUSES_TABLE_NAME,
+        )
+        if isinstance(adapter, RelationChangeTokenReader)
+        else None
+    )
+    if token is not None and token == quiet_token:
+        return ResumeOutcome(resumed=(), quiet_token=token)
+    holds: tuple[OpenHold, ...] = read_open_holds(
+        adapter=adapter, connection=connection, location=location
+    )
+    live: set[tuple[str | None, str | None, str]] = {
+        (hold.relation.database, hold.relation.schema, hold.relation.name)
+        for hold in holds
+        if hold.idle_seconds < grace_seconds
+    }
+    expired: tuple[OpenHold, ...] = tuple(
+        hold
+        for hold in holds
+        if hold.idle_seconds >= grace_seconds
+        and (hold.relation.database, hold.relation.schema, hold.relation.name) not in live
+    )
+    resume_holds(
+        adapter=adapter,
+        connection=connection,
+        location=location,
+        holds=expired,
+        recorded_by=recorded_by,
+    )
+    return ResumeOutcome(resumed=expired, quiet_token=None if holds else token)

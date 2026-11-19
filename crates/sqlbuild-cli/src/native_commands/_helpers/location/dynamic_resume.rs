@@ -43,9 +43,7 @@ pub(crate) async fn resume_expired_holds(state: &mut LocationMetadataSync) {
         Ok(Ok(DynamicResumeReply::Resumed(resumed))) => {
             for (location, token) in state.locations.iter().zip(resumed.quiet_tokens) {
                 match token {
-                    Some(token) => state
-                        .dynamic_quiet_tokens
-                        .insert(location.clone(), token),
+                    Some(token) => state.dynamic_quiet_tokens.insert(location.clone(), token),
                     None => state.dynamic_quiet_tokens.remove(location),
                 };
             }

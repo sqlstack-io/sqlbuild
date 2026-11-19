@@ -468,6 +468,11 @@ symbols = ["LoadCallbacks", "LoadExecutionResult", "LoadRuntimeParams"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
+modules = ["sqlbuild.executor.dynamic_pauses.main.resume_expired_holds"]
+symbols = ["resume_expired_holds"]
+reason = "Native code resolves these through the sqlbuild._native_host name table."
+
+[[targets.python.dead_code.roots]]
 modules = ["sqlbuild.executor.old_name_views._helpers.janitor"]
 symbols = ["is_compatibility_view"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."

@@ -1134,15 +1134,15 @@ def test_given_a_build_that_stopped_heartbeating_when_a_served_location_syncs_th
             log,
             tmp_path / "location.stdout",
             env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
-        ) as location:
-            _ = wait_for_generation(api, "development", 1, location, log)
+        ) as served:
+            _ = wait_for_generation(api, "development", 1, served, log)
             deadline: float = time.monotonic() + 45
             while "synchronization completed" not in log.read_text():
-                assert location.poll() is None, log.read_text()
+                assert served.poll() is None, log.read_text()
                 assert time.monotonic() < deadline, log.read_text()
                 record_finished_run(tmp_path / "control/.sqlbuild/control.sqlite3")
                 time.sleep(0.5)
-            wait_for_idle_sync(location, log)
+            wait_for_idle_sync(served, log)
         recorder: str = f"location-sync:{api.location_id}"
     text: str = log.read_text()
     connection = adapter.connect({"database": str(project / "warehouse.db")})

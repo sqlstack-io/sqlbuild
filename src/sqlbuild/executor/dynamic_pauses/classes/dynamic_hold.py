@@ -134,7 +134,6 @@ class DynamicHold:
         self._yield_to_rivals(
             connection=connection, location=location, names=tuple(self._paused), window=window
         )
-        # A location sync may resume a taken-over model before our pause is recorded; read it again.
         states.update(
             {
                 name: self._state(connection=connection, name=name)

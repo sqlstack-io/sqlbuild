@@ -17,8 +17,8 @@ use crate::native_commands::tests::helpers::{
     acknowledge_complete_pages, location_options, one_location, published_location,
 };
 use crate::native_commands::tests::test_types::BilledDeferralTestCase;
-use crate::native_commands::tests::test_types::FastClockScanTestCase;
 use crate::native_commands::tests::test_types::DynamicResumeTestCase;
+use crate::native_commands::tests::test_types::FastClockScanTestCase;
 use crate::native_commands::tests::test_types::{
     FailedReadHealthTestCase, NewestVersionsTestCase, ReadFailureTestCase,
 };

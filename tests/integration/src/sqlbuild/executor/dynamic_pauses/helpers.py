@@ -19,7 +19,6 @@ from sqlbuild.executor.build.models import (
     BuildExecutionResult,
     BuildRuntimeParams,
 )
-from sqlbuild.executor.dynamic_pauses.models import DynamicPauseEvent
 from sqlbuild.executor.dynamic_pauses._helpers.sql import insert_sql, setup_statements
 from sqlbuild.executor.dynamic_pauses.models import DynamicPauseEvent
 from sqlbuild.executor.dynamic_pauses.types import DynamicPauseEventType, StateLocation
@@ -84,6 +83,21 @@ class PausingDuckDbAdapter(DuckDbAdapter):
         self.states[name] = _STATES.get(operation, self.states[name])
         self.operations.append((operation.value, name))
         return ("SELECT 1",)
+
+
+class SyncDuringTakeoverAdapter(PausingDuckDbAdapter):
+    """Resumes models as a location sync would, right after `takeover_run` records its pause."""
+
+    def __init__(self, *, takeover_run: str, resumed: dict[str, str]) -> None:
+        super().__init__()
+        self._takeover_run: str = takeover_run
+        self._resumed: dict[str, str] = resumed
+
+    def execute(self, *, connection: Any, sql: str) -> Any:
+        cursor: Any = super().execute(connection=connection, sql=sql)
+        recorded_takeover: bool = "'paused'" in sql and f"'{self._takeover_run}'" in sql
+        self.states.update({True: self._resumed, False: {}}[recorded_takeover])
+        return cursor
 
 
 class TokenPausingDuckDbAdapter(PausingDuckDbAdapter):
@@ -183,6 +197,16 @@ def pause_events(*, connection: Any) -> list[tuple[str, str, str, str]]:
         "ORDER BY 1, 2, 3, 4"
     ).fetchall()
     return [(str(row[0]), str(row[1]), str(row[2]), str(row[3])) for row in rows]
+
+
+def recorded_events(*, connection: Any) -> list[tuple[str, str, str, str]]:
+    """The recorded pause events, or none when no build created the pause table."""
+
+    return [
+        event
+        for _ in pause_table_names(connection=connection)
+        for event in pause_events(connection=connection)
+    ]
 
 
 def pause_table_names(*, connection: Any) -> list[tuple[Any, ...]]:

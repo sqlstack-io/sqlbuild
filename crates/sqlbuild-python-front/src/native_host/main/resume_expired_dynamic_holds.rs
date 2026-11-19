@@ -11,6 +11,9 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 /// One state location's database and schema, and the pause table token its last quiet pass left.
 pub type ResumeLocation = ((Option<String>, String), Option<String>);
 
+/// Each resumed hold's run ID and dotted relation, and each location's new quiet token.
+pub type ResumedHolds = (Vec<(String, String)>, Vec<Option<String>>);
+
 /// Each resumed hold's run ID and dotted relation, after `[dynamic] heartbeat_grace` of silence,
 /// and each location's new quiet token, in `locations` order.
 pub fn resume_expired_dynamic_holds<'py>(
@@ -18,10 +21,9 @@ pub fn resume_expired_dynamic_holds<'py>(
     project_dir: &Bound<'py, PyAny>,
     locations: &[ResumeLocation],
     recorded_by: &str,
-) -> PyResult<(Vec<(String, String)>, Vec<Option<String>>)> {
+) -> PyResult<ResumedHolds> {
     let py = adapter.py();
-    let grace_seconds: u64 =
-        configured(project_dir, load_dynamic_config)?.heartbeat_grace_seconds;
+    let grace_seconds: u64 = configured(project_dir, load_dynamic_config)?.heartbeat_grace_seconds;
     let resume: Bound<'py, PyAny> = host_entry(py, ExecutorHost::ResumeExpiredDynamicHolds)?;
     let mut resumed: Vec<(String, String)> = Vec::new();
     let mut quiet_tokens: Vec<Option<String>> = Vec::new();

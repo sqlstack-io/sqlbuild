@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -11,13 +10,12 @@ import pytest
 from sqlbuild.executor.build.models import BuildExecutionResult, BuildRuntimeParams
 from sqlbuild.executor.build.types import BuildStatus
 from sqlbuild.executor.dynamic_pauses._helpers.resume import resume_holds
-from sqlbuild.executor.dynamic_pauses._helpers.sql import read_open_holds
+from sqlbuild.executor.dynamic_pauses._helpers.sql import read_open_holds, setup_statements
 from sqlbuild.executor.dynamic_pauses.classes.dynamic_hold import DynamicHold
 from sqlbuild.executor.dynamic_pauses.main.hold_dynamic_models import (
     hold_dynamic_models,
 )
 from sqlbuild.executor.dynamic_pauses.main.resume_expired_holds import resume_expired_holds
-from sqlbuild.executor.dynamic_pauses._helpers.sql import setup_statements
 from sqlbuild.executor.dynamic_pauses.models import OpenHold, ResumeOutcome
 from tests.integration.src.sqlbuild.executor.dynamic_pauses._test_types import (
     DoubleCloseTestCase,
@@ -28,13 +26,15 @@ from tests.integration.src.sqlbuild.executor.dynamic_pauses._test_types import (
 from tests.integration.src.sqlbuild.executor.dynamic_pauses.helpers import (
     LeaseProject,
     PausingDuckDbAdapter,
+    SyncDuringTakeoverAdapter,
+    TokenPausingDuckDbAdapter,
     build_lease_project,
     lease_project_case,
     pause_event_ids,
     pause_events,
     pause_table_names,
     plan_lease_project,
-    TokenPausingDuckDbAdapter,
+    recorded_events,
     seed_hold,
 )
 
@@ -142,8 +142,7 @@ def test_given_pause_holds_when_a_location_syncs_then_only_expired_holds_are_res
     )
     assert adapter.states == test_case.expected_states
     assert bool(pause_table_names(connection=connection)) == test_case.pause_table
-    if test_case.pause_table:
-        assert pause_events(connection=connection) == list(test_case.expected_events)
+    assert recorded_events(connection=connection) == list(test_case.expected_events)
 
 
 @pytest.mark.parametrize(
@@ -195,9 +194,10 @@ def test_given_pause_holds_when_a_location_syncs_then_only_expired_holds_are_res
 def test_given_a_quiet_token_when_a_location_syncs_then_only_a_changed_pause_table_is_read(
     test_case: QuietTokenTestCase, connection: Any
 ) -> None:
-    adapter: PausingDuckDbAdapter = (
-        TokenPausingDuckDbAdapter() if test_case.tokens else PausingDuckDbAdapter()
-    )
+    adapter: PausingDuckDbAdapter = {
+        True: TokenPausingDuckDbAdapter,
+        False: PausingDuckDbAdapter,
+    }[test_case.tokens]()
     for statement in setup_statements(adapter=adapter, location=(None, "staging")):
         connection.execute(statement)
     for run_id, name, idle_seconds in test_case.holds:
@@ -208,16 +208,10 @@ def test_given_a_quiet_token_when_a_location_syncs_then_only_a_changed_pause_tab
             name=name,
             idle_seconds=idle_seconds,
         )
-    token: str | None = (
-        TokenPausingDuckDbAdapter().read_relation_change_token(
-            connection=connection,
-            database=None,
-            schema="staging",
-            name="_sqlbuild_dynamic_pauses",
-        )
-        if test_case.quiet
-        else None
+    unchanged: str | None = TokenPausingDuckDbAdapter().read_relation_change_token(
+        connection=connection, database=None, schema="staging", name="_sqlbuild_dynamic_pauses"
     )
+    token: str | None = {True: unchanged, False: None}[test_case.quiet]
 
     outcome: ResumeOutcome = resume_expired_holds(
         adapter=adapter,
@@ -234,7 +228,7 @@ def test_given_a_quiet_token_when_a_location_syncs_then_only_a_changed_pause_tab
     assert tuple((hold.run_id, hold.relation.name) for hold in outcome.resumed) == (
         test_case.expected_resumed
     )
-    assert outcome.quiet_token == (current if test_case.expected_quiet else None)
+    assert outcome.quiet_token == {True: current, False: None}[test_case.expected_quiet]
 
 
 @pytest.mark.parametrize(
@@ -294,11 +288,13 @@ def test_given_one_expired_hold_when_two_closers_resume_it_then_it_closes_once(
 )
 def test_given_a_sync_resuming_mid_takeover_when_the_build_holds_then_it_pauses_the_model(
     test_case: SyncDuringTakeoverTestCase,
-    adapter: PausingDuckDbAdapter,
-    connection: Any,
     database_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    adapter: SyncDuringTakeoverAdapter = SyncDuringTakeoverAdapter(
+        takeover_run="second_run", resumed={"daily_totals": "ACTIVE"}
+    )
+    connection: Any = adapter.connect({"database": str(database_path)})
+    connection.execute("CREATE SCHEMA staging")
     case: LeaseProject = lease_project_case(
         orders_query="SELECT 1 AS order_id", report_locations={}, refresh_on_build=False
     )
@@ -323,15 +319,6 @@ def test_given_a_sync_resuming_mid_takeover_when_the_build_holds_then_it_pauses_
     assert dead is not None
     dead.acquire(connection=connection, on_progress=None)
     adapter.operations.clear()
-    execute: Callable[..., Any] = adapter.execute
-
-    def resumed_by_a_sync_after_the_takeover(*, connection: Any, sql: str) -> Any:
-        cursor: Any = execute(connection=connection, sql=sql)
-        if "'paused'" in sql and "'second_run'" in sql:
-            adapter.states["daily_totals"] = "ACTIVE"
-        return cursor
-
-    monkeypatch.setattr(adapter, "execute", resumed_by_a_sync_after_the_takeover)
 
     result: BuildExecutionResult = build_lease_project(
         adapter=adapter,
@@ -341,6 +328,7 @@ def test_given_a_sync_resuming_mid_takeover_when_the_build_holds_then_it_pauses_
         database_path=database_path,
     )
 
+    adapter.close(connection)
     assert result.status == BuildStatus.SUCCESS
     assert tuple(adapter.operations) == test_case.expected_operations
     assert adapter.states == test_case.expected_states
