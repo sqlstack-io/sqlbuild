@@ -8,7 +8,10 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
+from types import FrameType
+from typing import Any
 
 import pytest
 
@@ -318,16 +321,20 @@ def test_given_a_hanging_run_record_when_sigint_arrives_then_the_build_stops_pro
         "render_current_warehouse_user",
         lambda self: test_case.blocking_warehouse_user_sql,
     )
-    previous = signal.signal(signal.SIGINT, signal.default_int_handler)
+    previous: Callable[[int, FrameType | None], Any] | int | signal.Handlers | None = signal.signal(
+        signal.SIGINT, signal.default_int_handler
+    )
     signalled_at: list[float] = []
 
     def interrupt() -> None:
         signalled_at.append(time.monotonic())
         os.kill(os.getpid(), signal.SIGINT)
 
-    sender = threading.Timer(test_case.signal_after_seconds, interrupt)
+    sender: threading.Timer = threading.Timer(test_case.signal_after_seconds, interrupt)
     # A broken stop would hang on the insert forever; cancel it later so the test fails instead.
-    watchdog = threading.Timer(test_case.max_stop_seconds * 4, cancel_running_statements)
+    watchdog: threading.Timer = threading.Timer(
+        test_case.max_stop_seconds * 4, cancel_running_statements
+    )
     sender.start()
     watchdog.start()
     try:
