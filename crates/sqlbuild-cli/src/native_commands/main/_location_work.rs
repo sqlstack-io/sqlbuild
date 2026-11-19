@@ -185,9 +185,15 @@ async fn perform_work(
         LocationWork::Plan {
             selection,
             settings,
+            fresh,
             ..
-        } => plan_location((options, runtime), (&selection, &settings), copy, expires)
-            .await?
-            .map(|(document, diffs)| (LocationWorkOutcome::Plan { document, diffs }, Vec::new())),
+        } => plan_location(
+            (options, runtime),
+            (&selection, &settings, fresh),
+            copy,
+            expires,
+        )
+        .await?
+        .map(|(document, diffs)| (LocationWorkOutcome::Plan { document, diffs }, Vec::new())),
     })
 }

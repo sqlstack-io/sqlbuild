@@ -952,3 +952,31 @@ describe('listWarehouseConnections', () => {
 		expect(health.filter((p) => p.includes('/development/'))).toHaveLength(2);
 	});
 });
+
+describe('planning a build', () => {
+	function server() {
+		const bodies: Record<string, unknown>[] = [];
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				if (request.method === 'POST') {
+					bodies.push(await request.json());
+					return Response.json({ applied: true });
+				}
+				return Response.json({ expires_at: '2999-01-01T00:00:00Z', outcome: { kind: 'plan', document: { error: { code: 'plan_failed', message: 'stop here' } } } });
+			})
+		);
+		return { bodies, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('asks the location to plan again only when the person asks for a fresh plan', async () => {
+		const { bodies, client } = server();
+		for (const options of [undefined, { fresh: true }]) {
+			const planned = client.planBuild(ORDERS, ['build', '--changed'], options);
+			await vi.advanceTimersByTimeAsync(1000);
+			expect((await planned).error).toBe('plan_failed: stop here');
+		}
+		expect(bodies.map((body) => body.fresh)).toEqual([undefined, true]);
+	});
+});

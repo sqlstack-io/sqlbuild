@@ -7,7 +7,7 @@ use sqlbuild_core::plan_display::main::detach_model_diffs::detach_model_diffs;
 use uuid::Uuid;
 
 use crate::api::tests::plans_helpers::{ask, person, plan_request, register_instance, run_rows};
-use crate::api::tests::test_types::{PlanDiffTestCase, PlanTestCase};
+use crate::api::tests::test_types::{PlanDiffTestCase, PlanTestCase, PlanWorkFreshTestCase};
 use crate::api::tests::work_helpers::execute;
 use crate::authorization::main::people::bootstrap_user::bootstrap_user;
 use crate::credentials::models::{AuditContext, BuiltinRole};
@@ -38,12 +38,14 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
         PlanTestCase {
             description: "SQLite plans",
             backend: Backend::Sqlite,
+            fresh: true,
             expected_selection: &["customers", "orders"],
             expected_warning: "connect failed: db_password=[REDACTED]",
         },
         PlanTestCase {
             description: "PostgreSQL plans",
             backend: Backend::Postgres,
+            fresh: false,
             expected_selection: &["customers", "orders"],
             expected_warning: "connect failed: db_password=[REDACTED]",
         },
@@ -100,14 +102,17 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
             )
             .await;
             let outsider = person(store, owner, ("orders-outsider", location), &[]).await;
-            let first = plan_request(&[
-                "build",
-                "customers",
-                "orders",
-                "--full-refresh",
-                "--warehouse",
-                "WH_PLAN",
-            ]);
+            let first = PlanRequest {
+                fresh: test_case.fresh,
+                ..plan_request(&[
+                    "build",
+                    "customers",
+                    "orders",
+                    "--full-refresh",
+                    "--warehouse",
+                    "WH_PLAN",
+                ])
+            };
 
             let silent = ask(store, (&context, viewer), location, &first).await;
             assert!(
@@ -225,6 +230,7 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                     command: vec!["build".into(), "orders".into()],
                     selection: ["orders".to_owned()].into(),
                     settings: Default::default(),
+                    fresh: false,
                 },
             };
             assert!(
@@ -278,6 +284,7 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
             let LocationWork::Plan {
                 selection,
                 settings,
+                fresh,
                 ..
             } = &claimed.request.work
             else {
@@ -286,6 +293,12 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                     description = test_case.description
                 )
             };
+            assert_eq!(
+                *fresh,
+                test_case.fresh,
+                "{description}: the location sees whether to plan again",
+                description = test_case.description
+            );
             assert_eq!(
                 selection.iter().map(String::as_str).collect::<Vec<_>>(),
                 test_case.expected_selection,
@@ -702,5 +715,39 @@ fn given_a_plan_whose_document_left_diffs_out_when_read_then_pages_count_them_an
             );
             close_test_store(fixture).await;
         });
+    }
+}
+
+#[test]
+fn given_plan_work_when_serialized_then_fresh_is_sent_only_when_set() {
+    let test_cases = [
+        PlanWorkFreshTestCase {
+            description: "an ordinary plan omits fresh, so a location from before plan reuse accepts it",
+            fresh: false,
+            expected_field: serde_json::Value::Null,
+        },
+        PlanWorkFreshTestCase {
+            description: "plan again reaches the location",
+            fresh: true,
+            expected_field: json!(true),
+        },
+    ];
+    for test_case in test_cases {
+        let work = LocationWork::Plan {
+            command: vec!["build".into(), "orders".into()],
+            selection: ["model:orders".to_owned()].into(),
+            settings: BTreeMap::new(),
+            fresh: test_case.fresh,
+        };
+        let sent = serde_json::to_value(&work).expect("plan work");
+        assert_eq!(
+            (
+                sent["fresh"].clone(),
+                serde_json::from_value::<LocationWork>(sent).expect("read back"),
+            ),
+            (test_case.expected_field, work),
+            "{description}",
+            description = test_case.description
+        );
     }
 }

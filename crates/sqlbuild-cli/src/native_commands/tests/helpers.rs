@@ -1,4 +1,8 @@
 use std::path::Path;
+use std::sync::Mutex;
+
+use chrono::Utc;
+use serde_json::json;
 
 use sqlbuild_orchestration::warehouse_metadata::models::{MetadataBatch, WarehouseStateLocation};
 use uuid::Uuid;
@@ -10,7 +14,11 @@ use crate::native_commands::_helpers::command::paths::location_watch;
 use crate::native_commands::_helpers::location::execution::{
     acknowledge_metadata_page, settle_publication,
 };
-use crate::native_commands::models::{LocationMetadataPage, LocationMetadataSync, LocationServe};
+use crate::native_commands::_helpers::location::plan_reuse::remember_plan;
+use crate::native_commands::models::{
+    LocationMetadataPage, LocationMetadataSync, LocationServe, PlanKey, PlanReuse,
+};
+use crate::native_commands::types::LocationPlan;
 use sqlbuild_orchestration::platform::main::work::connect_location_work::connect_location_work;
 use sqlbuild_orchestration::platform::models::{
     ConnectionCheckTrigger, LocationWorkClient, LocationWorkPoll,
@@ -131,4 +139,40 @@ pub(super) fn published_location(
     state.begin_sync(chrono::Utc::now());
     state.idle = false;
     ((options, script), (client, poll), state)
+}
+
+/// The plan key of a `--changed` plan of `select`.
+pub(super) fn reuse_key(select: &[&str]) -> PlanKey {
+    PlanKey {
+        argv: vec!["plan".into(), "--json".into(), "--changed".into()],
+        select: select.iter().map(|name| (*name).to_owned()).collect(),
+        consumption: true,
+    }
+}
+
+/// A finished plan document, or a failed plan's error report.
+pub(super) fn finished_plan(failed: bool) -> LocationPlan {
+    let documents = [
+        json!({
+            "models": [{"name": "orders"}],
+            "timings": {"planned_from": "synced_state", "total_seconds": 4.2,
+                "steps": [{"name": "Detecting changes", "seconds": 4.2}]},
+        }),
+        json!({"error": {"code": "plan_failed", "message": "no plan"}}),
+    ];
+    (documents[usize::from(failed)].clone(), Default::default())
+}
+
+/// `count` finished plans of `model_<n>` under generation 1 and `copy-1`, oldest first.
+pub(super) fn kept_plans(count: usize) -> Mutex<Option<PlanReuse>> {
+    let reuse: Mutex<Option<PlanReuse>> = Mutex::new(None);
+    for index in 0..count {
+        remember_plan(
+            &reuse,
+            (1, "copy-1"),
+            reuse_key(&[format!("model_{index}").as_str()]),
+            (&finished_plan(false), Utc::now()),
+        );
+    }
+    reuse
 }

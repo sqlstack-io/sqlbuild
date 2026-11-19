@@ -133,6 +133,8 @@
 	let plannedKey = $state('');
 	let planning = $state(false);
 	let planError = $state<{ key: string; message: string } | null>(null);
+	/** Set by "Plan again": the next plan skips the plan the location kept for the same command. */
+	let planFresh = false;
 	const wantsPlan = $derived(fresh && check?.verb === 'build' && !check.error);
 	$effect(() => {
 		const key = requestKey;
@@ -141,7 +143,9 @@
 		const timer = setTimeout(async () => {
 			planning = true;
 			try {
-				const result = await app.client.planBuild(scope, request.command);
+				const replanned = planFresh;
+				planFresh = false;
+				const result = await app.client.planBuild(scope, request.command, { fresh: replanned });
 				if (result.plan) {
 					plan = result.plan;
 					planRequestId = result.requestId ?? null;
@@ -179,6 +183,7 @@
 		return app.client.planDiff(scope, requestId, model);
 	}
 	function replan() {
+		planFresh = true;
 		plannedKey = '';
 		planError = null;
 	}

@@ -214,6 +214,9 @@ pub enum LocationWork {
         selection: std::collections::BTreeSet<String>,
         #[schema(value_type = Object)]
         settings: std::collections::BTreeMap<String, serde_json::Value>,
+        /// Plan again even when the location kept a plan for the same request; sent only when set.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        fresh: bool,
     },
 }
 
@@ -233,6 +236,9 @@ pub struct LocationWorkRequest {
 pub struct PlanRequest {
     pub request_id: Uuid,
     pub command: Vec<String>,
+    /// Plan again instead of returning the plan the location kept for the same request.
+    #[serde(default)]
+    pub fresh: bool,
 }
 
 /// A person asks a location for one named read-only operation, such as a connection test.

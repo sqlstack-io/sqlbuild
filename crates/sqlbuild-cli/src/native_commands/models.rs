@@ -565,6 +565,36 @@ pub(crate) enum LostStdout {
     Raised(String),
 }
 
+/// What makes two plan requests identical once the generation and synced copy are the same.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PlanKey {
+    /// The `sqb plan` arguments the location built from the request's settings.
+    pub(crate) argv: Vec<String>,
+    /// The node names the server froze from the request's selection.
+    pub(crate) select: Vec<String>,
+    /// Whether the plan read the copy's consumption.
+    pub(crate) consumption: bool,
+}
+
+/// One finished plan, kept as its JSON text with the diffs that travel beside it.
+#[derive(Clone, Debug)]
+pub(crate) struct ReusedPlan {
+    pub(crate) key: PlanKey,
+    pub(crate) document: String,
+    pub(crate) diffs:
+        std::collections::BTreeMap<String, sqlbuild_orchestration::platform::models::PlanModelDiff>,
+    /// When the plan finished, as RFC 3339 text.
+    pub(crate) planned_at: String,
+}
+
+/// The finished plans of one published generation and synced copy, oldest first.
+#[derive(Clone, Debug)]
+pub(crate) struct PlanReuse {
+    pub(crate) generation: i64,
+    pub(crate) version: String,
+    pub(crate) plans: std::collections::VecDeque<ReusedPlan>,
+}
+
 /// The copy file the location last read, the mirror version it holds and whether it has consumption.
 #[derive(Clone, Debug)]
 pub(crate) struct HeldCopy {

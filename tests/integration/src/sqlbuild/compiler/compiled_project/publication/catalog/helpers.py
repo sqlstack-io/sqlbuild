@@ -90,18 +90,26 @@ def wait_for_statistics(
 
 
 def request_plan(
-    control: Path, selection: list[str], settings: dict[str, object] | None = None
+    control: Path,
+    selection: list[str],
+    settings: dict[str, object] | None = None,
+    *,
+    fresh: bool = False,
 ) -> str:
-    """Queue the plan work a person's Plan creates, frozen to exact node keys and settings."""
+    """Queue the plan work a person's Plan creates, frozen to exact node keys and settings.
+
+    `fresh` is Plan again: the location plans anew rather than return a plan it kept.
+    """
     request_id: str = str(uuid4())
     now: datetime = datetime.now(UTC)
+    fresh_field: str = {True: ",'fresh',json('true')", False: ""}[fresh]
     with closing(sqlite3.connect(control)) as database:
         _ = database.execute(
             "INSERT INTO sqb_location_work (request_id,location_id,target,snapshot_id,generation,"
             "request_json,requested_by,requested_at,expires_at) SELECT ?,c.location_id,c.target,"
             "c.snapshot_id,s.generation,json_object('request_id',?,'location_id',c.location_id,"
             "'target',c.target,'reason','Plan','work',json_object('kind','plan','command',"
-            "json('[\"build\"]'),'selection',json(?),'settings',json(?))),"
+            f"json('[\"build\"]'),'selection',json(?),'settings',json(?){fresh_field})),"
             "'test-admin',?,? FROM sqb_current_snapshots c JOIN sqb_snapshots s "
             "ON s.snapshot_id=c.snapshot_id",
             (
