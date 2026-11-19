@@ -92,6 +92,13 @@ class SyncResumeTestCase:
 
 
 @dataclass(frozen=True)
+class NoPauseTableTestCase:
+    description: str
+    suspended: str
+    expected_states: dict[str, str]
+
+
+@dataclass(frozen=True)
 class QuietTokenTestCase:
     description: str
     holds: tuple[tuple[str, str, int], ...]

@@ -21,6 +21,7 @@ from sqlbuild.executor.maintained_pauses._helpers.sql import setup_statements
 from sqlbuild.executor.maintained_pauses.models import OpenHold, ResumeOutcome
 from tests.integration.src.sqlbuild.executor.maintained_pauses._test_types import (
     DoubleCloseTestCase,
+    NoPauseTableTestCase,
     QuietTokenTestCase,
     SyncDuringTakeoverTestCase,
     SyncResumeTestCase,
@@ -35,20 +36,13 @@ from tests.integration.src.sqlbuild.executor.maintained_pauses.helpers import (
     pause_table_names,
     plan_lease_project,
     TokenPausingDuckDbAdapter,
+    no_token,
     pause_table_token,
+    same_token,
     seed_hold,
 )
 
 _GRACE_SECONDS: float = 600.0
-
-
-def _same_token(token: str) -> str | None:
-    return token
-
-
-def _no_token(token: str) -> str | None:
-    del token
-    return None
 
 _SYNC: str = "location-sync:warehouse"
 
@@ -141,10 +135,21 @@ def test_given_pause_holds_when_a_location_syncs_then_only_expired_holds_are_res
     assert pause_events(connection=connection) == list(test_case.expected_events)
 
 
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        NoPauseTableTestCase(
+            description="a suspended model with no pause table stays suspended",
+            suspended="daily_totals",
+            expected_states={"daily_totals": "SUSPENDED"},
+        ),
+    ],
+    ids=lambda case: case.description,
+)
 def test_given_no_pause_table_when_a_location_syncs_then_it_writes_nothing(
-    adapter: PausingDuckDbAdapter, connection: Any
+    test_case: NoPauseTableTestCase, adapter: PausingDuckDbAdapter, connection: Any
 ) -> None:
-    adapter.states["daily_totals"] = "SUSPENDED"
+    adapter.states[test_case.suspended] = "SUSPENDED"
 
     outcome: ResumeOutcome = resume_expired_holds(
         adapter=adapter,
@@ -156,7 +161,7 @@ def test_given_no_pause_table_when_a_location_syncs_then_it_writes_nothing(
     )
 
     assert outcome == ResumeOutcome(resumed=(), quiet_token=None)
-    assert adapter.states == {"daily_totals": "SUSPENDED"}
+    assert adapter.states == test_case.expected_states
     assert pause_table_names(connection=connection) == []
 
 
@@ -167,41 +172,41 @@ def test_given_no_pause_table_when_a_location_syncs_then_it_writes_nothing(
             description="a pause table unchanged since a pass left it quiet is not read",
             holds=(("dead_run", "daily_totals", 900),),
             adapter=TokenPausingDuckDbAdapter,
-            sent_token=_same_token,
+            sent_token=same_token,
             expected_resumed=(),
-            expected_token=_same_token,
+            expected_token=same_token,
         ),
         QuietTokenTestCase(
             description="a pass that leaves no hold open returns the table's token",
             holds=(),
             adapter=TokenPausingDuckDbAdapter,
-            sent_token=_no_token,
+            sent_token=no_token,
             expected_resumed=(),
-            expected_token=_same_token,
+            expected_token=same_token,
         ),
         QuietTokenTestCase(
             description="a pass that resumes returns no token, so the next pass reads again",
             holds=(("dead_run", "daily_totals", 900),),
             adapter=TokenPausingDuckDbAdapter,
-            sent_token=_no_token,
+            sent_token=no_token,
             expected_resumed=(("dead_run", "daily_totals"),),
-            expected_token=_no_token,
+            expected_token=no_token,
         ),
         QuietTokenTestCase(
             description="a live hold keeps the table from going quiet",
             holds=(("busy_run", "daily_totals", 30),),
             adapter=TokenPausingDuckDbAdapter,
-            sent_token=_no_token,
+            sent_token=no_token,
             expected_resumed=(),
-            expected_token=_no_token,
+            expected_token=no_token,
         ),
         QuietTokenTestCase(
             description="an adapter without change tokens reads every pass",
             holds=(("dead_run", "daily_totals", 900),),
             adapter=PausingDuckDbAdapter,
-            sent_token=_same_token,
+            sent_token=same_token,
             expected_resumed=(("dead_run", "daily_totals"),),
-            expected_token=_no_token,
+            expected_token=no_token,
         ),
     ],
     ids=lambda case: case.description,

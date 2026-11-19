@@ -102,6 +102,19 @@ def _table_token(*, connection: Any, table: str) -> str:
     return str(row[0])
 
 
+def same_token(token: str) -> str | None:
+    """The token itself, as a quiet-token case's sent or expected token."""
+
+    return token
+
+
+def no_token(token: str) -> str | None:
+    """No token, as a quiet-token case's sent or expected token."""
+
+    del token
+    return None
+
+
 def pause_table_token(*, connection: Any) -> str:
     """The staging pause table's change token, as `TokenPausingDuckDbAdapter` reads it."""
 
