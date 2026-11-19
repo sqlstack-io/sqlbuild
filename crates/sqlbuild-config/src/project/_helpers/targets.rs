@@ -16,7 +16,7 @@ use crate::project::_helpers::sections::{fixed_duration_seconds, item_timeout};
 use crate::project::_helpers::values::{int_below, is_int};
 use crate::project::constants::{
     CLONE_KEYS, CONCURRENCY_KEY, CONFIRMATION_POLICIES, EXECUTION_LIMIT_KEYS,
-    IGNORE_AUDIT_FAILURES_KEY, MAX_FULL_ROWS_KEY, PAUSE_MAINTAINED_KEY, PLAN_FROM_KEY,
+    IGNORE_AUDIT_FAILURES_KEY, MAX_FULL_ROWS_KEY, PAUSE_DYNAMIC_KEY, PLAN_FROM_KEY,
     PLAN_FROM_SOURCES, POOLS_KEY, RETENTION_MATERIALIZATIONS, TARGET_KEYS,
     UNLIMITED_DIFF_FULL_ROWS, WAREHOUSE_GROUPS,
 };
@@ -435,8 +435,8 @@ fn local_target(payload: &ConfigValue, target: TargetPlace<'_>) -> Loaded<Fields
     ));
     fields.push((PLAN_FROM_KEY, plan_from(mapping)?));
     fields.push((
-        PAUSE_MAINTAINED_KEY,
-        bool_or_none(optional_nullable_bool(mapping, PAUSE_MAINTAINED_KEY)?),
+        PAUSE_DYNAMIC_KEY,
+        bool_or_none(optional_nullable_bool(mapping, PAUSE_DYNAMIC_KEY)?),
     ));
     Ok(fields)
 }

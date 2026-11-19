@@ -61,7 +61,7 @@ from sqlbuild.adapter.contract.models import (
     RelationInfo,
     RelationReadProbe,
 )
-from sqlbuild.adapter.contract.types import MaintainedListing
+from sqlbuild.adapter.contract.types import DynamicListing
 from sqlbuild.adapter.relations.classes.inspection_catalog import InspectionCatalog
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.compile.types import (
@@ -835,8 +835,8 @@ def planned_entries(result: CompilePipelineResult) -> list[tuple[str, str]]:
 
 
 CLEAN_ORDERS_QUERY: str = "SELECT 1 AS order_id"
-_MAINTAINED: dict[str, object] = {
-    "materialized": "maintained",
+_DYNAMIC: dict[str, object] = {
+    "materialized": "dynamic",
     "refresh": {"lag": "1h"},
     "refresh_warehouse": "transform_wh",
 }
@@ -845,27 +845,32 @@ _MAINTAINED: dict[str, object] = {
 class ListingDuckDbAdapter(DuckDbAdapter):
     """DuckDB that lists every dynamic table the same way, as Snowflake's SHOW would."""
 
-    def __init__(self, listed: MaintainedListing | None) -> None:
+    def __init__(self, listed: DynamicListing | None) -> None:
         super().__init__()
-        self.listed: MaintainedListing | None = listed
+        self.listed: DynamicListing | None = listed
         self.read_names: list[str] = []
 
-    def maintained_listing(
+    def dynamic_listing(
         self, *, connection: Any, database: str | None, schema: str | None, name: str
-    ) -> MaintainedListing | None:
+    ) -> DynamicListing | None:
         del connection, database, schema
         self.read_names.append(name)
         return self.listed
 
 
-def maintained_project_case(upstream_query: str) -> BuildExecutionPlanTestCase:
-    """Clean orders and the daily totals maintained from it, both refreshed within an hour."""
+def dynamic_project_case(
+    upstream_query: str, totals_config: dict[str, object] | None = None
+) -> BuildExecutionPlanTestCase:
+    """Clean orders and dynamic daily totals built from it, both refreshed within an hour."""
 
     return BuildExecutionPlanTestCase(
-        description="clean orders and the daily totals maintained from it",
+        description="clean orders and the daily totals built from it as a dynamic model",
         setup_sql=(),
         model_locations={"clean_orders": "staging", "daily_totals": "staging"},
-        model_configs={"clean_orders": _MAINTAINED, "daily_totals": _MAINTAINED},
+        model_configs={
+            "clean_orders": _DYNAMIC,
+            "daily_totals": {**_DYNAMIC, **(totals_config or {})},
+        },
         model_queries={
             "clean_orders": upstream_query,
             "daily_totals": "SELECT count(*) AS orders FROM staging.clean_orders",
@@ -878,10 +883,10 @@ def maintained_project_case(upstream_query: str) -> BuildExecutionPlanTestCase:
 
 
 def change_tracking_project_case() -> BuildExecutionPlanTestCase:
-    """Daily totals is maintained from orders, and from payments through a view; not customers."""
+    """Dynamic daily totals read orders, and payments through a view; not customers."""
 
     return BuildExecutionPlanTestCase(
-        description="tables a maintained model reads, directly or via a view, and one it does not",
+        description="tables a dynamic model reads, directly or via a view, and one it does not",
         setup_sql=(),
         model_locations={
             "orders": "staging",
@@ -896,7 +901,7 @@ def change_tracking_project_case() -> BuildExecutionPlanTestCase:
             "payments": {"materialized": "table"},
             "settled_payments": {"materialized": "view"},
             "daily_totals": {
-                "materialized": "maintained",
+                "materialized": "dynamic",
                 "refresh": {"lag": "1h"},
                 "refresh_on_build": True,
             },

@@ -23,15 +23,15 @@ use crate::model_validation::constants::{
     QUALIFIED_NAME_SEPARATOR,
 };
 use crate::model_validation::constants::{
+    DYNAMIC_ADAPTER_CODE, DYNAMIC_ADAPTERS, DYNAMIC_MATERIALIZATION, DYNAMIC_ONLY_KEYS,
+    DYNAMIC_REFRESH_FORMS, DYNAMIC_REFRESH_MODES, DYNAMIC_REFRESH_UNSUPPORTED_CODE,
+    MATERIALIZED_VIEW_ADAPTER_CODE, MATERIALIZED_VIEW_MATERIALIZATION, SNAPSHOT_DISALLOWED_KEYS,
+    SNOWFLAKE_ADAPTER, SNOWFLAKE_MIN_LAG_SECONDS,
+};
+use crate::model_validation::constants::{
     ENGINE_FAMILY_SUFFIX, ENGINE_KEY, ORDER_BY_KEY, PARTITION_BY_KEY, PHYSICAL_STORAGE_KEYS,
     PHYSICAL_STORAGE_MATERIALIZATIONS, PRIMARY_KEY_KEY, TABLE_SETTINGS_KEY,
     UNSUPPORTED_ENGINE_PREFIXES,
-};
-use crate::model_validation::constants::{
-    MAINTAINED_ADAPTER_CODE, MAINTAINED_ADAPTERS, MAINTAINED_MATERIALIZATION, MAINTAINED_ONLY_KEYS,
-    MAINTAINED_REFRESH_FORMS, MAINTAINED_REFRESH_MODES, MAINTAINED_REFRESH_UNSUPPORTED_CODE,
-    MATERIALIZED_VIEW_ADAPTER_CODE, MATERIALIZED_VIEW_MATERIALIZATION, SNAPSHOT_DISALLOWED_KEYS,
-    SNOWFLAKE_ADAPTER, SNOWFLAKE_MIN_LAG_SECONDS,
 };
 use crate::model_validation::models::{
     ModelValidationFacts, ProjectValidationFacts, ValidationStop,
@@ -622,8 +622,8 @@ fn setting_name(name: &str) -> bool {
             .all(|character| character.is_ascii_alphanumeric() || character == '_')
 }
 
-/// Check the refresh fields: only maintained models on an adapter that builds them take them.
-pub(crate) fn check_maintained<N: AuthoredNode>(
+/// Check the refresh fields: only dynamic models on an adapter that builds them take them.
+pub(crate) fn check_dynamic<N: AuthoredNode>(
     config: &ConfigView<'_, N>,
     project: &ProjectValidationFacts,
 ) -> Check {
@@ -638,30 +638,30 @@ pub(crate) fn check_maintained<N: AuthoredNode>(
         return Err(coded(
             config,
             MATERIALIZED_VIEW_ADAPTER_CODE,
-            "Snowflake has no materialized_view materialization; use materialized maintained, \
+            "Snowflake has no materialized_view materialization; use materialized dynamic, \
              which builds a dynamic table",
         ));
     }
-    if materialized.as_deref() != Some(MAINTAINED_MATERIALIZATION) {
-        return match config.first_present(&MAINTAINED_ONLY_KEYS) {
-            Some(key) => Err(config.error(format!("{key} is only valid for maintained models"))),
+    if materialized.as_deref() != Some(DYNAMIC_MATERIALIZATION) {
+        return match config.first_present(&DYNAMIC_ONLY_KEYS) {
+            Some(key) => Err(config.error(format!("{key} is only valid for dynamic models"))),
             None => Ok(()),
         };
     }
-    if let Some(adapter) = adapter.filter(|adapter| !one_of(adapter, &MAINTAINED_ADAPTERS)) {
+    if let Some(adapter) = adapter.filter(|adapter| !one_of(adapter, &DYNAMIC_ADAPTERS)) {
         return Err(coded(
             config,
-            MAINTAINED_ADAPTER_CODE,
+            DYNAMIC_ADAPTER_CODE,
             format!(
-                "materialized maintained is not supported on the {adapter} adapter; adapters \
+                "materialized dynamic is not supported on the {adapter} adapter; adapters \
                  that support it: {}",
-                MAINTAINED_ADAPTERS.join(", ")
+                DYNAMIC_ADAPTERS.join(", ")
             ),
         ));
     }
     if let Some(key) = config.first_present(&SNAPSHOT_DISALLOWED_KEYS) {
         return Err(config.error(format!(
-            "{key} is not valid for maintained models: the warehouse refreshes them from the \
+            "{key} is not valid for dynamic models: the warehouse refreshes them from the \
              whole query"
         )));
     }
@@ -670,11 +670,11 @@ pub(crate) fn check_maintained<N: AuthoredNode>(
         let text: Option<String> = text_if_string(mode);
         if !text
             .as_deref()
-            .is_some_and(|text| one_of(text, &MAINTAINED_REFRESH_MODES))
+            .is_some_and(|text| one_of(text, &DYNAMIC_REFRESH_MODES))
         {
             return Err(config.error(format!(
                 "{REFRESH_MODE_KEY} must be one of: {}; got '{}'",
-                sorted_values(&MAINTAINED_REFRESH_MODES),
+                sorted_values(&DYNAMIC_REFRESH_MODES),
                 text.unwrap_or_default()
             )));
         }
@@ -711,7 +711,7 @@ fn check_refresh<N: AuthoredNode>(config: &ConfigView<'_, N>, adapter: Option<&s
     let [(form, value)] = block.as_slice() else {
         return Err(unknown_form(config, &forms));
     };
-    if !MAINTAINED_REFRESH_FORMS
+    if !DYNAMIC_REFRESH_FORMS
         .iter()
         .any(|known| form.is_text(known))
     {
@@ -727,7 +727,7 @@ fn check_refresh<N: AuthoredNode>(config: &ConfigView<'_, N>, adapter: Option<&s
     if adapter == Some(SNOWFLAKE_ADAPTER) && lag.fixed_seconds < SNOWFLAKE_MIN_LAG_SECONDS {
         return Err(coded(
             config,
-            MAINTAINED_REFRESH_UNSUPPORTED_CODE,
+            DYNAMIC_REFRESH_UNSUPPORTED_CODE,
             format!("{REFRESH_KEY} {LAG_FORM} on Snowflake must be at least 1m; got '{text}'"),
         ));
     }

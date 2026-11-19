@@ -89,12 +89,13 @@ def test_given_first_class_adapters_when_checking_contract_then_no_method_comes_
                 {
                     "create_sql_test_output",
                     "drop_sql_test_output",
-                    "maintained_listing",
-                    "render_alter_maintained",
-                    "render_create_maintained",
+                    "dynamic_listing",
+                    "render_alter_dynamic",
+                    "render_create_dynamic",
                     "render_create_temporary_function",
                     "render_drop_schema",
-                    "render_maintained_operation",
+                    "render_dynamic_operation",
+                    "render_track_changes",
                     "session_warehouse",
                 }
             ),
@@ -130,15 +131,15 @@ def test_given_strict_adapter_when_reading_optional_methods_then_defaults_keep_i
     assert temporary is test_case.expected_temporary_function
     assert drop_error.value.code == "A714"
     assert adapter.session_warehouse(connection=None) is None
-    with pytest.raises(AdapterUserError) as maintained_error:
-        adapter.render_create_maintained(
+    with pytest.raises(AdapterUserError) as dynamic_error:
+        adapter.render_create_dynamic(
             destination="main.daily_totals",
             sql="SELECT 1",
             target_lag="DOWNSTREAM",
             refresh_mode="incremental",
             warehouse="transform_wh",
         )
-    assert maintained_error.value.code == "A716"
+    assert dynamic_error.value.code == "A716"
 
 
 @pytest.mark.parametrize(

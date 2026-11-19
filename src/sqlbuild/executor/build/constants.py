@@ -11,11 +11,11 @@ INCREMENTAL_ACTIONS: frozenset[PlanAction] = frozenset(
         PlanAction.INCREMENTAL_MERGE,
     }
 )
-MAINTAINED_ACTIONS: frozenset[PlanAction] = frozenset(
+DYNAMIC_ACTIONS: frozenset[PlanAction] = frozenset(
     {
-        PlanAction.CREATE_MAINTAINED,
-        PlanAction.ALTER_MAINTAINED,
-        PlanAction.KEEP_MAINTAINED,
+        PlanAction.CREATE_DYNAMIC,
+        PlanAction.ALTER_DYNAMIC,
+        PlanAction.KEEP_DYNAMIC,
     }
 )
 
