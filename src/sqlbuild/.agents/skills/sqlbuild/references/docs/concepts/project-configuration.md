@@ -190,7 +190,7 @@ A target is a named build context - the database and schema you build into, plus
 | `concurrency` | Worker limit for commands run against this target, replacing `[settings] concurrency` (see below) |
 | `ignore_audit_failures` | Whether builds on this target let audit failures through, replacing `[settings] ignore_audit_failures`; see [Ignoring audit failures](audits.md#ignoring-audit-failures) |
 | `plan_from` | Where `sqb plan` and `sqb build` read warehouse state: `live` (default) or `synced_state`; see [Planning from synced state](#planning-from-synced-state) |
-| `pause_maintained` | `true` keeps this target's [maintained models](models/materializations.md#maintained) suspended between builds; each build refreshes the ones it selects. Default `false` |
+| `pause_maintained` | `true` keeps this target's [maintained models](models/maintained.md) suspended between builds; each build refreshes the ones it selects. Default `false` |
 
 ```toml
 [connections.warehouse]
@@ -699,7 +699,7 @@ old_name_views = "30d"
 
 ## Maintained
 
-How builds pause [maintained models](models/materializations.md#maintained) while they run:
+How builds pause [maintained models](models/maintained.md) while they run:
 
 ```toml
 [maintained]
