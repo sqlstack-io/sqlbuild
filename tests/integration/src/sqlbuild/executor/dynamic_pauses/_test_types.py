@@ -86,6 +86,15 @@ class CreatedModelHoldTestCase:
     expected_release_operations: tuple[tuple[str, str], ...]
     expected_code: str
     expected_message_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SyncResumeTestCase:
+    description: str
+    holds: tuple[tuple[str, str, int], ...]
+    hand_suspended: tuple[str, ...]
+    pause_table: bool
+    expected_resumed: tuple[tuple[str, str], ...]
     expected_states: dict[str, str]
     expected_events: tuple[tuple[str, str, str, str], ...]
 
@@ -96,6 +105,12 @@ class LateCommitTestCase:
     expected_code: str
     expected_rival: str
     expected_states: dict[str, str]
+
+
+@dataclass(frozen=True)
+class DoubleCloseTestCase:
+    description: str
+    closers: tuple[str, ...]
     expected_events: tuple[tuple[str, str, str, str], ...]
 
 
@@ -106,3 +121,10 @@ class TakenOverPauseTestCase:
     expected_rival: str
     expected_states: dict[str, str]
     expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class SyncDuringTakeoverTestCase:
+    description: str
+    expected_operations: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]

@@ -12,11 +12,15 @@ from typing import Any
 from sqlbuild._native import CompiledRelationLocation
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
-from sqlbuild.adapter.contract.types import DynamicListing, DynamicOperation
+from sqlbuild.adapter.contract.types import DynamicOperation
+from sqlbuild.executor.dynamic_pauses._helpers.resume import (
+    resume_holds,
+    run_dynamic_operation,
+    scheduling_state,
+)
 from sqlbuild.executor.dynamic_pauses._helpers.sql import (
     insert_sql,
-    open_holds,
-    open_holds_sql,
+    read_open_holds,
     setup_statements,
 )
 from sqlbuild.executor.dynamic_pauses.classes.dynamic_heartbeat import (
@@ -130,6 +134,14 @@ class DynamicHold:
         self._yield_to_rivals(
             connection=connection, location=location, names=tuple(self._paused), window=window
         )
+        # A location sync may resume a taken-over model before our pause is recorded; read it again.
+        states.update(
+            {
+                name: self._state(connection=connection, name=name)
+                for name in self._paused
+                if _key(self._held[name]) in taken_keys
+            }
+        )
         self._suspend_active(connection=connection, names=tuple(self._paused), states=states)
         self._heartbeat = self._new_heartbeat(self._write_heartbeat)
         self._heartbeat.start()
@@ -198,16 +210,13 @@ class DynamicHold:
     def _take_over(self, *, connection: Any, location: StateLocation) -> tuple[OpenHold, ...]:
         """Resume expired holds on other models now; return the held models' holds to take over."""
 
-        rows: tuple[tuple[Any, ...], ...] = tuple(
-            self._adapter.query(
-                connection=connection,
-                sql=open_holds_sql(adapter=self._adapter, location=location),
-                limit=None,
-            ).rows
-        )
         held_keys: set[_RelationKey] = {_key(location) for location in self._held.values()}
         holds: tuple[OpenHold, ...] = tuple(
-            hold for hold in open_holds(rows=rows) if hold.run_id != self._run_id
+            hold
+            for hold in read_open_holds(
+                adapter=self._adapter, connection=connection, location=location
+            )
+            if hold.run_id != self._run_id
         )
         live: tuple[OpenHold, ...] = tuple(
             hold
@@ -222,14 +231,12 @@ class DynamicHold:
         elsewhere: tuple[OpenHold, ...] = tuple(
             hold for hold in expired if _key(hold.relation) not in held_keys
         )
-        for hold in elsewhere:
-            self._resume_found(connection=connection, relation=hold.relation)
-        self._record(
+        resume_holds(
+            adapter=self._adapter,
             connection=connection,
-            events=tuple(
-                self._event(event_type=DynamicPauseEventType.RESUMED, hold=hold)
-                for hold in elsewhere
-            ),
+            location=location,
+            holds=elsewhere,
+            recorded_by=self._run_id,
         )
         taken: tuple[OpenHold, ...] = (*live, *(h for h in expired if h not in elsewhere))
         self._report(holds=elsewhere, verb="Resumed")
@@ -249,14 +256,9 @@ class DynamicHold:
         mine: set[_RelationKey] = {_key(self._held[name]) for name in names}
         if not mine:
             return
-        rows: tuple[tuple[Any, ...], ...] = tuple(
-            self._adapter.query(
-                connection=connection,
-                sql=open_holds_sql(adapter=self._adapter, location=location),
-                limit=None,
-            ).rows
+        holds: tuple[OpenHold, ...] = read_open_holds(
+            adapter=self._adapter, connection=connection, location=location
         )
-        holds: tuple[OpenHold, ...] = open_holds(rows=rows)
         paused_at: dict[_RelationKey, datetime] = {
             _key(hold.relation): hold.paused_at
             for hold in holds
@@ -319,27 +321,13 @@ class DynamicHold:
         if location is None or self._pause_dynamic:
             return None
         try:
-            rows: tuple[tuple[Any, ...], ...] = tuple(
-                self._adapter.query(
-                    connection=connection,
-                    sql=open_holds_sql(adapter=self._adapter, location=location),
-                    limit=None,
-                ).rows
+            holds: tuple[OpenHold, ...] = read_open_holds(
+                adapter=self._adapter, connection=connection, location=location
             )
         except Exception as error:
             self._warn(f"could not read which dynamic models this build still holds: {error}")
             return None
-        return open_holds(rows=rows)
-
-    def _resume_found(self, *, connection: Any, relation: CompiledRelationLocation) -> None:
-        if _scheduling_state(adapter=self._adapter, connection=connection, relation=relation) == (
-            SUSPENDED_STATE
-        ):
-            self._run(
-                connection=connection,
-                destination=self._destination(relation),
-                operation=DynamicOperation.RESUME,
-            )
+        return holds
 
     def _suspend_active(
         self,
@@ -358,28 +346,16 @@ class DynamicHold:
                 self._operate(connection=connection, name=name, operation=DynamicOperation.SUSPEND)
 
     def _state(self, *, connection: Any, name: str) -> str | None:
-        return _scheduling_state(
+        return scheduling_state(
             adapter=self._adapter, connection=connection, relation=self._held[name]
         )
 
     def _operate(self, *, connection: Any, name: str, operation: DynamicOperation) -> None:
-        self._run(
+        run_dynamic_operation(
+            adapter=self._adapter,
             connection=connection,
-            destination=self._destination(self._held[name]),
+            relation=self._held[name],
             operation=operation,
-        )
-
-    def _run(self, *, connection: Any, destination: str, operation: DynamicOperation) -> None:
-        for statement in self._adapter.render_dynamic_operation(
-            destination=destination, operation=operation
-        ):
-            self._adapter.execute(connection=connection, sql=statement)
-
-    def _destination(self, location: CompiledRelationLocation) -> str:
-        return location.qualified_name or str(
-            self._adapter.render_qualified_name(
-                database=location.database, schema=location.schema, name=location.name
-            )
         )
 
     def _timed_record(self, *, connection: Any, events: tuple[DynamicPauseEvent, ...]) -> timedelta:
@@ -444,18 +420,6 @@ class DynamicHold:
     def _warn(self, message: str) -> None:
         if self._on_progress is not None:
             self._on_progress(f"Warning: {message}")
-
-
-def _scheduling_state(
-    *, adapter: BaseAdapter, connection: Any, relation: CompiledRelationLocation
-) -> str | None:
-    listing: DynamicListing | None = adapter.dynamic_listing(
-        connection=connection,
-        database=relation.database,
-        schema=relation.schema,
-        name=relation.name,
-    )
-    return None if listing is None else listing.scheduling_state
 
 
 def _key(location: CompiledRelationLocation) -> _RelationKey:
