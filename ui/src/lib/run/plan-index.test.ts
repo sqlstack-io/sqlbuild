@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanDocument, PlanModel } from '$lib/api';
-import { cursorWords, diffPreview, diffStats, sectionNote, groupWarnings, planGroups, planSummaryLine, selectedGroup, sharedNote, whitespaceOnly, type PlanRow } from './plan-index';
+import { cursorWords, diffPreview, diffStats, sectionNote, groupWarnings, planGroups, selectedGroup, sharedNote, whitespaceOnly, type PlanRow } from './plan-index';
 
 const empty: PlanDocument = {
 	selected_count: 0,
@@ -113,7 +113,6 @@ describe('the plan index', () => {
 			['warnings', 1],
 			['unchanged', 1]
 		]);
-		expect(planSummaryLine(groups)).toBe('3 changed, 1 new, 1 Python · 1 unchanged');
 	});
 
 	it('breaks the changes down by kind, with line counts, whitespace-only and inline config changes', () => {

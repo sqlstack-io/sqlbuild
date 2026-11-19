@@ -338,6 +338,50 @@ def planned_migrations(plan: dict[str, Any]) -> tuple[tuple[str | None, str, str
     )
 
 
+def renamed_models(plan: dict[str, Any]) -> tuple[tuple[str, str], ...]:
+    """Return sorted (origin_model, name) for every model the plan builds under a new name."""
+
+    return tuple(
+        sorted(
+            (model["origin_model"], model["name"])
+            for model in plan["models"]
+            if model["reason"] == "renamed"
+        )
+    )
+
+
+def rename_migrations(plan: dict[str, Any]) -> tuple[tuple[str, str], ...]:
+    """Return sorted (origin_model, model) for every migration marked as a renamed model's own."""
+
+    return tuple(
+        sorted(
+            (migration["origin_model"], migration["model"])
+            for migration in plan["migrations"]
+            if migration["is_rename"]
+        )
+    )
+
+
+def renamed_old_names(plan: dict[str, Any]) -> dict[str, Any]:
+    """Return each renamed model's old_name, by model, as its own row carries it."""
+
+    return {
+        model["name"]: model.get("old_name")
+        for model in plan["models"]
+        if model["reason"] == "renamed"
+    }
+
+
+def rename_migration_old_names(plan: dict[str, Any]) -> dict[str, Any]:
+    """Return each rename migration's old_name, by model."""
+
+    return {
+        migration["model"]: migration["old_name"]
+        for migration in plan["migrations"]
+        if migration["is_rename"]
+    }
+
+
 def warning_messages(plan: dict[str, Any]) -> tuple[str, ...]:
     """Return every plan warning message."""
 

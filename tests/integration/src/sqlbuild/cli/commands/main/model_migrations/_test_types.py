@@ -60,6 +60,7 @@ class AutomaticMigrationTestCase:
     description: str
     expected_migrations: tuple[tuple[str | None, str, str, str], ...] = ()
     expected_events: tuple[tuple[str, str, str], ...] = ()
+    expected_renames: tuple[tuple[str, str], ...] = ()
     expected_reason: str = ""
     expected_warning: str = ""
 

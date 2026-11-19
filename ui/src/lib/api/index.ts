@@ -53,7 +53,9 @@ export function createClient(search: URLSearchParams, onUnauthorized: () => void
 		connection: LIVE.find((l) => l === live),
 		still: search.has('still')
 	});
-	const sized = search.has('huge') ? hugeProject(mock) : search.has('large') ? largeProject(mock) : mock;
+	// `?summary`: the large project with a plan shaped like a large real one's summary (CHI-1563).
+	const summary = search.has('summary');
+	const sized = search.has('huge') ? hugeProject(mock) : search.has('large') || summary ? largeProject(mock, { summary }) : mock;
 	return countedReads(search.has('awkward') ? awkward(sized) : sized);
 }
 
