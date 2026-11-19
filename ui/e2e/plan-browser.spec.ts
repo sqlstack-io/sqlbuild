@@ -262,3 +262,21 @@ test('a failed read is not repeated on its own: it says so, and Retry reads agai
 	await expect(rows(page)).toHaveCount(50);
 	await expect(page.getByTestId('plan-rows-error')).toHaveCount(0);
 });
+
+test('a failed read blocks only its own group, and a re-plan reads afresh', async ({ page }) => {
+	const fail = (on: boolean) => page.evaluate((v) => ((window as unknown as { __sqbFailPlanRows?: boolean }).__sqbFailPlanRows = v), on);
+	await page.addInitScript(() => ((window as unknown as { __sqbFailPlanRows?: boolean }).__sqbFailPlanRows = true));
+	await page.goto(`${LARGE}&section=unchanged`);
+	await expect(page.getByTestId('plan-rows-error')).toBeVisible({ timeout: 30_000 });
+	await fail(false);
+	// Another group reads its rows, though Unchanged's read failed.
+	await select(page, 'first_run');
+	await expect(rows(page).first()).toBeVisible();
+	await expect(page.getByTestId('plan-rows-error')).toHaveCount(0);
+	// Back on Unchanged the failure stands until Retry, or until the plan is made again.
+	await select(page, 'unchanged');
+	await expect(page.getByTestId('plan-rows-error')).toBeVisible();
+	await page.getByRole('button', { name: 'Plan again' }).click();
+	await expect(rows(page)).toHaveCount(50, { timeout: 30_000 });
+	await expect(page.getByTestId('plan-rows-error')).toHaveCount(0);
+});

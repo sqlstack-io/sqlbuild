@@ -10,7 +10,7 @@ const model = (name: string, over: Partial<PlanModel> = {}): PlanModel => ({
 	backfill: { action: 'forward', duration: null },
 	...over
 });
-const plan = (models: PlanModel[], over: Partial<PlanDocument> = {}): PlanDocument => ({
+const plan = (models: PlanModel[], over: Partial<Omit<PlanDocument, 'sections' | 'migration_steps'>> = {}): PlanDocument => ({
 	selected_count: models.length,
 	models,
 	seeds: [],

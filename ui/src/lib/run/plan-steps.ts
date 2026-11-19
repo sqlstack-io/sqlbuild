@@ -131,7 +131,7 @@ export function stepRowsOf(section: PlanPageSection, rows: unknown[]): StepRow[]
  * rows of a whole plan, which only the default mock serves.
  */
 export function migrationSteps(plan: PlanDocument): number {
-	if (plan.sections) return plan.migration_steps ?? 0;
+	if (plan.sections) return plan.migration_steps;
 	return plan.migrations.filter(isStep).length + plan.column_migrations.length + plan.table_type_conversions.length + plan.retention.length;
 }
 

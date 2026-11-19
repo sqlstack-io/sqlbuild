@@ -96,3 +96,18 @@ test('a failed read in Renames and migrations is not repeated on its own; Retry 
 	await expect(renames(page).locator('[data-part="renamed"] .row')).toHaveCount(10);
 	await expect(renames(page).getByTestId('renames-error')).toHaveCount(0);
 });
+
+test('a failed page read in Renames and migrations leaves the filter working, and a re-plan reads afresh', async ({ page }) => {
+	const fail = (on: boolean) => page.evaluate((v) => ((window as unknown as { __sqbFailPlanRows?: boolean }).__sqbFailPlanRows = v), on);
+	await page.addInitScript(() => ((window as unknown as { __sqbFailPlanRows?: boolean }).__sqbFailPlanRows = true));
+	await page.goto(`/plan?mock&summary&section=renames&${CMD}`);
+	await expect(renames(page).getByTestId('renames-error')).toBeVisible({ timeout: 30_000 });
+	await fail(false);
+	await renames(page).getByRole('textbox', { name: 'Filter renames and migrations' }).fill('summary_334');
+	await expect(renames(page).locator('[data-kind="retention"] .row')).toHaveCount(1);
+	await renames(page).getByRole('button', { name: 'Clear the filter' }).click();
+	await expect(renames(page).getByTestId('renames-error')).toBeVisible();
+	await page.getByRole('button', { name: 'Plan again' }).click();
+	await expect(renames(page).locator('[data-part="renamed"] .row')).toHaveCount(10, { timeout: 30_000 });
+	await expect(renames(page).getByTestId('renames-error')).toHaveCount(0);
+});
