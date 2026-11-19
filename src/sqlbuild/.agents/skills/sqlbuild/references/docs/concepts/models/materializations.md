@@ -125,7 +125,7 @@ A model the plan keeps can carry one more line:
 
 ### During a build
 
-A build pauses the maintained models it changes, and those that read a model it rebuilds, so they never refresh from half-built inputs. It resumes them when it ends, whether it succeeds or fails.
+A build pauses the maintained models it changes, and those that read a model it rebuilds, directly or through views, so they never refresh from half-built inputs. It resumes them when it ends, whether it succeeds or fails.
 
 - Dynamic tables outside the project that read a paused model pause too, until the build resumes it. One that someone had suspended before stays suspended.
 - A model that was already suspended when the build started stays suspended, and the build warns about it.
@@ -153,6 +153,7 @@ Two builds can't pause the same models at once. A build that needs a model anoth
 - Writing out the default `refresh_mode incremental` changes the model's definition, so the next build recreates it once.
 - A custom materialization named `maintained` is not used; the built-in one takes the name.
 - Unit tests and scenarios treat a maintained model as a table.
+- On a target with `schema = "preserve"`, builds see each other's pauses only when their maintained models share a schema.
 - A snapshot rebuilt in full is created without change tracking. Before a maintained model reads it again, run `ALTER TABLE <snapshot> SET CHANGE_TRACKING = TRUE`.
 
 ## Custom

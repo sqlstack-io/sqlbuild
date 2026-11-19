@@ -418,7 +418,7 @@ pub(crate) fn execute_build_plan<'py>(
     let build_callbacks: Bound<'py, PyAny> = call_with(
         &host_entry(py, ExecutorHost::BuildCallbacks)?,
         &[
-            ("on_migration_progress", line_writer(&context.stream)?),
+            ("on_lifecycle_progress", line_writer(&context.stream)?),
             (
                 "on_node_start",
                 keyword_relay(native_field(callbacks, "on_node_start")?, &NODE_START)?,

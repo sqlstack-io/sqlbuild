@@ -131,20 +131,32 @@ def test_given_built_maintained_models_when_replanning_then_live_settings_and_re
     "test_case",
     [
         ChangeTrackingPlanTestCase(
-            description="a table a maintained model reads is built with change tracking",
+            description="a table a maintained model reads, directly or through a view, is tracked",
             select=(),
             expected_maintained_readers={
                 "orders": ("daily_totals",),
                 "customers": (),
+                "payments": ("daily_totals",),
+                "settled_payments": ("daily_totals",),
                 "daily_totals": (),
             },
-            expected_refresh_on_build={"orders": False, "customers": False, "daily_totals": True},
+            expected_refresh_on_build={
+                "orders": False,
+                "customers": False,
+                "payments": False,
+                "settled_payments": False,
+                "daily_totals": True,
+            },
         ),
         ChangeTrackingPlanTestCase(
             description="the reader need not be selected for its upstream to be tracked",
-            select=("orders", "customers"),
-            expected_maintained_readers={"orders": ("daily_totals",), "customers": ()},
-            expected_refresh_on_build={"orders": False, "customers": False},
+            select=("orders", "customers", "payments"),
+            expected_maintained_readers={
+                "orders": ("daily_totals",),
+                "customers": (),
+                "payments": ("daily_totals",),
+            },
+            expected_refresh_on_build={"orders": False, "customers": False, "payments": False},
         ),
     ],
     ids=lambda case: case.description,

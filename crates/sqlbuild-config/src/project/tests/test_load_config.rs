@@ -88,6 +88,15 @@ fn given_project_files_when_loading_then_rejections_match_python_loader() {
             )),
         },
         ProjectFailureTestCase {
+            description: "a grace shorter than three heartbeats would expire a healthy build",
+            project: "name = 'orders'\nadapter = 'snowflake'\n[maintained]\nheartbeat_grace = '2m'\n",
+            local: "",
+            expected_failure: Some(ConfigFailure::at(
+                ConfigFile::Project,
+                "maintained.heartbeat_grace must be at least 3m, three of a build's one-minute heartbeats",
+            )),
+        },
+        ProjectFailureTestCase {
             description: "an unknown key suggests the nearest supported key",
             project: "name = 'orders'\nadapter = 'duckdb'\n[scopes]\nenforce_placment = true\n",
             local: "",
@@ -636,11 +645,11 @@ fn given_maintained_section_when_reading_then_returns_its_values_or_defaults() {
             },
         },
         MaintainedConfigTestCase {
-            description: "a grace shorter than one heartbeat is allowed",
+            description: "the shortest grace, three heartbeats",
             project: "name = 'orders'\nadapter = 'snowflake'\n[maintained]\n\
-                      heartbeat_grace = '30s'\n",
+                      heartbeat_grace = '3m'\n",
             expected_config: MaintainedConfig {
-                heartbeat_grace_seconds: 30,
+                heartbeat_grace_seconds: 180,
                 allow_ignore_grace: false,
             },
         },

@@ -23,6 +23,7 @@ class MaintainedFailureTestCase:
     setup_sql: tuple[str, ...]
     session_warehouse: str | None
     listed_settings: MaintainedListing | None
+    failing_query: str | None
     expected_error_code: str
     expected_listed_types: tuple[tuple[str], ...]
 

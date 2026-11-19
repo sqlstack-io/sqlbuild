@@ -26,11 +26,16 @@ class MaintainedDuckDbAdapter(DuckDbAdapter):
     """Builds a maintained model as a table that, like a dynamic table, replaces nothing else."""
 
     def __init__(
-        self, *, session_warehouse: str | None, listed_settings: MaintainedListing | None = None
+        self,
+        *,
+        session_warehouse: str | None,
+        listed_settings: MaintainedListing | None = None,
+        failing_query: str | None = None,
     ) -> None:
         super().__init__()
         self.warehouse: str | None = session_warehouse
         self.listed_settings: MaintainedListing | None = listed_settings
+        self.failing_query: str | None = failing_query
         self.created: list[tuple[str, str, str]] = []
         self.altered: list[tuple[str, str | None]] = []
 
@@ -48,7 +53,13 @@ class MaintainedDuckDbAdapter(DuckDbAdapter):
         self, *, destination: str, sql: str, target_lag: str, refresh_mode: str, warehouse: str
     ) -> tuple[str, ...]:
         self.created.append((target_lag, refresh_mode, warehouse))
-        return (f"CREATE TABLE {destination} AS {sql}",)
+        return (f"CREATE TABLE {destination} AS {self.failing_query or sql}",)
+
+    def render_rename(self, *, origin: str, destination: str) -> tuple[str, ...]:
+        return (f"ALTER TABLE {origin} RENAME TO {destination.split('.')[-1]}",)
+
+    def render_rename_view(self, *, origin: str, destination: str) -> tuple[str, ...]:
+        return (f"ALTER VIEW {origin} RENAME TO {destination.split('.')[-1]}",)
 
     def render_alter_maintained(
         self, *, destination: str, target_lag: str, warehouse: str | None

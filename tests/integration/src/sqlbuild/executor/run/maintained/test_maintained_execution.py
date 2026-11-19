@@ -110,6 +110,7 @@ def test_given_maintained_entry_when_executing_then_settings_reach_the_warehouse
             setup_sql=(),
             session_warehouse=None,
             listed_settings=None,
+            failing_query=None,
             expected_error_code="A717",
             expected_listed_types=(),
         ),
@@ -118,6 +119,25 @@ def test_given_maintained_entry_when_executing_then_settings_reach_the_warehouse
             setup_sql=("CREATE VIEW staging.daily_totals AS SELECT 1 AS orders",),
             session_warehouse="SESSION_WH",
             listed_settings=MaintainedListing("1 hour", "SESSION_WH", "ACTIVE"),
+            failing_query=None,
+            expected_error_code="R002",
+            expected_listed_types=(("VIEW",),),
+        ),
+        MaintainedFailureTestCase(
+            description="a table the model was before is restored when the create keeps failing",
+            setup_sql=("CREATE TABLE staging.daily_totals AS SELECT 1 AS orders",),
+            session_warehouse="SESSION_WH",
+            listed_settings=None,
+            failing_query="SELECT missing_column FROM staging.no_such_table",
+            expected_error_code="R002",
+            expected_listed_types=(("BASE TABLE",),),
+        ),
+        MaintainedFailureTestCase(
+            description="a view the model was before is restored when the create keeps failing",
+            setup_sql=("CREATE VIEW staging.daily_totals AS SELECT 1 AS orders",),
+            session_warehouse="SESSION_WH",
+            listed_settings=None,
+            failing_query="SELECT missing_column FROM staging.no_such_table",
             expected_error_code="R002",
             expected_listed_types=(("VIEW",),),
         ),
@@ -128,7 +148,9 @@ def test_given_unbuildable_maintained_entry_when_executing_then_fails_keeping_th
     test_case: MaintainedFailureTestCase, connection: Any
 ) -> None:
     adapter: MaintainedDuckDbAdapter = MaintainedDuckDbAdapter(
-        session_warehouse=test_case.session_warehouse, listed_settings=test_case.listed_settings
+        session_warehouse=test_case.session_warehouse,
+        listed_settings=test_case.listed_settings,
+        failing_query=test_case.failing_query,
     )
     for sql in test_case.setup_sql:
         connection.execute(sql)

@@ -5,14 +5,23 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from sqlbuild._native import CompiledRelationLocation, ModelPlanEntry, PlanAction
+from sqlbuild._native import (
+    CompiledRelationLocation,
+    ModelPlanEntry,
+    PlanAction,
+    fit_auxiliary_relation_name,
+)
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.adapter.contract.types import MaintainedListing, MaintainedOperation, RelationType
 from sqlbuild.adapter.relations.main.cached_relation_type import cached_relation_type
+from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
+    resolve_qualified_name_parts,
+)
 from sqlbuild.executor.maintained_pauses.classes.maintained_hold import MaintainedHold
 from sqlbuild.executor.run._helpers.materializations.view import execute_in_place_entry
+from sqlbuild.executor.run.constants import REPLACED_RELATION_SUFFIX
 from sqlbuild.executor.run.models import ModelExecutionResult, ModelMaterializationContext
 
 _NO_WAREHOUSE_CODE: str = "A717"
@@ -61,7 +70,7 @@ def execute_maintained_entry(*, context: ModelMaterializationContext) -> ModelEx
 def _create(
     *, context: ModelMaterializationContext, destination: str, recorder: StatementRecorder
 ) -> None:
-    """Create or replace; a table or view the model was before is dropped, never a dynamic table."""
+    """Create or replace; a table or view the model was before is swapped out, never a DT."""
 
     entry: ModelPlanEntry = context.entry
     adapter: BaseAdapter = context.adapter
@@ -90,16 +99,55 @@ def _create(
         )
         if former is None:
             raise error
-        drop: Callable[..., None] = (
-            adapter.drop_view if former == RelationType.VIEW else adapter.drop
-        )
-        drop(
-            connection=connection,
+        _replace_former(
+            context=context,
             destination=destination,
-            if_exists=True,
+            statements=statements,
+            former=former,
+            recorder=recorder,
+        )
+
+
+def _replace_former(
+    *,
+    context: ModelMaterializationContext,
+    destination: str,
+    statements: tuple[str, ...],
+    former: RelationType,
+    recorder: StatementRecorder,
+) -> None:
+    """Move the former table or view aside, create, then drop it; a failed create restores it."""
+
+    adapter: BaseAdapter = context.adapter
+    connection: Any = context.connection
+    location: CompiledRelationLocation = context.entry.destination
+    aside: str = resolve_qualified_name_parts(
+        adapter=adapter,
+        database=location.database,
+        schema=location.schema,
+        name=fit_auxiliary_relation_name(
+            base_name=location.name,
+            suffix=REPLACED_RELATION_SUFFIX,
+            identifier_limit=adapter.maximum_identifier_length(),
+        ),
+    )
+    view: bool = former == RelationType.VIEW
+    rename: Callable[..., None] = adapter.rename_view if view else adapter.rename
+    drop: Callable[..., None] = adapter.drop_view if view else adapter.drop
+    rename(
+        connection=connection, origin=destination, destination=aside, statement_recorder=recorder
+    )
+    try:
+        _run(adapter=adapter, connection=connection, statements=statements, recorder=recorder)
+    except Exception:
+        rename(
+            connection=connection,
+            origin=aside,
+            destination=destination,
             statement_recorder=recorder,
         )
-        _run(adapter=adapter, connection=connection, statements=statements, recorder=recorder)
+        raise
+    drop(connection=connection, destination=aside, if_exists=True, statement_recorder=recorder)
 
 
 def _former_relation(

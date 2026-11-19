@@ -153,9 +153,12 @@ class MaintainedHold:
             self._heartbeat.stop()
             self._report_heartbeat_failure(failure=self._heartbeat.failure)
         order: list[str] = list(self._held)
+        still_held: frozenset[_RelationKey] | None = self._still_held(connection=connection)
         resumed: list[str] = []
         failures: list[Exception] = []
         for name in sorted(self._paused, key=order.index):
+            if still_held is not None and _key(self._held[name]) not in still_held:
+                continue
             try:
                 self._operate(
                     connection=connection, name=name, operation=MaintainedOperation.RESUME
@@ -213,6 +216,27 @@ class MaintainedHold:
         self._report(holds=elsewhere, verb="Resumed")
         self._report(holds=taken, verb="Took over")
         return taken
+
+    def _still_held(self, *, connection: Any) -> frozenset[_RelationKey] | None:
+        """This run's holds nobody took over, or None when the pause table can't say."""
+
+        location: StateLocation | None = self._state_location
+        if location is None or self._pause_maintained:
+            return None
+        try:
+            rows: tuple[tuple[Any, ...], ...] = tuple(
+                self._adapter.query(
+                    connection=connection,
+                    sql=open_holds_sql(adapter=self._adapter, location=location),
+                    limit=None,
+                ).rows
+            )
+        except Exception as error:
+            self._warn(f"could not read which maintained models this build still holds: {error}")
+            return None
+        return frozenset(
+            _key(hold.relation) for hold in open_holds(rows=rows) if hold.run_id == self._run_id
+        )
 
     def _resume_found(self, *, connection: Any, relation: CompiledRelationLocation) -> None:
         if _scheduling_state(adapter=self._adapter, connection=connection, relation=relation) == (

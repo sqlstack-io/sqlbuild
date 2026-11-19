@@ -8,8 +8,13 @@ from typing import Any
 
 import pytest
 
+from sqlbuild._native import PlanOutput
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
-from sqlbuild.executor.build.models import BuildExecutionResult, BuildRuntimeParams
+from sqlbuild.executor.build.models import (
+    BuildCallbacks,
+    BuildExecutionResult,
+    BuildRuntimeParams,
+)
 from sqlbuild.executor.build.types import BuildStatus
 from sqlbuild.executor.maintained_pauses.classes.maintained_hold import MaintainedHold
 from sqlbuild.executor.maintained_pauses.main.hold_maintained_models import (
@@ -20,7 +25,9 @@ from tests.integration.src.sqlbuild.executor.maintained_pauses._test_types impor
     HeartbeatTestCase,
     HoldRefusalTestCase,
     HoldTakeoverTestCase,
+    LifecycleLineTestCase,
     PauseLeaseTestCase,
+    TakenOverReleaseTestCase,
 )
 from tests.integration.src.sqlbuild.executor.maintained_pauses.helpers import (
     TOTALS_QUERY,
@@ -438,3 +445,111 @@ def test_given_held_models_when_build_runs_then_heartbeat_writes_on_its_own_conn
         "WHERE event_type = 'heartbeat' AND run_id = 'beating_run'"
     ).fetchall()
     assert beats[0][0] >= test_case.expected_min_beats
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LifecycleLineTestCase(
+            description="a model suspended outside SQLBuild is reported on the build's output",
+            states_before_second={"daily_totals": "SUSPENDED"},
+            expected_line=(
+                "Warning: maintained model daily_totals was paused outside SQLBuild; "
+                "it stays paused"
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_build_output_when_hold_reports_then_line_reaches_the_lifecycle_writer(
+    test_case: LifecycleLineTestCase,
+    adapter: PausingDuckDbAdapter,
+    connection: Any,
+    database_path: Path,
+) -> None:
+    _ = build_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(orders_query=_ORDERS, report_locations={}, refresh_on_build=False),
+        runtime=BuildRuntimeParams(run_id="first_run"),
+        database_path=database_path,
+    )
+    adapter.states.update(test_case.states_before_second)
+    lines: list[str] = []
+
+    result: BuildExecutionResult = build_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(
+            orders_query=_MORE_ORDERS, report_locations={}, refresh_on_build=False
+        ),
+        runtime=BuildRuntimeParams(run_id="second_run"),
+        database_path=database_path,
+        callbacks=BuildCallbacks(on_lifecycle_progress=lines.append),
+    )
+
+    assert result.status == BuildStatus.SUCCESS
+    assert test_case.expected_line in lines
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        TakenOverReleaseTestCase(
+            description="a build whose hold was taken over leaves the model to the new holder",
+            expected_release_operations=(),
+            expected_states={"daily_totals": "SUSPENDED"},
+            expected_events=(
+                ("paused", "first_run", "first_run", "daily_totals"),
+                ("paused", "second_run", "second_run", "daily_totals"),
+                ("paused", "slow_run", "slow_run", "daily_totals"),
+                ("resumed", "first_run", "first_run", "daily_totals"),
+                ("resumed", "slow_run", "second_run", "daily_totals"),
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_hold_taken_over_when_first_build_releases_then_it_resumes_nothing(
+    test_case: TakenOverReleaseTestCase,
+    adapter: PausingDuckDbAdapter,
+    connection: Any,
+    database_path: Path,
+) -> None:
+    _ = build_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(orders_query=_ORDERS, report_locations={}, refresh_on_build=False),
+        runtime=BuildRuntimeParams(run_id="first_run"),
+        database_path=database_path,
+    )
+    changed: LeaseProject = lease_project_case(
+        orders_query=_MORE_ORDERS, report_locations={}, refresh_on_build=False
+    )
+    plan: PlanOutput = plan_lease_project(adapter=adapter, connection=connection, case=changed)
+    holds: list[MaintainedHold] = []
+    for runtime in (
+        BuildRuntimeParams(run_id="slow_run"),
+        BuildRuntimeParams(
+            run_id="second_run",
+            ignore_maintained_grace=True,
+            allow_ignore_maintained_grace=True,
+        ),
+    ):
+        hold: MaintainedHold | None = hold_maintained_models(
+            plan=plan,
+            adapter=adapter,
+            runtime=runtime,
+            connection_config={"database": str(database_path)},
+        )
+        assert hold is not None
+        hold.acquire(connection=connection, on_progress=None)
+        holds.append(hold)
+    adapter.operations.clear()
+
+    holds[0].release(connection=connection)
+
+    assert tuple(adapter.operations) == test_case.expected_release_operations
+    assert adapter.states == test_case.expected_states
+    assert pause_events(connection=connection) == sorted(test_case.expected_events)
+    holds[1].release(connection=connection)
