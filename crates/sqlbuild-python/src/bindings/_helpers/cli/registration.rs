@@ -6,10 +6,10 @@ use crate::bindings::_helpers::cli::{argv, entry, namespace, observability, term
 use crate::bindings::_helpers::{
     audit_command, build_command, build_progress, change_selection, check, clone, command_runtime,
     compute_logs, contract_command, cost_command, cost_report, cost_telemetry, dbt_command,
-    dbt_events, dbt_interop, debug_command, diff_report, event_exporting, execution_history,
-    format_command, freshness, init_command, janitor, load, output_capture, plan_command,
-    presentation_text, query_command, recall, result_output, review_command, scenario_command,
-    seed_command, sql_test_command, workspace_commands,
+    dbt_interop, debug_command, diff_report, event_exporting, execution_history, format_command,
+    freshness, init_command, janitor, load, output_capture, plan_command, presentation_text,
+    query_command, recall, result_output, review_command, scenario_command, seed_command,
+    sql_test_command, workspace_commands,
 };
 use sqlbuild_python_base::build_progress::main::progress::register_progress::register_progress;
 use sqlbuild_python_base::cli::main::register_launch_state::register_launch_state;
@@ -44,7 +44,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     cost_report::registration::register(module)?;
     cost_telemetry::registration::register(module)?;
     debug_command::registration::register(module)?;
-    dbt_events::registration::register(module)?;
+    sqlbuild_python_output::dbt_events::main::register_dbt_events::register_dbt_events(module)?;
     dbt_interop::registration::register(module)?;
     diff_report::registration::register(module)?;
     review_command::registration::register(module)?;
