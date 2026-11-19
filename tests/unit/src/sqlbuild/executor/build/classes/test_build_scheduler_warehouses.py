@@ -151,8 +151,7 @@ def test_given_an_unusable_job_warehouse_when_a_node_starts_then_it_fails_naming
 
     result: Any = BuildScheduler._enter_node_warehouse(scheduler, key=key, connection=object())
 
-    assert (type(result), failed_node_result(result), result.error_message) == (
+    assert (type(result), failed_node_result(result)) == (
         test_case.expected_result_type,
-        True,
-        test_case.expected_message,
+        (True, test_case.expected_message),
     )

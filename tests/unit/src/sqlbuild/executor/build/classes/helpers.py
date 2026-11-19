@@ -167,12 +167,13 @@ def node_key(*, resource_type: CompiledResourceType, name: str) -> CompiledObjec
     return CompiledObjectKey(resource_type=resource_type, name=name)
 
 
-def failed_node_result(result: Any) -> bool:
-    """Whether a node result of any kind reports failure."""
+def failed_node_result(result: Any) -> tuple[bool, str | None]:
+    """Whether a node result of any kind reports failure, and its error message."""
 
     return (
         getattr(result, "status", None) == ExecutionStatus.FAILED
-        or getattr(result, "outcome", None) == SqlTestOutcome.ERROR
+        or getattr(result, "outcome", None) == SqlTestOutcome.ERROR,
+        getattr(result, "error_message", None),
     )
 
 
