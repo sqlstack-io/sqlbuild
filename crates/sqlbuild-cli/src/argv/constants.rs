@@ -157,7 +157,7 @@ pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 193] = [
         "allow_snapshot_schema_change",
         NamespaceDefault::Bool(false),
     ),
-    ("ignore_maintained_grace", NamespaceDefault::Bool(false)),
+    ("ignore_dynamic_grace", NamespaceDefault::Bool(false)),
     ("concurrency", NamespaceDefault::None),
     ("verbose", NamespaceDefault::Bool(false)),
     ("debug", NamespaceDefault::Bool(false)),

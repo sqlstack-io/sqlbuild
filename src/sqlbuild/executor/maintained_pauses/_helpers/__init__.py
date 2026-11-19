@@ -1,1 +1,0 @@
-"""Maintained pause helpers."""

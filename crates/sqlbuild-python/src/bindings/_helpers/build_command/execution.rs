@@ -49,7 +49,7 @@ use sqlbuild_python_compile::compile_driver::models::TargetSettingsValues;
 use sqlbuild_python_front::cost_context::models::CostContext;
 use sqlbuild_python_front::cursor::main::overrides::cursor_integer::cursor_integer;
 use sqlbuild_python_front::cursor::main::overrides::cursor_timestamp::cursor_timestamp;
-use sqlbuild_python_front::discovery::main::project::configured_maintained::configured_maintained;
+use sqlbuild_python_front::discovery::main::project::configured_dynamic::configured_dynamic;
 use sqlbuild_python_front::native_host::main::recorder_callbacks::recorder_callbacks;
 use sqlbuild_python_output::build_progress::main::batch_complete_callback::batch_complete_callback;
 use sqlbuild_python_output::build_progress::main::check_callback::check_callback;
@@ -342,11 +342,11 @@ pub(crate) fn execute_build_plan<'py>(
     let target_config: TargetSettingsValues =
         project_target_settings(&discovered, &project, (&connection_config, &adapter))?;
     let (default_database, default_schema) = target_config.node_locations(&adapter)?;
-    let maintained = configured_maintained(&discovered, &context.request, &project_dir)?;
+    let dynamic = configured_dynamic(&discovered, &context.request, &project_dir)?;
     let runtime: Bound<'py, PyAny> = call_with(
         &host_entry(py, ExecutorHost::BuildRuntimeParams)?,
         &[
-            &maintained[..],
+            &dynamic[..],
             &[
                 ("run_id", native_field(&project, "run_id")?),
                 ("runtime_dir", joined(&project_dir, &["target"])?),

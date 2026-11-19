@@ -163,7 +163,7 @@ A target is a named build context - the database and schema you build into, plus
 | `concurrency` | Worker limit for commands run against this target, replacing `[settings] concurrency` (see below) |
 | `ignore_audit_failures` | Whether builds on this target let audit failures through, replacing `[settings] ignore_audit_failures`; see [Ignoring audit failures](/docs/concepts/audits#ignoring-audit-failures) |
 | `plan_from` | Where `sqb plan` and `sqb build` read warehouse state: `live` (default) or `synced_state`; see [Planning from synced state](#planning-from-synced-state) |
-| `pause_maintained` | `true` keeps this target's [maintained models](/docs/concepts/models/maintained) suspended between builds; each build refreshes the ones it selects. Default `false` |
+| `pause_dynamic` | `true` keeps this target's [dynamic models](/docs/concepts/models/dynamic) suspended between builds; each build refreshes the ones it selects. Default `false` |
 
 ```toml
 [connections.warehouse]
@@ -670,20 +670,20 @@ old_name_views = "30d"
 |-------|---------|-------------|
 | `old_name_views` | `"30d"` | How long a renamed model's old name keeps working through a [compatibility view](/docs/concepts/models/migrations#old-names) before janitor drops it. `false` keeps the old relation in place instead. A model's `old_name_view` header overrides it. |
 
-## Maintained
+## Dynamic
 
-How builds pause [maintained models](/docs/concepts/models/maintained) while they run:
+How builds pause [dynamic models](/docs/concepts/models/dynamic) while they run:
 
 ```toml
-[maintained]
+[dynamic]
 heartbeat_grace = "30m"
 allow_ignore_grace = false
 ```
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `heartbeat_grace` | `"30m"` | How long a build that paused maintained models may go silent before another build resumes them or takes them over. A fixed duration longer than `"1m"`, such as `"30m"` or `"2h"`; a build writes a heartbeat every minute |
-| `allow_ignore_grace` | `false` | Allow `sqb build --ignore-maintained-grace`, which takes over models another build holds without waiting for the grace. Without it the flag fails with `A719` |
+| `heartbeat_grace` | `"30m"` | How long a build that paused dynamic models may go silent before another build resumes them or takes them over. A fixed duration longer than `"1m"`, such as `"30m"` or `"2h"`; a build writes a heartbeat every minute |
+| `allow_ignore_grace` | `false` | Allow `sqb build --ignore-dynamic-grace`, which takes over models another build holds without waiting for the grace. Without it the flag fails with `A719` |
 
 ## Scenario
 

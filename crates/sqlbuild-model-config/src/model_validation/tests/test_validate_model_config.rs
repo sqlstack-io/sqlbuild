@@ -555,16 +555,16 @@ fn given_effective_configs_when_validating_natively_then_python_outcomes_result(
 }
 
 #[test]
-fn given_maintained_model_headers_when_validating_then_refresh_fields_are_checked() {
-    let maintained = |extra: Vec<(&'static str, Value)>| {
-        let mut config = vec![("materialized", Value::Str("maintained"))];
+fn given_dynamic_model_headers_when_validating_then_refresh_fields_are_checked() {
+    let dynamic = |extra: Vec<(&'static str, Value)>| {
+        let mut config = vec![("materialized", Value::Str("dynamic"))];
         config.extend(extra);
         config
     };
     let test_cases = [
         ValidateTestCase {
-            description: "a maintained model with a lag, a mode and a warehouse",
-            config: maintained(vec![
+            description: "a dynamic model with a lag, a mode and a warehouse",
+            config: dynamic(vec![
                 ("refresh", map(vec![("lag", Value::Str("1h"))])),
                 ("refresh_mode", Value::Str("adaptive")),
                 ("refresh_warehouse", Value::Str("transform_wh")),
@@ -575,8 +575,8 @@ fn given_maintained_model_headers_when_validating_then_refresh_fields_are_checke
             expected_outcome: "accepted",
         },
         ValidateTestCase {
-            description: "a maintained model refreshed by its readers",
-            config: maintained(vec![]),
+            description: "a dynamic model refreshed by its readers",
+            config: dynamic(vec![]),
             references: &["ref:orders"],
             query_sql: "select 1",
             expected_outcome: "accepted",
@@ -589,25 +589,25 @@ fn given_maintained_model_headers_when_validating_then_refresh_fields_are_checke
             ],
             references: &[],
             query_sql: "select 1",
-            expected_outcome: "model 'orders_daily': refresh is only valid for maintained models",
+            expected_outcome: "model 'orders_daily': refresh is only valid for dynamic models",
         },
         ValidateTestCase {
             description: "refresh_on_build on a model with no materialization",
             config: vec![("refresh_on_build", Value::Bool(true))],
             references: &[],
             query_sql: "select 1",
-            expected_outcome: "model 'orders_daily': refresh_on_build is only valid for maintained models",
+            expected_outcome: "model 'orders_daily': refresh_on_build is only valid for dynamic models",
         },
         ValidateTestCase {
             description: "a refresh block with a form no adapter has",
-            config: maintained(vec![("refresh", map(vec![("every", Value::Str("1h"))]))]),
+            config: dynamic(vec![("refresh", map(vec![("every", Value::Str("1h"))]))]),
             references: &[],
             query_sql: "select 1",
             expected_outcome: "model 'orders_daily': refresh takes exactly one form, such as refresh (lag 1h); got: every",
         },
         ValidateTestCase {
             description: "a refresh block with two forms",
-            config: maintained(vec![(
+            config: dynamic(vec![(
                 "refresh",
                 map(vec![
                     ("lag", Value::Str("1h")),
@@ -620,63 +620,63 @@ fn given_maintained_model_headers_when_validating_then_refresh_fields_are_checke
         },
         ValidateTestCase {
             description: "refresh written as a plain value",
-            config: maintained(vec![("refresh", Value::Str("1h"))]),
+            config: dynamic(vec![("refresh", Value::Str("1h"))]),
             references: &[],
             query_sql: "select 1",
             expected_outcome: "model 'orders_daily': refresh must be a block such as refresh (lag 1h)",
         },
         ValidateTestCase {
             description: "a lag in months",
-            config: maintained(vec![("refresh", map(vec![("lag", Value::Str("1mo"))]))]),
+            config: dynamic(vec![("refresh", map(vec![("lag", Value::Str("1mo"))]))]),
             references: &[],
             query_sql: "select 1",
             expected_outcome: "model 'orders_daily': refresh lag must be a fixed duration such as 5m, 1h or 1d; got '1mo'",
         },
         ValidateTestCase {
             description: "a lag that is not a duration",
-            config: maintained(vec![("refresh", map(vec![("lag", Value::Str("hourly"))]))]),
+            config: dynamic(vec![("refresh", map(vec![("lag", Value::Str("hourly"))]))]),
             references: &[],
             query_sql: "select 1",
             expected_outcome: "model 'orders_daily': refresh lag must be a fixed duration such as 5m, 1h or 1d; got 'hourly'",
         },
         ValidateTestCase {
             description: "an unknown refresh mode",
-            config: maintained(vec![("refresh_mode", Value::Str("fast"))]),
+            config: dynamic(vec![("refresh_mode", Value::Str("fast"))]),
             references: &[],
             query_sql: "select 1",
             expected_outcome: "model 'orders_daily': refresh_mode must be one of: adaptive, auto, full, incremental; got 'fast'",
         },
         ValidateTestCase {
             description: "refresh_on_build that is not a boolean",
-            config: maintained(vec![("refresh_on_build", Value::Str("yes"))]),
+            config: dynamic(vec![("refresh_on_build", Value::Str("yes"))]),
             references: &[],
             query_sql: "select 1",
             expected_outcome: "model 'orders_daily': refresh_on_build must be a boolean",
         },
         ValidateTestCase {
             description: "a blank refresh warehouse",
-            config: maintained(vec![("refresh_warehouse", Value::Str("  "))]),
+            config: dynamic(vec![("refresh_warehouse", Value::Str("  "))]),
             references: &[],
             query_sql: "select 1",
             expected_outcome: "model 'orders_daily': refresh_warehouse must be a non-empty warehouse name",
         },
         ValidateTestCase {
-            description: "an incremental-only key on a maintained model",
-            config: maintained(vec![("cursor", Value::Str("updated_at"))]),
+            description: "an incremental-only key on a dynamic model",
+            config: dynamic(vec![("cursor", Value::Str("updated_at"))]),
             references: &[],
             query_sql: "select 1",
-            expected_outcome: "model 'orders_daily': cursor is not valid for maintained models: the warehouse refreshes them from the whole query",
+            expected_outcome: "model 'orders_daily': cursor is not valid for dynamic models: the warehouse refreshes them from the whole query",
         },
         ValidateTestCase {
             description: "the smallest lag Snowflake accepts",
-            config: maintained(vec![("refresh", map(vec![("lag", Value::Str("1m"))]))]),
+            config: dynamic(vec![("refresh", map(vec![("lag", Value::Str("1m"))]))]),
             references: &[],
             query_sql: "select 1",
             expected_outcome: "accepted",
         },
         ValidateTestCase {
             description: "a lag one second under Snowflake's minimum",
-            config: maintained(vec![("refresh", map(vec![("lag", Value::Str("59s"))]))]),
+            config: dynamic(vec![("refresh", map(vec![("lag", Value::Str("59s"))]))]),
             references: &[],
             query_sql: "select 1",
             expected_outcome: "model 'orders_daily': refresh lag on Snowflake must be at least 1m; got '59s'",
@@ -686,7 +686,7 @@ fn given_maintained_model_headers_when_validating_then_refresh_fields_are_checke
             config: vec![("materialized", Value::Str("materialized_view"))],
             references: &[],
             query_sql: "select 1",
-            expected_outcome: "model 'orders_daily': Snowflake has no materialized_view materialization; use materialized maintained, which builds a dynamic table",
+            expected_outcome: "model 'orders_daily': Snowflake has no materialized_view materialization; use materialized dynamic, which builds a dynamic table",
         },
     ];
 

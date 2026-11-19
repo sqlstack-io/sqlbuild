@@ -31,10 +31,10 @@ from sqlbuild.adapter.contract.models import (
     TemporaryFunction,
 )
 from sqlbuild.adapter.contract.types import (
+    DynamicListing,
+    DynamicOperation,
     FrameworkType,
     LoaderLogicalType,
-    MaintainedListing,
-    MaintainedOperation,
     PromotionStrategy,
     StatementSizeLimit,
     TablePromotionMode,
@@ -329,47 +329,47 @@ class StrictAdapter(
         del connection
         return None
 
-    def render_create_maintained(
+    def render_create_dynamic(
         self, *, destination: str, sql: str, target_lag: str, refresh_mode: str, warehouse: str
     ) -> tuple[str, ...]:
-        """Optional: SQL that creates or replaces a maintained model; unsupported by default."""
+        """Optional: SQL that creates or replaces a dynamic model; unsupported by default."""
 
         del sql, target_lag, refresh_mode, warehouse
-        raise self._maintained_unsupported(destination)
+        raise self._dynamic_unsupported(destination)
 
-    def render_alter_maintained(
+    def render_alter_dynamic(
         self, *, destination: str, target_lag: str, warehouse: str | None
     ) -> tuple[str, ...]:
-        """Optional: SQL that changes a maintained model's refresh settings in place."""
+        """Optional: SQL that changes a dynamic model's refresh settings in place."""
 
         del target_lag, warehouse
-        raise self._maintained_unsupported(destination)
+        raise self._dynamic_unsupported(destination)
 
-    def render_maintained_operation(
-        self, *, destination: str, operation: MaintainedOperation
+    def render_dynamic_operation(
+        self, *, destination: str, operation: DynamicOperation
     ) -> tuple[str, ...]:
-        """Optional: SQL that suspends, resumes or refreshes a maintained model."""
+        """Optional: SQL that suspends, resumes or refreshes a dynamic model."""
 
         del operation
-        raise self._maintained_unsupported(destination)
+        raise self._dynamic_unsupported(destination)
 
     def render_track_changes(self, *, destination: str) -> tuple[str, ...]:
-        """Optional: SQL that turns on change tracking for a table a maintained model reads."""
+        """Optional: SQL that turns on change tracking for a table a dynamic model reads."""
 
         del destination
         return ()
 
-    def _maintained_unsupported(self, destination: str) -> AdapterUserError:
+    def _dynamic_unsupported(self, destination: str) -> AdapterUserError:
         return AdapterUserError(
-            f"the {self.adapter_name} adapter cannot build maintained model '{destination}'",
+            f"the {self.adapter_name} adapter cannot build dynamic model '{destination}'",
             code="A716",
-            help="materialized maintained needs an adapter whose warehouse refreshes it",
+            help="materialized dynamic needs an adapter whose warehouse refreshes it",
         )
 
-    def maintained_listing(
+    def dynamic_listing(
         self, *, connection: Any, database: str | None, schema: str | None, name: str
-    ) -> MaintainedListing | None:
-        """Optional: how the warehouse lists a maintained model, or None when it lists none."""
+    ) -> DynamicListing | None:
+        """Optional: how the warehouse lists a dynamic model, or None when it lists none."""
 
         del connection, database, schema, name
         return None

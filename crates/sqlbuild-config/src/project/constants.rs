@@ -55,8 +55,8 @@ pub(crate) const ALLOW_MISSING_SECRETS_KEY: &str = "allow_missing_secrets";
 pub(crate) const SCENARIO_TIMEOUT_KEY: &str = "scenario_timeout";
 /// Whether a failing audit holds nothing back; `[settings]` and each target may set it.
 pub(crate) const IGNORE_AUDIT_FAILURES_KEY: &str = "ignore_audit_failures";
-/// A target whose maintained models stay paused between builds, refreshed only by builds.
-pub(crate) const PAUSE_MAINTAINED_KEY: &str = "pause_maintained";
+/// A target whose dynamic models stay paused between builds, refreshed only by builds.
+pub(crate) const PAUSE_DYNAMIC_KEY: &str = "pause_dynamic";
 /// Whether each run records the machine it ran on in the runs state table.
 pub(crate) const RECORD_RUN_HOST_KEY: &str = "record_run_host";
 pub(crate) const DEFAULT_TEST_TIMEOUT: &str = "30s";
@@ -226,7 +226,7 @@ pub(crate) const TARGET_KEYS: [&str; 25] = [
     POOLS_KEY,
     IGNORE_AUDIT_FAILURES_KEY,
     PLAN_FROM_KEY,
-    PAUSE_MAINTAINED_KEY,
+    PAUSE_DYNAMIC_KEY,
 ];
 pub(crate) const CONTROL_KEYS: [&str; 3] = ["location", "server", "sync_at_least_every"];
 pub(crate) const CHANGES_KEYS: [&str; 2] = ["counts", "reach"];
@@ -239,10 +239,10 @@ pub(crate) const MIN_SYNC_INTERVAL_SECONDS: u64 = 60;
 pub(crate) const SYNC_INTERVAL_OFF: [&str; 3] = ["0", "0s", "off"];
 pub(crate) const SYNC_INTERVAL_HELP: &str =
     "must be a duration of at least '1m' such as '30m', or '0' or 'off' to turn safety syncs off";
-pub(crate) const MAINTAINED_KEYS: [&str; 2] = ["allow_ignore_grace", "heartbeat_grace"];
-/// How long a paused maintained model's heartbeat may be silent before another build takes over.
+pub(crate) const DYNAMIC_KEYS: [&str; 2] = ["allow_ignore_grace", "heartbeat_grace"];
+/// How long a paused dynamic model's heartbeat may be silent before another build takes over.
 pub(crate) const DEFAULT_HEARTBEAT_GRACE_SECONDS: u64 = 1_800;
-/// How often a build that holds maintained models writes a heartbeat; a grace must exceed it.
+/// How often a build that holds dynamic models writes a heartbeat; a grace must exceed it.
 pub(crate) const HEARTBEAT_INTERVAL_SECONDS: u64 = 60;
 pub(crate) const REVIEW_KEYS: [&str; 4] =
     ["against", "critical_tags", "downstream", "schema_prefix"];

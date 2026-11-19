@@ -24,8 +24,8 @@ from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.build.constants import (
     BUILD_CUSTOM_MATERIALIZATION_MISSING_CODE,
     BUILD_SOURCE_FRESHNESS_BLOCKED_CODE,
+    DYNAMIC_ACTIONS,
     INCREMENTAL_ACTIONS,
-    MAINTAINED_ACTIONS,
 )
 from sqlbuild.executor.build.models import (
     FunctionExecutionResult,
@@ -36,8 +36,8 @@ from sqlbuild.executor.custom.models import MaterializationResult
 from sqlbuild.executor.load.models import LoadExecutionResult
 from sqlbuild.executor.run.main._execute import (
     execute_custom_entry,
+    execute_dynamic_entry,
     execute_incremental_entry,
-    execute_maintained_entry,
     execute_microbatch_entry,
     execute_snapshot_entry,
     execute_table_entry,
@@ -165,8 +165,8 @@ def _dispatch_model_entry(
             context=context,
             declared_columns=entry.declared_columns,
         )
-    if entry.action in MAINTAINED_ACTIONS:
-        return execute_maintained_entry(context=context)
+    if entry.action in DYNAMIC_ACTIONS:
+        return execute_dynamic_entry(context=context)
     if entry.action == PlanAction.CREATE_VIEW:
         return execute_view_entry(context=context)
     if entry.action == PlanAction.SNAPSHOT:

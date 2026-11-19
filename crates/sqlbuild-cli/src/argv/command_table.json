@@ -2633,9 +2633,9 @@
        {
         "kind": "store_true",
         "options": [
-         "--ignore-maintained-grace"
+         "--ignore-dynamic-grace"
         ],
-        "dest": "ignore_maintained_grace",
+        "dest": "ignore_dynamic_grace",
         "nargs": 0,
         "const": true,
         "default": false,

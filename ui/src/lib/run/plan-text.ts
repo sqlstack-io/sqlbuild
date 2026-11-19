@@ -97,8 +97,8 @@ export function materializationLabel(m: PlanModel): string {
 export function actionText(m: PlanModel): string {
 	if (m.action === 'create_view') return 'recreate view';
 	if (m.action === 'custom') return 'run custom materialization';
-	if (m.action === 'create_maintained') return m.reason === 'first_run' ? 'create' : 'recreate, full recompute';
-	if (m.action === 'alter_maintained') return 'change refresh settings in place';
+	if (m.action === 'create_dynamic') return m.reason === 'first_run' ? 'create' : 'recreate, full recompute';
+	if (m.action === 'alter_dynamic') return 'change refresh settings in place';
 	if (m.backfill.action === 'bounded' && m.backfill.duration) return `rebuild last ${m.backfill.duration}`;
 	if (m.backfill.action === 'full' && m.reason !== 'first_run') return 'full rebuild';
 	return 'continue forward';
@@ -118,7 +118,7 @@ function cursorLines(m: PlanModel, showRange: boolean, windowStart?: string): st
 }
 
 function policyLine(m: PlanModel): string[] {
-	if (m.backfill.action === 'forward' || m.action === 'create_maintained' || !(m.reason === 'query_changed' || m.reason === 'schema_changed')) return [];
+	if (m.backfill.action === 'forward' || m.action === 'create_dynamic' || !(m.reason === 'query_changed' || m.reason === 'schema_changed')) return [];
 	const value = m.backfill.action === 'bounded' ? `bounded-${m.backfill.duration ?? 'full'}` : m.backfill.action;
 	return [`policy: replay_on_change=${value}`];
 }

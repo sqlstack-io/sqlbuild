@@ -95,12 +95,12 @@ from sqlbuild.adapter.contract.models import (
 from sqlbuild.adapter.contract.types import (
     BuiltinAdapter,
     CursorKind,
+    DynamicListing,
+    DynamicOperation,
     FrameworkType,
     HistoricalSnapshotCloseStyle,
     HistoricalSnapshotInsertStyle,
     LoaderLogicalType,
-    MaintainedListing,
-    MaintainedOperation,
     MigrationTransfer,
     PromotionStrategy,
     RelationReadStatus,
@@ -3674,14 +3674,14 @@ class SnowflakeAdapter(
         return None
 
     def session_warehouse(self, *, connection: Any) -> str | None:
-        """The session's warehouse, which refreshes a maintained model that names none."""
+        """The session's warehouse, which refreshes a dynamic model that names none."""
 
         rows: tuple[tuple[object, ...], ...] = self.query(
             connection=connection, sql="SELECT CURRENT_WAREHOUSE()", limit=None
         ).rows
         return None if not rows or rows[0][0] is None else str(rows[0][0])
 
-    def render_create_maintained(
+    def render_create_dynamic(
         self, *, destination: str, sql: str, target_lag: str, refresh_mode: str, warehouse: str
     ) -> tuple[str, ...]:
         """A dynamic table with an explicit mode and ON_CREATE, so it is readable at once."""
@@ -3692,7 +3692,7 @@ class SnowflakeAdapter(
             f"REFRESH_MODE = {refresh_mode.upper()} INITIALIZE = ON_CREATE AS {sql}",
         )
 
-    def render_alter_maintained(
+    def render_alter_dynamic(
         self, *, destination: str, target_lag: str, warehouse: str | None
     ) -> tuple[str, ...]:
         """The lag, and a declared warehouse, set in place."""
@@ -3705,8 +3705,8 @@ class SnowflakeAdapter(
             )
         return tuple(statements)
 
-    def render_maintained_operation(
-        self, *, destination: str, operation: MaintainedOperation
+    def render_dynamic_operation(
+        self, *, destination: str, operation: DynamicOperation
     ) -> tuple[str, ...]:
         return (f"ALTER DYNAMIC TABLE {destination} {operation.value.upper()}",)
 
@@ -3720,9 +3720,9 @@ class SnowflakeAdapter(
             return warehouse
         return '"' + warehouse.replace('"', '""') + '"'
 
-    def maintained_listing(
+    def dynamic_listing(
         self, *, connection: Any, database: str | None, schema: str | None, name: str
-    ) -> MaintainedListing | None:
+    ) -> DynamicListing | None:
         """The dynamic table's lag, warehouse and scheduling state from SHOW DYNAMIC TABLES."""
 
         row: dict[str, object] | None = self._listed_dynamic_table(
@@ -3730,7 +3730,7 @@ class SnowflakeAdapter(
         )
         if row is None:
             return None
-        return MaintainedListing(
+        return DynamicListing(
             target_lag=str(row.get("target_lag")),
             warehouse=str(row.get("warehouse")),
             scheduling_state=str(row.get("scheduling_state")),

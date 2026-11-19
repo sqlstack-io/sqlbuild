@@ -322,9 +322,9 @@ pub struct ModelPlanText {
     pub config_diff: Option<Vec<String>>,
     /// The rendered query diff, when the query changed and the previous query is known.
     pub query_diff: Option<Vec<String>>,
-    /// The rebuilt upstream that makes this kept maintained model recompute in full.
+    /// The rebuilt upstream that makes this kept dynamic model recompute in full.
     pub reinitialised_by: Option<String>,
-    /// Whether the warehouse lists this kept maintained model as suspended.
+    /// Whether the warehouse lists this kept dynamic model as suspended.
     pub paused: bool,
 }
 

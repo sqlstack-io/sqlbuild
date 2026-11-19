@@ -4,7 +4,7 @@ pub const AUDIT_GATE_METADATA_KEY: &str = "audit_gate";
 pub const MIGRATION_FINGERPRINT_METADATA_KEY: &str = "migration_fingerprint";
 pub const DECLARED_COLUMNS_METADATA_KEY: &str = "declared_columns_hash";
 pub const LOCAL_FUNCTION_HASHES_METADATA_KEY: &str = "local_function_hashes";
-/// The refresh mode of a maintained model that declares none; writing it out changes nothing.
+/// The refresh mode of a dynamic model that declares none; writing it out changes nothing.
 pub const DEFAULT_REFRESH_MODE: &str = "incremental";
 /// The fingerprint dialect when a project names none.
 pub(crate) const GENERIC_FINGERPRINT_DIALECT: &str = "generic";
