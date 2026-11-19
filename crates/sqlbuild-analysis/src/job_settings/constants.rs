@@ -14,7 +14,7 @@ pub const JOB_SETTING_CONFLICT_CODE: &str = "S027";
 /// How a conflict names a job's `[retry]` table.
 pub const RETRY_SETTING: &str = "[retry]";
 /// Every option of `sqb build`, in the parser's order, as a job setting.
-pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
+pub const JOB_SETTINGS: [JobSettingSpec; 53] = [
     JobSettingSpec {
         name: "help",
         options: &["-h", "--help"],
@@ -368,6 +368,16 @@ pub const JOB_SETTINGS: [JobSettingSpec; 52] = [
     JobSettingSpec {
         name: "allow_snapshot_schema_change",
         options: &["--allow-snapshot-schema-change"],
+        scope: Build,
+        python_nodes: false,
+        whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
+        group: OneBuild,
+    },
+    JobSettingSpec {
+        name: "ignore_dynamic_grace",
+        options: &["--ignore-dynamic-grace"],
         scope: Build,
         python_nodes: false,
         whole_run: false,

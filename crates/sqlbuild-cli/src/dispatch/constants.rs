@@ -146,7 +146,7 @@ pub(crate) const PLAN_ROUTE: Route = routed(
     REQUEST_KEYWORD_SHAPE,
 );
 
-const BUILD_FIELDS: [Field; 41] = [
+const BUILD_FIELDS: [Field; 42] = [
     PROJECT_DIR,
     NO_SQL_VALIDATION,
     same("no_cache"),
