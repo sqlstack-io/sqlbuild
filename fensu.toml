@@ -3569,7 +3569,7 @@ paths = ["crates/sqlbuild-python-base/src/boundary/_helpers/python_calls.rs", "c
 reason = "Each passes its own keyword set to its own Python callable; only building the keyword dict is alike."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-base/src/compile_context/_helpers/input_reads.rs", "crates/sqlbuild-python-front/src/discovery/main/project/register_project_files.rs", "crates/sqlbuild-python-front/src/discovery/main/snapshots/register_snapshot.rs", "crates/sqlbuild-python-output/src/dbt_events/models.rs"]
+paths = ["crates/sqlbuild-python-base/src/compile_context/_helpers/input_reads.rs", "crates/sqlbuild-python-front/src/discovery/main/project/register_project_files.rs", "crates/sqlbuild-python-front/src/discovery/main/snapshots/register_snapshot.rs", "crates/sqlbuild-python-output/src/dbt_events/main/register_dbt_events.rs"]
 reason = "Each registers its own module's Python functions; only the add-function calls are alike."
 
 [[dupes.allowlist]]
