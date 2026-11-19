@@ -16,6 +16,7 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     JobSettingsConflictTestCase,
 )
 from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
+    CONCURRENCY_VARIABLE,
     PARITY_NODES,
     job_flag_parity_outcome,
     peak_concurrency,
@@ -210,7 +211,9 @@ def test_given_a_named_job_when_building_then_its_settings_apply_below_the_comma
     test_case: JobSettingsBuildTestCase,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv(CONCURRENCY_VARIABLE, raising=False)
     write_project_files(project_dir=tmp_path, files=_PROJECT_FILES)
 
     exit_code: int = main(
@@ -372,6 +375,15 @@ def test_given_a_named_job_with_full_refresh_when_building_then_only_its_models_
             expected_job_peak=2,
             expected_least_build_peak=2,
         ),
+        JobConcurrencyTestCase(
+            description="SQLBUILD_CONCURRENCY sets the build's limit, not the job's",
+            build_args=("--select", "job:slow_job", "slow_c", "slow_d"),
+            job_nodes=("slow_a", "slow_b"),
+            build_nodes=("slow_a", "slow_b", "slow_c", "slow_d"),
+            expected_job_peak=1,
+            expected_least_build_peak=2,
+            environment_concurrency="8",
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -379,7 +391,9 @@ def test_given_a_job_concurrency_when_building_then_its_nodes_never_exceed_it(
     test_case: JobConcurrencyTestCase,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv(CONCURRENCY_VARIABLE, test_case.environment_concurrency)
     write_project_files(project_dir=tmp_path, files=_PROJECT_FILES)
     events: Path = tmp_path / "events.jsonl"
 
@@ -616,7 +630,9 @@ def test_given_a_named_job_when_planning_or_building_then_the_output_reflects_it
     test_case: JobOutputTestCase,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv(CONCURRENCY_VARIABLE, raising=False)
     write_project_files(project_dir=tmp_path, files={**_PROJECT_FILES, **test_case.extra_files})
 
     exit_code: int = main(["--project-dir", str(tmp_path), "--no-color", *test_case.command_args])

@@ -2,6 +2,10 @@
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_project::job_settings::main::given_settings::given_settings;
+
+/// The option that sets the build's limit and turns the named jobs' limits off when given.
+const CONCURRENCY_SETTING: &str = "concurrency";
 
 use crate::compile_driver::models::PlannedJobSettings;
 use crate::compile_driver::types::PipelineFields;
@@ -23,7 +27,7 @@ pub fn job_plan_fields<'py>(
         ),
     )?;
     let (limits, node_jobs) =
-        job_settings.job_limits(&plan_output, &native_field(options, "concurrency")?)?;
+        job_settings.job_limits(&plan_output, given_settings().contains(CONCURRENCY_SETTING))?;
     let (nodes, python) = job_settings.node_warehouses(&plan_output)?;
     Ok((
         plan_output,

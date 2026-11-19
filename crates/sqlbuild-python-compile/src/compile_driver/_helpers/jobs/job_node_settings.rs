@@ -285,12 +285,12 @@ impl PlannedJobSettings {
     pub(crate) fn job_limits<'py>(
         &self,
         plan: &Bound<'py, PyAny>,
-        cli_concurrency: &Bound<'py, PyAny>,
+        cli_concurrency: bool,
     ) -> PyResult<(Bound<'py, PyDict>, Bound<'py, PyDict>)> {
         let py: Python<'py> = plan.py();
         let limits: Bound<'py, PyDict> = PyDict::new(py);
         let node_jobs: Bound<'py, PyDict> = PyDict::new(py);
-        if !cli_concurrency.is_none() || self.settings.job_limits.is_empty() {
+        if cli_concurrency || self.settings.job_limits.is_empty() {
             return Ok((limits, node_jobs));
         }
         for (job, limit) in &self.settings.job_limits {

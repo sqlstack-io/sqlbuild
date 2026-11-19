@@ -113,7 +113,8 @@ A command-line flag replaces every named job's setting rather than merging with 
 settles named jobs that disagree: `--vars` replaces the job's whole `vars`, `--full-refresh`
 rebuilds every selected model, and `--warehouse` puts every node on its warehouse. An option that rules another out counts as setting both, so `--reload` wins
 over a job's `load_sources = false`. Any `--concurrency` sets the build's limit and turns off the
-per-job limits. The job's settings are added before a `--` on the command line, so selectors after
+per-job limits. `SQLBUILD_CONCURRENCY` is not a command-line flag: it sets the build's limit as a
+configured one does, and the named jobs' limits still apply. The job's settings are added before a `--` on the command line, so selectors after
 it still name jobs. `--no-job-settings` leaves out every job's settings.
 
 Some settings apply to the job's own nodes only, so a build that names two jobs can treat their

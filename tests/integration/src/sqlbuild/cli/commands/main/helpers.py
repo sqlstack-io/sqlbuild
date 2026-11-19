@@ -12,7 +12,7 @@ import time
 from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from itertools import accumulate, chain, takewhile
+from itertools import accumulate, chain, compress, takewhile
 from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
@@ -1485,6 +1485,8 @@ def peak_concurrency(*, events_path: Path, names: tuple[str, ...]) -> int:
 
 
 _CONNECT_MARKER: str = "-- connect"
+# The environment variable that sets a build's default concurrency.
+CONCURRENCY_VARIABLE: str = "SQLBUILD_CONCURRENCY"
 
 
 def _job_warehouse_model(source: str) -> str:
@@ -1555,17 +1557,50 @@ def install_writable_offline_snowflake(
 
     def marked_connect(**kwargs: object) -> object:
         executed_sql.append(_CONNECT_MARKER)
-        return connect(**kwargs)
+        raw: Any = connect(**kwargs)
+        raw._executed_sql = _ConnectionStatements(sink=executed_sql, connection=len(connect_calls))
+        return raw
 
     monkeypatch.setitem(connector.__dict__, "connect", marked_connect)
     return connect_calls, executed_sql
 
 
-def warehouse_switches(executed_sql: list[str]) -> tuple[str, ...]:
-    """The warehouses statements switch to, leaving out each new connection's own setup."""
+class _ConnectionStatements:
+    """One offline connection's statement log: each statement in order, and which connection."""
 
-    statements: str = "\n".join(executed_sql)
-    return tuple(re.findall(rf"(?<!{_CONNECT_MARKER}\n)USE WAREHOUSE (\S+)", statements))
+    def __init__(self, *, sink: list[str], connection: int) -> None:
+        self._sink: list[str] = sink
+        self._connection: int = connection
+
+    def append(self, sql: str) -> None:
+        self._sink.append(sql)
+        _STATEMENT_CONNECTIONS.setdefault(id(self._sink), []).append((self._connection, sql))
+
+
+# Each shared statement log's statements with the connection that ran them.
+_STATEMENT_CONNECTIONS: dict[int, list[tuple[int, str]]] = {}
+
+
+def warehouse_switches(executed_sql: list[str]) -> tuple[str, ...]:
+    """The warehouses statements switch to, leaving out each connection's first, its own setup."""
+
+    uses: list[tuple[int, str]] = [
+        (connection, sql.removeprefix(_USE_WAREHOUSE))
+        for connection, sql in _STATEMENT_CONNECTIONS.get(id(executed_sql), [])
+        if sql.startswith(_USE_WAREHOUSE)
+    ]
+    first_use: dict[int, int] = {
+        connection: index for index, (connection, _) in reversed(list(enumerate(uses)))
+    }
+    return tuple(
+        compress(
+            (warehouse for _, warehouse in uses),
+            (first_use[connection] != index for index, (connection, _) in enumerate(uses)),
+        )
+    )
+
+
+_USE_WAREHOUSE: str = "USE WAREHOUSE "
 
 
 def run_cli_exit_code(argv: tuple[str, ...], project_dir: Path) -> int:

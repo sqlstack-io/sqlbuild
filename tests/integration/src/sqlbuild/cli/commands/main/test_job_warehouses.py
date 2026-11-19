@@ -13,6 +13,7 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     JobWarehouseSwitchTestCase,
 )
 from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
+    CONCURRENCY_VARIABLE,
     dynamic_refresh_warehouses,
     install_writable_offline_snowflake,
     run_cli_exit_code,
@@ -94,6 +95,7 @@ def test_given_named_jobs_with_warehouses_when_building_then_each_node_runs_on_i
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    monkeypatch.delenv(CONCURRENCY_VARIABLE, raising=False)
     write_job_warehouse_project(project_dir=tmp_path)
     write_project_files(project_dir=tmp_path, files=test_case.extra_files)
     connect_calls, executed_sql = install_writable_offline_snowflake(monkeypatch)

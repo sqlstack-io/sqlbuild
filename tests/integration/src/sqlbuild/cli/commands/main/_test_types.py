@@ -1508,6 +1508,8 @@ class JobConcurrencyTestCase:
     build_nodes: tuple[str, ...]
     expected_job_peak: int
     expected_least_build_peak: int
+    # SQLBUILD_CONCURRENCY for the build; empty leaves it unset.
+    environment_concurrency: str = ""
 
 
 @dataclass(frozen=True)
