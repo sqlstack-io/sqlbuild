@@ -10,6 +10,7 @@ use crate::runs::_helpers::groups::admission::{
 };
 use crate::runs::_helpers::groups::selection::child_ready;
 use crate::runs::_helpers::lifecycle::claims::{publish_claim, reserve_claims};
+use crate::runs::_helpers::lifecycle::unreadable::fail_unreadable_run;
 use crate::runs::models::{QueueCandidate, RunClaim, RunDispatch};
 use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::SchedulerLease;
@@ -20,14 +21,31 @@ use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
 use crate::store::models::{Connection, ControlStore, Parameter, TransactionMode};
 
-/// Limits come from one installation configuration, never from competing per-job declarations.
+/// Limits come from one installation configuration, never from competing per-job declarations; a candidate whose snapshot can't be read fails on its own and the claim moves on.
 pub async fn claim_next_run<'a>(
     store: &ControlStore,
     lease: &SchedulerLease,
     limits: &BTreeMap<String, NonZeroU32>,
     dispatch: impl Into<RunDispatch<'a>>,
 ) -> Result<Option<RunClaim>, ControlError> {
-    let dispatch = dispatch.into();
+    let dispatch: RunDispatch<'a> = dispatch.into();
+    loop {
+        match claim_once(store, lease, limits, dispatch).await {
+            Err(ControlError::UnreadableSnapshot {
+                run_id: Some(run_id),
+                ..
+            }) => fail_unreadable_run(store, lease, run_id).await?,
+            claimed => return claimed,
+        }
+    }
+}
+
+async fn claim_once(
+    store: &ControlStore,
+    lease: &SchedulerLease,
+    limits: &BTreeMap<String, NonZeroU32>,
+    dispatch: RunDispatch<'_>,
+) -> Result<Option<RunClaim>, ControlError> {
     let (mut transaction, waiters) = limit_waiters(
         check_lease(begin(store, TransactionMode::Write).await?, lease).await?,
         dispatch.eligible,
@@ -62,8 +80,11 @@ pub async fn claim_next_run<'a>(
                 after = Some(candidate);
                 continue;
             }
+            let run_id = candidate.request_json.run_id;
             let ready;
-            (transaction, ready) = child_ready(transaction, &candidate.request_json).await?;
+            (transaction, ready) = child_ready(transaction, &candidate.request_json)
+                .await
+                .map_err(|error| error.for_run(run_id))?;
             if !ready {
                 after = Some(candidate);
                 continue;
@@ -86,7 +107,9 @@ pub async fn claim_next_run<'a>(
                 continue;
             }
             let claim;
-            (transaction, claim) = publish_claim(transaction, candidate.request_json).await?;
+            (transaction, claim) = publish_claim(transaction, candidate.request_json)
+                .await
+                .map_err(|error| error.for_run(run_id))?;
             (transaction, _) =
                 query(transaction, "RELEASE SAVEPOINT candidate_claim", vec![]).await?;
             commit(check_lease(transaction, lease).await?).await?;

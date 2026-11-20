@@ -7,7 +7,7 @@ type Wire = components['schemas'];
 
 const placeOf = (name: string, target: string) => `${name} · ${target}`;
 
-/** Live problems as active banner events: a stopped scheduler, each broken location, and late schedules and low calendars per location. */
+/** Live problems as active banner events: a stopped scheduler, each broken location, and late schedules, low calendars and skipped triggers per location. */
 export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number): PlatformEvent[] {
 	const events: PlatformEvent[] = [];
 	if (!problems.scheduler_leader) {
@@ -83,6 +83,29 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 					: `${calendars.length} calendars in ${place} are running out of dates, starting with ${soonest.name}.`
 		});
 	}
+	const skipped = new Map<string, Wire['SkippedTrigger'][]>();
+	for (const trigger of problems.skipped_triggers ?? []) {
+		const key = keyOf(trigger.location_id, trigger.target);
+		skipped.set(key, [...(skipped.get(key) ?? []), trigger]);
+	}
+	for (const [key, triggers] of skipped) {
+		const first = triggers.reduce((a, b) => (a.skipped_at <= b.skipped_at ? a : b));
+		const place = placeOf(first.location_name, first.target);
+		events.push({
+			id: `skipped:${key}`,
+			kind: 'trigger_skipped',
+			severity: 'warning',
+			occurredAt: first.skipped_at,
+			members: [...new Set(triggers.map((t) => t.trigger_id))].sort(),
+			active: true,
+			locationId: key,
+			subject: place,
+			message:
+				triggers.length === 1
+					? `${first.name} in ${place} is skipped: its job was published by an earlier SQLBuild release and can’t be read. It runs again after the location publishes again.`
+					: `${triggers.length} triggers in ${place} are skipped, starting with ${first.name}: their jobs were published by an earlier SQLBuild release and can’t be read. They run again after the location publishes again.`
+		});
+	}
 	return events;
 }
 
@@ -122,6 +145,8 @@ function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, stri
 			return { ...base, kind: event.kind, severity: 'warning', message: `A schedule in ${place ?? 'a location'} was late.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'schedule', locationId: key }] : [], payload: { scheduled_for: event.scheduled_for } };
 		case 'calendar_horizon_low':
 			return { ...base, kind: event.kind, severity: 'warning', message: `A calendar in ${place ?? 'a location'} was running out of dates.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'calendar', locationId: key }] : [], payload: { refresh_at: event.refresh_at, ...(event.horizon_end ? { horizon_end: event.horizon_end } : {}) } };
+		case 'trigger_skipped':
+			return { ...base, kind: event.kind, severity: 'warning', message: `A trigger in ${place ?? 'a location'} was skipped: ${event.reason}.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'trigger', locationId: key }] : [], payload: { snapshot_id: event.snapshot_id } };
 		case 'launch_failed':
 			return { ...base, kind: event.kind, severity: 'critical', message: `A run in ${place ?? 'a location'} couldn't start (${event.code}).`, links: key ? [{ kind: 'run', id: event.run_id, locationId: key }] : [], payload: { code: event.code } };
 		case 'heartbeat':

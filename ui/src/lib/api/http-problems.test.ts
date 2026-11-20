@@ -56,6 +56,31 @@ describe('toPlatformEvents', () => {
 		]);
 	});
 
+	it('groups skipped triggers per location, dated and named by the first one skipped', () => {
+		const skipped = (name: string, location: string, skipped_at: string) => ({
+			trigger_id: `s-${name}`,
+			name,
+			location_id: location,
+			location_name: location === 'l1' ? 'orders' : 'inventory',
+			target: 'development',
+			skipped_at,
+			reason: "this trigger's job was published by an earlier SQLBuild release and can't be read; it runs again after its location publishes again"
+		});
+		const events = toPlatformEvents(
+			{
+				scheduler_leader: true,
+				broken_locations: [],
+				overdue_ticks: [],
+				skipped_triggers: [skipped('nightly_orders', 'l1', '2026-11-08T11:30:00Z'), skipped('hourly_orders', 'l1', '2026-11-08T11:00:00Z'), skipped('stock_levels', 'l2', '2026-11-08T11:45:00Z')]
+			},
+			NOW
+		);
+		expect(events.map((e) => [e.kind, e.locationId, e.occurredAt, e.members, e.message])).toEqual([
+			['trigger_skipped', 'l1:development', '2026-11-08T11:00:00Z', ['s-hourly_orders', 's-nightly_orders'], '2 triggers in orders · development are skipped, starting with hourly_orders: their jobs were published by an earlier SQLBuild release and can’t be read. They run again after the location publishes again.'],
+			['trigger_skipped', 'l2:development', '2026-11-08T11:45:00Z', ['s-stock_levels'], 'stock_levels in inventory · development is skipped: its job was published by an earlier SQLBuild release and can’t be read. It runs again after the location publishes again.']
+		]);
+	});
+
 	it('groups late ticks per location, dated and named by the oldest', () => {
 		const events = toPlatformEvents(
 			{

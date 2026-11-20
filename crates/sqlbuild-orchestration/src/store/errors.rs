@@ -24,9 +24,35 @@ pub enum ControlError {
     StaleGeneration,
     #[error("scheduler lease expired or was fenced by another holder")]
     Fenced,
+    /// A pinned snapshot's documents no longer decode, such as after a breaking change to their shape; only the run, trigger or request that reads it fails.
+    #[error("{}", crate::store::constants::UNREADABLE_SNAPSHOT)]
+    UnreadableSnapshot {
+        snapshot_id: uuid::Uuid,
+        /// The run that read it, when the reader knows.
+        run_id: Option<uuid::Uuid>,
+        /// What failed to decode, for logs.
+        detail: String,
+    },
 }
 
 impl ControlError {
+    /// This error, naming `run_id` as the run whose snapshot is unreadable; other errors are unchanged.
+    #[must_use]
+    pub fn for_run(self, run_id: uuid::Uuid) -> Self {
+        match self {
+            Self::UnreadableSnapshot {
+                snapshot_id,
+                detail,
+                ..
+            } => Self::UnreadableSnapshot {
+                snapshot_id,
+                run_id: Some(run_id),
+                detail,
+            },
+            error => error,
+        }
+    }
+
     /// A store that is briefly busy or unreachable; the same operation may succeed when retried.
     #[must_use]
     pub fn transient(&self) -> bool {

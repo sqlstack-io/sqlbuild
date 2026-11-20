@@ -2914,9 +2914,17 @@ export interface components {
             run_id: string;
             run_kind: components["schemas"]["RunKind"];
             target: string;
+        } | {
+            /** @enum {string} */
+            kind: "trigger_skipped";
+            reason: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            /** Format: uuid */
+            trigger_id: string;
         };
         /** @enum {string} */
-        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed" | "run_failed";
+        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed" | "run_failed" | "trigger_skipped";
         /** @description Problems derived from live state when read; nothing here is stored. */
         PlatformProblems: {
             broken_locations: components["schemas"]["BrokenLocation"][];
@@ -2929,6 +2937,8 @@ export interface components {
              * @description When the last scheduler lease ran out, or will run out; absent until a server first leads.
              */
             scheduler_lease_expires_at?: string | null;
+            /** @description Triggers skipped because their stored job or pinned snapshot can't be read, until their location publishes again. */
+            skipped_triggers?: components["schemas"]["SkippedTrigger"][];
         };
         /** @description A job or group asking for more of a pool than this server's cap, so it runs alone in that pool. */
         PoolCapWarning: {
@@ -3821,6 +3831,22 @@ export interface components {
             principal_id: string;
             /** Format: uuid */
             session_id: string;
+        };
+        /** @description A trigger the scheduler skips because its stored job or pinned snapshot can't be read; it clears once its location publishes again. */
+        SkippedTrigger: {
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            name: string;
+            reason: string;
+            /**
+             * Format: date-time
+             * @description When it was first skipped for this snapshot.
+             */
+            skipped_at: string;
+            target: string;
+            /** Format: uuid */
+            trigger_id: string;
         };
         /** @description Node-level changes do not duplicate unchanged definitions or source text. */
         SnapshotChange: {

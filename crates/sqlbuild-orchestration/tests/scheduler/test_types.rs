@@ -31,9 +31,13 @@ pub(crate) struct GroupScheduleOldDocumentTestCase {
     pub(crate) backend: Backend,
     /// The concurrency source an older release stored with each job.
     pub(crate) stored_source: &'static str,
-    /// The scheduler cycle due to queue the group after 0004, before the location publishes again.
-    pub(crate) expected_until_republished: &'static str,
-    /// Ticks the cycle takes once the location has published again.
+    /// The scheduler cycle after 0004, before the location publishes again: `ok` when it carries on.
+    pub(crate) expected_cycle: &'static str,
+    /// Ticks that cycle takes, from the other location's schedule.
+    pub(crate) expected_ticks: usize,
+    /// The triggers the live problems list as skipped meanwhile, as `name: reason`.
+    pub(crate) expected_skipped: &'static [&'static str],
+    /// Ticks the next cycle takes once the location has published again.
     pub(crate) expected_ticks_after_republish: usize,
 }
 
@@ -42,8 +46,10 @@ pub(crate) struct PinnedOldDocumentTestCase {
     pub(crate) backend: Backend,
     /// The concurrency source an older release stored in the snapshot's jobs document.
     pub(crate) stored_source: &'static str,
-    /// The `ControlError::Invalid` message advancing the group returns.
-    pub(crate) expected_error: &'static str,
+    /// Advancing the location's groups: `ok` when it carries on.
+    pub(crate) expected_advance: &'static str,
+    /// Every run afterwards, as `job status: reason`.
+    pub(crate) expected_runs: &'static [&'static str],
 }
 
 pub(crate) struct FailedJobRunOldDocumentTestCase {
@@ -53,6 +59,24 @@ pub(crate) struct FailedJobRunOldDocumentTestCase {
     pub(crate) stored_source: &'static str,
     /// The outcome of each worker report: started, the node finished, the run failed.
     pub(crate) expected_reports: [&'static str; 3],
-    /// The run's status afterwards.
-    pub(crate) expected_status: &'static str,
+    /// Every run afterwards, as `job status: reason`.
+    pub(crate) expected_runs: &'static [&'static str],
+}
+
+pub(crate) struct ClaimOldDocumentTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The concurrency source an older release stored in the snapshot's documents.
+    pub(crate) stored_source: &'static str,
+    /// The claimed run, as `location job`.
+    pub(crate) expected_claimed: &'static str,
+    /// The group member whose snapshot can't be read, as `job status: reason`.
+    pub(crate) expected_member: &'static str,
+}
+
+pub(crate) struct AdhocOldDocumentTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The ad hoc plan check's outcome.
+    pub(crate) expected_check: &'static str,
 }

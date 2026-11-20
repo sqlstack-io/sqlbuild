@@ -327,6 +327,7 @@ pub enum PlatformEventKind {
     LocationBroken,
     LaunchFailed,
     RunFailed,
+    TriggerSkipped,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -371,6 +372,12 @@ pub enum PlatformEvent {
         failed_nodes: Vec<RunNodeFailure>,
         failed_node_count: i64,
     },
+    /// A trigger was skipped because its stored job or pinned snapshot can't be read; it runs again after its location publishes again.
+    TriggerSkipped {
+        trigger_id: Uuid,
+        snapshot_id: Uuid,
+        reason: String,
+    },
 }
 
 impl PlatformEvent {
@@ -384,6 +391,7 @@ impl PlatformEvent {
             Self::LocationBroken { .. } => PlatformEventKind::LocationBroken,
             Self::LaunchFailed { .. } => PlatformEventKind::LaunchFailed,
             Self::RunFailed { .. } => PlatformEventKind::RunFailed,
+            Self::TriggerSkipped { .. } => PlatformEventKind::TriggerSkipped,
         }
     }
 
@@ -397,6 +405,7 @@ impl PlatformEvent {
             Self::LocationBroken { .. } => "platform_location_broken",
             Self::LaunchFailed { .. } => "platform_launch_failed",
             Self::RunFailed { .. } => "platform_run_failed",
+            Self::TriggerSkipped { .. } => "platform_trigger_skipped",
         }
     }
 }
@@ -475,6 +484,32 @@ pub struct PlatformProblems {
     /// Running calendar schedules whose dates run out within a day.
     #[serde(default)]
     pub low_calendars: Vec<LowCalendar>,
+    /// Triggers skipped because their stored job or pinned snapshot can't be read, until their location publishes again.
+    #[serde(default)]
+    pub skipped_triggers: Vec<SkippedTrigger>,
+}
+
+/// A trigger the scheduler skips because its stored job or pinned snapshot can't be read; it clears once its location publishes again.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SkippedTrigger {
+    pub trigger_id: Uuid,
+    pub name: String,
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    /// When it was first skipped for this snapshot.
+    pub skipped_at: DateTime<Utc>,
+    pub reason: String,
+}
+
+/// A live trigger and the snapshot it was published in.
+#[derive(Debug, Deserialize)]
+pub(crate) struct PublishedTrigger {
+    pub(crate) name: String,
+    pub(crate) location_id: Uuid,
+    pub(crate) location_name: String,
+    pub(crate) target: String,
+    pub(crate) snapshot_id: Uuid,
 }
 
 /// A running calendar schedule whose last date is at most a day away, or which has none left.
@@ -541,6 +576,7 @@ pub(crate) struct ProblemScan {
     pub(crate) broken: Vec<BrokenLocation>,
     pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
     pub(crate) low_calendars: Vec<LowCalendar>,
+    pub(crate) skipped_triggers: Vec<SkippedTrigger>,
 }
 
 /// Where the control store keeps its data.

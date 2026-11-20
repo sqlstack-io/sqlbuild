@@ -5,12 +5,19 @@ use uuid::Uuid;
 
 use crate::declarations::models::Schedule;
 use crate::platform::constants::LOCATION_SILENCE_SECONDS;
-use crate::platform::models::{LateTarget, LowCalendar, OverdueTick, ProblemScan, RunningSchedule};
+use std::collections::BTreeSet;
+
+use crate::platform::constants::SKIPPED_TRIGGER_EVENTS;
+use crate::platform::models::{
+    LateTarget, LowCalendar, OverdueTick, PlatformEvent, PlatformEventEnvelope, ProblemScan,
+    PublishedTrigger, RunningSchedule, SkippedTrigger,
+};
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
+use crate::store::main::query_records::query_records;
 use crate::store::main::{begin::begin, commit::commit};
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 
 pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, ControlError> {
     let transaction = begin(store, TransactionMode::Read).await?;
@@ -50,6 +57,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
         vec![],
     )
     .await?;
+    let (transaction, skipped_triggers) = skipped_triggers(transaction).await?;
     commit(transaction).await?;
     let schedules: Vec<RunningSchedule> = schedules
         .into_iter()
@@ -72,6 +80,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
         .collect();
     Ok(ProblemScan {
         low_calendars,
+        skipped_triggers,
         now,
         lease: leases.into_iter().next().map(decode_row).transpose()?,
         broken: locations
@@ -86,6 +95,60 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
             })
             .collect::<Result<_, ControlError>>()?,
     })
+}
+
+/// Triggers whose newest `trigger_skipped` event names the snapshot they are still published in: their location has not published again since.
+async fn skipped_triggers(
+    transaction: ControlTransaction,
+) -> Result<(ControlTransaction, Vec<SkippedTrigger>), ControlError> {
+    let (mut transaction, events): (ControlTransaction, Vec<PlatformEventEnvelope>) =
+        query_records(
+            transaction,
+            "SELECT storage_id,event_id,occurred_at,payload FROM recall_events WHERE producer='platform' \
+             AND event_type='platform_trigger_skipped' ORDER BY storage_id DESC LIMIT $1",
+            vec![Parameter::Integer(SKIPPED_TRIGGER_EVENTS)],
+        )
+        .await?;
+    let mut seen: BTreeSet<Uuid> = BTreeSet::new();
+    let mut skipped: Vec<SkippedTrigger> = Vec::new();
+    for envelope in events {
+        let PlatformEvent::TriggerSkipped {
+            trigger_id,
+            snapshot_id,
+            reason,
+        } = envelope.payload.platform
+        else {
+            continue;
+        };
+        if !seen.insert(trigger_id) {
+            continue;
+        }
+        let rows;
+        (transaction, rows) = query(
+            transaction,
+            "SELECT t.name, t.location_id, l.name AS location_name, t.target, t.snapshot_id \
+             FROM sqb_triggers t JOIN sqb_locations l ON l.location_id=t.location_id \
+             WHERE t.trigger_id=$1 AND t.removed_in_snapshot_id IS NULL AND l.archived_at IS NULL",
+            vec![Parameter::Id(trigger_id)],
+        )
+        .await?;
+        let Some(row) = rows.into_iter().next() else {
+            continue;
+        };
+        let trigger: PublishedTrigger = decode_row(row)?;
+        if trigger.snapshot_id == snapshot_id {
+            skipped.push(SkippedTrigger {
+                trigger_id,
+                name: trigger.name,
+                location_id: trigger.location_id,
+                location_name: trigger.location_name,
+                target: trigger.target,
+                skipped_at: envelope.occurred_at,
+                reason,
+            });
+        }
+    }
+    Ok((transaction, skipped))
 }
 
 /// At most 100 late ticks per target, oldest first.

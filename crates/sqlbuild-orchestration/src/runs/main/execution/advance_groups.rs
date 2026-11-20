@@ -1,10 +1,11 @@
-//! Resume virtual parents independently of launcher capacity or process restarts.
+//! Resume virtual parents independently of launcher capacity or process restarts; a group whose snapshot can't be read fails on its own.
 
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 use std::time::{Duration, Instant};
 
 use crate::runs::_helpers::groups::lifecycle::advance_group;
+use crate::runs::_helpers::lifecycle::unreadable::fail_unreadable_group;
 use crate::runs::models::RunDispatch;
 use crate::scheduler::constants::RENEW_INTERVAL_SECONDS;
 use crate::scheduler::main::{check_lease::check_lease, renew_lease::renew_lease};
@@ -43,8 +44,13 @@ pub async fn advance_groups<'a>(
                 .map_err(|error| ControlError::Invalid(error.to_string()))?;
             let transaction =
                 check_lease(begin(store, TransactionMode::Write).await?, lease).await?;
-            let transaction = advance_group(transaction, run_id, limits, dispatch.eligible).await?;
-            commit(check_lease(transaction, lease).await?).await?;
+            match advance_group(transaction, run_id, limits, dispatch.eligible).await {
+                Ok(transaction) => commit(check_lease(transaction, lease).await?).await?,
+                Err(ControlError::UnreadableSnapshot { .. }) => {
+                    fail_unreadable_group(store, lease, run_id).await?;
+                }
+                Err(error) => return Err(error),
+            }
             after = Some(run_id);
         }
     }

@@ -280,3 +280,106 @@ pub(crate) async fn report_run(
     }
     outcomes
 }
+
+/// A control-store result as a test compares it: `ok`, or the error as people read it.
+pub(crate) fn refusal<T>(result: Result<T, ControlError>) -> String {
+    result.map_or_else(|error| error.to_string(), |_| "ok".to_owned())
+}
+
+/// Every run as `job status: reason`, by job then run.
+pub(crate) async fn run_states(store: &ControlStore) -> Vec<String> {
+    crate::runs::tests::helpers::rows(
+        store,
+        "SELECT job_key, status, status_reason FROM sqb_runs ORDER BY job_key, run_id",
+        vec![],
+    )
+    .await
+    .iter()
+    .map(|row| {
+        format!(
+            "{} {}: {}",
+            row["job_key"].as_str().unwrap_or_default(),
+            row["status"].as_str().unwrap_or_default(),
+            row["status_reason"].as_str().unwrap_or_default()
+        )
+    })
+    .collect()
+}
+
+/// The triggers the live problems list as skipped for `principal_id`, as `name: reason`.
+pub(crate) async fn skipped_triggers(
+    store: &ControlStore,
+    principal_id: uuid::Uuid,
+) -> Vec<String> {
+    crate::platform::main::person_reads::read_person_problems::read_person_problems(
+        store,
+        principal_id,
+        crate::credentials::models::DefaultRole::None,
+    )
+    .await
+    .expect("problems")
+    .skipped_triggers
+    .into_iter()
+    .map(|trigger| format!("{}: {}", trigger.name, trigger.reason))
+    .collect()
+}
+
+/// Give `snapshot_id` a `jobs` document in the form an older release published, which no longer decodes.
+pub(crate) async fn store_unreadable_jobs(store: &ControlStore, snapshot_id: uuid::Uuid) {
+    use crate::store::main::{begin::begin, commit::commit, compress::compress, query::query};
+    use crate::store::models::{Parameter, TransactionMode};
+
+    let body = serde_json::json!({"orders": {"description": "Build orders", "selection": ["orders"],
+        "resolved_concurrency": {"limit": 4, "source": "project"}}});
+    let hash = format!("{snapshot_id}-jobs-published-before-0004");
+    let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    let (transaction, _) = query(
+        transaction,
+        "INSERT INTO sqb_documents (document_hash, body) VALUES ($1, $2)",
+        vec![
+            Parameter::Text(hash.clone()),
+            Parameter::Bytes(compress(&serde_json::to_vec(&body).expect("JSON")).expect("gzip")),
+        ],
+    )
+    .await
+    .expect("store the old document");
+    let (transaction, _) = query(
+        transaction,
+        "DELETE FROM sqb_snapshot_documents WHERE snapshot_id=$1 AND kind='jobs'",
+        vec![Parameter::Id(snapshot_id)],
+    )
+    .await
+    .expect("drop the current jobs document");
+    let (transaction, _) = query(
+        transaction,
+        "INSERT INTO sqb_snapshot_documents (snapshot_id, kind, document_hash) VALUES ($1, 'jobs', $2)",
+        vec![Parameter::Id(snapshot_id), Parameter::Text(hash)],
+    )
+    .await
+    .expect("point the snapshot at it");
+    commit(transaction).await.expect("commit");
+}
+
+/// Two jobs, the second waiting for the first, and the group that runs them.
+pub(crate) fn group_snapshot(location: uuid::Uuid) -> crate::snapshots::models::SnapshotInput {
+    let mut input = crate::runs::tests::helpers::snapshot(location);
+    input.nodes.get_mut("orders").expect("orders").definition["deps"] =
+        serde_json::json!(["customers"]);
+    input.documents.insert(
+        "jobs".into(),
+        serde_json::json!({
+            "staging_job": {"description": "Stage customers", "selection": ["customers"],
+                "resolved_concurrency": {"limit": 4}},
+            "marts_job": {"description": "Build orders", "selection": ["orders"],
+                "resolved_concurrency": {"limit": 4}}
+        }),
+    );
+    input.documents.insert(
+        "groups".into(),
+        serde_json::json!({"nightly_job_group": {
+            "description": "Stage then build orders", "selection": ["customers", "orders"],
+            "jobs": {"staging_job": [], "marts_job": ["staging_job"]}
+        }}),
+    );
+    input
+}

@@ -29,13 +29,20 @@ pub(crate) async fn evaluate_trigger(
          JOIN sqb_jobs j ON j.location_id=t.location_id AND j.target=t.target AND j.job_key=t.job_key \
          WHERE t.trigger_id=$1 AND t.kind='schedule' AND t.removed_in_snapshot_id IS NULL",
         vec![Parameter::Id(trigger_id)]).await?;
-    let Some(trigger) = rows
-        .into_iter()
-        .next()
-        .map(decode_row::<DueTrigger>)
-        .transpose()?
-    else {
+    let Some(row) = rows.into_iter().next() else {
         return Ok(None);
+    };
+    let snapshot_id = serde_json::from_value::<Uuid>(row["snapshot_id"].clone());
+    let trigger: DueTrigger = match (decode_row::<DueTrigger>(row), snapshot_id) {
+        (Ok(trigger), _) => trigger,
+        (Err(ControlError::Invalid(detail)), Ok(snapshot_id)) => {
+            return Err(ControlError::UnreadableSnapshot {
+                snapshot_id,
+                run_id: None,
+                detail,
+            });
+        }
+        (Err(error), _) => return Err(error),
     };
     if trigger.status != TriggerStatus::Running {
         return Ok(None);
