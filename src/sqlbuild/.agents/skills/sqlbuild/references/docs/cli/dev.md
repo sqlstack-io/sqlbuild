@@ -68,8 +68,9 @@ Once the first version is published, `sqb dev` connects to the target's warehous
 foreground. A client that asks for a password, a code or a browser sign-in asks once, in a
 **sign in** block above the running steps, and every later connection in the session reuses that
 sign-in. What you type goes to the client, which reads it on its own terminal, so prompts that
-read `/dev/tty` work too. Typed text is not echoed, so a password or code never appears on the
-screen or in the log; `--plain` never prints it either. Ctrl+C still stops `sqb dev`. `sqb dev`
+read `/dev/tty` work too. A prompt that hides what you type, such as a password prompt, keeps it
+hidden on the screen, in the log and in `--plain` output; other prompts show what you type.
+Ctrl+C still stops `sqb dev`. `sqb dev`
 waits for the sign-in as long as it takes, and the block shows how long it has waited.
 
 If the first connection fails, `sqb dev` shows the error and stops with exit status 2; run
@@ -98,13 +99,14 @@ configuration, opens the control store, compiles, connects or waits for a sign-i
 
 When no run is in flight, each service stops with one line, and anything still running after
 about a second is killed, the code location included. When runs are in flight, `sqb dev` cancels
-them first: each worker cancels its running statements, records the run as cancelled and
-releases its claims, as it does for a cancel from the UI. This takes up to 30 seconds, then
-whatever is left is killed. Ctrl+C again, or Ctrl+\\, stops at once:
+them first, also when a service fails after it was ready: each worker cancels its running
+statements, records the run as cancelled and releases its claims, as it does for a cancel from
+the UI. This takes up to 30 seconds, then whatever is left is killed. Ctrl+C again, or Ctrl+\\,
+stops at once:
 
 ```text
-· Cancelling run orders_job… 2 queries (Ctrl+C again to force)
-· Cancelled run orders_job  2 queries cancelled   1.2s
+· Cancelling run orders_job… 2 running nodes (Ctrl+C again to force)
+· Cancelled run orders_job  2 running nodes cancelled   1.2s
 · Stopped scheduler       0.0s
 · Stopped UI server       0.1s
 · Stopped code location   0.3s

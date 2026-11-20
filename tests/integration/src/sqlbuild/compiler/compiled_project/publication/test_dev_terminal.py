@@ -8,16 +8,15 @@ import sys
 import termios
 import time
 from pathlib import Path
-from uuid import uuid4
 
 import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     PUBLISHABLE_FILES,
-    duckshop_orchestration,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     DevelopmentActiveRunStopTestCase,
+    DevelopmentHangUpTestCase,
     DevelopmentKeyStopTestCase,
     DevelopmentSignalStopTestCase,
     DevelopmentStartFailureTestCase,
@@ -26,10 +25,13 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     development_environment,
+    development_run_state,
     drain_terminal,
+    endless_build_files,
     processes_naming,
     read_terminal_until,
     reap_development,
+    request_development_run,
     start_development_on_terminal,
     statement_started,
 )
@@ -67,27 +69,6 @@ BUSY_LOCATION: str = (
     "    time.sleep(300)\n"
 )
 
-# DuckDB whose statement cancellation leaves a mark, so a test sees the cancel path run.
-CANCEL_MARKING_ADAPTER: str = (
-    "import os\nfrom pathlib import Path\n"
-    "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
-    "class DuckDbCancelMarkingAdapter(DuckDbAdapter):\n"
-    "    adapter_name = 'duckdb_cancel_marking'\n\n"
-    "    def interrupt_connection(self, connection):\n"
-    "        with Path(os.environ['ORDERS_CANCELS']).open('a') as cancels:\n"
-    "            cancels.write(f'{os.getpid()}\\n')\n"
-    "        return super().interrupt_connection(connection)\n"
-)
-
-# A model whose one statement runs until it is cancelled.
-ENDLESS_ORDERS: str = (
-    "MODEL (description 'Typed orders.',\n"
-    "  columns (order_id (type INTEGER), amount (type BIGINT)),\n"
-    ");\n\n"
-    "SELECT CAST(1 AS INTEGER) AS order_id, CAST(sum(sin(value)) AS BIGINT) AS amount\n"
-    "FROM range(10000000000) t(value)\n"
-)
-
 DEVELOPMENT_PROJECT: str = (
     'default_target = "development"\n'
     + PUBLISHABLE_FILES["sqlbuild_project.toml"]
@@ -104,40 +85,40 @@ NO_PLAIN: frozenset[str] = frozenset({"CI", "SQLBUILD_NO_PROGRESS"})
     "test_case",
     [
         DevelopmentTerminalTestCase(
-            "the live screen passes the typed code to the client's own terminal, without echo",
+            "the live screen passes the typed code to the client's own terminal, which echoes it",
             [],
             NO_PLAIN,
             READ_STDIN,
             "─ ready ",
             ["terminal=True code=424242"],
-            0,
+            True,
         ),
         DevelopmentTerminalTestCase(
-            "the live screen's terminal is the client's controlling terminal, so /dev/tty works",
+            "the live screen's terminal is the client's controlling terminal; getpass hides the code",
             [],
             NO_PLAIN,
             READ_TTY,
             "─ ready ",
             ["terminal=True code=424242"],
-            0,
+            False,
         ),
         DevelopmentTerminalTestCase(
-            "--plain still signs in on the terminal before ready; only the terminal echoes stdin",
+            "--plain still signs in on the terminal before ready, which echoes a plain prompt",
             ["--plain"],
             NO_PLAIN,
             READ_STDIN,
             "✓ ready  http",
             ["terminal=True code=424242"],
-            1,
+            True,
         ),
         DevelopmentTerminalTestCase(
-            "--plain never prints the code a /dev/tty prompt reads",
+            "--plain never prints the code a getpass prompt reads",
             ["--plain"],
             NO_PLAIN,
             READ_TTY,
             "✓ ready  http",
             ["terminal=True code=424242"],
-            0,
+            False,
         ),
     ],
     ids=lambda case: case.description,
@@ -184,7 +165,7 @@ def test_given_an_interactive_adapter_when_developing_then_sign_in_happens_once_
         os.close(terminal)
 
     assert sign_ins.read_text().splitlines() == test_case.expected_sign_ins, shown
-    assert shown.count("424242") == test_case.expected_code_shown, shown
+    assert ("424242" in shown) == test_case.expected_code_shown, shown
     assert exit_code == 128 + signal.SIGTERM, shown
 
 
@@ -405,8 +386,8 @@ def test_given_a_start_up_step_waiting_when_stopped_then_it_stops_cleanly_before
             b"\x03",
             130,
             [
-                "Cancelling run annual_orders_job… 1 query (Ctrl+C again to force)",
-                "Cancelled run annual_orders_job  1 query cancelled",
+                "Cancelling run annual_orders_job… 1 running node (Ctrl+C again to force)",
+                "Cancelled run annual_orders_job  1 running node cancelled",
                 "sqb dev stopped (interrupted)",
             ],
             "cancelled",
@@ -419,53 +400,14 @@ def test_given_a_running_build_when_stopped_then_its_worker_cancels_it_and_relea
 ) -> None:
     project: Path = tmp_path / "project"
     cancels: Path = tmp_path / "cancels.txt"
-    write_files(
-        project_dir=project,
-        files=PUBLISHABLE_FILES
-        | {
-            "sqlbuild_project.toml": DEVELOPMENT_PROJECT.replace(
-                'adapter = "duckdb"', 'adapter = "duckdb_cancel_marking"'
-            ),
-            "adapters/duckdb_cancel_marking.py": CANCEL_MARKING_ADAPTER,
-            "models/orders.sql": ENDLESS_ORDERS,
-            **duckshop_orchestration("development_orders"),
-        },
-    )
+    write_files(project_dir=project, files=endless_build_files(DEVELOPMENT_PROJECT))
     environment: dict[str, str] = development_environment(
         {"ORDERS_CANCELS": str(cancels)}, NO_PLAIN
     )
-    control: Path = project / ".sqlbuild/control.sqlite3"
-    run_id: str = str(uuid4())
     terminal, process = start_development_on_terminal(project, [], environment)
     try:
-        shown: str = read_terminal_until(terminal, process, lambda shown: "─ ready " in shown)
-        with sqlite3.connect(control) as store:
-            (location_id,) = store.execute(
-                "SELECT location_id FROM sqb_development_locations"
-            ).fetchone()
-        requested: subprocess.CompletedProcess[str] = subprocess.run(
-            [
-                str(Path(sys.executable).with_name("sqb")),
-                "--project-dir",
-                str(project),
-                "admin",
-                "request-run",
-                str(location_id),
-                "annual_orders_job",
-                "--target",
-                "development",
-                "--run-id",
-                run_id,
-                "--reason",
-                "A build to stop",
-            ],
-            env=environment | {"SQLBUILD_CONTROL_DATABASE_URL": str(control)},
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-        assert requested.returncode == 0, requested.stderr
+        shown: str = read_terminal_until(terminal, process, lambda shown: "\u2500 ready " in shown)
+        control, run_id = request_development_run(project, environment)
         shown += read_terminal_until(
             terminal, process, lambda _: statement_started(control), timeout=90
         )
@@ -475,18 +417,53 @@ def test_given_a_running_build_when_stopped_then_its_worker_cancels_it_and_relea
     finally:
         left: list[str] = reap_development(process, project)
         os.close(terminal)
-    with sqlite3.connect(control) as store:
-        (status,) = store.execute(
-            "SELECT status FROM sqb_runs WHERE run_id = ?", (run_id,)
-        ).fetchone()
-        claims: list[tuple[str]] = store.execute(
-            "SELECT node_key FROM sqb_write_claims WHERE run_id = ?", (run_id,)
-        ).fetchall()
 
     assert exit_code == test_case.expected_exit_code, shown
     assert list(filter(lambda line: line not in shown, test_case.expected_lines)) == [], shown
     assert "(forced)" not in shown, shown
-    assert status == test_case.expected_status, shown
-    assert claims == [], shown
+    assert development_run_state(control, run_id) == (test_case.expected_status, []), shown
+    assert cancels.read_text().split() != [], shown
+    assert left == [], shown
+
+
+@pytest.mark.skipif(
+    not sys.platform.startswith("linux"), reason="reads /proc for leftover processes"
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DevelopmentHangUpTestCase(
+            "closing the terminal cancels the running build, as SIGTERM does",
+            129,
+            "cancelled",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_running_build_when_the_terminal_closes_then_its_worker_still_cancels_it(
+    test_case: DevelopmentHangUpTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    cancels: Path = tmp_path / "cancels.txt"
+    write_files(project_dir=project, files=endless_build_files(DEVELOPMENT_PROJECT))
+    environment: dict[str, str] = development_environment(
+        {"ORDERS_CANCELS": str(cancels)}, NO_PLAIN
+    )
+    terminal, process = start_development_on_terminal(project, [], environment)
+    try:
+        shown: str = read_terminal_until(terminal, process, lambda shown: "\u2500 ready " in shown)
+        control, run_id = request_development_run(project, environment)
+        shown += read_terminal_until(
+            terminal, process, lambda _: statement_started(control), timeout=90
+        )
+    finally:
+        os.close(terminal)
+    try:
+        exit_code: int = process.wait(timeout=40)
+    finally:
+        left: list[str] = reap_development(process, project)
+
+    assert exit_code == test_case.expected_exit_code, shown
+    assert development_run_state(control, run_id) == (test_case.expected_status, []), shown
     assert cancels.read_text().split() != [], shown
     assert left == [], shown

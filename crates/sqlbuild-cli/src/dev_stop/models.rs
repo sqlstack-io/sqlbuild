@@ -56,8 +56,6 @@ impl StopReason {
 pub(crate) struct StopSwitch {
     asked: watch::Sender<Option<StopReason>>,
     requests: AtomicUsize,
-    /// The newest request's reason, which a forced exit reports.
-    latest: Mutex<Option<StopReason>>,
     /// Bumped by every `arm` and `disarm`; a deadline fires only while its own value is current.
     deadline: AtomicU64,
     /// Process groups of children that must not outlive `sqb dev`.
@@ -76,7 +74,6 @@ impl StopSwitch {
         Self {
             asked: watch::channel(None).0,
             requests: AtomicUsize::new(0),
-            latest: Mutex::new(None),
             deadline: AtomicU64::new(0),
             groups: Mutex::new(Vec::new()),
             #[cfg(unix)]
@@ -87,11 +84,8 @@ impl StopSwitch {
         }
     }
 
-    /// Ask to stop: the first request starts a clean stop with a deadline, a later Ctrl+C or signal exits at once with its own status.
+    /// Ask to stop: the first request starts a clean stop with a deadline that exits with its status; a later Ctrl+C, SIGINT or SIGTERM exits at once with its own, and a later `q` or hang-up changes nothing: a closed terminal reports itself twice, as SIGHUP and as the end of its input.
     pub(crate) fn request(&'static self, reason: StopReason) {
-        if let Ok(mut latest) = self.latest.lock() {
-            *latest = Some(reason);
-        }
         let earlier: usize = self.requests.fetch_add(1, Ordering::SeqCst);
         if earlier == 0 {
             if let Ok(mut asked_at) = self.asked_at.lock() {
@@ -101,7 +95,7 @@ impl StopSwitch {
             self.arm(STOP_GRACE + STOP_DEADLINE);
             return;
         }
-        if reason != StopReason::Quit {
+        if !matches!(reason, StopReason::Quit | StopReason::Hangup) {
             self.force(reason);
         }
     }
@@ -111,13 +105,15 @@ impl StopSwitch {
         self.exit_now(reason.status(), FORCED_LINE)
     }
 
-    /// Force the stop `after` from now unless it is armed again or disarmed first.
+    /// Force the stop `after` from now, with the stop request's status, unless it is armed again or disarmed first; without a stop request, such as when a service failed, nothing is forced.
     pub(crate) fn arm(&'static self, after: Duration) {
+        let Some(reason) = self.reason() else {
+            return;
+        };
         let armed: u64 = self.deadline.fetch_add(1, Ordering::SeqCst) + 1;
         std::thread::spawn(move || {
             std::thread::sleep(after);
             if self.deadline.load(Ordering::SeqCst) == armed {
-                let reason: StopReason = self.latest().unwrap_or(StopReason::Terminate);
                 self.force(reason);
             }
         });
@@ -126,14 +122,6 @@ impl StopSwitch {
     /// The stop finished cleanly; no deadline fires after this.
     pub(crate) fn disarm(&self) {
         self.deadline.fetch_add(1, Ordering::SeqCst);
-    }
-
-    /// The newest stop request's reason.
-    fn latest(&self) -> Option<StopReason> {
-        match self.latest.lock() {
-            Ok(latest) => *latest,
-            Err(_poisoned) => self.reason(),
-        }
     }
 
     /// The first stop reason, once something asked.

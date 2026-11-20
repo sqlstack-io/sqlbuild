@@ -326,8 +326,8 @@ class DevelopmentTerminalTestCase:
     read_code: str
     expected_ready: str
     expected_sign_ins: list[str]
-    # How often the typed code appears on the terminal: only a terminal's own echo ever shows it.
-    expected_code_shown: int
+    # Whether the typed code is visible: a plain prompt echoes it, a getpass prompt never does.
+    expected_code_shown: bool
 
 
 @dataclass(frozen=True)
@@ -336,6 +336,29 @@ class DevelopmentStartupStopTestCase:
     keys: bytes
     expected_exit_code: int
     expected_result: str
+
+
+@dataclass(frozen=True)
+class DevelopmentHangUpTestCase:
+    description: str
+    expected_exit_code: int
+    expected_status: str
+
+
+@dataclass(frozen=True)
+class ForcedWorkerStopTestCase:
+    description: str
+    first: signal.Signals
+    second: signal.Signals
+    expected_exit_code: int
+    expected_worker_exit_code: int
+
+
+@dataclass(frozen=True)
+class WorkerHangUpTestCase:
+    description: str
+    expected_exit_code: int
+    expected_status: str
 
 
 @dataclass(frozen=True)

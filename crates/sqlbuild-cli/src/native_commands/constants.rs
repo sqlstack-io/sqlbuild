@@ -238,3 +238,6 @@ pub(crate) const PLAN_NOT_PRODUCED: &str =
 
 /// Return to the start of the line and erase it: a child's spinner may be drawn there.
 pub(crate) const CLEAR_TERMINAL_LINE: &str = "\r\u{1b}[K";
+/// What a second signal during worker shutdown prints before it kills the workers.
+pub(crate) const FORCED_WORKER_STOP: &str =
+    "Stopping now: killing the workers' process groups instead of waiting for them\n";

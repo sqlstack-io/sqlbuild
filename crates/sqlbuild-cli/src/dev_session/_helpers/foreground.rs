@@ -1,4 +1,4 @@
-//! Open the dev target's first connection in the foreground: the client owns a pseudo-terminal the screen types into, without echo, so Ctrl+C stays with `sqb dev` and typed secrets are never shown or logged.
+//! Open the dev target's first connection in the foreground: the client owns a pseudo-terminal the screen types into as its controlling terminal, so Ctrl+C stays with `sqb dev` and a password prompt can turn echo off itself.
 
 use std::fs::File;
 use std::io::Read;
@@ -175,7 +175,7 @@ impl Drop for ReportFile {
     }
 }
 
-/// Anything the client writes to its terminal, shown in the prompt; typed keys are not echoed back.
+/// Anything the client writes to its terminal, shown in the prompt, with what is typed when the client leaves echo on.
 fn echo_terminal(controller: File, screen: UnboundedSender<ScreenMessage>) {
     std::thread::spawn(move || {
         let mut controller: File = controller;
@@ -194,7 +194,7 @@ fn echo_terminal(controller: File, screen: UnboundedSender<ScreenMessage>) {
     });
 }
 
-/// A pseudo-terminal: the controller `sqb dev` writes keys to, and the terminal the client reads, sized like this one and without echo, so what is typed never comes back as output.
+/// A pseudo-terminal: the controller `sqb dev` writes keys to, and the terminal the client reads, sized like this one. It echoes as a terminal does, so a plain prompt shows what is typed and a password prompt that turns echo off hides it.
 #[cfg(unix)]
 fn open_terminal() -> std::io::Result<(File, File)> {
     use rustix::fs::{Mode, OFlags};
@@ -211,9 +211,6 @@ fn open_terminal() -> std::io::Result<(File, File)> {
     if let Ok(size) = rustix::termios::tcgetwinsize(std::io::stdin()) {
         let _ = rustix::termios::tcsetwinsize(&client, size);
     }
-    let mut modes = rustix::termios::tcgetattr(&client)?;
-    modes.local_modes -= rustix::termios::LocalModes::ECHO | rustix::termios::LocalModes::ECHONL;
-    rustix::termios::tcsetattr(&client, rustix::termios::OptionalActions::Now, &modes)?;
     Ok((File::from(controller), File::from(client)))
 }
 

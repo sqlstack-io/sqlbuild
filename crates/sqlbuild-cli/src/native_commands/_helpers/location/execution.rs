@@ -1217,43 +1217,6 @@ pub(crate) async fn open_control_workers(
     Ok((workers, (images, adhoc_planner())))
 }
 
-pub(crate) async fn shutdown_signal() -> Result<(), ControlError> {
-    #[cfg(unix)]
-    {
-        let mut terminate =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
-        tokio::select! {
-            result = tokio::signal::ctrl_c() => result?,
-            _ = terminate.recv() => {},
-        }
-    }
-    #[cfg(not(unix))]
-    tokio::signal::ctrl_c().await?;
-    Ok(())
-}
-
-/// Stop sibling roles on a signal or role failure, then drain their shutdown results.
-pub(crate) async fn supervise_control_roles(
-    mut tasks: JoinSet<Result<(), ControlError>>,
-    stop: watch::Sender<bool>,
-) -> Result<(), ControlError> {
-    let mut result = tokio::select! {
-        result = tasks.join_next() => match result {
-            Some(result) => result.map_err(ControlError::from).and_then(std::convert::identity),
-            None => Ok(()),
-        },
-        result = shutdown_signal() => result,
-    };
-    stop.send_replace(true);
-    while let Some(joined) = tasks.join_next().await {
-        let joined = joined
-            .map_err(ControlError::from)
-            .and_then(std::convert::identity);
-        result = result.and(joined);
-    }
-    result
-}
-
 /// The capture Python's `dispatch_with_compute_logs` opens; a failure only loses the log.
 fn open_capture(
     invocation: &NativeInvocation,

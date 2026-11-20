@@ -41,7 +41,7 @@ impl DevRoles {
     }
 }
 
-/// Wait for a stop request or a role to end; a requested stop cancels the runs in flight first. Then stop every role: each gets the grace period, then its processes are killed and the rest aborted.
+/// Wait for a stop request or a role to end; a requested stop, or a service failing after ready, cancels the runs in flight first. Then stop every role: each gets the grace period, then its processes are killed and the rest aborted.
 pub(crate) async fn supervise_development_roles(
     mut roles: DevRoles,
     stop: watch::Sender<bool>,
@@ -52,7 +52,7 @@ pub(crate) async fn supervise_development_roles(
         reason = stop_switch().requested() => DevEnd::Stopped(reason),
     };
     drop(messages.send(ScreenMessage::Stopping));
-    if let (DevEnd::Stopped(_), Some(runs)) = (&end, &roles.runs) {
+    if let (DevEnd::Stopped(_) | DevEnd::Failed { .. }, Some(runs)) = (&end, &roles.runs) {
         cancel_active_runs(runs, messages).await;
     }
     stop.send_replace(true);

@@ -65,7 +65,10 @@ from sqlbuild.microbatches.classes.direct_store import DirectMicrobatchEventStor
 from sqlbuild.microbatches.classes.event_codec import MicrobatchEventCodec
 from sqlbuild.microbatches.constants import MICROBATCH_COLUMNS
 from sqlbuild.microbatches.models import MicrobatchEvent, MicrobatchWriteResult
-from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import duckshop_orchestration
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
+    PUBLISHABLE_FILES,
+    duckshop_orchestration,
+)
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ClaimedWorker,
     ScheduledWorker,
@@ -2107,3 +2110,97 @@ def statement_started(control: Path) -> bool:
             ).fetchone()
             is not None
         )
+
+
+# DuckDB whose statement cancellation leaves a mark, so a test sees the cancel path run.
+CANCEL_MARKING_ADAPTER: str = (
+    "import os\nfrom pathlib import Path\n"
+    "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
+    "class DuckDbCancelMarkingAdapter(DuckDbAdapter):\n"
+    "    adapter_name = 'duckdb_cancel_marking'\n\n"
+    "    def interrupt_connection(self, connection):\n"
+    "        with Path(os.environ['ORDERS_CANCELS']).open('a') as cancels:\n"
+    "            cancels.write(f'{os.getpid()}\\n')\n"
+    "        return super().interrupt_connection(connection)\n"
+)
+
+# A model whose one statement runs until it is cancelled.
+ENDLESS_ORDERS: str = (
+    "MODEL (description 'Typed orders.',\n"
+    "  columns (order_id (type INTEGER), amount (type BIGINT)),\n"
+    ");\n\n"
+    "SELECT CAST(1 AS INTEGER) AS order_id, CAST(sum(sin(value)) AS BIGINT) AS amount\n"
+    "FROM range(10000000000) t(value)\n"
+)
+
+
+def endless_build_files(project_toml: str) -> dict[str, str]:
+    """A dev project whose job runs one endless statement on a DuckDB that marks its cancels."""
+    return PUBLISHABLE_FILES | {
+        "sqlbuild_project.toml": project_toml.replace(
+            'adapter = "duckdb"', 'adapter = "duckdb_cancel_marking"'
+        ),
+        "adapters/duckdb_cancel_marking.py": CANCEL_MARKING_ADAPTER,
+        "models/orders.sql": ENDLESS_ORDERS,
+        **duckshop_orchestration("development_orders"),
+    }
+
+
+def request_development_run(project: Path, environment: dict[str, str]) -> tuple[Path, str]:
+    """Queue `annual_orders_job` in `project`'s running `sqb dev`: its control store and the run."""
+    control: Path = project / ".sqlbuild/control.sqlite3"
+    run_id: str = str(uuid4())
+    with closing(sqlite3.connect(control)) as store:
+        (location_id,) = store.execute(
+            "SELECT location_id FROM sqb_development_locations"
+        ).fetchone()
+    requested: subprocess.CompletedProcess[str] = subprocess.run(
+        [
+            str(Path(sys.executable).with_name("sqb")),
+            "--project-dir",
+            str(project),
+            "admin",
+            "request-run",
+            str(location_id),
+            "annual_orders_job",
+            "--target",
+            "development",
+            "--run-id",
+            run_id,
+            "--reason",
+            "A build to stop",
+        ],
+        env=environment | {"SQLBUILD_CONTROL_DATABASE_URL": str(control)},
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert requested.returncode == 0, requested.stderr
+    return control, run_id
+
+
+def development_run_state(control: Path, run_id: str) -> tuple[str, list[str]]:
+    """The run's status and the nodes it still holds write claims on."""
+    with closing(sqlite3.connect(control)) as store:
+        (status,) = store.execute(
+            "SELECT status FROM sqb_runs WHERE run_id = ?", (run_id,)
+        ).fetchone()
+        claims: list[str] = [
+            node
+            for (node,) in store.execute(
+                "SELECT node_key FROM sqb_write_claims WHERE run_id = ?", (run_id,)
+            ).fetchall()
+        ]
+    return status, claims
+
+
+def uncooperative_worker_pid(worker: ScheduledWorker) -> int:
+    """The process ID the uncooperative launcher's worker writes once it has started."""
+    pidfile: Path = worker.project / "worker.pid"
+    deadline: float = time.monotonic() + 15
+    while not pidfile.exists():
+        assert worker.process.poll() is None, worker.log.read_text()
+        assert time.monotonic() < deadline, worker.log.read_text()
+        time.sleep(0.02)
+    return int(pidfile.read_text())

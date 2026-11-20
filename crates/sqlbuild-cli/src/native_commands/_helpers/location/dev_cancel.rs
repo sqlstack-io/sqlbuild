@@ -27,15 +27,17 @@ pub(crate) struct DevRuns {
     pub(crate) target: String,
 }
 
-/// A run being cancelled: its ID, its name on the screen and the statements it was running.
+/// A run being cancelled: its ID, its name on the screen and how many of its nodes were running.
 struct Cancelling {
     run_id: Uuid,
     name: String,
-    queries: String,
+    running: i64,
 }
 
-/// Ask every executing run to cancel, then wait for each to end, at most `CANCEL_DEADLINE`; whatever is left is killed, and the rest of the stop gets the usual deadline.
+/// Ask every executing run to cancel, then wait for each to end; reading the runs counts against the same `CANCEL_DEADLINE`. Whatever is left is killed, and the rest of the stop gets the usual deadline.
 pub(crate) async fn cancel_active_runs(runs: &DevRuns, messages: &UnboundedSender<ScreenMessage>) {
+    stop_switch().arm(CANCEL_DEADLINE + STOP_GRACE + STOP_DEADLINE);
+    let began: Instant = Instant::now();
     let active: Vec<RunRecord> =
         match list_runs(&runs.store, (runs.location_id, &runs.target), RUN_SCAN).await {
             Ok(records) => records.into_iter().filter(executing).collect(),
@@ -43,14 +45,13 @@ pub(crate) async fn cancel_active_runs(runs: &DevRuns, messages: &UnboundedSende
                 drop(messages.send(ScreenMessage::Log(format!(
                     "could not read the runs to cancel: {error}"
                 ))));
-                return;
+                Vec::new()
             }
         };
     if active.is_empty() {
+        stop_switch().arm(STOP_GRACE + STOP_DEADLINE);
         return;
     }
-    stop_switch().arm(CANCEL_DEADLINE + STOP_GRACE + STOP_DEADLINE);
-    let began: Instant = Instant::now();
     let context: AuditContext = AuditContext {
         actor: DEV_ACTOR.to_owned(),
         granting_role: DEV_GRANTING_ROLE.to_owned(),
@@ -62,12 +63,13 @@ pub(crate) async fn cancel_active_runs(runs: &DevRuns, messages: &UnboundedSende
         let cancelling: Cancelling = Cancelling {
             run_id: run.run_id,
             name: run.job_key.clone().unwrap_or_else(|| "ad hoc".to_owned()),
-            queries: queries(run.node_counts_json.get("running").copied().unwrap_or(0)),
+            running: run.node_counts_json.get("running").copied().unwrap_or(0),
         };
         drop(messages.send(ScreenMessage::Cancelling {
             label: format!(
                 "Cancelling run {}\u{2026} {} (Ctrl+C again to force)",
-                cancelling.name, cancelling.queries
+                cancelling.name,
+                running_nodes(cancelling.running)
             ),
         }));
         let requested = change_run(
@@ -99,7 +101,7 @@ pub(crate) async fn cancel_active_runs(runs: &DevRuns, messages: &UnboundedSende
             match observe_run(&runs.store, run.run_id).await {
                 Ok(state) if !open(state.status) => {
                     drop(messages.send(ScreenMessage::Stopped {
-                        label: format!("Cancelled run {}  {} cancelled", run.name, run.queries),
+                        label: cancelled_line(&run),
                         elapsed: began.elapsed(),
                     }));
                 }
@@ -131,10 +133,22 @@ fn open(status: RunStatus) -> bool {
     )
 }
 
-/// `1 query` or `N queries`.
-fn queries(count: i64) -> String {
+/// `1 running node` or `N running nodes`.
+fn running_nodes(count: i64) -> String {
     match count {
-        1 => "1 query".to_owned(),
-        count => format!("{count} queries"),
+        1 => "1 running node".to_owned(),
+        count => format!("{count} running nodes"),
+    }
+}
+
+/// `Cancelled run orders_job  2 running nodes cancelled`, naming nodes only when some were running.
+fn cancelled_line(run: &Cancelling) -> String {
+    match run.running {
+        0 => format!("Cancelled run {}", run.name),
+        running => format!(
+            "Cancelled run {}  {} cancelled",
+            run.name,
+            running_nodes(running)
+        ),
     }
 }
