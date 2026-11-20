@@ -134,6 +134,42 @@ class SyncDuringTakeoverTestCase:
 
 
 @dataclass(frozen=True)
+class ClaimRaceTestCase:
+    description: str
+    expected_operations: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]
+    expected_open_holds: tuple[str, ...]
+    expected_claims: tuple[tuple[str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class ClaimWaitTestCase:
+    description: str
+    expected_operations: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]
+    expected_claim_reads: int
+    expected_progress: str
+
+
+@dataclass(frozen=True)
+class AbandonedClaimTestCase:
+    description: str
+    claim_age_seconds: int
+    limit_seconds: float
+    expected_waited: bool
+    expected_states: dict[str, str]
+
+
+@dataclass(frozen=True)
+class TwoSyncsTestCase:
+    description: str
+    expected_operations: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]
+    expected_resumed: tuple[tuple[str, ...], tuple[str, ...]]
+    expected_claims: tuple[tuple[str, str, str], ...]
+
+
+@dataclass(frozen=True)
 class StaleSyncResumeTestCase:
     description: str
     expected_states: dict[str, str]

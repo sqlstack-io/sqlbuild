@@ -572,10 +572,13 @@ Details:
   interval, add one more sync after it, not one each.
 - The interval restarts after every completed sync, so a location that syncs often for other
   reasons never syncs extra.
-- A sync reads the warehouse and writes only one thing: on Snowflake, after it completes, it
-  resumes the [dynamic models](../concepts/models/dynamic.md#when-a-build-dies) whose pausing build
-  has been silent past `[dynamic] heartbeat_grace`, and records that in the pause table as
-  `location-sync:<location ID>`. It checks the pause table in the target's schema and in every
+- A sync reads the warehouse and writes only to the dynamic pause table: on Snowflake, after it
+  completes, it resumes the [dynamic models](../concepts/models/dynamic.md#when-a-build-dies) whose
+  pausing build has been silent past `[dynamic] heartbeat_grace`, and records that in the pause
+  table as `location-sync:<location ID>`. Before resuming, it records a `resuming` claim on each
+  model and reads the holds again, so a build that paused the model meanwhile keeps it paused; a
+  build that finds an open claim waits for it to close. A claim older than 2 minutes, the time a
+  sync gets to resume, is treated as abandoned. It checks the pause table in the target's schema and in every
   schema the location's models write to. A model that fails to resume is logged as
   `Resuming an expired dynamic hold failed: <model>: <error>`, keeps its hold, and is retried on
   the next sync; the others still resume. Other adapters can't build dynamic models, so their

@@ -21,6 +21,15 @@ class DynamicPauseEvent:
 
 
 @dataclass(frozen=True)
+class OpenClaim:
+    """A sync's claim on a model it may be resuming, and its age by the warehouse clock."""
+
+    run_id: str
+    relation: CompiledRelationLocation
+    age_seconds: float
+
+
+@dataclass(frozen=True)
 class OpenHold:
     """A model a run paused and nobody resumed, when it paused, and how long the run is silent."""
 

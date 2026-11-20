@@ -20,7 +20,11 @@ from sqlbuild.executor.build.models import (
     BuildExecutionResult,
     BuildRuntimeParams,
 )
+from sqlbuild.executor.dynamic_pauses._helpers.resume import run_dynamic_operation
 from sqlbuild.executor.dynamic_pauses._helpers.sql import insert_sql, setup_statements
+from sqlbuild.executor.dynamic_pauses.classes.dynamic_hold import DynamicHold
+from sqlbuild.executor.dynamic_pauses.constants import CLAIM_RUN_MARKER
+from sqlbuild.executor.dynamic_pauses.main.hold_dynamic_models import hold_dynamic_models
 from sqlbuild.executor.dynamic_pauses.models import DynamicPauseEvent
 from sqlbuild.executor.dynamic_pauses.types import DynamicPauseEventType, StateLocation
 from tests.integration.src.sqlbuild.compiler.planner.main._test_types import (
@@ -99,6 +103,38 @@ class SyncDuringTakeoverAdapter(PausingDuckDbAdapter):
         recorded_takeover: bool = "'paused'" in sql and f"'{self._takeover_run}'" in sql
         self.states.update({True: self._resumed, False: {}}[recorded_takeover])
         return cursor
+
+
+class ClaimHookAdapter(PausingDuckDbAdapter):
+    """Runs one queued step right after the next resume-claim write, and after the next read."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.after_claim_write: list[Callable[[Any], None]] = []
+        self.after_claim_read: list[Callable[[Any], None]] = []
+        self.claim_reads: int = 0
+
+    def execute(self, *, connection: Any, sql: str) -> Any:
+        cursor: Any = super().execute(connection=connection, sql=sql)
+        wrote_claim: bool = sql.startswith("INSERT") and "'resuming'" in sql
+        _run_next(
+            steps={True: self.after_claim_write, False: []}[wrote_claim], connection=connection
+        )
+        return cursor
+
+    def query(self, *, connection: Any, sql: str, limit: int | None) -> Any:
+        result: Any = super().query(connection=connection, sql=sql, limit=limit)
+        read_claims: bool = "'resuming'" in sql
+        self.claim_reads += int(read_claims)
+        _run_next(
+            steps={True: self.after_claim_read, False: []}[read_claims], connection=connection
+        )
+        return result
+
+
+def _run_next(*, steps: list[Callable[[Any], None]], connection: Any) -> None:
+    for step in [steps.pop(0) for _ in steps[:1]]:
+        step(connection)
 
 
 class RefusingResumeAdapter(PausingDuckDbAdapter):
@@ -229,8 +265,8 @@ def pause_events(*, connection: Any) -> list[tuple[str, str, str, str]]:
 
     rows: list[tuple[Any, ...]] = connection.execute(
         "SELECT event_type, run_id, recorded_by, relation_name "
-        "FROM staging._sqlbuild_dynamic_pauses WHERE event_type <> 'heartbeat' "
-        "ORDER BY 1, 2, 3, 4"
+        "FROM staging._sqlbuild_dynamic_pauses WHERE event_type NOT IN ('heartbeat', 'resuming') "
+        f"AND run_id NOT LIKE '%{CLAIM_RUN_MARKER}%' ORDER BY 1, 2, 3, 4"
     ).fetchall()
     return [(str(row[0]), str(row[1]), str(row[2]), str(row[3])) for row in rows]
 
@@ -293,11 +329,116 @@ def seed_hold(
     adapter.states[name] = "SUSPENDED"
 
 
+def held_by_dead_run(
+    *, adapter: PausingDuckDbAdapter, connection: Any, database_path: Path
+) -> PlanOutput:
+    """Build once, then let `dead_run` pause `daily_totals` and stop; the plan a rebuild runs."""
+
+    _ = build_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(
+            orders_query="SELECT 1 AS order_id", report_locations={}, refresh_on_build=False
+        ),
+        runtime=BuildRuntimeParams(run_id="first_run"),
+        database_path=database_path,
+    )
+    plan: PlanOutput = plan_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(
+            orders_query="SELECT 1 AS order_id UNION ALL SELECT 2",
+            report_locations={},
+            refresh_on_build=False,
+        ),
+    )
+    dead: DynamicHold | None = hold_dynamic_models(
+        plan=plan,
+        adapter=adapter,
+        runtime=BuildRuntimeParams(run_id="dead_run"),
+        connection_config={"database": str(database_path)},
+    )
+    assert dead is not None
+    dead.acquire(connection=connection, on_progress=None)
+    return plan
+
+
+def seed_claim(
+    *, adapter: PausingDuckDbAdapter, connection: Any, claim_run: str, age_seconds: int
+) -> None:
+    """A sync's open claim on `daily_totals`, written `age_seconds` ago."""
+
+    connection.execute(
+        insert_sql(
+            adapter=adapter,
+            location=(None, "staging"),
+            events=(
+                DynamicPauseEvent(
+                    event_type=DynamicPauseEventType.RESUMING,
+                    run_id=claim_run,
+                    recorded_by="location-sync:warehouse",
+                    relation=_daily_totals(),
+                ),
+            ),
+        )
+    )
+    connection.execute(
+        "UPDATE staging._sqlbuild_dynamic_pauses "
+        f"SET recorded_at = recorded_at - INTERVAL {age_seconds} SECOND "
+        f"WHERE run_id = '{claim_run}'"
+    )
+
+
+def finish_claimed_resume(
+    *, adapter: PausingDuckDbAdapter, connection: Any, claim_run: str
+) -> None:
+    """The claiming sync's next steps: resume daily_totals; close dead_run's hold and the claim."""
+
+    run_dynamic_operation(
+        adapter=adapter,
+        connection=connection,
+        relation=_daily_totals(),
+        operation=DynamicOperation.RESUME,
+    )
+    connection.execute(
+        insert_sql(
+            adapter=adapter,
+            location=(None, "staging"),
+            events=tuple(
+                DynamicPauseEvent(
+                    event_type=DynamicPauseEventType.RESUMED,
+                    run_id=run_id,
+                    recorded_by="location-sync:warehouse",
+                    relation=_daily_totals(),
+                )
+                for run_id in ("dead_run", claim_run)
+            ),
+        )
+    )
+
+
+def claim_events(*, connection: Any) -> list[tuple[str, str, str]]:
+    """Each claim row's type, recording sync and model, sorted."""
+
+    rows: list[tuple[Any, ...]] = connection.execute(
+        "SELECT event_type, recorded_by, relation_name FROM staging._sqlbuild_dynamic_pauses "
+        f"WHERE run_id LIKE '%{CLAIM_RUN_MARKER}%' ORDER BY 1, 2, 3"
+    ).fetchall()
+    return [(str(row[0]), str(row[1]), str(row[2])) for row in rows]
+
+
+def _daily_totals() -> CompiledRelationLocation:
+    return CompiledRelationLocation(
+        database=None, schema="staging", name="daily_totals", qualified_name=None
+    )
+
+
 def pause_event_ids(*, connection: Any) -> list[tuple[str, str, str]]:
     """Each resume's event ID, holding run and recording run, sorted."""
 
     rows: list[tuple[Any, ...]] = connection.execute(
         "SELECT event_id, run_id, recorded_by FROM staging._sqlbuild_dynamic_pauses "
-        "WHERE event_type = 'resumed' ORDER BY 1, 2, 3"
+        f"WHERE event_type = 'resumed' AND run_id NOT LIKE '%{CLAIM_RUN_MARKER}%' "
+        "ORDER BY 1, 2, 3"
     ).fetchall()
     return [(str(row[0]), str(row[1]), str(row[2])) for row in rows]

@@ -46,6 +46,8 @@ pub const RESOURCE_COSTS_TABLE_NAME: &str = "_sqlbuild_resource_costs";
 pub const RUNS_TABLE_NAME: &str = "_sqlbuild_runs";
 /// State table of the dynamic models a build paused, and its heartbeats while it holds them.
 pub const DYNAMIC_PAUSES_TABLE_NAME: &str = "_sqlbuild_dynamic_pauses";
+/// How long a location may spend resuming dynamic holds before it is killed; older claims are dead.
+pub const DYNAMIC_RESUME_SECONDS: u64 = 120;
 /// Every state table SQLBuild writes in a target's state schema.
 pub const STATE_TABLE_NAMES: [&str; 14] = [
     FINGERPRINT_TABLE_NAME,

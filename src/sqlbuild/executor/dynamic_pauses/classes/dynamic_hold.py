@@ -20,6 +20,7 @@ from sqlbuild.executor.dynamic_pauses._helpers.resume import (
 )
 from sqlbuild.executor.dynamic_pauses._helpers.sql import (
     insert_sql,
+    read_open_claims,
     read_open_holds,
     setup_statements,
 )
@@ -31,7 +32,12 @@ from sqlbuild.executor.dynamic_pauses.constants import (
     HELD_ELSEWHERE_CODE,
     SUSPENDED_STATE,
 )
-from sqlbuild.executor.dynamic_pauses.models import DynamicPauseEvent, HoldsResumed, OpenHold
+from sqlbuild.executor.dynamic_pauses.models import (
+    DynamicPauseEvent,
+    HoldsResumed,
+    OpenClaim,
+    OpenHold,
+)
 from sqlbuild.executor.dynamic_pauses.types import DynamicPauseEventType, StateLocation
 
 type _RelationKey = tuple[str | None, str | None, str]
@@ -49,8 +55,10 @@ class DynamicHold:
         state_location: StateLocation | None,
         settings: tuple[str, bool, float, bool],
         heartbeat: Callable[[Callable[..., None]], DynamicHeartbeat],
+        claim_wait: tuple[float, float],
     ) -> None:
         self._adapter: BaseAdapter = adapter
+        self._claim_wait: tuple[float, float] = claim_wait
         self._held: dict[str, CompiledRelationLocation] = held
         self._refreshed: frozenset[str] = refreshed
         self._state_location: StateLocation | None = state_location
@@ -134,11 +142,14 @@ class DynamicHold:
         self._yield_to_rivals(
             connection=connection, location=location, names=tuple(self._paused), window=window
         )
+        claimed: frozenset[_RelationKey] = self._await_claims(
+            connection=connection, location=location, names=tuple(self._paused)
+        )
         states.update(
             {
                 name: self._state(connection=connection, name=name)
                 for name in self._paused
-                if _key(self._held[name]) in taken_keys
+                if _key(self._held[name]) in taken_keys | claimed
             }
         )
         self._suspend_active(connection=connection, names=tuple(self._paused), states=states)
@@ -294,6 +305,34 @@ class DynamicHold:
             raise _held_elsewhere(holds=tuple(rivals), close_failure=error) from error
         raise _held_elsewhere(holds=tuple(rivals))
 
+    def _await_claims(
+        self, *, connection: Any, location: StateLocation, names: tuple[str, ...]
+    ) -> frozenset[_RelationKey]:
+        """Wait while a sync's claim on these models is open and young; return those claimed."""
+
+        mine: set[_RelationKey] = {_key(self._held[name]) for name in names}
+        if not mine:
+            return frozenset()
+        limit_seconds: float
+        poll_seconds: float
+        limit_seconds, poll_seconds = self._claim_wait
+        deadline: float = time.monotonic() + limit_seconds
+        claimed: set[_RelationKey] = set()
+        while True:
+            claims: tuple[OpenClaim, ...] = tuple(
+                claim
+                for claim in read_open_claims(
+                    adapter=self._adapter, connection=connection, location=location
+                )
+                if _key(claim.relation) in mine and claim.age_seconds < limit_seconds
+            )
+            for name in sorted({claim.relation.name for claim in claims} - {k[2] for k in claimed}):
+                self._progress(f"Waiting for a location sync resuming dynamic model {name}")
+            claimed.update(_key(claim.relation) for claim in claims)
+            if not claims or time.monotonic() >= deadline:
+                return frozenset(claimed)
+            time.sleep(poll_seconds)
+
     def _resume_unheld(
         self, *, connection: Any, holds: tuple[OpenHold, ...] | None
     ) -> list[Exception]:
@@ -417,6 +456,10 @@ class DynamicHold:
     def _report_heartbeat_failure(self, *, failure: Exception | None) -> None:
         if failure is not None:
             self._warn(f"a dynamic pause heartbeat failed: {failure}")
+
+    def _progress(self, message: str) -> None:
+        if self._on_progress is not None:
+            self._on_progress(message)
 
     def _warn(self, message: str) -> None:
         if self._on_progress is not None:

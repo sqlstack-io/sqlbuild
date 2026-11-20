@@ -67,9 +67,10 @@ whether it succeeds or fails.
   example by `SIGKILL`, can't resume them itself.
 - **The location's sync resumes them.** Once the stopped build has been silent for
   `[dynamic] heartbeat_grace`, 30 minutes by default, the next completed sync of a served location
-  resumes its models and closes its hold, and the location's log says which. It leaves alone the
-  models another build held live when it read the holds, and models suspended outside SQLBuild.
-  A model it fails to resume, for example for a missing privilege, keeps its hold and is retried
+  resumes its models and closes its hold, and the location's log says which. A sync never leaves
+  a model running while another build holds it, and it leaves models suspended outside SQLBuild
+  alone. A build that takes a model over while a sync is resuming it waits for the sync, at most
+  2 minutes, then pauses the model again if the sync resumed it. A model it fails to resume, for example for a missing privilege, keeps its hold and is retried
   on the next sync. See
   [Dynamic](/docs/concepts/project-configuration#dynamic) and
   [location syncs](/docs/cli/server#sync-from-the-warehouse-now).
@@ -81,8 +82,5 @@ whether it succeeds or fails.
 
 ## Limitations
 
-- A build that takes over an expired hold while a sync is resuming that same hold can find the
-  model resumed after the build has paused it. The model then refreshes during that build. A build
-  started after the sync finishes is not affected.
 - Unit tests and scenarios treat a dynamic model as a table.
 - On a target with `schema = "preserve"`, builds see each other's pauses only when their dynamic models share a schema.

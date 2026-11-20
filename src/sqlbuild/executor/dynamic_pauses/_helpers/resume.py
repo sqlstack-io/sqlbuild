@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import uuid
 from typing import Any
 
 from sqlbuild._native import DYNAMIC_PAUSES_TABLE_NAME, CompiledRelationLocation
@@ -9,7 +11,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.types import DynamicListing, DynamicOperation
 from sqlbuild.adapter.relations.types import RelationChangeTokenReader
 from sqlbuild.executor.dynamic_pauses._helpers.sql import insert_sql, read_open_holds
-from sqlbuild.executor.dynamic_pauses.constants import SUSPENDED_STATE
+from sqlbuild.executor.dynamic_pauses.constants import CLAIM_RUN_MARKER, SUSPENDED_STATE
 from sqlbuild.executor.dynamic_pauses.models import (
     DynamicPauseEvent,
     HoldsResumed,
@@ -168,18 +170,114 @@ def resume_expired(
         if hold.idle_seconds >= grace_seconds
         and (hold.relation.database, hold.relation.schema, hold.relation.name) not in live
     )
-    outcome: HoldsResumed = resume_holds(
+    outcome: HoldsResumed = claim_and_resume(
         adapter=adapter,
         connection=connection,
         location=location,
         holds=expired,
-        recorded_by=recorded_by,
+        holds_after=holds_after,
     )
     return ResumeOutcome(
         resumed=outcome.resumed,
         failures=tuple(f"{_dotted(hold.relation)}: {error}" for hold, error in outcome.failures),
         quiet_token=None if holds else token,
     )
+
+
+def claim_and_resume(
+    *,
+    adapter: BaseAdapter,
+    connection: Any,
+    location: StateLocation,
+    holds: tuple[OpenHold, ...],
+    holds_after: tuple[float, str],
+) -> HoldsResumed:
+    """Claim the expired holds' models, then resume only those no run holds live after the claim."""
+
+    grace_seconds: float
+    recorded_by: str
+    grace_seconds, recorded_by = holds_after
+    if not holds:
+        return HoldsResumed(resumed=(), failures=())
+    claim_run: str = f"{recorded_by}{CLAIM_RUN_MARKER}{uuid.uuid4().hex}"
+    claimed: tuple[CompiledRelationLocation, ...] = tuple(
+        {_relation_key(hold.relation): hold.relation for hold in holds}.values()
+    )
+    claims: tuple[DynamicPauseEvent, ...] = tuple(
+        DynamicPauseEvent(
+            event_type=DynamicPauseEventType.RESUMING,
+            run_id=claim_run,
+            recorded_by=recorded_by,
+            relation=relation,
+        )
+        for relation in claimed
+    )
+    _append(adapter=adapter, connection=connection, location=location, events=claims)
+    closes: tuple[DynamicPauseEvent, ...] = tuple(
+        DynamicPauseEvent(
+            event_type=DynamicPauseEventType.RESUMED,
+            run_id=claim_run,
+            recorded_by=recorded_by,
+            relation=relation,
+        )
+        for relation in claimed
+    )
+    try:
+        live: frozenset[tuple[str | None, str | None, str]] = frozenset(
+            _relation_key(hold.relation)
+            for hold in read_open_holds(adapter=adapter, connection=connection, location=location)
+            if hold.idle_seconds < grace_seconds
+        )
+    except Exception:
+        with contextlib.suppress(Exception):
+            _append(adapter=adapter, connection=connection, location=location, events=closes)
+        raise
+    resumed: list[OpenHold] = []
+    failures: list[tuple[OpenHold, Exception]] = []
+    for hold in holds:
+        if _relation_key(hold.relation) in live:
+            continue
+        try:
+            _resume_suspended(adapter=adapter, connection=connection, relation=hold.relation)
+        except Exception as error:
+            failures.append((hold, error))
+            continue
+        resumed.append(hold)
+    _append(
+        adapter=adapter,
+        connection=connection,
+        location=location,
+        events=(
+            *(
+                DynamicPauseEvent(
+                    event_type=DynamicPauseEventType.RESUMED,
+                    run_id=hold.run_id,
+                    recorded_by=recorded_by,
+                    relation=hold.relation,
+                )
+                for hold in resumed
+            ),
+            *closes,
+        ),
+    )
+    return HoldsResumed(resumed=tuple(resumed), failures=tuple(failures))
+
+
+def _append(
+    *,
+    adapter: BaseAdapter,
+    connection: Any,
+    location: StateLocation,
+    events: tuple[DynamicPauseEvent, ...],
+) -> None:
+    adapter.execute(
+        connection=connection,
+        sql=insert_sql(adapter=adapter, location=location, events=events),
+    )
+
+
+def _relation_key(relation: CompiledRelationLocation) -> tuple[str | None, str | None, str]:
+    return (relation.database, relation.schema, relation.name)
 
 
 def _dotted(relation: CompiledRelationLocation) -> str:
