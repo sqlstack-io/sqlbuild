@@ -12,16 +12,19 @@ use crate::credentials::tests::role_helpers::{credentials, role_fixture};
 use crate::declarations::main::read_person_job::read_person_job;
 use crate::declarations::models::ServerPoolCaps;
 use crate::runs::main::{
-    execution::advance_groups::advance_groups, requests::request_job_run::request_job_run,
+    execution::advance_groups::advance_groups, execution::claim_next_run::claim_next_run,
+    requests::request_job_run::request_job_run,
 };
+use crate::runs::models::{NodeOutcome, RunOutcome};
 use crate::runs::tests::helpers::{json_column, rows, snapshot};
 use crate::scheduler::models::SchedulerState;
 use crate::scheduler::tests::contracts::helpers::{
-    acquire_lease, manual_run, operator, outcome, scheduler_cycle, store_old_documents,
+    acquire_lease, manual_run, operator, outcome, report_run, scheduler_cycle, store_old_documents,
     store_old_job_definitions, upgrade_snapshot,
 };
 use crate::scheduler::tests::contracts::test_types::{
-    GroupScheduleOldDocumentTestCase, MigratedConcurrencySourceTestCase, PinnedOldDocumentTestCase,
+    FailedJobRunOldDocumentTestCase, GroupScheduleOldDocumentTestCase,
+    MigratedConcurrencySourceTestCase, PinnedOldDocumentTestCase,
 };
 use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
 use crate::sensors::tests::helpers::append_events;
@@ -247,6 +250,76 @@ fn given_a_group_schedule_published_before_0004_when_the_scheduler_cycles_then_i
                     test_case.expected_ticks_after_republish
                 ),
                 "{}: the cycle fails Invalid until the location publishes again, then ticks",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+// A job run that fails reads its snapshot's documents to decide on a retry before it checks for a
+// retry policy, so until the location publishes again its failure report is refused and the run
+// stays running until it is found unresponsive. Tracked separately with the other reads, and that
+// change replaces this expectation.
+#[test]
+fn given_a_job_published_before_0004_when_its_run_fails_before_a_republish_then_the_failure_is_refused()
+ {
+    let test_cases = [FailedJobRunOldDocumentTestCase {
+        description: "SQLite store",
+        backend: Backend::Sqlite,
+        stored_source: "project",
+        expected_reports: ["ok", "ok", OLD_FORM],
+        expected_status: "running",
+    }];
+    for test_case in test_cases {
+        run(async {
+            let fixture = open_test_store(test_case.backend)
+                .await
+                .expect("required backend");
+            let store = &fixture.store;
+            migrate_with(store, &MIGRATIONS[..2])
+                .await
+                .expect("a store at version 3");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            publish_snapshot(store, &upgrade_snapshot(location, json!({})))
+                .await
+                .expect("publish");
+            store_old_job_definitions(store, test_case.stored_source).await;
+            store_old_documents(store, test_case.stored_source).await;
+            migrate_store(store).await.expect("migrate to version 4");
+            request_job_run(store, (&operator(), None), &manual_run(location, "orders"))
+                .await
+                .expect("a manual run of the migrated job");
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let claim = claim_next_run(
+                store,
+                &lease,
+                &BTreeMap::new(),
+                Some((location, "development")),
+            )
+            .await
+            .expect("claim")
+            .expect("the queued run");
+
+            let reports =
+                report_run(store, &claim, (NodeOutcome::Failed, RunOutcome::Failed)).await;
+            let status = rows(store, "SELECT status FROM sqb_runs", vec![]).await;
+
+            assert_eq!(
+                (
+                    reports,
+                    status[0]["status"].as_str().unwrap_or_default().to_owned()
+                ),
+                (
+                    test_case.expected_reports.map(str::to_owned).to_vec(),
+                    test_case.expected_status.to_owned()
+                ),
+                "{}: the failure report is refused and the run stays running",
                 test_case.description
             );
             close_test_store(fixture).await;

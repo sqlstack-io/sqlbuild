@@ -531,7 +531,7 @@
 	.picked li {
 		padding: 2px 0;
 	}
-	/* The Concurrency panel: one plain fact per line, where it came from quieter beside it. */
+	/* The Concurrency panel: one plain fact per line, any detail quieter beside it. */
 	.concurrency {
 		display: flex;
 		flex-direction: column;

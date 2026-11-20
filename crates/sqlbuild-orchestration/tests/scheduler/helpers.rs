@@ -227,3 +227,56 @@ pub(crate) fn upgrade_snapshot(
     input.documents.insert("triggers".into(), triggers);
     input
 }
+
+/// Report a claimed run as its worker does: started, each node with `node`, then finished with `run`; each report's outcome.
+pub(crate) async fn report_run(
+    store: &ControlStore,
+    claim: &crate::runs::models::RunClaim,
+    (node, run): (
+        crate::runs::models::NodeOutcome,
+        crate::runs::models::RunOutcome,
+    ),
+) -> Vec<String> {
+    use crate::runs::main::execution::change_run::change_run;
+    use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest};
+
+    let mut changes = vec![RunChange::Started];
+    changes.extend(
+        claim
+            .request
+            .selection
+            .iter()
+            .map(|node_key| RunChange::NodeFinished {
+                node_key: node_key.clone(),
+                outcome: node,
+                rows_affected: Some(1),
+                error_code: None,
+                skipped_because_of: None,
+                error_message: None,
+            }),
+    );
+    changes.push(RunChange::Finished {
+        outcome: run,
+        reason: "the worker finished".into(),
+        exit_code: Some(1),
+    });
+    let mut outcomes = Vec::new();
+    for change in changes {
+        let reported = change_run(
+            store,
+            RunAuthority::Worker {
+                run_id: claim.request.run_id,
+                claim_id: claim.claim_id,
+            },
+            &RunChangeRequest {
+                event_id: Uuid::now_v7(),
+                run_id: claim.request.run_id,
+                claim_id: Some(claim.claim_id),
+                change,
+            },
+        )
+        .await;
+        outcomes.push(outcome(reported));
+    }
+    outcomes
+}

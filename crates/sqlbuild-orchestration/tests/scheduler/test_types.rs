@@ -45,3 +45,14 @@ pub(crate) struct PinnedOldDocumentTestCase {
     /// The `ControlError::Invalid` message advancing the group returns.
     pub(crate) expected_error: &'static str,
 }
+
+pub(crate) struct FailedJobRunOldDocumentTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The concurrency source an older release stored with each job.
+    pub(crate) stored_source: &'static str,
+    /// The outcome of each worker report: started, the node finished, the run failed.
+    pub(crate) expected_reports: [&'static str; 3],
+    /// The run's status afterwards.
+    pub(crate) expected_status: &'static str,
+}
