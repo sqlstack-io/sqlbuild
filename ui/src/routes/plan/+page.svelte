@@ -690,7 +690,10 @@
 	.tabs:first-child {
 		margin-left: 0;
 	}
+	/* One grid row that fills the box, so the graph's height: 100% has a definite height to fill; in a plain block it collapsed to its toolbar. */
 	.graph {
+		display: grid;
+		grid-template-rows: minmax(0, 1fr);
 		min-height: 320px;
 		flex: 1;
 		border: 1px solid var(--border);
