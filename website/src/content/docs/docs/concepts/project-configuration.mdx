@@ -166,6 +166,7 @@ A target is a named build context - the database and schema you build into, plus
 | `plan_from` | Where `sqb plan` and `sqb build` read warehouse state: `live` (default) or `synced_state`; see [Planning from synced state](#planning-from-synced-state) |
 | `pause_dynamic` | `true` keeps this target's [dynamic models](/docs/concepts/models/dynamic) suspended between builds; each build refreshes the ones it selects. Default `false` |
 | `env_file` | File of provider settings and secrets for this target, replacing the project's `env_file`; see [Env file](#env-file) |
+| `allow_missing_secrets` | Providers whose missing secrets are expected on this target; see [Allowed missing secrets](#allowed-missing-secrets) |
 
 ```toml
 [connections.warehouse]
@@ -433,6 +434,24 @@ Details:
 - `sqb init` and `sqb playground` add `.env` to `.gitignore`.
 - `sqlbuild_local.toml` can't set `env_file`.
 
+### Allowed missing secrets
+
+A target can expect some providers' secrets to be missing, such as a dev target that never has the
+production export keys:
+
+```toml
+[targets.dev]
+schema = "dev"
+allow_missing_secrets = ["export_bucket"]
+```
+
+On that target, static commands such as `compile` don't fail on those providers' missing secrets,
+and a location shows them as a note instead of a health problem. Builds and runs still stop the nodes
+that use them, before the warehouse. The list holds provider names; `sqlbuild_local.toml` can't set
+it. To allow any provider on one machine, use the local
+[`allow_missing_secrets`](#settings) setting or `--allow-missing-secrets` instead; see
+[Secrets](/docs/concepts/python-nodes/providers#allowing-missing-secrets).
+
 ## Defaults
 
 Project-wide defaults for models, seeds, and functions:
@@ -588,7 +607,7 @@ delta_compile = true
 | `test_timeout` | `30s` | Time limit for each SQL unit test, or `"disabled"` |
 | `scenario_timeout` | none | Time limit for each scenario, or `"disabled"` |
 | `delta_compile` | `true` | After an edit to model SQL or SQL test files only, compile just the changed files against the previous compile. See [Compiling after an edit](/docs/cli/compile#compiling-after-an-edit). |
-| `allow_missing_secrets` | `false` | Let `compile`, `rules run`, `format`, `dag`, `lineage` and `scope` run without provider secrets. `sqlbuild_local.toml` only. See [Secrets](/docs/concepts/python-nodes/providers#secrets). |
+| `allow_missing_secrets` | `false` | Let `compile`, `rules run`, `format`, `dag`, `lineage` and `scope` run without any provider's secrets on this machine. `sqlbuild_local.toml` only; a target lists the providers it expects to miss in [`[targets.<name>] allow_missing_secrets`](#allowed-missing-secrets). See [Secrets](/docs/concepts/python-nodes/providers#allowing-missing-secrets). |
 | `allow_warehouse_round_trips` | `false` | Allow a loader to depend on a task or asset that reads SQL, so data can leave the warehouse and come back through a source. Project file only. See [The SQL boundary](/docs/concepts/python-nodes/overview#warehouse-round-trips). |
 | `ignore_audit_failures` | `false` | Let builds go on past failing audits: they still run and record `fail`, but promote, apply and build downstream as if they passed. A target, a job and `--ignore-audit-failures` / `--no-ignore-audit-failures` override it. See [Ignoring audit failures](/docs/concepts/audits#ignoring-audit-failures). |
 | `record_run_host` | `true` | Record the machine name in each run's rows in `_sqlbuild_runs`. See [Run records](/docs/cli/build#run-records). |
