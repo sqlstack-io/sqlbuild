@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from sqlbuild._native import PlanOutput
+from sqlbuild._native import CompiledRelationLocation, PlanOutput
 from sqlbuild.adapter.contract.types import (
     DynamicListing,
     DynamicOperation,
@@ -19,7 +20,9 @@ from sqlbuild.executor.build.models import (
     BuildExecutionResult,
     BuildRuntimeParams,
 )
+from sqlbuild.executor.dynamic_pauses._helpers.sql import insert_sql, setup_statements
 from sqlbuild.executor.dynamic_pauses.models import DynamicPauseEvent
+from sqlbuild.executor.dynamic_pauses.types import DynamicPauseEventType, StateLocation
 from tests.integration.src.sqlbuild.compiler.planner.main._test_types import (
     BuildExecutionPlanTestCase,
 )
@@ -81,6 +84,59 @@ class PausingDuckDbAdapter(DuckDbAdapter):
         self.states[name] = _STATES.get(operation, self.states[name])
         self.operations.append((operation.value, name))
         return ("SELECT 1",)
+
+
+class SyncDuringTakeoverAdapter(PausingDuckDbAdapter):
+    """Resumes models as a location sync would, right after `takeover_run` records its pause."""
+
+    def __init__(self, *, takeover_run: str, resumed: dict[str, str]) -> None:
+        super().__init__()
+        self._takeover_run: str = takeover_run
+        self._resumed: dict[str, str] = resumed
+
+    def execute(self, *, connection: Any, sql: str) -> Any:
+        cursor: Any = super().execute(connection=connection, sql=sql)
+        recorded_takeover: bool = "'paused'" in sql and f"'{self._takeover_run}'" in sql
+        self.states.update({True: self._resumed, False: {}}[recorded_takeover])
+        return cursor
+
+
+class RefusingResumeAdapter(PausingDuckDbAdapter):
+    """Refuses to resume the models in `refused`, as a warehouse refusing the ALTER would."""
+
+    def __init__(self, *, refused: frozenset[str]) -> None:
+        super().__init__()
+        self._refused: frozenset[str] = refused
+
+    def render_dynamic_operation(
+        self, *, destination: str, operation: DynamicOperation
+    ) -> tuple[str, ...]:
+        name: str = destination.rsplit(".", 1)[-1]
+        refusing: bool = operation == DynamicOperation.RESUME and name in self._refused
+        {True: _refuse_resume, False: _allow_operation}[refusing](name)
+        return super().render_dynamic_operation(destination=destination, operation=operation)
+
+
+def _refuse_resume(name: str) -> None:
+    raise RuntimeError(f"insufficient privileges to resume {name}")
+
+
+def _allow_operation(name: str) -> None:
+    del name
+
+
+class TokenPausingDuckDbAdapter(PausingDuckDbAdapter):
+    """Also reads a table's change token, as Snowflake does without a running warehouse."""
+
+    def read_relation_change_token(
+        self, *, connection: Any, database: str | None, schema: str, name: str
+    ) -> str | None:
+        del database
+        row: tuple[Any, ...] = connection.execute(
+            f"SELECT COUNT(*) || '/' || COALESCE(CAST(MAX(recorded_at) AS VARCHAR), '') "
+            f"FROM {schema}.{name}"
+        ).fetchone()
+        return str(row[0])
 
 
 def lease_project_case(
@@ -157,6 +213,17 @@ def build_lease_project(
     )
 
 
+def heartbeat_count(*, connection: Any, run_id: str) -> int:
+    """How many heartbeats the run `run_id` has recorded in the staging pause table."""
+
+    rows: list[tuple[Any, ...]] = connection.execute(
+        "SELECT count(*) FROM staging._sqlbuild_dynamic_pauses "
+        "WHERE event_type = 'heartbeat' AND run_id = ?",
+        [run_id],
+    ).fetchall()
+    return int(rows[0][0])
+
+
 def pause_events(*, connection: Any) -> list[tuple[str, str, str, str]]:
     """Each recorded pause event's type, holding run, recording run and model, sorted."""
 
@@ -166,6 +233,16 @@ def pause_events(*, connection: Any) -> list[tuple[str, str, str, str]]:
         "ORDER BY 1, 2, 3, 4"
     ).fetchall()
     return [(str(row[0]), str(row[1]), str(row[2]), str(row[3])) for row in rows]
+
+
+def recorded_events(*, connection: Any) -> list[tuple[str, str, str, str]]:
+    """The recorded pause events, or none when no build created the pause table."""
+
+    read: Callable[..., list[tuple[str, str, str, str]]] = {
+        True: pause_events,
+        False: lambda **_: [],
+    }[bool(pause_table_names(connection=connection))]
+    return read(connection=connection)
 
 
 def pause_table_names(*, connection: Any) -> list[tuple[Any, ...]]:
@@ -182,3 +259,45 @@ def refuse_insert(*, connection: Any, events: tuple[DynamicPauseEvent, ...]) -> 
 
     del connection, events
     raise RuntimeError("pause table is read-only")
+
+
+def seed_hold(
+    *, adapter: PausingDuckDbAdapter, connection: Any, run_id: str, name: str, idle_seconds: int
+) -> None:
+    """A run's pause of `name`, with its last write `idle_seconds` ago, and the model suspended."""
+
+    location: StateLocation = (None, "staging")
+    for statement in setup_statements(adapter=adapter, location=location):
+        connection.execute(statement)
+    relation: CompiledRelationLocation = CompiledRelationLocation(
+        database=None, schema="staging", name=name, qualified_name=None
+    )
+    connection.execute(
+        insert_sql(
+            adapter=adapter,
+            location=location,
+            events=(
+                DynamicPauseEvent(
+                    event_type=DynamicPauseEventType.PAUSED,
+                    run_id=run_id,
+                    recorded_by=run_id,
+                    relation=relation,
+                ),
+            ),
+        )
+    )
+    connection.execute(
+        "UPDATE staging._sqlbuild_dynamic_pauses "
+        f"SET recorded_at = recorded_at - INTERVAL {idle_seconds} SECOND WHERE run_id = '{run_id}'"
+    )
+    adapter.states[name] = "SUSPENDED"
+
+
+def pause_event_ids(*, connection: Any) -> list[tuple[str, str, str]]:
+    """Each resume's event ID, holding run and recording run, sorted."""
+
+    rows: list[tuple[Any, ...]] = connection.execute(
+        "SELECT event_id, run_id, recorded_by FROM staging._sqlbuild_dynamic_pauses "
+        "WHERE event_type = 'resumed' ORDER BY 1, 2, 3"
+    ).fetchall()
+    return [(str(row[0]), str(row[1]), str(row[2])) for row in rows]

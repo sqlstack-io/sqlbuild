@@ -31,6 +31,7 @@ use crate::native_commands::_helpers::command::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
 use crate::native_commands::_helpers::command::terminal::{live_screen, stderr_columns};
+use crate::native_commands::_helpers::location::dynamic_resume::resume_expired_holds;
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_timeout_seconds, rows_text, scan_line,
 };
@@ -512,6 +513,7 @@ pub(crate) fn metadata_sync(
         state_history_versions: None,
         progress: SyncProgress::new(),
         reads_wake_compute: false,
+        dynamic_quiet_tokens: std::collections::BTreeMap::new(),
     }
 }
 
@@ -1438,14 +1440,20 @@ pub(crate) async fn read_metadata_page(
     Ok(Some((state, read)))
 }
 
-/// A completed synchronization closes its reader, so no warehouse session outlives the sync.
+/// A completed synchronization resumes expired dynamic holds, then closes its reader, so no warehouse session outlives the sync.
 pub(crate) async fn finish_metadata_page(
     state: LocationMetadataSync,
+    stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
-    if state.idle {
-        return Ok(Some(close_metadata_reader(state).await?));
+    if !state.idle {
+        return Ok(Some(state));
     }
-    Ok(Some(state))
+    tokio::pin!(stopped);
+    let state: LocationMetadataSync = tokio::select! {
+        result = &mut stopped => { result?; return Ok(None); },
+        state = resume_expired_holds(state) => state,
+    };
+    Ok(Some(close_metadata_reader(state).await?))
 }
 
 /// End of input lets the reader close its warehouse session; one that ignores it is killed.
@@ -1636,13 +1644,16 @@ pub(crate) async fn settle_publication(
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Settled>, ControlError> {
     let (mut metadata, deferred) = if connect {
-        let sync: LocationMetadataSync = metadata_sync(
+        let mut sync: LocationMetadataSync = metadata_sync(
             (locations, generation),
             (
                 options.metadata_reconcile_seconds,
                 options.safety_sync_seconds,
             ),
         );
+        sync.dynamic_quiet_tokens = metadata
+            .map(|previous| previous.dynamic_quiet_tokens)
+            .unwrap_or_default();
         (Some(sync), None)
     } else {
         (metadata, Some((locations, generation)))

@@ -106,3 +106,54 @@ class TakenOverPauseTestCase:
     expected_rival: str
     expected_states: dict[str, str]
     expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class SyncResumeTestCase:
+    description: str
+    holds: tuple[tuple[str, str, int], ...]
+    hand_suspended: tuple[str, ...]
+    pause_table: bool
+    expected_resumed: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]
+    expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class DoubleCloseTestCase:
+    description: str
+    closers: tuple[str, ...]
+    expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class SyncDuringTakeoverTestCase:
+    description: str
+    expected_operations: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]
+
+
+@dataclass(frozen=True)
+class StaleSyncResumeTestCase:
+    description: str
+    expected_states: dict[str, str]
+
+
+@dataclass(frozen=True)
+class RefusedResumeTestCase:
+    description: str
+    refused: frozenset[str]
+    expected_resumed: tuple[tuple[str, str], ...]
+    expected_failures: tuple[str, ...]
+    expected_states: dict[str, str]
+    expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class QuietTokenTestCase:
+    description: str
+    holds: tuple[tuple[str, str, int], ...]
+    tokens: bool
+    quiet: bool
+    expected_resumed: tuple[tuple[str, str], ...]
+    expected_quiet: bool

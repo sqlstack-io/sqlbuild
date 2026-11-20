@@ -584,6 +584,13 @@ class ChangedBuildPublicationTestCase:
 
 
 @dataclass(frozen=True)
+class NoDynamicAdapterSyncTestCase:
+    description: str
+    fixture: str
+    expected_open_holds: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ChangedBuildReplanTestCase:
     description: str
     edit: tuple[str, str]

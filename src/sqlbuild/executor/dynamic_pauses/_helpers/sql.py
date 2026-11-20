@@ -115,6 +115,22 @@ def open_holds(*, rows: tuple[tuple[Any, ...], ...]) -> tuple[OpenHold, ...]:
     )
 
 
+def read_open_holds(
+    *, adapter: BaseAdapter, connection: Any, location: StateLocation
+) -> tuple[OpenHold, ...]:
+    """The pause table's open holds as the warehouse sees them now."""
+
+    return open_holds(
+        rows=tuple(
+            adapter.query(
+                connection=connection,
+                sql=open_holds_sql(adapter=adapter, location=location),
+                limit=None,
+            ).rows
+        )
+    )
+
+
 def _seconds_between(*, start: datetime, end: datetime) -> float:
     return (end.replace(tzinfo=None) - start.replace(tzinfo=None)).total_seconds()
 

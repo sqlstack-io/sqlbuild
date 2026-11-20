@@ -28,3 +28,20 @@ class OpenHold:
     relation: CompiledRelationLocation
     idle_seconds: float
     paused_at: datetime
+
+
+@dataclass(frozen=True)
+class HoldsResumed:
+    """The holds whose models resumed and were closed, and each hold that failed with its error."""
+
+    resumed: tuple[OpenHold, ...]
+    failures: tuple[tuple[OpenHold, Exception], ...]
+
+
+@dataclass(frozen=True)
+class ResumeOutcome:
+    """A pass's resumed holds and failures, and the pause table's token when it left none open."""
+
+    resumed: tuple[OpenHold, ...]
+    failures: tuple[str, ...]
+    quiet_token: str | None
