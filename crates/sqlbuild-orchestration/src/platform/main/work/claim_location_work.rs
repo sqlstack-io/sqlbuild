@@ -48,10 +48,9 @@ pub async fn claim_location_work(
     let stored = stored.ok_or_else(|| ControlError::Invalid("location work disappeared".into()))?;
     let lease = match &stored.record.request_json.work {
         LocationWork::Plan { .. } => PLAN_LEASE_SECONDS,
-        LocationWork::EvaluateSensor { evaluation } => (2 * i64::from(
-            evaluation.definition.timeout_seconds.get(),
-        ))
-        .max(WORK_LEASE_SECONDS),
+        LocationWork::EvaluateSensor { evaluation } => {
+            (2 * i64::from(evaluation.definition.timeout_seconds.get())).max(WORK_LEASE_SECONDS)
+        }
         _ => WORK_LEASE_SECONDS,
     };
     let retained = stored.session_id == Some(poll.session_id)

@@ -46,47 +46,15 @@ use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 use sqlbuild_python_output::recall::models::InvocationRecall;
 use sqlbuild_python_project::compiled_project::constants::SQL_TEST_KEY_PREFIX;
 use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
-use sqlbuild_python_project::job_settings::constants::SQL_TEST_NODE_KIND;
 use sqlbuild_python_project::job_settings::main::frozen_run_flags::frozen_run_flags;
 use sqlbuild_python_project::job_settings::main::frozen_selectors::frozen_selectors;
 use sqlbuild_python_project::job_settings::main::with_frozen_job::with_frozen_job;
 use sqlbuild_python_project::job_settings::models::FrozenRunFlags;
+use sqlbuild_python_project::project_snapshot::main::attached_nodes::attached_nodes;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationWorker;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 use sqlbuild_python_project::project_snapshot::types::NodeKeys;
-
-/// Each audit and SQL test the snapshot publishes, with the node keys it checks.
-fn attached_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Vec<String>> {
-    let mut attached: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for (key, node) in &snapshot.input.nodes {
-        let definition: &Value = &node.definition;
-        let nodes: Vec<String> = match node.kind.as_str() {
-            "audit" => definition
-                .get("target")
-                .and_then(|target| {
-                    Some(format!(
-                        "{}:{}",
-                        target.get("kind")?.as_str()?,
-                        target.get("name")?.as_str()?
-                    ))
-                })
-                .into_iter()
-                .collect(),
-            SQL_TEST_NODE_KIND => definition
-                .pointer("/test/payload/expected_model_names")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str)
-                .map(|name| format!("model:{name}"))
-                .collect(),
-            _ => continue,
-        };
-        attached.insert(key.clone(), nodes);
-    }
-    attached
-}
 
 /// Each compiled SQL test with the nodes a failure of it blocks in a build: its expected, assertion and reference models, as the scheduler's `scope_deps` names them, and the functions a direct test checks, keyed `udf:` or `table_fn:` like the snapshot.
 pub(super) fn blocked_nodes(project: &Bound<'_, PyAny>) -> PyResult<NodeKeys> {
@@ -319,7 +287,11 @@ pub(super) fn execute_worker<'py>(
     )?;
     let worker = WorkerBuild::new(
         &owner,
-        (attached_nodes(snapshot), blocked, upstream_nodes(snapshot)),
+        (
+            attached_nodes(&snapshot.input.nodes),
+            blocked,
+            upstream_nodes(snapshot),
+        ),
     )?;
     if let Some(recall) = recall {
         *recall

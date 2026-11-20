@@ -202,7 +202,7 @@ pub(crate) async fn run_development_roles(
                 target: target.clone(),
             },
         ),
-        (store.clone(), location_id, url),
+        (store.clone(), location_id, url.clone()),
         shutdown.clone(),
     ));
     drop(messages.send(ScreenMessage::Started {
@@ -211,10 +211,11 @@ pub(crate) async fn run_development_roles(
     }));
     if scheduler {
         let scheduler_store = store.clone();
+        let origin = Some(url.clone());
         tasks.spawn(async move {
             run_scheduler(
                 &scheduler_store,
-                SchedulerState::new(Uuid::now_v7()),
+                SchedulerState::new(Uuid::now_v7()).with_origin(origin),
                 shutdown,
                 workers,
             )

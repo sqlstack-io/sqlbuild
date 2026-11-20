@@ -4,6 +4,7 @@ pub(crate) mod held_copy;
 pub(crate) mod plan_document;
 pub(crate) mod plan_request;
 pub(crate) mod plan_reuse;
+pub(crate) mod sensor_function;
 pub(crate) mod sync_outcomes;
 pub(crate) mod sync_report;
 pub(crate) mod work;

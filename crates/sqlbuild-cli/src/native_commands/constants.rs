@@ -231,3 +231,10 @@ pub(crate) const PLAN_NOT_PRODUCED: &str =
 
 /// Return to the start of the line and erase it: a child's spinner may be drawn there.
 pub(crate) const CLEAR_TERMINAL_LINE: &str = "\r\u{1b}[K";
+
+/// The command `sqb sensor` answers.
+pub(crate) const SENSOR_COMMAND: &str = "sensor";
+/// Exit status of a misused command, as for other usage errors.
+pub(crate) const SENSOR_USAGE_EXIT: i32 = 2;
+/// Exit status when the function failed, timed out, or there was nothing to call it with.
+pub(crate) const SENSOR_FAILED_EXIT: i32 = 1;

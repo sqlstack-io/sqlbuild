@@ -15,3 +15,5 @@ pub(crate) const RECENT_EVENT_PAGES: usize = 10;
 pub(crate) const FAILING_TICKS_READ: usize = 200;
 /// Events `sqb sensor try` lists at most.
 pub(crate) const MAX_TRIAL_EVENTS: usize = 100;
+/// The runtime request key of `sqb sensor try`: `{"try_sensor": SensorTrial}`.
+pub const TRY_SENSOR_REQUEST: &str = "try_sensor";

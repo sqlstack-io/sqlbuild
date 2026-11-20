@@ -486,6 +486,16 @@ pub struct PersonSensorRunRequest {
     pub status: crate::runs::models::RunStatus,
 }
 
+/// One call `sqb sensor try` asks a location interpreter for: local code, no published hash, nothing recorded.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SensorTrial {
+    pub sensor: String,
+    pub target: String,
+    /// `None` calls a polling sensor once.
+    pub event: Option<SensorEvent>,
+}
+
 /// Which event `sqb sensor try` calls a sensor with, or `Recent` to list the ones it could.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "choice", rename_all = "snake_case", deny_unknown_fields)]

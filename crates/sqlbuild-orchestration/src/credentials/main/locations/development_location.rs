@@ -61,3 +61,30 @@ pub async fn development_location(
     commit(transaction).await?;
     Ok(id)
 }
+
+/// The location `sqb dev` keeps for a project and target, without creating one; `None` before its first start.
+pub async fn existing_development_location(
+    store: &ControlStore,
+    project_path: &str,
+    target: &str,
+) -> Result<Option<Uuid>, ControlError> {
+    let (transaction, rows) = query(
+        begin(store, TransactionMode::Read).await?,
+        "SELECT location_id FROM sqb_development_locations WHERE project_path=$1 AND target=$2",
+        vec![
+            Parameter::Text(project_path.into()),
+            Parameter::Text(target.into()),
+        ],
+    )
+    .await?;
+    commit(transaction).await?;
+    rows.first()
+        .map(|row| {
+            row["location_id"]
+                .as_str()
+                .unwrap_or_default()
+                .parse()
+                .map_err(|_| ControlError::Schema("invalid development location identity".into()))
+        })
+        .transpose()
+}

@@ -19,9 +19,9 @@ use crate::native_commands::_helpers::command::paths::location_files;
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::check_location_connection;
 use crate::native_commands::_helpers::location::plan_reuse::keep_plan;
+use crate::native_commands::_helpers::location::sensor_function::run_sensor_function;
 use crate::native_commands::_helpers::location::work::work_error;
 use crate::native_commands::main::_location_plan::plan_location;
-use crate::native_commands::main::_location_sensor::run_sensor_function;
 use crate::native_commands::models::{
     LocationRuntimeRequest, LocationServe, LocationWatch, LocationWorkTurn, PlanToKeep,
 };
@@ -180,24 +180,19 @@ async fn perform_work(
                     (LocationWorkOutcome::Connection { healthy }, files, None)
                 })
         }
-        LocationWork::EvaluateSensor { evaluation } => {
-            run_sensor_function(
-                (options, script),
-                (
-                    &*evaluation,
-                    evaluation.definition.timeout_seconds.get(),
-                ),
-                expires,
+        LocationWork::EvaluateSensor { evaluation } => run_sensor_function(
+            (options, script),
+            (&*evaluation, evaluation.definition.timeout_seconds.get()),
+            expires,
+        )
+        .await?
+        .map(|outcome| {
+            (
+                LocationWorkOutcome::SensorEvaluation { outcome },
+                Vec::new(),
+                None,
             )
-            .await?
-                .map(|outcome| {
-                    (
-                        LocationWorkOutcome::SensorEvaluation { outcome },
-                        Vec::new(),
-                        None,
-                    )
-                })
-        }
+        }),
         LocationWork::Plan {
             selection,
             settings,

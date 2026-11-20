@@ -4,10 +4,12 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
+use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::api::constants::ANY_ETAG;
 use crate::api::errors::ApiError;
+use crate::api::models::BrowserOrigin;
 use crate::api::models::{
     CostQuery, PlatformEventsQuery, ReadQuery, RunEventsQuery, RunNodePath, ServerFacts,
     StatementSqlQuery,
@@ -38,7 +40,8 @@ use crate::runs::models::{
 use crate::scheduler::main::list_person_ticks::list_person_ticks;
 use crate::scheduler::models::TickRecord;
 use crate::sensors::main::read_person_sensor::read_person_sensor;
-use crate::sensors::models::PersonSensorState;
+use crate::sensors::main::read_sensor_events::read_person_sensor_events;
+use crate::sensors::models::{PersonSensorState, SensorEventChoice, SensorTrialEvents};
 use crate::snapshots::main::reads::list_person_snapshots::list_person_snapshots;
 use crate::snapshots::models::PublishedSnapshot;
 use crate::store::errors::ControlError;
@@ -608,6 +611,64 @@ pub(crate) async fn sensor_state(
     .await?
     .map(Json)
     .ok_or_else(|| not_found("sensor not found"))
+}
+
+/// How `sqb sensor try` chooses events: at most one of `latest`, `event` and `run`, else the newest `limit`.
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SensorEventsQuery {
+    limit: Option<u32>,
+    latest: Option<bool>,
+    event: Option<String>,
+    run: Option<Uuid>,
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/sensors/{name}/events", operation_id = "readPersonSensorEvents",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("name" = String, Path), SensorEventsQuery),
+    responses((status = 200, body = SensorTrialEvents, description = "The published sensor and the chosen events, newest first; reading them changes nothing"),
+        (status = 400, body = crate::api::models::ApiErrorBody, description = "More than one of latest, event and run"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody),
+        (status = 409, body = crate::api::models::ApiErrorBody, description = "No such sensor, event or matching run, and why")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn sensor_events(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    (Extension(default_role), origin): (Extension<DefaultRole>, Option<Extension<BrowserOrigin>>),
+    (Path((location_id, target, name)), Query(options)): (
+        Path<(Uuid, String, String)>,
+        Query<SensorEventsQuery>,
+    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<SensorTrialEvents>, ApiError> {
+    let choice = match (options.latest.unwrap_or(false), options.event, options.run) {
+        (false, None, None) => SensorEventChoice::Recent {
+            limit: options.limit.unwrap_or(10),
+        },
+        (true, None, None) => SensorEventChoice::Latest,
+        (false, Some(event_id), None) => SensorEventChoice::Event { event_id },
+        (false, None, Some(run_id)) => SensorEventChoice::Run { run_id },
+        _ => {
+            return Err(ApiError {
+                status: StatusCode::BAD_REQUEST,
+                message: "choose at most one of latest, event and run".into(),
+                decision_id: None,
+            });
+        }
+    };
+    let origin = origin.map(|Extension(BrowserOrigin(origin))| origin);
+    read_person_sensor_events(
+        &store,
+        (&context, principal),
+        ((location_id, &target), (&name, &choice)),
+        (default_role, origin.as_deref()),
+    )
+    .await?
+    .map(Json)
+    .map_err(|message| ApiError {
+        status: StatusCode::CONFLICT,
+        message,
+        decision_id: None,
+    })
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/snapshots", operation_id = "listPersonSnapshots",

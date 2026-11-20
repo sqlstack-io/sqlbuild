@@ -12,6 +12,7 @@ class PlatformEventKind(StrEnum):
     CALENDAR_HORIZON_LOW = "calendar_horizon_low"
     LOCATION_BROKEN = "location_broken"
     LAUNCH_FAILED = "launch_failed"
+    RUN_FAILED = "run_failed"
 
 
 class RunEventKind(StrEnum):
@@ -32,3 +33,10 @@ class NodeEventKind(StrEnum):
     SUCCESS = "success"
     FAILED = "failed"
     RECOVERED = "recovered"
+
+
+class CheckEventKind(StrEnum):
+    """A check, audit or SQL test inside a run that failed or warned, whatever the run's outcome."""
+
+    FAILED = "failed"
+    WARN = "warn"

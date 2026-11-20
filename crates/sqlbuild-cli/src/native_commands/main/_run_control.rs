@@ -34,6 +34,7 @@ pub(crate) async fn run_control(
     let config = read_server_config(namespace)?;
     let address = control_address(namespace, standalone, &config.server)?;
     let (authentication, mut facts) = control_api_settings(namespace, standalone, &config)?;
+    let origin: Option<String> = authentication.login.origin().map(str::to_owned);
     let store = open_control_store(namespace, Some(&config.server)).await?;
     let (workers, handoff) = open_control_workers(
         (&store, namespace),
@@ -78,14 +79,15 @@ pub(crate) async fn run_control(
         )?;
     }
     if facts.scheduler {
-        start_scheduler(&mut tasks, store, shutdown, workers);
+        start_scheduler(&mut tasks, (store, origin), shutdown, workers);
     }
     supervise_control_roles(tasks, stop).await
 }
 
+/// Start the scheduler, whose sensor events link runs under `origin`.
 fn start_scheduler(
     tasks: &mut JoinSet<Result<(), ControlError>>,
-    store: ControlStore,
+    (store, origin): (ControlStore, Option<String>),
     shutdown: watch::Receiver<bool>,
     workers: Workers,
 ) {
@@ -93,7 +95,7 @@ fn start_scheduler(
     tasks.spawn(async move {
         run_scheduler(
             &store,
-            SchedulerState::new(Uuid::now_v7()),
+            SchedulerState::new(Uuid::now_v7()).with_origin(origin),
             shutdown,
             workers,
         )
