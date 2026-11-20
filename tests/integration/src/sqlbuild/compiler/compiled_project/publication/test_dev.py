@@ -26,6 +26,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     DevelopmentDiscoveryTestCase,
+    DevelopmentSecretReloadTestCase,
     DevelopmentTestCase,
     DevelopmentWarningTestCase,
     SnapshotApi,
@@ -34,6 +35,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalo
     record_finished_run,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    REGION_PROVIDER_FILES,
     current_snapshot,
     location_process,
     stop_location,
@@ -321,3 +323,103 @@ def test_given_plain_development_when_a_warehouse_read_fails_then_a_warning_line
         assert process.wait(timeout=15) == 0, log.read_text()
 
     assert test_case.hidden_line not in log.read_text()
+
+
+def request_development_run(
+    executable: str, project: Path, identity: str, environment: dict[str, str]
+) -> str:
+    """Request a run of `annual_orders_job` from the development store; its run ID."""
+    run_id: str = str(uuid4())
+    requested: subprocess.CompletedProcess[str] = subprocess.run(
+        [
+            executable,
+            "--project-dir",
+            str(project),
+            "admin",
+            "request-run",
+            identity,
+            "annual_orders_job",
+            "--target",
+            "development",
+            "--run-id",
+            run_id,
+            "--reason",
+            "Development secret reload",
+        ],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert requested.returncode == 0, requested.stderr
+    return run_id
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DevelopmentSecretReloadTestCase(
+            "a secret added to .env reaches the next worker run",
+            "UNRELATED_SETTING=1\n",
+            "WORKER_ENV_REGION_CODE=42\nWORKER_ENV_TOKEN=worker-token\n",
+            "failed",
+            ("source:raw_regions", "failed", "D012"),
+            "success",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_missing_secret_when_it_is_added_to_the_env_file_then_the_next_run_reads_it(
+    test_case: DevelopmentSecretReloadTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "development"\n'
+                '[connections.local]\ndatabase = "warehouse.duckdb"\n'
+                '[targets.development]\nschema = "main"\n'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Orders.', materialized table);\n"
+                'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")\n'
+            ),
+            ".env": test_case.first_env_file,
+        }
+        | REGION_PROVIDER_FILES
+        | duckshop_orchestration("upstream_loaded_orders"),
+    )
+    (project / ".env").chmod(0o600)
+    executable: str = str(Path(sys.executable).with_name("sqb"))
+    environment: dict[str, str] = dict(os.environ)
+    for name in ("SQLBUILD_PLATFORM_WEBHOOK_URL", "SQLBUILD_CONTROL_DATABASE_URL"):
+        _ = environment.pop(name, None)
+    admin: dict[str, str] = environment | {
+        "SQLBUILD_CONTROL_DATABASE_URL": str(project / ".sqlbuild/control.sqlite3")
+    }
+    log: Path = tmp_path / "development.log"
+    output: Path = tmp_path / "publications.jsonl"
+    arguments: list[str] = [executable, "dev", "--project-dir", str(project), "--port", "0"]
+    with location_process(arguments, log, output, env=environment) as process:
+        url, identity = wait_for_development_ready(process, log)
+        api: SnapshotApi = SnapshotApi(url, identity, "local-development")
+        _ = wait_for_generation(api, "development", 1, process, log)
+        first_id: str = request_development_run(executable, project, identity, admin)
+        first: dict[str, Any] = wait_for_run(api, process, log, run_id=first_id)
+        with sqlite3.connect(project / ".sqlbuild/control.sqlite3") as control:
+            node: tuple[str, str, str | None] = control.execute(
+                "SELECT node_key, status, error_code FROM sqb_run_nodes "
+                "WHERE run_id=? AND node_key='source:raw_regions'",
+                (first_id,),
+            ).fetchone()
+        _ = (project / ".env").write_text(test_case.second_env_file)
+        _ = wait_for_generation(api, "development", 2, process, log)
+        second_id: str = request_development_run(executable, project, identity, admin)
+        second: dict[str, Any] = wait_for_run(api, process, log, run_id=second_id)
+
+    assert first["status"] == test_case.expected_first_status, log.read_text()
+    assert node == test_case.expected_first_node, log.read_text()
+    assert second["status"] == test_case.expected_second_status, log.read_text()

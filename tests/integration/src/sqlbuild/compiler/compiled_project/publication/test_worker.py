@@ -42,6 +42,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     INTERMEDIATE_LOADER_FILES,
     LOADED_ORDER_FILES,
+    REGION_PROVIDER_FILES,
     cancel_running_statement,
     claimed_worker,
     provider_secrets_health,
@@ -56,35 +57,6 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
-# A provider whose settings only the project's .env sets; the worker must see them.
-REGION_PROVIDER_FILES: dict[str, str] = {
-    "providers/region.py": (
-        "from pydantic import Field, SecretStr\n"
-        "from sqlbuild.providers import Provider\n\n\n"
-        "class Region(Provider):\n"
-        '    """Region settings from the environment."""\n'
-        "    token: SecretStr = Field(validation_alias='WORKER_ENV_TOKEN')\n"
-        "    code: int = Field(validation_alias='WORKER_ENV_REGION_CODE')\n"
-    ),
-    "sources/regions.yml": (
-        "sources:\n"
-        "  - name: raw_regions\n"
-        "    description: The region code the provider reads.\n"
-        "    managed: true\n"
-        "    write_strategy: table\n"
-        "    columns:\n"
-        "      - name: code\n"
-        "        type: BIGINT\n"
-    ),
-    "python/loaders/regions.py": (
-        "from providers.region import Region\n"
-        "from sqlbuild.loaders import loader\n\n\n"
-        "@loader\n"
-        "def raw_regions(ctx, region: Region):\n"
-        '    """Load the provider\'s region code."""\n'
-        "    return [{'code': region.code}]\n"
-    ),
-}
 ENV_FILE_REGION_FILES: dict[str, str] = {
     ".env": "WORKER_ENV_REGION_CODE=42\nWORKER_ENV_TOKEN=worker-token\n"
 } | REGION_PROVIDER_FILES

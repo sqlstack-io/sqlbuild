@@ -611,3 +611,15 @@ class ProviderSecretsHealthTestCase:
     # What the location prints about them, and what it must not print.
     expected_output_fragments: tuple[str, ...]
     unexpected_output_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DevelopmentSecretReloadTestCase:
+    description: str
+    # The project's .env before and after the secret is added.
+    first_env_file: str
+    second_env_file: str
+    expected_first_status: str
+    # (node key, status, error code) of the node that uses the provider in the first run.
+    expected_first_node: tuple[str, str, str | None]
+    expected_second_status: str

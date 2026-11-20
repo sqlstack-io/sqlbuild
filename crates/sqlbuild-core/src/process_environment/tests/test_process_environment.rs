@@ -4,6 +4,7 @@ use crate::process_environment::constants::ENV_FILE_MARKER_VARIABLE;
 use crate::process_environment::main::env_file_marker::env_file_marker;
 use crate::process_environment::main::environment_var_os::environment_var_os;
 use crate::process_environment::main::environment_vars_os::environment_vars_os;
+use crate::process_environment::main::environment_without_env_file::environment_without_env_file;
 use crate::process_environment::main::install_environment_overlay::install_environment_overlay;
 use crate::process_environment::main::marker_json::marker_json;
 use crate::process_environment::models::{EnvFileMarker, EnvironmentOverlay};
@@ -48,6 +49,7 @@ fn given_an_overlay_when_reading_the_environment_then_it_sets_unsets_and_carries
         let read: Option<OsString> = environment_var_os(name);
         let removed: Option<OsString> = environment_var_os(test_case.removed);
         let read_marker: Option<EnvFileMarker> = env_file_marker();
+        let for_children: Vec<(OsString, OsString)> = environment_without_env_file();
         install_environment_overlay(EnvironmentOverlay::default());
 
         assert_eq!(
@@ -70,6 +72,13 @@ fn given_an_overlay_when_reading_the_environment_then_it_sets_unsets_and_carries
                 .iter()
                 .all(|(listed, _)| listed != test_case.removed),
             "{}: the effective environment leaves removed variables out",
+            test_case.description
+        );
+        assert!(
+            for_children
+                .iter()
+                .all(|(listed, _)| listed != name && listed != ENV_FILE_MARKER_VARIABLE),
+            "{}: children start without the file's variables or its marker",
             test_case.description
         );
         assert_eq!(environment_var_os(name), None, "{}", test_case.description);
