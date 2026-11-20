@@ -38,7 +38,7 @@ where
         }
         let mut suffix_end = matching_paren_end(sql, suffix_start, syntax)?;
         if table_call
-            && let Some(open) = over_clause_open(sql, suffix_end)
+            && let Some(open) = over_clause_open(sql, suffix_end, &syntax.line_comment_prefixes)
             && !protected.contains(open)
         {
             suffix_end = matching_paren_end(sql, open, syntax)?;

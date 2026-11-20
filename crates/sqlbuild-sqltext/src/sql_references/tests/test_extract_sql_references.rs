@@ -45,6 +45,12 @@ fn given_sql_when_extracting_references_then_matches_python_scanner() {
             ]),
         },
         ExtractSqlReferencesTestCase {
+            description: "a dialect line comment before OVER keeps the call partitioned",
+            sql: "SELECT * FROM __table_fn(\"a\")(1) # c\n OVER (PARTITION BY k)",
+            syntax: backslash_hash_comments(),
+            expected_extraction: extracted(vec![partitioned_table_function("a", 1)]),
+        },
+        ExtractSqlReferencesTestCase {
             description: "an empty window or a following OVER word is not a partition clause",
             sql: "SELECT * FROM __table_fn(\"a\")(1) OVER () , __table_fn(\"b\")(2) overflow (partition by x)",
             syntax: generic(),

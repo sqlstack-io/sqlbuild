@@ -129,7 +129,7 @@ fn parse_reference(
         }
         let suffix_close = matching_paren(sql, suffix, syntax, TABLE_FUNCTION_CALL_CONTEXT)?;
         call_argument_count = Some(split_arguments(text, suffix + 1, suffix_close, syntax)?.len());
-        call_partitioned = partition_clause_follows(text, suffix_close + 1);
+        call_partitioned = partition_clause_follows(text, suffix_close + 1, syntax);
     }
     Ok((
         Parsed::Reference(SqlReference {
@@ -351,13 +351,14 @@ fn empty_argument() -> String {
 }
 
 /// Whether `OVER (PARTITION BY` follows `start`, in any case, with whitespace or comments between.
-fn partition_clause_follows(text: &str, start: usize) -> bool {
-    let Some(open) = over_clause_open(text, start) else {
+fn partition_clause_follows(text: &str, start: usize, syntax: &LexicalSyntax) -> bool {
+    let comments: &[String] = &syntax.line_comment_prefixes;
+    let Some(open) = over_clause_open(text, start, comments) else {
         return false;
     };
     let mut position: usize = open + 1;
     for word in PARTITION_CLAUSE_WORDS {
-        let Some(word_start) = code_start(text, position) else {
+        let Some(word_start) = code_start(text, position, comments) else {
             return false;
         };
         position = word_start;

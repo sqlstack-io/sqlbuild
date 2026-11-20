@@ -147,8 +147,8 @@ pub(super) fn normalize(
     let mut edits: Vec<Edit> = Vec::new();
     let mut cursor: CharCursor = CharCursor::default();
     let mut consumed_until = 0;
-    let non_code: Vec<(usize, usize)> =
-        dialect_non_code_ranges(&result.sql, &dialect_lexical_syntax(dialect));
+    let syntax = dialect_lexical_syntax(dialect);
+    let non_code: Vec<(usize, usize)> = dialect_non_code_ranges(&result.sql, &syntax);
     for captures in FUNCTIONS
         .as_ref()
         .map_err(Clone::clone)?
@@ -170,7 +170,7 @@ pub(super) fn normalize(
             end = matching_paren(result.sql.as_bytes(), whole.end(), QuotePolicy::COMPILER)
                 .map_err(|error| format!("invalid table-function analysis input: {error:?}"))?
                 + 1;
-            if let Some(open) = over_clause_open(&result.sql, end) {
+            if let Some(open) = over_clause_open(&result.sql, end, &syntax.line_comment_prefixes) {
                 end = matching_paren(result.sql.as_bytes(), open, QuotePolicy::COMPILER).map_err(
                     |error| format!("invalid table-function partition clause: {error:?}"),
                 )? + 1;
