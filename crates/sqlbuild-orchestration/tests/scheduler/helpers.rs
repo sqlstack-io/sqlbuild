@@ -237,8 +237,7 @@ pub(crate) async fn report_run(
         crate::runs::models::RunOutcome,
     ),
 ) -> Vec<String> {
-    use crate::runs::main::execution::change_run::change_run;
-    use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest};
+    use crate::runs::models::RunChange;
 
     let mut changes = vec![RunChange::Started];
     changes.extend(
@@ -260,6 +259,18 @@ pub(crate) async fn report_run(
         reason: "the worker finished".into(),
         exit_code: Some(1),
     });
+    report_changes(store, claim, changes).await
+}
+
+/// Report `changes` for a claimed run as its worker does; each report's outcome.
+pub(crate) async fn report_changes(
+    store: &ControlStore,
+    claim: &crate::runs::models::RunClaim,
+    changes: Vec<crate::runs::models::RunChange>,
+) -> Vec<String> {
+    use crate::runs::main::execution::change_run::change_run;
+    use crate::runs::models::{RunAuthority, RunChangeRequest};
+
     let mut outcomes = Vec::new();
     for change in changes {
         let reported = change_run(
@@ -382,4 +393,14 @@ pub(crate) fn group_snapshot(location: uuid::Uuid) -> crate::snapshots::models::
         }}),
     );
     input
+}
+
+/// Execute `sql` against the store as it stands, such as to put a stored row in the form an earlier release wrote it.
+pub(crate) async fn execute(store: &ControlStore, sql: &str) {
+    use crate::store::main::{begin::begin, commit::commit, query::query};
+    use crate::store::models::TransactionMode;
+
+    let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    let (transaction, _) = query(transaction, sql, vec![]).await.expect(sql);
+    commit(transaction).await.expect("commit");
 }

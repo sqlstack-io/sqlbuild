@@ -8,10 +8,10 @@ use crate::scheduler::main::_plan_ticks::plan_ticks;
 use crate::scheduler::main::active_job_run::active_job_run;
 use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::{DueTrigger, SchedulerLease, TickPlan, TickState};
+use crate::snapshots::main::reads::decode_published_row::decode_published_row;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
-use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
@@ -32,18 +32,7 @@ pub(crate) async fn evaluate_trigger(
     let Some(row) = rows.into_iter().next() else {
         return Ok(None);
     };
-    let snapshot_id = serde_json::from_value::<Uuid>(row["snapshot_id"].clone());
-    let trigger: DueTrigger = match (decode_row::<DueTrigger>(row), snapshot_id) {
-        (Ok(trigger), _) => trigger,
-        (Err(ControlError::Invalid(detail)), Ok(snapshot_id)) => {
-            return Err(ControlError::UnreadableSnapshot {
-                snapshot_id,
-                run_id: None,
-                detail,
-            });
-        }
-        (Err(error), _) => return Err(error),
-    };
+    let trigger: DueTrigger = decode_published_row(row)?;
     if trigger.status != TriggerStatus::Running {
         return Ok(None);
     }

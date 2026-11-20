@@ -1352,6 +1352,10 @@ path = "src/sqlbuild/adapters/sqlserver/classes/sqlserver_adapter.py"
 reason = "The SQL Server adapter intentionally keeps overrideable backend behavior on one class."
 
 [[dupes.allowlist]]
+paths = ["crates/sqlbuild-orchestration/src/declarations/main/published_job.rs", "crates/sqlbuild-orchestration/src/scheduler/main/active_job_run.rs"]
+reason = "Each reads one row by location, target and job key: the published job, decoded with its snapshot named when it no longer decodes, and the run a skip overlap yields to. Only the keyed one-row query shape is alike."
+
+[[dupes.allowlist]]
 paths = ["crates/sqlbuild-orchestration/src/platform/models.rs", "crates/sqlbuild-orchestration/src/runs/models.rs"]
 reason = "PlatformEvent::event_type and RunChange::event_type each name their own enum's stored event types, one arm per variant; only the variant-to-string match shape is alike."
 

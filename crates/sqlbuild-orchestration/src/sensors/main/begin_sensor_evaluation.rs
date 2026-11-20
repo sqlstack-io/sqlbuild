@@ -1,14 +1,16 @@
-//! Commit the requested phase before evaluation, so crashes count as attempts.
+//! Commit the requested phase before evaluation, so crashes count as attempts; a last attempt an earlier release recorded in a form that no longer decodes counts as none, with a health problem until the location publishes again.
 
 use chrono::TimeDelta;
 use uuid::Uuid;
 
 use crate::declarations::models::TriggerStatus;
+use crate::platform::main::health::record_trigger_skipped::record_trigger_skipped;
 use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::SchedulerLease;
 use crate::sensors::_helpers::attempts::{defer_sensor, last_attempt, read_sensor};
 use crate::sensors::_helpers::custom::request_evaluation_work;
 use crate::sensors::_helpers::facts::{append_evaluation, definition_fingerprint};
+use crate::sensors::constants::UNREADABLE_SENSOR_ATTEMPT;
 use crate::sensors::main::read_sensor_cursor::read_sensor_cursor;
 use crate::sensors::models::{SensorEvaluationOutcome, SensorEvaluationRequest};
 use crate::store::errors::ControlError;
@@ -32,7 +34,15 @@ pub async fn begin_sensor_evaluation(
     let now = transaction.now;
     let (transaction, cursor) = read_sensor_cursor(transaction, trigger_id).await?;
     let (mut transaction, previous) = last_attempt(transaction, trigger_id).await?;
-    if let Some((previous, terminal)) = previous {
+    if let Some(Err(_)) = &previous {
+        transaction = record_trigger_skipped(
+            transaction,
+            (trigger_id, sensor.snapshot_id),
+            UNREADABLE_SENSOR_ATTEMPT,
+        )
+        .await?;
+    }
+    if let Some(Ok((previous, terminal))) = previous {
         if !terminal {
             if previous.request.epoch == lease.epoch
                 && previous.request.snapshot_id == sensor.snapshot_id

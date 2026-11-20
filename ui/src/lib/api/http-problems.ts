@@ -102,8 +102,8 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			subject: place,
 			message:
 				triggers.length === 1
-					? `${first.name} in ${place} is skipped: its job was published by an earlier SQLBuild release and can’t be read. It runs again after the location publishes again.`
-					: `${triggers.length} triggers in ${place} are skipped, starting with ${first.name}: their jobs were published by an earlier SQLBuild release and can’t be read. They run again after the location publishes again.`
+					? `${first.name} in ${place}: ${first.reason}.`
+					: `${triggers.length} triggers in ${place} need attention, starting with ${first.name}: ${first.reason}.`
 		});
 	}
 	return events;

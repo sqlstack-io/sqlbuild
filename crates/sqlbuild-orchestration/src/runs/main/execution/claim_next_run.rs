@@ -21,7 +21,7 @@ use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
 use crate::store::models::{Connection, ControlStore, Parameter, TransactionMode};
 
-/// Limits come from one installation configuration, never from competing per-job declarations; a candidate whose snapshot can't be read fails on its own and the claim moves on.
+/// Limits come from one installation configuration, never from competing per-job declarations. A group member whose readiness needs its group's snapshot, and that snapshot can't be read, fails on its own and the claim moves on; a plain run reads no snapshot here.
 pub async fn claim_next_run<'a>(
     store: &ControlStore,
     lease: &SchedulerLease,
@@ -107,9 +107,7 @@ async fn claim_once(
                 continue;
             }
             let claim;
-            (transaction, claim) = publish_claim(transaction, candidate.request_json)
-                .await
-                .map_err(|error| error.for_run(run_id))?;
+            (transaction, claim) = publish_claim(transaction, candidate.request_json).await?;
             (transaction, _) =
                 query(transaction, "RELEASE SAVEPOINT candidate_claim", vec![]).await?;
             commit(check_lease(transaction, lease).await?).await?;

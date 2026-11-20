@@ -15,23 +15,24 @@ use crate::runs::main::{
     execution::advance_groups::advance_groups, execution::claim_next_run::claim_next_run,
     requests::check_adhoc_run::check_adhoc_run, requests::request_job_run::request_job_run,
 };
-use crate::runs::models::{AdhocCheckRequest, NodeOutcome, RunOutcome};
+use crate::runs::models::{AdhocCheckRequest, NodeOutcome, RunChange, RunOutcome};
 use crate::runs::tests::helpers::{adhoc_fixture, json_column, rows};
 use crate::runs::tests::test_types::ExactKeyPlanner;
 use crate::scheduler::models::SchedulerState;
 use crate::scheduler::tests::contracts::helpers::{
-    acquire_lease, group_snapshot, manual_run, operator, outcome, refusal, report_run, run_states,
-    scheduler_cycle, skipped_triggers, store_old_documents, store_old_job_definitions,
-    store_unreadable_jobs, upgrade_snapshot,
+    acquire_lease, group_snapshot, manual_run, operator, outcome, refusal, report_changes,
+    report_run, run_states, scheduler_cycle, skipped_triggers, store_old_documents,
+    store_old_job_definitions, store_unreadable_jobs, upgrade_snapshot,
 };
 use crate::scheduler::tests::contracts::test_types::{
     AdhocOldDocumentTestCase, ClaimOldDocumentTestCase, FailedJobRunOldDocumentTestCase,
     GroupScheduleOldDocumentTestCase, MigratedConcurrencySourceTestCase, PinnedOldDocumentTestCase,
+    RunningMemberOldDocumentTestCase,
 };
 use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
 use crate::sensors::tests::helpers::append_events;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
-use crate::store::constants::UNREADABLE_SNAPSHOT;
+use crate::store::constants::UNREADABLE_PUBLICATION;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
@@ -54,7 +55,7 @@ fn given_jobs_published_before_0004_when_migrating_then_plain_job_runs_work_and_
             expected_resolved_concurrency: json!({"limit": 4}),
             expected_ticks: 1,
             expected_runs: &["manual 1", "schedule 1", "sensor 1"],
-            expected_until_republished: [UNREADABLE_SNAPSHOT, UNREADABLE_SNAPSHOT],
+            expected_until_republished: [UNREADABLE_PUBLICATION, UNREADABLE_PUBLICATION],
             expected_after_republish: ["ok", "ok"],
         },
         MigratedConcurrencySourceTestCase {
@@ -65,7 +66,7 @@ fn given_jobs_published_before_0004_when_migrating_then_plain_job_runs_work_and_
             expected_resolved_concurrency: json!({"limit": 4}),
             expected_ticks: 1,
             expected_runs: &["manual 1", "schedule 1", "sensor 1"],
-            expected_until_republished: [UNREADABLE_SNAPSHOT, UNREADABLE_SNAPSHOT],
+            expected_until_republished: [UNREADABLE_PUBLICATION, UNREADABLE_PUBLICATION],
             expected_after_republish: ["ok", "ok"],
         },
     ];
@@ -160,7 +161,7 @@ fn given_jobs_published_before_0004_when_migrating_then_plain_job_runs_work_and_
 
             assert_eq!(
                 (
-                    matches!(&before, Err(ControlError::Invalid(message)) if message.contains("unknown field `source`")),
+                    matches!(&before, Err(ControlError::UnreadableSnapshot { detail, .. }) if detail.contains("unknown field `source`")),
                     json_column(&stored[0]["definition_json"])["resolved_concurrency"].clone(),
                     cycle.ticks,
                     runs,
@@ -544,12 +545,12 @@ fn given_a_snapshot_with_an_old_jobs_document_when_checking_an_ad_hoc_plan_then_
         AdhocOldDocumentTestCase {
             description: "SQLite store",
             backend: Backend::Sqlite,
-            expected_check: UNREADABLE_SNAPSHOT,
+            expected_check: UNREADABLE_PUBLICATION,
         },
         AdhocOldDocumentTestCase {
             description: "PostgreSQL store",
             backend: Backend::Postgres,
-            expected_check: UNREADABLE_SNAPSHOT,
+            expected_check: UNREADABLE_PUBLICATION,
         },
     ];
     for test_case in test_cases {
@@ -585,6 +586,133 @@ fn given_a_snapshot_with_an_old_jobs_document_when_checking_an_ad_hoc_plan_then_
                 refusal(checked),
                 test_case.expected_check,
                 "{}: the plan request fails with the message",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_running_member_when_its_group_snapshot_becomes_unreadable_then_the_group_fails_only_once_the_member_stops()
+ {
+    let test_cases = [
+        RunningMemberOldDocumentTestCase {
+            description: "SQLite store",
+            backend: Backend::Sqlite,
+            stored_source: "project",
+            expected_while_running: &[
+                "marts_job cancelled: cancelled before launch",
+                "nightly_job_group running: ",
+                "staging_job running: ",
+            ],
+            expected_cancel_requested: &["marts_job", "staging_job"],
+            expected_after: &[
+                "marts_job cancelled: cancelled before launch",
+                "nightly_job_group failed: this run's snapshot was published by an earlier SQLBuild release and can't be read; rerun it after its location publishes again",
+                "staging_job cancelled: cancelled",
+            ],
+        },
+        RunningMemberOldDocumentTestCase {
+            description: "PostgreSQL store",
+            backend: Backend::Postgres,
+            stored_source: "default",
+            expected_while_running: &[
+                "marts_job cancelled: cancelled before launch",
+                "nightly_job_group running: ",
+                "staging_job running: ",
+            ],
+            expected_cancel_requested: &["marts_job", "staging_job"],
+            expected_after: &[
+                "marts_job cancelled: cancelled before launch",
+                "nightly_job_group failed: this run's snapshot was published by an earlier SQLBuild release and can't be read; rerun it after its location publishes again",
+                "staging_job cancelled: cancelled",
+            ],
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let fixture = open_test_store(test_case.backend)
+                .await
+                .expect("required backend");
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            publish_snapshot(store, &group_snapshot(location))
+                .await
+                .expect("publish");
+            request_job_run(
+                store,
+                (&operator(), None),
+                &manual_run(location, "nightly_job_group"),
+            )
+            .await
+            .expect("request the group");
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let limits = BTreeMap::new();
+            let scope = (location, "development");
+            advance_groups(store, &lease, (&limits, scope))
+                .await
+                .expect("start the group");
+            let claim = claim_next_run(store, &lease, &limits, Some(scope))
+                .await
+                .expect("claim")
+                .expect("the first member");
+            report_changes(store, &claim, vec![RunChange::Started]).await;
+            store_old_documents(store, test_case.stored_source).await;
+
+            advance_groups(store, &lease, (&limits, scope))
+                .await
+                .expect("a pass over the unreadable group");
+            let while_running = run_states(store).await;
+            let cancel_requested: Vec<String> = rows(
+                store,
+                "SELECT job_key FROM sqb_runs WHERE cancel_requested_at IS NOT NULL ORDER BY job_key",
+                vec![],
+            )
+            .await
+            .iter()
+            .map(|row| row["job_key"].as_str().unwrap_or_default().to_owned())
+            .collect();
+            report_changes(
+                store,
+                &claim,
+                vec![RunChange::Finished {
+                    outcome: RunOutcome::Cancelled,
+                    reason: "cancelled".into(),
+                    exit_code: Some(143),
+                }],
+            )
+            .await;
+            advance_groups(store, &lease, (&limits, scope))
+                .await
+                .expect("the next pass");
+
+            assert_eq!(
+                (while_running, cancel_requested, run_states(store).await),
+                (
+                    test_case
+                        .expected_while_running
+                        .iter()
+                        .map(|run| (*run).to_owned())
+                        .collect::<Vec<_>>(),
+                    test_case
+                        .expected_cancel_requested
+                        .iter()
+                        .map(|run| (*run).to_owned())
+                        .collect::<Vec<_>>(),
+                    test_case
+                        .expected_after
+                        .iter()
+                        .map(|run| (*run).to_owned())
+                        .collect::<Vec<_>>()
+                ),
+                "{}: the running member is asked to stop and keeps the group open; once it stops, the group fails",
                 test_case.description
             );
             close_test_store(fixture).await;

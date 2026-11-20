@@ -80,3 +80,29 @@ pub(crate) struct AdhocOldDocumentTestCase {
     /// The ad hoc plan check's outcome.
     pub(crate) expected_check: &'static str,
 }
+
+pub(crate) struct UnreadableSensorTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// What an earlier release left behind, applied after the sensor's first check.
+    pub(crate) earlier_form: &'static str,
+    /// The second scheduler cycle: `ok` when it carries on.
+    pub(crate) expected_cycle: &'static str,
+    /// The triggers the live problems list as skipped afterwards, as `name: reason`.
+    pub(crate) expected_skipped: &'static [&'static str],
+    /// Runs the sensor has queued by then.
+    pub(crate) expected_sensor_runs: i64,
+}
+
+pub(crate) struct RunningMemberOldDocumentTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The concurrency source an older release stored in the snapshot's jobs document.
+    pub(crate) stored_source: &'static str,
+    /// Every run after the pass that meets the unreadable snapshot, as `job status: reason`.
+    pub(crate) expected_while_running: &'static [&'static str],
+    /// The runs asked to cancel by then.
+    pub(crate) expected_cancel_requested: &'static [&'static str],
+    /// Every run after the running member stops and the next pass, as `job status: reason`.
+    pub(crate) expected_after: &'static [&'static str],
+}

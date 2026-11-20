@@ -42,7 +42,7 @@ pub(crate) async fn fail_unreadable_run(
     commit(check_lease(transaction, lease).await?).await
 }
 
-/// Ask each unfinished member of group `group_id` to cancel, then end the group failed, in one transaction under the scheduler's lease.
+/// Ask each unfinished member of group `group_id` to cancel, in one transaction under the scheduler's lease: one that never launched ends cancelled before launch, a running one is asked to stop. The group ends failed only once no member is open, so a member still running keeps its pool slots until it ends; a later pass, which meets the same unreadable snapshot, finishes the group.
 pub(crate) async fn fail_unreadable_group(
     store: &ControlStore,
     lease: &SchedulerLease,
@@ -70,14 +70,16 @@ pub(crate) async fn fail_unreadable_group(
         )
         .await?;
     }
-    let group;
-    (transaction, group) = query(
+    let open;
+    (transaction, open) = query(
         transaction,
-        "SELECT 1 AS open FROM sqb_runs WHERE run_id=$1 AND status IN ('queued','launched','running','unresponsive')",
+        "SELECT 1 AS open FROM sqb_runs WHERE run_id=$1 AND status IN ('queued','launched','running','unresponsive') \
+         AND NOT EXISTS (SELECT 1 FROM sqb_runs m WHERE m.parent_run_id=$1 \
+         AND m.status IN ('queued','launched','running','unresponsive'))",
         vec![Parameter::Id(group_id)],
     )
     .await?;
-    if !group.is_empty() {
+    if !open.is_empty() {
         transaction = group_change(transaction, group_id, failed()).await?;
     }
     commit(check_lease(transaction, lease).await?).await
