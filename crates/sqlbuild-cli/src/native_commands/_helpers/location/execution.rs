@@ -34,6 +34,7 @@ use crate::native_commands::_helpers::command::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
 use crate::native_commands::_helpers::command::terminal::{live_screen, screen_colour};
+use crate::native_commands::_helpers::location::dev_cancel::DevRuns;
 use crate::native_commands::_helpers::location::dev_supervision::{
     DevRoles, supervise_development_roles,
 };
@@ -221,6 +222,11 @@ pub(crate) async fn run_development_roles(
         detail: String::new(),
     }));
     if scheduler {
+        roles.runs = Some(DevRuns {
+            store: store.clone(),
+            location_id,
+            target: target.clone(),
+        });
         let scheduler_store = store.clone();
         roles.spawn(Some("scheduler"), async move {
             run_scheduler(
@@ -326,7 +332,7 @@ fn development_location_role(
                 },
                 () = development_stopped(shutdown) => {
                     stop_switch().terminate_groups();
-                    terminate_child(&mut child)?;
+                    terminate_child(&mut child, false)?;
                     match tokio::time::timeout(Duration::from_secs(10), child.wait()).await {
                         Ok(result) => { result?; },
                         Err(_) => child.kill().await?,

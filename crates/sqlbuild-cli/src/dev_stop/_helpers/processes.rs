@@ -17,7 +17,7 @@ pub(crate) fn signal_group(group: i32, kill: bool) {
 #[cfg(not(unix))]
 pub(crate) fn signal_group(_group: i32, _kill: bool) {}
 
-/// SIGKILL every direct child still running, such as local workers that share this process group.
+/// SIGKILL every direct child still running, and the process group each local worker leads, so nothing a worker started is left behind.
 #[cfg(target_os = "linux")]
 pub(crate) fn kill_children() {
     let own: i32 = rustix::process::getpid().as_raw_nonzero().get();
@@ -35,6 +35,7 @@ pub(crate) fn kill_children() {
             && parent == own
             && let Some(pid) = Pid::from_raw(pid)
         {
+            let _ = kill_process_group(pid, Signal::KILL);
             let _ = kill_process(pid, Signal::KILL);
         }
     }

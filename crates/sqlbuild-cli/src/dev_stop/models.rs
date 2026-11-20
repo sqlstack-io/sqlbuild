@@ -3,7 +3,7 @@
 use std::fs::File;
 use std::io::Write;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 #[cfg(unix)]
@@ -51,11 +51,15 @@ impl StopReason {
     }
 }
 
-/// Shared by the signal task, the key thread and the roles: the first request stops cleanly, a second Ctrl+C or signal forces it.
+/// Shared by the signal task, the key thread and the roles: the first request stops cleanly under a deadline, a second Ctrl+C or signal forces it.
 #[derive(Debug)]
 pub(crate) struct StopSwitch {
     asked: watch::Sender<Option<StopReason>>,
     requests: AtomicUsize,
+    /// The newest request's reason, which a forced exit reports.
+    latest: Mutex<Option<StopReason>>,
+    /// Bumped by every `arm` and `disarm`; a deadline fires only while its own value is current.
+    deadline: AtomicU64,
     /// Process groups of children that must not outlive `sqb dev`.
     groups: Mutex<Vec<i32>>,
     /// The terminal's cooked mode, put back however `sqb dev` exits.
@@ -72,6 +76,8 @@ impl StopSwitch {
         Self {
             asked: watch::channel(None).0,
             requests: AtomicUsize::new(0),
+            latest: Mutex::new(None),
+            deadline: AtomicU64::new(0),
             groups: Mutex::new(Vec::new()),
             #[cfg(unix)]
             cooked: Mutex::new(None),
@@ -81,25 +87,52 @@ impl StopSwitch {
         }
     }
 
-    /// Ask to stop: the first request starts a clean stop with a deadline, a later Ctrl+C or signal exits at once.
+    /// Ask to stop: the first request starts a clean stop with a deadline, a later Ctrl+C or signal exits at once with its own status.
     pub(crate) fn request(&'static self, reason: StopReason) {
+        if let Ok(mut latest) = self.latest.lock() {
+            *latest = Some(reason);
+        }
         let earlier: usize = self.requests.fetch_add(1, Ordering::SeqCst);
         if earlier == 0 {
             if let Ok(mut asked_at) = self.asked_at.lock() {
                 *asked_at = Some(Instant::now());
             }
             self.asked.send_replace(Some(reason));
-            std::thread::spawn(move || {
-                std::thread::sleep(STOP_GRACE);
-                self.kill_all();
-                std::thread::sleep(STOP_DEADLINE);
-                self.exit_now(reason.status(), FORCED_LINE);
-            });
+            self.arm(STOP_GRACE + STOP_DEADLINE);
             return;
         }
         if reason != StopReason::Quit {
-            let first: StopReason = self.reason().unwrap_or(reason);
-            self.exit_now(first.status(), FORCED_LINE);
+            self.force(reason);
+        }
+    }
+
+    /// Kill everything and exit now with `reason`'s status, as Ctrl+\ or a second Ctrl+C asks.
+    pub(crate) fn force(&self, reason: StopReason) -> ! {
+        self.exit_now(reason.status(), FORCED_LINE)
+    }
+
+    /// Force the stop `after` from now unless it is armed again or disarmed first.
+    pub(crate) fn arm(&'static self, after: Duration) {
+        let armed: u64 = self.deadline.fetch_add(1, Ordering::SeqCst) + 1;
+        std::thread::spawn(move || {
+            std::thread::sleep(after);
+            if self.deadline.load(Ordering::SeqCst) == armed {
+                let reason: StopReason = self.latest().unwrap_or(StopReason::Terminate);
+                self.force(reason);
+            }
+        });
+    }
+
+    /// The stop finished cleanly; no deadline fires after this.
+    pub(crate) fn disarm(&self) {
+        self.deadline.fetch_add(1, Ordering::SeqCst);
+    }
+
+    /// The newest stop request's reason.
+    fn latest(&self) -> Option<StopReason> {
+        match self.latest.lock() {
+            Ok(latest) => *latest,
+            Err(_poisoned) => self.reason(),
         }
     }
 

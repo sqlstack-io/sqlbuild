@@ -2,12 +2,10 @@
 
 use serde_json::json;
 
-use crate::dev_session::_helpers::connection::{
-    ReportSplit, connection_outcome, split_debug_output,
-};
+use crate::dev_session::_helpers::connection::{connection_outcome, split_debug_output};
 use crate::dev_session::constants::NO_REPORT;
 use crate::dev_session::tests::helpers::{report, row, state_text};
-use crate::dev_session::tests::test_types::{OutcomeTestCase, ReportSplitTestCase, SplitTestCase};
+use crate::dev_session::tests::test_types::{OutcomeTestCase, SplitTestCase};
 
 #[test]
 fn given_a_debug_report_when_read_then_the_adapter_and_warehouse_state_follow_its_rows() {
@@ -156,54 +154,5 @@ fn given_debug_stderr_when_split_then_only_complete_sqlbuild_rows_leave_the_clie
             test_case.description
         );
         assert_eq!(rows, test_case.expected_rows, "{}", test_case.description);
-    }
-}
-
-#[test]
-fn given_debug_stdout_when_split_then_the_client_prompt_is_shown_and_the_report_kept() {
-    let test_cases = [
-        ReportSplitTestCase {
-            description: "a sign-in URL and a prompt without a newline come before the report",
-            chunks: vec![
-                "Go to https://example.com/authorize to sign in\n",
-                "Enter the URL: ",
-                "{\"success\": ",
-                "true}\n",
-            ],
-            expected_client: vec![
-                "Go to https://example.com/authorize to sign in\n",
-                "Enter the URL: ",
-                "",
-                "",
-            ],
-            expected_report: "{\"success\": true}\n",
-        },
-        ReportSplitTestCase {
-            description: "a report split mid-line is held until its line ends",
-            chunks: vec!["{\"succ", "ess\": true}\n"],
-            expected_client: vec!["", ""],
-            expected_report: "{\"success\": true}\n",
-        },
-    ];
-
-    for test_case in test_cases {
-        let mut split: ReportSplit = ReportSplit::default();
-        let client: Vec<String> = test_case
-            .chunks
-            .iter()
-            .map(|chunk| split.feed(chunk))
-            .collect();
-
-        assert_eq!(
-            client, test_case.expected_client,
-            "{}",
-            test_case.description
-        );
-        assert_eq!(
-            String::from_utf8(split.finish()).unwrap_or_default(),
-            test_case.expected_report,
-            "{}",
-            test_case.description
-        );
     }
 }

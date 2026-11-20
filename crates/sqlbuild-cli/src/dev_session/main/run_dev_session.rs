@@ -98,11 +98,6 @@ pub(crate) async fn run_dev_session(
             Some(action) = actions.recv() => match action {
                 ScreenAction::OpenUi => drop(open_browser(&url)),
                 ScreenAction::Recompile => send_control(&mut stdin, DevControl::Recompile).await?,
-                ScreenAction::RetryWarehouse => {
-                    if connecting.is_none() {
-                        connecting = Some(connect());
-                    }
-                }
                 ScreenAction::None => {}
             },
             _ = poll.tick(), if connected.is_some() => {

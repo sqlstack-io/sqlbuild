@@ -1,4 +1,4 @@
-//! Keys from the terminal in raw mode: Ctrl+C and `q` stop `sqb dev` directly, typing at a sign-in prompt goes to the client.
+//! Keys from the terminal in raw mode: Ctrl+C and `q` stop `sqb dev`, Ctrl+\\ forces the stop, typing at a sign-in prompt goes to the client, and a terminal that hangs up stops it.
 
 use std::io::Write;
 use std::sync::Arc;
@@ -12,7 +12,9 @@ use rustix::termios::{
 use tokio::sync::mpsc::UnboundedSender;
 
 #[cfg(unix)]
-use crate::dev_screen::constants::{INTERRUPT_BYTE, KEY_WAIT_TENTHS};
+use crate::dev_screen::constants::{
+    FORCE_BYTE, INTERRUPT_BYTE, KEY_WAIT, SUSPEND_BYTE, SUSPEND_UNSUPPORTED,
+};
 use crate::dev_screen::models::{KeyInput, ScreenMessage};
 use crate::dev_stop::main::stop_switch::stop_switch;
 #[cfg(unix)]
@@ -68,36 +70,58 @@ impl Drop for KeyReader {
     }
 }
 
-/// No echo, no line buffering and no signal keys, so Ctrl+C arrives as a byte; reads give up after a tenth of a second.
+/// No echo, no line buffering and no signal keys, so Ctrl+C, Ctrl+\\ and Ctrl+Z arrive as bytes; a read returns what is there without waiting.
 #[cfg(unix)]
 fn raw_mode(cooked: &Termios) -> Termios {
     let mut raw: Termios = cooked.clone();
     raw.local_modes -= LocalModes::ICANON | LocalModes::ECHO | LocalModes::ISIG;
     raw.special_codes[SpecialCodeIndex::VMIN] = 0;
-    raw.special_codes[SpecialCodeIndex::VTIME] = KEY_WAIT_TENTHS;
+    raw.special_codes[SpecialCodeIndex::VTIME] = 0;
     raw
 }
 
+/// Wait up to `KEY_WAIT` for a key; a terminal that is readable but has nothing to read has hung up.
 #[cfg(unix)]
 fn read_keys(input: &KeyInput, keys: &UnboundedSender<ScreenMessage>) {
+    use rustix::event::{PollFd, PollFlags, Timespec, poll};
+    let wait: Timespec = Timespec {
+        tv_sec: 0,
+        tv_nsec: i64::from(KEY_WAIT.subsec_nanos()),
+    };
     let mut byte: [u8; 1] = [0];
     while !input.stop.load(Ordering::SeqCst) {
-        match rustix::io::read(std::io::stdin(), &mut byte) {
-            Ok(1) => key(input, keys, byte[0]),
+        let stdin = std::io::stdin();
+        let mut ready: [PollFd<'_>; 1] = [PollFd::new(&stdin, PollFlags::IN)];
+        match poll(&mut ready, Some(&wait)) {
+            Ok(0) | Err(rustix::io::Errno::INTR | rustix::io::Errno::AGAIN) => continue,
             Ok(_) => {}
+            Err(_) => return hung_up(),
+        }
+        match rustix::io::read(&stdin, &mut byte) {
+            Ok(1) => key(input, keys, byte[0]),
             Err(rustix::io::Errno::INTR | rustix::io::Errno::AGAIN) => {}
-            Err(_) => {
-                stop_switch().request(StopReason::Hangup);
-                return;
-            }
+            Ok(_) | Err(_) => return hung_up(),
         }
     }
+}
+
+/// The terminal went away: stop as SIGHUP would.
+#[cfg(unix)]
+fn hung_up() {
+    stop_switch().request(StopReason::Hangup);
 }
 
 #[cfg(unix)]
 fn key(input: &KeyInput, keys: &UnboundedSender<ScreenMessage>, byte: u8) {
     if byte == INTERRUPT_BYTE {
         stop_switch().request(StopReason::Interrupt);
+        return;
+    }
+    if byte == FORCE_BYTE {
+        stop_switch().force(StopReason::Interrupt);
+    }
+    if byte == SUSPEND_BYTE {
+        drop(keys.send(ScreenMessage::Log(SUSPEND_UNSUPPORTED.to_owned())));
         return;
     }
     if let Ok(mut forward) = input.forward.lock()

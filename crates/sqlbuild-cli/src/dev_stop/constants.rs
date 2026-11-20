@@ -12,6 +12,18 @@ pub(crate) const QUIT_STATUS: i32 = 0;
 pub(crate) const INTERRUPT_STATUS: i32 = 130;
 /// SIGHUP, as shells report it.
 pub(crate) const HANGUP_STATUS: i32 = 129;
+/// With a run active, its cancellation gets this long before the stop forces it.
+pub(crate) const CANCEL_DEADLINE: Duration = Duration::from_secs(30);
+/// How often a stop checks whether the runs it cancels have ended.
+pub(crate) const CANCEL_POLL: Duration = Duration::from_millis(250);
+/// The newest runs a stop looks through for ones to cancel.
+pub(crate) const RUN_SCAN: u32 = 100;
+/// Who a stop's cancellations name in the audit log.
+pub(crate) const DEV_ACTOR: &str = "local-development";
+/// The role a stop's cancellations are granted by: the local control store's owner.
+pub(crate) const DEV_GRANTING_ROLE: &str = "control-store-owner";
+/// Why a stop cancels a run.
+pub(crate) const CANCEL_REASON: &str = "sqb dev stopped";
 /// SIGTERM, as shells report it.
 pub(crate) const TERMINATE_STATUS: i32 = 143;
 /// What a forced stop prints on the terminal before it exits.

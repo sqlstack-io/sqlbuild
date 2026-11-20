@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import fcntl
 import gzip
 import hashlib
 import json
@@ -2032,7 +2033,7 @@ def development_environment(extra: dict[str, str], unset: frozenset[str]) -> dic
 def start_development_on_terminal(
     project: Path, arguments: list[str], environment: dict[str, str]
 ) -> tuple[int, subprocess.Popen[bytes]]:
-    """`sqb dev` for `project` on a new 80x24 pseudo-terminal: its controller and the process."""
+    """`sqb dev` for `project` on a new 80x24 controlling terminal: its controller, the process."""
     terminal, attached = pty.openpty()
     termios.tcsetwinsize(attached, (24, 80))
     process: subprocess.Popen[bytes] = subprocess.Popen(
@@ -2050,9 +2051,15 @@ def start_development_on_terminal(
         stderr=attached,
         env=environment,
         start_new_session=True,
+        preexec_fn=_take_terminal,
     )
     os.close(attached)
     return terminal, process
+
+
+def _take_terminal() -> None:
+    """In the child, after `setsid`: the terminal on stdin becomes the session's terminal."""
+    fcntl.ioctl(0, termios.TIOCSCTTY, 0)
 
 
 def drain_terminal(terminal: int) -> str:
@@ -2088,3 +2095,15 @@ def reap_development(process: subprocess.Popen[bytes], project: Path) -> list[st
         with suppress(ProcessLookupError):
             os.kill(int(line.split()[0]), signal.SIGKILL)
     return left
+
+
+def statement_started(control: Path) -> bool:
+    """Whether a worker has sent the endless `range(10000000000)` statement to the warehouse."""
+    with sqlite3.connect(control) as store:
+        return (
+            store.execute(
+                "SELECT 1 FROM recall_artifacts WHERE CAST(content AS TEXT) LIKE ?",
+                ("%range(10000000000)%",),
+            ).fetchone()
+            is not None
+        )

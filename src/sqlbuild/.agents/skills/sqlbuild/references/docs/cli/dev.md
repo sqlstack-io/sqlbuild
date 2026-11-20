@@ -67,8 +67,10 @@ and how to fix it.
 Once the first version is published, `sqb dev` connects to the target's warehouse in the
 foreground. A client that asks for a password, a code or a browser sign-in asks once, in a
 **sign in** block above the running steps, and every later connection in the session reuses that
-sign-in. What you type goes to the client; Ctrl+C still stops `sqb dev`. `sqb dev` waits for the
-sign-in as long as it takes, and the block shows how long it has waited.
+sign-in. What you type goes to the client, which reads it on its own terminal, so prompts that
+read `/dev/tty` work too. Typed text is not echoed, so a password or code never appears on the
+screen or in the log; `--plain` never prints it either. Ctrl+C still stops `sqb dev`. `sqb dev`
+waits for the sign-in as long as it takes, and the block shows how long it has waited.
 
 If the first connection fails, `sqb dev` shows the error and stops with exit status 2; run
 `sqb debug` to test the connection on its own. The ready box's Warehouse line names the adapter
@@ -84,20 +86,34 @@ location reads warehouse history once the connection succeeds.
 | `l` | Show or hide the detailed log, the latest 500 lines |
 | `q` | Stop |
 | Ctrl+C | Stop; a second Ctrl+C stops at once |
+| Ctrl+\\ | Stop at once, without cancelling runs |
+
+Ctrl+Z is not supported: `sqb dev` does not suspend. Stop it with `q` or Ctrl+C instead.
 
 ## Stop
 
-`q`, Ctrl+C, SIGINT, SIGTERM and SIGHUP stop `sqb dev` at any point, including while it compiles,
-connects or waits for a sign-in. Each service stops with one line, and anything still running
-after about a second is killed, the code location and local workers included. The terminal is
-put back as it was. The last line says how the session ended:
+`q`, Ctrl+C, SIGINT, SIGTERM and SIGHUP stop `sqb dev` at any point, including while it reads the
+configuration, opens the control store, compiles, connects or waits for a sign-in. A stop before
+`sqb dev` is ready ends with `sqb dev stopped (interrupted) before it was ready`.
+
+When no run is in flight, each service stops with one line, and anything still running after
+about a second is killed, the code location included. When runs are in flight, `sqb dev` cancels
+them first: each worker cancels its running statements, records the run as cancelled and
+releases its claims, as it does for a cancel from the UI. This takes up to 30 seconds, then
+whatever is left is killed. Ctrl+C again, or Ctrl+\\, stops at once:
 
 ```text
+· Cancelling run orders_job… 2 queries (Ctrl+C again to force)
+· Cancelled run orders_job  2 queries cancelled   1.2s
 · Stopped scheduler       0.0s
 · Stopped UI server       0.1s
 · Stopped code location   0.3s
-· sqb dev stopped (interrupted)  ran 42m 10s   0.4s
+· sqb dev stopped (interrupted)  ran 42m 10s   1.6s
 ```
+
+Each local worker runs in its own process group, which is stopped as a whole, so nothing a worker
+started is left running. The terminal is put back as it was, and the last line says how the
+session ended.
 
 | Exit status | Meaning |
 | --- | --- |

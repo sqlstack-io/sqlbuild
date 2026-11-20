@@ -354,7 +354,7 @@ impl Workers {
     }
 }
 
-/// The worker holds its claim's ownership before it runs any code; other platforms never adopt.
+/// The worker holds its claim's ownership before it runs any code; other platforms never adopt. It leads its own process group, so a terminal's Ctrl+C reaches the server, not the worker, and stopping the worker stops everything it started.
 fn prepare_spawn(
     location: &LocalLauncher,
     claim: &RunClaim,
@@ -375,6 +375,8 @@ fn prepare_spawn(
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(&mut command, 0);
     let (command, ownership) = prepare_worker(command, &location.claim(claim))?;
     let mut command = Command::from(command);
     command.kill_on_drop(true);

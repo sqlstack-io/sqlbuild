@@ -5,12 +5,10 @@ use std::time::Instant;
 use sqlbuild_core::screen_text::main::render_key_line::render_key_line;
 use sqlbuild_core::screen_text::main::render_prompt::render_prompt;
 use sqlbuild_core::screen_text::main::render_step_line::render_step_line;
-use sqlbuild_core::screen_text::models::{
-    Hotkey, PhaseState, PromptBlock, StepLine, WarehouseState,
-};
+use sqlbuild_core::screen_text::models::{Hotkey, PhaseState, PromptBlock, StepLine};
 
 use crate::dev_screen::_helpers::labels::{elapsed_since, step_label};
-use crate::dev_screen::constants::{READY_KEYS, RETRY_KEY, STARTING_KEYS};
+use crate::dev_screen::constants::{READY_KEYS, STARTING_KEYS};
 use crate::dev_screen::models::{DevScreen, StepRow};
 
 /// The rows redrawn in place below everything printed for good.
@@ -128,17 +126,13 @@ pub(crate) fn sign_in_title(adapter: &str) -> String {
     format!("{adapter} needs you to sign in")
 }
 
-/// The keys for where the session stands: `s` only while the warehouse is not connected.
+/// The keys for where the session stands.
 pub(crate) fn hotkeys(screen: &DevScreen) -> Vec<Hotkey> {
-    let mut keys: Vec<(char, &str)> = if screen.ready {
+    let keys: Vec<(char, &str)> = if screen.ready {
         READY_KEYS.to_vec()
     } else {
         STARTING_KEYS.to_vec()
     };
-    let connected: bool = matches!(screen.warehouse, Some(WarehouseState::Connected { .. }));
-    if screen.ready && !connected {
-        keys.insert(keys.len() - 1, RETRY_KEY);
-    }
     keys.into_iter()
         .map(|(key, label)| Hotkey {
             key,

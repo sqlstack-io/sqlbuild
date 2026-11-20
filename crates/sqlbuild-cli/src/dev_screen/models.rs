@@ -71,6 +71,10 @@ pub(crate) enum ScreenMessage {
     Tick,
     /// The session is stopping; the live rows give way to one line per stopped service.
     Stopping,
+    /// A stop is cancelling a run first, such as `Cancelling run orders_job… 2 queries (Ctrl+C again to force)`.
+    Cancelling {
+        label: String,
+    },
     /// A service stopped, such as `Stopped UI server`, after `elapsed`.
     Stopped {
         label: String,
@@ -84,7 +88,6 @@ pub(crate) enum ScreenAction {
     None,
     OpenUi,
     Recompile,
-    RetryWarehouse,
 }
 
 /// The text one message writes and the action it asks for.

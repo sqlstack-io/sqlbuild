@@ -1,4 +1,4 @@
-//! Stop the development roles together within a grace period, one line per service, and say how the session ended.
+//! Stop the development roles together within a grace period, one line per service, and say how the session ended; a stop with runs in flight cancels them first.
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -14,15 +14,17 @@ use crate::dev_session::constants::WAREHOUSE_FAILED;
 use crate::dev_stop::constants::{ABORT_WAIT, STOP_GRACE};
 use crate::dev_stop::main::stop_switch::stop_switch;
 use crate::dev_stop::models::DevEnd;
+use crate::native_commands::_helpers::location::dev_cancel::{DevRuns, cancel_active_runs};
 
 /// A role's end as `JoinSet::join_next_with_id` reports it; `None` when no role was left.
 type RoleEnd = Option<Result<(Id, Result<(), ControlError>), JoinError>>;
 
-/// The development roles and the name each stop line gives them.
+/// The development roles, the name each stop line gives them, and the runs a stop cancels while the scheduler runs.
 #[derive(Default)]
 pub(crate) struct DevRoles {
     pub(crate) tasks: JoinSet<Result<(), ControlError>>,
     labels: HashMap<Id, &'static str>,
+    pub(crate) runs: Option<DevRuns>,
 }
 
 impl DevRoles {
@@ -39,7 +41,7 @@ impl DevRoles {
     }
 }
 
-/// Wait for a stop request or a role to end, then stop every role: each gets the grace period, then its processes are killed and the rest aborted.
+/// Wait for a stop request or a role to end; a requested stop cancels the runs in flight first. Then stop every role: each gets the grace period, then its processes are killed and the rest aborted.
 pub(crate) async fn supervise_development_roles(
     mut roles: DevRoles,
     stop: watch::Sender<bool>,
@@ -50,6 +52,9 @@ pub(crate) async fn supervise_development_roles(
         reason = stop_switch().requested() => DevEnd::Stopped(reason),
     };
     drop(messages.send(ScreenMessage::Stopping));
+    if let (DevEnd::Stopped(_), Some(runs)) = (&end, &roles.runs) {
+        cancel_active_runs(runs, messages).await;
+    }
     stop.send_replace(true);
     stop_switch().terminate_groups();
     let began: Instant = Instant::now();

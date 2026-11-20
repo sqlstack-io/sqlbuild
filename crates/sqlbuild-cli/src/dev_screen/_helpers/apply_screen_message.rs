@@ -6,8 +6,8 @@ use sqlbuild_core::screen_text::models::PhaseState;
 
 use crate::dev_screen::_helpers::lines::{compose, ready_lines};
 use crate::dev_screen::_helpers::transitions::{
-    child_event, client_text, key_pressed, logged, run_reported, service_stopped, step_failed,
-    step_finished, step_started, warehouse_settled,
+    child_event, client_text, key_pressed, logged, run_cancelling, run_reported, service_stopped,
+    step_failed, step_finished, step_started, warehouse_settled,
 };
 use crate::dev_screen::models::{DevScreen, ScreenAction, ScreenMessage, ScreenOutput};
 
@@ -80,6 +80,10 @@ pub(crate) fn apply_screen_message(
                 },
                 Vec::new(),
             )
+        }
+        ScreenMessage::Cancelling { label } => {
+            let lines: Vec<String> = run_cancelling(&screen, label);
+            (screen, lines)
         }
         ScreenMessage::Stopped { label, elapsed } => {
             let lines: Vec<String> = service_stopped(&screen, label, elapsed);

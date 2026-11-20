@@ -322,8 +322,29 @@ class DevelopmentTerminalTestCase:
     description: str
     arguments: list[str]
     unset: frozenset[str]
+    # How the client reads the code: `sys.stdin.readline()` or `getpass.getpass(...)` on /dev/tty.
+    read_code: str
     expected_ready: str
     expected_sign_ins: list[str]
+    # How often the typed code appears on the terminal: only a terminal's own echo ever shows it.
+    expected_code_shown: int
+
+
+@dataclass(frozen=True)
+class DevelopmentStartupStopTestCase:
+    description: str
+    keys: bytes
+    expected_exit_code: int
+    expected_result: str
+
+
+@dataclass(frozen=True)
+class DevelopmentActiveRunStopTestCase:
+    description: str
+    keys: bytes
+    expected_exit_code: int
+    expected_lines: list[str]
+    expected_status: str
 
 
 @dataclass(frozen=True)

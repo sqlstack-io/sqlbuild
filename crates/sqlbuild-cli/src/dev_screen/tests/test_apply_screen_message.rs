@@ -289,13 +289,13 @@ fn given_any_session_when_drawn_then_the_header_is_printed_once_and_no_row_overf
 #[test]
 fn given_keys_after_ready_when_pressed_then_they_ask_for_actions() {
     let test_cases = [KeyTestCase {
-        description: "o, r and s act; l toggles the log; other keys do nothing",
+        description: "o and r act; l toggles the log; other keys, s among them, do nothing",
         keys: "olrsx",
         expected_actions: vec![
             ScreenAction::OpenUi,
             ScreenAction::None,
             ScreenAction::Recompile,
-            ScreenAction::RetryWarehouse,
+            ScreenAction::None,
             ScreenAction::None,
         ],
     }];

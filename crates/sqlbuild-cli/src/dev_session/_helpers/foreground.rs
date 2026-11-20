@@ -1,19 +1,17 @@
-//! Open the dev target's first connection in the foreground: the client reads a pseudo-terminal the screen types into, so Ctrl+C stays with `sqb dev`.
+//! Open the dev target's first connection in the foreground: the client owns a pseudo-terminal the screen types into, without echo, so Ctrl+C stays with `sqb dev` and typed secrets are never shown or logged.
 
 use std::fs::File;
 use std::io::Read;
 use std::process::Stdio;
 
 use sqlbuild_core::screen_text::models::WarehouseState;
-use sqlbuild_orchestration::dev_events::constants::DEV_EVENTS_VARIABLE;
+use sqlbuild_orchestration::dev_events::constants::{DEBUG_REPORT_VARIABLE, DEV_EVENTS_VARIABLE};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::dev_screen::models::{DevStep, KeyInput, ScreenMessage};
-use crate::dev_session::_helpers::connection::{
-    ReportSplit, connection_outcome, split_debug_output,
-};
+use crate::dev_session::_helpers::connection::{connection_outcome, split_debug_output};
 use crate::dev_session::constants::{CONNECTING, DEBUG_DRAIN, NO_REPORT};
 use crate::dev_session::models::DevProject;
 use crate::dev_stop::main::stop_switch::stop_switch;
@@ -63,18 +61,22 @@ impl Drop for Foreground<'_> {
     }
 }
 
-/// The report on stdout, the client's text on stdout and stderr streamed to the screen, until `sqb debug` exits even if a browser it opened keeps the pipes.
+/// The report from its own file; the client's text on stdout and stderr streamed to the screen, until `sqb debug` exits even if a browser it opened keeps the pipes.
 async fn run_debug(
     screen: &UnboundedSender<ScreenMessage>,
     keys: Option<&KeyInput>,
     dev: &DevProject,
 ) -> std::io::Result<Vec<u8>> {
+    let report: ReportFile = ReportFile(
+        std::env::temp_dir().join(format!("sqb-dev-debug-{}.json", uuid::Uuid::now_v7())),
+    );
     let mut command = Command::new(&dev.executable);
     command
         .arg("--project-dir")
         .arg(&dev.project)
         .args(["debug", "--target", &dev.target, "--json"])
         .env_remove(DEV_EVENTS_VARIABLE)
+        .env(DEBUG_REPORT_VARIABLE, &report.0)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
@@ -92,7 +94,9 @@ async fn run_debug(
         Some((_, client)) => {
             command.stdin(Stdio::from(client.try_clone()?));
             #[cfg(unix)]
-            command.process_group(0);
+            sqlbuild_process_ownership::terminal::main::controlling_terminal::controlling_terminal(
+                command.as_std_mut(),
+            );
         }
         None => {
             command.stdin(Stdio::inherit());
@@ -116,7 +120,6 @@ async fn run_debug(
     let (Some(mut stdout), Some(mut stderr)) = (child.stdout.take(), child.stderr.take()) else {
         return Err(std::io::Error::other("sqb debug output is unavailable"));
     };
-    let mut split: ReportSplit = ReportSplit::default();
     let errors = async {
         let mut chunk: [u8; 4096] = [0; 4096];
         loop {
@@ -140,10 +143,9 @@ async fn run_debug(
             if read == 0 {
                 return Ok::<(), std::io::Error>(());
             }
-            let client: String = split.feed(&String::from_utf8_lossy(&chunk[..read]));
-            if !client.is_empty() {
-                drop(screen.send(ScreenMessage::ClientOutput(client)));
-            }
+            drop(screen.send(ScreenMessage::ClientOutput(
+                String::from_utf8_lossy(&chunk[..read]).into_owned(),
+            )));
         }
     };
     {
@@ -161,10 +163,19 @@ async fn run_debug(
     }
     child.wait().await?;
     drop(foreground);
-    Ok(split.finish())
+    std::fs::read(&report.0)
 }
 
-/// The client's echo of what is typed, and anything it writes to its terminal, shown in the prompt.
+/// The file `sqb debug` writes its report to, removed once read or abandoned.
+struct ReportFile(std::path::PathBuf);
+
+impl Drop for ReportFile {
+    fn drop(&mut self) {
+        drop(std::fs::remove_file(&self.0));
+    }
+}
+
+/// Anything the client writes to its terminal, shown in the prompt; typed keys are not echoed back.
 fn echo_terminal(controller: File, screen: UnboundedSender<ScreenMessage>) {
     std::thread::spawn(move || {
         let mut controller: File = controller;
@@ -183,7 +194,7 @@ fn echo_terminal(controller: File, screen: UnboundedSender<ScreenMessage>) {
     });
 }
 
-/// A pseudo-terminal: the controller `sqb dev` writes keys to, and the terminal the client reads, sized like this one.
+/// A pseudo-terminal: the controller `sqb dev` writes keys to, and the terminal the client reads, sized like this one and without echo, so what is typed never comes back as output.
 #[cfg(unix)]
 fn open_terminal() -> std::io::Result<(File, File)> {
     use rustix::fs::{Mode, OFlags};
@@ -200,6 +211,9 @@ fn open_terminal() -> std::io::Result<(File, File)> {
     if let Ok(size) = rustix::termios::tcgetwinsize(std::io::stdin()) {
         let _ = rustix::termios::tcsetwinsize(&client, size);
     }
+    let mut modes = rustix::termios::tcgetattr(&client)?;
+    modes.local_modes -= rustix::termios::LocalModes::ECHO | rustix::termios::LocalModes::ECHONL;
+    rustix::termios::tcsetattr(&client, rustix::termios::OptionalActions::Now, &modes)?;
     Ok((File::from(controller), File::from(client)))
 }
 

@@ -542,7 +542,6 @@ pub(crate) fn key_pressed(
     let action: ScreenAction = match key {
         'o' => ScreenAction::OpenUi,
         'r' => ScreenAction::Recompile,
-        's' => ScreenAction::RetryWarehouse,
         _ => ScreenAction::None,
     };
     if key != 'l' {
@@ -559,6 +558,19 @@ pub(crate) fn key_pressed(
         Vec::new()
     };
     (screen, shown, action)
+}
+
+/// The line a stop prints while it cancels a run, in the live view and plain output alike.
+pub(crate) fn run_cancelling(screen: &DevScreen, label: String) -> Vec<String> {
+    lasting_step(
+        screen,
+        &StepLine {
+            state: PhaseState::Pending,
+            label,
+            elapsed: None,
+            detail: String::new(),
+        },
+    )
 }
 
 /// A service stopped: `· Stopped UI server  0.1s`.
