@@ -84,11 +84,11 @@ export interface ApiClient extends PlatformApi {
 	listCatalogNodes(scope: Scope): Promise<CatalogNode[]>;
 	/** Every node's build state at the current status version, for applying `node_status` changes to a listing. */
 	listNodeStates(scope: Scope): Promise<NodeStates>;
-	/** `listing` is a current `listCatalogNodes` result the caller already holds, so it isn't read again. */
-	getCatalogNode(scope: Scope, key: string, listing?: CatalogNode[]): Promise<CatalogNodeDetail | null>;
+	/** `listing` and `checks` are current `listCatalogNodes` and `listChecks` results the caller already holds, so they aren't read again. */
+	getCatalogNode(scope: Scope, key: string, listing?: CatalogNode[], checks?: Check[]): Promise<CatalogNodeDetail | null>;
 	/** The snapshot's column lineage around one node; `listing` as for `getCatalogNode`. */
 	getColumnLineage(scope: Scope, key: string, listing?: CatalogNode[]): Promise<ColumnLineage | null>;
-	/** Every audit and check with its latest result. */
+	/** Every audit and check with its latest result; a repeat the server answers with 304 returns the held list. */
 	listChecks(scope: Scope): Promise<Check[]>;
 	getCheck(scope: Scope, id: string): Promise<CheckDetail | null>;
 	/** The latest evaluation's SQL and error texts. `view.sql`; every read is audited. */
