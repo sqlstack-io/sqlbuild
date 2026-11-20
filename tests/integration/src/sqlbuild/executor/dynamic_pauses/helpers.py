@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -26,6 +27,7 @@ from sqlbuild.executor.dynamic_pauses.classes.dynamic_heartbeat import DynamicHe
 from sqlbuild.executor.dynamic_pauses.classes.dynamic_hold import DynamicHold
 from sqlbuild.executor.dynamic_pauses.constants import CLAIM_RUN_MARKER
 from sqlbuild.executor.dynamic_pauses.main.hold_dynamic_models import hold_dynamic_models
+from sqlbuild.executor.dynamic_pauses.main.resume_expired_holds import resume_expired_holds
 from sqlbuild.executor.dynamic_pauses.models import DynamicPauseEvent
 from sqlbuild.executor.dynamic_pauses.types import DynamicPauseEventType, StateLocation
 from tests.integration.src.sqlbuild.compiler.planner.main._test_types import (
@@ -365,6 +367,84 @@ def held_by_dead_run(
     assert dead is not None
     dead.acquire(connection=connection, on_progress=None)
     return plan
+
+
+def expired_hold_plan(
+    *, adapter: PausingDuckDbAdapter, connection: Any, database_path: Path
+) -> PlanOutput:
+    """Build once, seed `dead_run`'s hold on `daily_totals` an hour silent; the rebuild's plan."""
+
+    _ = build_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(
+            orders_query="SELECT 1 AS order_id", report_locations={}, refresh_on_build=False
+        ),
+        runtime=BuildRuntimeParams(run_id="first_run"),
+        database_path=database_path,
+    )
+    plan: PlanOutput = plan_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(
+            orders_query="SELECT 1 AS order_id UNION ALL SELECT 2",
+            report_locations={},
+            refresh_on_build=False,
+        ),
+    )
+    seed_hold(
+        adapter=adapter,
+        connection=connection,
+        run_id="dead_run",
+        name="daily_totals",
+        idle_seconds=3600,
+    )
+    return plan
+
+
+def age_beat_and_sync(
+    *,
+    adapter: PausingDuckDbAdapter,
+    connection: Any,
+    waiting: tuple[str, int],
+    sync: tuple[str, float, str],
+) -> None:
+    """Age the waiting run as a long wait would, let it beat, run a sync, then close the claim."""
+
+    run_id, age_seconds = waiting
+    recorded_by, grace_seconds, claim_run = sync
+    connection.execute(
+        "UPDATE staging._sqlbuild_dynamic_pauses "
+        f"SET recorded_at = recorded_at - INTERVAL {age_seconds} SECOND WHERE run_id = '{run_id}'"
+    )
+    aged: int = heartbeat_count(connection=connection, run_id=run_id)
+    deadline: float = time.monotonic() + 2
+    while heartbeat_count(connection=connection, run_id=run_id) <= aged and (
+        time.monotonic() < deadline
+    ):
+        time.sleep(0.02)
+    _ = resume_expired_holds(
+        adapter=adapter,
+        connection=connection,
+        location=(None, "staging"),
+        grace_seconds=grace_seconds,
+        recorded_by=recorded_by,
+        quiet_token=None,
+    )
+    connection.execute(
+        insert_sql(
+            adapter=adapter,
+            location=(None, "staging"),
+            events=(
+                DynamicPauseEvent(
+                    event_type=DynamicPauseEventType.RESUMED,
+                    run_id=claim_run,
+                    recorded_by=recorded_by,
+                    relation=_daily_totals(),
+                ),
+            ),
+        )
+    )
 
 
 def other_model_hold(*, adapter: PausingDuckDbAdapter, database_path: Path) -> DynamicHold:

@@ -85,5 +85,6 @@ whether it succeeds or fails.
 
 ## Limitations
 
+- A resume that takes longer than its 2-minute claim can still start a model a build has just paused: the last `ALTER` of a sync killed at the limit, or a build's resume of another model on a queued warehouse.
 - Unit tests and scenarios treat a dynamic model as a table.
 - On a target with `schema = "preserve"`, builds see each other's pauses only when their dynamic models share a schema.
