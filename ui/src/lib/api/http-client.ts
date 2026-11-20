@@ -881,7 +881,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const [runs, checks, nodes, changes, events, acknowledgements, conditions] = read;
 			return overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now: Date.now(), scopeKey: scope.locationId });
 		},
-		listChecks: (scope: Scope): Promise<Check[]> => shared(`checks ${scope.locationId}`, () => checkListing(scope)),
+		listChecks: (scope: Scope, notBefore?: number): Promise<Check[]> => shared(`checks ${scope.locationId}`, () => checkListing(scope), notBefore),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
 		async getCheckSql(scope: Scope, checkId: string): Promise<CheckSql> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
@@ -947,7 +947,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 	 * One request per listing at a time: pages that refresh together on a change notice share it
 	 * instead of each asking the server again. A write clears it, so reads after a write see it.
 	 */
-	const inFlight = new Map<string, Promise<unknown>>();
+	/** Reads in flight by key, with when each began (`performance.now()`). */
+	const inFlight = new Map<string, { read: Promise<unknown>; startedAt: number }>();
 	/** Windows of runs older than the newest, by the run each starts after; a mutation here forgets them. */
 	const olderWindows = new Map<string, Promise<Wire['RunRecord'][]>>();
 	function forgetPending() {
@@ -969,11 +970,13 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		return read;
 	}
 
-	function shared<T>(key: string, load: () => Promise<T>): Promise<T> {
-		const pending = inFlight.get(key) as Promise<T> | undefined;
-		if (pending) return pending;
-		const started: Promise<T> = load().finally(() => inFlight.get(key) === started && inFlight.delete(key));
-		inFlight.set(key, started);
+	/** Joins the read in flight under `key`, unless it began before `notBefore`, such as a change signal, and may miss it. */
+	function shared<T>(key: string, load: () => Promise<T>, notBefore = -Infinity): Promise<T> {
+		const pending = inFlight.get(key);
+		if (pending && pending.startedAt > notBefore) return pending.read as Promise<T>;
+		const startedAt = performance.now();
+		const started: Promise<T> = load().finally(() => inFlight.get(key)?.read === started && inFlight.delete(key));
+		inFlight.set(key, { read: started, startedAt });
 		return started;
 	}
 

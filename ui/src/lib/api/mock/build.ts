@@ -191,7 +191,7 @@ export class MockBuild {
 		);
 	}
 
-	listChecks(scope: Scope): Promise<Check[]> {
+	listChecks(scope: Scope, _notBefore?: number): Promise<Check[]> {
 		return this.#ctx.reply(this.#checks(scope, this.#states(scope)));
 	}
 

@@ -88,8 +88,11 @@ export interface ApiClient extends PlatformApi {
 	getCatalogNode(scope: Scope, key: string, listing?: CatalogNode[], checks?: Check[]): Promise<CatalogNodeDetail | null>;
 	/** The snapshot's column lineage around one node; `listing` as for `getCatalogNode`. */
 	getColumnLineage(scope: Scope, key: string, listing?: CatalogNode[]): Promise<ColumnLineage | null>;
-	/** Every audit and check with its latest result; a repeat the server answers with 304 returns the held list. */
-	listChecks(scope: Scope): Promise<Check[]>;
+	/**
+	 * Every audit and check with its latest result; a repeat the server answers with 304 returns the held list.
+	 * A read already in flight is joined only if it began after `notBefore` (`performance.now()`), such as a change signal.
+	 */
+	listChecks(scope: Scope, notBefore?: number): Promise<Check[]>;
 	getCheck(scope: Scope, id: string): Promise<CheckDetail | null>;
 	/** The latest evaluation's SQL and error texts. `view.sql`; every read is audited. */
 	getCheckSql(scope: Scope, checkId: string): Promise<CheckSql>;

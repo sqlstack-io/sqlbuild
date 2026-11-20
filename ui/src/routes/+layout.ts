@@ -15,6 +15,18 @@ export const trailingSlash = 'never';
 
 type Read = (client: ApiClient, scope: Scope, match: RegExpMatchArray, search: URLSearchParams) => Promise<unknown>[];
 
+/**
+ * The node view's detail read, started early only with the listing and checks it will be given: both held
+ * for this location, and no checks read in flight. Otherwise the page waits for the checks and reads the
+ * detail once, which a read started with other arguments could not stand in for.
+ */
+function nodeDetailRead(client: ApiClient, scope: Scope, name: string): Promise<unknown>[] {
+	const { nodes, scopeKey } = catalogNodes.view;
+	const checks = sharedChecks.view;
+	if (!nodes || scopeKey !== scope.locationId || !checks.checks || checks.loading || checks.scopeKey !== scope.locationId) return [];
+	return [client.getCatalogNode(scope, name, nodes, checks.checks)];
+}
+
 const part = (match: RegExpMatchArray) => decodeURIComponent(match[1]);
 
 /** The shared catalog store's listing, which these pages read; the store holds it, so pages never read it themselves. */
@@ -38,7 +50,7 @@ const PAGE_READS: [RegExp, Read][] = [
 	[/^\/triggers$/, (c, s) => [c.listTriggers(s)]],
 	[/^\/triggers\/([^/]+)$/, (c, s, m) => [c.getTrigger(s, part(m))]],
 	[/^\/catalog$/, () => []],
-	[/^\/catalog\/([^/]+)$/, (c, s, m) => [c.getCatalogNode(s, part(m), catalogNodes.view.nodes, sharedChecks.view.checks), c.getColumnLineage(s, part(m), catalogNodes.view.nodes)]],
+	[/^\/catalog\/([^/]+)$/, (c, s, m) => [...nodeDetailRead(c, s, part(m)), c.getColumnLineage(s, part(m), catalogNodes.view.nodes)]],
 	[/^\/checks$/, () => []],
 	[/^\/checks\/([^/]+)$/, (c, s, m) => [c.getCheck(s, part(m))]],
 	[/^\/changes$/, (c, s) => [c.listSnapshotChanges(s)]],
