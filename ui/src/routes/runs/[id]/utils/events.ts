@@ -2,6 +2,7 @@
 
 import type { RunEvent, RunEventLevel, RunNode, RunOutputLine } from '$lib/api';
 import { eventTone } from '$lib/operate/labels';
+import { fullStamp } from './proto';
 import type { EventCategory } from '../types';
 
 export const EVENT_CATEGORIES: { value: EventCategory; label: string }[] = [
@@ -86,7 +87,22 @@ export type LogEntry = {
 	queries: LogEntry[];
 	/** Shown even with printed output hidden: a failing run's last printed block, which ends with its failures. */
 	pinned: boolean;
+	/** A short tag in plain words (built, merged, failed, skipped, check, run) and its colour. */
+	tag?: { text: string; tone: string };
+	/** Structured details the row opens to in place, as key and value; `long` is text behind "show more". */
+	details?: [string, string][];
+	long?: string;
 };
+
+const TAG_TONE = { ok: 'var(--sb-success)', err: 'var(--sb-error)', warn: 'var(--sb-warning)', run: 'var(--sb-running)', quiet: 'var(--sb-text-faint)' };
+/** The tag an event's row carries: plain words, never the event type. */
+function eventTag(e: RunEvent): LogEntry['tag'] {
+	if (e.type === 'resource_attempt_completed') return { text: 'built', tone: TAG_TONE.ok };
+	if (e.type === 'resource_attempt_failed' || e.type === 'statement_failed' || e.type === 'invocation_failed') return { text: 'failed', tone: TAG_TONE.err };
+	if (e.type === 'resource_attempt_skipped') return { text: 'skipped', tone: TAG_TONE.quiet };
+	if (e.type === 'audit_completed') return { text: 'check', tone: e.level === 'info' ? TAG_TONE.ok : TAG_TONE.warn };
+	return { text: 'run', tone: TAG_TONE.quiet };
+}
 
 const QUERY_DONE = new Set(['statement_completed', 'statement_failed']);
 const NODE_ENDS = new Set(['resource_attempt_completed', 'resource_attempt_failed', 'resource_attempt_skipped']);
@@ -106,7 +122,9 @@ function entryOf(e: RunEvent): LogEntry {
 		stream: null,
 		statementId: e.statementId,
 		queries: [],
-		pinned: false
+		pinned: false,
+		tag: eventTag(e),
+		details: e.message && e.message !== text ? [['Message', e.message]] : undefined
 	};
 }
 
@@ -169,6 +187,18 @@ export type NodeOutcomes = {
 	now: number;
 };
 
+/** A node line's tag: built or merged, a warned check, failed, skipped, building or not run. */
+function nodeTag(n: RunNode, checks: readonly RunEvent[]): LogEntry['tag'] {
+	if (n.status === 'success' || n.status === 'warn') {
+		if (n.status === 'warn' || checks.some((c) => c.level !== 'info')) return { text: 'check', tone: TAG_TONE.warn };
+		return { text: n.kind === 'incremental' ? 'merged' : 'built', tone: TAG_TONE.ok };
+	}
+	if (n.status === 'failed') return { text: 'failed', tone: TAG_TONE.err };
+	if (n.status === 'skipped') return { text: 'skipped', tone: TAG_TONE.quiet };
+	if (n.status === 'running') return { text: 'building', tone: TAG_TONE.run };
+	return { text: 'not run', tone: TAG_TONE.quiet };
+}
+
 const rowsText = (n: number) => n.toLocaleString('en-GB');
 const secsText = (ms: number) => (ms < 60_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`);
 const BUILT: Record<string, string> = { table: 'rebuilt table', view: 'rebuilt view', incremental: 'incremental merge', seed: 'loaded seed', loader: 'loaded', task: 'ran task' };
@@ -228,6 +258,17 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 		if (!at || n.status === 'pending') return [];
 		const checks = evs.filter((e) => e.type === 'audit_completed');
 		const o = outcomeText(n, checks, skipCause(n), now);
+		const where = n.errorLocation ? (n.errorLocation.line == null ? n.errorLocation.file : `${n.errorLocation.file}:${n.errorLocation.line}`) : null;
+		const details: [string, string][] = [
+			['Kind', n.kind ?? 'node'],
+			...(n.startedAt ? [['Started', fullStamp(n.startedAt)] as [string, string]] : []),
+			...(n.endedAt && n.startedAt ? [['Took', secsText(Date.parse(n.endedAt) - Date.parse(n.startedAt))] as [string, string]] : []),
+			...(n.rowsAffected != null ? [[n.status === 'running' ? 'Rows so far' : 'Rows', `${n.kind === 'incremental' ? '+' : ''}${rowsText(n.rowsAffected)}`] as [string, string]] : []),
+			...(n.errorMessage ? [['Error', n.errorMessage] as [string, string]] : []),
+			...(where ? [['Location', where] as [string, string]] : []),
+			...(n.status === 'skipped' && skipCause(n) ? [['Why', skipCause(n)!.replace(/^skipped: /, '')] as [string, string]] : []),
+			...checks.map((c): [string, string] => ['Check', c.message.replace(/ \(severity (\w+)\)$/, ' · severity $1')])
+		];
 		return [
 			{
 				id: `node-${n.runId}-${n.nodeKey}`,
@@ -242,7 +283,10 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 				stream: null,
 				statementId: null,
 				queries: evs.filter((e) => QUERY_DONE.has(e.type)).map(entryOf),
-				pinned: false
+				pinned: false,
+				tag: nodeTag(n, checks),
+				details,
+				long: n.errorDetail ?? undefined
 			}
 		];
 	});

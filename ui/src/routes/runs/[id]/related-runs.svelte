@@ -160,8 +160,8 @@
 		flex: 0 0 auto;
 		max-height: 300px;
 		overflow: auto;
-		padding: 10px 24px;
-		border-bottom: 1px solid var(--border);
+		padding: 12px 24px;
+		border-bottom: 1px solid var(--border-subtle);
 		background: var(--sb-surface-low);
 		font-size: 12.5px;
 	}

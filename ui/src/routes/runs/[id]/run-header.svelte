@@ -99,8 +99,8 @@
 		display: flex;
 		align-items: flex-start;
 		gap: 16px;
-		padding: 12px 24px 12px;
-		border-bottom: 1px solid var(--border);
+		padding: 16px 24px 14px;
+		border-bottom: 1px solid var(--border-subtle);
 	}
 	.left {
 		min-width: 0;
@@ -160,7 +160,7 @@
 		display: flex;
 		align-items: baseline;
 		gap: 14px;
-		margin-top: 6px;
+		margin-top: 8px;
 	}
 	.summary-row :global(.details-toggle) {
 		margin-left: auto;

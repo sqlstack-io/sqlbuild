@@ -180,7 +180,8 @@
 		color: var(--sb-text-faint);
 	}
 	.pick {
-		border-bottom: 1px solid var(--border);
+		padding: 4px 14px;
+		border-bottom: 1px solid var(--border-subtle);
 	}
 	.pick :global(.selection-bar) {
 		border-bottom: none;
@@ -220,7 +221,7 @@
 		position: relative;
 		height: 7px;
 		flex-shrink: 0;
-		border-block: 1px solid var(--border);
+		border-block: 1px solid var(--border-subtle);
 		background: var(--sb-surface-low);
 		cursor: row-resize;
 	}

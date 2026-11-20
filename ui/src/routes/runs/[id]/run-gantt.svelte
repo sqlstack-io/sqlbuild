@@ -390,7 +390,7 @@
 		content-visibility: auto;
 		contain-intrinsic-size: auto 32px;
 		align-items: center;
-		border-bottom: 1px solid var(--border-subtle);
+		border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 45%, transparent);
 		text-align: left;
 	}
 	.row[role="button"] {

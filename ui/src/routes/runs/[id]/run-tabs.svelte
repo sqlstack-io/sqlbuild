@@ -37,9 +37,9 @@
 	const shownEntries = $derived(filtering ? entries.filter((e) => (e.nodeKey ? sel.has(e.nodeKey) : filterKeys.some((k) => e.text.includes(k)))) : entries);
 	const grouped = $derived((view.detail?.children.length ?? 0) > 0);
 	// Kept here so the choice survives switching tabs, and the Log count matches the rows shown.
-	// On by default (CHI-1591, change 5): what sqb printed is the proof the run is moving.
-	let printed = $state(true);
-	const logCount = $derived(shownEntries.filter((e) => printed || e.category !== 'output' || e.pinned).length);
+	// Events | Output (CHI-1591): the log opens on its events, one line per node; Output is what sqb printed.
+	let printed = $state(false);
+	const logCount = $derived(shownEntries.filter((e) => (printed ? e.category === 'output' : e.category !== 'output')).length);
 
 	const TABS = $derived(bottomTabs(app.client, (c) => app.can(c), !!view.cost && view.cost.status !== 'none'));
 	$effect(() => {

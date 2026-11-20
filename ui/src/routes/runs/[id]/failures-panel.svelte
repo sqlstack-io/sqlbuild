@@ -106,8 +106,8 @@
 <style>
 	.failures {
 		flex: 0 0 auto;
-		border-bottom: 1px solid color-mix(in srgb, var(--sb-error) 30%, var(--border));
-		background: color-mix(in srgb, var(--sb-error) 4%, var(--background));
+		border-bottom: 1px solid var(--border-subtle);
+		background: color-mix(in srgb, var(--sb-error) 2.5%, var(--background));
 		font-size: 12.5px;
 	}
 	ul {
