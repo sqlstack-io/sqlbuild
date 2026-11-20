@@ -60,7 +60,10 @@ export const SNAPSHOT_NODES: SnapshotNode[] = [
 	node('stg_shipments', 'view', 'fulfillment', ['raw__shipments']),
 	node('fct_shipments', 'incremental', 'fulfillment', ['stg_shipments', 'fact_orders'], { cursor: 'timestamp' }),
 	node('agg_delivery_times', 'table', 'fulfillment', ['fct_shipments']),
-	node('rpt_late_deliveries', 'table', 'fulfillment', ['agg_delivery_times', 'dim_customers'])
+	node('rpt_late_deliveries', 'table', 'fulfillment', ['agg_delivery_times', 'dim_customers']),
+	// Python nodes (CHI-1591): a loader that prints its paging, and a task that warns.
+	node('raw_events', 'loader', 'ingest', [], { cursor: 'timestamp', path: 'models/ingest/raw_events.py' }),
+	node('score_customers', 'task', 'ml', ['dim_customers'], { path: 'models/ml/score_customers.py' })
 ];
 
 const BY_KEY = new Map(SNAPSHOT_NODES.map((n) => [n.key, n]));

@@ -113,7 +113,7 @@
 		<StatementsTab {statements} total={view.statements.length} {grouped} />
 	{:else if view.tab === 'cost'}
 		{#if view.cost}
-			<CostTab cost={view.cost} filteredBy={view.selected} onnode={(key) => view.focusNode(key, 'cost')} />
+			<CostTab cost={view.cost} filteredBy={filterKeys} onnode={(key) => view.focusNode(key, 'cost')} />
 		{:else if view.costRes.error}
 			<p class="err">Couldn't load this run's cost: {view.costRes.error}</p>
 		{/if}

@@ -94,8 +94,8 @@
 	function onnodeclick({ node, event }: { node: Node; event: MouseEvent | TouchEvent }) {
 		if (node.type === 'folder') return setOpen(new Set([...(open ?? allFolders(runCatalog)), String(node.data.group)]));
 		if (node.type !== 'asset') return;
-		if ('shiftKey' in event && (event.shiftKey || event.metaKey || event.ctrlKey)) view.selectNode(node.id);
-		else view.openDrawer(node.id);
+		void event;
+		view.clickNode(node.id);
 	}
 
 	// ---- a group run: the group's lineage, coloured by this run ----
@@ -110,7 +110,7 @@
 	let memberSelection = $state<MemberSelection | null>(null);
 	$effect(() => {
 		const node = memberSelection?.node;
-		if (node) untrack(() => view.openDrawer(node));
+		if (node) untrack(() => view.clickNode(node));
 	});
 </script>
 

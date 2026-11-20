@@ -7,7 +7,6 @@
 	import { to } from '$lib/paths';
 	import DisclosureButton from '$lib/components/disclosure-button.svelte';
 	import DownloadIcon from '@lucide/svelte/icons/download';
-	import SearchIcon from '@lucide/svelte/icons/search';
 	import type { RunEventLevel } from '$lib/api';
 	import { formatStamp } from '$lib/format/time';
 	import { nodeLabel, shortRunId } from '$lib/operate/labels';
@@ -16,6 +15,7 @@
 	import { fullStamp } from './utils/proto';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import LogFilter, { type FilterOption } from './log-filter.svelte';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 
 	let {
@@ -64,8 +64,37 @@
 	const hasOutput = $derived(entries.some((e) => e.category === 'output'));
 	const kindShown = (e: LogEntry) => (printed ? e.category === 'output' : e.category !== 'output' && (category === 'all' || e.category === category));
 	const levelShown = (e: LogEntry) => level === 'all' || e.level === level;
-	const q = $derived(query.trim().toLowerCase());
-	const matches = (e: LogEntry) => !q || [e.nodeKey ?? '', e.text, e.title, ...e.queries.map((x) => x.text)].join(' ').toLowerCase().includes(q);
+	// The filter: `prefix:value` terms must all hold, and the other words are a free search (CHI-1591).
+	let stream = $state<'all' | 'stdout' | 'stderr'>('all');
+	const kindOf = (e: LogEntry) => e.tag?.text.replace(/ /g, '-') ?? null;
+	const terms = $derived(
+		query
+			.trim()
+			.split(/\s+/)
+			.filter(Boolean)
+			.map((t) => {
+				const m = t.match(/^(node|kind|level|job|stream):(.*)$/i);
+				return m ? { key: m[1].toLowerCase(), value: m[2].toLowerCase() } : { key: 'text', value: t.toLowerCase() };
+			})
+	);
+	const holds = (e: LogEntry, t: { key: string; value: string }) => {
+		if (!t.value) return true;
+		if (t.key === 'node') return !!e.nodeKey && nodeLabel(e.nodeKey).toLowerCase() === t.value;
+		if (t.key === 'kind') return kindOf(e) === t.value;
+		if (t.key === 'level') return e.level === (t.value === 'warning' ? 'warn' : t.value);
+		if (t.key === 'job') return memberOf(e.runId)?.toLowerCase() === t.value;
+		if (t.key === 'stream') return e.stream === t.value;
+		return [e.nodeKey ?? '', e.text, e.title, ...e.queries.map((x) => x.text)].join(' ').toLowerCase().includes(t.value);
+	};
+	const matches = (e: LogEntry) => terms.every((t) => holds(e, t)) && (!printed || stream === 'all' || e.stream === stream);
+	const uniq = (xs: (string | null | undefined)[]) => [...new Set(xs.filter((x): x is string => !!x))].sort();
+	const filterOptions = $derived<FilterOption[]>([
+		{ prefix: 'node', hint: 'a node', values: uniq(entries.map((e) => (e.nodeKey ? nodeLabel(e.nodeKey) : null))) },
+		{ prefix: 'kind', hint: 'built, merged, failed, check…', values: printed ? [] : uniq(entries.map(kindOf)) },
+		{ prefix: 'level', hint: 'error, warn, info', values: uniq(entries.filter((e) => (printed ? e.category === 'output' : e.category !== 'output')).map((e) => e.level)) },
+		{ prefix: 'job', hint: 'a member job', values: grouped ? uniq(entries.map((e) => memberOf(e.runId))) : [] },
+		{ prefix: 'stream', hint: 'stdout or stderr', values: printed ? uniq(entries.map((e) => e.stream)) : [] }
+	]);
 	const byCategory = $derived(entries.filter(kindShown));
 	const byLevel = $derived(entries.filter((e) => levelShown(e) && (printed ? e.category === 'output' : e.category !== 'output')));
 	const levelText = $derived(LEVELS.find((l) => l.value === level)?.label ?? 'All');
@@ -122,10 +151,18 @@
 			]}
 		/>
 	{/if}
-	<label class="search">
-		<SearchIcon size={13} />
-		<input bind:value={query} placeholder="Filter…" aria-label="Filter the log" />
-	</label>
+	{#if printed}
+		<SegmentedFilter
+			label="Stream"
+			bind:value={stream}
+			options={[
+				{ value: 'all', label: 'All' },
+				{ value: 'stdout', label: 'stdout' },
+				{ value: 'stderr', label: 'stderr' }
+			]}
+		/>
+	{/if}
+	<LogFilter bind:value={query} options={filterOptions} />
 	<DropdownMenu.Root>
 		<DropdownMenu.Trigger class="menu-trigger" aria-label="Levels">{level === 'all' ? 'Levels' : levelText} <ChevronDownIcon size={13} /></DropdownMenu.Trigger>
 		<DropdownMenu.Content class="w-44">
@@ -152,7 +189,7 @@
 
 <DataTable class="static compact log" embedded columns={logColumns} rows={shown} key={(e) => e.id} empty={entries.length ? 'Nothing in the log matches these filters.' : 'Nothing logged yet.'}>
 	{#snippet row(e)}
-			<tr class:error={e.level === 'error'} class:warn={e.level === 'warn'}>
+			<tr class:error={e.level === 'error'} class:warn={e.level === 'warn'} class:stderr={e.stream === 'stderr'}>
 				<td class="faint nowrap mono stamp" title={formatStamp(e.at)}>{fullStamp(e.at)}</td>
 				<td class="mono" class:faint={!e.nodeKey} title={e.nodeKey ? `Show only ${e.nodeKey} in the log` : undefined}>
 					{#if e.nodeKey && onnode}<Button variant="link" size="inline" class="font-mono text-[12px]" onclick={() => onnode(e.nodeKey!)}>{nodeLabel(e.nodeKey)}</Button>{:else}{e.nodeKey ? nodeLabel(e.nodeKey) : (e.stream ?? 'run')}{/if}
@@ -220,30 +257,13 @@
 	.filters {
 		position: sticky;
 		top: 0;
-		z-index: 2;
+		z-index: 6;
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 8px 12px;
 		padding: 10px 24px;
 		background: var(--background);
-	}
-	.search {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		padding: 3px 8px;
-		border: 1px solid var(--border-subtle);
-		border-radius: 2px;
-		color: var(--sb-text-faint);
-	}
-	.search input {
-		width: 180px;
-		border: 0;
-		outline: 0;
-		background: transparent;
-		color: var(--foreground);
-		font-size: 12px;
 	}
 	.filters :global(.menu-trigger) {
 		display: inline-flex;
@@ -297,6 +317,11 @@
 		font-family: var(--font-mono);
 		white-space: pre-wrap;
 		word-break: break-word;
+	}
+	/* What a node or sqb wrote to stderr: tinted, so warnings and tracebacks stand out from stdout. */
+	tr.stderr td.out {
+		background: color-mix(in srgb, var(--sb-warning) 5%, transparent);
+		color: color-mix(in srgb, var(--sb-warning) 70%, var(--foreground));
 	}
 	td.opens {
 		cursor: pointer;

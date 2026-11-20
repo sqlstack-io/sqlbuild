@@ -216,6 +216,11 @@ export function createRunDetailState(runId: string) {
 		openDrawer(key: string | null) {
 			drawer = key;
 		},
+		/** A click on a node's row, bar or card: ticks it in the selection (or unticks it) and shows it in the drawer. */
+		clickNode(key: string) {
+			selectNode(key);
+			drawer = key;
+		},
 		get summary() {
 			return summary;
 		},

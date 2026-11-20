@@ -191,6 +191,47 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
 };
 
 export const PYTHON_SOURCE: Record<string, { file: string; source: string }> = {
+	raw_events: {
+		file: 'models/ingest/raw_events.py',
+		source: `import logging
+
+from sqlbuild.loaders import loader
+from sqlbuild.executor.load.models import LoaderContext
+
+from shop.events_api import fetch_page
+
+log = logging.getLogger("shop.events")
+
+
+@loader(cursor="occurred_at", strategy="append")
+def raw_events(ctx: LoaderContext):
+    """Storefront events from the events API, paged since the last cursor."""
+    page = 1
+    while True:
+        rows = fetch_page(since=ctx.current_cursor_value, page=page)
+        if not rows:
+            return
+        print(f"Page {page}: {len(rows):,} events")
+        yield rows
+        page += 1`
+	},
+	score_customers: {
+		file: 'models/ml/score_customers.py',
+		source: `import pandas as pd
+from sqlbuild.tasks import task
+
+
+@task(upstream=["dim_customers"])
+def score_customers(ctx):
+    """Scores each customer's churn risk and writes it back."""
+    customers = ctx.query('SELECT * FROM __ref("dim_customers")').to_pandas()
+    print(f"Loaded {len(customers):,} customers")
+    features = customers[["orders", "lifetime_value"]]
+    features = features.fillna(method="ffill")
+    customers["churn_risk"] = model().predict_proba(features)[:, 1]
+    ctx.write("customer_scores", customers[["customer_id", "churn_risk"]])
+    print(f"Scored {len(customers):,} customers")`
+	},
 	raw__orders: {
 		file: 'tasks/raw__orders.py',
 		source: `from sqlbuild.loaders import loader

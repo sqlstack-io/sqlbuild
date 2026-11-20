@@ -213,7 +213,7 @@ function checkText(e: RunEvent): string {
 /** What a node did, on one line: its outcome, rows, time and checks, with a warning or failed check named on it. */
 export function outcomeText(n: RunNode, checks: readonly RunEvent[], skip: string | null, now: number): { text: string; level: RunEventLevel; tone: string } {
 	const took = n.startedAt ? secsText((n.endedAt ? Date.parse(n.endedAt) : now) - Date.parse(n.startedAt)) : null;
-	const rows = n.rowsAffected == null ? null : `${n.kind === 'incremental' ? '+' : ''}${rowsText(n.rowsAffected)} rows`;
+	const rows = n.rowsAffected == null ? null : `${n.kind === 'incremental' || n.kind === 'loader' ? '+' : ''}${rowsText(n.rowsAffected)} rows`;
 	const join = (parts: (string | null | false)[]) => parts.filter(Boolean).join(' · ');
 	switch (n.status) {
 		case 'success':
@@ -263,7 +263,7 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 			['Kind', n.kind ?? 'node'],
 			...(n.startedAt ? [['Started', fullStamp(n.startedAt)] as [string, string]] : []),
 			...(n.endedAt && n.startedAt ? [['Took', secsText(Date.parse(n.endedAt) - Date.parse(n.startedAt))] as [string, string]] : []),
-			...(n.rowsAffected != null ? [[n.status === 'running' ? 'Rows so far' : 'Rows', `${n.kind === 'incremental' ? '+' : ''}${rowsText(n.rowsAffected)}`] as [string, string]] : []),
+			...(n.rowsAffected != null ? [[n.status === 'running' ? 'Rows so far' : 'Rows', `${n.kind === 'incremental' || n.kind === 'loader' ? '+' : ''}${rowsText(n.rowsAffected)}`] as [string, string]] : []),
 			...(n.errorMessage ? [['Error', n.errorMessage] as [string, string]] : []),
 			...(where ? [['Location', where] as [string, string]] : []),
 			...(n.status === 'skipped' && skipCause(n) ? [['Why', skipCause(n)!.replace(/^skipped: /, '')] as [string, string]] : []),

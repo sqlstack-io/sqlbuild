@@ -25,6 +25,18 @@ import { NODE_SPECS } from './build-fixtures';
 const PROTO = /^run-p(f31|r02|s07|g40)/;
 /** Rows a prototype node writes per second while it builds, for its progress. */
 const protoRate = (key: string) => 37 + (hash(key) % 400);
+/**
+ * Honest progress (CHI-1591): only loaders and microbatch models know their rows while they run; a
+ * warehouse statement reports none until it finishes, so other nodes show elapsed time only.
+ */
+const reportsRowsWhileRunning = (key: string) => snapshotNode(key)?.kind === 'loader' || !!NODE_SPECS[key]?.microbatch;
+/** Rows a finished node reports: added rows for incrementals and loaders, the table's count from metadata after a rebuild, none for views and tasks. */
+const finishedRows = (key: string, ms: number): number | null => {
+	const kind = snapshotNode(key)?.kind;
+	if (kind === 'view' || kind === 'task') return null;
+	if (kind === 'incremental' || kind === 'loader') return Math.round((ms / 1000) * protoRate(key));
+	return 800 + (hash(`${key}/rows`) % 60_000);
+};
 
 /** `crashed`: the worker stopped before building anything, as when its plan is refused; `crashError` says why. */
 export type RunEnd = 'complete' | 'cancelled' | 'presumed_failed' | 'never_started' | 'crashed';
@@ -165,7 +177,7 @@ export function computeNodes(record: RunRecord, siblings: RunRecord[], now: numb
 				...base(key, status),
 				startedAt: iso(s),
 				endedAt: iso(e),
-				rowsAffected: fails || snapshotNode(key)?.kind === 'view' ? null : PROTO.test(run.id) ? Math.round(((e - s) / 1000) * protoRate(key)) : 120 + (hash(key + run.id) % 48000),
+				rowsAffected: fails || snapshotNode(key)?.kind === 'view' ? null : PROTO.test(run.id) ? finishedRows(key, e - s) : 120 + (hash(key + run.id) % 48000),
 				errorCode: fails ? 'E2103' : null,
 				errorMessage: message,
 				...(fails ? failureDetail(key, run, message ?? '') : {})
@@ -175,7 +187,7 @@ export function computeNodes(record: RunRecord, siblings: RunRecord[], now: numb
 		if (e <= clock) return finish();
 		if (s <= clock) {
 			// A prototype run reports rows so far while a node builds, for the timeline bar and the drawer.
-			if (!terminal) return { ...base(key, 'running'), startedAt: iso(s), rowsAffected: PROTO.test(run.id) ? Math.round(((clock - s) / 1000) * protoRate(key)) : null };
+			if (!terminal) return { ...base(key, 'running'), startedAt: iso(s), rowsAffected: PROTO.test(run.id) && reportsRowsWhileRunning(key) ? Math.round(((clock - s) / 1000) * protoRate(key)) : null };
 			if (script.end === 'presumed_failed')
 				return {
 					...base(key, 'failed'),
@@ -383,7 +395,7 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 	if (script.cancel) fact('cancel_requested', script.cancel.requestedAt, `Cancel requested by ${script.cancel.requestedBy.displayName}`);
 
 	if (inv && run.startedAt && PROTO.test(run.id)) {
-		protoExecution(record, nodes, now ?? Date.now(), { ev, out });
+		protoExecution(record, nodes, now ?? Date.now(), { ev, out, statements, inv });
 	} else if (inv && run.startedAt) {
 		const start = Date.parse(run.startedAt);
 		ev('invocation_started', start, null, commandOf(record));
@@ -487,23 +499,76 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 type Emit = {
 	ev: (type: RunEvent['type'], at: number, nodeKey: string | null, message: string, statementId?: string | null) => void;
 	out: (stream: RunOutputLine['stream'], at: number, text: string, error?: boolean, nodeKey?: string | null) => void;
+	statements: RunStatement[];
+	inv: string;
 };
+
+/** What a prototype Python node prints while it runs: its own stdout, and a warning with a traceback on stderr. */
+function pythonOutput(key: string, s: number, e: number | null, now: number, out: Emit['out']) {
+	const until = e ?? now;
+	const at = (ms: number) => s + ms;
+	const line = (ms: number, stream: RunOutputLine['stream'], text: string) => at(ms) < until && out(stream, at(ms), text, false, key);
+	if (key === 'raw_events') {
+		line(400, 'stdout', 'Fetching events since 2026-11-20T09:00:00Z');
+		for (let page = 1, t = 6_000; t < (e ?? now) - s; page++, t += 9_000) {
+			line(t, 'stdout', `Page ${page}: ${(11_000 + (hash(`${key}${page}`) % 2_000)).toLocaleString('en-GB')} events`);
+			if (page === 3)
+				line(
+					t + 2_500,
+					'stderr',
+					[
+						'WARNING shop.events: page 4 failed, retrying in 5s',
+						'Traceback (most recent call last):',
+						'  File "/app/models/ingest/raw_events.py", line 18, in raw_events',
+						'    rows = fetch_page(since=ctx.current_cursor_value, page=page)',
+						'  File "/app/shop/events_api.py", line 41, in fetch_page',
+						'    resp.raise_for_status()',
+						'requests.exceptions.HTTPError: 503 Server Error: Service Unavailable for url: https://events.example.com/v1/events?page=4'
+					].join('\n')
+				);
+		}
+	}
+	if (key === 'score_customers') {
+		line(500, 'stdout', 'Loaded 4,812 customers');
+		line(
+			1_400,
+			'stderr',
+			[
+				'/app/models/ml/score_customers.py:11: FutureWarning: DataFrame.fillna with \'method\' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.',
+				'  features = features.fillna(method="ffill")'
+			].join('\n')
+		);
+		if (e != null) line(e - s - 300, 'stdout', 'Scored 4,812 customers');
+	}
+}
+
+/** The heartbeat's backoff: 30 s, then 1 min, 2 min, and every 5 min after that. */
+function heartbeatTimes(start: number, until: number): number[] {
+	const gaps = [30_000, 60_000, 120_000];
+	const out: number[] = [];
+	for (let t = start, i = 0; ; i++) {
+		t += gaps[i] ?? 300_000;
+		if (t >= until) return out;
+		out.push(t);
+	}
+}
 
 /**
  * A prototype run's events and what sqb printed. Each check is its own event (the page folds them into
  * their node's line); sqb prints a progress line for a building node every 30 seconds, and every line
  * it prints for a node carries that node.
  */
-function protoExecution(record: RunRecord, nodes: RunNode[], now: number, { ev, out }: Emit) {
+function protoExecution(record: RunRecord, nodes: RunNode[], now: number, { ev, out, statements, inv }: Emit) {
 	const { run, script } = record;
 	const start = Date.parse(run.startedAt!);
 	const secs = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
 	const rows = (n: number) => n.toLocaleString('en-GB');
 	ev('invocation_started', start, null, commandOf(record));
-	out('stderr', start + 120, `sqb ${commandOf(record).replace(/^sqb /, '')}`);
-	out('stderr', start + 450, `✓ Project compiled  ${script.nodes.length} models  0.4s`);
-	out('stderr', start + 900, '✓ Warehouse connected  duckdb  0.1s');
-	out('stderr', start + 1100, `Building ${script.nodes.length} nodes, 4 at a time`);
+	// sqb prints its progress on stdout, and warnings and errors on stderr.
+	out('stdout', start + 120, `sqb ${commandOf(record).replace(/^sqb /, '')}`);
+	out('stdout', start + 450, `✓ Project compiled  ${script.nodes.length} models  0.4s`);
+	out('stdout', start + 900, '✓ Warehouse connected  snowflake  0.1s');
+	out('stdout', start + 1100, `Building ${script.nodes.length} nodes, 4 at a time`);
 	const audits = (key: string) => (NODE_SPECS[key]?.columns ?? []).flatMap((c) => (c.audits ?? []).map((a) => `${a}(${c.name})`));
 	for (const n of nodes) {
 		const k = snapshotNode(n.nodeKey)?.kind ?? 'table';
@@ -515,16 +580,44 @@ function protoExecution(record: RunRecord, nodes: RunNode[], now: number, { ev, 
 			const across = why && why.runId !== run.id ? ` in ${why.jobKey ?? why.runId}` : '';
 			const cause = !why ? 'an upstream node did not run' : via ? `${via.nodeKey} was skipped (after ${why.nodeKey} failed${across})` : `${why.nodeKey} failed${across}`;
 			ev('resource_attempt_skipped', Date.parse(n.endedAt), key, `Skipped: ${cause}`);
-			out('stderr', Date.parse(n.endedAt), `  – ${key}  skipped: ${cause}`, false, key);
+			out('stdout', Date.parse(n.endedAt), `  – ${key}  skipped: ${cause}`, false, key);
 			continue;
 		}
 		if (!n.startedAt) continue;
 		const s = Date.parse(n.startedAt);
 		const e = n.endedAt ? Date.parse(n.endedAt) : null;
 		ev('resource_attempt_started', s, key, `Started ${k} ${key}`);
-		out('stderr', s, `  ▸ ${key}  ${k}`, false, key);
-		// sqb's own progress line, every 30 seconds while the node builds.
-		for (let t = s + 30_000; t < (e ?? now) - 500; t += 30_000) out('stderr', t, `    … ${key}  ${rows(Math.round(((t - s) / 1000) * protoRate(key)))} rows so far`, false, key);
+		out('stdout', s, `  ▸ ${key}  ${k}`, false, key);
+		pythonOutput(key, s, e, now, out);
+		const kind = STATEMENT_KIND[k];
+		if (kind) {
+			// The node's warehouse statement, with its query ID, for the Statements tab, the cost and the drawer.
+			const statementId = statementIdOf(run, key);
+			const stEnd = e != null ? e - 120 : null;
+			const failed = n.status === 'failed';
+			statements.push({
+				id: statementId,
+				runId: run.id,
+				invocationId: inv,
+				sequence: statements.length + 1,
+				nodeKey: key,
+				kind,
+				status: n.status === 'running' ? 'running' : failed ? 'failed' : 'completed',
+				startedAt: iso(s + 60),
+				endedAt: stEnd == null ? null : iso(stEnd),
+				rowsAffected: n.status === 'running' ? null : n.rowsAffected,
+				rowsSoFar: n.status === 'running' && reportsRowsWhileRunning(key) ? n.rowsAffected : null,
+				queryId: queryIdOf(statementId),
+				sqlRecorded: true,
+				error: failed ? (n.errorDetail ?? n.errorMessage) : null
+			});
+			ev('statement_submitted', s + 40, key, `${kind} submitted`, statementId);
+			ev('statement_started', s + 60, key, `${kind} running`, statementId);
+			if (stEnd != null) {
+				if (failed) ev('statement_failed', stEnd, key, n.errorMessage ?? 'Statement failed', statementId);
+				else ev('statement_completed', stEnd, key, n.rowsAffected != null ? `${rows(n.rowsAffected)} rows` : 'Completed', statementId);
+			}
+		}
 		if (e == null) continue;
 		const took = secs(e - s);
 		if (n.status === 'failed') {
@@ -534,7 +627,7 @@ function protoExecution(record: RunRecord, nodes: RunNode[], now: number, { ev, 
 		}
 		const added = k === 'incremental' && n.rowsAffected != null ? `  +${rows(n.rowsAffected)} rows` : n.rowsAffected != null ? `  ${rows(n.rowsAffected)} rows` : '';
 		ev('resource_attempt_completed', e, key, `${n.status === 'warn' ? 'Completed with warnings' : 'Completed'} in ${took}${added ? ` ·${added.replace(/^ +/, ' ')}` : ''}`);
-		out('stderr', e, `  ✓ ${key}  ${k}  ${took}${added}`, false, key);
+		out('stdout', e, `  ✓ ${key}  ${k}  ${took}${added}`, false, key);
 		audits(key).forEach((audit, i) => {
 			const warns = n.status === 'warn' && i === 0;
 			const failing = 2 + (hash(key) % 5);
@@ -542,13 +635,28 @@ function protoExecution(record: RunRecord, nodes: RunNode[], now: number, { ev, 
 			if (warns) out('stderr', e + 40, `    ! ${key}  check ${audit}: ${failing} failing rows (warn)`, false, key);
 		});
 	}
+	// One combined heartbeat line for whatever is still running, backing off: 30 s, 1 min, 2 min, then every 5 min.
+	const firstStart = Math.min(...nodes.map((n) => (n.startedAt ? Date.parse(n.startedAt) : Infinity)));
+	if (Number.isFinite(firstStart)) {
+		const until = run.endedAt ? Date.parse(run.endedAt) : now;
+		for (const t of heartbeatTimes(firstStart, until)) {
+			const busy = nodes.filter((n) => n.startedAt && Date.parse(n.startedAt) <= t && (!n.endedAt || Date.parse(n.endedAt) > t));
+			if (!busy.length) continue;
+			const span = (ms: number) => (ms >= 60_000 ? `${Math.floor(ms / 60_000)}m${String(Math.floor((ms % 60_000) / 1000)).padStart(2, '0')}s` : `${Math.floor(ms / 1000)}s`);
+			const parts = busy.map((n) => {
+				const ms = t - Date.parse(n.startedAt!);
+				return `${n.nodeKey} ${span(ms)}${reportsRowsWhileRunning(n.nodeKey) ? ` (${rows(Math.round((ms / 1000) * protoRate(n.nodeKey)))} rows)` : ''}`;
+			});
+			out('stdout', t, `… still running (${busy.length})  ${parts.join(' · ')}`);
+		}
+	}
 	if (run.endedAt) {
 		const end = Date.parse(run.endedAt) - 400;
 		const c = countNodes(nodes);
 		const summary = `${c.success + c.warn} built · ${c.failed} failed · ${c.skipped} skipped`;
 		const ok = c.failed === 0;
 		ev(ok ? 'invocation_completed' : 'invocation_failed', end, null, `${summary} · ${secs(end - start)}`);
-		out('stderr', end, `${ok ? '✓ Completed' : '✗ Completed with errors'}  ${summary}  ${secs(end - start)}`);
+		out(ok ? 'stdout' : 'stderr', end, `${ok ? '✓ Completed' : '✗ Completed with errors'}  ${summary}  ${secs(end - start)}`);
 	}
 }
 

@@ -1,15 +1,25 @@
 <script lang="ts">
 	import XIcon from '@lucide/svelte/icons/x';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import CodePreview from '$lib/components/code/code-preview.svelte';
+	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
+	import OutcomeStrip from '$lib/components/build-area/outcome-strip.svelte';
+	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { to } from '$lib/paths';
 	import { formatDuration } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
+	import { createResource } from '$lib/state/resource.svelte';
+	import { useCatalogNodes } from '$lib/state/catalog.svelte';
+	import { nodeOutcomeTone } from '$lib/status';
+	import { relationName } from '$lib/build-area/labels';
 	import { nodeLabel, nodeStatusTone, shortRunId } from '$lib/operate/labels';
 	import type { RunDetailState } from './state.svelte';
+	import { formatQueryCost } from './utils';
 	import { fullStamp, skipCause } from './utils/proto';
 
-	// A node's details in a drawer from the right (CHI-1591, change 4), in place of the side panel: what
-	// happened to it in this run, why, its checks, and what to do next.
+	// A node in this run, in a drawer from the right (CHI-1591), modelled on the Lineage sidebar but
+	// scoped to the run: what it did here, its SQL as it ran, its last builds, what it printed, and where
+	// it lives. It shows the node last clicked on the timeline or the graph.
 	let { view }: { view: RunDetailState } = $props();
 
 	const key = $derived(view.drawer);
@@ -17,10 +27,32 @@
 	const name = $derived(key ? nodeLabel(key) : '');
 	const cause = $derived(n ? skipCause(n, view.nodes, view.detail?.edges ?? []) : null);
 	const checks = $derived(key ? (view.eventsRes.data ?? []).filter((e) => e.type === 'audit_completed' && e.nodeKey === key) : []);
-	const selected = $derived(!!key && view.selected.includes(key));
+	const statements = $derived(key ? view.statements.filter((s) => s.nodeKey === key && s.runId === n?.runId) : []);
+	const running = $derived(statements.find((s) => s.status === 'running') ?? null);
+	const cost = $derived(key ? (view.cost?.resources.find((r) => r.nodeKey === key) ?? null) : null);
+	const output = $derived(key ? (view.outputRes.data ?? []).filter((l) => l.nodeKey === key && l.runId === n?.runId) : []);
 	const STATUS: Record<string, string> = { success: 'Built', warn: 'Built, with warnings', failed: 'Failed', skipped: 'Skipped', running: 'Building', pending: 'Waiting', not_run: 'Not run', cancelled: 'Not run (cancelled)' };
-	// While it builds, the rows written so far: the node's live progress (CHI-1591, change 4).
-	const rows = $derived(n?.rowsAffected == null ? null : `${n.kind === 'incremental' ? '+' : ''}${n.rowsAffected.toLocaleString('en-GB')} rows${n.status === 'running' ? ' so far' : n.kind === 'incremental' ? ' inserted' : ''}`);
+	const added = $derived(n?.kind === 'incremental' || n?.kind === 'loader');
+	// Rows only where they are real: added rows, or a rebuilt table's count; while running only loaders and microbatches know.
+	const rows = $derived(n?.rowsAffected == null ? null : `${added ? '+' : ''}${n.rowsAffected.toLocaleString('en-GB')}${n.status === 'running' ? ' so far' : ''}`);
+
+	// The node's catalog facts: SQL or code, relation, description, and its last builds.
+	const catalog = useCatalogNodes();
+	const detail = createResource((client, scope) => {
+		const k = key;
+		const listing = catalog.data;
+		return k && listing && app.client.supports('getCatalogNode') ? client.getCatalogNode(scope, k, listing) : Promise.resolve(null);
+	});
+	const d = $derived(detail.data && detail.data.key === key ? detail.data : null);
+	// The SQL as it ran: the statement's own text when it was recorded, else the compiled definition.
+	const ran = createResource((client, scope) => {
+		const st = statements[0];
+		return st?.sqlRecorded && app.client.supports('getStatementSql') ? client.getStatementSql(scope, st.runId, st.id).then((r) => r.sql) : Promise.resolve(null);
+	});
+	let sqlMode = $state<'raw' | 'compiled'>('compiled');
+
+	/** A warehouse query's page in its console, for a running SQL node (prototype: Snowflake's query detail). */
+	const queryHref = (id: string) => `https://app.snowflake.com/#/compute/history/queries/${id}/detail`;
 
 	function onkey(e: KeyboardEvent) {
 		if (e.key === 'Escape' && key) view.openDrawer(null);
@@ -33,39 +65,88 @@
 	<aside class="drawer" aria-label="{name} in this run" data-testid="node-drawer">
 		<header>
 			<div class="title">
-				<a class="mono" href={to(`/catalog/${key}`)} title="Open {key} in the catalog">{name}</a>
-				<span class="state"><i style:background={nodeStatusTone[n.status]}></i>{STATUS[n.status] ?? n.status}</span>
+				<span class="name" title={key}>{name}</span>
+				<div class="links">
+					<a href={to(`/catalog/${key}`)} title="Open {key} in the Catalog">Catalog ↗</a>
+					<a href={to(`/lineage?focus=${encodeURIComponent(key)}`)} title="Open {key} on Lineage">Lineage ↗</a>
+					<Button variant="ghost" size="icon-sm" onclick={() => view.openDrawer(null)} aria-label="Close" title="Close (Esc)"><XIcon /></Button>
+				</div>
 			</div>
-			<Button variant="ghost" size="icon-sm" onclick={() => view.openDrawer(null)} aria-label="Close" title="Close (Esc)"><XIcon /></Button>
+			<div class="meta">
+				<span>{n.kind}</span>
+				{#if d?.group}<span>{d.group}</span>{/if}
+				{#if n.jobKey && view.detail?.children.length}<span><a href={to(`/runs/${n.runId}`)}>{n.jobKey} · {shortRunId(n.runId)}</a></span>{/if}
+			</div>
 		</header>
-		<dl>
-			<dt>Kind</dt><dd>{n.kind}</dd>
-			{#if n.jobKey && view.detail?.children.length}<dt>Job run</dt><dd><a href={to(`/runs/${n.runId}`)}>{n.jobKey} · {shortRunId(n.runId)}</a></dd>{/if}
-			{#if n.startedAt}<dt>Started</dt><dd class="mono">{fullStamp(n.startedAt)}</dd>{/if}
-			{#if n.startedAt}<dt>Took</dt><dd>{formatDuration(n.startedAt, n.endedAt, app.now)}{n.status === 'running' ? ' so far' : ''}</dd>{/if}
-			{#if rows}<dt>Rows</dt><dd>{rows}</dd>{/if}
-			{#if n.attempt > 1}<dt>Attempt</dt><dd>{n.attempt}</dd>{/if}
-		</dl>
-		{#if cause}<p class="why">{cause}</p>{/if}
-		{#if n.status === 'failed' && n.errorMessage}
-			<div class="error">
-				<b>{n.errorMessage}</b>
-				{#if n.errorLocation}<div class="faint mono">{n.errorLocation}</div>{/if}
-				{#if n.errorDetail}<pre>{n.errorDetail}</pre>{/if}
-			</div>
-		{/if}
-		{#if checks.length}
-			<h3>Checks</h3>
-			<ul class="checks">
-				{#each checks as c (c.id)}
-					<li><i style:background={c.level === 'warn' ? 'var(--sb-warning)' : c.level === 'error' ? 'var(--sb-error)' : 'var(--sb-success)'}></i><span class="mono">{c.message}</span></li>
-				{/each}
-			</ul>
-		{/if}
-		<div class="actions">
-			<Button size="sm" variant="outline" onclick={() => view.focusNode(key, 'log')}>Filter the log to {name}</Button>
-			<Button size="sm" variant="outline" onclick={() => view.selectNode(key)}>{selected ? 'Take out of the selection' : 'Add to the selection'}</Button>
-			<a href={to(`/lineage?focus=${encodeURIComponent(key)}`)}>Open in Lineage</a>
+
+		<div class="body">
+			<InspectorSection title="In this run">
+				<div class="status-top"><StatusLabel tone={nodeStatusTone[n.status]} label={STATUS[n.status] ?? n.status} /></div>
+				<div class="stats">
+					<div><span>Duration</span><b>{n.startedAt ? `${formatDuration(n.startedAt, n.endedAt, app.now)}${n.status === 'running' ? ' so far' : ''}` : '—'}</b></div>
+					<div><span>Rows</span><b>{rows ?? '—'}</b></div>
+					<div><span>Checks</span><b>{checks.length ? `${checks.filter((c) => c.level === 'info').length}/${checks.length}` : '—'}</b></div>
+					<div><span>Cost</span><b>{cost ? formatQueryCost(cost) : '—'}</b></div>
+				</div>
+				{#if cause}<p class="why">{cause}</p>{/if}
+				{#if n.status === 'failed' && n.errorMessage}
+					<div class="error">
+						<b>{n.errorMessage}</b>
+						{#if n.errorLocation}<div class="faint mono">{n.errorLocation.file}{n.errorLocation.line != null ? `:${n.errorLocation.line}` : ''}</div>{/if}
+					</div>
+				{/if}
+				<dl class="kv">
+					{#if n.startedAt}<div><dt>Started</dt><dd class="mono">{fullStamp(n.startedAt)}</dd></div>{/if}
+					{#if running?.queryId}
+						<div><dt>Query</dt><dd><a class="mono" href={queryHref(running.queryId)} target="_blank" rel="noreferrer" title="Open this query in the warehouse">{running.queryId} ↗</a></dd></div>
+					{/if}
+					{#if statements.length}
+						<div><dt>Statements</dt><dd><Button variant="link" size="inline" onclick={() => (view.tab = 'statements')}>{statements.length} in the warehouse →</Button></dd></div>
+					{/if}
+				</dl>
+				{#if checks.length}
+					<ul class="checks">
+						{#each checks as c (c.id)}
+							<li><i style:background={c.level === 'warn' ? 'var(--sb-warning)' : c.level === 'error' ? 'var(--sb-error)' : 'var(--sb-success)'}></i><span class="mono">{c.message}</span></li>
+						{/each}
+					</ul>
+				{/if}
+			</InspectorSection>
+
+			{#if d?.recentOutcomes.length}
+				<InspectorSection title="Builds">
+					<OutcomeStrip outcomes={d.recentOutcomes} tones={nodeOutcomeTone} caption="Last {d.recentOutcomes.length} builds" />
+				</InspectorSection>
+			{/if}
+
+			{#if output.length}
+				<InspectorSection title="Output">
+					{#snippet meta()}<span>{output.length} {output.length === 1 ? 'line' : 'lines'}</span>{/snippet}
+					<div class="output">
+						{#each output.slice(-40) as l, i (i)}<div class:err={l.stream === 'stderr'}><span class="stream">{l.stream}</span><pre>{l.text}</pre></div>{/each}
+					</div>
+				</InspectorSection>
+			{/if}
+
+			{#if d?.sql}
+				<InspectorSection title="SQL as it ran">
+					<CodePreview file="{name}.sql" code={d.sql.raw} compiled={ran.data ?? d.sql.compiled} bind:mode={sqlMode} maxLines={16} />
+				</InspectorSection>
+			{:else if d?.code}
+				<InspectorSection title="Code">
+					<CodePreview file={d.code.file} code={d.code.source} language="text" maxLines={16} />
+				</InspectorSection>
+			{/if}
+
+			{#if d}
+				<InspectorSection title="Details">
+					<dl class="kv">
+						{#if d.relation}<div><dt>Relation</dt><dd class="mono">{relationName(d.relation)}</dd></div>{/if}
+						{#if d.path}<div><dt>File</dt><dd class="mono">{d.path}</dd></div>{/if}
+					</dl>
+					{#if d.description}<p class="desc">{d.description}</p>{/if}
+				</InspectorSection>
+			{/if}
 		</div>
 	</aside>
 {/if}
@@ -78,34 +159,117 @@
 		bottom: 0;
 		z-index: 40;
 		display: flex;
-		width: min(460px, 92vw);
+		width: min(500px, 94vw);
 		flex-direction: column;
-		gap: 12px;
-		overflow-y: auto;
-		padding: 14px 18px;
-		border-left: 1px solid var(--border);
+		border-left: 1px solid var(--border-subtle);
 		background: var(--card);
 		box-shadow: -8px 0 24px rgb(0 0 0 / 0.18);
 		font-size: 12.5px;
 	}
 	header {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 8px;
+		padding: 14px 16px 12px;
+		border-bottom: 1px solid var(--border-subtle);
 	}
 	.title {
 		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		min-width: 0;
+		align-items: center;
+		gap: 10px;
 	}
-	.title a {
+	.name {
+		overflow: hidden;
+		min-width: 0;
+		font-family: var(--font-mono);
 		font-size: 14px;
 		font-weight: 600;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.links {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		margin-left: auto;
+		font-size: 12px;
+	}
+	.links a {
+		color: var(--primary);
+	}
+	.meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 12px;
+		margin-top: 6px;
+		color: var(--muted-foreground);
+		font-size: 12px;
+	}
+	.meta span + span::before {
+		content: '·';
+		margin-right: 12px;
+		color: var(--sb-text-faint);
+	}
+	.body {
+		overflow-y: auto;
+		flex: 1;
+		padding: 4px 8px 24px;
+	}
+	.status-top {
+		margin: 2px 0 8px;
+	}
+	.stats {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 8px;
+		margin-bottom: 8px;
+	}
+	.stats div {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.stats span {
+		color: var(--sb-text-faint);
+		font-size: 11.5px;
+	}
+	.stats b {
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
+	}
+	.kv {
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+		margin: 6px 0 0;
+	}
+	.kv div {
+		display: grid;
+		grid-template-columns: 90px 1fr;
+	}
+	dt {
+		color: var(--sb-text-faint);
+	}
+	dd {
+		margin: 0;
 		overflow-wrap: anywhere;
 	}
-	.state i,
+	.why,
+	.desc {
+		margin: 6px 0 0;
+		color: var(--muted-foreground);
+	}
+	.error {
+		margin-top: 6px;
+		padding: 8px 10px;
+		border-left: 2px solid var(--sb-error);
+		background: color-mix(in srgb, var(--sb-error) 6%, transparent);
+	}
+	.checks {
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+		margin: 8px 0 0;
+		padding: 0;
+		list-style: none;
+	}
 	.checks i {
 		display: inline-block;
 		width: 7px;
@@ -113,52 +277,30 @@
 		margin-right: 6px;
 		border-radius: 50%;
 	}
-	dl {
-		display: grid;
-		grid-template-columns: max-content 1fr;
-		gap: 4px 14px;
-		margin: 0;
-	}
-	dt {
-		color: var(--sb-text-faint);
-	}
-	dd {
-		margin: 0;
-	}
-	.why {
-		margin: 0;
-		color: var(--muted-foreground);
-	}
-	.error {
-		padding: 8px 10px;
-		border-left: 2px solid var(--sb-error);
-		background: color-mix(in srgb, var(--sb-error) 7%, transparent);
-	}
-	.error pre {
-		margin: 6px 0 0;
+	.output {
+		max-height: 260px;
+		overflow: auto;
+		font-family: var(--font-mono);
 		font-size: 11.5px;
-		white-space: pre-wrap;
 	}
-	h3 {
-		margin: 4px 0 0;
-		color: var(--sb-text-faint);
-		font-size: 12px;
-		font-weight: 600;
-	}
-	.checks {
+	.output div {
 		display: flex;
-		flex-direction: column;
-		gap: 3px;
-		margin: 0;
-		padding: 0;
-		list-style: none;
-	}
-	.actions {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
 		gap: 8px;
-		margin-top: 4px;
+		padding: 1px 4px;
+	}
+	.output div.err {
+		background: color-mix(in srgb, var(--sb-warning) 6%, transparent);
+		color: color-mix(in srgb, var(--sb-warning) 70%, var(--foreground));
+	}
+	.output .stream {
+		flex: none;
+		width: 42px;
+		color: var(--sb-text-faint);
+	}
+	.output pre {
+		margin: 0;
+		white-space: pre-wrap;
+		word-break: break-word;
 	}
 	.faint {
 		color: var(--sb-text-faint);

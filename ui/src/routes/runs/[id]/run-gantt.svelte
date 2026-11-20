@@ -38,7 +38,7 @@
 		skipText?: (nodeKey: string) => string | null;
 		/** The tick box: adds the node to the selection, or takes it out. */
 		onselect: (nodeKey: string) => void;
-		/** A click on the row: the node's details, in the drawer. */
+		/** A click on the row or its bar: selects the node and shows it in the drawer. */
 		onopen: (nodeKey: string) => void;
 	} = $props();
 
@@ -204,7 +204,7 @@
 					{@const s = startOf(n)}
 					{@const e = endOf(n)}
 					<!-- A row of the chart: a click opens its node's details; its tick box selects it. -->
-					<div class="row" class:sel={selected.includes(n.nodeKey)} role="button" tabindex="0" onclick={() => onopen(n.nodeKey)} onkeydown={(ev) => (ev.key === 'Enter' || ev.key === ' ') && onopen(n.nodeKey)} title="Show {n.nodeKey}'s details">
+					<div class="row" class:sel={selected.includes(n.nodeKey)} role="button" tabindex="0" onclick={() => onopen(n.nodeKey)} onkeydown={(ev) => (ev.key === 'Enter' || ev.key === ' ') && onopen(n.nodeKey)} title="Select {n.nodeKey} and show its details">
 						<span
 							class="gutter cell"
 							class:shadow={scrolledX}
@@ -224,7 +224,7 @@
 								aria-label="Select {n.nodeKey}"
 								title="Add to the selection, or take it out"
 							/>
-							{nodeLabel(n.nodeKey)}{#if tag(n)}<span class="mtag">{tag(n)}</span>{/if}{#if n.critical}<em title="Marked critical: if it fails, the whole group stops">critical</em>{/if}
+							<a class="name" href={to(`/catalog/${n.nodeKey}`)} onclick={(ev) => ev.stopPropagation()} title="Open {n.nodeKey} in the Catalog">{nodeLabel(n.nodeKey)}</a>{#if tag(n)}<span class="mtag">{tag(n)}</span>{/if}{#if n.critical}<em title="Marked critical: if it fails, the whole group stops">critical</em>{/if}
 						</span>
 						<span class="track">
 							{#if s == null || e == null}
@@ -526,6 +526,10 @@
 	}
 	.note {
 		left: 8px;
+	}
+	.name:hover {
+		color: var(--primary);
+		text-decoration: underline;
 	}
 	.mtag {
 		color: var(--sb-text-faint);
