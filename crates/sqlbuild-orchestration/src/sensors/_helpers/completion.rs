@@ -24,7 +24,7 @@ pub(crate) async fn pending_evaluation(
         return Err(ControlError::Fenced);
     }
     let (transaction, previous) = last_attempt(transaction, evaluation.trigger_id).await?;
-    let Some((previous, terminal)) = previous else {
+    let Some(Ok((previous, terminal))) = previous else {
         return Err(ControlError::Fenced);
     };
     if previous.request != *evaluation {

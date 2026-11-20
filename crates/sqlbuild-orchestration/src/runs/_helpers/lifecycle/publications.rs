@@ -185,6 +185,7 @@ async fn read_publication(
     let (transaction, node_keys) = read_snapshot_keys(transaction, snapshot_id).await?;
     let (transaction, nodes) = read_kind_nodes(transaction, snapshot_id, &PLANNED_KINDS).await?;
     let (transaction, definitions) = frozen_definitions(transaction, snapshot_id).await?;
+    let definitions = definitions?;
     let jobs = PublishedJobs {
         selections: definitions
             .jobs

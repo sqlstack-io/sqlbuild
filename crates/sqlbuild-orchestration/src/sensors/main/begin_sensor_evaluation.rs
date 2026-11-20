@@ -1,9 +1,11 @@
-//! Commit the requested phase before evaluation, so crashes count as attempts.
+//! Commit the requested phase before evaluation, so crashes count as attempts; a last attempt an earlier release recorded in a form that no longer decodes counts as none, with a health problem until a check completes.
 
 use chrono::TimeDelta;
 use uuid::Uuid;
 
 use crate::declarations::models::TriggerStatus;
+use crate::platform::main::health::record_trigger_problem::record_trigger_problem;
+use crate::platform::models::PlatformEvent;
 use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::SchedulerLease;
 use crate::sensors::_helpers::attempts::{defer_sensor, last_attempt, read_sensor};
@@ -32,7 +34,8 @@ pub async fn begin_sensor_evaluation(
     let now = transaction.now;
     let (transaction, cursor) = read_sensor_cursor(transaction, trigger_id).await?;
     let (mut transaction, previous) = last_attempt(transaction, trigger_id).await?;
-    if let Some((previous, terminal)) = previous {
+    let rechecked: bool = matches!(previous, Some(Err(_)));
+    if let Some(Ok((previous, terminal))) = previous {
         if !terminal {
             if previous.request.epoch == lease.epoch
                 && previous.request.snapshot_id == sensor.snapshot_id
@@ -70,8 +73,19 @@ pub async fn begin_sensor_evaluation(
         epoch: lease.epoch,
         requested_at: now,
     };
-    let transaction =
+    let mut transaction =
         append_evaluation(transaction, &request, SensorEvaluationOutcome::Requested).await?;
+    if rechecked {
+        transaction = record_trigger_problem(
+            transaction,
+            PlatformEvent::SensorRechecked {
+                trigger_id: request.trigger_id,
+                snapshot_id: request.snapshot_id,
+                evaluation_id: request.evaluation_id,
+            },
+        )
+        .await?;
+    }
     let transaction = request_evaluation_work(transaction, &request).await?;
     commit(check_lease(transaction, lease).await?).await?;
     Ok(Some(request))
