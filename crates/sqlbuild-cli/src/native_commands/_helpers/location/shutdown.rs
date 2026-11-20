@@ -27,35 +27,26 @@ impl ShutdownSignals {
         Ok(Self {})
     }
 
-    /// The next SIGINT, SIGTERM or SIGHUP; a closed terminal stops the process as SIGTERM does.
-    pub(crate) async fn next(&mut self) -> Result<(), ControlError> {
+    /// The next SIGINT or SIGTERM, or SIGHUP too when `hang_up`: a closed terminal stops the process as SIGTERM does, but a repeated hang-up never forces a shutdown already under way.
+    pub(crate) async fn next(&mut self, hang_up: bool) -> Result<(), ControlError> {
         #[cfg(unix)]
         tokio::select! {
             _ = self.interrupt.recv() => {},
             _ = self.terminate.recv() => {},
-            _ = self.hangup.recv() => {},
+            _ = self.hangup.recv(), if hang_up => {},
         }
         #[cfg(not(unix))]
-        tokio::signal::ctrl_c().await?;
-        Ok(())
-    }
-
-    /// The next SIGINT or SIGTERM, which forces a shutdown already under way; a repeated hang-up does not.
-    pub(crate) async fn next_forcing(&mut self) -> Result<(), ControlError> {
-        #[cfg(unix)]
-        tokio::select! {
-            _ = self.interrupt.recv() => {},
-            _ = self.terminate.recv() => {},
+        {
+            let _ = hang_up;
+            tokio::signal::ctrl_c().await?;
         }
-        #[cfg(not(unix))]
-        tokio::signal::ctrl_c().await?;
         Ok(())
     }
 }
 
 /// The first SIGINT, SIGTERM or SIGHUP.
 pub(crate) async fn shutdown_signal() -> Result<(), ControlError> {
-    ShutdownSignals::listen()?.next().await
+    ShutdownSignals::listen()?.next(true).await
 }
 
 /// Stop sibling roles on a signal or role failure, then drain their shutdown results; a second SIGINT or SIGTERM meanwhile kills the workers' process groups at once instead of waiting for them.
@@ -69,7 +60,7 @@ pub(crate) async fn supervise_control_roles(
             Some(result) => result.map_err(ControlError::from).and_then(std::convert::identity),
             None => Ok(()),
         },
-        result = signals.next() => result,
+        result = signals.next(true) => result,
     };
     stop.send_replace(true);
     let mut forced: bool = false;
@@ -84,7 +75,7 @@ pub(crate) async fn supervise_control_roles(
                     .and_then(std::convert::identity);
                 result = result.and(joined);
             }
-            signalled = signals.next_forcing(), if !forced => {
+            signalled = signals.next(false), if !forced => {
                 signalled?;
                 forced = true;
                 drop(write_output(&[(Stream::Stderr, FORCED_WORKER_STOP)]));
