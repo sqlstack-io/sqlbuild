@@ -290,6 +290,32 @@ describe('check list', () => {
 		expect(asked).toEqual([null, null]);
 	});
 
+	it('starts a new read for a caller that needs one begun after a signal, rather than joining an older one', async () => {
+		let release!: () => void;
+		const held = new Promise<void>((resolve) => (release = resolve));
+		let reads = 0;
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => {
+				const read = ++reads;
+				if (read === 1) await held;
+				return Response.json([{ ...result, run_id: `r${read}` }]);
+			})
+		);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		// A read begun before the signal, such as the navigation counts', is still in flight.
+		const older = client.listChecks(ORDERS);
+		await vi.waitFor(() => expect(reads).toBe(1));
+		const signalledAt = performance.now();
+		const joined = client.listChecks(ORDERS);
+		const fresh = client.listChecks(ORDERS, signalledAt);
+		release();
+		expect((await older).map((c) => c.latest?.fingerprintRunId)).toEqual(['r1']);
+		expect(await joined).toBe(await older);
+		expect((await fresh).map((c) => c.latest?.fingerprintRunId)).toEqual(['r2']);
+		expect(reads).toBe(2);
+	});
+
 	it('gives a node its checks from the list it is handed, without reading the list', async () => {
 		const { paths, client } = server();
 		const held = await client.listChecks(ORDERS);

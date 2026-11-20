@@ -40,14 +40,19 @@
 	const catalog = useCatalogNodes();
 	const checks = useChecks();
 	// The shared listing, when held, saves the detail read from listing every node again; it is not a dependency.
-	// The shared checks are: a new list reloads the detail, and their first read is waited for rather than repeated.
-	// Settled once that read answers or fails, which rereads do not change; after a failure the detail reads them itself.
-	const checksSettled = $derived(checks.data !== undefined || !checks.loading);
+	// The detail reloads once for each read of the shared checks, which follow the signals that change it (runs,
+	// node states, snapshots, warehouse syncs and reconnects), so a burst of signals reloads it once, with its
+	// checks. A checks read in flight, such as of a list that went stale while no page showed it, is waited for
+	// rather than read around; after a failure the detail reads the checks itself. Derived, so the store's
+	// other changes do not reload the detail.
+	const checkList = $derived(checks.data);
+	const checksRead = $derived(checks.revision);
+	const checksSettled = $derived(!checks.loading);
 	const res = createResource((client, scope) => {
-		const checkList = checks.data;
+		void checksRead;
 		if (!checksSettled) return new Promise<never>(() => {});
 		return client.getCatalogNode(scope, name, untrack(() => catalog.data), checkList);
-	}, ['runs', 'snapshot', 'node_status', 'warehouse_sync']);
+	});
 	const n = $derived(res.data ?? null);
 	// Checks and migrations link nodes by bare name; settle on the node key so the graph and links agree.
 	$effect(() => {
