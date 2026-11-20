@@ -317,18 +317,26 @@ pub(crate) async fn run_states(store: &ControlStore) -> Vec<String> {
     .collect()
 }
 
-/// The triggers the live problems list for `principal_id`: skipped ones as `name: reason`, then sensors checked again from scratch by name.
-pub(crate) async fn trigger_problems(
+/// The live problems `principal_id` can see.
+pub(crate) async fn problems(
     store: &ControlStore,
     principal_id: uuid::Uuid,
-) -> (Vec<String>, Vec<String>) {
-    let problems = crate::platform::main::person_reads::read_person_problems::read_person_problems(
+) -> crate::platform::models::PlatformProblems {
+    crate::platform::main::person_reads::read_person_problems::read_person_problems(
         store,
         principal_id,
         crate::credentials::models::DefaultRole::None,
     )
     .await
-    .expect("problems");
+    .expect("problems")
+}
+
+/// The triggers the live problems list for `principal_id`: skipped ones as `name: reason`, then sensors checked again from scratch by name.
+pub(crate) async fn trigger_problems(
+    store: &ControlStore,
+    principal_id: uuid::Uuid,
+) -> (Vec<String>, Vec<String>) {
+    let problems = problems(store, principal_id).await;
     (
         problems
             .skipped_triggers
@@ -349,6 +357,26 @@ pub(crate) async fn skipped_triggers(
     principal_id: uuid::Uuid,
 ) -> Vec<String> {
     trigger_problems(store, principal_id).await.0
+}
+
+/// The calendars whose dropped times the live problems list for `principal_id`, as `name: time, time`.
+pub(crate) async fn dropped_calendar_times(
+    store: &ControlStore,
+    principal_id: uuid::Uuid,
+) -> Vec<String> {
+    problems(store, principal_id)
+        .await
+        .dropped_calendar_times
+        .into_iter()
+        .map(|calendar| {
+            let times: Vec<String> = calendar
+                .times
+                .iter()
+                .map(|time| time.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
+                .collect();
+            format!("{}: {}", calendar.name, times.join(", "))
+        })
+        .collect()
 }
 
 /// Publish sensor `health_orders` in `location_id`, let it check once, apply `earlier_form`, then make it due again with a new overdue tick to see; the scheduler's state and the sensor.
@@ -485,10 +513,10 @@ pub(crate) fn nightly_calendar(days: &[i64]) -> serde_json::Value {
         "schedule": {"kind": "calendar", "times": times, "refresh_at": "2029-01-01T00:00:00Z"}}})
 }
 
-/// The health problem for the calendar times days 0 to 2 that the republish drops.
+/// The calendar times days 0 to 2 that the republish drops, as the live problems list them.
 pub(crate) fn dropped_days_problem() -> String {
     format!(
-        "nightly_orders: pending times {}, {}, {} were not ticked: the calendar's previous definition was published by an earlier SQLBuild release and can't be read",
+        "nightly_orders: {}, {}, {}",
         crate::scheduler::tests::contracts::ticks::helpers::calendar_text(0),
         crate::scheduler::tests::contracts::ticks::helpers::calendar_text(1),
         crate::scheduler::tests::contracts::ticks::helpers::calendar_text(2)

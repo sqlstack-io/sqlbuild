@@ -41,8 +41,8 @@ export function conditionOf(item: AttentionItem): { key: string; shape: Conditio
 	}
 }
 
-const COUNT_LABEL: Record<string, string> = { changed: 'changed', behind: 'behind', warn: 'late', error: 'past their error threshold', tick_overdue: 'late', calendar_horizon_low: 'running out of dates', trigger_skipped: 'skipped', sensor_rechecked: 'checked again from scratch' };
-const NOUNS: Record<string, string> = { tick_overdue: 'schedule', calendar_horizon_low: 'calendar', trigger_skipped: 'trigger', sensor_rechecked: 'sensor' };
+const COUNT_LABEL: Record<string, string> = { changed: 'changed', behind: 'behind', warn: 'late', error: 'past their error threshold', tick_overdue: 'late', calendar_horizon_low: 'running out of dates', trigger_skipped: 'skipped', sensor_rechecked: 'checked again from scratch', calendar_times_dropped: 'dropping pending times' };
+const NOUNS: Record<string, string> = { tick_overdue: 'schedule', calendar_horizon_low: 'calendar', trigger_skipped: 'trigger', sensor_rechecked: 'sensor', calendar_times_dropped: 'calendar' };
 
 /** The server keeps keys to 256 characters; a longer one is cut, with a hash of the whole to keep it distinct. */
 export const MAX_KEY_CHARS = 256;
@@ -141,7 +141,7 @@ export const CLEARED_REASON = 'automatic: the condition cleared';
  */
 export function visibleEventKey(key: string, scopeKey: string): boolean {
 	if (key === boundedKey('event:scheduler_no_leader::')) return true;
-	return ['location_broken', 'tick_overdue', 'calendar_horizon_low', 'trigger_skipped', 'sensor_rechecked'].some((kind) => key.startsWith(`event:${kind}:${scopeKey}:`));
+	return ['location_broken', 'tick_overdue', 'calendar_horizon_low', 'trigger_skipped', 'sensor_rechecked', 'calendar_times_dropped'].some((kind) => key.startsWith(`event:${kind}:${scopeKey}:`));
 }
 
 /**

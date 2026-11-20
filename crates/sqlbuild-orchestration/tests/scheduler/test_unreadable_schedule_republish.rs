@@ -1,5 +1,6 @@
-//! A republish over a schedule whose stored definition an earlier release left unreadable keeps its timing, operator status and cursor; a calendar's pending times are dropped and reported until its next tick.
+//! A republish over a schedule whose stored definition an earlier release left unreadable keeps its timing, operator status and cursor; a calendar's pending times are dropped and reported until its next tick. A skipped schedule's problem is not withdrawn by a tick.
 
+use chrono::{SecondsFormat, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -9,15 +10,20 @@ use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
 use crate::runs::tests::helpers::rows;
 use crate::scheduler::models::SchedulerState;
 use crate::scheduler::tests::contracts::helpers::{
-    dropped_days_problem, execute, nightly_calendar, nightly_cron, operator, scheduler_cycle,
-    skipped_triggers, upgrade_snapshot,
+    dropped_calendar_times, dropped_days_problem, execute, nightly_calendar, nightly_cron,
+    operator, scheduler_cycle, skipped_triggers, upgrade_snapshot,
 };
-use crate::scheduler::tests::contracts::test_types::UnreadableScheduleRepublishTestCase;
+use crate::scheduler::tests::contracts::test_types::{
+    CoveredTickTestCase, UnreadableScheduleRepublishTestCase,
+};
 use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+
+/// The calendar's problem once its job can't be read.
+const SKIPPED_JOB: &str = "nightly_orders: this trigger's job was published by an earlier SQLBuild release and can't be read; it runs again after its location publishes again";
 
 #[test]
 fn given_a_schedule_an_earlier_release_stored_unreadable_when_its_location_publishes_again_then_its_state_survives()
@@ -150,11 +156,11 @@ fn given_a_schedule_an_earlier_release_stored_unreadable_when_its_location_publi
                 .expect("the location publishes again");
 
             let after = rows(store, state, vec![]).await;
-            let problems = skipped_triggers(store, credentials(&roles.administrator)).await;
+            let problems = dropped_calendar_times(store, credentials(&roles.administrator)).await;
             scheduler_cycle(store, SchedulerState::new(Uuid::now_v7()))
                 .await
                 .expect("a scheduler cycle");
-            let cleared = skipped_triggers(store, credentials(&roles.administrator)).await;
+            let cleared = dropped_calendar_times(store, credentials(&roles.administrator)).await;
             assert_eq!(
                 (
                     (
@@ -170,6 +176,76 @@ fn given_a_schedule_an_earlier_release_stored_unreadable_when_its_location_publi
                     test_case.expected_problems.clone(),
                 ),
                 "{}: the operator status and cursor survive the republish, and only dropped calendar times are reported",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_schedule_skipped_for_an_unreadable_job_when_a_tick_is_covered_then_its_problem_stays() {
+    let test_cases = [
+        CoveredTickTestCase {
+            description: "SQLite store",
+            backend: Backend::Sqlite,
+            expected_skipped: &[SKIPPED_JOB],
+        },
+        CoveredTickTestCase {
+            description: "PostgreSQL store",
+            backend: Backend::Postgres,
+            expected_skipped: &[SKIPPED_JOB],
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let fixture = open_test_store(test_case.backend)
+                .await
+                .expect("required backend");
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let roles = role_fixture(store).await;
+            let mut input = upgrade_snapshot(roles.location_id, nightly_calendar(&[0, 1, 2]));
+            input.generation = 2;
+            publish_snapshot(store, &input).await.expect("publish");
+            execute(
+                store,
+                "UPDATE sqb_jobs SET definition_json='{\"retired\": true}' WHERE job_key='orders'",
+            )
+            .await;
+            scheduler_cycle(store, SchedulerState::new(Uuid::now_v7()))
+                .await
+                .expect("a cycle that skips the schedule");
+            let skipped = skipped_triggers(store, credentials(&roles.administrator)).await;
+
+            execute(
+                store,
+                &format!(
+                    "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome) \
+                     SELECT '{}', trigger_id, '{}', '{}', 1, 'covered' FROM sqb_triggers WHERE name='nightly_orders'",
+                    Uuid::now_v7(),
+                    calendar_text(3),
+                    Utc::now().to_rfc3339_opts(SecondsFormat::Micros, true)
+                ),
+            )
+            .await;
+
+            let names = |lines: &[&str]| {
+                lines
+                    .iter()
+                    .map(|line| (*line).to_owned())
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(
+                (
+                    skipped,
+                    skipped_triggers(store, credentials(&roles.administrator)).await
+                ),
+                (
+                    names(test_case.expected_skipped),
+                    names(test_case.expected_skipped)
+                ),
+                "{}: a tick covered by a run already queued reads no job, so the problem stays until the location publishes again",
                 test_case.description
             );
             close_test_store(fixture).await;

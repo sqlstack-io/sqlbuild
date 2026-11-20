@@ -2,7 +2,7 @@
 
 use chrono::{DateTime, TimeDelta, Utc};
 
-use crate::declarations::constants::{DROPPED_TIMES_NAMED, UPCOMING_TIMES};
+use crate::declarations::constants::UPCOMING_TIMES;
 use crate::declarations::models::{
     PreviousTriggerState, Schedule, StoredCalendarTimes, StoredSchedule, StoredTriggerState,
     TriggerDeclaration, TriggerDefinition, TriggerStatus,
@@ -87,29 +87,6 @@ fn stored_calendar_times(
     } else {
         Vec::new()
     }
-}
-
-/// The health problem a republish leaves for the calendar times it dropped, naming the first few.
-pub(crate) fn dropped_times_reason(dropped: &[DateTime<Utc>]) -> String {
-    let named: Vec<String> = dropped
-        .iter()
-        .take(DROPPED_TIMES_NAMED)
-        .map(|time| time.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
-        .collect();
-    let more: String = match dropped.len().saturating_sub(DROPPED_TIMES_NAMED) {
-        0 => String::new(),
-        more => format!(" and {more} more"),
-    };
-    format!(
-        "{} {}{more} {} not ticked: the calendar's previous definition was published by an earlier SQLBuild release and can't be read",
-        if dropped.len() == 1 {
-            "pending time"
-        } else {
-            "pending times"
-        },
-        named.join(", "),
-        if dropped.len() == 1 { "was" } else { "were" },
-    )
 }
 
 /// A previous calendar time that was due by the publish but not yet ticked.

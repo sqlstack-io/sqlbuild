@@ -9,8 +9,9 @@ use std::collections::BTreeSet;
 
 use crate::platform::constants::SKIPPED_TRIGGER_EVENTS;
 use crate::platform::models::{
-    LateTarget, LowCalendar, OverdueTick, PlatformEvent, PlatformEventEnvelope, ProblemScan,
-    PublishedTrigger, RecheckedSensor, RunningSchedule, SkippedTrigger,
+    DroppedCalendarTimes, LateTarget, LowCalendar, OverdueTick, PlatformEvent,
+    PlatformEventEnvelope, ProblemScan, PublishedTrigger, RecheckedSensor, RunningSchedule,
+    SkippedTrigger, TriggerProblems,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
@@ -57,7 +58,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
         vec![],
     )
     .await?;
-    let (transaction, skipped_triggers, rechecked_sensors) = trigger_problems(transaction).await?;
+    let (transaction, problems) = trigger_problems(transaction).await?;
     commit(transaction).await?;
     let schedules: Vec<RunningSchedule> = schedules
         .into_iter()
@@ -80,8 +81,9 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
         .collect();
     Ok(ProblemScan {
         low_calendars,
-        skipped_triggers,
-        rechecked_sensors,
+        skipped_triggers: problems.skipped,
+        rechecked_sensors: problems.rechecked,
+        dropped_calendar_times: problems.dropped,
         now,
         lease: leases.into_iter().next().map(decode_row).transpose()?,
         broken: locations
@@ -98,24 +100,12 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
     })
 }
 
-/// Triggers whose newest `trigger_skipped` event names the snapshot they are still published in and that have not ticked successfully since it was published, and sensors whose newest `sensor_rechecked` event does and whose re-check, or a later check, has not completed.
+/// Each trigger's live problems, all for the snapshot it is still published in: skipped until the location publishes again, a sensor's re-check from scratch until it or a later check completes, and dropped calendar times until the next successful tick.
 async fn trigger_problems(
     transaction: ControlTransaction,
-) -> Result<
-    (
-        ControlTransaction,
-        Vec<SkippedTrigger>,
-        Vec<RecheckedSensor>,
-    ),
-    ControlError,
-> {
-    let (transaction, skipped) = open_problems(
-        transaction,
-        "platform_trigger_skipped",
-        "NOT EXISTS (SELECT 1 FROM sqb_ticks k WHERE k.trigger_id=t.trigger_id \
-         AND k.outcome IN ('requested','covered') AND k.evaluated_at>=p.published_at)",
-    )
-    .await?;
+) -> Result<(ControlTransaction, TriggerProblems), ControlError> {
+    let (transaction, skipped) =
+        open_problems(transaction, "platform_trigger_skipped", "TRUE").await?;
     let (transaction, rechecked) = open_problems(
         transaction,
         "platform_sensor_rechecked",
@@ -123,33 +113,57 @@ async fn trigger_problems(
          AND e.phase='completed' AND e.evaluation_id>=$2)",
     )
     .await?;
-    let skipped: Vec<SkippedTrigger> = skipped
-        .into_iter()
-        .filter_map(|(envelope, trigger)| match envelope.payload.platform {
-            PlatformEvent::TriggerSkipped { reason, .. } => Some(SkippedTrigger {
-                trigger_id: trigger.trigger_id,
-                name: trigger.name,
-                location_id: trigger.location_id,
-                location_name: trigger.location_name,
-                target: trigger.target,
-                skipped_at: envelope.occurred_at,
+    let (transaction, dropped) = open_problems(
+        transaction,
+        "platform_calendar_times_dropped",
+        "NOT EXISTS (SELECT 1 FROM sqb_ticks k WHERE k.trigger_id=t.trigger_id \
+         AND k.outcome IN ('requested','covered') AND k.evaluated_at>=p.published_at)",
+    )
+    .await?;
+    let mut problems: TriggerProblems = TriggerProblems::default();
+    for (envelope, trigger) in skipped.into_iter().chain(rechecked).chain(dropped) {
+        let PublishedTrigger {
+            trigger_id,
+            name,
+            location_id,
+            location_name,
+            target,
+            ..
+        } = trigger;
+        let at = envelope.occurred_at;
+        match envelope.payload.platform {
+            PlatformEvent::TriggerSkipped { reason, .. } => problems.skipped.push(SkippedTrigger {
+                trigger_id,
+                name,
+                location_id,
+                location_name,
+                target,
+                skipped_at: at,
                 reason,
             }),
-            _ => None,
-        })
-        .collect();
-    let rechecked: Vec<RecheckedSensor> = rechecked
-        .into_iter()
-        .map(|(envelope, trigger)| RecheckedSensor {
-            trigger_id: trigger.trigger_id,
-            name: trigger.name,
-            location_id: trigger.location_id,
-            location_name: trigger.location_name,
-            target: trigger.target,
-            rechecked_at: envelope.occurred_at,
-        })
-        .collect();
-    Ok((transaction, skipped, rechecked))
+            PlatformEvent::SensorRechecked { .. } => problems.rechecked.push(RecheckedSensor {
+                trigger_id,
+                name,
+                location_id,
+                location_name,
+                target,
+                rechecked_at: at,
+            }),
+            PlatformEvent::CalendarTimesDropped { times, .. } => {
+                problems.dropped.push(DroppedCalendarTimes {
+                    trigger_id,
+                    name,
+                    location_id,
+                    location_name,
+                    target,
+                    dropped_at: at,
+                    times,
+                });
+            }
+            _ => {}
+        }
+    }
+    Ok((transaction, problems))
 }
 
 /// Each trigger's newest `event_type` event whose trigger is still published in the event's snapshot and whose `open` condition holds, with `$2` bound to a re-check's evaluation.
@@ -179,6 +193,11 @@ async fn open_problems(
                 snapshot_id,
                 evaluation_id,
             } => (*trigger_id, *snapshot_id, Some(*evaluation_id)),
+            PlatformEvent::CalendarTimesDropped {
+                trigger_id,
+                snapshot_id,
+                ..
+            } => (*trigger_id, *snapshot_id, None),
             _ => continue,
         };
         if !seen.insert(trigger_id) {

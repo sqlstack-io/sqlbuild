@@ -136,3 +136,10 @@ pub(crate) struct SensorRecheckTestCase {
     /// The re-checked sensors once it completes.
     pub(crate) expected_after: &'static [&'static str],
 }
+
+pub(crate) struct CoveredTickTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The skipped triggers listed before and after the covered tick, as `name: reason`.
+    pub(crate) expected_skipped: &'static [&'static str],
+}
