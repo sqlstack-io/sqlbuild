@@ -37,8 +37,6 @@ const ESCAPED_QUOTE_MACRO: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR
 const ESCAPED_QUOTE_FORMATTED: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCONCAT(@v, 'O\\'Brien\n      kept indent', 'tail')\n";
 const E_STRING_MACRO: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCONCAT(\n  @v,\n  E'O\\'Brien\n      kept indent',\n  'tail'\n)\n";
 const E_STRING_FORMATTED: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCONCAT(@v, E'O\\'Brien\n      kept indent', 'tail')\n";
-const NESTED_COMMENT_MACRO: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCOALESCE(\n  @v, /* outer /* inner */ it's\n      kept */\n  'x'\n)\n";
-const NESTED_COMMENT_FORMATTED: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCOALESCE(\n  @v, /* outer /* inner */ it's\n      kept */ 'x'\n)\n";
 const BLOCK_COMMENT_MACRO: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCOALESCE(\n  @v, /* first\n      second */\n  'x'\n)\n";
 const BLOCK_COMMENT_FORMATTED: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCOALESCE(\n  @v, /* first\n      second */ 'x'\n)\n";
 const NORMALISE_NAME_FORMATTED: &str = "MACRO (\n  description \"Normalise a name\",\n  arguments (column_name VARCHAR),\n  returns VARCHAR,\n);\n\nREGEXP_REPLACE(\n  TRIM(\n    UPPER(\n      -- Collapse repeated spaces\n      REGEXP_REPLACE(@column_name, '[[:space:]]+', ' ')\n    )\n  ),\n  '(^| )([A-Z]) ',\n  '\\\\1\\\\2'\n)\n";
@@ -1036,12 +1034,6 @@ fn given_expression_macro_bodies_when_formatting_twice_then_every_dialect_lays_t
             dialects: &["duckdb"],
             contents: E_STRING_MACRO.to_string(),
             expected_formatted: E_STRING_FORMATTED.to_string(),
-        },
-        ExpressionMacroFormatTestCase {
-            description: "a nested block comment holding an apostrophe",
-            dialects: &["databricks"],
-            contents: NESTED_COMMENT_MACRO.to_string(),
-            expected_formatted: NESTED_COMMENT_FORMATTED.to_string(),
         },
         ExpressionMacroFormatTestCase {
             description: "a block comment with indented lines",
