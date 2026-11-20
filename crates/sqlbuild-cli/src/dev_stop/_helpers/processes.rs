@@ -25,8 +25,7 @@ pub(crate) fn kill_children() {
         return;
     };
     for entry in entries.flatten() {
-        let Some(pid) = entry.file_name().to_str().and_then(|name| name.parse::<i32>().ok())
-        else {
+        let Some(Ok(pid)) = entry.file_name().to_str().map(str::parse::<i32>) else {
             continue;
         };
         let Ok(stat) = std::fs::read_to_string(entry.path().join("stat")) else {
@@ -48,7 +47,10 @@ pub(crate) fn kill_children() {}
 #[cfg(target_os = "linux")]
 fn parent_of(stat: &str) -> Option<i32> {
     let rest: &str = &stat[stat.rfind(')')? + 1..];
-    rest.split_whitespace().nth(1)?.parse().ok()
+    match rest.split_whitespace().nth(1)?.parse::<i32>() {
+        Ok(parent) => Some(parent),
+        Err(_not_a_number) => None,
+    }
 }
 
 /// Put stdin's terminal back in `cooked` mode.

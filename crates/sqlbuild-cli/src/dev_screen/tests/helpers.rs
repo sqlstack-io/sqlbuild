@@ -6,6 +6,7 @@ use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::screen_text::models::{
     DevHeader, Problem, ProblemLevel, ResultLine, ScreenFacts, WarehouseState,
 };
+use sqlbuild_core::text::main::cell_len::cell_len;
 use sqlbuild_orchestration::dev_events::models::{
     DevEvent, DevPhase, DevStepState, SourcePosition,
 };
@@ -16,7 +17,7 @@ use crate::dev_screen::_helpers::new_dev_screen::new_dev_screen;
 use crate::dev_screen::models::{
     DevScreen, DevStep, ScreenAction, ScreenEnd, ScreenMessage, ScreenSetup,
 };
-use crate::dev_screen::tests::test_types::Transcript;
+use crate::dev_screen::tests::test_types::{Terminal, Transcript};
 
 /// An uncoloured screen `size` big (columns, rows); `None` makes it plain.
 pub(super) fn screen(size: Option<(usize, usize)>) -> DevScreen {
@@ -85,7 +86,11 @@ pub(super) fn connecting() -> Vec<ScreenMessage> {
             Some("118 models \u{b7} 24 seeds \u{b7} 2 Python nodes"),
         ),
         step(DevPhase::Compile, DevStepState::Started, None),
-        step(DevPhase::Compile, DevStepState::Finished, Some("0 errors \u{b7} 1 warning")),
+        step(
+            DevPhase::Compile,
+            DevStepState::Finished,
+            Some("0 errors \u{b7} 1 warning"),
+        ),
         step(DevPhase::Publish, DevStepState::Started, None),
         step(DevPhase::Publish, DevStepState::Finished, None),
         ScreenMessage::Child(DevEvent::Published {
@@ -142,10 +147,11 @@ pub(super) fn failed_compile() -> Vec<ScreenMessage> {
     let mut messages: Vec<ScreenMessage> = discovering();
     messages.push(ScreenMessage::Child(DevEvent::Failed {
         generation: 1,
-        message: "[D001] models/marts/fct_orders.sql:42:7: column net_amount_usd does not exist in \
+        message:
+            "[D001] models/marts/fct_orders.sql:42:7: column net_amount_usd does not exist in \
                   stg_payments; the column was renamed to amount_usd_net when the payments source \
                   moved to the v2 export, and fct_orders still selects the old name"
-            .to_owned(),
+                .to_owned(),
         position: Some(SourcePosition {
             path: "models/marts/fct_orders.sql".to_owned(),
             line: 42,
@@ -228,11 +234,26 @@ pub(super) fn not_started_end() -> ScreenEnd {
     }
 }
 
-/// Apply `messages` 100 ms apart at `size`, then `end`'s closing text; what the terminal shows and keeps.
+/// Nothing: the session is still running.
+pub(super) fn still_running(_screen: DevScreen) -> String {
+    String::new()
+}
+
+/// The closing text Ctrl+C leaves.
+pub(super) fn close_interrupted(screen: DevScreen) -> String {
+    closing_text(screen, Some(&interrupted_end()))
+}
+
+/// The closing text a configuration error leaves.
+pub(super) fn close_not_started(screen: DevScreen) -> String {
+    closing_text(screen, Some(&not_started_end()))
+}
+
+/// Apply `messages` 100 ms apart at `size`, then write what `close` leaves; what the terminal shows and keeps.
 pub(super) fn play(
     size: Option<(usize, usize)>,
     messages: Vec<ScreenMessage>,
-    end: Option<ScreenEnd>,
+    close: fn(DevScreen) -> String,
 ) -> Transcript {
     let start: Instant = Instant::now();
     let mut screen: DevScreen = screen(size);
@@ -245,9 +266,7 @@ pub(super) fn play(
         terminal.write(&output.text);
         actions.push(output.action);
     }
-    if let Some(end) = end {
-        terminal.write(&closing_text(screen, Some(&end)));
-    }
+    terminal.write(&close(screen));
     Transcript {
         viewport: terminal.viewport(),
         scrollback: terminal.lines(),
@@ -255,80 +274,38 @@ pub(super) fn play(
     }
 }
 
-/// A terminal `height` rows tall that keeps its scrollback: lines, `ESC[nF` (up, never above the top of the screen) and `ESC[J`.
-struct Terminal {
-    lines: Vec<String>,
-    cursor: usize,
-    height: usize,
-}
-
-impl Terminal {
-    fn new(height: usize) -> Self {
-        Self {
-            lines: vec![String::new()],
-            cursor: 0,
-            height,
-        }
-    }
-
-    fn write(&mut self, text: &str) {
-        let mut characters = text.chars().peekable();
-        while let Some(character) = characters.next() {
-            match character {
-                '\u{1b}' if characters.peek() == Some(&'[') => {
-                    characters.next();
-                    let mut argument: String = String::new();
-                    for next in characters.by_ref() {
-                        if next.is_ascii_alphabetic() {
-                            self.escape(next, &argument);
-                            break;
-                        }
-                        argument.push(next);
-                    }
-                }
-                '\n' => {
-                    self.cursor += 1;
-                    if self.cursor == self.lines.len() {
-                        self.lines.push(String::new());
-                    }
-                }
-                character => self.lines[self.cursor].push(character),
-            }
-        }
-    }
-
-    fn escape(&mut self, command: char, argument: &str) {
-        match command {
-            'F' => {
-                let top: usize = self.lines.len().saturating_sub(self.height);
-                let up: usize = argument.parse().unwrap_or(1);
-                self.cursor = self.cursor.saturating_sub(up).max(top);
-                self.lines[self.cursor].clear();
-            }
-            'J' => {
-                self.lines.truncate(self.cursor + 1);
-                self.lines[self.cursor].clear();
-            }
-            _ => {}
-        }
-    }
-
-    /// Every line written, scrollback included, without the cursor's empty last line.
-    fn lines(&self) -> Vec<String> {
-        let mut lines: Vec<String> = self.lines.clone();
-        if lines.last().is_some_and(String::is_empty) {
-            lines.pop();
-        }
-        lines
-    }
-
-    /// What the screen shows: the last `height` rows, the cursor's row included.
-    fn viewport(&self) -> Vec<String> {
-        let skip: usize = self.lines.len().saturating_sub(self.height);
-        let mut rows: Vec<String> = self.lines[skip..].to_vec();
-        while rows.last().is_some_and(String::is_empty) {
-            rows.pop();
-        }
-        rows
-    }
+/// What is wrong with every session's layout at `size`: a header printed other than once, more rows than the terminal, or a row as wide as it.
+pub(super) fn layout_problems((columns, rows): (usize, usize)) -> Vec<String> {
+    let sessions: [Vec<ScreenMessage>; 5] = [
+        connecting(),
+        failed_compile(),
+        signing_in(),
+        ready(),
+        interrupted(),
+    ];
+    sessions
+        .into_iter()
+        .flat_map(|messages| {
+            let transcript: Transcript = play(Some((columns, rows)), messages, close_interrupted);
+            let headers: usize = transcript
+                .scrollback
+                .iter()
+                .filter(|line| line.starts_with("sqb dev  shop"))
+                .count();
+            let wide = transcript
+                .scrollback
+                .iter()
+                .filter(|line| cell_len(line) >= columns)
+                .map(|line| format!("{columns}x{rows}: too wide: {line}"));
+            [
+                (headers != 1).then(|| format!("{columns}x{rows}: header printed {headers} times")),
+                (transcript.viewport.len() > rows)
+                    .then(|| format!("{columns}x{rows}: {} rows shown", transcript.viewport.len())),
+            ]
+            .into_iter()
+            .flatten()
+            .chain(wide)
+            .collect::<Vec<String>>()
+        })
+        .collect()
 }

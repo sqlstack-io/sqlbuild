@@ -1,5 +1,6 @@
 """Publication cases and isolated server credentials."""
 
+import signal
 import sqlite3
 from collections.abc import Callable
 from contextlib import AbstractContextManager
@@ -319,10 +320,34 @@ class DevelopmentWarningTestCase:
 @dataclass(frozen=True)
 class DevelopmentTerminalTestCase:
     description: str
-    environment: dict[str, str]
+    arguments: list[str]
     unset: frozenset[str]
     expected_ready: str
     expected_sign_ins: list[str]
+
+
+@dataclass(frozen=True)
+class DevelopmentKeyStopTestCase:
+    description: str
+    keys: bytes
+    expected_exit_code: int
+    expected_result: str
+
+
+@dataclass(frozen=True)
+class DevelopmentSignalStopTestCase:
+    description: str
+    stop: signal.Signals
+    expected_exit_code: int
+    expected_result: str
+
+
+@dataclass(frozen=True)
+class DevelopmentStartFailureTestCase:
+    description: str
+    configuration: str
+    expected_exit_code: int
+    expected_lines: list[str]
 
 
 @dataclass(frozen=True)

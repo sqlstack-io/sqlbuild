@@ -1,6 +1,8 @@
 use std::time::Duration;
 
-use crate::screen_text::models::{BoxRow, EventLine, Problem, ResultLine, ScreenFacts, StepLine};
+use crate::screen_text::models::{
+    BoxRow, EventLine, Problem, ResultLine, ScreenFacts, StepLine, TreeGroup,
+};
 
 pub(super) struct StepLineTestCase {
     pub(super) description: &'static str,
@@ -68,4 +70,11 @@ pub(super) struct WidthTestCase {
     pub(super) description: &'static str,
     pub(super) facts: fn(usize) -> ScreenFacts,
     pub(super) expected_too_wide: Vec<String>,
+}
+
+pub(super) struct TreeGroupTestCase {
+    pub(super) description: &'static str,
+    pub(super) group: TreeGroup,
+    pub(super) facts: ScreenFacts,
+    pub(super) expected_rows: Vec<&'static str>,
 }

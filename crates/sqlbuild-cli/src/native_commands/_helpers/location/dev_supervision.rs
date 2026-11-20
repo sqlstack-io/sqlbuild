@@ -15,6 +15,9 @@ use crate::dev_stop::constants::{ABORT_WAIT, STOP_GRACE};
 use crate::dev_stop::main::stop_switch::stop_switch;
 use crate::dev_stop::models::DevEnd;
 
+/// A role's end as `JoinSet::join_next_with_id` reports it; `None` when no role was left.
+type RoleEnd = Option<Result<(Id, Result<(), ControlError>), JoinError>>;
+
 /// The development roles and the name each stop line gives them.
 #[derive(Default)]
 pub(crate) struct DevRoles {
@@ -68,7 +71,8 @@ pub(crate) async fn supervise_development_roles(
                 roles.tasks.abort_all();
                 while let Ok(Some(_)) =
                     tokio::time::timeout(ABORT_WAIT, roles.tasks.join_next()).await
-                {}
+                {
+                }
                 break;
             }
         }
@@ -77,10 +81,7 @@ pub(crate) async fn supervise_development_roles(
 }
 
 /// Why the session ends when a role ended by itself: before ready it did not start, after it failed.
-fn role_ended(
-    joined: Option<Result<(Id, Result<(), ControlError>), JoinError>>,
-    labels: &HashMap<Id, &'static str>,
-) -> DevEnd {
+fn role_ended(joined: RoleEnd, labels: &HashMap<Id, &'static str>) -> DevEnd {
     let reason: String = match joined {
         None => "every service stopped".to_owned(),
         Some(Ok((id, Ok(())))) => format!(

@@ -28,9 +28,16 @@ impl KeyReader {
     /// Put stdin in raw mode and read keys into `keys`, or `None` when stdin is not a terminal.
     #[cfg(unix)]
     pub(crate) fn start(keys: UnboundedSender<ScreenMessage>) -> Option<Self> {
-        let cooked: Termios = tcgetattr(std::io::stdin()).ok()?;
+        let cooked: Termios = match tcgetattr(std::io::stdin()) {
+            Ok(cooked) => cooked,
+            Err(_not_a_terminal) => return None,
+        };
         stop_switch().save_cooked(cooked.clone());
-        tcsetattr(std::io::stdin(), OptionalActions::Now, &raw_mode(&cooked)).ok()?;
+        if let Err(_unchangeable) =
+            tcsetattr(std::io::stdin(), OptionalActions::Now, &raw_mode(&cooked))
+        {
+            return None;
+        }
         let input: Arc<KeyInput> = Arc::new(KeyInput::default());
         let shared: Arc<KeyInput> = Arc::clone(&input);
         let thread = std::thread::spawn(move || read_keys(&shared, &keys));
@@ -79,7 +86,10 @@ fn read_keys(input: &KeyInput, keys: &UnboundedSender<ScreenMessage>) {
             Ok(1) => key(input, keys, byte[0]),
             Ok(_) => {}
             Err(rustix::io::Errno::INTR | rustix::io::Errno::AGAIN) => {}
-            Err(_) => return,
+            Err(_) => {
+                stop_switch().request(StopReason::Hangup);
+                return;
+            }
         }
     }
 }

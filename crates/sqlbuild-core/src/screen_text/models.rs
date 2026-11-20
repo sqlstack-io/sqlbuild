@@ -1,4 +1,4 @@
-//! The rows of the `sqb dev` screen: step lines, problem blocks, the ready box and event lines.
+//! The rows of live terminal screens: tree groups, and the `sqb dev` screen's step lines, problem blocks, ready box and event lines.
 
 use std::time::Duration;
 
@@ -58,6 +58,34 @@ pub struct StepLine {
     pub label: String,
     pub elapsed: Option<Duration>,
     pub detail: String,
+}
+
+/// A titled group of entries drawn as a tree, bounded to `limit` entries.
+#[derive(Clone, Debug)]
+pub struct TreeGroup {
+    pub title: String,
+    /// Every entry the group has, shown or not.
+    pub total: usize,
+    pub entries: Vec<TreeEntry>,
+    pub limit: usize,
+    /// The flag that shows every entry, such as `--verbose`.
+    pub flag: String,
+}
+
+/// One named entry of a tree group and its key/value rows.
+#[derive(Clone, Debug)]
+pub struct TreeEntry {
+    pub name: String,
+    pub rows: Vec<TreeRow>,
+}
+
+/// One `key  value` row under a tree entry; `link` makes the value clickable.
+#[derive(Clone, Debug)]
+pub struct TreeRow {
+    pub key: String,
+    pub value: String,
+    pub tone: Tone,
+    pub link: Option<String>,
 }
 
 /// How serious a problem block is.

@@ -46,7 +46,8 @@ pub(crate) const AUTH_NAMES: [(&str, &str); 8] = [
     ("programmatic_access_token", "access token"),
 ];
 /// Setting values that say nothing on the Warehouse line.
-pub(crate) const UNSHOWN_VALUES: [&str; 6] = ["none", "null", "true", "false", "not configured", "not set"];
+pub(crate) const UNSHOWN_VALUES: [&str; 6] =
+    ["none", "null", "true", "false", "not configured", "not set"];
 /// Why `sqb dev` stops when the first warehouse connection fails.
 pub(crate) const WAREHOUSE_FAILED: &str = "could not connect to the warehouse";
 /// Why `sqb dev` stops when the code location exits by itself.

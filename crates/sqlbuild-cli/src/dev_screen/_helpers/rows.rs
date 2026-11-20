@@ -21,7 +21,9 @@ pub(crate) fn live_rows(screen: &DevScreen, now: Instant) -> Vec<String> {
     let facts = &screen.facts;
     if let Some(since) = screen.stopping {
         let line: StepLine = StepLine {
-            state: PhaseState::Running { frame: screen.frame },
+            state: PhaseState::Running {
+                frame: screen.frame,
+            },
             label: "Stopping sqb dev".to_owned(),
             elapsed: Some(now.saturating_duration_since(since)),
             detail: String::new(),
@@ -89,10 +91,11 @@ fn fit_waiting(
     }
     let shown: usize = room - 1;
     let mut rows: Vec<String> = waiting[..shown].to_vec();
-    rows.push(facts.style.muted(&format!(
-        "\u{b7} {} more waiting",
-        waiting.len() - shown
-    )));
+    rows.push(
+        facts
+            .style
+            .muted(&format!("\u{b7} {} more waiting", waiting.len() - shown)),
+    );
     rows
 }
 

@@ -23,7 +23,10 @@ pub fn render_step_line(line: &StepLine, facts: &ScreenFacts, lasting: bool) -> 
         span(label, tones.label),
         span(right(&time, STEP_TIME_WIDTH), tones.time),
     ];
-    let column: usize = lead.iter().map(|segment| cell_len(&segment.text)).sum::<usize>()
+    let column: usize = lead
+        .iter()
+        .map(|segment| cell_len(&segment.text))
+        .sum::<usize>()
         + STEP_GAP.len();
     if !lasting {
         let mut segments: Vec<Segment> = lead;

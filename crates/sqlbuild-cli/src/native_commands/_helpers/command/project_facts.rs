@@ -3,10 +3,10 @@
 use std::path::Path;
 
 use sqlbuild_config::models::ConfigValue;
-use sqlbuild_config::project::main::load_project_config::load_project_config;
-use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::errors::{LoadFailure, MessagePiece};
 use sqlbuild_config::project::main::load_local_config::load_local_config;
+use sqlbuild_config::project::main::load_project_config::load_project_config;
+use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::models::{Built, ConfigFile, ConfigPaths};
 use sqlbuild_core::screen_text::models::{Problem, ProblemLevel};
 use sqlbuild_orchestration::store::errors::ControlError;
@@ -14,7 +14,8 @@ use sqlbuild_orchestration::store::errors::ControlError;
 use crate::native_commands::main::effective_target::effective_target;
 
 use crate::native_commands::constants::{
-    CONFIG_ERROR_CODE, CUSTOM_RULES_DIRECTORY, EVENT_EXPORTERS_DIRECTORY, LIFECYCLE_SINK_PATH, SINKS_DIRECTORY,
+    CONFIG_ERROR_CODE, CUSTOM_RULES_DIRECTORY, EVENT_EXPORTERS_DIRECTORY, LIFECYCLE_SINK_PATH,
+    SINKS_DIRECTORY,
 };
 
 pub(crate) fn object_field<'a>(built: &'a Built, name: &str) -> Option<&'a Built> {
@@ -78,17 +79,20 @@ pub(crate) fn development_project_name(project_dir: &Path) -> Result<String, Con
 pub(crate) fn development_config(
     project_dir: &Path,
     selected: Option<String>,
-) -> Result<(String, String), Problem> {
+) -> Result<(String, String), Box<Problem>> {
     let paths: ConfigPaths = project_config_paths(project_dir);
-    let project: Built = load_project_config(&paths).map_err(|failure| load_problem(&paths, failure))?;
+    let project: Built =
+        load_project_config(&paths).map_err(|failure| load_problem(&paths, failure))?;
     load_local_config(&paths).map_err(|failure| load_problem(&paths, failure))?;
-    let target_problem = |why: String| Problem {
-        level: ProblemLevel::Error,
-        title: "target".to_owned(),
-        code: String::new(),
-        at: Vec::new(),
-        why,
-        fix: "pass --target <name>, or set default_target in sqlbuild_project.toml".to_owned(),
+    let target_problem = |why: String| {
+        Box::new(Problem {
+            level: ProblemLevel::Error,
+            title: "target".to_owned(),
+            code: String::new(),
+            at: Vec::new(),
+            why,
+            fix: "pass --target <name>, or set default_target in sqlbuild_project.toml".to_owned(),
+        })
     };
     let target: String = effective_target(project_dir, selected)
         .map_err(target_problem)?
@@ -101,7 +105,7 @@ pub(crate) fn development_config(
 }
 
 /// A configuration file the loader rejected, with its message and help in full.
-fn load_problem(paths: &ConfigPaths, failure: LoadFailure) -> Problem {
+fn load_problem(paths: &ConfigPaths, failure: LoadFailure) -> Box<Problem> {
     let name = |file: ConfigFile| -> String {
         let path = match file {
             ConfigFile::Project => &paths.project,
@@ -109,10 +113,20 @@ fn load_problem(paths: &ConfigPaths, failure: LoadFailure) -> Problem {
             ConfigFile::Local => &paths.local,
             ConfigFile::LegacyLocal => &paths.legacy_local,
         };
-        path.file_name()
-            .map_or_else(|| path.display().to_string(), |name| name.to_string_lossy().into_owned())
+        path.file_name().map_or_else(
+            || path.display().to_string(),
+            |name| name.to_string_lossy().into_owned(),
+        )
     };
-    let (title, code, why, fix): (String, &str, String, Option<String>) = match failure {
+    let problem = |title: String, why: String| Problem {
+        level: ProblemLevel::Error,
+        title,
+        code: String::new(),
+        at: Vec::new(),
+        why,
+        fix: "sqb debug checks the configuration on its own".to_owned(),
+    };
+    Box::new(match failure {
         LoadFailure::Config(failure) => {
             let title: String = failure
                 .message
@@ -123,24 +137,20 @@ fn load_problem(paths: &ConfigPaths, failure: LoadFailure) -> Problem {
                 })
                 .unwrap_or_else(|| "configuration".to_owned());
             let why: String = failure.render(|_| String::new()).trim().to_owned();
-            (title, CONFIG_ERROR_CODE, why, failure.help)
+            Problem {
+                code: CONFIG_ERROR_CODE.to_owned(),
+                fix: failure
+                    .help
+                    .unwrap_or_else(|| "sqb debug checks the configuration on its own".to_owned()),
+                ..problem(title, why)
+            }
         }
-        LoadFailure::Io(file, error) => (name(file), "", format!("could not read it: {error}"), None),
-        LoadFailure::Utf8(_) => (
+        LoadFailure::Io(file, error) => problem(name(file), format!("could not read it: {error}")),
+        LoadFailure::Utf8(_) => problem(
             "configuration".to_owned(),
-            "",
             "a configuration file is not UTF-8 text".to_owned(),
-            None,
         ),
-    };
-    Problem {
-        level: ProblemLevel::Error,
-        title,
-        code: code.to_owned(),
-        at: Vec::new(),
-        why,
-        fix: fix.unwrap_or_else(|| "sqb debug checks the configuration on its own".to_owned()),
-    }
+    })
 }
 
 /// The project's configured name, or its directory's name when the configuration has none.

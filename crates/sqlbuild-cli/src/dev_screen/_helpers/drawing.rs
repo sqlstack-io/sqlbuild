@@ -15,9 +15,9 @@ use crate::dev_screen::_helpers::capture::release_stderr;
 use crate::dev_screen::_helpers::keys::KeyReader;
 use crate::dev_screen::_helpers::lines::{compose, physical_rows};
 use crate::dev_screen::constants::{FAILURE_LOG_LINES, TICK};
+use crate::dev_screen::main::terminal_size::terminal_size;
 use crate::dev_screen::models::{DevScreen, ScreenAction, ScreenEnd, ScreenMessage};
 use crate::dev_stop::main::stop_switch::stop_switch;
-use crate::native_commands::_helpers::command::terminal::terminal_size;
 
 /// Apply each message and write what it draws until the session finishes; then leave its result.
 pub(crate) async fn draw_screen(
@@ -91,7 +91,14 @@ pub(crate) fn closing_text(screen: DevScreen, end: Option<&ScreenEnd>) -> String
     let live: bool = screen.live;
     let previous: usize = physical_rows(&screen.drawn, screen.facts.columns);
     if !live || !header_printed {
-        let (_, text) = compose(DevScreen { live: false, ..screen }, lines, Instant::now());
+        let (_, text) = compose(
+            DevScreen {
+                live: false,
+                ..screen
+            },
+            lines,
+            Instant::now(),
+        );
         return if live && previous > 0 {
             format!("{}{text}", redraw_rows(previous, &[]))
         } else {

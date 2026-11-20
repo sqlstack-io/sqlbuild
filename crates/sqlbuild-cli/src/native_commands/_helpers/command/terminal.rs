@@ -5,8 +5,8 @@ use crate::native_commands::_helpers::command::argv_host::python_int;
 use crate::native_commands::constants::CLEAR_TERMINAL_LINE;
 use crate::native_commands::constants::{
     BROKEN_PIPE_EXCEPTION, CI_VARIABLE, COLUMNS_VARIABLE, DUMB_TERMINAL, EXIT_FLUSH_FAILURE,
-    EXIT_FLUSH_FAILURE_STATUS, FALLBACK_COLUMNS, NO_COLOR_VARIABLE, NO_PROGRESS_VARIABLE, PASSWORD_INPUT_BYTES,
-    PYTHON_STDOUT_BUFFER_SIZE, TERM_VARIABLE, UNCAUGHT_EXCEPTION_STATUS,
+    EXIT_FLUSH_FAILURE_STATUS, FALLBACK_COLUMNS, NO_COLOR_VARIABLE, NO_PROGRESS_VARIABLE,
+    PASSWORD_INPUT_BYTES, PYTHON_STDOUT_BUFFER_SIZE, TERM_VARIABLE, UNCAUGHT_EXCEPTION_STATUS,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::LostStdout;
@@ -219,24 +219,6 @@ pub(crate) fn live_screen(plain: bool) -> bool {
 /// Whether a live `sqb dev` screen is coloured: `NO_COLOR` turns colour off and nothing else.
 pub(crate) fn screen_colour(live: bool) -> bool {
     live && std::env::var_os(NO_COLOR_VARIABLE).is_none()
-}
-
-/// The width and height of the terminal `terminal` (or stderr) is, or `None` when it is not one.
-#[cfg(unix)]
-pub(crate) fn terminal_size(terminal: Option<&std::fs::File>) -> Option<(usize, usize)> {
-    let size = match terminal {
-        Some(terminal) => rustix::termios::tcgetwinsize(terminal),
-        None => rustix::termios::tcgetwinsize(io::stderr()),
-    }
-    .ok()?;
-    (size.ws_col > 0 && size.ws_row > 0)
-        .then(|| (usize::from(size.ws_col), usize::from(size.ws_row)))
-}
-
-/// Without the console API, no size.
-#[cfg(not(unix))]
-pub(crate) fn terminal_size(_terminal: Option<&std::fs::File>) -> Option<(usize, usize)> {
-    None
 }
 
 /// A child interpreter now writes to this terminal; later writes clear its spinner line first.

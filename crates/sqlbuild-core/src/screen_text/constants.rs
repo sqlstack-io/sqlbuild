@@ -16,6 +16,10 @@ pub(crate) const SPINNER_FRAMES: [&str; 10] = [
 pub(crate) const CUT_MARK: &str = "\u{2026}";
 pub(crate) const SEPARATOR: &str = " \u{b7} ";
 pub(crate) const RULE_CHAR: char = '\u{2500}';
+pub(crate) const TREE_BRANCH: &str = "\u{251c}\u{2500}\u{2500} ";
+pub(crate) const TREE_LAST: &str = "\u{2514}\u{2500}\u{2500} ";
+pub(crate) const TREE_BAR: &str = "\u{2502}   ";
+pub(crate) const TREE_SPACE: &str = "    ";
 pub(crate) const PRODUCT: &str = "sqb dev";
 /// The label column of a step line.
 pub(crate) const STEP_LABEL_WIDTH: usize = 22;

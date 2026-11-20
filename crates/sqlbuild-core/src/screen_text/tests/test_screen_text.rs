@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use crate::screen_text::_helpers::rows::elapsed_text;
 use crate::screen_text::main::redraw_rows::redraw_rows;
 use crate::screen_text::main::render_event_line::render_event_line;
 use crate::screen_text::main::render_problem::render_problem;
@@ -7,33 +8,46 @@ use crate::screen_text::main::render_prompt::render_prompt;
 use crate::screen_text::main::render_ready_box::render_ready_box;
 use crate::screen_text::main::render_result::render_result;
 use crate::screen_text::main::render_step_line::render_step_line;
+use crate::screen_text::main::render_tree_group::render_tree_group;
 use crate::screen_text::main::visible_cells::visible_cells;
 use crate::screen_text::models::{
     BoxRow, EventLine, EventMark, PhaseState, Problem, ProblemLevel, PromptBlock, ResultLine,
 };
 use crate::screen_text::tests::helpers::{
-    colour_facts, millis, plain, plain_facts, removed_key, rows_too_wide, run_started, step,
-    ui_row, warehouse_row,
+    colour_facts, millis, plain, plain_facts, removed_key, rows_too_wide, run_started,
+    semantic_group, step, ui_row, warehouse_row,
 };
 use crate::screen_text::tests::test_types::{
     ElapsedTestCase, EventTestCase, ProblemTestCase, PromptTestCase, ReadyBoxTestCase,
-    RedrawTestCase, ResultTestCase, StepLineTestCase, VisibleCellsTestCase, WidthTestCase,
+    RedrawTestCase, ResultTestCase, StepLineTestCase, TreeGroupTestCase, VisibleCellsTestCase,
+    WidthTestCase,
 };
-use crate::screen_text::_helpers::rows::elapsed_text;
 
 #[test]
 fn given_step_lines_when_rendering_then_label_time_and_detail_line_up() {
     let test_cases = [
         StepLineTestCase {
             description: "a finished step has its glyph, label, time and detail in columns",
-            line: step(PhaseState::Ok, "Discovered project", millis(1_800), "118 models \u{b7} 24 seeds"),
+            line: step(
+                PhaseState::Ok,
+                "Discovered project",
+                millis(1_800),
+                "118 models \u{b7} 24 seeds",
+            ),
             lasting: true,
             columns: 80,
-            expected_rows: vec!["\u{2713} Discovered project      1.8s   118 models \u{b7} 24 seeds"],
+            expected_rows: vec![
+                "\u{2713} Discovered project      1.8s   118 models \u{b7} 24 seeds",
+            ],
         },
         StepLineTestCase {
             description: "a running step shows its spinner frame and live time",
-            line: step(PhaseState::Running { frame: 0 }, "Connecting warehouse", millis(10_300), "snowflake"),
+            line: step(
+                PhaseState::Running { frame: 0 },
+                "Connecting warehouse",
+                millis(10_300),
+                "snowflake",
+            ),
             lasting: false,
             columns: 80,
             expected_rows: vec!["\u{280b} Connecting warehouse   10.3s   snowflake"],
@@ -47,14 +61,26 @@ fn given_step_lines_when_rendering_then_label_time_and_detail_line_up() {
         },
         StepLineTestCase {
             description: "a live row is cut one cell short of the terminal",
-            line: step(PhaseState::Ok, "Compiled project", millis(2_400), "0 errors \u{b7} 1 warning \u{b7} 412 python nodes"),
+            line: step(
+                PhaseState::Ok,
+                "Compiled project",
+                millis(2_400),
+                "0 errors \u{b7} 1 warning \u{b7} 412 python nodes",
+            ),
             lasting: false,
             columns: 50,
-            expected_rows: vec!["\u{2713} Compiled project        2.4s   0 errors \u{b7} 1 wa\u{2026}"],
+            expected_rows: vec![
+                "\u{2713} Compiled project        2.4s   0 errors \u{b7} 1 wa\u{2026}",
+            ],
         },
         StepLineTestCase {
             description: "a lasting row wraps its detail under the detail column",
-            line: step(PhaseState::Ok, "Compiled project", millis(2_400), "0 errors \u{b7} 1 warning \u{b7} 412 python nodes"),
+            line: step(
+                PhaseState::Ok,
+                "Compiled project",
+                millis(2_400),
+                "0 errors \u{b7} 1 warning \u{b7} 412 python nodes",
+            ),
             lasting: true,
             columns: 60,
             expected_rows: vec![
@@ -66,7 +92,11 @@ fn given_step_lines_when_rendering_then_label_time_and_detail_line_up() {
 
     for test_case in test_cases {
         assert_eq!(
-            render_step_line(&test_case.line, &plain_facts(test_case.columns), test_case.lasting),
+            render_step_line(
+                &test_case.line,
+                &plain_facts(test_case.columns),
+                test_case.lasting
+            ),
             test_case.expected_rows,
             "{}",
             test_case.description
@@ -230,7 +260,10 @@ fn given_a_session_end_when_rendering_then_one_result_line_and_next_commands() {
                 title: "sqb dev did not start".to_owned(),
                 detail: "could not connect to the warehouse".to_owned(),
                 elapsed: millis(14_700),
-                next: vec![("sqb debug".to_owned(), "test the connection on its own".to_owned())],
+                next: vec![(
+                    "sqb debug".to_owned(),
+                    "test the connection on its own".to_owned(),
+                )],
             },
             columns: 80,
             expected_rows: vec![
@@ -343,7 +376,7 @@ fn given_styled_rows_when_measuring_then_escapes_take_no_cells() {
                 },
                 &colour_facts(80),
             )[1]
-                .clone(),
+            .clone(),
             expected_cells: 10,
         },
     ];
@@ -416,5 +449,46 @@ fn given_any_width_when_rendering_every_piece_then_no_row_is_wider_than_the_scre
             "{}",
             test_case.description
         );
+    }
+}
+
+#[test]
+fn given_tree_group_when_rendering_then_rows_are_bounded_with_overflow_line() {
+    let test_cases = [
+        TreeGroupTestCase {
+            description: "two of five entries shown, overflow names the flag",
+            group: semantic_group(5),
+            facts: plain_facts(120),
+            expected_rows: vec![
+                "Partial semantic checks (5)",
+                "\u{251c}\u{2500}\u{2500} orders__mart_v__fulfilment_monitoring",
+                "\u{2502}   \u{251c}\u{2500}\u{2500} reason  reads open input orders__mart__fulfilment_monitoring",
+                "\u{2502}   \u{2514}\u{2500}\u{2500} fix     declare the input shape, then sqb compile --no-cache",
+                "\u{251c}\u{2500}\u{2500} fct_revenue",
+                "\u{2502}   \u{251c}\u{2500}\u{2500} at     models/finance/fct_revenue.sql:42:7",
+                "\u{2502}   \u{2514}\u{2500}\u{2500} error  unknown column net_amount_usd",
+                "\u{2514}\u{2500}\u{2500} \u{2026} 3 more (--verbose)",
+            ],
+        },
+        TreeGroupTestCase {
+            description: "every entry shown ends on the last branch and cuts long rows at 60",
+            group: semantic_group(2),
+            facts: plain_facts(60),
+            expected_rows: vec![
+                "Partial semantic checks (2)",
+                "\u{251c}\u{2500}\u{2500} orders__mart_v__fulfilment_monitoring",
+                "\u{2502}   \u{251c}\u{2500}\u{2500} reason  reads open input orders__mart__fulfilment_m\u{2026}",
+                "\u{2502}   \u{2514}\u{2500}\u{2500} fix     declare the input shape, then sqb compile -\u{2026}",
+                "\u{2514}\u{2500}\u{2500} fct_revenue",
+                "    \u{251c}\u{2500}\u{2500} at     models/finance/fct_revenue.sql:42:7",
+                "    \u{2514}\u{2500}\u{2500} error  unknown column net_amount_usd",
+            ],
+        },
+    ];
+
+    for test_case in test_cases {
+        let rows: Vec<String> = render_tree_group(&test_case.group, &test_case.facts);
+
+        assert_eq!(rows, test_case.expected_rows, "{}", test_case.description);
     }
 }

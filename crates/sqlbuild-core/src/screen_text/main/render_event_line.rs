@@ -1,8 +1,6 @@
 //! One timestamped event of the `sqb dev` screen, wrapped in full.
 
-use crate::screen_text::_helpers::rows::{
-    elapsed_text, paint, span, wrap_width, wrap_words,
-};
+use crate::screen_text::_helpers::rows::{elapsed_text, paint, span, wrap_width, wrap_words};
 use crate::screen_text::constants::{
     CHANGED_GLYPH, EVENT_TEXT_COLUMN, FAIL_GLYPH, OK_GLYPH, RESTARTED_GLYPH, STARTED_GLYPH,
     WARN_GLYPH,
@@ -44,7 +42,10 @@ pub fn render_event_line(event: &EventLine, facts: &ScreenFacts) -> Vec<String> 
                 facts,
             )
         } else {
-            paint(&[span(hang.as_str(), Tone::Plain), span(line, Tone::Plain)], facts)
+            paint(
+                &[span(hang.as_str(), Tone::Plain), span(line, Tone::Plain)],
+                facts,
+            )
         });
     }
     for note in &event.notes {

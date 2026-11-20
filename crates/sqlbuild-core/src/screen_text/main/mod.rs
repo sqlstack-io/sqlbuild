@@ -9,4 +9,5 @@ pub mod render_prompt;
 pub mod render_ready_box;
 pub mod render_result;
 pub mod render_step_line;
+pub mod render_tree_group;
 pub mod visible_cells;

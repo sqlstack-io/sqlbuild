@@ -12,7 +12,8 @@ use tokio::sync::watch;
 
 use crate::dev_stop::_helpers::processes::{kill_children, restore_termios, signal_group};
 use crate::dev_stop::constants::{
-    FORCED_LINE, INTERRUPT_STATUS, QUIT_STATUS, STOP_DEADLINE, STOP_GRACE, TERMINATE_STATUS,
+    FORCED_LINE, HANGUP_STATUS, INTERRUPT_STATUS, QUIT_STATUS, STOP_DEADLINE, STOP_GRACE,
+    TERMINATE_STATUS,
 };
 
 /// What asked `sqb dev` to stop.
@@ -24,6 +25,8 @@ pub(crate) enum StopReason {
     Interrupt,
     /// SIGTERM.
     Terminate,
+    /// SIGHUP, or the terminal went away under the key reader.
+    Hangup,
 }
 
 impl StopReason {
@@ -33,6 +36,7 @@ impl StopReason {
             Self::Quit => QUIT_STATUS,
             Self::Interrupt => INTERRUPT_STATUS,
             Self::Terminate => TERMINATE_STATUS,
+            Self::Hangup => HANGUP_STATUS,
         }
     }
 
@@ -42,6 +46,7 @@ impl StopReason {
             Self::Quit => "",
             Self::Interrupt => " (interrupted)",
             Self::Terminate => " (terminated)",
+            Self::Hangup => " (terminal closed)",
         }
     }
 }
@@ -105,10 +110,10 @@ impl StopSwitch {
 
     /// How long ago the stop was asked for.
     pub(crate) fn stopping_for(&self) -> Option<Duration> {
-        self.asked_at
-            .lock()
-            .ok()
-            .and_then(|asked_at| asked_at.map(|asked_at| asked_at.elapsed()))
+        match self.asked_at.lock() {
+            Ok(asked_at) => asked_at.map(|asked_at| asked_at.elapsed()),
+            Err(_poisoned) => None,
+        }
     }
 
     /// Wait until something asks to stop.
@@ -196,11 +201,14 @@ impl StopSwitch {
         self.kill_all();
         self.restore_terminal();
         let text: String = format!("\n{line}");
-        match self.output.lock().ok().and_then(|output| {
-            output
-                .as_ref()
-                .and_then(|terminal| terminal.try_clone().ok())
-        }) {
+        let terminal: Option<File> = match self.output.lock() {
+            Ok(output) => match output.as_ref().map(File::try_clone) {
+                Some(Ok(terminal)) => Some(terminal),
+                Some(Err(_)) | None => None,
+            },
+            Err(_poisoned) => None,
+        };
+        match terminal {
             Some(mut terminal) => drop(terminal.write_all(text.as_bytes())),
             None => drop(std::io::stderr().write_all(text.as_bytes())),
         }

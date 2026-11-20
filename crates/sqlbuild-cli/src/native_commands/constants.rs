@@ -211,7 +211,6 @@ pub(crate) const PLAN_OUTPUT_BYTES: usize =
 /// `sqb dev` names at most this many changed inputs per change event.
 pub(crate) const CHANGED_PATHS_SHOWN: usize = 3;
 
-
 /// Seconds a state-table or catalog page may take; its byte budget bounds the transfer.
 pub(crate) const METADATA_PAGE_SECONDS: u64 = 120;
 

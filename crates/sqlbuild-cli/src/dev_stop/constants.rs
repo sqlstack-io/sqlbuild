@@ -10,6 +10,8 @@ pub(crate) const STOP_DEADLINE: Duration = Duration::from_millis(2_500);
 pub(crate) const QUIT_STATUS: i32 = 0;
 /// Ctrl+C or SIGINT, as shells report it.
 pub(crate) const INTERRUPT_STATUS: i32 = 130;
+/// SIGHUP, as shells report it.
+pub(crate) const HANGUP_STATUS: i32 = 129;
 /// SIGTERM, as shells report it.
 pub(crate) const TERMINATE_STATUS: i32 = 143;
 /// What a forced stop prints on the terminal before it exits.

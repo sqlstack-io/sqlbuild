@@ -32,7 +32,11 @@ pub fn render_prompt(block: &PromptBlock, facts: &ScreenFacts) -> Vec<String> {
     rows.push(fit_row(
         vec![
             span(
-                format!("{indent}{:<1$}", "wait", PROBLEM_TEXT_COLUMN - PROBLEM_LABEL_INDENT),
+                format!(
+                    "{indent}{:<1$}",
+                    "wait",
+                    PROBLEM_TEXT_COLUMN - PROBLEM_LABEL_INDENT
+                ),
                 Tone::Muted,
             ),
             span(
@@ -47,6 +51,10 @@ pub fn render_prompt(block: &PromptBlock, facts: &ScreenFacts) -> Vec<String> {
         width,
         facts,
     ));
-    rows.push(facts.style.muted(&std::iter::repeat_n(RULE_CHAR, width).collect::<String>()));
+    rows.push(
+        facts
+            .style
+            .muted(&std::iter::repeat_n(RULE_CHAR, width).collect::<String>()),
+    );
     rows
 }

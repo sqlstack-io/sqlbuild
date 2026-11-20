@@ -33,7 +33,10 @@ pub fn render_problem(problem: &Problem, facts: &ScreenFacts) -> Vec<String> {
         {
             let label: &str = if index == 0 { label } else { "" };
             rows.push(paint(
-                &[span(field_lead(label), Tone::Muted), span(line, Tone::Plain)],
+                &[
+                    span(field_lead(label), Tone::Muted),
+                    span(line, Tone::Plain),
+                ],
                 facts,
             ));
         }

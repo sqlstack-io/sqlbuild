@@ -11,7 +11,9 @@ use tokio::process::Command;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::dev_screen::models::{DevStep, KeyInput, ScreenMessage};
-use crate::dev_session::_helpers::connection::{ReportSplit, connection_outcome, split_debug_output};
+use crate::dev_session::_helpers::connection::{
+    ReportSplit, connection_outcome, split_debug_output,
+};
 use crate::dev_session::constants::{CONNECTING, DEBUG_DRAIN, NO_REPORT};
 use crate::dev_session::models::DevProject;
 use crate::dev_stop::main::stop_switch::stop_switch;
@@ -76,8 +78,14 @@ async fn run_debug(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
-    let terminal: Option<(File, File)> = match keys {
-        Some(_) => open_terminal().ok(),
+    let terminal: Option<(File, File)> = match keys.map(|_| open_terminal()) {
+        Some(Ok(terminal)) => Some(terminal),
+        Some(Err(error)) => {
+            drop(screen.send(ScreenMessage::Log(format!(
+                "the warehouse client reads this terminal directly: {error}"
+            ))));
+            None
+        }
         None => None,
     };
     match &terminal {

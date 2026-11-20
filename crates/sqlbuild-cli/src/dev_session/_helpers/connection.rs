@@ -94,31 +94,35 @@ pub(crate) fn connection_outcome(report: &[u8]) -> (String, WarehouseState) {
 
 /// The connection's labelled settings in a fixed order: where (account or host), auth, role, then the warehouse or database. Unknown, masked, boolean and nested values are left out.
 pub(crate) fn connection_facts(settings: &[(String, String)]) -> Vec<String> {
-    let value = |keys: &[&str]| -> Option<(String, String)> {
-        keys.iter().find_map(|key| {
-            settings
-                .iter()
-                .find(|(label, value)| label == key && shown(value))
-                .map(|(label, value)| (label.clone(), value.clone()))
-        })
-    };
     let mut facts: Vec<String> = Vec::new();
-    if let Some((label, place)) = value(&PLACE_KEYS) {
+    if let Some((label, place)) = setting(settings, &PLACE_KEYS) {
         facts.push(format!("{label} {place}"));
     }
-    let auth: Option<String> = value(&AUTH_KEYS)
+    let auth: Option<String> = setting(settings, &AUTH_KEYS)
         .map(|(_, method)| auth_name(&method))
-        .or_else(|| value(&KEY_PAIR_KEYS).map(|_| "key pair".to_owned()));
+        .or_else(|| setting(settings, &KEY_PAIR_KEYS).map(|_| "key pair".to_owned()));
     if let Some(auth) = auth {
         facts.push(format!("auth {auth}"));
     }
-    if let Some((_, role)) = value(&ROLE_KEYS) {
+    if let Some((_, role)) = setting(settings, &ROLE_KEYS) {
         facts.push(format!("role {role}"));
     }
-    if let Some((label, storage)) = value(&STORAGE_KEYS) {
+    if let Some((label, storage)) = setting(settings, &STORAGE_KEYS) {
         facts.push(format!("{label} {storage}"));
     }
     facts
+}
+
+/// The first of `keys` that `settings` has with a value worth showing, and that value.
+fn setting(settings: &[(String, String)], keys: &[&str]) -> Option<(String, String)> {
+    for key in keys {
+        for (label, value) in settings {
+            if label == key && shown(value) {
+                return Some((label.clone(), value.clone()));
+            }
+        }
+    }
+    None
 }
 
 /// A readable name for an authenticator, such as `browser sign-in (OAuth)` for `OAUTH_AUTHORIZATION_CODE`.

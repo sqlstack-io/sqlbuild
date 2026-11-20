@@ -47,6 +47,8 @@ pub(crate) enum ScreenMessage {
         problem: Problem,
     },
     Child(DevEvent),
+    /// The development location's ID, known once the control store is open; plain output prints it with `ready`.
+    Location(String),
     /// The dev target's triggers, such as `41 paused`, read after the first publication.
     Triggers(String),
     /// The foreground warehouse connection's outcome.
@@ -129,6 +131,7 @@ pub(crate) struct DevScreen {
     pub(crate) header: DevHeader,
     pub(crate) header_printed: bool,
     pub(crate) ui_url: String,
+    pub(crate) location: String,
     pub(crate) triggers: String,
     pub(crate) steps: Vec<StepRow>,
     pub(crate) ready: bool,

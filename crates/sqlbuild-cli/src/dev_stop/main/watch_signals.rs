@@ -1,15 +1,16 @@
-//! Turn SIGINT and SIGTERM into stop requests.
+//! Turn SIGINT, SIGTERM and SIGHUP into stop requests.
 
 use crate::dev_stop::main::stop_switch::stop_switch;
 use crate::dev_stop::models::StopReason;
 
-/// Every SIGINT or SIGTERM asks the switch to stop; the second forces it.
+/// Every SIGINT, SIGTERM or SIGHUP asks the switch to stop; the second forces it.
 pub(crate) fn watch_signals() -> std::io::Result<()> {
     #[cfg(unix)]
     {
         use tokio::signal::unix::{SignalKind, signal};
         let mut interrupt = signal(SignalKind::interrupt())?;
         let mut terminate = signal(SignalKind::terminate())?;
+        let mut hangup = signal(SignalKind::hangup())?;
         tokio::spawn(async move {
             loop {
                 let reason: StopReason = tokio::select! {
@@ -21,6 +22,10 @@ pub(crate) fn watch_signals() -> std::io::Result<()> {
                         Some(()) => StopReason::Terminate,
                         None => return,
                     },
+                    received = hangup.recv() => match received {
+                        Some(()) => StopReason::Hangup,
+                        None => return,
+                    },
                 };
                 stop_switch().request(reason);
             }
@@ -28,8 +33,11 @@ pub(crate) fn watch_signals() -> std::io::Result<()> {
     }
     #[cfg(not(unix))]
     tokio::spawn(async {
-        while tokio::signal::ctrl_c().await.is_ok() {
-            stop_switch().request(StopReason::Interrupt);
+        loop {
+            match tokio::signal::ctrl_c().await {
+                Ok(()) => stop_switch().request(StopReason::Interrupt),
+                Err(_) => return,
+            }
         }
     });
     Ok(())

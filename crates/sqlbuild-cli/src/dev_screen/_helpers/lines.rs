@@ -45,7 +45,18 @@ pub(crate) fn ready_lines(mut screen: DevScreen) -> (DevScreen, Vec<String>) {
     let parts: Vec<String> = warehouse_parts(&screen.adapter, &warehouse);
     if !screen.live {
         let mut lines: Vec<String> = vec![format!("\u{2713} ready  {}", screen.ui_url)];
-        lines.extend(render_labelled_parts("warehouse", &parts, screen.facts.columns));
+        lines.extend(render_labelled_parts(
+            "warehouse",
+            &parts,
+            screen.facts.columns,
+        ));
+        if !screen.location.is_empty() {
+            lines.extend(render_labelled_parts(
+                "location ",
+                std::slice::from_ref(&screen.location),
+                screen.facts.columns,
+            ));
+        }
         if !screen.triggers.is_empty() {
             lines.extend(render_labelled_parts(
                 "triggers ",
@@ -55,7 +66,10 @@ pub(crate) fn ready_lines(mut screen: DevScreen) -> (DevScreen, Vec<String>) {
         }
         return (screen, lines);
     }
-    let mut project: Vec<String> = vec![screen.header.project.clone(), home_relative(&screen.project_root)];
+    let mut project: Vec<String> = vec![
+        screen.header.project.clone(),
+        home_relative(&screen.project_root),
+    ];
     if !screen.header.target.is_empty() {
         project.push(format!("target {}", screen.header.target));
     }
@@ -139,4 +153,3 @@ pub(crate) fn physical_rows(rows: &[String], columns: usize) -> usize {
         .map(|row| visible_cells(row).div_ceil(columns).max(1))
         .sum()
 }
-

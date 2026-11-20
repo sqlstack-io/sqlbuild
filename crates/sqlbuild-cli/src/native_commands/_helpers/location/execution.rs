@@ -8,6 +8,7 @@ use crate::compute_logs::main::finish_capture::finish_capture;
 use crate::compute_logs::main::open_log_root::open_log_root;
 use crate::compute_logs::main::start_capture::start_capture;
 use crate::compute_logs::models::{CaptureEnd, CaptureStart, OpenCapture};
+use crate::dev_screen::main::terminal_size::terminal_size;
 use crate::dev_screen::models::ScreenSetup;
 use crate::dev_screen::models::{DevStep, ScreenMessage};
 use crate::dev_screen::types::DevScreenParts;
@@ -15,9 +16,6 @@ use crate::dev_session::main::run_dev_session::run_dev_session;
 use crate::dev_session::models::{DevProject, LocationPipes};
 use crate::dev_stop::main::stop_switch::stop_switch;
 use crate::dev_stop::models::DevEnd;
-use crate::native_commands::_helpers::location::dev_supervision::{
-    DevRoles, supervise_development_roles,
-};
 use crate::native_commands::_helpers::command::decision::{
     control_address, control_database, control_database_variable, flag, text,
 };
@@ -35,8 +33,9 @@ use crate::native_commands::_helpers::command::terminal::share_terminal;
 use crate::native_commands::_helpers::command::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
-use crate::native_commands::_helpers::command::terminal::{
-    live_screen, screen_colour, terminal_size,
+use crate::native_commands::_helpers::command::terminal::{live_screen, screen_colour};
+use crate::native_commands::_helpers::location::dev_supervision::{
+    DevRoles, supervise_development_roles,
 };
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_timeout_seconds, rows_text, scan_line,
@@ -233,10 +232,17 @@ pub(crate) async fn run_development_roles(
             .await
         });
     }
-    drop(messages.send(ScreenMessage::Finished {
-        step: DevStep::Scheduler,
-        detail: if scheduler { "triggers start paused" } else { "off (--no-scheduler)" }.to_owned(),
-    }));
+    drop(
+        messages.send(ScreenMessage::Finished {
+            step: DevStep::Scheduler,
+            detail: if scheduler {
+                "triggers start paused"
+            } else {
+                "off (--no-scheduler)"
+            }
+            .to_owned(),
+        }),
+    );
     Ok(supervise_development_roles(roles, stop, &messages).await)
 }
 
@@ -1566,7 +1572,7 @@ pub(crate) async fn next_turn(
     }
 }
 
-/// `sqb dev`'s control lines from stdin; outside `sqb dev`, a fixed connected state.
+/// `sqb dev`'s control lines from stdin; outside `sqb dev`, a fixed connected state. `sqb dev` holds stdin open while it lives, so its end, even after `sqb dev` was killed, stops the location as SIGTERM does.
 pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevControlState> {
     let (sender, receiver) = watch::channel(DevControlState {
         warehouse: (!options.dev_events).then_some(true),
@@ -1585,6 +1591,11 @@ pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevContro
                     None => {}
                 }
             }
+            #[cfg(unix)]
+            let _ = rustix::process::kill_process(
+                rustix::process::getpid(),
+                rustix::process::Signal::TERM,
+            );
         });
     }
     receiver
@@ -1748,6 +1759,7 @@ pub(crate) async fn announced_store(
         step: DevStep::ControlStore,
         detail: database,
     }));
+    drop(messages.send(ScreenMessage::Location(scope.location_id.to_string())));
     Ok((store, scope))
 }
 

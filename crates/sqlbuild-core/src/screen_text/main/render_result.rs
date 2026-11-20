@@ -31,7 +31,11 @@ pub fn render_result(result: &ResultLine, facts: &ScreenFacts) -> Vec<String> {
             .into_iter()
             .enumerate()
         {
-            let first: String = if index == 0 { lead.clone() } else { "  ".to_owned() };
+            let first: String = if index == 0 {
+                lead.clone()
+            } else {
+                "  ".to_owned()
+            };
             rows.push(paint(&[span(first, tone), span(line, Tone::Strong)], facts));
         }
     }
@@ -51,7 +55,10 @@ pub fn render_result(result: &ResultLine, facts: &ScreenFacts) -> Vec<String> {
             } else {
                 " ".repeat(column)
             };
-            rows.push(paint(&[span(first, Tone::Plain), span(line, Tone::Muted)], facts));
+            rows.push(paint(
+                &[span(first, Tone::Plain), span(line, Tone::Muted)],
+                facts,
+            ));
         }
     }
     rows

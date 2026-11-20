@@ -35,7 +35,10 @@ pub(crate) fn start_dev_screen(setup: ScreenSetup) -> DevScreenHandle {
             None
         }
     };
-    stop_switch().save_output(terminal.as_ref().and_then(|file| file.try_clone().ok()));
+    stop_switch().save_output(match terminal.as_ref().map(File::try_clone) {
+        Some(Ok(copy)) => Some(copy),
+        Some(Err(_)) | None => None,
+    });
     let screen: DevScreen = new_dev_screen(setup);
     let task = tokio::spawn(draw_screen(
         screen,

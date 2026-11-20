@@ -30,6 +30,7 @@ pub(crate) fn apply_screen_message(
             problem,
         } => step_failed(screen, (step, detail, problem), now),
         ScreenMessage::Child(event) => child_event(screen, event, now, clock),
+        ScreenMessage::Location(location) => (DevScreen { location, ..screen }, Vec::new()),
         ScreenMessage::Triggers(triggers) => (DevScreen { triggers, ..screen }, Vec::new()),
         ScreenMessage::Warehouse { adapter, state } => {
             warehouse_settled(screen, (adapter, state), now, clock)
@@ -41,7 +42,13 @@ pub(crate) fn apply_screen_message(
                     screen.client_partial = !text.ends_with('\n');
                 }
                 output.push_str(&text);
-                return (screen, ScreenOutput { text: output, action });
+                return (
+                    screen,
+                    ScreenOutput {
+                        text: output,
+                        action,
+                    },
+                );
             }
             (client_text(screen, &text, now), Vec::new())
         }

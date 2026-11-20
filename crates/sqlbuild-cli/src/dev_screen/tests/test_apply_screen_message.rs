@@ -1,11 +1,9 @@
-use sqlbuild_core::text::main::cell_len::cell_len;
-
 use crate::dev_screen::models::ScreenAction;
 use crate::dev_screen::tests::helpers::{
-    connecting, failed_compile, interrupted, interrupted_end, not_started_end, play, ready,
-    removed_key, signing_in,
+    close_interrupted, close_not_started, connecting, failed_compile, interrupted, layout_problems,
+    play, ready, removed_key, signing_in, still_running,
 };
-use crate::dev_screen::tests::test_types::{KeyTestCase, ScreenTestCase};
+use crate::dev_screen::tests::test_types::{KeyTestCase, LayoutTestCase, ScreenTestCase};
 
 const SHORT: Option<(usize, usize)> = Some((80, 10));
 const TALL: Option<(usize, usize)> = Some((80, 24));
@@ -17,7 +15,7 @@ fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
             description: "start-up at 80x24",
             size: TALL,
             messages: connecting(),
-            end: None,
+            close: still_running,
             expected_viewport: vec![
                 "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
                 "\u{2713} Opened control store    0.1s   sqlite",
@@ -34,7 +32,7 @@ fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
             description: "start-up at 80x10",
             size: SHORT,
             messages: connecting(),
-            end: None,
+            close: still_running,
             expected_viewport: vec![
                 "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
                 "\u{2713} Opened control store    0.1s   sqlite",
@@ -51,7 +49,7 @@ fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
             description: "a failed step with a long error at 80x24",
             size: TALL,
             messages: failed_compile(),
-            end: None,
+            close: still_running,
             expected_viewport: vec![
                 "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
                 "\u{2713} Opened control store    0.1s   sqlite",
@@ -75,7 +73,7 @@ fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
             description: "a failed step with a long error at 80x10",
             size: SHORT,
             messages: failed_compile(),
-            end: None,
+            close: still_running,
             expected_viewport: vec![
                 "  why    column net_amount_usd does not exist in stg_payments; the column was",
                 "         renamed to amount_usd_net when the payments source moved to the v2",
@@ -92,7 +90,7 @@ fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
             description: "the sign-in prompt at 80x24",
             size: TALL,
             messages: signing_in(),
-            end: None,
+            close: still_running,
             expected_viewport: vec![
                 "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
                 "\u{2713} Opened control store    0.1s   sqlite",
@@ -116,7 +114,7 @@ fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
             description: "the sign-in prompt at 80x10",
             size: SHORT,
             messages: signing_in(),
-            end: None,
+            close: still_running,
             expected_viewport: vec![
                 "\u{25cc} sign in  snowflake needs you to sign in",
                 "  Go to https://xy12345.snowflakecomputing.com/oauth/authorize?client_id=SQLBUI",
@@ -133,7 +131,7 @@ fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
             description: "ready at 80x24",
             size: TALL,
             messages: ready(),
-            end: None,
+            close: still_running,
             expected_viewport: vec![
                 "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
                 "\u{2713} Opened control store    0.1s   sqlite",
@@ -157,7 +155,7 @@ fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
             description: "Ctrl+C at 80x24",
             size: TALL,
             messages: interrupted(),
-            end: Some(interrupted_end()),
+            close: close_interrupted,
             expected_viewport: vec![
                 "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
                 "\u{2713} Opened control store    0.1s   sqlite",
@@ -184,7 +182,7 @@ fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
             description: "Ctrl+C at 80x10",
             size: SHORT,
             messages: interrupted(),
-            end: Some(interrupted_end()),
+            close: close_interrupted,
             expected_viewport: vec![
                 "\u{2502} Project    shop \u{b7} /home/analyst/projects/shop \u{b7} target dev                 \u{2502}",
                 "\u{2502} Warehouse  snowflake \u{b7} account xy12345 \u{b7} auth browser sign-in (OAuth)      \u{2502}",
@@ -201,7 +199,7 @@ fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
             description: "a configuration error at 80x10",
             size: SHORT,
             messages: removed_key(),
-            end: Some(not_started_end()),
+            close: close_not_started,
             expected_viewport: vec![
                 "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
                 "\u{2717} Read configuration      0.0s   1 error",
@@ -218,7 +216,7 @@ fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
             description: "--plain appends finished lines only",
             size: None,
             messages: interrupted(),
-            end: Some(interrupted_end()),
+            close: close_interrupted,
             expected_viewport: vec![
                 "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
                 "\u{2713} Opened control store    0.1s   sqlite",
@@ -243,7 +241,7 @@ fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
     ];
 
     for test_case in test_cases {
-        let transcript = play(test_case.size, test_case.messages, test_case.end);
+        let transcript = play(test_case.size, test_case.messages, test_case.close);
 
         assert_eq!(
             transcript.viewport, test_case.expected_viewport,
@@ -255,32 +253,37 @@ fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
 
 #[test]
 fn given_any_session_when_drawn_then_the_header_is_printed_once_and_no_row_overflows() {
-    let sessions = [connecting(), failed_compile(), signing_in(), ready(), interrupted()];
-    let mut problems: Vec<String> = Vec::new();
-    for size in [SHORT, TALL, Some((40, 6)), Some((120, 30))] {
-        for messages in sessions.clone() {
-            let transcript = play(size, messages, Some(interrupted_end()));
-            let (columns, rows) = size.unwrap_or((80, 24));
-            let headers: usize = transcript
-                .scrollback
-                .iter()
-                .filter(|line| line.starts_with("sqb dev  shop"))
-                .count();
-            if headers != 1 {
-                problems.push(format!("{columns}x{rows}: header printed {headers} times"));
-            }
-            if transcript.viewport.len() > rows {
-                problems.push(format!("{columns}x{rows}: {} rows shown", transcript.viewport.len()));
-            }
-            for line in &transcript.scrollback {
-                if cell_len(line) >= columns && columns >= 60 {
-                    problems.push(format!("{columns}x{rows}: too wide: {line}"));
-                }
-            }
-        }
-    }
+    let test_cases = [
+        LayoutTestCase {
+            description: "80x10",
+            size: (80, 10),
+            expected_problems: Vec::new(),
+        },
+        LayoutTestCase {
+            description: "80x24",
+            size: (80, 24),
+            expected_problems: Vec::new(),
+        },
+        LayoutTestCase {
+            description: "120x30",
+            size: (120, 30),
+            expected_problems: Vec::new(),
+        },
+        LayoutTestCase {
+            description: "a terminal only 6 rows tall",
+            size: (60, 6),
+            expected_problems: Vec::new(),
+        },
+    ];
 
-    assert_eq!(problems, Vec::<String>::new());
+    for test_case in test_cases {
+        assert_eq!(
+            layout_problems(test_case.size),
+            test_case.expected_problems,
+            "{}",
+            test_case.description
+        );
+    }
 }
 
 #[test]
@@ -310,7 +313,7 @@ fn given_keys_after_ready_when_pressed_then_they_ask_for_actions() {
                     .collect(),
             ]
             .concat(),
-            None,
+            still_running,
         );
 
         assert_eq!(

@@ -7,6 +7,7 @@ import gzip
 import hashlib
 import json
 import os
+import pty
 import random
 import secrets
 import select
@@ -14,6 +15,7 @@ import signal
 import sqlite3
 import subprocess
 import sys
+import termios
 import time
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, closing, contextmanager, nullcontext, suppress
@@ -108,9 +110,9 @@ def location_process(
 
 
 def stop_location(process: subprocess.Popen[bytes], interpreter_pid: int, log: Path) -> None:
-    """Exercise graceful supervisor shutdown and prove its interpreter was reaped."""
+    """Exercise graceful `sqb dev` shutdown on SIGTERM and prove its interpreter was reaped."""
     process.send_signal(signal.SIGTERM)
-    assert process.wait(timeout=15) == 0, log.read_text()
+    assert process.wait(timeout=15) == 128 + signal.SIGTERM, log.read_text()
     with pytest.raises(ProcessLookupError):
         os.kill(interpreter_pid, 0)
 
@@ -564,11 +566,11 @@ def wait_for_log_count(
 def wait_for_development_ready(
     process: subprocess.Popen[bytes], log: Path, *, timeout: float = 60
 ) -> tuple[str, str]:
-    """The UI URL and location ID from `sqb dev`'s plain `ready` and `location` lines."""
-    wait_for_log(process, log, "sqlbuild dev: ready ", timeout=timeout)
+    """The UI URL and location ID from `sqb dev`'s plain `ready` block."""
+    wait_for_log(process, log, "  location   ", timeout=timeout)
     text: str = log.read_text()
-    url: str = text.partition("sqlbuild dev: ready ")[2].splitlines()[0]
-    identity: str = text.partition("sqlbuild dev: location ")[2].split()[0]
+    url: str = text.partition("\u2713 ready  ")[2].splitlines()[0]
+    identity: str = text.partition("  location   ")[2].split()[0]
     return url, identity
 
 
@@ -2018,3 +2020,71 @@ def plan_before_sync(
         request_id: str = request_plan(control, [], settings)
         result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
     return result["result_json"]["outcome"], log.read_text()
+
+
+def development_environment(extra: dict[str, str], unset: frozenset[str]) -> dict[str, str]:
+    """This environment with `extra` and `TERM=xterm`, less `unset` and the platform webhook."""
+    environment: dict[str, str] = dict(os.environ) | {"TERM": "xterm"} | extra
+    dropped: frozenset[str] = unset | {"SQLBUILD_PLATFORM_WEBHOOK_URL"}
+    return dict(filter(lambda item: item[0] not in dropped, environment.items()))
+
+
+def start_development_on_terminal(
+    project: Path, arguments: list[str], environment: dict[str, str]
+) -> tuple[int, subprocess.Popen[bytes]]:
+    """`sqb dev` for `project` on a new 80x24 pseudo-terminal: its controller and the process."""
+    terminal, attached = pty.openpty()
+    termios.tcsetwinsize(attached, (24, 80))
+    process: subprocess.Popen[bytes] = subprocess.Popen(
+        [
+            str(Path(sys.executable).with_name("sqb")),
+            "dev",
+            "--project-dir",
+            str(project),
+            "--port",
+            "0",
+            *arguments,
+        ],
+        stdin=attached,
+        stdout=attached,
+        stderr=attached,
+        env=environment,
+        start_new_session=True,
+    )
+    os.close(attached)
+    return terminal, process
+
+
+def drain_terminal(terminal: int) -> str:
+    """What is left to read on `terminal` once its process has exited."""
+    written: bytes = b""
+    with suppress(OSError):
+        while select.select([terminal], [], [], 0.2)[0] and (chunk := os.read(terminal, 65536)):
+            written += chunk
+    return written.decode(errors="replace")
+
+
+def _command_line(process_directory: Path) -> str:
+    """A `/proc/<pid>` directory's command line, empty once the process is gone."""
+    with suppress(OSError):
+        return (process_directory / "cmdline").read_bytes().replace(b"\0", b" ").decode()
+    return ""
+
+
+def processes_naming(project: Path) -> list[str]:
+    """`<pid> <command line>` of every running process whose command line names `project`."""
+    running: list[Path] = list(filter(lambda entry: entry.name.isdigit(), Path("/proc").iterdir()))
+    commands: list[str] = [f"{entry.name} {_command_line(entry)}" for entry in running]
+    return list(filter(lambda command: str(project) in command, commands))
+
+
+def reap_development(process: subprocess.Popen[bytes], project: Path) -> list[str]:
+    """Kill `process` if it still runs, then any process left naming `project`; return those."""
+    process.kill()
+    _ = process.wait(timeout=5)
+    time.sleep(0.5)
+    left: list[str] = processes_naming(project)
+    for line in left:
+        with suppress(ProcessLookupError):
+            os.kill(int(line.split()[0]), signal.SIGKILL)
+    return left

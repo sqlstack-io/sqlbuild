@@ -19,6 +19,15 @@ pub(crate) fn span(text: impl Into<String>, tone: Tone) -> Segment {
     }
 }
 
+/// A span of `text` in `tone` that links to `link`.
+pub(crate) fn linked(text: impl Into<String>, tone: Tone, link: Option<String>) -> Segment {
+    Segment {
+        text: text.into(),
+        tone,
+        link,
+    }
+}
+
 /// The leading characters of `text` that fit in `cells`.
 pub(crate) fn take_cells(text: &str, cells: usize) -> String {
     let mut used: usize = 0;
@@ -32,6 +41,24 @@ pub(crate) fn take_cells(text: &str, cells: usize) -> String {
         kept.push(character);
     }
     kept
+}
+
+/// `text` cut to `cells` with a trailing `…` when it is wider.
+pub(crate) fn cut(text: &str, cells: usize) -> String {
+    if cell_len(text) <= cells {
+        return text.to_owned();
+    }
+    if cells == 0 {
+        return String::new();
+    }
+    format!("{}{CUT_MARK}", take_cells(text, cells - 1))
+}
+
+/// `text` cut to `cells`, then padded with spaces to exactly `cells`.
+pub(crate) fn column(text: &str, cells: usize) -> String {
+    let kept: String = cut(text, cells);
+    let padding: usize = cells.saturating_sub(cell_len(&kept));
+    format!("{kept}{}", " ".repeat(padding))
 }
 
 /// `text` right-aligned in `cells`.

@@ -10,10 +10,7 @@ use crate::text::main::cell_len::cell_len;
 /// `╭─ ready ─╮`, one labelled row each, wrapped between parts, then `╰─╯`.
 #[must_use]
 pub fn render_ready_box(rows: &[BoxRow], facts: &ScreenFacts) -> Vec<String> {
-    let width: usize = facts
-        .columns
-        .saturating_sub(BOX_MARGIN)
-        .max(BOX_MIN_WIDTH);
+    let width: usize = facts.columns.saturating_sub(BOX_MARGIN).max(BOX_MIN_WIDTH);
     let inner: usize = width - 4;
     let value_width: usize = inner.saturating_sub(BOX_LABEL_WIDTH).max(1);
     let title: &str = "\u{256d}\u{2500} ready ";

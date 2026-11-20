@@ -13,7 +13,7 @@ use crate::screen_text::main::render_step_line::render_step_line;
 use crate::screen_text::main::visible_cells::visible_cells;
 use crate::screen_text::models::{
     BoxRow, DevHeader, EventLine, EventMark, Hotkey, PhaseState, Problem, ProblemLevel,
-    PromptBlock, ResultLine, ScreenFacts, Segment, StepLine, Tone,
+    PromptBlock, ResultLine, ScreenFacts, Segment, StepLine, Tone, TreeEntry, TreeGroup, TreeRow,
 };
 
 /// Uncoloured facts without links, `columns` wide and 24 rows tall.
@@ -39,7 +39,12 @@ pub(super) fn millis(value: u64) -> Option<Duration> {
     Some(Duration::from_millis(value))
 }
 
-pub(super) fn step(state: PhaseState, label: &str, elapsed: Option<Duration>, detail: &str) -> StepLine {
+pub(super) fn step(
+    state: PhaseState,
+    label: &str,
+    elapsed: Option<Duration>,
+    detail: &str,
+) -> StepLine {
     StepLine {
         state,
         label: label.to_owned(),
@@ -108,6 +113,51 @@ pub(super) fn run_started() -> EventLine {
     }
 }
 
+pub(super) fn semantic_group(total: usize) -> TreeGroup {
+    let entry = |name: &str, rows: &[(&str, &str, Tone)]| TreeEntry {
+        name: name.to_owned(),
+        rows: rows
+            .iter()
+            .map(|(key, value, tone)| TreeRow {
+                key: (*key).to_owned(),
+                value: (*value).to_owned(),
+                tone: *tone,
+                link: (*key == "at").then(|| format!("file:///work/shop/{value}")),
+            })
+            .collect(),
+    };
+    TreeGroup {
+        title: "Partial semantic checks".to_owned(),
+        total,
+        entries: vec![
+            entry(
+                "orders__mart_v__fulfilment_monitoring",
+                &[
+                    (
+                        "reason",
+                        "reads open input orders__mart__fulfilment_monitoring",
+                        Tone::Plain,
+                    ),
+                    (
+                        "fix",
+                        "declare the input shape, then sqb compile --no-cache",
+                        Tone::Plain,
+                    ),
+                ],
+            ),
+            entry(
+                "fct_revenue",
+                &[
+                    ("at", "models/finance/fct_revenue.sql:42:7", Tone::Muted),
+                    ("error", "unknown column net_amount_usd", Tone::Error),
+                ],
+            ),
+        ],
+        limit: 2,
+        flag: "--verbose".to_owned(),
+    }
+}
+
 /// Every row any renderer draws at `facts`, with whether it is live (cut) rather than lasting (wrapped).
 pub(super) fn every_row(facts: &ScreenFacts) -> Vec<(bool, String)> {
     let long: &str = "Python nodes 287/412 \u{b7} models/marts/finance/fct_revenue_by_region.sql \
@@ -120,8 +170,16 @@ pub(super) fn every_row(facts: &ScreenFacts) -> Vec<(bool, String)> {
         PhaseState::Fail,
     ] {
         let line: StepLine = step(state, "Connecting warehouse", millis(24_650), long);
-        rows.extend(render_step_line(&line, facts, false).into_iter().map(|row| (true, row)));
-        rows.extend(render_step_line(&line, facts, true).into_iter().map(|row| (false, row)));
+        rows.extend(
+            render_step_line(&line, facts, false)
+                .into_iter()
+                .map(|row| (true, row)),
+        );
+        rows.extend(
+            render_step_line(&line, facts, true)
+                .into_iter()
+                .map(|row| (false, row)),
+        );
     }
     rows.push((
         true,
@@ -137,7 +195,10 @@ pub(super) fn every_row(facts: &ScreenFacts) -> Vec<(bool, String)> {
         render_prompt(
             &PromptBlock {
                 title: "snowflake needs you to sign in".to_owned(),
-                text: format!("Go to https://example.com/authorize?{} to sign in\n", "x".repeat(150)),
+                text: format!(
+                    "Go to https://example.com/authorize?{} to sign in\n",
+                    "x".repeat(150)
+                ),
                 waited: Duration::from_secs(24),
             },
             facts,
@@ -164,7 +225,10 @@ pub(super) fn every_row(facts: &ScreenFacts) -> Vec<(bool, String)> {
                 title: "sqb dev did not start".to_owned(),
                 detail: "could not connect to the warehouse".to_owned(),
                 elapsed: millis(14_700),
-                next: vec![("sqb debug".to_owned(), "test the connection on its own".to_owned())],
+                next: vec![(
+                    "sqb debug".to_owned(),
+                    "test the connection on its own".to_owned(),
+                )],
             },
             facts,
         ),

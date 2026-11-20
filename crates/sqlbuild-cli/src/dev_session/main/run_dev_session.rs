@@ -1,7 +1,5 @@
 //! Feed the `sqb dev` screen from the location child, open the warehouse in the foreground and act on keys.
 
-use std::future::Future;
-use std::pin::Pin;
 use std::time::Duration;
 
 use sqlbuild_core::screen_text::models::WarehouseState;
@@ -25,11 +23,9 @@ use crate::dev_session::constants::{
     CANCELLED_CONNECT, LOCATION_STOPPED, RUN_PAGE, RUN_POLL, WAREHOUSE_FAILED,
 };
 use crate::dev_session::models::{DevProject, LocationPipes};
+use crate::dev_session::types::Connecting;
 use crate::dev_stop::main::stop_switch::stop_switch;
 use crate::person_login::main::open_browser::open_browser;
-
-/// A foreground connection that is still open.
-type Connecting<'a> = Pin<Box<dyn Future<Output = WarehouseState> + Send + 'a>>;
 
 /// Run until shutdown; the location child closing its output, or the first connection failing, is an error.
 pub(crate) async fn run_dev_session(
@@ -49,9 +45,8 @@ pub(crate) async fn run_dev_session(
     let mut connected: Option<bool> = None;
     let mut connecting: Option<Connecting<'_>> = None;
     let mut poll = tokio::time::interval(RUN_POLL);
-    let connect = || -> Connecting<'_> {
-        Box::pin(connect_in_foreground(&screen, keys.as_deref(), &dev))
-    };
+    let connect =
+        || -> Connecting<'_> { Box::pin(connect_in_foreground(&screen, keys.as_deref(), &dev)) };
     loop {
         tokio::select! {
             changed = shutdown.changed() => {

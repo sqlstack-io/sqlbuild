@@ -170,7 +170,12 @@ fn given_debug_stdout_when_split_then_the_client_prompt_is_shown_and_the_report_
                 "{\"success\": ",
                 "true}\n",
             ],
-            expected_client: vec!["Go to https://example.com/authorize to sign in\n", "Enter the URL: ", "", ""],
+            expected_client: vec![
+                "Go to https://example.com/authorize to sign in\n",
+                "Enter the URL: ",
+                "",
+                "",
+            ],
             expected_report: "{\"success\": true}\n",
         },
         ReportSplitTestCase {
@@ -189,7 +194,11 @@ fn given_debug_stdout_when_split_then_the_client_prompt_is_shown_and_the_report_
             .map(|chunk| split.feed(chunk))
             .collect();
 
-        assert_eq!(client, test_case.expected_client, "{}", test_case.description);
+        assert_eq!(
+            client, test_case.expected_client,
+            "{}",
+            test_case.description
+        );
         assert_eq!(
             String::from_utf8(split.finish()).unwrap_or_default(),
             test_case.expected_report,

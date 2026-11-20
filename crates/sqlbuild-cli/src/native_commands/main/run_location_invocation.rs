@@ -9,11 +9,10 @@ use sqlbuild_orchestration::platform::models::LocationState;
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream};
-use crate::dev_stop::constants::{RUNTIME_SHUTDOWN, START_FAILURE_STATUS};
 use crate::native_commands::_helpers::command::decision::text;
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::location_options;
-use crate::native_commands::main::_run_dev::run_dev;
+use crate::native_commands::main::_run_dev::run_development;
 use crate::native_commands::main::_run_location::run_location;
 
 /// Health needs no Python CLI; serving and development return `None` without one so the caller reports it.
@@ -64,26 +63,6 @@ pub(crate) fn run_location_invocation(namespace: &Namespace, script: Option<&Pat
             1
         }
     })
-}
-
-/// `sqb dev`: its own result line and exit status; leftover tasks get a moment, never a hang.
-fn run_development(namespace: &Namespace) -> i32 {
-    let runtime = match tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(runtime) => runtime,
-        Err(error) => {
-            drop(write_output(&[(
-                Stream::Stderr,
-                &format!("\u{2717} sqb dev did not start  {error}\n"),
-            )]));
-            return START_FAILURE_STATUS;
-        }
-    };
-    let status: i32 = runtime.block_on(run_dev(namespace));
-    runtime.shutdown_timeout(RUNTIME_SHUTDOWN);
-    status
 }
 
 /// `sqb location health`: 0 when healthy or degraded, 1 when down or falling back, 2 when unanswered.

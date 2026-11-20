@@ -58,7 +58,9 @@ fn given_runs_since_the_last_poll_when_read_then_each_start_and_end_is_reported_
                     (5, 3),
                 ),
             ],
-            expected_messages: vec!["adhoc | succeeded with warnings \u{b7} 5 nodes | ok 90s".to_owned()],
+            expected_messages: vec![
+                "adhoc | succeeded with warnings \u{b7} 5 nodes | ok 90s".to_owned(),
+            ],
         },
         RunPollTestCase {
             description: "a run already seen ending is not reported again",

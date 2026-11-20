@@ -23,7 +23,10 @@ pub fn render_dev_header(header: &DevHeader, facts: &ScreenFacts) -> Vec<String>
         format!("{SEPARATOR}sqb {}", header.version),
         Tone::Muted,
     ));
-    let text: String = segments.iter().map(|segment| segment.text.as_str()).collect();
+    let text: String = segments
+        .iter()
+        .map(|segment| segment.text.as_str())
+        .collect();
     if cell_len(&text) <= row_width(facts) {
         return vec![paint(&segments, facts)];
     }

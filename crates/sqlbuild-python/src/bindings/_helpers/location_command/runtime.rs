@@ -24,6 +24,7 @@ use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sens
 use crate::bindings::_helpers::native_host::warehouse_metadata::close_history_session;
 use crate::bindings::_helpers::native_host::warehouse_metadata::open_history_session;
 use crate::bindings::_helpers::native_host::warehouse_metadata::read_history;
+use sqlbuild_python_base::boundary::main::error_text_fields::error_text_fields;
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
@@ -65,15 +66,9 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                                 py,
                                 &format!("Location compilation/publication failed: {error}\n"),
                             )?;
-                            let failed = generation_failed(
-                                generation,
-                                error_text(py, &error, "message")
-                                    .unwrap_or_else(|| error.to_string()),
-                                (
-                                    error_text(py, &error, "code"),
-                                    error_text(py, &error, "help"),
-                                ),
-                            );
+                            let (message, code, help) = error_text_fields(py, &error)?;
+                            let message = message.unwrap_or_else(|| error.to_string());
+                            let failed = generation_failed(generation, message, (code, help));
                             py.detach(|| emit_dev_event(&failed))?;
                             (None, None)
                         }
@@ -210,14 +205,4 @@ fn failure_reason(error: &PyErr) -> String {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
-}
-
-/// The error's non-empty `attribute` text, such as a `CliUserError`'s `code`, `help` or `message`.
-fn error_text(py: Python<'_>, error: &PyErr, attribute: &str) -> Option<String> {
-    error
-        .value(py)
-        .getattr(attribute)
-        .ok()
-        .and_then(|value| value.extract::<String>().ok())
-        .filter(|text| !text.trim().is_empty())
 }

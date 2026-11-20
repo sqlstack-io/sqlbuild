@@ -277,7 +277,7 @@ def test_given_development_start_when_location_is_ready_then_project_python_is_d
     [
         DevelopmentWarningTestCase(
             "a failed warehouse read is a plain line, without the detailed log",
-            "sqlbuild dev: warehouse read failed: retrying in 30s: ",
+            "  why    retrying in 30s: ",
             "Warehouse history read failed; retaining mirror",
         )
     ],
@@ -318,6 +318,6 @@ def test_given_plain_development_when_a_warehouse_read_fails_then_a_warning_line
         record_finished_run(project / ".sqlbuild/control.sqlite3")
         wait_for_log(process, log, test_case.expected_line, timeout=45)
         process.send_signal(signal.SIGTERM)
-        assert process.wait(timeout=15) == 0, log.read_text()
+        assert process.wait(timeout=15) == 128 + signal.SIGTERM, log.read_text()
 
     assert test_case.hidden_line not in log.read_text()

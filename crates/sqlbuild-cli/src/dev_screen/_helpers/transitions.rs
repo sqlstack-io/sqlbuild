@@ -172,7 +172,12 @@ pub(crate) fn child_event(
                 .flat_map(|title| {
                     event_lines(
                         &screen,
-                        event_line(clock, EventMark::Changed, format!("{title} changed"), String::new()),
+                        event_line(
+                            clock,
+                            EventMark::Changed,
+                            format!("{title} changed"),
+                            String::new(),
+                        ),
                     )
                 })
                 .collect();
@@ -181,7 +186,12 @@ pub(crate) fn child_event(
         DevEvent::Restarted { reason } => {
             let lines: Vec<String> = event_lines(
                 &screen,
-                event_line(clock, EventMark::Restarted, "location restarted".to_owned(), reason),
+                event_line(
+                    clock,
+                    EventMark::Restarted,
+                    "location restarted".to_owned(),
+                    reason,
+                ),
             );
             (screen, lines)
         }
@@ -266,7 +276,12 @@ fn published(mut screen: DevScreen, snapshot_id: &str, now: Instant, clock: &str
         &screen,
         EventLine {
             elapsed,
-            ..event_line(clock, EventMark::Succeeded, format!("published snapshot {short}"), detail)
+            ..event_line(
+                clock,
+                EventMark::Succeeded,
+                format!("published snapshot {short}"),
+                detail,
+            )
         },
     );
     (screen, lines)
@@ -441,7 +456,7 @@ pub(crate) fn client_text(mut screen: DevScreen, text: &str, now: Instant) -> De
         text: String::new(),
         since: now,
     });
-    typed(&mut prompt.text, text);
+    prompt.text = typed(std::mem::take(&mut prompt.text), text);
     if prompt.text.len() > PROMPT_TEXT_LIMIT {
         let mut start: usize = prompt.text.len() - PROMPT_TEXT_LIMIT;
         while !prompt.text.is_char_boundary(start) {
@@ -457,8 +472,8 @@ pub(crate) fn client_text(mut screen: DevScreen, text: &str, now: Instant) -> De
     screen
 }
 
-/// Append `text` as a terminal would show it: backspaces erase, escape sequences and carriage returns go.
-fn typed(buffer: &mut String, text: &str) {
+/// `buffer` with `text` appended as a terminal would show it: backspaces erase, escape sequences and carriage returns go.
+fn typed(mut buffer: String, text: &str) -> String {
     let mut characters = text.chars().peekable();
     while let Some(character) = characters.next() {
         match character {
@@ -481,6 +496,7 @@ fn typed(buffer: &mut String, text: &str) {
             character => buffer.push(character),
         }
     }
+    buffer
 }
 
 /// A run started or finished.
@@ -557,4 +573,3 @@ pub(crate) fn service_stopped(screen: &DevScreen, label: String, elapsed: Durati
         },
     )
 }
-
