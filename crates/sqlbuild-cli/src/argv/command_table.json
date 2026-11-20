@@ -136,7 +136,8 @@
        {"kind": "store", "options": ["--port"], "dest": "control_port", "default": 8000, "type": "int", "help": "loopback TCP port, or 0 to choose a free port (default: 8000)", "group": 1},
        {"kind": "store", "options": ["--control-store-url"], "dest": "development_store_url", "help": "control store URL or path (default: .sqlbuild/control.sqlite3 in the project)", "group": 1},
        {"kind": "store_true", "options": ["--no-scheduler"], "dest": "control_no_scheduler", "nargs": 0, "const": true, "default": false, "help": "serve and reload without executing scheduled work", "group": 1},
-       {"kind": "store_true", "options": ["--triggers"], "dest": "development_triggers", "nargs": 0, "const": true, "default": false, "help": "preserve trigger defaults and operator overrides instead of pausing on startup", "group": 1}
+       {"kind": "store_true", "options": ["--triggers"], "dest": "development_triggers", "nargs": 0, "const": true, "default": false, "help": "preserve trigger defaults and operator overrides instead of pausing on startup", "group": 1},
+       {"kind": "store_true", "options": ["--plain"], "dest": "development_plain", "nargs": 0, "const": true, "default": false, "help": "append plain lines instead of redrawing the screen; chosen automatically when stdout or stderr is not a terminal", "group": 1}
       ]
      }
     },

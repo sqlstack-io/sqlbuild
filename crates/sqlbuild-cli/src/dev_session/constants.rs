@@ -24,3 +24,33 @@ pub(crate) const RUN_PAGE: u32 = 20;
 pub(crate) const CONNECTING: &str = "connecting";
 /// How long the foreground `sqb debug`'s pipes are drained after it exits.
 pub(crate) const DEBUG_DRAIN: Duration = Duration::from_secs(2);
+/// Connection settings that say where the warehouse is, in the order they are looked for.
+pub(crate) const PLACE_KEYS: [&str; 3] = ["account", "host", "project"];
+/// Connection settings that name the authentication method.
+pub(crate) const AUTH_KEYS: [&str; 2] = ["authenticator", "method"];
+/// Connection settings that mean key-pair authentication when no method is named.
+pub(crate) const KEY_PAIR_KEYS: [&str; 2] = ["private_key_file", "private_key_path"];
+/// Connection settings that name the role.
+pub(crate) const ROLE_KEYS: [&str; 1] = ["role"];
+/// Connection settings that name the compute or storage, a warehouse before a database.
+pub(crate) const STORAGE_KEYS: [&str; 4] = ["warehouse", "database", "dataset", "path"];
+/// Readable names for authenticators, keyed by their lower-case setting.
+pub(crate) const AUTH_NAMES: [(&str, &str); 8] = [
+    ("oauth_authorization_code", "browser sign-in (OAuth)"),
+    ("externalbrowser", "browser sign-in (SSO)"),
+    ("snowflake_jwt", "key pair"),
+    ("snowflake", "password"),
+    ("username_password_mfa", "password and MFA"),
+    ("oauth", "OAuth token"),
+    ("oauth_client_credentials", "OAuth client credentials"),
+    ("programmatic_access_token", "access token"),
+];
+/// Setting values that say nothing on the Warehouse line.
+pub(crate) const UNSHOWN_VALUES: [&str; 6] =
+    ["none", "null", "true", "false", "not configured", "not set"];
+/// Why `sqb dev` stops when the first warehouse connection fails.
+pub(crate) const WAREHOUSE_FAILED: &str = "could not connect to the warehouse";
+/// Why `sqb dev` stops when the code location exits by itself.
+pub(crate) const LOCATION_STOPPED: &str = "the code location stopped unexpectedly";
+/// The stop line of a warehouse connection that was still open.
+pub(crate) const CANCELLED_CONNECT: &str = "Cancelled warehouse connection";

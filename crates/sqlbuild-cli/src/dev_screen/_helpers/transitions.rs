@@ -2,24 +2,30 @@
 
 use std::time::{Duration, Instant};
 
-use sqlbuild_core::screen_text::main::format_plain_line::format_plain_line;
-use sqlbuild_core::screen_text::main::redraw_rows::redraw_rows;
-use sqlbuild_core::screen_text::main::render_frame_rule::render_frame_rule;
+use sqlbuild_core::screen_text::main::render_event_line::render_event_line;
 use sqlbuild_core::screen_text::main::render_log_line::render_log_line;
-use sqlbuild_core::screen_text::models::{EventMark, PhaseState, Segment, Tone, WarehouseState};
+use sqlbuild_core::screen_text::main::render_problem::render_problem;
+use sqlbuild_core::screen_text::models::{
+    EventLine, EventMark, PhaseState, Problem, ProblemLevel, Segment, StepLine, Tone,
+    WarehouseState,
+};
 use sqlbuild_orchestration::dev_events::models::{
     DevEvent, DevPhase, DevStepState, SourcePosition,
 };
 
-use crate::dev_screen::_helpers::lines::{Report, report_lines};
-use crate::dev_screen::_helpers::rows::{elapsed_since, live_rows};
-use crate::dev_screen::constants::{FAILED_HINT, LOG_RING_LINES, SNAPSHOT_ID_CHARS};
-use crate::dev_screen::models::{DevScreen, DevStep, ScreenAction, StepRow};
+use crate::dev_screen::_helpers::labels::elapsed_since;
+use crate::dev_screen::_helpers::lines::lasting_step;
+use crate::dev_screen::_helpers::rows::step_line;
+use crate::dev_screen::constants::{LOG_RING_LINES, SIGN_IN_DETAIL, SNAPSHOT_ID_CHARS};
+use crate::dev_screen::models::{DevScreen, DevStep, Prompt, ScreenAction, StepRow};
 
 /// The screen after a message, and the lines it prints for good.
 pub(crate) type Printed = (DevScreen, Vec<String>);
 
-/// A startup step began; discovery starts a new generation, so its later steps go back to pending.
+/// The most client text a sign-in prompt keeps; older text drops off the front.
+const PROMPT_TEXT_LIMIT: usize = 4_000;
+
+/// A step began; discovery starts a new generation, so its later steps go back to pending.
 pub(crate) fn step_started(
     mut screen: DevScreen,
     (step, detail): (DevStep, String),
@@ -52,7 +58,7 @@ pub(crate) fn step_started(
     (screen, Vec::new())
 }
 
-/// A checklist row that has not started.
+/// A step that has not started.
 pub(crate) fn pending(step: DevStep) -> StepRow {
     StepRow {
         step,
@@ -63,57 +69,67 @@ pub(crate) fn pending(step: DevStep) -> StepRow {
     }
 }
 
-/// The location is known; the plain screen names it and the target.
-pub(crate) fn located(mut screen: DevScreen, location: String) -> Printed {
-    screen.location = location;
-    if screen.live {
-        return (screen, Vec::new());
-    }
-    let line: String = format_plain_line(
-        &format!(
-            "location {} \u{b7} target {}",
-            screen.location, screen.header.target
-        ),
-        None,
-    );
-    (screen, vec![line])
-}
-
-/// A startup step ended in `state`; the plain screen reports the control store and the compile.
+/// A step ended in `state`: its line is printed for good, except publishing, which waits for the snapshot ID.
 pub(crate) fn step_finished(
     mut screen: DevScreen,
     (step, state): (DevStep, PhaseState),
     detail: String,
     now: Instant,
 ) -> Printed {
-    match step {
-        DevStep::Compile => screen.compile_detail.clone_from(&detail),
-        DevStep::Api => screen.ui_url = format!("http://{detail}"),
-        _ => {}
-    }
+    let detail: String = match step {
+        DevStep::Compile => {
+            screen.compile_detail.clone_from(&detail);
+            detail
+        }
+        DevStep::Api => {
+            screen.ui_url = format!("http://{detail}");
+            screen.ui_url.clone()
+        }
+        _ => detail,
+    };
     if screen.ready {
         return (screen, Vec::new());
     }
-    let mut elapsed: Option<Duration> = None;
-    for row in &mut screen.steps {
-        if row.step == step {
-            row.elapsed = Some(elapsed_since(row.started, now).unwrap_or_default());
-            row.state = state;
-            row.detail.clone_from(&detail);
-            elapsed = row.elapsed;
-        }
-    }
-    if screen.live {
+    let Some(index) = screen.steps.iter().position(|row| row.step == step) else {
+        return (screen, Vec::new());
+    };
+    let row: &mut StepRow = &mut screen.steps[index];
+    row.elapsed = Some(elapsed_since(row.started, now).unwrap_or_default());
+    row.state = state;
+    row.detail = detail;
+    if step == DevStep::Publish && screen.serving.is_none() {
         return (screen, Vec::new());
     }
-    let lines: Vec<String> = match step {
-        DevStep::ControlStore => vec![format_plain_line("control store ready", elapsed)],
-        DevStep::Compile => vec![format_plain_line(
-            &format!("discovered {}", screen.compile_detail),
-            elapsed_since(screen.generation_started, now),
-        )],
-        _ => Vec::new(),
-    };
+    let line: StepLine = step_line(&screen.steps[index], 0, now);
+    let lines: Vec<String> = lasting_step(&screen, &line);
+    (screen, lines)
+}
+
+/// A step of `sqb dev` itself failed: its line, then the problem under it.
+pub(crate) fn step_failed(
+    mut screen: DevScreen,
+    (step, detail, problem): (DevStep, String, Problem),
+    now: Instant,
+) -> Printed {
+    let mut row: StepRow = screen
+        .steps
+        .iter()
+        .find(|row| row.step == step)
+        .cloned()
+        .unwrap_or_else(|| StepRow {
+            started: Some(now),
+            ..pending(step)
+        });
+    row.state = PhaseState::Fail;
+    row.elapsed = Some(elapsed_since(row.started, now).unwrap_or_default());
+    row.detail = detail;
+    let mut lines: Vec<String> = lasting_step(&screen, &step_line(&row, 0, now));
+    lines.extend(render_problem(&problem, &screen.facts));
+    for kept in &mut screen.steps {
+        if kept.step == step {
+            kept.clone_from(&row);
+        }
+    }
     (screen, lines)
 }
 
@@ -153,273 +169,334 @@ pub(crate) fn child_event(
             }
             let lines: Vec<String> = titles
                 .into_iter()
-                .flat_map(|title| changed_line(&screen, clock, title))
+                .flat_map(|title| {
+                    event_lines(
+                        &screen,
+                        event_line(
+                            clock,
+                            EventMark::Changed,
+                            format!("{title} changed"),
+                            String::new(),
+                        ),
+                    )
+                })
                 .collect();
             (screen, lines)
         }
         DevEvent::Restarted { reason } => {
-            let lines: Vec<String> = report_lines(
+            let lines: Vec<String> = event_lines(
                 &screen,
-                Report {
+                event_line(
                     clock,
-                    mark: EventMark::Restarted,
-                    title: "location restarted".to_owned(),
-                    plain: format!("location restarted: {reason}"),
-                    detail: reason,
-                    elapsed: None,
-                    notes: Vec::new(),
-                },
+                    EventMark::Restarted,
+                    "location restarted".to_owned(),
+                    reason,
+                ),
             );
             (screen, lines)
         }
-        DevEvent::Published {
-            generation,
-            snapshot_id,
-            ..
-        } => published(screen, (generation, &snapshot_id), now, clock),
+        DevEvent::Published { snapshot_id, .. } => published(screen, &snapshot_id, now, clock),
         DevEvent::Failed {
-            generation,
             message,
             position,
-        } => failed(
-            screen,
-            (generation, &message, position.as_ref()),
-            now,
-            clock,
-        ),
+            code,
+            help,
+            ..
+        } => {
+            let problem: Problem = failure_problem(
+                &screen.project_root,
+                (&message, position.as_ref()),
+                (code, help),
+            );
+            failed(screen, problem, now, clock)
+        }
         DevEvent::Warning { title, detail } => {
-            let lines: Vec<String> = report_lines(
-                &screen,
-                Report {
-                    clock,
-                    mark: EventMark::Warning,
-                    plain: format!("{title}: {detail}"),
+            let lines: Vec<String> = render_problem(
+                &Problem {
+                    level: ProblemLevel::Warning,
                     title,
-                    detail: String::new(),
-                    elapsed: None,
-                    notes: vec![vec![Segment {
-                        text: detail,
-                        tone: Tone::Muted,
-                        link: None,
-                    }]],
+                    code: String::new(),
+                    at: Vec::new(),
+                    why: detail,
+                    fix: String::new(),
                 },
+                &screen.facts,
             );
             (screen, lines)
         }
     }
 }
 
-fn changed_line(screen: &DevScreen, clock: &str, title: String) -> Vec<String> {
-    report_lines(
-        screen,
-        Report {
-            clock,
-            mark: EventMark::Changed,
-            plain: format!("changed {title}"),
-            title,
-            detail: String::new(),
-            elapsed: None,
-            notes: Vec::new(),
-        },
-    )
+/// An event line without elapsed time or notes.
+fn event_line(clock: &str, mark: EventMark, title: String, detail: String) -> EventLine {
+    EventLine {
+        clock: clock.to_owned(),
+        mark,
+        title,
+        detail,
+        elapsed: None,
+        notes: Vec::new(),
+    }
 }
 
-fn published(
-    mut screen: DevScreen,
-    (generation, snapshot_id): (i64, &str),
-    now: Instant,
-    clock: &str,
-) -> Printed {
+/// The event's rows, wrapped in full in both live and plain mode.
+pub(crate) fn event_lines(screen: &DevScreen, line: EventLine) -> Vec<String> {
+    render_event_line(&line, &screen.facts)
+}
+
+fn published(mut screen: DevScreen, snapshot_id: &str, now: Instant, clock: &str) -> Printed {
     let short: String = snapshot_id.chars().take(SNAPSHOT_ID_CHARS).collect();
     let elapsed: Option<Duration> = elapsed_since(screen.generation_started.take(), now);
     let changes: usize = std::mem::take(&mut screen.pending_changes);
-    screen.serving = Some(generation);
-    let plain: String = format!("published gen {generation} {short}");
+    screen.serving = Some(short.clone());
     if !screen.ready {
-        let mut row_elapsed: Option<Duration> = None;
-        for row in &mut screen.steps {
-            if row.step == DevStep::Publish {
-                row.detail = format!("gen {generation} \u{b7} {short}");
-                row_elapsed = row.elapsed;
-            }
-        }
-        if screen.live {
+        let Some(index) = screen
+            .steps
+            .iter()
+            .position(|row| row.step == DevStep::Publish)
+        else {
             return (screen, Vec::new());
-        }
-        return (screen, vec![format_plain_line(&plain, row_elapsed)]);
+        };
+        let row: &mut StepRow = &mut screen.steps[index];
+        row.state = PhaseState::Ok;
+        row.elapsed = row
+            .elapsed
+            .or_else(|| Some(elapsed_since(row.started, now).unwrap_or_default()));
+        row.detail = format!("snapshot {short}");
+        let line: StepLine = step_line(&screen.steps[index], 0, now);
+        let lines: Vec<String> = lasting_step(&screen, &line);
+        return (screen, lines);
     }
     let detail: String = match changes {
         0 => String::new(),
         1 => "1 file changed".to_owned(),
         count => format!("{count} files changed"),
     };
-    let lines: Vec<String> = report_lines(
+    let lines: Vec<String> = event_lines(
         &screen,
-        Report {
-            clock,
-            mark: EventMark::Succeeded,
-            title: format!("gen {generation} published"),
-            detail,
+        EventLine {
             elapsed,
-            notes: Vec::new(),
-            plain,
+            ..event_line(
+                clock,
+                EventMark::Succeeded,
+                format!("published snapshot {short}"),
+                detail,
+            )
         },
     );
     (screen, lines)
 }
 
-fn failed(
-    mut screen: DevScreen,
-    (generation, message, position): (i64, &str, Option<&SourcePosition>),
-    now: Instant,
-    clock: &str,
-) -> Printed {
-    screen.generation_started = None;
-    screen.pending_changes = 0;
-    for row in &mut screen.steps {
-        if !screen.ready && matches!(row.state, PhaseState::Running { .. }) {
-            row.state = PhaseState::Fail;
-            row.elapsed = elapsed_since(row.started, now);
-            row.detail = format!("gen {generation} failed");
+/// The problem block for a failed generation: the file it points at, its code, the message and the fix.
+pub(crate) fn failure_problem(
+    project_root: &str,
+    (message, position): (&str, Option<&SourcePosition>),
+    (code, help): (Option<String>, Option<String>),
+) -> Problem {
+    let code: String = code.unwrap_or_default();
+    let prefix: String = format!("[{code}] ");
+    let mut why: &str = message.strip_prefix(prefix.as_str()).unwrap_or(message);
+    if let Some(position) = position {
+        for place in [
+            format!("{}:{}:{}:", position.path, position.line, position.column),
+            format!("{}:{}:", position.path, position.line),
+        ] {
+            why = why.strip_prefix(place.as_str()).unwrap_or(why);
         }
     }
-    let title: String = match screen.serving {
-        Some(serving) => format!("gen {generation} failed \u{b7} still serving gen {serving}"),
-        None => format!("gen {generation} failed"),
+    let (title, at): (String, Vec<Segment>) = match position {
+        Some(position) => (
+            position.path.clone(),
+            vec![Segment {
+                text: format!("{}:{}:{}", position.path, position.line, position.column),
+                tone: Tone::Link,
+                link: Some(format!(
+                    "file://{}/{}",
+                    project_root.trim_end_matches('/'),
+                    position.path
+                )),
+            }],
+        ),
+        None => ("project".to_owned(), Vec::new()),
     };
-    let (place, mut first_note): (String, Vec<Segment>) = match position {
-        Some(position) => position_note(&screen.project_root, position),
-        None => (String::new(), Vec::new()),
-    };
-    first_note.push(Segment {
-        text: message.to_owned(),
-        tone: Tone::Plain,
-        link: None,
-    });
-    let lines: Vec<String> = report_lines(
-        &screen,
-        Report {
-            clock,
-            mark: EventMark::Failed,
-            plain: format!("{title}: {place}{message}"),
-            title,
-            detail: String::new(),
-            elapsed: None,
-            notes: vec![
-                first_note,
-                vec![Segment {
-                    text: FAILED_HINT.to_owned(),
-                    tone: Tone::Muted,
-                    link: None,
-                }],
-            ],
-        },
-    );
+    Problem {
+        level: ProblemLevel::Error,
+        title,
+        code,
+        at,
+        why: why.trim().to_owned(),
+        fix: help.unwrap_or_else(|| {
+            "fix it and save; sqb dev compiles again (r recompiles now)".to_owned()
+        }),
+    }
+}
+
+/// A generation failed: before ready, the running steps fail and wait for a fix; after, one event line. The problem follows in full.
+fn failed(mut screen: DevScreen, problem: Problem, now: Instant, clock: &str) -> Printed {
+    screen.generation_started = None;
+    screen.pending_changes = 0;
+    let mut lines: Vec<String> = Vec::new();
+    if screen.ready {
+        let title: String = match &screen.serving {
+            Some(serving) => format!("compile failed \u{b7} still serving snapshot {serving}"),
+            None => "compile failed".to_owned(),
+        };
+        lines.extend(event_lines(
+            &screen,
+            event_line(clock, EventMark::Failed, title, String::new()),
+        ));
+    } else {
+        for index in 0..screen.steps.len() {
+            if !matches!(screen.steps[index].state, PhaseState::Running { .. })
+                || screen.steps[index].step == DevStep::Warehouse
+            {
+                continue;
+            }
+            let mut row: StepRow = screen.steps[index].clone();
+            row.state = PhaseState::Fail;
+            row.elapsed = elapsed_since(row.started, now);
+            row.detail = "1 error".to_owned();
+            lines.extend(lasting_step(&screen, &step_line(&row, 0, now)));
+        }
+        for row in &mut screen.steps {
+            if matches!(
+                row.step,
+                DevStep::Discover | DevStep::Compile | DevStep::Publish
+            ) {
+                *row = pending(row.step);
+            }
+            if row.step == DevStep::Discover {
+                row.detail = "waiting for a fix (r recompiles)".to_owned();
+            }
+        }
+    }
+    lines.extend(render_problem(&problem, &screen.facts));
     (screen, lines)
 }
 
-/// `path:line:col ` for the plain line, and the clickable position the live note starts with.
-fn position_note(project_root: &str, position: &SourcePosition) -> (String, Vec<Segment>) {
-    let place: String = format!("{}:{}:{}", position.path, position.line, position.column);
-    let note: Vec<Segment> = vec![
-        Segment {
-            text: place.clone(),
-            tone: Tone::Link,
-            link: Some(format!(
-                "file://{}/{}",
-                project_root.trim_end_matches('/'),
-                position.path
-            )),
-        },
-        Segment {
-            text: "  ".to_owned(),
-            tone: Tone::Plain,
-            link: None,
-        },
-    ];
-    (format!("{place} "), note)
-}
-
-/// The foreground connection settled: close any framed client block and record the outcome.
+/// The foreground connection settled: the prompt goes, and its step line or event line is printed.
 pub(crate) fn warehouse_settled(
     mut screen: DevScreen,
     (adapter, state): (String, WarehouseState),
     now: Instant,
     clock: &str,
-) -> (DevScreen, String, Vec<String>) {
-    let mut raw: String = String::new();
-    if screen.client_output {
-        if screen.client_partial {
-            raw.push('\n');
-        }
-        if screen.live {
-            raw.push_str(&render_frame_rule(None, &screen.facts));
-            raw.push_str("\n\n");
-        }
-        screen.client_output = false;
-        screen.client_partial = false;
-        screen.drawn = 0;
+) -> Printed {
+    screen.prompt = None;
+    if !adapter.is_empty() {
+        screen.adapter.clone_from(&adapter);
     }
-    screen.adapter.clone_from(&adapter);
     screen.warehouse = Some(state.clone());
-    let (row_state, detail, plain): (PhaseState, String, Option<String>) = match &state {
-        WarehouseState::Connected { detail } => {
-            (PhaseState::Ok, format!("{adapter} \u{b7} {detail}"), None)
+    let adapter: String = screen.adapter.clone();
+    let (row_state, detail): (PhaseState, String) = match &state {
+        WarehouseState::Connected { facts } => (
+            PhaseState::Ok,
+            [adapter.clone()]
+                .into_iter()
+                .chain(
+                    facts
+                        .iter()
+                        .filter_map(|fact| fact.strip_prefix("auth ").map(str::to_owned)),
+                )
+                .filter(|part| !part.is_empty())
+                .collect::<Vec<String>>()
+                .join(" \u{b7} "),
+        ),
+        WarehouseState::NotConnected { reason } => {
+            (PhaseState::Warn, format!("not connected \u{b7} {reason}"))
         }
-        WarehouseState::NotConnected { reason } => (
-            PhaseState::Warn,
-            format!("not connected \u{b7} {reason}"),
-            Some(format!("warehouse not connected: {reason}")),
-        ),
-        WarehouseState::Failed { message } => (
+        WarehouseState::Failed { .. } => (
             PhaseState::Fail,
-            message.clone(),
-            Some(format!("warehouse connection failed: {message}")),
+            [adapter.as_str(), "failed"]
+                .into_iter()
+                .filter(|part| !part.is_empty())
+                .collect::<Vec<&str>>()
+                .join(" \u{b7} "),
         ),
     };
-    if !screen.ready {
-        let (screen, _) = step_finished(screen, (DevStep::Warehouse, row_state), detail, now);
-        let lines: Vec<String> = match (screen.live, plain) {
-            (false, Some(plain)) => vec![format_plain_line(&plain, None)],
-            _ => Vec::new(),
+    let mut lines: Vec<String> = Vec::new();
+    if screen.ready {
+        let (mark, title): (EventMark, &str) = match row_state {
+            PhaseState::Ok => (EventMark::Succeeded, "warehouse connected"),
+            _ => (EventMark::Failed, "warehouse not connected"),
         };
-        return (screen, raw, lines);
+        lines.extend(event_lines(
+            &screen,
+            event_line(clock, mark, title.to_owned(), detail),
+        ));
+    } else {
+        let printed: Printed = step_finished(screen, (DevStep::Warehouse, row_state), detail, now);
+        screen = printed.0;
+        lines.extend(printed.1);
     }
-    let (mark, title): (EventMark, &str) = match row_state {
-        PhaseState::Ok => (EventMark::Succeeded, "warehouse connected"),
-        _ => (EventMark::Failed, "warehouse not connected"),
-    };
-    let lines: Vec<String> = report_lines(
-        &screen,
-        Report {
-            clock,
-            mark,
-            title: title.to_owned(),
-            plain: plain.unwrap_or_else(|| format!("warehouse connected: {detail}")),
-            detail,
-            elapsed: None,
-            notes: Vec::new(),
-        },
-    );
-    (screen, raw, lines)
+    if let WarehouseState::Failed { message } = &state {
+        lines.extend(render_problem(
+            &Problem {
+                level: ProblemLevel::Error,
+                title: "warehouse connection".to_owned(),
+                code: adapter,
+                at: vec![Segment {
+                    text: format!("target {}", screen.header.target),
+                    tone: Tone::Plain,
+                    link: None,
+                }],
+                why: message.clone(),
+                fix: "sqb debug shows the whole connection check; fix the target's connection \
+                      settings, then start sqb dev again"
+                    .to_owned(),
+            },
+            &screen.facts,
+        ));
+    }
+    (screen, lines)
 }
 
-/// The client's own output, written as it came; the first chunk freezes the checklist above a rule.
-pub(crate) fn client_text(mut screen: DevScreen, text: &str, now: Instant) -> (DevScreen, String) {
-    let mut output: String = String::new();
-    if !screen.client_output {
-        screen.client_output = true;
-        if screen.live {
-            let rows: Vec<String> = live_rows(&screen, now);
-            output.push_str(&redraw_rows(screen.drawn, &rows));
-            screen.drawn = 0;
+/// The client's own text: kept in the prompt block above the live steps until the connection settles.
+pub(crate) fn client_text(mut screen: DevScreen, text: &str, now: Instant) -> DevScreen {
+    let prompt: &mut Prompt = screen.prompt.get_or_insert(Prompt {
+        text: String::new(),
+        since: now,
+    });
+    prompt.text = typed(std::mem::take(&mut prompt.text), text);
+    if prompt.text.len() > PROMPT_TEXT_LIMIT {
+        let mut start: usize = prompt.text.len() - PROMPT_TEXT_LIMIT;
+        while !prompt.text.is_char_boundary(start) {
+            start += 1;
+        }
+        prompt.text.drain(..start);
+    }
+    for row in &mut screen.steps {
+        if row.step == DevStep::Warehouse && matches!(row.state, PhaseState::Running { .. }) {
+            row.detail = SIGN_IN_DETAIL.to_owned();
         }
     }
-    if !text.is_empty() {
-        screen.client_partial = !text.ends_with('\n');
+    screen
+}
+
+/// `buffer` with `text` appended as a terminal would show it: backspaces erase, escape sequences and carriage returns go.
+fn typed(mut buffer: String, text: &str) -> String {
+    let mut characters = text.chars().peekable();
+    while let Some(character) = characters.next() {
+        match character {
+            '\u{8}' | '\u{7f}' => {
+                if !buffer.ends_with('\n') {
+                    buffer.pop();
+                }
+            }
+            '\u{1b}' => {
+                if characters.peek() == Some(&'[') {
+                    characters.next();
+                    for next in characters.by_ref() {
+                        if next.is_ascii_alphabetic() {
+                            break;
+                        }
+                    }
+                }
+            }
+            '\r' => {}
+            character => buffer.push(character),
+        }
     }
-    output.push_str(text);
-    (screen, output)
+    buffer
 }
 
 /// A run started or finished.
@@ -429,33 +506,16 @@ pub(crate) fn run_reported(
     finished: Option<(bool, Duration)>,
     clock: &str,
 ) -> Vec<String> {
-    let (mark, plain, elapsed): (EventMark, String, Option<Duration>) = match finished {
-        None => (
-            EventMark::Started,
-            format!("run {name} started: {detail}"),
-            None,
-        ),
-        Some((true, elapsed)) => (
-            EventMark::Succeeded,
-            format!("run {name} succeeded: {detail}"),
-            Some(elapsed),
-        ),
-        Some((false, elapsed)) => (
-            EventMark::Failed,
-            format!("run {name} failed: {detail}"),
-            Some(elapsed),
-        ),
+    let (mark, elapsed): (EventMark, Option<Duration>) = match finished {
+        None => (EventMark::Started, None),
+        Some((true, elapsed)) => (EventMark::Succeeded, Some(elapsed)),
+        Some((false, elapsed)) => (EventMark::Failed, Some(elapsed)),
     };
-    report_lines(
+    event_lines(
         screen,
-        Report {
-            clock,
-            mark,
-            title: format!("run {name}"),
-            detail,
+        EventLine {
             elapsed,
-            notes: Vec::new(),
-            plain,
+            ..event_line(clock, mark, format!("run {name}"), detail)
         },
     )
 }
@@ -465,8 +525,8 @@ pub(crate) fn logged(mut screen: DevScreen, line: String) -> Printed {
     if screen.log.len() == LOG_RING_LINES {
         screen.log.pop_front();
     }
-    let shown: Vec<String> = if screen.live && screen.show_log {
-        vec![render_log_line(&line, &screen.facts)]
+    let shown: Vec<String> = if screen.show_log {
+        render_log_line(&line, &screen.facts)
     } else {
         Vec::new()
     };
@@ -479,14 +539,10 @@ pub(crate) fn key_pressed(
     mut screen: DevScreen,
     key: char,
 ) -> (DevScreen, Vec<String>, ScreenAction) {
-    if !screen.live {
-        return (screen, Vec::new(), ScreenAction::None);
-    }
     let action: ScreenAction = match key {
         'o' => ScreenAction::OpenUi,
         'r' => ScreenAction::Recompile,
         's' => ScreenAction::RetryWarehouse,
-        'q' => ScreenAction::Quit,
         _ => ScreenAction::None,
     };
     if key != 'l' {
@@ -497,10 +553,23 @@ pub(crate) fn key_pressed(
         screen
             .log
             .iter()
-            .map(|line| render_log_line(line, &screen.facts))
+            .flat_map(|line| render_log_line(line, &screen.facts))
             .collect()
     } else {
         Vec::new()
     };
     (screen, shown, action)
+}
+
+/// A service stopped: `· Stopped UI server  0.1s`.
+pub(crate) fn service_stopped(screen: &DevScreen, label: String, elapsed: Duration) -> Vec<String> {
+    lasting_step(
+        screen,
+        &StepLine {
+            state: PhaseState::Pending,
+            label,
+            elapsed: Some(elapsed),
+            detail: String::new(),
+        },
+    )
 }

@@ -52,6 +52,12 @@ pub enum DevEvent {
         generation: i64,
         message: String,
         position: Option<SourcePosition>,
+        /// The error's code, such as `D001`, when it has one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        code: Option<String>,
+        /// How to fix it, when the error says.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        help: Option<String>,
     },
     /// Something the location could not do, such as a warehouse sync that stopped; it keeps serving.
     Warning { title: String, detail: String },

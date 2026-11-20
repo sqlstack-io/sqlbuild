@@ -6,29 +6,38 @@ sidebar:
 ---
 
 Run the control API, the scheduler and a code location for the project in the current directory,
-then open the web UI at the address on the ready card:
+then open the web UI at the address in the ready box:
 
 ```bash
 sqb dev
 ```
 
 ```text
-  sqlbuild dev  v0.233.0   ready in 1.0s
-
-  ➜  UI          http://127.0.0.1:8000
-  ➜  Location    dev · gen 1 · 4 python nodes, 38 models
-  ➜  Warehouse   ● duckdb · /work/shop/warehouse.duckdb
-  ➜  Triggers    3 paused
-  ➜  Watching    shop/
-
-  o open UI · r recompile · s retry warehouse · l logs · q quit
+sqb dev  shop · target dev · sqb 0.256.0
+✓ Opened control store    0.0s   sqlite
+✓ Started UI server       0.1s   http://127.0.0.1:8000
+✓ Started scheduler       0.0s   triggers start paused
+✓ Discovered project      0.6s   4 python nodes, 38 models
+✓ Compiled project        0.4s
+✓ Published snapshot      0.1s   snapshot 01a1d7ff
+✓ Connected warehouse     0.3s   duckdb
+╭─ ready ────────────────────────────────────────────────────────────────────╮
+│ UI         http://127.0.0.1:8000                                           │
+│ Project    shop · ~/src/shop · target dev                                  │
+│ Warehouse  duckdb · database /work/shop/warehouse.duckdb                   │
+│ Triggers   3 paused                                                        │
+╰────────────────────────────────────────────────────────────────────────────╯
+keys  o open UI · l full log · r recompile · q quit
 ```
 
-The location compiles the project, runs its [Rules](/docs/concepts/rules), and publishes it to
-the server. When you save a model, orchestration file or other project input, it compiles and
-publishes again, so the UI and the next run use the new version. Each change, publication, failure
-and run gets one line above the hotkey bar. A compile error or a Rule finding leaves the previous
-version published, and its failure line names the error or the first finding.
+Each step shows a spinner and its elapsed time while it runs, and its finished line stays on
+screen. The live part of the screen, the running steps and the key line, is never taller than the
+terminal. The location compiles the project, runs its [Rules](/docs/concepts/rules), and publishes
+it to the server. When you save a model, orchestration file or other project input, it compiles
+and publishes again, so the UI and the next run use the new version. Each change, publication,
+failure and run gets one line above the key line, wrapped rather than cut off. A compile error or
+a Rule finding leaves the previous version published and is shown in full: what failed, where, why
+and how to fix it.
 
 ## Options
 
@@ -39,15 +48,20 @@ version published, and its failure line names the error or the first finding.
 | `--control-store-url` | `.sqlbuild/control.sqlite3` in the project | Control store URL or path |
 | `--no-scheduler` | Off | Serve and reload without running scheduled work |
 | `--triggers` | Off | Keep each trigger's default status and your changes to it, instead of pausing every trigger at start-up |
+| `--plain` | Off, unless stdout or stderr is not a terminal | Print appended lines instead of redrawing the screen; see [Plain output](#plain-output) |
 
 ## Sign in to the warehouse
 
 Once the first version is published, `sqb dev` connects to the target's warehouse in the
-foreground. A client that asks for a password, a code or a browser sign-in asks once, in a framed
-block on your terminal, and every later connection in the session reuses that sign-in.
+foreground. A client that asks for a password, a code or a browser sign-in asks once, in a
+**sign in** block above the running steps, and every later connection in the session reuses that
+sign-in. What you type goes to the client; Ctrl+C still stops `sqb dev`. `sqb dev` waits for the
+sign-in as long as it takes, and the block shows how long it has waited.
 
-If the connection fails, the card shows the error and the UI still works. Press `s` to try again.
-The location reads warehouse history once the connection succeeds.
+If the first connection fails, `sqb dev` shows the error and stops with exit status 2; run
+`sqb debug` to test the connection on its own. The ready box's Warehouse line names the adapter
+and the connection's account or host, authentication, role and warehouse or database. The
+location reads warehouse history once the connection succeeds.
 
 ## Keys
 
@@ -55,25 +69,55 @@ The location reads warehouse history once the connection succeeds.
 | --- | --- |
 | `o` | Open the UI in your browser |
 | `r` | Compile and publish again |
-| `s` | Retry the warehouse connection in the foreground |
 | `l` | Show or hide the detailed log, the latest 500 lines |
-| `q` | Stop, like Ctrl+C |
+| `q` | Stop |
+| Ctrl+C | Stop; a second Ctrl+C stops at once |
+
+## Stop
+
+`q`, Ctrl+C, SIGINT, SIGTERM and SIGHUP stop `sqb dev` at any point, including while it compiles,
+connects or waits for a sign-in. Each service stops with one line, and anything still running
+after about a second is killed, the code location and local workers included. The terminal is
+put back as it was. The last line says how the session ended:
+
+```text
+· Stopped scheduler       0.0s
+· Stopped UI server       0.1s
+· Stopped code location   0.3s
+· sqb dev stopped (interrupted)  ran 42m 10s   0.4s
+```
+
+| Exit status | Meaning |
+| --- | --- |
+| `0` | Stopped with `q` |
+| `1` | A service failed after `sqb dev` was ready |
+| `2` | `sqb dev` did not start, for example because the configuration is invalid or the first warehouse connection failed; the screen says why |
+| `129` | SIGHUP, or the terminal closed |
+| `130` | Ctrl+C or SIGINT |
+| `143` | SIGTERM |
 
 ## Plain output
 
-On Windows, when `NO_COLOR`, `CI` or `SQLBUILD_NO_PROGRESS` is set, or when stderr is not a
-terminal, `sqb dev` prints one stable line per step, event and warning, with no redraws or keys:
+With `--plain`, on Windows, with `TERM=dumb`, when `CI` or `SQLBUILD_NO_PROGRESS` is set, or when
+stdout or stderr is not a terminal, `sqb dev` appends lines and never redraws: no spinners, no
+keys and no colour. Only finished steps are printed. `NO_COLOR` turns colour off and nothing else.
 
 ```text
-sqlbuild dev: control store ready (0.1s)
-sqlbuild dev: location 01a1d7ff-0b3a-7631-ba35-e44d44d072f2 · target dev
-sqlbuild dev: discovered 4 python nodes, 38 models (0.6s)
-sqlbuild dev: published gen 1 01a1d7ff (0.1s)
-sqlbuild dev: ready http://127.0.0.1:8000
-sqlbuild dev: warehouse read failed: retrying in 30s: CatalogException: Table _sqlbuild_fingerprints does not exist
+sqb dev  shop · target dev · sqb 0.256.0
+✓ Opened control store    0.0s   sqlite
+✓ Started UI server       0.1s   http://127.0.0.1:8000
+✓ Discovered project      0.6s   4 python nodes, 38 models
+✓ Published snapshot      0.1s   snapshot 01a1d7ff
+✓ Connected warehouse     0.3s   duckdb
+✓ ready  http://127.0.0.1:8000
+  warehouse  duckdb · database /work/shop/warehouse.duckdb
+  location   01a1d7ff-0b3a-7631-ba35-e44d44d072f2
+  triggers   3 paused
+14:20:31 ▸ run orders_daily  started manually
 ```
 
-Warnings cover failed warehouse reads, a stopped warehouse sync and unset provider secrets.
+Warnings, such as a failed warehouse read, a stopped warehouse sync or unset provider secrets, are
+printed as warning blocks.
 
 When stdout is redirected, it receives one JSON record per published version.
 
@@ -120,5 +164,5 @@ timed reads but not the read after each publication or run.
 - The control store keeps the newest 5 builds of each node and results of each check that it copies
   from the warehouse; older ones are deleted and the file shrinks. See
   [retention](/docs/cli/server#set-retention).
-- When `sqb dev` stops, it prints `Development services stopped successfully`. After a failure it
-  prints the last log lines that explain it.
+- When a service fails without an explanation on screen, `sqb dev` prints the last log lines
+  above its result line.

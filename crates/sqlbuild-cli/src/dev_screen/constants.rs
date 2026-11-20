@@ -6,19 +6,20 @@ use crate::dev_screen::models::DevStep;
 
 /// Detailed log lines kept in memory for `l`; older lines drop off the front.
 pub(crate) const LOG_RING_LINES: usize = 500;
-/// The keys the hotkey bar shows, in order.
-pub(crate) const HOTKEYS: [(char, &str); 5] = [
+/// The keys before the services are ready.
+pub(crate) const STARTING_KEYS: [(char, &str); 2] = [('l', "full log"), ('q', "quit")];
+/// The keys once they are, before `s`, which shows only while the warehouse is not connected.
+pub(crate) const READY_KEYS: [(char, &str); 4] = [
     ('o', "open UI"),
+    ('l', "full log"),
     ('r', "recompile"),
-    ('s', "retry warehouse"),
-    ('l', "logs"),
     ('q', "quit"),
 ];
-/// The note under a failed generation's event line.
-pub(crate) const FAILED_HINT: &str = "r retry \u{b7} l full log";
+/// The key that retries the warehouse connection, and its label.
+pub(crate) const RETRY_KEY: (char, &str) = ('s', "retry warehouse");
 /// The snapshot ID characters a published line shows.
 pub(crate) const SNAPSHOT_ID_CHARS: usize = 8;
-/// The checklist's steps, in the order they are drawn.
+/// The steps listed as pending until they start, in order; reading the configuration is never pending.
 pub(crate) const STEPS: [DevStep; 7] = [
     DevStep::ControlStore,
     DevStep::Api,
@@ -28,11 +29,13 @@ pub(crate) const STEPS: [DevStep; 7] = [
     DevStep::Publish,
     DevStep::Warehouse,
 ];
-/// The framed sign-in block's label while the adapter is not yet known.
-pub(crate) const WAREHOUSE_FRAME_LABEL: &str = "warehouse";
-/// How often the hotkey thread checks whether it may read stdin.
-pub(crate) const KEY_POLL: Duration = Duration::from_millis(50);
-/// How often the running step's spinner and timer redraw.
+/// The warehouse step's detail while the client waits for the person.
+pub(crate) const SIGN_IN_DETAIL: &str = "waiting for the sign-in above";
+/// How often the running steps' spinners and timers redraw.
 pub(crate) const TICK: Duration = Duration::from_millis(100);
-/// Log lines printed when `sqb dev` stops on an error, so the cause stays on screen.
+/// How long the key reader waits for a key before it checks whether to stop.
+pub(crate) const KEY_WAIT_TENTHS: u8 = 1;
+/// Log lines left on screen when `sqb dev` stops on an error the screen did not explain.
 pub(crate) const FAILURE_LOG_LINES: usize = 40;
+/// Ctrl+C, read as a byte while the terminal is in raw mode.
+pub(crate) const INTERRUPT_BYTE: u8 = 0x03;

@@ -1,106 +1,155 @@
-//! The lines the `sqb dev` screen prints: event lines, the ready card, and the redraw that places them.
+//! The lines the `sqb dev` screen prints for good, and the redraw that places them above the live rows.
 
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-use sqlbuild_core::screen_text::main::format_plain_line::format_plain_line;
 use sqlbuild_core::screen_text::main::redraw_rows::redraw_rows;
-use sqlbuild_core::screen_text::main::render_event_line::render_event_line;
-use sqlbuild_core::screen_text::main::render_ready_card::render_ready_card;
-use sqlbuild_core::screen_text::models::{EventLine, EventMark, ReadyCard, Segment};
+use sqlbuild_core::screen_text::main::render_dev_header::render_dev_header;
+use sqlbuild_core::screen_text::main::render_labelled_parts::render_labelled_parts;
+use sqlbuild_core::screen_text::main::render_ready_box::render_ready_box;
+use sqlbuild_core::screen_text::main::render_step_line::render_step_line;
+use sqlbuild_core::screen_text::main::visible_cells::visible_cells;
+use sqlbuild_core::screen_text::models::{BoxRow, StepLine, WarehouseState};
 
 use crate::dev_screen::_helpers::rows::live_rows;
-use crate::dev_screen::models::{DevScreen, DevStep};
+use crate::dev_screen::models::DevScreen;
 
-/// One event: its live line, and the plain line's message.
-pub(crate) struct Report<'a> {
-    pub(crate) clock: &'a str,
-    pub(crate) mark: EventMark,
-    pub(crate) title: String,
-    pub(crate) detail: String,
-    pub(crate) elapsed: Option<Duration>,
-    pub(crate) notes: Vec<Vec<Segment>>,
-    pub(crate) plain: String,
+/// A step line printed for good, its detail wrapped in full.
+pub(crate) fn lasting_step(screen: &DevScreen, line: &StepLine) -> Vec<String> {
+    render_step_line(line, &screen.facts, true)
 }
 
-/// The event's rows on a live screen, or its one plain line.
-pub(crate) fn report_lines(screen: &DevScreen, report: Report<'_>) -> Vec<String> {
-    if !screen.live {
-        return vec![format_plain_line(&report.plain, report.elapsed)];
+/// The Warehouse line's parts: the adapter, then its labelled settings, or why it is not connected.
+pub(crate) fn warehouse_parts(adapter: &str, state: &WarehouseState) -> Vec<String> {
+    let mut parts: Vec<String> = Vec::new();
+    if !adapter.is_empty() {
+        parts.push(adapter.to_owned());
     }
-    render_event_line(
-        &EventLine {
-            clock: report.clock.to_owned(),
-            mark: report.mark,
-            title: report.title,
-            detail: report.detail,
-            elapsed: report.elapsed,
-            notes: report.notes,
-        },
-        &screen.facts,
-    )
+    match state {
+        WarehouseState::Connected { facts } => parts.extend(facts.iter().cloned()),
+        WarehouseState::NotConnected { reason } => {
+            parts.push(format!("not connected: {reason}"));
+        }
+        WarehouseState::Failed { message } => parts.push(format!("failed: {message}")),
+    }
+    parts
 }
 
-/// The card, or the plain `ready` line, once the first generation is published and the warehouse settled.
-pub(crate) fn ready_lines(mut screen: DevScreen, now: Instant) -> (DevScreen, Vec<String>) {
-    let published: bool = screen
-        .steps
-        .iter()
-        .any(|row| row.step == DevStep::Publish && row.elapsed.is_some());
-    let (Some(generation), Some(warehouse), false, true) = (
-        screen.serving,
-        screen.warehouse.clone(),
-        screen.ready,
-        published,
-    ) else {
+/// The ready box, or plain `✓ ready` lines, once the first snapshot serves and the warehouse settled.
+pub(crate) fn ready_lines(mut screen: DevScreen) -> (DevScreen, Vec<String>) {
+    let (Some(_), Some(warehouse), false) =
+        (&screen.serving, screen.warehouse.clone(), screen.ready)
+    else {
         return (screen, Vec::new());
     };
     screen.ready = true;
+    let parts: Vec<String> = warehouse_parts(&screen.adapter, &warehouse);
     if !screen.live {
-        let line: String = format_plain_line(&format!("ready {}", screen.ui_url), None);
-        return (screen, vec![line]);
+        let mut lines: Vec<String> = vec![format!("\u{2713} ready  {}", screen.ui_url)];
+        lines.extend(render_labelled_parts(
+            "warehouse",
+            &parts,
+            screen.facts.columns,
+        ));
+        if !screen.location.is_empty() {
+            lines.extend(render_labelled_parts(
+                "location ",
+                std::slice::from_ref(&screen.location),
+                screen.facts.columns,
+            ));
+        }
+        if !screen.triggers.is_empty() {
+            lines.extend(render_labelled_parts(
+                "triggers ",
+                std::slice::from_ref(&screen.triggers),
+                screen.facts.columns,
+            ));
+        }
+        return (screen, lines);
     }
-    let mut location: String = format!("{} \u{b7} gen {generation}", screen.header.target);
-    if !screen.compile_detail.is_empty() {
-        location = format!("{location} \u{b7} {}", screen.compile_detail);
+    let mut project: Vec<String> = vec![
+        screen.header.project.clone(),
+        home_relative(&screen.project_root),
+    ];
+    if !screen.header.target.is_empty() {
+        project.push(format!("target {}", screen.header.target));
     }
-    let lines: Vec<String> = render_ready_card(
-        &ReadyCard {
-            version: screen.header.version.clone(),
-            ready_in: now.saturating_duration_since(screen.started),
-            ui_url: screen.ui_url.clone(),
-            location,
-            adapter: screen.adapter.clone(),
-            warehouse,
-            triggers: screen.triggers.clone(),
-            watching: screen.watching.clone(),
+    let mut rows: Vec<BoxRow> = vec![
+        BoxRow {
+            label: "UI".to_owned(),
+            parts: vec![screen.ui_url.clone()],
+            link: Some(screen.ui_url.clone()),
         },
-        &screen.facts,
-    );
-    screen.event_gap = true;
+        BoxRow {
+            label: "Project".to_owned(),
+            parts: project,
+            link: None,
+        },
+        BoxRow {
+            label: "Warehouse".to_owned(),
+            parts,
+            link: None,
+        },
+    ];
+    if !screen.triggers.is_empty() {
+        rows.push(BoxRow {
+            label: "Triggers".to_owned(),
+            parts: vec![screen.triggers.clone()],
+            link: None,
+        });
+    }
+    let lines: Vec<String> = render_ready_box(&rows, &screen.facts);
     (screen, lines)
 }
 
-/// `raw` client text, then `lines` printed for good, then the live rows redrawn below them.
+/// `path` with the home directory written as `~`.
+fn home_relative(path: &str) -> String {
+    match std::env::var("HOME") {
+        Ok(home) if !home.is_empty() && path.starts_with(&home) => {
+            format!("~{}", &path[home.len()..])
+        }
+        _ => path.to_owned(),
+    }
+}
+
+/// The header once, then `lines` printed for good, then the live rows redrawn below them.
 pub(crate) fn compose(
     mut screen: DevScreen,
-    (raw, lines): (&str, &[String]),
+    lines: Vec<String>,
     now: Instant,
 ) -> (DevScreen, String) {
-    let mut text: String = raw.to_owned();
+    let mut lasting: Vec<String> = Vec::new();
+    if !screen.header_printed {
+        screen.header_printed = true;
+        lasting.extend(render_dev_header(&screen.header, &screen.facts));
+    }
+    lasting.extend(lines);
     if !screen.live {
-        for line in lines {
-            text.push_str(line);
+        let mut text: String = String::new();
+        if screen.client_partial && !lasting.is_empty() {
+            screen.client_partial = false;
+            text.push('\n');
+        }
+        for line in lasting {
+            text.push_str(&line);
             text.push('\n');
         }
         return (screen, text);
     }
-    if screen.client_output {
-        return (screen, text);
-    }
     let live: Vec<String> = live_rows(&screen, now);
-    let mut rows: Vec<String> = lines.to_vec();
-    rows.extend(live.iter().cloned());
-    text.push_str(&redraw_rows(screen.drawn, &rows));
-    screen.drawn = live.len();
+    if lasting.is_empty() && live == screen.drawn {
+        return (screen, String::new());
+    }
+    let previous: usize = physical_rows(&screen.drawn, screen.facts.columns);
+    lasting.extend(live.iter().cloned());
+    let text: String = redraw_rows(previous, &lasting);
+    screen.drawn = live;
     (screen, text)
+}
+
+/// The terminal rows `rows` cover at `columns`, after a resize may have wrapped them.
+pub(crate) fn physical_rows(rows: &[String], columns: usize) -> usize {
+    let columns: usize = columns.max(1);
+    rows.iter()
+        .map(|row| visible_cells(row).div_ceil(columns).max(1))
+        .sum()
 }
