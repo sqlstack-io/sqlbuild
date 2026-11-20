@@ -97,7 +97,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
     })
 }
 
-/// Triggers whose newest `trigger_skipped` event names the snapshot they are still published in: their location has not published again since.
+/// Triggers whose newest `trigger_skipped` event names the snapshot they are still published in, and that have not ticked successfully since it was published: their location has not published again, and no tick has run since.
 async fn skipped_triggers(
     transaction: ControlTransaction,
 ) -> Result<(ControlTransaction, Vec<SkippedTrigger>), ControlError> {
@@ -128,7 +128,10 @@ async fn skipped_triggers(
             transaction,
             "SELECT t.name, t.location_id, l.name AS location_name, t.target, t.snapshot_id \
              FROM sqb_triggers t JOIN sqb_locations l ON l.location_id=t.location_id \
-             WHERE t.trigger_id=$1 AND t.removed_in_snapshot_id IS NULL AND l.archived_at IS NULL",
+             JOIN sqb_snapshots p ON p.snapshot_id=t.snapshot_id \
+             WHERE t.trigger_id=$1 AND t.removed_in_snapshot_id IS NULL AND l.archived_at IS NULL \
+             AND NOT EXISTS (SELECT 1 FROM sqb_ticks k WHERE k.trigger_id=t.trigger_id \
+             AND k.outcome IN ('requested','covered') AND k.evaluated_at>=p.published_at)",
             vec![Parameter::Id(trigger_id)],
         )
         .await?;

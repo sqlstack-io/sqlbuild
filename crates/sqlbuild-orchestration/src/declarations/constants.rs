@@ -34,3 +34,5 @@ pub(crate) const CONCURRENCY_SETTING: &str = "concurrency";
 
 /// A job setting that lets its runs go on past failing audits.
 pub(crate) const IGNORE_AUDIT_FAILURES_SETTING: &str = "ignore_audit_failures";
+/// The dropped calendar times a republish's health problem names before `and N more`.
+pub(crate) const DROPPED_TIMES_NAMED: usize = 10;

@@ -404,3 +404,31 @@ pub(crate) async fn execute(store: &ControlStore, sql: &str) {
     let (transaction, _) = query(transaction, sql, vec![]).await.expect(sql);
     commit(transaction).await.expect("commit");
 }
+
+/// A nightly cron schedule of `orders`.
+pub(crate) fn nightly_cron() -> serde_json::Value {
+    serde_json::json!({"nightly_orders": {"description": "Refresh orders nightly", "job_key": "orders",
+        "schedule": {"kind": "cron", "expression": "0 0 * * *", "timezone": "UTC"}}})
+}
+
+/// A calendar schedule of `orders` at `days`, then far in the future.
+pub(crate) fn nightly_calendar(days: &[i64]) -> serde_json::Value {
+    let times: Vec<String> = days
+        .iter()
+        .map(|day| crate::scheduler::tests::contracts::ticks::helpers::calendar_text(*day))
+        .chain(["2030-01-01T00:00:00Z".to_owned()])
+        .collect();
+    serde_json::json!({"nightly_orders": {"description": "Refresh orders on business days", "job_key": "orders",
+        "starts_at": crate::scheduler::tests::contracts::ticks::helpers::calendar_text(0),
+        "schedule": {"kind": "calendar", "times": times, "refresh_at": "2029-01-01T00:00:00Z"}}})
+}
+
+/// The health problem for the calendar times days 0 to 2 that the republish drops.
+pub(crate) fn dropped_days_problem() -> String {
+    format!(
+        "nightly_orders: pending times {}, {}, {} were not ticked: the calendar's previous definition was published by an earlier SQLBuild release and can't be read",
+        crate::scheduler::tests::contracts::ticks::helpers::calendar_text(0),
+        crate::scheduler::tests::contracts::ticks::helpers::calendar_text(1),
+        crate::scheduler::tests::contracts::ticks::helpers::calendar_text(2)
+    )
+}

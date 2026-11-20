@@ -2,8 +2,11 @@
 
 use uuid::Uuid;
 
-use crate::declarations::_helpers::trigger_state::{retain_calendar_ticks, trigger_timing};
-use crate::declarations::models::{Definitions, PreviousTriggerState};
+use crate::declarations::_helpers::trigger_state::{
+    dropped_times_reason, previous_state, retain_calendar_ticks, trigger_timing,
+};
+use crate::declarations::models::{Definitions, StoredTriggerState};
+use crate::platform::main::health::record_trigger_skipped::record_trigger_skipped;
 use crate::sensors::main::publish_sensors::publish_sensors;
 use crate::snapshots::models::SnapshotRecord;
 use crate::store::errors::ControlError;
@@ -31,11 +34,18 @@ pub(crate) async fn publish_projections(
         (transaction, previous) = query(transaction,
             "SELECT t.definition_json, s.started_at, s.last_tick_for, s.status_override FROM sqb_trigger_state s JOIN sqb_triggers t ON t.trigger_id=s.trigger_id WHERE s.trigger_id=$1",
             vec![Parameter::Id(id)]).await?;
-        let state = previous
+        let (state, dropped) = match previous
             .into_iter()
             .next()
-            .map(decode_row::<PreviousTriggerState>)
-            .transpose()?;
+            .map(decode_row::<StoredTriggerState>)
+            .transpose()?
+        {
+            Some(stored) => {
+                let (state, dropped) = previous_state(stored, &trigger, snapshot);
+                (Some(state), dropped)
+            }
+            None => (None, Vec::new()),
+        };
         retain_calendar_ticks(&name, &mut trigger, state.as_ref(), snapshot)?;
         let definition = serde_json::to_value(&trigger)
             .map_err(|error| ControlError::Invalid(error.to_string()))?;
@@ -58,6 +68,14 @@ pub(crate) async fn publish_projections(
             "INSERT INTO sqb_trigger_state (trigger_id, status, started_at, next_due_at) VALUES ($1,$2,$3,$4) \
              ON CONFLICT (trigger_id) DO UPDATE SET status=excluded.status, next_due_at=excluded.next_due_at",
             vec![Parameter::Id(id), Parameter::Text(status.as_str().into()), Parameter::Time(started_at), Parameter::OptionalTime(next)]).await?;
+        if !dropped.is_empty() {
+            transaction = record_trigger_skipped(
+                transaction,
+                (id, snapshot.snapshot_id),
+                &dropped_times_reason(&dropped),
+            )
+            .await?;
+        }
     }
     Ok(transaction)
 }

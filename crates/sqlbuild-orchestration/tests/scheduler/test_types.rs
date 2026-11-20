@@ -106,3 +106,22 @@ pub(crate) struct RunningMemberOldDocumentTestCase {
     /// Every run after the running member stops and the next pass, as `job status: reason`.
     pub(crate) expected_after: &'static [&'static str],
 }
+
+pub(crate) struct UnreadableScheduleRepublishTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The schedule as first published.
+    pub(crate) published: serde_json::Value,
+    /// Operator changes made before the republish.
+    pub(crate) operator_changes: &'static [crate::declarations::models::TriggerChange],
+    /// The stored definition an earlier release left, which no longer decodes.
+    pub(crate) earlier_form: serde_json::Value,
+    /// The schedule as republished.
+    pub(crate) republished: serde_json::Value,
+    /// The schedule's status and operator status after the republish.
+    pub(crate) expected_status: (&'static str, Option<&'static str>),
+    /// Whether the next due time is the same before and after the republish.
+    pub(crate) expected_same_next_due: bool,
+    /// The live problems after the republish, as `name: reason`, then after the next scheduler cycle.
+    pub(crate) expected_problems: [Vec<String>; 2],
+}
