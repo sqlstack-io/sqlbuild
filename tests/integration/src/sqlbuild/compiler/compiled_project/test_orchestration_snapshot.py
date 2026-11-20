@@ -489,6 +489,7 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                                 "env": "FULFILLMENT_API_KEY",
                                 "description": None,
                                 "missing": False,
+                                "line": 15,
                             },
                             {
                                 "name": "backup_key",
@@ -498,6 +499,7 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                                 "env": "FULFILLMENT_BACKUP_KEY",
                                 "description": None,
                                 "missing": False,
+                                "line": 16,
                             },
                             {
                                 "name": "regions",
@@ -507,6 +509,7 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                                 "env": "FULFILLMENT_REGIONS",
                                 "description": None,
                                 "missing": False,
+                                "line": 17,
                             },
                             {
                                 "name": "compression",
@@ -516,6 +519,7 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                                 "env": "FULFILLMENT_COMPRESSION",
                                 "description": None,
                                 "missing": False,
+                                "line": 18,
                             },
                             {
                                 "name": "endpoint",
@@ -525,6 +529,7 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                                 "env": "FULFILLMENT_ENDPOINT",
                                 "description": "Base URL",
                                 "missing": False,
+                                "line": 19,
                             },
                             {
                                 "name": "timeout_seconds",
@@ -534,6 +539,7 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                                 "env": "SHIP_TIMEOUT",
                                 "description": None,
                                 "missing": False,
+                                "line": 20,
                             },
                         ],
                         "used_by": [
@@ -579,6 +585,7 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                                 "env": "REGION",
                                 "description": None,
                                 "missing": False,
+                                "line": 12,
                             },
                             {
                                 "name": "token",
@@ -588,6 +595,7 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                                 "env": "INVENTORY_TOKEN",
                                 "description": None,
                                 "missing": False,
+                                "line": 13,
                             },
                         ],
                         "used_by": [],
