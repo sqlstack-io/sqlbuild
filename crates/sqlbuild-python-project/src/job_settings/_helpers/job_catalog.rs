@@ -9,7 +9,6 @@ use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{PyResult, Python};
 use serde_json::Value;
-use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
 use sqlbuild_analysis::graph::models::{JobSelection, ParsedSelector};
 use sqlbuild_analysis::job_settings::main::declared_runs::declared_runs;
@@ -125,15 +124,21 @@ pub(crate) fn with_frozen_jobs<T>(
     )
 }
 
-/// The project's catalog with each pinned job selecting its frozen nodes, and only the pinned jobs declared.
+/// The project's catalog with each pinned job selecting its frozen nodes as a job run selects them, a loader with its source, and only the pinned jobs declared.
 fn pinned_catalog(
     (mut catalog, triggered): Catalog,
     pinned: &PinnedJobs,
 ) -> (Catalog, BTreeMap<String, DeclaredRun>) {
     let mut declared: BTreeMap<String, DeclaredRun> = BTreeMap::new();
-    for (name, (keys, settings)) in pinned {
-        let keys: Vec<ObjectKey> = keys.iter().cloned().collect();
-        catalog.insert(name.clone(), JobSelection::Resolved { keys });
+    for (name, (select, settings)) in pinned {
+        let selection = match select.is_empty() {
+            true => JobSelection::Resolved { keys: Vec::new() },
+            false => JobSelection::Job {
+                select: select.clone(),
+                exclude: Vec::new(),
+            },
+        };
+        catalog.insert(name.clone(), selection);
         declared.insert(
             name.clone(),
             DeclaredRun::Job {

@@ -833,13 +833,15 @@ what it writes from the same settings. Ad-hoc runs never retry, so a job's `[ret
 apply to them.
 
 Applying a job's settings needs the permissions running that job needs: `job.run` for each named
-job that gives the build a setting, and `run.rewrite_history` or `run.load` when the job's own
+job that gives the build a setting the command line doesn't replace, and `run.rewrite_history` or `run.load` when the job's own
 settings rewrite history (`full_refresh`, a cursor or an `allow_*` setting) or load sources
 (`reload`, `load_sources`), on top of what the typed flags need. With `job.run`, a job's settings
 that are refused when typed, such as `defer_to` or `plan_from`, apply as they do in the job's own
 runs. The job's `vars` and `warehouse` need no `run.vars` or `run.warehouse`, which gate only what a
-person types. A named job left with none of the selected nodes, which gives the build no setting,
-needs nothing.
+person types. A warehouse every named job shares is the whole build's, so it counts as applied
+whatever the adapter. A named job that gives the build nothing, because it has no settings, the
+command line replaces them, or it keeps none of the selected nodes and sets nothing build-wide,
+needs only `run.adhoc`.
 
 Upgrade the server and every location, and let each location publish again, before running ad-hoc
 commands that name a job. A location that hasn't been upgraded runs such a command without the

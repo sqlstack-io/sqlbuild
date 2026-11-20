@@ -109,7 +109,7 @@ fn given_a_build_naming_jobs_when_planned_then_each_is_pinned_to_the_nodes_it_gi
             )),
         },
         JobPinTestCase {
-            description: "a named job left with none of its nodes stays pinned for its build-wide settings",
+            description: "a named job left with none of its nodes stays pinned for its build-wide settings, its warehouse among them",
             command: &[
                 "build",
                 "--select",
@@ -121,7 +121,7 @@ fn given_a_build_naming_jobs_when_planned_then_each_is_pinned_to_the_nodes_it_gi
             expected_plan: Ok((
                 &["model:orders"],
                 json!({"weekly": weekly_pin(&[])}),
-                north.clone(),
+                json!({"vars": {"region": "north"}, "warehouse": "REPORTS_XS"}),
             )),
         },
         JobPinTestCase {

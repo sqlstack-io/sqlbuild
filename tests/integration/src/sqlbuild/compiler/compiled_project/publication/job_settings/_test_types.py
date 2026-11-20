@@ -29,4 +29,4 @@ class TypedWarehouseTestCase:
 class LoaderWarehouseTestCase:
     description: str
     command: tuple[str, ...]
-    expected_log: str
+    expected_warehouses: dict[str, str]

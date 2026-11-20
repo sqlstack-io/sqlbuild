@@ -233,6 +233,24 @@ fn given_an_adhoc_build_that_pinned_jobs_when_launched_then_it_needs_the_permiss
             expected_permissions: r#"[["run.adhoc", true, null]]"#,
             expected_launch: Ok(()),
         },
+        PinnedPermissionTestCase {
+            description: "a pinned job without settings needs only run.adhoc",
+            generation: 9,
+            permissions: &["run.adhoc"],
+            jobs: &[("nightly_job", &["orders"], "{}")],
+            job_settings: "{}",
+            expected_permissions: r#"[["run.adhoc", true, null]]"#,
+            expected_launch: Ok(()),
+        },
+        PinnedPermissionTestCase {
+            description: "a job's whole-run warehouse needs job.run though the job keeps none of the nodes",
+            generation: 10,
+            permissions: &["run.adhoc"],
+            jobs: &[("nightly_job", &[], r#"{"warehouse": "REPORTS_XS"}"#)],
+            job_settings: r#"{"warehouse": "REPORTS_XS"}"#,
+            expected_permissions: r#"[["run.adhoc", true, null], ["job.run", false, "missing job.run permission for this target: applying job nightly_job's settings needs job.run, as running the job does"]]"#,
+            expected_launch: Err(JOB_DENIED),
+        },
     ];
     for backend in [Backend::Sqlite, Backend::Postgres] {
         run(async {

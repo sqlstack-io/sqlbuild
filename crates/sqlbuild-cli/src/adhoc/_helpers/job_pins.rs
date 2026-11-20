@@ -44,16 +44,18 @@ fn refusal(error: NodeJobSettingsError) -> Refusal {
     }
 }
 
-/// The jobs `select` names and the build-wide settings they give where the command's `settings` are silent.
+/// The jobs `select` names and the build-wide settings they give where the command's `settings` are silent; a warehouse they share counts as build-wide whatever the adapter, so it is always gated.
 pub(crate) fn named_job_settings(
     publication: &IndexedPublication,
     select: &[String],
     settings: &BTreeMap<String, Json>,
 ) -> Result<(Vec<String>, BTreeMap<String, Json>), Refusal> {
     let given: BTreeSet<String> = settings.keys().cloned().collect();
-    resolve_job_settings(declared(publication), (select, &given), None)
-        .map(|resolved| (resolved.named, resolved.build))
-        .map_err(refusal)
+    let resolved =
+        resolve_job_settings(declared(publication), (select, &given), None).map_err(refusal)?;
+    let mut build: BTreeMap<String, Json> = resolved.whole_run;
+    build.extend(resolved.build);
+    Ok((resolved.named, build))
 }
 
 /// Each job `select` names, pinned to the nodes of `selection` it gives its settings to; named jobs that give one node different values are refused, as `sqb build` refuses them.

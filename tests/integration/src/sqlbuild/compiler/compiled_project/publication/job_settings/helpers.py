@@ -6,9 +6,10 @@ import json
 import os
 import subprocess
 import sys
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from itertools import accumulate
 from pathlib import Path
 from typing import Any, NamedTuple
 from uuid import uuid4
@@ -80,6 +81,7 @@ LOADER_PROJECT_FILES: dict[str, str] = {
         'name = "orders"\nadapter = "duckdb"\n'
         '[connections.local]\ndatabase = "warehouse.duckdb"\n'
         '[targets.development]\nschema = "main"\n'
+        "[settings]\nconcurrency = 1\n"
     ),
     "sources/loaded.yml": (
         "sources:\n"
@@ -101,7 +103,11 @@ LOADER_PROJECT_FILES: dict[str, str] = {
         '    return [{"customer_id": 7}]\n\n\n'
         "@loader\ndef raw_inventory(ctx):\n"
         '    """Load inventory."""\n    _record("raw_inventory")\n'
-        '    return [{"product_id": 1}]\n'
+        '    return [{"product_id": 1}]\n\n\n'
+        '@loader(write_strategy="table")\ndef stage_inventory(ctx):\n'
+        '    """Stage inventory in the loader\'s own relation; no source declares it."""\n'
+        '    _record("stage_inventory")\n'
+        '    return [{"product_id": 2}]\n'
     ),
     "models/customers.sql": (
         "MODEL (description 'Loaded customers.', materialized table);\n"
@@ -111,6 +117,11 @@ LOADER_PROJECT_FILES: dict[str, str] = {
         'name = "loads_job"\ndescription = "Inventory loads on their own warehouse."\n'
         'select = "source:raw_inventory"\n'
         '[settings]\nwarehouse = "LOADS_WH"\n'
+    ),
+    "orchestration/jobs/stage_job.toml": (
+        'name = "stage_job"\ndescription = "Staged inventory on its own warehouse."\n'
+        'select = "loader:stage_inventory"\n'
+        '[settings]\nwarehouse = "STAGE_WH"\n'
     ),
     "orchestration/jobs/customers_job.toml": (
         'name = "customers_job"\ndescription = "Customers."\nselect = "customers"\n'
@@ -298,3 +309,22 @@ def job_keys(document: dict[str, Any]) -> dict[str, Any]:
 def error_code(document: dict[str, Any]) -> str | None:
     """The plan's error code, or None when it planned."""
     return document.get("error", {}).get("code")
+
+
+def loader_warehouses(log: str, loaders: Iterable[str]) -> dict[str, str]:
+    """Each of `loaders` with the warehouse current when the warehouse log records it ran."""
+    lines: list[list[str]] = [line.split(" ", 1) for line in log.splitlines()]
+    current: list[str] = list(
+        accumulate(
+            lines,
+            lambda warehouse, line: {"USE": line[1]}.get(line[0], warehouse),
+            initial="HOME_WH",
+        )
+    )
+    ran: dict[str, str] = dict(
+        (line[1], warehouse)
+        for line, warehouse in filter(
+            lambda pair: pair[0][0] == "LOAD", zip(lines, current[1:], strict=True)
+        )
+    )
+    return {loader: ran.get(loader, "did not run") for loader in loaders}

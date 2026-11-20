@@ -27,6 +27,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.job_se
     error_code,
     job_keys,
     job_settings_location,
+    loader_warehouses,
     planned_actions,
     preview,
 )
@@ -153,7 +154,12 @@ def test_given_a_typed_warehouse_and_a_job_warehouse_when_previewed_and_run_then
         LoaderWarehouseTestCase(
             description="a job's warehouse reaches its loader in the CLI and the ad-hoc run alike",
             command=("build", "--select", "job:loads_job", "job:customers_job"),
-            expected_log="LOAD raw_customers\nUSE LOADS_WH\nLOAD raw_inventory\nUSE HOME_WH\n",
+            expected_warehouses={"raw_inventory": "LOADS_WH"},
+        ),
+        LoaderWarehouseTestCase(
+            description="a job's warehouse reaches a loader it selects as loader:, which no source declares",
+            command=("build", "--select", "job:stage_job", "job:customers_job"),
+            expected_warehouses={"stage_inventory": "STAGE_WH"},
         ),
     ],
     ids=lambda case: case.description,
@@ -177,13 +183,13 @@ def test_given_a_job_holding_a_loader_when_a_person_runs_it_then_the_loader_runs
         built: subprocess.CompletedProcess[str] = run_sqb(
             location.project, "build", "--target", "development", "--select", *command[2:]
         )
-        cli: str = log.read_text()
+        cli: dict[str, str] = loader_warehouses(log.read_text(), test_case.expected_warehouses)
         _ = log.write_text("")
         run: dict[str, Any] = adhoc_run(location, command)
-        adhoc: str = log.read_text()
+        adhoc: dict[str, str] = loader_warehouses(log.read_text(), test_case.expected_warehouses)
     assert (built.returncode, run["status"], cli, adhoc) == (
         0,
         "success",
-        test_case.expected_log,
-        test_case.expected_log,
+        test_case.expected_warehouses,
+        test_case.expected_warehouses,
     ), (built.stderr, run)

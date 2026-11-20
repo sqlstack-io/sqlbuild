@@ -26,13 +26,22 @@ pub(crate) fn build_settings(
     effective
 }
 
-/// The pinned jobs that give `request` a setting: to some of its nodes, or to the whole build.
+/// The pinned jobs that give `request` a setting the command line does not replace: to some of its nodes, or to the whole build.
 pub(crate) fn applying_jobs(request: &RunRequest) -> Vec<(&String, &PinnedJob)> {
     request
         .jobs
         .iter()
-        .filter(|(_, job)| !job.selection.is_empty() || gives_build_settings(request, job))
+        .filter(|(_, job)| gives_node_settings(request, job) || gives_build_settings(request, job))
         .collect()
+}
+
+/// Whether `job` keeps some of `request`'s nodes and sets a setting the command line leaves to it.
+fn gives_node_settings(request: &RunRequest, job: &PinnedJob) -> bool {
+    !job.selection.is_empty()
+        && job
+            .settings
+            .keys()
+            .any(|name| !request.settings.contains_key(name))
 }
 
 /// Whether `job` set one of the build-wide settings `request` takes from its jobs.

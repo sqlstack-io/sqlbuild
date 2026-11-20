@@ -5,10 +5,10 @@ use std::path::PathBuf;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{PyResult, Python};
-use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_cli::argv::main::accepted_settings_arguments::accepted_settings_arguments;
 use sqlbuild_orchestration::runs::models::PinnedJob;
 
+use crate::job_settings::_helpers::frozen_selector::frozen_key_selectors;
 use crate::job_settings::_helpers::job_catalog::with_frozen_jobs;
 use crate::job_settings::_helpers::named_job_build_settings::scoped_job_build_settings;
 use crate::job_settings::models::PinnedBuild;
@@ -24,12 +24,15 @@ pub(crate) fn pinned_build(
     let pinned: PinnedJobs = jobs
         .iter()
         .map(|(name, job)| {
-            (
+            Ok((
                 name.clone(),
-                (frozen_keys(job, skipped), job.settings.clone()),
-            )
+                (
+                    frozen_key_selectors(&job.selection, skipped)?,
+                    job.settings.clone(),
+                ),
+            ))
         })
-        .collect();
+        .collect::<PyResult<_>>()?;
     let tokens: Vec<String> = jobs.keys().map(|name| format!("job:{name}")).collect();
     let mut flags: Vec<String> = Vec::new();
     if !jobs.is_empty() {
@@ -45,19 +48,4 @@ pub(crate) fn pinned_build(
         flags,
         given,
     })
-}
-
-/// A pinned job's frozen node keys that still run.
-fn frozen_keys(job: &PinnedJob, skipped: &BTreeMap<String, String>) -> BTreeSet<ObjectKey> {
-    let mut keys: BTreeSet<ObjectKey> = BTreeSet::new();
-    for key in job
-        .selection
-        .iter()
-        .filter(|key| !skipped.contains_key(*key))
-    {
-        if let Some((kind, name)) = key.split_once(':') {
-            keys.insert((kind.to_owned(), name.to_owned()));
-        }
-    }
-    keys
 }
