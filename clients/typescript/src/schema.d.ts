@@ -2308,6 +2308,8 @@ export interface components {
             command: string[];
             /** @description Plan again even when the location kept a plan for the same request. */
             fresh: boolean;
+            /** @description The settings the command gives, `warehouse` included though a plan never takes it; they replace the pinned jobs' own. */
+            given?: string[];
             /** @description The jobs the command names, pinned as an ad-hoc build of it pins them. */
             jobs?: {
                 [key: string]: components["schemas"]["PinnedJob"];
@@ -3531,6 +3533,10 @@ export interface components {
             command?: components["schemas"]["RunCommand"];
             image_id?: string | null;
             job_key?: string | null;
+            /** @description The build-wide settings those jobs give where `settings` is silent; they decide its gates and write set. */
+            job_settings?: {
+                [key: string]: unknown;
+            };
             /** @description The jobs an ad-hoc build's selection names, each pinned to its frozen nodes and settings. */
             jobs?: {
                 [key: string]: components["schemas"]["PinnedJob"];

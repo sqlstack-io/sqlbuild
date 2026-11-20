@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::Value as Json;
 use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::errors::SelectorError;
+use sqlbuild_analysis::job_settings::constants::JOB_SETTING_CONFLICT_CODE;
 use sqlbuild_analysis::job_settings::errors::NodeJobSettingsError;
-use sqlbuild_analysis::job_settings::main::pinned_job_nodes::pinned_job_nodes;
 use sqlbuild_analysis::job_settings::main::resolve_job_settings::resolve_job_settings;
 use sqlbuild_analysis::job_settings::models::DeclaredRun;
 use sqlbuild_orchestration::runs::models::PinnedJob;
@@ -37,7 +37,9 @@ fn declared(publication: &IndexedPublication) -> BTreeMap<String, DeclaredRun> {
 
 fn refusal(error: NodeJobSettingsError) -> Refusal {
     match error {
-        NodeJobSettingsError::Conflict(conflict) => Refusal::Selection(conflict.message),
+        NodeJobSettingsError::Conflict(conflict) => {
+            Refusal::Selection(format!("{JOB_SETTING_CONFLICT_CODE}: {}", conflict.message))
+        }
         NodeJobSettingsError::Selector(failure) => Refusal::Selector(failure.error),
     }
 }
@@ -54,24 +56,42 @@ pub(crate) fn named_job_settings(
         .map_err(refusal)
 }
 
-/// Each job `select` names, pinned to the nodes of `selection` it gives its settings to, as `sqb build` decides.
+/// Each job `select` names, pinned to the nodes of `selection` it gives its settings to; named jobs that give one node different values are refused, as `sqb build` refuses them.
 pub(crate) fn pinned_jobs(
     publication: &IndexedPublication,
     (select, exclude): (&[String], &[String]),
-    include_python: bool,
+    (settings, include_python): (&BTreeMap<String, Json>, bool),
     selection: &BTreeSet<String>,
 ) -> Result<BTreeMap<String, PinnedJob>, Refusal> {
     let token_nodes =
         |token: &str, exclude: &[String]| -> Result<BTreeSet<ObjectKey>, SelectorError> {
             selected_keys(publication, &[token.to_owned()], exclude, include_python)
         };
-    let pinned = pinned_job_nodes(
-        publication.graph_with_jobs(include_python),
-        (select, exclude),
-        &declared(publication),
-        &token_nodes,
+    let given: BTreeSet<String> = settings.keys().cloned().collect();
+    let resolved = resolve_job_settings(
+        declared(publication),
+        (select, &given),
+        Some((
+            publication.graph_with_jobs(include_python),
+            (select, exclude),
+            &token_nodes,
+        )),
     )
-    .map_err(|failure| Refusal::Selector(failure.error))?;
+    .map_err(refusal)?;
+    let mut pinned: BTreeMap<String, BTreeSet<ObjectKey>> = resolved
+        .named
+        .into_iter()
+        .map(|job| (job, BTreeSet::new()))
+        .collect();
+    for (key, jobs) in resolved
+        .nodes
+        .map(|nodes| nodes.node_jobs)
+        .unwrap_or_default()
+    {
+        for job in jobs {
+            pinned.entry(job).or_default().insert(key.clone());
+        }
+    }
     Ok(pinned
         .into_iter()
         .map(|(name, keys)| {

@@ -98,7 +98,7 @@ impl PreparedPublication for IndexedPublication {
             BTreeMap::new()
         } else {
             let python = runs_python(&verb, (&settings, &job_settings));
-            pinned_jobs(self, (&select, &exclude), python, &selection)?
+            pinned_jobs(self, (&select, &exclude), (&settings, python), &selection)?
         };
         Ok(CommandPlan {
             verb,

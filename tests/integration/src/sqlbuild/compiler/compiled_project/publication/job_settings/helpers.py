@@ -35,6 +35,10 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
+WAREHOUSE_REFUSAL: str = (
+    "the requested warehouse is not configured for this target on this location; "
+    "no warehouse statement ran"
+)
 JOB_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "orders"\nadapter = "duckdb"\n'
@@ -66,7 +70,67 @@ JOB_PROJECT_FILES: dict[str, str] = {
         'select = "orders"\n'
         '[settings]\nwarehouse = "REPORTS_XS"\nvars = { amount = "5" }\n'
     ),
+    "orchestration/jobs/changed_job.toml": (
+        'name = "changed_job"\ndescription = "Orders when they changed."\nselect = "orders"\n'
+        "[settings]\nchanged = true\n"
+    ),
 }
+LOADER_PROJECT_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": (
+        'name = "orders"\nadapter = "duckdb"\n'
+        '[connections.local]\ndatabase = "warehouse.duckdb"\n'
+        '[targets.development]\nschema = "main"\n'
+    ),
+    "sources/loaded.yml": (
+        "sources:\n"
+        "  - name: raw_customers\n    description: Customers.\n    managed: true\n"
+        "    write_strategy: table\n    table: raw_customers\n    columns:\n"
+        "      - name: customer_id\n        type: BIGINT\n"
+        "  - name: raw_inventory\n    description: Inventory.\n    managed: true\n"
+        "    write_strategy: table\n    table: raw_inventory\n    columns:\n"
+        "      - name: product_id\n        type: BIGINT\n"
+    ),
+    "python/loaders/loaded.py": (
+        '"""Two loaders that record each run in the warehouse log."""\n\n'
+        "import os\nfrom pathlib import Path\n\nfrom sqlbuild.loaders import loader\n\n\n"
+        "def _record(name):\n"
+        '    with Path(os.environ["WAREHOUSE_LOG"]).open("a") as log:\n'
+        '        log.write(f"LOAD {name}\\n")\n\n\n'
+        "@loader\ndef raw_customers(ctx):\n"
+        '    """Load customers."""\n    _record("raw_customers")\n'
+        '    return [{"customer_id": 7}]\n\n\n'
+        "@loader\ndef raw_inventory(ctx):\n"
+        '    """Load inventory."""\n    _record("raw_inventory")\n'
+        '    return [{"product_id": 1}]\n'
+    ),
+    "models/customers.sql": (
+        "MODEL (description 'Loaded customers.', materialized table);\n"
+        'SELECT customer_id FROM __source("raw_customers")\n'
+    ),
+    "orchestration/jobs/loads_job.toml": (
+        'name = "loads_job"\ndescription = "Inventory loads on their own warehouse."\n'
+        'select = "source:raw_inventory"\n'
+        '[settings]\nwarehouse = "LOADS_WH"\n'
+    ),
+    "orchestration/jobs/customers_job.toml": (
+        'name = "customers_job"\ndescription = "Customers."\nselect = "customers"\n'
+    ),
+}
+# DuckDB with a session warehouse that logs each switch, showing the warehouse each node ran on.
+WAREHOUSE_HOOK: str = (
+    "import os\nfrom pathlib import Path\n"
+    "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n"
+    "DuckDbAdapter.supports_session_warehouse = True\n"
+    "def use_session_warehouse(self, *, connection, warehouse):\n"
+    '    with Path(os.environ["WAREHOUSE_LOG"]).open("a") as log:\n'
+    '        log.write(f"USE {warehouse}\\n")\n'
+    "    self._session_warehouse = warehouse\n"
+    "def current_session_warehouse(self, *, connection):\n"
+    '    return getattr(self, "_session_warehouse", "HOME_WH")\n'
+    "DuckDbAdapter.use_session_warehouse = use_session_warehouse\n"
+    "DuckDbAdapter.current_session_warehouse = current_session_warehouse\n"
+    "DuckDbAdapter.session_warehouse = current_session_warehouse\n"
+)
 
 
 class JobSettingsLocation(NamedTuple):
@@ -81,11 +145,14 @@ class JobSettingsLocation(NamedTuple):
 
 @contextmanager
 def job_settings_location(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    files: dict[str, str] = JOB_PROJECT_FILES,
+    environment: dict[str, str] | None = None,
 ) -> Iterator[JobSettingsLocation]:
     """Build the project, serve it with a scheduler's local workers, and sign an admin in."""
     project: Path = tmp_path / "project"
-    write_files(project_dir=project, files=JOB_PROJECT_FILES)
+    write_files(project_dir=project, files=files)
     built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
     assert built.returncode == 0, built.stderr
     executable: str = str(Path(sys.executable).with_name("sqb"))
@@ -112,7 +179,7 @@ def job_settings_location(
             ],
             log,
             tmp_path / "location.stdout",
-            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+            env=os.environ | (environment or {}) | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
         ) as served,
     ):
         _ = wait_for_generation(api, "development", 1, served, log)
@@ -155,6 +222,7 @@ def job_settings_location(
             ],
             scheduler_log,
             tmp_path / "scheduler.stdout",
+            env=os.environ | (environment or {}),
         ) as scheduler:
             admin: dict[str, Any] = provision_person(
                 tmp_path / "control", "create-user", "orders-admin"
@@ -223,7 +291,7 @@ def planned_actions(document: dict[str, Any]) -> dict[str, tuple[str, str]]:
 
 def job_keys(document: dict[str, Any]) -> dict[str, Any]:
     """The plan's keys about named jobs: full refresh, concurrency and warehouses."""
-    keys: tuple[str, ...] = ("full_refresh_jobs", "job_concurrency", "job_warehouses")
+    keys: tuple[str, ...] = ("full_refresh_jobs", "job_concurrency", "job_warehouses", "changed")
     return {key: document[key] for key in document.keys() & set(keys)}
 
 

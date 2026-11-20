@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
-use crate::runs::_helpers::lifecycle::pinned_jobs::narrow_pinned_jobs;
+use crate::runs::_helpers::lifecycle::pinned_jobs::{build_settings, narrow_pinned_jobs};
 use crate::runs::_helpers::requests::permissions::authorize_execution;
 use crate::runs::models::{RerunRequest, RunCommand, RunKind, RunOrigin, RunRequest, RunStatus};
 use crate::snapshots::constants::SOURCE_KEY_PREFIX;
@@ -77,10 +77,11 @@ pub(crate) async fn frozen_rerun(
         frozen.selection.retain(|key| failed.contains(key.as_str()));
     }
     let writers;
+    let settings = build_settings((&frozen.settings, &frozen.job_settings));
     (transaction, writers) = job_write_set(
         transaction,
         frozen.snapshot_id,
-        (&frozen.selection, &frozen.settings),
+        (&frozen.selection, &settings),
     )
     .await?;
     frozen.write_set.retain(|key| writers.contains(key));

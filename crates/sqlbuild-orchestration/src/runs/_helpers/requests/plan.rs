@@ -117,6 +117,7 @@ pub(in crate::runs) async fn request_plan_in(
         work: LocationWork::Plan {
             command: request.command.clone(),
             selection: frozen.selection,
+            given: frozen.settings.keys().cloned().collect(),
             settings: frozen
                 .settings
                 .into_iter()

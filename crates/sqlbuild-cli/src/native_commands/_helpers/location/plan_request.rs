@@ -15,6 +15,7 @@ use crate::native_commands::_helpers::location::execution::{
     plan_error, plan_failure, without_diffs,
 };
 use crate::native_commands::_helpers::location::plan_document::plan_document;
+use crate::native_commands::constants::CHANGED_SETTING;
 use crate::native_commands::constants::{PLAN_COMMAND, PLAN_NOT_PRODUCED};
 use crate::native_commands::models::{LocationPlanRequest, LocationRuntimeRequest, LocationServe};
 use crate::native_commands::types::LocationPlan;
@@ -35,6 +36,27 @@ pub(crate) fn plan_arguments(
     ];
     argv.extend(accepted_settings_arguments(PLAN_COMMAND, settings)?);
     Ok(argv)
+}
+
+/// Whether a plan shows what changed, so it reads the copy's consumption: `--changed`, or else a pinned job's `changed`.
+pub(crate) fn plans_changes(
+    settings: &BTreeMap<String, Value>,
+    jobs: &BTreeMap<String, PinnedJob>,
+) -> bool {
+    let changed: Option<&Value> = settings.get(CHANGED_SETTING).or_else(|| {
+        jobs.values()
+            .find_map(|job| job.settings.get(CHANGED_SETTING))
+    });
+    changed.is_some_and(|changed| !matches!(changed, Value::Null | Value::Bool(false)))
+}
+
+/// Every setting a plan request's command gives, `settings` and `given` together, and [`plans_changes`].
+pub(crate) fn given_and_changes(
+    (settings, given): (&BTreeMap<String, Value>, &BTreeSet<String>),
+    jobs: &BTreeMap<String, PinnedJob>,
+) -> (BTreeSet<String>, bool) {
+    let all: BTreeSet<String> = given.iter().chain(settings.keys()).cloned().collect();
+    (all, plans_changes(settings, jobs))
 }
 
 /// The node names of a frozen selection, each selected as `--select <name>` would, then `job:<name>` for each pinned job.

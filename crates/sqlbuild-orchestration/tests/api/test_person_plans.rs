@@ -245,6 +245,7 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                     settings: Default::default(),
                     fresh: false,
                     jobs: Default::default(),
+                    given: Default::default(),
                 },
             };
             assert!(

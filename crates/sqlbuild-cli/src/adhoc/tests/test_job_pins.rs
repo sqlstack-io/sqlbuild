@@ -30,6 +30,7 @@ fn given_a_build_naming_jobs_when_planned_then_each_is_pinned_to_the_nodes_it_gi
             ),
             ("weekly".to_owned(), keys(&["model:customers"])),
             ("south".to_owned(), keys(&["model:customers"])),
+            ("keep_orders".to_owned(), keys(&["model:orders"])),
             (
                 "reports".to_owned(),
                 keys(&["model:customers", "model:order_totals", "model:orders"]),
@@ -53,6 +54,10 @@ fn given_a_build_naming_jobs_when_planned_then_each_is_pinned_to_the_nodes_it_gi
             (
                 "south".to_owned(),
                 settings(json!({"vars": {"region": "south"}})),
+            ),
+            (
+                "keep_orders".to_owned(),
+                settings(json!({"full_refresh": false, "vars": {"region": "north"}})),
             ),
         ]),
     };
@@ -156,6 +161,11 @@ fn given_a_build_naming_jobs_when_planned_then_each_is_pinned_to_the_nodes_it_gi
             description: "named jobs that set vars differently are refused, as the build would",
             command: &["build", "--select", "job:nightly", "job:south"],
             expected_plan: Err("set vars differently"),
+        },
+        JobPinTestCase {
+            description: "named jobs that give one node different values are refused with S027, as the build would",
+            command: &["build", "--select", "job:nightly", "job:keep_orders"],
+            expected_plan: Err("S027: "),
         },
     ];
     let publication = adhoc_planner().prepare(resources.to_vec(), jobs);

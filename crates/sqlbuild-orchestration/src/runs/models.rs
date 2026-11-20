@@ -172,6 +172,9 @@ pub struct RunRequest {
     /// The jobs an ad-hoc build's selection names, each pinned to its frozen nodes and settings.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub jobs: BTreeMap<String, PinnedJob>,
+    /// The build-wide settings those jobs give where `settings` is silent; they decide its gates and write set.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub job_settings: BTreeMap<String, serde_json::Value>,
     /// Set on an automatic retry of a failed run, which is not claimed before `not_before`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry: Option<RunRetry>,

@@ -44,3 +44,9 @@ pub(crate) type PlanSelection<'a> = (
     &'a std::collections::BTreeSet<String>,
     &'a std::collections::BTreeMap<String, sqlbuild_orchestration::runs::models::PinnedJob>,
 );
+
+/// A plan request's settings, and the names of every setting its command gives, `warehouse` included.
+pub(crate) type PlanSettings<'a> = (
+    &'a std::collections::BTreeMap<String, serde_json::Value>,
+    &'a std::collections::BTreeSet<String>,
+);

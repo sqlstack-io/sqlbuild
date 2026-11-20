@@ -15,3 +15,18 @@ class JobPreviewRunTestCase:
     expected_error_code: str | None
     expected_run_status: str
     expected_amounts: list[tuple[int]]
+
+
+@dataclass(frozen=True)
+class TypedWarehouseTestCase:
+    description: str
+    command: tuple[str, ...]
+    expected_preview: tuple[dict[str, tuple[str, str]], dict[str, Any], str | None]
+    expected_run: tuple[str, str]
+
+
+@dataclass(frozen=True)
+class LoaderWarehouseTestCase:
+    description: str
+    command: tuple[str, ...]
+    expected_log: str

@@ -1,5 +1,6 @@
 //! The command planner the server is built with; the CLI owns the grammar and the selector resolver.
 
+use crate::credentials::models::PermissionScope;
 use crate::runs::models::{
     CommandPlan, PlannerResource, PublicationCache, PublishedJobs, SelectionProblem,
     SelectionVocabulary,
@@ -44,3 +45,6 @@ pub type RunHandoff = (
     Vec<crate::api::models::DockerImageSource>,
     std::sync::Arc<dyn CommandPlanner>,
 );
+
+/// A permission a launch needs, and the pinned job whose settings it is needed for, if any.
+pub(crate) type ExecutionScope = (PermissionScope, Option<String>);

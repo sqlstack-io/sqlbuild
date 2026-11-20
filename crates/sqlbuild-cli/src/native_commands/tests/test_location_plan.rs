@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use chrono::TimeDelta;
 
 use crate::native_commands::_helpers::location::plan_document::plan_document;
-use crate::native_commands::_helpers::location::plan_request::plan_arguments;
+use crate::native_commands::_helpers::location::plan_request::{plan_arguments, plans_changes};
 use crate::native_commands::_helpers::location::plan_reuse::{remember_plan, reused_plan};
 use crate::native_commands::_helpers::location::work::next_work_check;
 use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
@@ -22,7 +22,7 @@ use crate::native_commands::tests::helpers::{
     finished_plan, finished_plan_bytes, kept_plans, plan_output, plan_to_keep, reuse_clock,
     reuse_key,
 };
-use crate::native_commands::tests::test_types::PinnedReuseTestCase;
+use crate::native_commands::tests::test_types::{PinnedReuseTestCase, PlanChangesTestCase};
 use crate::native_commands::tests::test_types::{
     PlanArgumentsTestCase, PlanDocumentTestCase, PlanReuseBoundTestCase, PlanReuseTestCase,
     WorkCheckTestCase,
@@ -214,18 +214,28 @@ fn given_a_kept_plan_when_a_request_pins_other_jobs_then_it_plans_again() {
             description: "the same pinned jobs reuse the plan",
             kept: pinned(json!({"full_refresh": true})),
             asked: pinned(json!({"full_refresh": true})),
+            given: (&[], &[]),
             expected_reused: true,
+        },
+        PinnedReuseTestCase {
+            description: "a typed warehouse, which replaces the pinned jobs' own, plans again",
+            kept: pinned(json!({"warehouse": "REPORTS_XS"})),
+            asked: pinned(json!({"warehouse": "REPORTS_XS"})),
+            given: (&[], &["warehouse"]),
+            expected_reused: false,
         },
         PinnedReuseTestCase {
             description: "a pinned job with other settings plans again",
             kept: pinned(json!({"full_refresh": true})),
             asked: pinned(json!({"full_refresh": false})),
+            given: (&[], &[]),
             expected_reused: false,
         },
         PinnedReuseTestCase {
             description: "a request that pins no job does not reuse one that pinned a job",
             kept: pinned(json!({"full_refresh": true})),
             asked: BTreeMap::new(),
+            given: (&[], &[]),
             expected_reused: false,
         },
     ];
@@ -234,6 +244,12 @@ fn given_a_kept_plan_when_a_request_pins_other_jobs_then_it_plans_again() {
         let (document, diffs) = finished_plan(false);
         let mut keep: PlanToKeep = plan_to_keep(3, "copy-1", &["orders"]);
         keep.key.jobs = test_case.kept;
+        keep.key.given = test_case
+            .given
+            .0
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect();
         remember_plan(
             (&reuse, (REUSED_PLANS, REUSED_PLAN_BYTES)),
             keep,
@@ -241,10 +257,64 @@ fn given_a_kept_plan_when_a_request_pins_other_jobs_then_it_plans_again() {
         );
         let mut asked: PlanKey = reuse_key(&["orders"]);
         asked.jobs = test_case.asked;
+        asked.given = test_case
+            .given
+            .1
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect();
         let reused = reused_plan(&reuse, (3, "copy-1"), &asked, reuse_clock());
         assert_eq!(
             reused.is_some(),
             test_case.expected_reused,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_plan_request_when_deciding_whether_it_shows_what_changed_then_a_pinned_jobs_changed_counts()
+ {
+    let test_cases = [
+        PlanChangesTestCase {
+            description: "a typed --changed reads consumption",
+            settings: json!({"changed": true}),
+            job_settings: json!({}),
+            expected_changes: true,
+        },
+        PlanChangesTestCase {
+            description: "a pinned job's changed reads consumption, as a typed --changed does",
+            settings: json!({}),
+            job_settings: json!({"changed": ["definition", "source_data"]}),
+            expected_changes: true,
+        },
+        PlanChangesTestCase {
+            description: "a typed --changed=false replaces the job's changed",
+            settings: json!({"changed": false}),
+            job_settings: json!({"changed": true}),
+            expected_changes: false,
+        },
+        PlanChangesTestCase {
+            description: "neither reads none",
+            settings: json!({}),
+            job_settings: json!({"full_refresh": true}),
+            expected_changes: false,
+        },
+    ];
+    for test_case in test_cases {
+        let settings: BTreeMap<String, Value> =
+            serde_json::from_value(test_case.settings).expect("settings");
+        let jobs = BTreeMap::from([(
+            "changed_job".to_owned(),
+            PinnedJob {
+                selection: ["model:orders".to_owned()].into(),
+                settings: serde_json::from_value(test_case.job_settings).expect("job settings"),
+            },
+        )]);
+        assert_eq!(
+            plans_changes(&settings, &jobs),
+            test_case.expected_changes,
             "{}",
             test_case.description
         );

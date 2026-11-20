@@ -361,11 +361,27 @@ pub(crate) struct PinnedRerunTestCase {
     pub(crate) expected_jobs: &'static [(&'static str, &'static [&'static str])],
 }
 
-/// The jobs an ad-hoc build pins, and whether launching it rewrites history or sets vars a person typed.
+/// A member's permissions, the jobs an ad-hoc build pins with the build-wide settings they give, and what launching it needs.
 pub(crate) struct PinnedPermissionTestCase {
     pub(crate) description: &'static str,
+    /// The roles document generation that grants the member `permissions`.
+    pub(crate) generation: i64,
+    pub(crate) permissions: &'static [&'static str],
+    /// Each pinned job: its name, nodes and settings as JSON.
     pub(crate) jobs: &'static [(&'static str, &'static [&'static str], &'static str)],
-    pub(crate) expected_actions: &'static [crate::credentials::models::Action],
+    pub(crate) job_settings: &'static str,
+    /// The dry run's `[action, allowed, reason]` for each permission, as JSON.
+    pub(crate) expected_permissions: &'static str,
+    /// The launch, or the reason it is refused.
+    pub(crate) expected_launch: Result<(), &'static str>,
+}
+
+/// The build-wide settings a pinned job gave an ad-hoc build of `model:customers`, and what its rerun writes.
+pub(crate) struct PinnedWriteSetTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) source_id: u128,
+    pub(crate) job_settings: &'static str,
+    pub(crate) expected_write_set: &'static [&'static str],
 }
 
 pub(crate) struct NamedRerunTestCase {

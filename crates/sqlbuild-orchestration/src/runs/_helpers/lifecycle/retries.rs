@@ -10,7 +10,6 @@ use crate::credentials::models::AuditContext;
 use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::declarations::models::OnFailure;
 use crate::runs::_helpers::lifecycle::events::append_run_event;
-use crate::runs::_helpers::lifecycle::pinned_jobs::narrow_pinned_jobs;
 use crate::runs::_helpers::requests::rerun::frozen_rerun;
 use crate::runs::constants::NODE_FAILED;
 use crate::runs::constants::{MEMBER_RECOVERED_EVENT, MEMBER_RETRYING_EVENT};
@@ -177,7 +176,7 @@ async fn queue_member_retry(
         );
     }
     let not_before = transaction.now + TimeDelta::seconds(i64::from(policy.retry_delay_seconds));
-    let mut request = RunRequest {
+    let request = RunRequest {
         run_id: retry_id,
         origin: RunOrigin::Rerun,
         rerun_of_run_id: Some(source.run_id),
@@ -191,7 +190,6 @@ async fn queue_member_retry(
         member_attempt: Some(attempt),
         ..source.clone()
     };
-    narrow_pinned_jobs(&mut request);
     let transaction = queue_run(transaction, &request).await?;
     let job_key = source.job_key.clone().unwrap_or_default();
     let (transaction, _) = append_run_event(

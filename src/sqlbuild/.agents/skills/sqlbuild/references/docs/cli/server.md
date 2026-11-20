@@ -849,10 +849,22 @@ A `build` whose selection names a job takes the job's settings, exactly as `sqb 
 job's own runs do; see
 [Settings when a build names a job](../concepts/orchestration.md#settings-when-a-build-names-a-job).
 The server freezes each named job with the run: the nodes that take its settings and the settings
-themselves, as published. A rerun or retry keeps those jobs, narrowed to the nodes it reruns. The
-job's `vars` and `warehouse` need no `run.vars` or `run.warehouse`, which gate only flags a person
-types; publishing the job already decided them. A job's `full_refresh` still needs
-`run.rewrite_history`, as running the job does, unless the build selects none of the job's nodes.
+themselves, as published. A rerun keeps those jobs, narrowed to the nodes it reruns, and works out
+what it writes from the same settings. Ad-hoc runs never retry, so a job's `[retry]` doesn't
+apply to them.
+
+Applying a job's settings needs the permissions running that job needs: `job.run` for each named
+job that gives the build a setting, and `run.rewrite_history` or `run.load` when the job's own
+settings rewrite history (`full_refresh`, a cursor or an `allow_*` setting) or load sources
+(`reload`, `load_sources`), on top of what the typed flags need. With `job.run`, a job's settings
+that are refused when typed, such as `defer_to` or `plan_from`, apply as they do in the job's own
+runs. The job's `vars` and `warehouse` need no `run.vars` or `run.warehouse`, which gate only what a
+person types. A named job left with none of the selected nodes, which gives the build no setting,
+needs nothing.
+
+Upgrade the server and every location, and let each location publish again, before running ad-hoc
+commands that name a job. A location that hasn't been upgraded runs such a command without the
+job's settings, and refuses a plan of it.
 
 | Flags | Verbs | Needs |
 | --- | --- | --- |
@@ -901,8 +913,10 @@ runs. The web UI's plan page does this for every Run button: the location servin
 and reason, backfills, migrations and warnings. Running the command still needs `run.adhoc`.
 
 A plan of a command that names a job takes the job's settings as the run would, from the jobs the
-server froze with the request, so the plan shows the job's full refreshes and concurrency, and
-fails as the run would when the job's warehouse can't be selected.
+server froze with the request, so the plan shows the job's full refreshes, concurrency and, for a
+job that sets `changed`, what changed. It fails as the run would when the job's warehouse can't be
+selected. A plan never takes a warehouse a person types, but a typed `--warehouse` still replaces
+the job's own, as it does in the run.
 
 A plan reads the server's synced copy of the target's warehouse metadata, not the warehouse, so
 planning never resumes a suspended warehouse. The page shows when that copy synced, or that it

@@ -100,6 +100,7 @@ pub(crate) async fn frozen_job_request(
             pools: definition.pools,
             narrowing,
             jobs: Default::default(),
+            job_settings: Default::default(),
             retry: None,
             member_attempt: None,
         },

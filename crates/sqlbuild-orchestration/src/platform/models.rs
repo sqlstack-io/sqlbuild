@@ -219,6 +219,9 @@ pub enum LocationWork {
         /// The jobs the command names, pinned as an ad-hoc build of it pins them.
         #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
         jobs: std::collections::BTreeMap<String, crate::runs::models::PinnedJob>,
+        /// The settings the command gives, `warehouse` included though a plan never takes it; they replace the pinned jobs' own.
+        #[serde(default, skip_serializing_if = "std::collections::BTreeSet::is_empty")]
+        given: std::collections::BTreeSet<String>,
     },
 }
 
