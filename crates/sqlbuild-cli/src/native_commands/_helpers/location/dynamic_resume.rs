@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use sqlbuild_core::constants::DYNAMIC_RESUME_SECONDS;
 use sqlbuild_orchestration::warehouse_metadata::constants::DYNAMIC_RESUME_REQUEST;
 use sqlbuild_orchestration::warehouse_metadata::models::{
     DynamicResumeLocation, DynamicResumeReply,
@@ -11,7 +12,7 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::location_warning;
-use crate::native_commands::constants::{DYNAMIC_RESUME_SECONDS, METADATA_REPLY_BYTES};
+use crate::native_commands::constants::METADATA_REPLY_BYTES;
 use crate::native_commands::models::{LocationCompiler, LocationMetadataSync};
 
 /// Ask the reader to resume expired holds, sending each location's quiet token; a failure only warns.

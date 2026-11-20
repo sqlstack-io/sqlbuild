@@ -169,9 +169,6 @@ pub(crate) const METADATA_ERROR_CHARS: usize = 500;
 /// A metadata reader that ignores end of input this long after a synchronization is killed.
 pub(crate) const METADATA_READER_CLOSE_SECONDS: u64 = 5;
 
-/// How long a completed synchronization waits for its reader to resume expired dynamic holds.
-pub(crate) const DYNAMIC_RESUME_SECONDS: u64 = 120;
-
 /// How often a location asks git whether `HEAD` moved.
 pub(crate) const LOCATION_COMMIT_CHECK_SECONDS: u64 = 2;
 

@@ -4,6 +4,8 @@ from sqlbuild._native import StateSqlValueType
 
 DYNAMIC_PAUSE_SCHEMA_VERSION: int = 1
 HEARTBEAT_SECONDS: float = 60.0
+CLAIM_POLL_SECONDS: float = 1.0
+CLAIM_RUN_MARKER: str = "/claim/"
 ACTIVE_STATE: str = "ACTIVE"
 SUSPENDED_STATE: str = "SUSPENDED"
 HELD_ELSEWHERE_CODE: str = "A718"
