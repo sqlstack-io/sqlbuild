@@ -1442,13 +1442,18 @@ pub(crate) async fn read_metadata_page(
 
 /// A completed synchronization resumes expired dynamic holds, then closes its reader, so no warehouse session outlives the sync.
 pub(crate) async fn finish_metadata_page(
-    mut state: LocationMetadataSync,
+    state: LocationMetadataSync,
+    stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
-    if state.idle {
-        state = resume_expired_holds(state).await;
-        return Ok(Some(close_metadata_reader(state).await?));
+    if !state.idle {
+        return Ok(Some(state));
     }
-    Ok(Some(state))
+    tokio::pin!(stopped);
+    let state: LocationMetadataSync = tokio::select! {
+        result = &mut stopped => { result?; return Ok(None); },
+        state = resume_expired_holds(state) => state,
+    };
+    Ok(Some(close_metadata_reader(state).await?))
 }
 
 /// End of input lets the reader close its warehouse session; one that ignores it is killed.

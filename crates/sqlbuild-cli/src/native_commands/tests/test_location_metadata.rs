@@ -1382,7 +1382,7 @@ fn given_a_completed_sync_when_finishing_then_its_reader_resumes_expired_holds_o
                 );
                 state.reader =
                     Some(open_location_runtime(&options, &script, Vec::new()).expect("runtime"));
-                finish_metadata_page(state).await
+                finish_metadata_page(state, std::future::pending()).await
             })
             .expect("no control error")
             .expect("not stopped");
