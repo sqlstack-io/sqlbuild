@@ -12,10 +12,11 @@ use crate::provider_check::_helpers::blocks::blocks_for;
 use crate::provider_check::_helpers::users::missing_providers;
 use crate::provider_check::models::SecretBlock;
 
-/// The providers missing secrets that `select`/`exclude` would run, with the nodes they stop; empty when nothing is missing.
+/// The providers missing secrets that `select`/`exclude` would run, leaving out the `not_run` node keys, with the nodes they stop.
 pub fn selection_secret_blocks(
     (discovered, project): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
     (select, exclude): (&[String], &[String]),
+    not_run: &BTreeSet<String>,
 ) -> PyResult<Vec<SecretBlock>> {
     let missing = missing_providers(discovered)?;
     if missing.is_empty() {
@@ -27,7 +28,10 @@ pub fn selection_secret_blocks(
     let selection = ProjectSelection::new(project, discovered)?;
     let selected: BTreeSet<String> = selection
         .run_keys(graph.bind(py).get().graph(), select, exclude)
-        .map_err(PyValueError::new_err)?;
+        .map_err(PyValueError::new_err)?
+        .difference(not_run)
+        .cloned()
+        .collect();
     drop(view);
     blocks_for((discovered, project), (&selection, &selected), missing)
 }

@@ -6,6 +6,7 @@ use sqlbuild_python_planner::planner_phases::constants::{BUILD_HISTORY, DISCOVER
 use sqlbuild_python_planner::planner_phases::main::timing::timed::timed;
 use sqlbuild_python_planner::planner_phases::models::PlanTimingScope;
 use sqlbuild_python_planner::planner_phases::models::PlanTimings;
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use pyo3::prelude::{
@@ -446,7 +447,7 @@ fn write_output(
             options.push((CHANGED_KEY, changed_json(py, decision)?.into_any()));
         }
         let mut text: String = format_plan_json(py, Some(keywords(py, &options)?))?;
-        let blocks: Vec<SecretBlock> = cant_run(request, invocation, pipeline)?;
+        let blocks: Vec<SecretBlock> = cant_run(request, invocation, (pipeline, changed))?;
         if !blocks.is_empty() {
             let project_dir: std::path::PathBuf = invocation.project_dir.extract()?;
             let env_file: Option<String> = env_file_display(&project_dir);
@@ -493,7 +494,7 @@ fn write_output(
     }
     let text: String = format_plan(py, Some(keywords(py, &options)?))?;
     print_line(py, &format!("\n{text}"))?;
-    let blocks: Vec<SecretBlock> = cant_run(request, invocation, pipeline)?;
+    let blocks: Vec<SecretBlock> = cant_run(request, invocation, (pipeline, changed))?;
     if !blocks.is_empty() {
         let missing_from: String =
             secret_places(&invocation.project_dir.extract::<std::path::PathBuf>()?);
@@ -628,18 +629,24 @@ fn with_field(document: String, key: &str, value: &serde_json::Value) -> String 
     }
 }
 
-/// The planned selection's nodes that can't run because a provider they use is missing secrets.
+/// The nodes the plan runs that can't, because a provider they use is missing secrets; `--changed` leaves some unbuilt anyway.
 fn cant_run(
     request: &Bound<'_, PyAny>,
     invocation: &PlanInvocation<'_>,
-    pipeline: &Bound<'_, PyAny>,
+    (pipeline, changed): (&Bound<'_, PyAny>, Option<&ChangedDecision>),
 ) -> PyResult<Vec<SecretBlock>> {
+    let not_run: BTreeSet<String> = changed
+        .into_iter()
+        .flat_map(ChangedDecision::not_run)
+        .map(|key| format!("{}:{}", key.kind, key.name))
+        .collect();
     selection_secret_blocks(
         (&invocation.discovered, &native_field(pipeline, "project")?),
         (
             &selectors(request, "select")?,
             &selectors(request, "exclude")?,
         ),
+        &not_run,
     )
 }
 

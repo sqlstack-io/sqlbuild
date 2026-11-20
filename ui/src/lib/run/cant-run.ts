@@ -31,7 +31,7 @@ export function sinkLines(entries: PlanCantRun[]): string[] {
 /** Whether a sink's missing secret stops the whole plan, so leaving nodes out can't help. */
 export const sinkBlocks = (entries: PlanCantRun[]) => entries.some((e) => (e.sinks ?? []).length > 0);
 
-/** The plan's Will run count without the nodes it can't run. */
+/** The plan's Will run count without the nodes it can't run; `cant_run` lists only nodes the plan runs, never ones held back or skipped. */
 export const willRunCount = (run: number, entries: PlanCantRun[]) => (sinkBlocks(entries) ? 0 : Math.max(0, run - cantRunKeys(entries).length));
 
 /** Why Run is disabled: "Run is disabled: 1 missing secret. Fix it and plan again, or leave those 3 nodes out." */

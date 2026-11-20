@@ -168,6 +168,7 @@ fn require_selected_secrets(
             &selectors(options, "select")?,
             &selectors(options, "exclude")?,
         ),
+        &std::collections::BTreeSet::new(),
     )?;
     if blocks.is_empty() {
         return Ok(());

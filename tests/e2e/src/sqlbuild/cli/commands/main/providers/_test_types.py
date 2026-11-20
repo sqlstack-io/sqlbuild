@@ -185,3 +185,13 @@ class ProjectDirSpellingTestCase:
     # The `--project-dir` argument for the project, such as a symlink to it or a relative path.
     project_argument: Callable[[Path], Path]
     expected_output_fragment: str
+
+
+@dataclass(frozen=True)
+class ChangedCantRunTestCase:
+    description: str
+    # Selectors built once with the secret set, then planned with --changed without it.
+    select: str
+    expected_cant_run_nodes: list[str]
+    expected_cant_run_readers: list[str]
+    expected_unchanged: list[str]

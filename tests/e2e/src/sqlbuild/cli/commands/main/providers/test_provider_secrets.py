@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from textwrap import dedent
@@ -9,6 +10,7 @@ from textwrap import dedent
 import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.providers._test_types import (
+    ChangedCantRunTestCase,
     ProjectDirSpellingTestCase,
     ProviderCommandDiagnosticE2ETestCase,
     ProviderSecretE2ETestCase,
@@ -554,3 +556,48 @@ def test_given_a_project_dir_spelling_when_a_secret_is_missing_then_the_env_file
     output: str = result.stdout + result.stderr
     assert result.returncode == 1, output
     assert test_case.expected_output_fragment in output, output
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ChangedCantRunTestCase(
+            description="an unchanged reader that --changed skips is not counted as can't run",
+            select="+api_events",
+            expected_cant_run_nodes=["source:raw_api_events"],
+            expected_cant_run_readers=[],
+            expected_unchanged=["model:api_events"],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_changed_plan_when_a_secret_is_missing_then_only_nodes_it_runs_cant_run(
+    test_case: ChangedCantRunTestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="provider_secret_project",
+        repo_files={**PROJECT_FILES, **READING_MODEL, **TARGET_ALLOWS_API},
+    )
+    marker: dict[str, str] = {"MARKER_PATH": str(tmp_path / "marker.log")}
+    built: subprocess.CompletedProcess[str] = run_sqb(
+        command=(*BUILD, test_case.select),
+        project_dir=project_dir,
+        env=marker | {SECRET_VARIABLE: "token"},
+    )
+    assert built.returncode == 0, built.stdout + built.stderr
+
+    planned: subprocess.CompletedProcess[str] = run_sqb(
+        command=("plan", "--json", "--changed", "--select", test_case.select),
+        project_dir=project_dir,
+        env=marker,
+    )
+
+    assert planned.returncode == 0, planned.stderr
+    document: dict[str, object] = json.loads(planned.stdout)
+    changed: dict[str, list[str]] = document["changed"]  # type: ignore[assignment]
+    cant_run: list[dict[str, list[str]]] = document["cant_run"]  # type: ignore[assignment]
+    assert changed["unchanged"] == test_case.expected_unchanged, planned.stdout
+    assert [entry["nodes"] for entry in cant_run] == [test_case.expected_cant_run_nodes]
+    assert [entry["readers"] for entry in cant_run] == [test_case.expected_cant_run_readers]
