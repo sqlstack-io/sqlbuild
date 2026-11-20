@@ -14,7 +14,7 @@ use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// One page of finished rows of `kind` (`node` or `check`) in the scope, in `direction`'s order.
+/// One page of finished rows in the scope, in `direction`'s order: started nodes and checks of job runs for `node_event`, or checks for `check_event`.
 async fn finished_rows(
     transaction: ControlTransaction,
     scope: EventScope<'_>,
@@ -25,7 +25,7 @@ async fn finished_rows(
     let started = if kind == "node" {
         " AND n.started_at IS NOT NULL AND r.kind<>'group'"
     } else {
-        ""
+        " AND n.kind='check'"
     };
     let (transaction, rows) = query(
         transaction,
@@ -33,7 +33,7 @@ async fn finished_rows(
             "SELECT n.run_id,n.node_key,n.status,n.finished_storage_id,r.job_key,\
              COALESCE(n.ended_at, r.ended_at, r.queued_at) AS occurred_at FROM sqb_run_nodes n \
              JOIN sqb_runs r ON r.run_id=n.run_id \
-             WHERE n.finished_storage_id IS NOT NULL AND n.kind='{kind}' AND n.status IN ({statuses}){started} \
+             WHERE n.finished_storage_id IS NOT NULL AND n.status IN ({statuses}){started} \
              AND r.location_id=$2 AND r.target=$3 AND {clause} LIMIT {EVENT_PAGE_SIZE}"
         ),
         vec![

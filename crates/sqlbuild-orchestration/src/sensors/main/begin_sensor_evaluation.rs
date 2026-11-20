@@ -55,10 +55,14 @@ pub async fn begin_sensor_evaluation(
             )
             .await?;
         }
-        let delivered = terminal.as_deref() == Some(SensorEvaluationOutcome::COMPLETED)
-            && previous.request.event.is_some();
+        let retry_now = match terminal.as_deref() {
+            None => previous.request.epoch == lease.epoch,
+            Some(SensorEvaluationOutcome::ABANDONED) => true,
+            Some(SensorEvaluationOutcome::COMPLETED) => previous.request.event.is_some(),
+            Some(_) => false,
+        };
         let next = previous.request.requested_at + interval;
-        if !delivered && next > now {
+        if !retry_now && next > now {
             commit(defer_sensor(transaction, trigger_id, next).await?).await?;
             return Ok(None);
         }

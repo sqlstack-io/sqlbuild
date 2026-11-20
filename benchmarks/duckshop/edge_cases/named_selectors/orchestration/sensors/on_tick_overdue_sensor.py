@@ -2,11 +2,12 @@
 
 from orchestration.sensors._orders_conditions import TICK_OVERDUE
 
-from sqlbuild.orchestration import sensor
+from sqlbuild.orchestration import RunRequest, sensor
 
-on_tick_overdue = sensor(
-    "on_tick_overdue_sensor",
+
+@sensor(
     description="Repair orders after an overdue tick",
     when=TICK_OVERDUE,
-    run="orders_repair_job",
 )
+def on_tick_overdue_sensor(ctx):
+    return RunRequest(job="orders_repair_job")

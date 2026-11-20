@@ -1340,7 +1340,8 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             expected_sensors={
                 "edge_platform_orders_sensor": {
                     "description": "Catch up retained platform observations with a stopped group sensor.",
-                    "job_key": "edge_snapshot_job_group",
+                    "function": "edge_platform_orders_sensor",
+                    "timeout_seconds": 60,
                     "when": {
                         "kind": "platform_event",
                         "kinds": ["tick_overdue", "location_broken", "launch_failed"],
@@ -1349,12 +1350,13 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     "default_status": "paused",
                     "declared_at": {
                         "path": "orchestration/sensors/edge_cases/edge_platform_orders_sensor.py",
-                        "line": 5,
+                        "line": 6,
                     },
                 },
                 "edge_job_outcomes_sensor": {
                     "description": "Keep warning and partial outcomes distinct from success.",
-                    "job_key": "edge_snapshot_inventory_job",
+                    "function": "edge_job_outcomes_sensor",
+                    "timeout_seconds": 60,
                     "when": {
                         "kind": "run_event",
                         "job_key": "edge_snapshot_orders_job",
@@ -1364,12 +1366,13 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     "default_status": "paused",
                     "declared_at": {
                         "path": "orchestration/sensors/edge_cases/edge_job_outcomes_sensor.py",
-                        "line": 5,
+                        "line": 6,
                     },
                 },
                 "edge_group_outcomes_sensor": {
                     "description": "Observe group completion including cancellation and presumed failure.",
-                    "job_key": "edge_snapshot_inventory_job",
+                    "function": "edge_group_outcomes_sensor",
+                    "timeout_seconds": 60,
                     "when": {
                         "kind": "run_event",
                         "job_key": "edge_snapshot_job_group",
@@ -1380,7 +1383,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     "default_status": "paused",
                     "declared_at": {
                         "path": "orchestration/sensors/edge_cases/edge_group_outcomes_sensor.py",
-                        "line": 5,
+                        "line": 6,
                     },
                 },
             },
@@ -1416,17 +1419,17 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     'jobs = ["source_orders_job"]\n'
                 ),
                 "orchestration/sensors/on_orders_sensor.py": (
-                    "from sqlbuild.orchestration import RunEventKind, run_event, sensor\n"
-                    "on_orders = sensor(\n"
-                    "    'on_orders_sensor',\n"
+                    "from sqlbuild.orchestration import RunRequest, RunEventKind, run_event, sensor\n"
+                    "@sensor(\n"
                     "    description='Build inventory after group completion.',\n"
                     "    when=run_event(\n"
                     "        job='source_job_group',\n"
                     "        kinds=[RunEventKind.COMPLETED],\n"
                     "        executed_successfully=('orders', 'orders*'),\n"
                     "    ),\n"
-                    "    run='inventory_job',\n"
                     ")\n"
+                    "def on_orders_sensor(ctx):\n"
+                    "    return RunRequest(job='inventory_job')\n"
                 ),
             },
             expected_jobs=("inventory_job", "source_orders_job"),
@@ -1434,7 +1437,8 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             expected_sensors={
                 "on_orders_sensor": {
                     "description": "Build inventory after group completion.",
-                    "job_key": "inventory_job",
+                    "function": "on_orders_sensor",
+                    "timeout_seconds": 60,
                     "when": {
                         "kind": "run_event",
                         "job_key": "source_job_group",
@@ -1461,13 +1465,13 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     'jobs = ["source_orders_job"]\n'
                 ),
                 "orchestration/sensors/on_orders_sensor.py": (
-                    "from sqlbuild.orchestration import RunEventKind, run_event, sensor\n"
-                    "on_orders = sensor(\n"
-                    "    'on_orders_sensor',\n"
+                    "from sqlbuild.orchestration import RunRequest, RunEventKind, run_event, sensor\n"
+                    "@sensor(\n"
                     "    description='Build inventory when the group skips orders.',\n"
                     "    when=run_event(job='source_orders_job', kinds=[RunEventKind.SKIPPED]),\n"
-                    "    run='inventory_job',\n"
                     ")\n"
+                    "def on_orders_sensor(ctx):\n"
+                    "    return RunRequest(job='inventory_job')\n"
                 ),
             },
             expected_jobs=("inventory_job", "source_orders_job"),
@@ -1475,7 +1479,8 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             expected_sensors={
                 "on_orders_sensor": {
                     "description": "Build inventory when the group skips orders.",
-                    "job_key": "inventory_job",
+                    "function": "on_orders_sensor",
+                    "timeout_seconds": 60,
                     "when": {
                         "kind": "run_event",
                         "job_key": "source_orders_job",
@@ -1494,7 +1499,8 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             expected_sensors={
                 "on_orders_sensor": {
                     "description": "Build inventory for every genuine orders rebuild.",
-                    "job_key": "inventory_job",
+                    "function": "on_orders_sensor",
+                    "timeout_seconds": 60,
                     "when": {
                         "kind": "node_event",
                         "selection": ["model:orders"],
@@ -1502,7 +1508,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "running",
-                    "declared_at": {"path": "orchestration/sensors/on_orders_sensor.py", "line": 5},
+                    "declared_at": {"path": "orchestration/sensors/on_orders_sensor.py", "line": 6},
                 }
             },
         ),
@@ -1513,7 +1519,8 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             expected_sensors={
                 "on_orders_sensor": {
                     "description": "Build inventory for every genuine orders rebuild.",
-                    "job_key": "inventory_job",
+                    "function": "on_orders_sensor",
+                    "timeout_seconds": 60,
                     "when": {
                         "kind": "node_event",
                         "selection": ["model:orders"],
@@ -1523,7 +1530,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     "default_status": "running",
                     "declared_at": {
                         "path": "orchestration/sensors/inventory/on_orders_sensor.py",
-                        "line": 7,
+                        "line": 8,
                     },
                 }
             },
@@ -1542,7 +1549,8 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             expected_sensors={
                 "on_orders_sensor": {
                     "description": "Build inventory for every genuine orders rebuild.",
-                    "job_key": "inventory_job",
+                    "function": "on_orders_sensor",
+                    "timeout_seconds": 60,
                     "when": {
                         "kind": "node_event",
                         "selection": ["model:orders"],
@@ -1550,7 +1558,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "running",
-                    "declared_at": {"path": "orchestration/sensors/on_orders_sensor.py", "line": 5},
+                    "declared_at": {"path": "orchestration/sensors/on_orders_sensor.py", "line": 6},
                 }
             },
         ),
@@ -1566,13 +1574,14 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             expected_sensors={
                 "on_source_orders_sensor": {
                     "description": "Refresh orders for the first source version and each changed version.",
-                    "job_key": "orders_refresh_job",
+                    "function": "on_source_orders_sensor",
+                    "timeout_seconds": 60,
                     "when": {"kind": "source_new_data", "selection": ["source:raw_orders"]},
                     "minimum_interval_seconds": 1,
                     "default_status": "running",
                     "declared_at": {
                         "path": "orchestration/sensors/on_source_orders_sensor.py",
-                        "line": 5,
+                        "line": 6,
                     },
                 }
             },
@@ -1589,7 +1598,8 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             expected_sensors={
                 "on_stale_orders_sensor": {
                     "description": "Refresh orders once for each timestamp version older than one minute.",
-                    "job_key": "orders_refresh_job",
+                    "function": "on_stale_orders_sensor",
+                    "timeout_seconds": 60,
                     "when": {
                         "kind": "source_stale",
                         "selection": ["source:raw_orders"],
@@ -1599,7 +1609,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     "default_status": "running",
                     "declared_at": {
                         "path": "orchestration/sensors/on_stale_orders_sensor.py",
-                        "line": 5,
+                        "line": 6,
                     },
                 }
             },
@@ -1611,7 +1621,8 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             expected_sensors={
                 "on_orders_sensor": {
                     "description": "Build inventory only after orders actually succeeds.",
-                    "job_key": "inventory_job",
+                    "function": "on_orders_sensor",
+                    "timeout_seconds": 60,
                     "when": {
                         "kind": "run_event",
                         "job_key": "source_orders_job",
@@ -1620,7 +1631,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "running",
-                    "declared_at": {"path": "orchestration/sensors/on_orders_sensor.py", "line": 5},
+                    "declared_at": {"path": "orchestration/sensors/on_orders_sensor.py", "line": 6},
                 }
             },
         ),
@@ -1631,14 +1642,15 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             expected_sensors={
                 "overdue_orders_sensor": {
                     "description": "Catch up overdue order reporting.",
-                    "job_key": "health_orders_job",
+                    "function": "overdue_orders_sensor",
+                    "timeout_seconds": 60,
                     "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
                     "minimum_interval_seconds": 7,
                     "default_status": "paused",
                     "targets": ["development"],
                     "declared_at": {
                         "path": "orchestration/sensors/overdue_orders_sensor.py",
-                        "line": 8,
+                        "line": 6,
                     },
                 }
             },
@@ -1674,9 +1686,12 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         name: definition["jobs"]
         for name, definition in publication["documents"].get("groups", {}).items()
     } == test_case.expected_groups
-    assert {
-        name: publication["documents"]["triggers"][name] for name in test_case.expected_sensors
-    } == test_case.expected_sensors
+    sensors: dict[str, dict[str, Any]] = {
+        name: dict(publication["documents"]["triggers"][name])
+        for name in test_case.expected_sensors
+    }
+    assert all(len(sensor.pop("code_hash")) == 64 for sensor in sensors.values())
+    assert sensors == test_case.expected_sensors
     assert tuple(publication["documents"].get("triggers", {})) == tuple(
         sorted((*test_case.expected_schedules, *test_case.expected_sensors))
     )
@@ -1719,10 +1734,10 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
                     'name = "refresh_orders_job"\ndescription = "Build orders."\nselect = "orders"\n'
                 ),
                 "orchestration/sensors/overdue_sensor.py": (
-                    "from sqlbuild.orchestration import PlatformEventKind, platform_event, sensor\n"
-                    "SENSORS = {'overdue': sensor('overdue_sensor', description='Catch up.', "
-                    "when=platform_event(kinds=[PlatformEventKind.TICK_OVERDUE]), "
-                    "run='refresh_orders_job')}\n"
+                    "from sqlbuild.orchestration import PlatformEventKind, RunRequest, platform_event, sensor\n"
+                    "if False:\n"
+                    "    @sensor(description='Catch up.', when=platform_event(kinds=[PlatformEventKind.TICK_OVERDUE]))\n"
+                    "    def overdue_sensor(ctx):\n        return RunRequest(job='refresh_orders_job')\n"
                 ),
             },
             expected_error=ValueError,
@@ -1732,34 +1747,18 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             ),
         ),
         SnapshotDiscoveryRejectionTestCase(
-            description="a polling sensor needs an actual callback",
+            description="a sensor call that decorates no function cannot publish",
             files={
                 "orchestration/jobs/refresh_orders_job.toml": (
                     'name = "refresh_orders_job"\ndescription = "Build orders."\nselect = "orders"\n'
                 ),
                 "orchestration/sensors/poll_sensor.py": (
                     "from sqlbuild.orchestration import sensor\n"
-                    "poll = sensor('poll_sensor', description='Poll orders.', run='refresh_orders_job')\n"
+                    "poll_sensor = sensor(description='Poll orders.')\n"
                 ),
             },
             expected_error=ValueError,
-            expected_message="either a built-in condition or a decorated polling callback",
-        ),
-        SnapshotDiscoveryRejectionTestCase(
-            description="callbacks with event conditions remain explicitly unsupported",
-            files={
-                "orchestration/jobs/refresh_orders_job.toml": (
-                    'name = "refresh_orders_job"\ndescription = "Build orders."\nselect = "orders"\n'
-                ),
-                "orchestration/sensors/poll_sensor.py": (
-                    "from sqlbuild.orchestration import sensor, platform_event, PlatformEventKind\n"
-                    "@sensor('poll_sensor', description='Poll orders.', run='refresh_orders_job', "
-                    "when=platform_event(kinds=[PlatformEventKind.TICK_OVERDUE]))\n"
-                    "def poll(ctx):\n    return []\n"
-                ),
-            },
-            expected_error=ValueError,
-            expected_message="callbacks with when are not supported yet",
+            expected_message="sensor\\(\\.\\.\\.\\) must decorate a function",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="a job description past max_description_lines cannot publish",
@@ -2076,7 +2075,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
                 )
             },
             expected_error=ValueError,
-            expected_message="executed_successfully must select nonempty source job/group nodes",
+            expected_message="executed_successfully nonempty nodes it selects",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="sensor code defaults use running or paused",

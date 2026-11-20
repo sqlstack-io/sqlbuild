@@ -8,11 +8,9 @@ STALE_REASON: str = "Stock feed is fresh"
 
 
 @sensor(
-    "stock_feed_stale_sensor",
     description="Count stock when the supplier feed goes stale.",
-    run="stock_count_job",
     minimum_interval_seconds=60,
 )
-def stock_feed_stale(ctx: SensorContext) -> SkipReason:
+def stock_feed_stale_sensor(ctx: SensorContext[None]) -> SkipReason:
     """Count stock when the supplier feed goes stale."""
     return SkipReason(f"{STALE_REASON} {python.report.__name__}")

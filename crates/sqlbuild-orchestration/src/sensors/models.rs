@@ -384,6 +384,7 @@ pub struct SensorRequests {
 
 impl SensorEvaluationOutcome {
     pub(crate) const COMPLETED: &'static str = "completed";
+    pub(crate) const ABANDONED: &'static str = "abandoned";
 
     #[must_use]
     pub const fn phase(&self) -> &'static str {

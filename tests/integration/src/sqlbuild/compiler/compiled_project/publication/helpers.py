@@ -16,7 +16,14 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable, Iterator
-from contextlib import AbstractContextManager, closing, contextmanager, nullcontext, suppress
+from contextlib import (
+    AbstractContextManager,
+    ExitStack,
+    closing,
+    contextmanager,
+    nullcontext,
+    suppress,
+)
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from io import StringIO
@@ -900,8 +907,12 @@ def scheduled_worker(
     test_case: WorkerExecutionTestCase,
     *,
     server_arguments: tuple[str, ...] = (),
+    serve_sensors: bool = True,
 ) -> Iterator[ScheduledWorker]:
-    """Declare, publish and schedule isolated DuckDB work without provisioning claims."""
+    """Declare, publish and schedule isolated DuckDB work without provisioning claims.
+
+    A project with sensors also gets a serving location, which runs their functions.
+    """
     project: Path = directory / "project"
     write_files(
         project_dir=project,
@@ -991,18 +1002,44 @@ def scheduled_worker(
             "http://127.0.0.1:1/audit?token=synthetic-audit-credential",
         )
         log: Path = directory / "scheduler.log"
-        with location_process(
-            [
-                executable,
-                "scheduler",
-                "--database-env",
-                "SQLBUILD_SCHEDULER_TEST_STORE",
-                "--config",
-                str(configuration),
-            ],
-            log,
-            directory / "scheduler.stdout",
-        ) as process:
+        with ExitStack() as serving:
+            if serve_sensors and any(
+                path.startswith("orchestration/sensors/") for path in test_case.files
+            ):
+                _ = serving.enter_context(
+                    location_process(
+                        [
+                            executable,
+                            "--project-dir",
+                            str(project),
+                            "location",
+                            "serve",
+                            "--server",
+                            api.url,
+                            "--location-id",
+                            api.location_id,
+                            "--target",
+                            "development",
+                        ],
+                        directory / "location.log",
+                        directory / "location.stdout",
+                        env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+                    )
+                )
+            process: subprocess.Popen[bytes] = serving.enter_context(
+                location_process(
+                    [
+                        executable,
+                        "scheduler",
+                        "--database-env",
+                        "SQLBUILD_SCHEDULER_TEST_STORE",
+                        "--config",
+                        str(configuration),
+                    ],
+                    log,
+                    directory / "scheduler.stdout",
+                )
+            )
             yield ScheduledWorker(api, project, control_store, process, log, deployment.docker)
 
 

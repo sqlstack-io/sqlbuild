@@ -91,10 +91,10 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
                     'jobs = ["marts_job", "staging_job"]\n'
                 ),
                 "orchestration/sensors/health_orders_sensor.py": (
-                    "from sqlbuild.orchestration import PlatformEventKind, platform_event, sensor\n"
-                    "health_orders = sensor('health_orders_sensor', description='Refresh on platform heartbeat.', "
-                    "when=platform_event(kinds=[PlatformEventKind.HEARTBEAT]), run='annual_orders_job_group', "
-                    "minimum_interval_seconds=60)\n"
+                    "from sqlbuild.orchestration import PlatformEventKind, RunRequest, platform_event, sensor\n"
+                    "@sensor(description='Refresh on platform heartbeat.', "
+                    "when=platform_event(kinds=[PlatformEventKind.HEARTBEAT]), minimum_interval_seconds=60)\n"
+                    "def health_orders_sensor(ctx):\n    return RunRequest(job='annual_orders_job_group')\n"
                 ),
             },
         ),
@@ -883,10 +883,10 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
                     'name = "annual_orders_job"\ndescription = "Build orders."\nselect = "orders"\n'
                 ),
                 "orchestration/sensors/health_orders_sensor.py": (
-                    "from sqlbuild.orchestration import PlatformEventKind, platform_event, sensor\n"
-                    "health_orders = sensor('health_orders_sensor', description='Refresh on platform heartbeat.', "
-                    "when=platform_event(kinds=[PlatformEventKind.HEARTBEAT]), run='annual_orders_job', "
-                    "minimum_interval_seconds=60)\n"
+                    "from sqlbuild.orchestration import PlatformEventKind, RunRequest, platform_event, sensor\n"
+                    "@sensor(description='Refresh on platform heartbeat.', "
+                    "when=platform_event(kinds=[PlatformEventKind.HEARTBEAT]), minimum_interval_seconds=60)\n"
+                    "def health_orders_sensor(ctx):\n    return RunRequest(job='annual_orders_job')\n"
                 ),
             },
         ),
@@ -1330,7 +1330,12 @@ def test_given_an_attached_check_failure_when_a_sensor_observes_it_then_its_dest
         )
         assert destination["status"] == test_case.expected_status, worker.log.read_text()
         assert destination["selection_json"] == ["model:inventory"]
-        assert destination["snapshot_id"] == source["snapshot_id"]
+        with sqlite3.connect(worker.control_store) as control:
+            generations: dict[str, int] = dict(
+                control.execute("SELECT snapshot_id, generation FROM sqb_snapshots").fetchall()
+            )
+        # The serving location that runs the sensor's function republishes the same code.
+        assert generations[destination["snapshot_id"]] >= generations[source["snapshot_id"]]
         assert source["selection_json"] == ["model:orders"]
         with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
             assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
@@ -1378,18 +1383,22 @@ def test_given_an_attached_check_query_when_cancelled_then_it_cannot_trigger_fai
                 (run["run_id"],),
             ).fetchall()
             assert outcomes == [("cancelled",)]
-            completed_query: str = (
-                "SELECT count(*) FROM sqb_sensor_evaluation_events WHERE phase='completed'"
+            due_query: str = (
+                "SELECT s.next_due_at FROM sqb_trigger_state s "
+                "JOIN sqb_triggers t ON t.trigger_id=s.trigger_id "
+                "WHERE t.name='failed_orders_sensor'"
             )
-            # Two more completions mean at least one evaluation started after the outcome.
-            target: int = control.execute(completed_query).fetchone()[0] + 2
+            # A scan with no matching event moves the next due time on; two mean one started after the outcome.
+            seen: set[str] = {control.execute(due_query).fetchone()[0]}
             deadline: float = time.monotonic() + 15
-            evaluated: int = 0
-            while evaluated < target:
+            while len(seen) < 3:
                 assert worker.process.poll() is None, worker.log.read_text()
                 assert time.monotonic() < deadline, worker.log.read_text()
-                evaluated = control.execute(completed_query).fetchone()[0]
+                seen.add(control.execute(due_query).fetchone()[0])
                 time.sleep(0.02)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_sensor_evaluation_events"
+            ).fetchone() == (0,), "a cancelled check is no event, so no tick is recorded"
             assert control.execute("SELECT count(*) FROM sqb_run_requests").fetchone() == (0,)
             assert control.execute(
                 "SELECT count(*) FROM sqb_runs WHERE job_key='refresh_inventory'"
@@ -1425,10 +1434,11 @@ def test_given_an_attached_check_query_when_cancelled_then_it_cannot_trigger_fai
                     "\n[settings]\nreload = true\n"
                 ),
                 "orchestration/sensors/on_group_sensor.py": (
-                    "from sqlbuild.orchestration import RunEventKind, run_event, sensor\n"
-                    "on_group = sensor('on_group_sensor', description='Refresh after group completion.', "
+                    "from sqlbuild.orchestration import RunEventKind, RunRequest, run_event, sensor\n"
+                    "@sensor(description='Refresh after group completion.', "
                     "when=run_event(job='source_job_group', kinds=[RunEventKind.COMPLETED, RunEventKind.SUCCESS], executed_successfully=('orders',)), "
-                    "run='annual_orders_job', minimum_interval_seconds=1)\n"
+                    "minimum_interval_seconds=1)\n"
+                    "def on_group_sensor(ctx):\n    return RunRequest(job='annual_orders_job')\n"
                 ),
             },
         )
@@ -1448,9 +1458,11 @@ def test_given_a_real_group_completion_when_a_run_sensor_matches_then_one_destin
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute("SELECT run_key,run_id FROM sqb_run_requests").fetchall() == [
                 (
-                    control.execute(
+                    "run:"
+                    + control.execute(
                         "SELECT run_id FROM sqb_runs WHERE job_key='source_job_group'"
-                    ).fetchone()[0],
+                    ).fetchone()[0]
+                    + ":annual_orders_job",
                     destination["run_id"],
                 )
             ]
@@ -1491,10 +1503,10 @@ def test_given_a_real_group_completion_when_a_run_sensor_matches_then_one_destin
                     "\n[settings]\nreload = true\n"
                 ),
                 "orchestration/sensors/on_node_sensor.py": (
-                    "from sqlbuild.orchestration import NodeEventKind, node_event, sensor\n"
-                    "on_node = sensor('on_node_sensor', description='React to actual orders rebuilds.', "
-                    "when=node_event(select='orders', kinds=[NodeEventKind.SUCCESS]), "
-                    "run='annual_orders_job', minimum_interval_seconds=1)\n"
+                    "from sqlbuild.orchestration import NodeEventKind, RunRequest, node_event, sensor\n"
+                    "@sensor(description='React to actual orders rebuilds.', "
+                    "when=node_event(select='orders', kinds=[NodeEventKind.SUCCESS]), minimum_interval_seconds=1)\n"
+                    "def on_node_sensor(ctx):\n    return RunRequest(job='annual_orders_job')\n"
                 ),
             },
         )
@@ -1521,10 +1533,11 @@ def test_given_a_real_group_child_rebuild_when_a_node_sensor_matches_then_only_t
                 "SELECT q.run_key,q.run_id FROM sqb_run_requests q"
             ).fetchall() == [
                 (
-                    control.execute(
+                    "node:"
+                    + control.execute(
                         "SELECT run_id FROM sqb_runs WHERE job_key='source_orders_job'"
                     ).fetchone()[0]
-                    + "/model:orders",
+                    + ":model:orders:annual_orders_job",
                     destination["run_id"],
                 )
             ]

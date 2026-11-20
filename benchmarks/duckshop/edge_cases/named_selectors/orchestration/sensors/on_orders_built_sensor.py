@@ -2,11 +2,12 @@
 
 from orchestration.sensors._orders_conditions import landed_after
 
-from sqlbuild.orchestration import sensor
+from sqlbuild.orchestration import RunRequest, sensor
 
-on_orders_built = sensor(
-    "on_orders_built_sensor",
+
+@sensor(
     description="Refresh order totals after the totals model",
     when=landed_after("order_totals"),
-    run="orders_folder_job",
 )
+def on_orders_built_sensor(ctx):
+    return RunRequest(job="orders_folder_job")
