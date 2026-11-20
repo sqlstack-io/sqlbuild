@@ -213,6 +213,17 @@ def build_lease_project(
     )
 
 
+def heartbeat_count(*, connection: Any, run_id: str) -> int:
+    """How many heartbeats the run `run_id` has recorded in the staging pause table."""
+
+    rows: list[tuple[Any, ...]] = connection.execute(
+        "SELECT count(*) FROM staging._sqlbuild_dynamic_pauses "
+        "WHERE event_type = 'heartbeat' AND run_id = ?",
+        [run_id],
+    ).fetchall()
+    return int(rows[0][0])
+
+
 def pause_events(*, connection: Any) -> list[tuple[str, str, str, str]]:
     """Each recorded pause event's type, holding run, recording run and model, sorted."""
 

@@ -134,6 +134,12 @@ class SyncDuringTakeoverTestCase:
 
 
 @dataclass(frozen=True)
+class StaleSyncResumeTestCase:
+    description: str
+    expected_states: dict[str, str]
+
+
+@dataclass(frozen=True)
 class RefusedResumeTestCase:
     description: str
     refused: frozenset[str]

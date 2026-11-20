@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,7 @@ from tests.integration.src.sqlbuild.executor.dynamic_pauses._test_types import (
     DoubleCloseTestCase,
     QuietTokenTestCase,
     RefusedResumeTestCase,
+    StaleSyncResumeTestCase,
     SyncDuringTakeoverTestCase,
     SyncResumeTestCase,
 )
@@ -32,6 +34,7 @@ from tests.integration.src.sqlbuild.executor.dynamic_pauses.helpers import (
     SyncDuringTakeoverAdapter,
     TokenPausingDuckDbAdapter,
     build_lease_project,
+    heartbeat_count,
     lease_project_case,
     pause_event_ids,
     pause_events,
@@ -387,23 +390,24 @@ def test_given_one_refused_resume_when_a_location_syncs_then_the_other_holds_sti
     strict=True,
     reason=(
         "A sync that read the holds before a build took one over still resumes the model after "
-        "the build's state check. Whether to close this gap, and how, waits on the owner's "
+        "the build's state check, and nothing suspends it again. The test waits two of the "
+        "build's heartbeats after the sync's pass, so a fix in the sync or in the heartbeat "
+        "turns it into an XPASS. Whether to close this gap, and how, waits on the owner's "
         "decision on the sync/takeover race (CHI-1569 review, finding 1)."
     ),
 )
 @pytest.mark.parametrize(
     "test_case",
     [
-        SyncDuringTakeoverTestCase(
+        StaleSyncResumeTestCase(
             description="a sync resuming from a stale read after the build's state check",
-            expected_operations=(("resume", "daily_totals"),),
             expected_states={"daily_totals": "SUSPENDED"},
         ),
     ],
     ids=lambda case: case.description,
 )
 def test_given_a_sync_resuming_after_the_takeover_state_check_when_the_build_holds_then_the_model_stays_paused(
-    test_case: SyncDuringTakeoverTestCase,
+    test_case: StaleSyncResumeTestCase,
     adapter: PausingDuckDbAdapter,
     connection: Any,
     database_path: Path,
@@ -443,10 +447,10 @@ def test_given_a_sync_resuming_after_the_takeover_state_check_when_the_build_hol
         adapter=adapter,
         runtime=BuildRuntimeParams(run_id="second_run", dynamic_heartbeat_grace_seconds=0),
         connection_config={"database": str(database_path)},
+        heartbeat_seconds=0.05,
     )
     assert taking_over is not None
     taking_over.acquire(connection=connection, on_progress=None)
-    adapter.operations.clear()
 
     _ = resume_holds(
         adapter=adapter,
@@ -455,9 +459,12 @@ def test_given_a_sync_resuming_after_the_takeover_state_check_when_the_build_hol
         holds=stale,
         recorded_by=_SYNC,
     )
+    beats_after_pass: int = heartbeat_count(connection=connection, run_id="second_run") + 2
+    deadline: float = time.monotonic() + 10
+    while heartbeat_count(connection=connection, run_id="second_run") < beats_after_pass:
+        assert time.monotonic() < deadline, "the taking-over build stopped heartbeating"
+        time.sleep(0.02)
     states: dict[str, str] = dict(adapter.states)
-    operations: tuple[tuple[str, str], ...] = tuple(adapter.operations)
     taking_over.release(connection=connection)
 
-    assert operations == test_case.expected_operations
     assert states == test_case.expected_states
