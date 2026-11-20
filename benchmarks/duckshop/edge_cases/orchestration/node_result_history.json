@@ -2,7 +2,7 @@
   "record": {
     "state_database": null,
     "state_schema": "main",
-    "node_type": "task",
+    "node_type": "asset",
     "node_name": "result-000",
     "target_database": null,
     "target_schema": "main",

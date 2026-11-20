@@ -411,7 +411,7 @@ def test_given_sqlserver_dbt_profile_when_running_dbt_init_then_builds_profile_l
             description="direct node results persist and read on SQL Server",
             expected_rows=(
                 ("check", "check_produce_result", "success"),
-                ("task", "produce_result", "success"),
+                ("asset", "produce_result", "success"),
             ),
         )
     ],

@@ -1463,9 +1463,9 @@ RUN_RECORD_MARTS_FILES: dict[str, str] = {
         "  enabled false, schema archive);\nSELECT 1 AS order_id\n"
     ),
     "python/noop.py": (
-        '"""A task that writes no relation."""\n\n'
-        "from sqlbuild.tasks import task\n\n\n"
-        "@task()\n"
+        '"""An asset that writes no relation."""\n\n'
+        "from sqlbuild.assets import asset\n\n\n"
+        "@asset()\n"
         "def noop(ctx):\n"
         '    """Do nothing."""\n'
     ),
@@ -1655,8 +1655,8 @@ def write_job_warehouse_project(*, project_dir: Path) -> None:
             "models/orders_daily.sql": _job_warehouse_model(' FROM __ref("orders")'),
             "models/refunds.sql": _job_warehouse_model(' FROM __ref("orders_daily")'),
             "models/summary.sql": _job_warehouse_model(' FROM __ref("refunds")'),
-            "python/tasks.py": (
-                "from sqlbuild.tasks import task\n\n\n@task\ndef refresh_marker(ctx):\n"
+            "python/assets.py": (
+                "from sqlbuild.assets import asset\n\n\n@asset\ndef refresh_marker(ctx):\n"
                 '    """Refresh."""\n    ctx.execute_sql("SELECT \'task marker\'")\n'
             ),
             "orchestration/jobs/orders_wh_job.toml": _job_file(

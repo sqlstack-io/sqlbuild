@@ -33,7 +33,7 @@ def test_given_non_dict_metadata_when_reading_node_results_then_returns_empty_me
         return NodeResultReadFakeResult(
             [
                 (
-                    "task",
+                    "asset",
                     "produce_result",
                     None,
                     "main",
@@ -56,7 +56,7 @@ def test_given_non_dict_metadata_when_reading_node_results_then_returns_empty_me
         database=None,
         schema="main",
         query=NodeResultQuery(
-            node_type="task",
+            node_type="asset",
             node_name="produce_result",
             target_database=None,
             target_schema="main",

@@ -1905,7 +1905,7 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "@asset\n"
                 "def configured_task(ctx, target_probe: TargetProbe):\n"
                 "    '''Test task configured_task.'''\n"
-                "    record(ctx, 'task')\n"
+                "    record(ctx, 'asset')\n"
                 "    return ctx.result()\n"
             ),
             "python/loaders/raw.py": (
@@ -1963,7 +1963,7 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
     # Each command (build, load, check) sets the provider up once, before its first node runs.
     assert [str(line.pop("node")) for line in recorded] == [
         "provider",
-        "task",
+        "asset",
         "loader",
         "check",
         "provider",
@@ -2096,7 +2096,7 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
                 "@asset\n"
                 "def configured_task(ctx):\n"
                 '    """Test task configured_task."""\n'
-                "    record(ctx, 'task')\n"
+                "    record(ctx, 'asset')\n"
                 "    return ctx.result()\n"
             ),
             "sources/raw.yml": (
@@ -2130,7 +2130,7 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
     ]
     assert [(line["node"], line["name"], line["loader_schema"]) for line in recorded] == [
         ("loader", "dev", test_case.expected_loader_schema),
-        ("task", "dev", test_case.expected_loader_schema),
+        ("asset", "dev", test_case.expected_loader_schema),
         ("loader", "dev", test_case.expected_loader_schema),
     ], recorded
     # Python node results land in the adapter's default schema; no schema keeps the template.

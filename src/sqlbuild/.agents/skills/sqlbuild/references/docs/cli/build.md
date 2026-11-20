@@ -356,7 +356,7 @@ each schema carry the same run ID, so a role that can build in a schema can also
 there, with no other grants. A run that writes to any schema never writes these rows anywhere
 else, such as the target's default schema.
 
-A run whose nodes write no relation, such as one that only runs Python tasks or checks, has no
+A run whose nodes write no relation, such as one that only runs Python assets or checks, has no
 schema of its own. It records in the target's default schema instead, where audit results go.
 
 A run's status is its `finished` row, in any of its schemas. A run with only `started` rows was

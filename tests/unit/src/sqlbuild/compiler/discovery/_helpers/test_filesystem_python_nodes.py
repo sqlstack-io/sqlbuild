@@ -505,7 +505,7 @@ def test_given_python_root_helper_edit_when_rediscovering_then_node_identity_cha
         project_dir=tmp_path
     ).assets[0]
     before: PythonNodeIdentity = build_python_node_identity(
-        node_type="task",
+        node_type="asset",
         node_name=before_task.name,
         function=before_task.function,
         project_dir=tmp_path,
@@ -520,7 +520,7 @@ def test_given_python_root_helper_edit_when_rediscovering_then_node_identity_cha
         project_dir=tmp_path
     ).assets[0]
     after: PythonNodeIdentity = build_python_node_identity(
-        node_type="task",
+        node_type="asset",
         node_name=after_task.name,
         function=after_task.function,
         project_dir=tmp_path,
@@ -630,7 +630,7 @@ def test_given_unrelated_python_package_restored_when_building_identity_then_hel
         0
     ]
     identity: PythonNodeIdentity = build_python_node_identity(
-        node_type="task",
+        node_type="asset",
         node_name=task.name,
         function=task.function,
         project_dir=project_dir,

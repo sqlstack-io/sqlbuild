@@ -143,7 +143,7 @@ def test_given_databricks_dbt_profile_when_running_dbt_init_then_builds_profile_
             description="direct node results persist and read on databricks",
             expected_rows=(
                 ("check", "check_produce_result", "success"),
-                ("task", "produce_result", "success"),
+                ("asset", "produce_result", "success"),
             ),
         )
     ],

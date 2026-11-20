@@ -1,8 +1,8 @@
-"""Two loaders and a task that reads both of their results.
+"""Two loaders and an asset that reads both of their results.
 
 A build that selects only one loader still reads the other loader's latest result, which may come
 from an earlier build. On Snowflake the adapter has no default schema, so the results must go to
-the target's schema for the task to find them.
+the target's schema for the asset to find them.
 """
 
 from sqlbuild.assets import asset

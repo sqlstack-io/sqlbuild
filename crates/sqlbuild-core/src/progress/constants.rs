@@ -1,7 +1,7 @@
 //! Lifecycle event types, operation labels and layout of CLI progress lines.
 
 /// Operations with visible progress lines, and the label each renders with.
-pub(crate) const VISIBLE_OPERATION_LABELS: [(&str, &str); 30] = [
+pub(crate) const VISIBLE_OPERATION_LABELS: [(&str, &str); 29] = [
     ("clone_finalization", "Clone finalization"),
     ("discovery_declaration_parse", "Declaration parsing"),
     ("discovery_filesystem_walk", "Filesystem discovery"),
@@ -17,7 +17,6 @@ pub(crate) const VISIBLE_OPERATION_LABELS: [(&str, &str); 30] = [
     ("python_asset", "Python asset attempt"),
     ("python_check", "Python check attempt"),
     ("python_hook", "Python hook"),
-    ("python_task", "Python task attempt"),
     ("sql_hook", "SQL hook"),
     ("audit_evaluation", "Audit evaluation"),
     ("sql_test_setup", "SQL test setup"),
@@ -37,7 +36,7 @@ pub(crate) const VISIBLE_OPERATION_LABELS: [(&str, &str); 30] = [
     ("relation_promotion", "Promote relation"),
 ];
 /// Operations a live transient owner shows on a terminal when no resource attempt owns them.
-pub(crate) const TTY_TRANSIENT_OWNER_OPERATIONS: [&str; 17] = [
+pub(crate) const TTY_TRANSIENT_OWNER_OPERATIONS: [&str; 16] = [
     "adbc_driver_install",
     "dbt_command",
     "discovery_declaration_parse",
@@ -52,7 +51,6 @@ pub(crate) const TTY_TRANSIENT_OWNER_OPERATIONS: [&str; 17] = [
     "python_asset",
     "python_check",
     "python_hook",
-    "python_task",
     "sql_hook",
     "sql_test_setup",
 ];

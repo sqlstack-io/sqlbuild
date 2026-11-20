@@ -90,7 +90,7 @@ PROVIDER_MARKER_FILE: str = (
                 ("custom materialization", "copy_table", "marker_provider"),
                 ("hook", "mark_pre", "marker_provider"),
                 ("loader", "raw_orders", "marker_provider"),
-                ("task", "publish_orders", "marker_provider"),
+                ("asset", "publish_orders", "marker_provider"),
             ),
         )
     ],

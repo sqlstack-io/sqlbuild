@@ -152,10 +152,10 @@ def test_given_target_location_when_building_and_loading_then_node_results_stay_
             "GROUP BY ALL ORDER BY ALL"
         ),
     ) == [
+        ("asset", "announce_orders", test_case.expected_runs_per_node),
         ("check", "check_orders_announced", test_case.expected_runs_per_node),
         ("loader", "raw_order_copies", test_case.expected_runs_per_node),
         ("loader", "raw_orders", test_case.expected_runs_per_node),
-        ("task", "announce_orders", test_case.expected_runs_per_node),
     ]
     assert query_duckdb(db_path=db_path, sql="SELECT order_id FROM raw.raw_order_copies") == [(1,)]
 
@@ -221,18 +221,18 @@ def test_given_preserved_schema_without_loader_schema_when_compiling_then_python
         PlanAfterBuildsE2ETestCase(
             description="a preserved schema reads the task's fingerprint from the loader schema",
             target_lines='schema = "preserve"\nloader_schema = "raw"\n',
-            expected_plan_line="announce_orders      task (unchanged)",
+            expected_plan_line="announce_orders      asset (unchanged)",
         ),
         PlanAfterBuildsE2ETestCase(
             description="a plan of the task alone reads its fingerprint from the loader schema",
             target_lines='schema = "preserve"\nloader_schema = "raw"\n',
-            expected_plan_line="announce_orders      task (unchanged)",
+            expected_plan_line="announce_orders      asset (unchanged)",
             plan_args=("--select", "announce_orders"),
         ),
         PlanAfterBuildsE2ETestCase(
             description="a named schema reads the task's fingerprint from the target schema",
             target_lines='schema = "analytics"\n',
-            expected_plan_line="announce_orders      task (unchanged)",
+            expected_plan_line="announce_orders      asset (unchanged)",
         ),
     ],
     ids=lambda case: case.description,
@@ -270,7 +270,7 @@ def test_given_two_builds_when_planning_then_python_nodes_are_not_new(
             description="older task results in a later-sorting model schema do not hide current ones",
             earlier_target_lines='schema = "staging"\n',
             target_lines='schema = "preserve"\nloader_schema = "raw"\n',
-            expected_plan_line="announce_orders      task (unchanged)",
+            expected_plan_line="announce_orders      asset (unchanged)",
         ),
     ],
     ids=lambda case: case.description,
@@ -384,7 +384,7 @@ def test_given_results_in_the_adapter_default_when_one_loader_rebuilds_then_both
     assert set(new_runs) == {test_case.rebuilt_loader}
     assert new_runs[test_case.rebuilt_loader] != old_runs[test_case.rebuilt_loader]
     [(_, task_run, payload)] = node_results_in(
-        db_path=db_path, schema=test_case.target_schema, node_type="task"
+        db_path=db_path, schema=test_case.target_schema, node_type="asset"
     )
     assert task_run == new_runs[test_case.rebuilt_loader]
     rebuilt_key, kept_key = test_case.expected_payload_keys

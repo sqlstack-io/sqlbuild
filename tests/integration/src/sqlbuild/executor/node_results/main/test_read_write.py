@@ -49,7 +49,7 @@ def test_given_node_result_record_when_writing_and_reading_then_round_trips_enve
             database=None,
             schema="main",
             record=NodeResultRecord(
-                node_type="task",
+                node_type="asset",
                 node_name="produce_result",
                 target_database=None,
                 target_schema="main",
@@ -71,7 +71,7 @@ def test_given_node_result_record_when_writing_and_reading_then_round_trips_enve
             database=None,
             schema="main",
             query=NodeResultQuery(
-                node_type="task",
+                node_type="asset",
                 node_name="produce_result",
                 target_database=None,
                 target_schema="main",
@@ -152,7 +152,7 @@ def test_given_result_in_earlier_location_when_reading_then_store_falls_back_onl
             schema="raw",
             target_config=TargetSettings(schema_preserved=test_case.schema_preserved),
         )
-        found: object = reader.result_of(node_type="task", node_name="produce_result", default=None)
+        found: object = reader.result_of(node_type="asset", node_name="produce_result", default=None)
     finally:
         adapter.close(connection)
 

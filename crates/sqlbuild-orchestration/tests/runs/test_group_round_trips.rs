@@ -65,7 +65,7 @@ fn given_a_round_trip_split_across_jobs_when_the_group_runs_then_members_follow_
                 ),
                 (
                     "asset:score_orders".into(),
-                    snapshot_node("task", json!({"deps": ["model:orders"]})),
+                    snapshot_node("asset", json!({"deps": ["model:orders"]})),
                 ),
                 (
                     "loader:partner_scores".into(),

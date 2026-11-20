@@ -385,29 +385,6 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         expected_help_fragments=('@loader(description="What raw_returns does", ...)',),
     ),
     RequiredDescriptionCase(
-        description="task",
-        missing_files=(
-            (
-                "python/tasks/refresh_exports.py",
-                python_node_source(module="tasks", decorator="task", name="refresh_exports"),
-            ),
-        ),
-        described_files=(
-            (
-                "python/tasks/refresh_exports.py",
-                python_node_source(
-                    module="tasks",
-                    decorator="task",
-                    name="refresh_exports",
-                    docstring_line='    """Refresh the order exports."""\n',
-                ),
-            ),
-        ),
-        expected_diagnostic=("P010", "python/tasks/refresh_exports.py", 4),
-        expected_message="task 'refresh_exports' has no description",
-        expected_help_fragments=('@asset(description="What refresh_exports does", ...)',),
-    ),
-    RequiredDescriptionCase(
         description="asset",
         missing_files=(
             (
@@ -511,31 +488,31 @@ _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
     "test_case",
     [
         RequiredDescriptionCase(
-            description="task docstring",
+            description="asset docstring",
             missing_files=(
                 (
-                    "python/tasks/refresh_exports.py",
+                    "python/assets/order_report.py",
                     python_node_source(
-                        module="tasks",
-                        decorator="task",
-                        name="refresh_exports",
+                        module="assets",
+                        decorator="asset",
+                        name="order_report",
                         docstring_line=description_paragraphs(6),
                     ),
                 ),
             ),
             described_files=(
                 (
-                    "python/tasks/refresh_exports.py",
+                    "python/assets/order_report.py",
                     python_node_source(
-                        module="tasks",
-                        decorator="task",
-                        name="refresh_exports",
+                        module="assets",
+                        decorator="asset",
+                        name="order_report",
                         docstring_line=description_paragraphs(5),
                     ),
                 ),
             ),
-            expected_diagnostic=("P027", "python/tasks/refresh_exports.py", 4),
-            expected_message="task 'refresh_exports' description exceeds 10 lines",
+            expected_diagnostic=("P027", "python/assets/order_report.py", 4),
+            expected_message="asset 'order_report' description exceeds 10 lines",
             expected_help_fragments=("Shorten the description to 10 lines",),
         ),
         RequiredDescriptionCase(

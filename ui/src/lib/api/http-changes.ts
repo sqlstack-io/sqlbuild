@@ -7,7 +7,7 @@ type Wire = components['schemas'];
 /** How many runs of each deploy the feed lists. */
 const FOLLOWING_RUNS = 8;
 
-const NODE_KINDS: Record<string, NodeKind> = { seed: 'seed', source: 'source', asset: 'asset', loader: 'loader', task: 'task', udf: 'udf', table_fn: 'table_fn' };
+const NODE_KINDS: Record<string, NodeKind> = { seed: 'seed', source: 'source', asset: 'asset', loader: 'loader', udf: 'udf', table_fn: 'table_fn' };
 
 function opOf(kind: string): ChangeOp {
 	return kind === 'added' || kind === 'removed' ? kind : 'changed';

@@ -12,7 +12,6 @@ describe('counts', () => {
 	it('name node kinds, telling SQL audits from Python checks', () => {
 		expect(nodeCount(407, 'asset')).toBe('407 assets');
 		expect(nodeCount(1, 'asset')).toBe('1 asset');
-		expect(nodeCount(26, 'task')).toBe('26 tasks');
 		expect(nodeCount(35, 'check')).toBe('35 Python checks');
 		expect(nodeCount(4668, 'audit')).toBe('4,668 audits');
 		expect(nodeNoun('table_fn', 2)).toBe('table functions');

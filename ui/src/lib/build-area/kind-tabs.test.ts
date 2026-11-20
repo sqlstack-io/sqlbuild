@@ -3,7 +3,7 @@ import { NODE_KINDS, kindTabOf, nodeIcon, nodeIconKey, parseKindTab } from './la
 
 describe('catalog kind tabs', () => {
 	it('puts Python nodes and functions in their own tabs', () => {
-		expect(['asset', 'loader', 'task'].map((k) => kindTabOf(k as never))).toEqual(['python', 'python', 'python']);
+		expect(['asset', 'loader'].map((k) => kindTabOf(k as never))).toEqual(['python', 'python']);
 		expect(['udf', 'table_fn'].map((k) => kindTabOf(k as never))).toEqual(['functions', 'functions']);
 		expect(kindTabOf('view')).toBe('view');
 	});

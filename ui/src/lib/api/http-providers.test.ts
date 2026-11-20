@@ -16,23 +16,23 @@ describe('toProviders', () => {
 					path: 'providers/fulfillment.py',
 					settings: [{ name: 'api_key', type: 'SecretStr', required: true, secret: true, env: 'FULFILLMENT_API_KEY', description: null, missing: true }],
 					used_by: [
-						{ kind: 'task', name: 'publish_orders' },
+						{ kind: 'asset', name: 'publish_orders' },
 						{ kind: 'sink', name: 'order_events' },
 						{ kind: 'event_exporter', name: 'run_events' }
 					],
-					nodes: ['task:publish_orders'],
+					nodes: ['asset:publish_orders'],
 					jobs: ['order_exports'],
-					job_nodes: { order_exports: ['task:publish_orders'] }
+					job_nodes: { order_exports: ['asset:publish_orders'] }
 				}
 			]
 		};
 		const [provider] = toProviders(wire);
 		expect(provider.className).toBe('providers.fulfillment.FulfillmentApi');
 		expect(provider.settings[0]).toEqual({ name: 'api_key', type: 'SecretStr', required: true, secret: true, env: 'FULFILLMENT_API_KEY', description: null, missing: true });
-		expect(provider.usedBy.map((c) => `${c.kind}:${c.name}`)).toEqual(['task:publish_orders', 'sink:order_events', 'event_exporter:run_events']);
+		expect(provider.usedBy.map((c) => `${c.kind}:${c.name}`)).toEqual(['asset:publish_orders', 'sink:order_events', 'event_exporter:run_events']);
 		expect(provider.jobs).toEqual(['order_exports']);
-		expect(provider.nodes).toEqual(['task:publish_orders']);
-		expect(provider.jobNodes).toEqual({ order_exports: ['task:publish_orders'] });
+		expect(provider.nodes).toEqual(['asset:publish_orders']);
+		expect(provider.jobNodes).toEqual({ order_exports: ['asset:publish_orders'] });
 	});
 
 	it('defaults the nodes to none when the server leaves them out', () => {

@@ -18,7 +18,9 @@ Online: https://sqlbuild.com/docs/concepts/python-nodes/assets/
 - Decorator parameters
 - Running assets
 
-Assets are Python functions that run as part of the DAG. Use them for computation, side effects and external artifacts such as an exported file, a published dataset, a dashboard refresh or an ML model. See [Python Nodes](overview.md) for the shared model and the SQL boundary rules.
+Assets are Python functions that run as part of the DAG, for computation, side effects and external artifacts such as an exported file, a published dataset, a dashboard refresh or an ML model. If you are coming from a task-based tool, an asset is a task that may not describe its output.
+
+See [Python Nodes](overview.md) for the shared model and the SQL boundary rules.
 
 ## Defining an asset
 

@@ -149,7 +149,7 @@ def test_given_bigquery_dbt_profile_when_running_dbt_init_then_builds_profile_li
             description="direct node results persist and read on bigquery",
             expected_rows=(
                 ("check", "check_produce_result", "success"),
-                ("task", "produce_result", "success"),
+                ("asset", "produce_result", "success"),
             ),
         )
     ],

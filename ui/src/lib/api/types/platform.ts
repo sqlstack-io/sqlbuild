@@ -302,7 +302,7 @@ export type ProviderSetting = {
 
 /** Python code that injects a provider. None of it is a catalog node, so it has no page to open. */
 export type ProviderConsumer = {
-	kind: 'loader' | 'task' | 'asset' | 'check' | 'hook' | 'materialization' | 'event_exporter' | 'sink';
+	kind: 'loader' | 'asset' | 'check' | 'hook' | 'materialization' | 'event_exporter' | 'sink';
 	name: string;
 };
 
