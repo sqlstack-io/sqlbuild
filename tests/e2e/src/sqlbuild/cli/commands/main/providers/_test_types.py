@@ -172,6 +172,6 @@ class EnvFileE2ETestCase:
     env: dict[str, str]
     expected_exit_code: int
     expected_output_fragments: tuple[str, ...]
-    # The region the provider read, or None when the task did not run.
-    expected_region: str | None
+    # The region the provider read; empty when the task did not run.
+    expected_region: str
     unexpected_output_fragments: tuple[str, ...] = ()

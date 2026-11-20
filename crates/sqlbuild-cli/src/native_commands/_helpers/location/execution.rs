@@ -16,7 +16,6 @@ use crate::dev_session::models::{DevProject, LocationPipes};
 use crate::native_commands::_helpers::command::decision::{
     control_address, control_database, control_database_variable, flag, text,
 };
-use crate::native_commands::_helpers::command::environment::with_environment_overlay;
 use crate::native_commands::_helpers::command::init::run_init;
 use crate::native_commands::_helpers::command::package::installed_package;
 use crate::native_commands::_helpers::command::paths::exclude_location_databases;
@@ -73,6 +72,7 @@ use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::main::sync_interval_seconds::sync_interval_seconds;
 use sqlbuild_config::project::models::ControlConfig;
 use sqlbuild_core::cli_text::models::CliStyle;
+use sqlbuild_core::process_environment::main::apply_environment_overlay::apply_environment_overlay;
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use sqlbuild_core::screen_text::models::{DevHeader, ScreenFacts};
 use sqlbuild_orchestration::api::constants::BODY_BYTES;
@@ -98,11 +98,11 @@ use sqlbuild_orchestration::platform::main::health::unallowed_secret_count::unal
 use sqlbuild_orchestration::platform::main::installation::run_maintenance::run_maintenance;
 use sqlbuild_orchestration::platform::models::ConnectionCheckTrigger;
 use sqlbuild_orchestration::platform::models::LocationRuleFailure;
-use sqlbuild_orchestration::platform::models::MissingProviderSecrets;
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
     WarehouseSyncFailure,
 };
+use sqlbuild_orchestration::platform::models::{MissingProviderSecrets, PublishedGeneration};
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
@@ -254,7 +254,7 @@ fn development_location_role(
     ControlError,
 > {
     let mut command = Command::new(executable);
-    with_environment_overlay(&mut command);
+    apply_environment_overlay(command.as_std_mut());
     command
         .args(["--project-dir"])
         .arg(project)
@@ -360,7 +360,13 @@ pub(crate) async fn compile_generation(
             }
         }
     };
-    let Some((record, refresh, locations, missing_secrets)) = load.published else {
+    let Some(PublishedGeneration {
+        record,
+        refresh_at: refresh,
+        state_locations: locations,
+        missing_secrets,
+    }) = load.published
+    else {
         if let Some(rules) = &load.rules {
             dev_failure(dev_events, generation, rule_failure_text(rules));
         }
@@ -798,16 +804,12 @@ pub(crate) async fn report_provider_secrets(
 ) {
     let missing: u64 = unallowed_secret_count(&providers);
     if missing > 0 {
-        let variables: Vec<String> = providers
-            .iter()
-            .filter(|provider| !provider.allowed)
-            .flat_map(|provider| {
-                provider
-                    .settings
-                    .iter()
-                    .map(move |setting| format!("{} {}", provider.provider, setting.variable))
-            })
-            .collect();
+        let mut variables: Vec<String> = Vec::new();
+        for provider in providers.iter().filter(|provider| !provider.allowed) {
+            for setting in &provider.settings {
+                variables.push(format!("{} {}", provider.provider, setting.variable));
+            }
+        }
         drop(write_output(&[(
             Stream::Stderr,
             &format!(
@@ -1084,7 +1086,7 @@ pub(crate) async fn check_location_connection(
 
 pub(crate) fn location_child(options: &LocationServe, script: &Path) -> Command {
     let mut command = Command::new(script);
-    with_environment_overlay(&mut command);
+    apply_environment_overlay(command.as_std_mut());
     command.arg("--project-dir").arg(&options.project_dir);
     if terminal_columns().is_err() {
         command.env(COLUMNS_VARIABLE, FALLBACK_COLUMNS.to_string());

@@ -2230,7 +2230,7 @@ export interface components {
              */
             missing: number;
             /** @description Every provider missing a secret, including those the target allows; names only, never values. */
-            providers?: components["schemas"]["MissingProviderSecrets"][];
+            providers: components["schemas"]["MissingProviderSecrets"][];
         } | {
             /** Format: int64 */
             generation: number;
@@ -2503,7 +2503,7 @@ export interface components {
         /** @description One unset required setting: the field, the variable it reads and the field's line in the provider file. */
         MissingProviderSetting: {
             field: string;
-            /** Format: int32 */
+            /** Format: int64 */
             line?: number | null;
             variable: string;
         };

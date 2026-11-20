@@ -26,10 +26,14 @@ fn optional_text(value: &Value, key: &str) -> Option<Option<String>> {
 /// The marker in the effective environment, `None` when nothing loaded a file or it is malformed.
 #[must_use]
 pub fn env_file_marker() -> Option<EnvFileMarker> {
-    let text: String = environment_var_os(ENV_FILE_MARKER_VARIABLE)?
-        .into_string()
-        .ok()?;
-    let value: Value = serde_json::from_str(&text).ok()?;
+    let text: String = match environment_var_os(ENV_FILE_MARKER_VARIABLE)?.into_string() {
+        Ok(text) => text,
+        Err(_not_unicode) => return None,
+    };
+    let value: Value = match serde_json::from_str(&text) {
+        Ok(value) => value,
+        Err(_malformed) => return None,
+    };
     Some(EnvFileMarker {
         project_dir: value.get("project_dir")?.as_str()?.to_owned(),
         target: optional_text(&value, "target")?,

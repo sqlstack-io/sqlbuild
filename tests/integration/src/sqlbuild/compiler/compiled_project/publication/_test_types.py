@@ -608,5 +608,6 @@ class ProviderSecretsHealthTestCase:
     allowed: tuple[str, ...]
     expected_missing: int
     expected_allowed: bool
-    # What the location prints about them; empty when it should print nothing.
-    expected_output: str
+    # What the location prints about them, and what it must not print.
+    expected_output_fragments: tuple[str, ...]
+    unexpected_output_fragments: tuple[str, ...]

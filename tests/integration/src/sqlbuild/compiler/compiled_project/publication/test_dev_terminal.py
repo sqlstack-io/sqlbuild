@@ -167,11 +167,12 @@ def test_given_an_env_file_when_developing_then_start_up_names_it_and_r_reloads_
     env_file: Path = project / ".env"
     _ = env_file.write_text(test_case.first_env_file)
     env_file.chmod(0o600)
-    environment: dict[str, str] = {
-        key: value
-        for key, value in os.environ.items()
-        if key not in {"NO_COLOR", "CI", "SQLBUILD_NO_PROGRESS", "SQLBUILD_PLATFORM_WEBHOOK_URL"}
-    } | {"TERM": "xterm", "ORDERS_ENV_PROBES": str(probes)}
+    environment: dict[str, str] = dict(os.environ) | {
+        "TERM": "xterm",
+        "ORDERS_ENV_PROBES": str(probes),
+    }
+    for key in ("NO_COLOR", "CI", "SQLBUILD_NO_PROGRESS", "SQLBUILD_PLATFORM_WEBHOOK_URL"):
+        _ = environment.pop(key, None)
     executable: str = str(Path(sys.executable).with_name("sqb"))
     terminal, attached = pty.openpty()
     fcntl.ioctl(attached, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
@@ -200,7 +201,7 @@ def test_given_an_env_file_when_developing_then_start_up_names_it_and_r_reloads_
 
     plain: str = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", shown)
     assert test_case.expected_card_row in plain, plain
-    restart_line: str = next(line for line in plain.splitlines() if "location restarted" in line)
+    restart_line: str = next(filter(lambda line: "location restarted" in line, plain.splitlines()))
     assert all(part in restart_line for part in test_case.expected_restart), plain
     assert probes.read_text().split()[0] == "first", probes.read_text()
     assert exit_code == 0, shown

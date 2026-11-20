@@ -262,8 +262,7 @@ pub(crate) fn discover_provider_classes<'py>(
     tuple_of(py, providers)
 }
 
-/// Note on stderr which providers run with missing secrets because the command allows them.
-/// Under `Allow`, every provider missing secrets; under `Require`, only those the target's `allow_missing_secrets` lists reach here.
+/// Note on stderr the providers running with missing secrets: all under `Allow`, the target's listed ones under `Require`.
 fn report_allowed(py: Python<'_>, policy: SecretPolicy, allowed: &[String]) -> PyResult<()> {
     if policy == SecretPolicy::Defer || allowed.is_empty() {
         return Ok(());

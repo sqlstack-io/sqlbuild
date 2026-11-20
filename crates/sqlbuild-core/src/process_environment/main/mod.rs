@@ -1,3 +1,4 @@
+pub mod apply_environment_overlay;
 pub mod env_file_marker;
 pub mod environment_overlay;
 pub mod environment_var_os;

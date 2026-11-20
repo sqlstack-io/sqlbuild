@@ -1065,3 +1065,12 @@ impl Drop for NativeOrchestrationWorker {
         }
     }
 }
+
+/// How a consumer's code runs inside other snapshot nodes, besides its own node.
+#[derive(Clone, Copy)]
+pub(crate) enum RunsIn {
+    Itself,
+    ModelHooks,
+    ModelMaterialization,
+    SourceLoader,
+}

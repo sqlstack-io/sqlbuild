@@ -1,7 +1,4 @@
-//! A provider class's declared settings and whether the environment sets its required secrets.
-//!
-//! A setting without a default is a required secret, whatever its type: a provider declares
-//! what it needs as required fields, and nothing it needs is checked lazily.
+//! A provider class's declared settings and whether the environment sets its required secrets, its fields without a default.
 
 use crate::orchestration_reads::models::ProviderState;
 use pyo3::exceptions::PyValueError;

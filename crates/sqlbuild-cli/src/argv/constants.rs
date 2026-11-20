@@ -288,3 +288,6 @@ pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 194] = [
     ("refactor_from_file", NamespaceDefault::None),
     ("refactor_cascade", NamespaceDefault::Bool(false)),
 ];
+
+/// Columns for the help text of a parse that only reads options, which nothing shows.
+pub(crate) const UNSHOWN_COLUMNS: i64 = 80;

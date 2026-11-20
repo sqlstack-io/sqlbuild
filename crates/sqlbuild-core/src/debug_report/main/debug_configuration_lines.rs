@@ -1,41 +1,11 @@
 //! The configuration section of `sqb debug`.
 
+use crate::debug_report::_helpers::env_file_line::env_file_line;
 use crate::debug_report::constants::{NOT_CONFIGURED, NOT_PRESENT};
 use crate::debug_report::models::{DebugLine, DebugProjectFacts, DebugStatus, WarehouseCheck};
-use crate::process_environment::models::EnvFileMarker;
 
 fn resolved(label: &str, message: &str, status_message: &str) -> DebugLine {
     DebugLine::checked(label, message, (DebugStatus::Ok, Some(status_message)))
-}
-
-/// Which env file loaded, by path and variable count; never a value.
-fn env_file_line(marker: &EnvFileMarker) -> DebugLine {
-    let Some(path) = &marker.path else {
-        return DebugLine::checked(
-            "env file",
-            "off",
-            (DebugStatus::Skip, Some("env_file = \"\"")),
-        );
-    };
-    if !marker.loaded {
-        return DebugLine::checked(
-            "env file",
-            path,
-            (DebugStatus::Ok, Some("not found, optional")),
-        );
-    }
-    let count: usize = marker.names.len();
-    let mut status: String = format!(
-        "loaded, {count} variable{}",
-        if count == 1 { "" } else { "s" }
-    );
-    if !marker.overridden.is_empty() {
-        status.push_str(&format!(
-            ", {} already set in the environment",
-            marker.overridden.len()
-        ));
-    }
-    DebugLine::checked("env file", path, (DebugStatus::Ok, Some(&status)))
 }
 
 fn warehouse_line(check: &WarehouseCheck) -> DebugLine {

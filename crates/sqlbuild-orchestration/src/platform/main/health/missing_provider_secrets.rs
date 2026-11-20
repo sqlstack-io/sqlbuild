@@ -29,9 +29,7 @@ pub fn missing_provider_secrets(
             .map(|setting| MissingProviderSetting {
                 field: setting["name"].as_str().unwrap_or_default().to_owned(),
                 variable: setting["env"].as_str().unwrap_or_default().to_owned(),
-                line: setting["line"]
-                    .as_u64()
-                    .and_then(|line| u32::try_from(line).ok()),
+                line: setting["line"].as_u64(),
             })
             .collect();
         if settings.is_empty() {

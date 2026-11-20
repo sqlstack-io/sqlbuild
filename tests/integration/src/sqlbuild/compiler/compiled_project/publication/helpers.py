@@ -1990,9 +1990,6 @@ def failed_load(tmp_path: Path, project: Path) -> tuple[dict[str, Any], int, str
 def provider_secrets_health(tmp_path: Path, project: Path) -> tuple[dict[str, Any], str]:
     """Serve `project` until it reports which providers miss secrets: that health and the log."""
     log: Path = tmp_path / "location.log"
-    environment: dict[str, str] = {
-        name: value for name, value in os.environ.items() if not name.startswith("WORKER_ENV_")
-    }
     with (
         snapshot_api(tmp_path / "control") as api,
         location_process(
@@ -2011,7 +2008,7 @@ def provider_secrets_health(tmp_path: Path, project: Path) -> tuple[dict[str, An
             ],
             log,
             tmp_path / "location.stdout",
-            env=environment | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
         ) as location,
     ):
         report: dict[str, Any] = wait_for_location_health(

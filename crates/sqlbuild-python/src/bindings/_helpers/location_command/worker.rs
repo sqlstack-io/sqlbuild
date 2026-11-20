@@ -1,8 +1,9 @@
 //! Execute only the API's frozen request after compiling and verifying the unmodified baseline.
 
-use crate::bindings::_helpers::provider_check::error::secret_block_error;
-use crate::bindings::_helpers::provider_check::selection::{SecretBlock, key_secret_blocks};
-use sqlbuild_python_front::discovery::main::sources::secret_places::secret_places;
+use sqlbuild_python_compile::provider_check::main::key_secret_blocks::key_secret_blocks;
+use sqlbuild_python_compile::provider_check::main::missing_secret_failures::missing_secret_failures;
+use sqlbuild_python_compile::provider_check::main::secret_block_error::secret_block_error;
+use sqlbuild_python_compile::provider_check::models::SecretBlock;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::sync::{Arc, mpsc};
@@ -239,35 +240,6 @@ fn unconfigured_warehouse(
         "the requested warehouse is not configured for this target on this location; \
          no warehouse statement ran",
     ))
-}
-
-/// Each selected node that uses a provider missing secrets, with its failure message, and the run's status reason.
-fn missing_secret_failures(
-    blocks: &[SecretBlock],
-    project_dir: &std::path::Path,
-) -> (Vec<(String, String)>, String) {
-    let places: String =
-        secret_places(project_dir).replacen("the environment", "the location's environment", 1);
-    let mut failures: Vec<(String, String)> = Vec::new();
-    let mut needs: Vec<String> = Vec::new();
-    for block in blocks {
-        let variables: String = block.variables.join(", ");
-        needs.push(format!("provider {} needs {variables}", block.provider));
-        for key in block.users.iter().filter(|key| !key.starts_with("sink:")) {
-            failures.push((
-                key.clone(),
-                format!(
-                    "provider {}: {variables} not set (missing from {places})",
-                    block.provider
-                ),
-            ));
-        }
-    }
-    let reason: String = format!(
-        "Couldn't run: {} (missing from {places}); nothing ran",
-        needs.join("; ")
-    );
-    (failures, reason)
 }
 
 /// The heartbeat is native; only driver cancellation crosses the executor host boundary.

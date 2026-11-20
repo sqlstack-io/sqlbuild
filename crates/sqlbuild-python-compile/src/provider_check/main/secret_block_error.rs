@@ -7,43 +7,12 @@ use sqlbuild_python_base::records::main::construct::new_annotated_error::new_ann
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_front::discovery::main::sources::secret_places::secret_places;
 
-use crate::bindings::_helpers::provider_check::selection::SecretBlock;
-
-/// Set in a worker's environment; its run reports to the location's server.
-const RUN_TOKEN_VARIABLE: &str = "SQLBUILD_RUN_TOKEN";
-
-/// A node key's name, such as `raw_payments` for `source:raw_payments`.
-fn short(key: &str) -> &str {
-    key.split_once(':').map_or(key, |(_, name)| name)
-}
-
-/// One row per variable: provider, variable, and the nodes that use it and that read those.
-fn rows(blocks: &[SecretBlock]) -> Vec<[String; 3]> {
-    let mut rows: Vec<[String; 3]> = Vec::new();
-    for block in blocks {
-        let users: Vec<&str> = block.users.iter().map(|key| short(key)).collect();
-        let mut needed_by: String = users.join(", ");
-        if !block.readers.is_empty() {
-            let readers: Vec<&str> = block.readers.iter().map(|key| short(key)).collect();
-            needed_by.push_str(&format!("; read by {}", readers.join(", ")));
-        }
-        for variable in &block.variables {
-            rows.push([
-                block.provider.clone(),
-                variable.clone(),
-                format!("({needed_by})"),
-            ]);
-        }
-    }
-    rows
-}
+use crate::provider_check::_helpers::text::rows;
+use crate::provider_check::constants::RUN_TOKEN_VARIABLE;
+use crate::provider_check::models::SecretBlock;
 
 /// `D012`: the providers, variables and nodes, raised before any warehouse connection.
-pub(crate) fn secret_block_error(
-    py: Python<'_>,
-    blocks: &[SecretBlock],
-    project_dir: &Path,
-) -> PyErr {
+pub fn secret_block_error(py: Python<'_>, blocks: &[SecretBlock], project_dir: &Path) -> PyErr {
     let rows = rows(blocks);
     let width = |column: usize| {
         rows.iter()

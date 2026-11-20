@@ -7,6 +7,8 @@ use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use crate::env_file::constants::DEFAULT_ENV_FILE;
 use crate::env_file::models::{ChoiceSource, EnvFileChoice};
 use crate::models::ConfigValue;
+use crate::project::main::load_project_config::load_project_config;
+use crate::project::main::project_config_paths::project_config_paths;
 use crate::project::models::Built;
 
 fn field<'a>(built: &'a Built, name: &str) -> Option<&'a Built> {
@@ -70,5 +72,17 @@ pub(crate) fn choice(source: ChoiceSource) -> EnvFileChoice {
         display: written,
         configured,
         setting,
+    }
+}
+
+/// The chosen env file, `None` without a valid `sqlbuild_project.toml`, which the command itself reports.
+pub(crate) fn env_file_choice(project_dir: &Path, target: Option<&str>) -> Option<EnvFileChoice> {
+    let paths = project_config_paths(project_dir);
+    if !paths.project.is_file() {
+        return None;
+    }
+    match load_project_config(&paths) {
+        Ok(project) => Some(choice(configured_source(&project, (project_dir, target)))),
+        Err(_invalid) => None,
     }
 }

@@ -57,8 +57,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
 # A provider whose settings only the project's .env sets; the worker must see them.
-ENV_FILE_REGION_FILES: dict[str, str] = {
-    ".env": "WORKER_ENV_REGION_CODE=42\nWORKER_ENV_TOKEN=worker-token\n",
+REGION_PROVIDER_FILES: dict[str, str] = {
     "providers/region.py": (
         "from pydantic import Field, SecretStr\n"
         "from sqlbuild.providers import Provider\n\n\n"
@@ -86,6 +85,9 @@ ENV_FILE_REGION_FILES: dict[str, str] = {
         "    return [{'code': region.code}]\n"
     ),
 }
+ENV_FILE_REGION_FILES: dict[str, str] = {
+    ".env": "WORKER_ENV_REGION_CODE=42\nWORKER_ENV_TOKEN=worker-token\n"
+} | REGION_PROVIDER_FILES
 
 
 @pytest.mark.parametrize(
@@ -1094,8 +1096,7 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
             "failed",
             [],
             default_job_files={},
-            files={path: text for path, text in ENV_FILE_REGION_FILES.items() if path != ".env"}
-            | duckshop_orchestration("upstream_loaded_orders"),
+            files=REGION_PROVIDER_FILES | duckshop_orchestration("upstream_loaded_orders"),
         ),
     ],
     ids=lambda case: case.description,
@@ -1943,14 +1944,19 @@ def test_given_an_uncooperative_worker_when_scheduler_stops_then_the_fence_and_c
             allowed=(),
             expected_missing=2,
             expected_allowed=False,
-            expected_output="runs that use them stop before the warehouse: region WORKER_ENV_",
+            expected_output_fragments=(
+                "runs that use them stop before the warehouse: "
+                "region WORKER_ENV_TOKEN, region WORKER_ENV_REGION_CODE",
+            ),
+            unexpected_output_fragments=(),
         ),
         ProviderSecretsHealthTestCase(
             description="a provider the target allows to miss secrets is reported but no problem",
             allowed=("region",),
             expected_missing=0,
             expected_allowed=True,
-            expected_output="",
+            expected_output_fragments=(),
+            unexpected_output_fragments=("stop before the warehouse",),
         ),
     ],
     ids=lambda case: case.description,
@@ -1973,31 +1979,25 @@ def test_given_a_provider_missing_secrets_when_a_location_publishes_then_its_hea
                 'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")\n'
             ),
         }
-        | {path: text for path, text in ENV_FILE_REGION_FILES.items() if path != ".env"},
+        | REGION_PROVIDER_FILES,
     )
 
     health, log = provider_secrets_health(tmp_path, project)
 
     assert health["missing"] == test_case.expected_missing, log
-    assert [
-        (
-            provider["provider"],
-            provider["path"],
-            provider["allowed"],
-            provider["nodes"],
-            sorted(setting["variable"] for setting in provider["settings"]),
-        )
-        for provider in health["providers"]
-    ] == [
-        (
-            "region",
-            "providers/region.py",
-            test_case.expected_allowed,
-            ["loader:raw_regions", "source:raw_regions"],
-            ["WORKER_ENV_REGION_CODE", "WORKER_ENV_TOKEN"],
-        )
+    assert health["providers"] == [
+        {
+            "provider": "region",
+            "path": "providers/region.py",
+            "settings": [
+                {"field": "token", "variable": "WORKER_ENV_TOKEN", "line": 7},
+                {"field": "code", "variable": "WORKER_ENV_REGION_CODE", "line": 8},
+            ],
+            "nodes": ["loader:raw_regions", "source:raw_regions"],
+            "allowed": test_case.expected_allowed,
+        }
     ], log
-    if test_case.expected_output:
-        assert test_case.expected_output in log, log
-    else:
-        assert "stop before the warehouse" not in log, log
+    for fragment in test_case.expected_output_fragments:
+        assert fragment in log, log
+    for fragment in test_case.unexpected_output_fragments:
+        assert fragment not in log, log

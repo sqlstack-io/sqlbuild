@@ -125,18 +125,3 @@ fn given_providers_missing_secrets_when_a_location_reports_them_then_only_unallo
         );
     }
 }
-
-#[test]
-fn given_an_older_location_when_it_reports_only_a_count_then_the_report_still_reads() {
-    let health: LocationHealth =
-        serde_json::from_value(json!({"kind": "provider_secrets", "generation": 2, "missing": 1}))
-            .expect("an older report reads");
-    assert_eq!(
-        health,
-        LocationHealth::ProviderSecrets {
-            generation: 2,
-            missing: 1,
-            providers: Vec::new()
-        }
-    );
-}

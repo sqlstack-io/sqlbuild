@@ -30,9 +30,6 @@ use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::plan_command::changed::changed_json;
 use crate::bindings::_helpers::plan_command::changed::changed_text;
-use crate::bindings::_helpers::provider_check::selection::{
-    SecretBlock, cant_run_json, selection_secret_blocks,
-};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -43,6 +40,10 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
+use sqlbuild_python_compile::provider_check::main::cant_run_json::cant_run_json;
+use sqlbuild_python_compile::provider_check::main::cant_run_text::cant_run_text;
+use sqlbuild_python_compile::provider_check::main::selection_secret_blocks::selection_secret_blocks;
+use sqlbuild_python_compile::provider_check::models::SecretBlock;
 use sqlbuild_python_front::compile_attachment::main::build_effective_settings_config::build_effective_settings_config;
 use sqlbuild_python_front::discovery::main::sources::env_file_display::env_file_display;
 use sqlbuild_python_front::discovery::main::sources::secret_places::secret_places;
@@ -638,30 +639,6 @@ fn cant_run(
             &selectors(request, "exclude")?,
         ),
     )
-}
-
-/// The text plan's `Can't run` lines: per provider, its variables and the nodes it stops.
-fn cant_run_text(blocks: &[SecretBlock], missing_from: &str) -> String {
-    let short = |key: &String| {
-        key.split_once(':')
-            .map_or(key.clone(), |(_, name)| name.to_owned())
-    };
-    let mut lines: Vec<String> = Vec::new();
-    for block in blocks {
-        lines.push(format!(
-            "Can't run: provider {} needs {} (missing from {missing_from})",
-            block.provider,
-            block.variables.join(", ")
-        ));
-        let users: Vec<String> = block.users.iter().map(short).collect();
-        let mut needs: String = users.join(", ");
-        if !block.readers.is_empty() {
-            let readers: Vec<String> = block.readers.iter().map(short).collect();
-            needs.push_str(&format!(", and {} that read it", readers.join(", ")));
-        }
-        lines.push(format!("  needs  {needs}"));
-    }
-    format!("\n{}", lines.join("\n"))
 }
 
 /// Whether any plan finding has error severity, which `sqb build` refuses.

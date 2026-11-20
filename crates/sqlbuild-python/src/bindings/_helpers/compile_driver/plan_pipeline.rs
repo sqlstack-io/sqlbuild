@@ -16,8 +16,6 @@ use crate::bindings::_helpers::compile_driver::plan_result::PlanningInputs;
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
 use crate::bindings::_helpers::compile_driver::plan_result::pipeline_result;
 use crate::bindings::_helpers::compile_driver::rules_at_load::rules_ran_at_load;
-use crate::bindings::_helpers::provider_check::error::secret_block_error;
-use crate::bindings::_helpers::provider_check::selection::selection_secret_blocks;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -39,6 +37,8 @@ use sqlbuild_python_compile::compile_driver::main::stages::apply_unit_test_selec
 use sqlbuild_python_compile::compile_driver::main::stages::monotonic::monotonic;
 use sqlbuild_python_compile::compile_driver::main::stages::resolve_configured_rule_selection::resolve_configured_rule_selection;
 use sqlbuild_python_compile::frontier::main::write_plan_capture::write_plan_capture;
+use sqlbuild_python_compile::provider_check::main::secret_block_error::secret_block_error;
+use sqlbuild_python_compile::provider_check::main::selection_secret_blocks::selection_secret_blocks;
 use sqlbuild_python_compile::rules::constants::DEFAULT_RULES_NOTICE_ATTR;
 use sqlbuild_python_compile::rules::main::checking::format_rules_result::format_rules_result;
 use sqlbuild_python_compile::rules::main::checking::rules_progress::rules_progress;

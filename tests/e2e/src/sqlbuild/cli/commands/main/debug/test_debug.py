@@ -301,6 +301,7 @@ def test_given_local_default_and_explicit_target_when_debugging_json_then_report
     assert destination == {
         "project file": str(project_dir / "sqlbuild_project.toml"),
         "local config": str(project_dir / "sqlbuild_local.toml"),
+        "env file": str(project_dir / ".env"),
         "project": "debug_target_json_project",
         "adapter": "duckdb",
         "target": "test",

@@ -452,7 +452,6 @@ fn local_target(payload: &ConfigValue, target: TargetPlace<'_>) -> Loaded<Fields
         ENV_FILE_KEY,
         optional_text_allowing_empty(mapping, ENV_FILE_KEY)?,
     ));
-    // Only the project file sets it, so a local target never overrides the project's list.
     let allowed_label = format!("targets.{}.{ALLOW_MISSING_SECRETS_KEY}", target.name);
     fields.push((
         ALLOW_MISSING_SECRETS_KEY,

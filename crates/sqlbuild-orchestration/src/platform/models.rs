@@ -5,7 +5,7 @@ use crate::credentials::models::AuditRetention;
 use crate::declarations::models::TriggerDefinition;
 use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
 use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
-use crate::snapshots::models::SnapshotRetention;
+use crate::snapshots::models::{SnapshotRecord, SnapshotRetention};
 use crate::warehouse_metadata::models::StateHistoryRetention;
 use crate::warehouse_metadata::models::{
     StatisticsRetention, WarehouseHistoryKind, WarehouseStateLocation,
@@ -59,7 +59,6 @@ pub enum LocationHealth {
         /// Unset secrets of providers the target doesn't allow to miss them; above zero is a health problem.
         missing: u64,
         /// Every provider missing a secret, including those the target allows; names only, never values.
-        #[serde(default)]
         providers: Vec<MissingProviderSecrets>,
     },
     /// Jobs and groups this server's `pool_caps` clamp, derived by the server, never reported by a location.
@@ -95,6 +94,18 @@ pub enum LocationHealth {
     },
 }
 
+/// A location's published generation, as its interpreter hands it to the supervisor.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PublishedGeneration {
+    pub record: SnapshotRecord,
+    /// The earliest calendar refresh deadline.
+    pub refresh_at: Option<DateTime<Utc>>,
+    /// The state locations its nodes write.
+    pub state_locations: Vec<WarehouseStateLocation>,
+    /// The providers whose required secrets the location's environment leaves unset.
+    pub missing_secrets: Vec<MissingProviderSecrets>,
+}
+
 /// A provider whose required secrets are unset: what is missing and which nodes need it, never a value.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -115,7 +126,7 @@ pub struct MissingProviderSecrets {
 pub struct MissingProviderSetting {
     pub field: String,
     pub variable: String,
-    pub line: Option<u32>,
+    pub line: Option<u64>,
 }
 
 /// The stage a warehouse sync failed at; only a failed read also reports its redacted error.

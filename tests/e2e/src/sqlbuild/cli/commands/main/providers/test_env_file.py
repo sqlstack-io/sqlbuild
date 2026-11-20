@@ -113,7 +113,7 @@ BUILD: tuple[str, ...] = (
             env={},
             expected_exit_code=1,
             expected_output_fragments=(TOKEN_VARIABLE, "nothing was run"),
-            expected_region=None,
+            expected_region="",
         ),
         EnvFileE2ETestCase(
             description="a configured env file that does not exist is an error naming it",
@@ -126,7 +126,7 @@ BUILD: tuple[str, ...] = (
                 "env file secrets/missing.env does not exist "
                 "(set by env_file in sqlbuild_project.toml)",
             ),
-            expected_region=None,
+            expected_region="",
         ),
         EnvFileE2ETestCase(
             description="an env file others can read loads with a warning",
@@ -152,7 +152,7 @@ BUILD: tuple[str, ...] = (
                 "/.env [OK loaded, 2 variables]\n",
                 f"  settings_api: {TOKEN_VARIABLE} [OK set from env file]\n",
             ),
-            expected_region=None,
+            expected_region="",
             unexpected_output_fragments=(TOKEN_VALUE, "from-file"),
         ),
     ],
@@ -163,6 +163,7 @@ def test_given_a_project_env_file_when_running_commands_then_providers_read_it_a
     tmp_path: Path,
 ) -> None:
     marker_path: Path = tmp_path / "region.txt"
+    _ = marker_path.write_text("", encoding="utf-8")
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,
         project_name="env_file_project",
@@ -192,5 +193,4 @@ def test_given_a_project_env_file_when_running_commands_then_providers_read_it_a
         assert fragment in output, output
     for fragment in test_case.unexpected_output_fragments:
         assert fragment not in output, output
-    region: str | None = marker_path.read_text(encoding="utf-8") if marker_path.exists() else None
-    assert region == test_case.expected_region
+    assert marker_path.read_text(encoding="utf-8") == test_case.expected_region, output

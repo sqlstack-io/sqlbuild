@@ -38,10 +38,10 @@ describe('location health', () => {
 	});
 
 	it('reports missing provider secrets ahead of a failed connection until a newer report finds none', () => {
-		const missing = seen(10, { kind: 'provider_secrets', generation: 2, missing: 1 });
+		const missing = seen(10, { kind: 'provider_secrets', generation: 2, missing: 1, providers: [] });
 		const unhealthy = seen(10, { kind: 'connection', generation: 2, healthy: false });
 		expect(healthOf([missing, unhealthy], now).health).toBe('missing_secrets');
-		expect(healthOf([seen(5, { kind: 'provider_secrets', generation: 3, missing: 0 }), missing], now).health).toBe('healthy');
+		expect(healthOf([seen(5, { kind: 'provider_secrets', generation: 3, missing: 0, providers: [] }), missing], now).health).toBe('healthy');
 	});
 
 	it('lists the newest check\'s providers missing secrets, the target\'s allowed ones last, and raises only the others', () => {

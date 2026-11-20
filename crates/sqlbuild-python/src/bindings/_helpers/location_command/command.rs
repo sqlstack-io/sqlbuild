@@ -1,13 +1,12 @@
 //! Compile in the location interpreter and publish data through its scoped HTTP credential.
 
 use sqlbuild_orchestration::platform::main::health::missing_provider_secrets::missing_provider_secrets;
-use sqlbuild_orchestration::platform::models::MissingProviderSecrets;
+use sqlbuild_orchestration::platform::models::{MissingProviderSecrets, PublishedGeneration};
 use sqlbuild_python_front::discovery::main::sources::target_allowed_missing_secrets::target_allowed_missing_secrets;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use chrono::{DateTime, Utc};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::PyDict;
@@ -20,7 +19,7 @@ use sqlbuild_orchestration::dev_events::main::compile_summary::compile_summary;
 use sqlbuild_orchestration::dev_events::main::emit_dev_steps::emit_dev_steps;
 use sqlbuild_orchestration::dev_events::models::{DevPhase, DevStepState};
 use sqlbuild_orchestration::platform::models::LocationRuleFailure;
-use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
+use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
 
 use crate::bindings::_helpers::location_command::constants::EXECUTE_ACTION;
@@ -221,18 +220,10 @@ pub(super) fn location_arguments<'py>(
     )
 }
 
-/// A published record, its earliest calendar refresh and the state locations its nodes write.
-pub(super) type Published = (
-    SnapshotRecord,
-    Option<DateTime<Utc>>,
-    Vec<WarehouseStateLocation>,
-    Vec<MissingProviderSecrets>,
-);
-
 pub(super) fn publish_location<'py>(
     py: Python<'py>,
     arguments: &KeywordArguments<'py>,
-) -> PyResult<Result<(Published, HeldProject<'py>), LocationRuleFailure>> {
+) -> PyResult<Result<(PublishedGeneration, HeldProject<'py>), LocationRuleFailure>> {
     if arguments
         .value("action")?
         .extract::<Option<String>>()?
@@ -324,12 +315,12 @@ pub(super) fn publish_location<'py>(
     status(py, "Location snapshot published.")?;
     steps(py, &[(DevPhase::Publish, DevStepState::Finished)], None)?;
     Ok(Ok((
-        (
+        PublishedGeneration {
             record,
             refresh_at,
-            locations.into_iter().collect(),
+            state_locations: locations.into_iter().collect(),
             missing_secrets,
-        ),
+        },
         (project.discovered, compiled),
     )))
 }
@@ -384,12 +375,13 @@ pub(crate) fn run_location<'py>(
         return run_runtime(py, options.unwrap_or_else(|| PyDict::new(py)));
     }
     let publication = (|| {
-        let ((record, _, _, _), _) = publish_location(py, &arguments)?.map_err(|failure| {
-            PyValueError::new_err(format!(
-                "Compile failed: {} rule findings",
-                failure.finding_count
-            ))
-        })?;
+        let (PublishedGeneration { record, .. }, _) =
+            publish_location(py, &arguments)?.map_err(|failure| {
+                PyValueError::new_err(format!(
+                    "Compile failed: {} rule findings",
+                    failure.finding_count
+                ))
+            })?;
         let output = serde_json::to_string(&record)
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
         write_console(py, "stdout", &format!("{output}\n")).map_err(|error| {

@@ -70,7 +70,6 @@ pub(crate) mod planner_strategy;
 pub(crate) mod planner_warehouse;
 pub(crate) mod presentation_text;
 pub(crate) mod project_assembly;
-pub(crate) mod provider_check;
 pub(crate) mod query_command;
 pub(crate) mod recall;
 pub(crate) mod record_behaviours;

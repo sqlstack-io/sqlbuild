@@ -28,9 +28,7 @@ fn changes_values(overlay: &EnvironmentOverlay) -> bool {
             .any(|name| environment_var_os(name).is_some())
 }
 
-/// Re-read the env file under `sqb dev`; the runtime interpreter must restart when this returns true.
-///
-/// A file that no longer loads keeps the values from the last good read, with a warning.
+/// Re-read the env file under `sqb dev`, keeping the last good read with a warning; `true` means restart the interpreter.
 pub(crate) fn reload_env_file(options: &LocationServe) -> bool {
     if !options.dev_events {
         return false;

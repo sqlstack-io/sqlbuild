@@ -2,10 +2,7 @@
 
 use std::ffi::OsString;
 
-/// Changes to the inherited environment that this process and every child it starts see.
-///
-/// The process environment itself is never modified; in-process reads go through the
-/// `environment_*` functions and children receive the changes on their command.
+/// Changes to the inherited environment that in-process `environment_*` reads and every started child see.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct EnvironmentOverlay {
     /// Variables set, or replaced, in order.

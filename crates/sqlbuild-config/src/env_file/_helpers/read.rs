@@ -2,7 +2,8 @@
 
 use std::path::Path;
 
-use crate::env_file::models::{EnvFileChoice, EnvFileError};
+use crate::env_file::errors::EnvFileError;
+use crate::env_file::models::EnvFileChoice;
 
 /// The physical line number where the logical line `text` starts, `1` when it cannot be found.
 fn line_number(path: &Path, text: &str) -> usize {
@@ -74,7 +75,16 @@ pub(crate) fn shared_read_warning(path: &Path, choice: &EnvFileChoice) -> Option
 
     use crate::env_file::constants::SHARED_READ_BITS;
 
-    let mode: u32 = std::fs::metadata(path).ok()?.permissions().mode();
+    let mode: u32 = match std::fs::metadata(path) {
+        Ok(metadata) => metadata.permissions().mode(),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(error) => {
+            return Some(format!(
+                "cannot check who may read env file {}: {error}",
+                choice.display
+            ));
+        }
+    };
     (mode & SHARED_READ_BITS != 0).then(|| {
         format!(
             "env file {} is readable by group or others (mode {:o}); restrict it with chmod 600 {}",
