@@ -25,6 +25,7 @@ use sqlbuild_process_ownership::ownership::main::{
 use tokio::process::Command;
 use uuid::Uuid;
 
+use crate::dev_stop::main::stop_switch::stop_switch;
 use crate::workers::_helpers::invocation::{arguments, environment, excluded};
 use crate::workers::constants::SLOW_SCHEDULER_CYCLE;
 use crate::workers::models::{
@@ -225,6 +226,7 @@ impl Workers {
                     exit: None,
                     launch_failure: None,
                     recovered: false,
+                    group: None,
                 });
                 let worker = &mut self.active[index];
                 let claim = &worker.claim;
@@ -298,6 +300,10 @@ impl Workers {
                 .await?;
                 let launched = match local_command {
                     Some(command) => command.spawn().map(|child| {
+                        worker.group = child.id();
+                        if let Some(group) = worker.group {
+                            stop_switch().register_group(group);
+                        }
                         worker.child = Some(WorkerChild::Local(child));
                     }),
                     None => {
@@ -409,6 +415,15 @@ impl LocalSpawn {
             return Err(error.into());
         }
         Ok(child)
+    }
+}
+
+impl Drop for ClaimedWorker {
+    /// The worker's group may be reused once it is reaped, so a forced stop must no longer signal it.
+    fn drop(&mut self) {
+        if let Some(group) = self.group {
+            stop_switch().forget_group(group);
+        }
     }
 }
 

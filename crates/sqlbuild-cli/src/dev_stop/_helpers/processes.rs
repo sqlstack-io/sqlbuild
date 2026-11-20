@@ -17,7 +17,7 @@ pub(crate) fn signal_group(group: i32, kill: bool) {
 #[cfg(not(unix))]
 pub(crate) fn signal_group(_group: i32, _kill: bool) {}
 
-/// SIGKILL every direct child still running, and the process group each local worker leads, so nothing a worker started is left behind.
+/// On Linux, also SIGKILL every direct child still running and the process group it leads, as a backstop for children nothing registered; registered groups, such as each local worker's, are killed on every Unix.
 #[cfg(target_os = "linux")]
 pub(crate) fn kill_children() {
     let own: i32 = rustix::process::getpid().as_raw_nonzero().get();
@@ -41,7 +41,7 @@ pub(crate) fn kill_children() {
     }
 }
 
-/// Elsewhere, children die with their registered groups or when their handles drop.
+/// Elsewhere, children die with their registered groups, which `killpg` reaches on every Unix, or when their handles drop.
 #[cfg(not(target_os = "linux"))]
 pub(crate) fn kill_children() {}
 

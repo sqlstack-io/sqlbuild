@@ -164,7 +164,7 @@ impl StopSwitch {
         }
     }
 
-    /// Kill every registered group and every remaining child, such as local workers.
+    /// Kill every registered group, such as each local worker's, on every Unix, then on Linux any child left over.
     pub(crate) fn kill_all(&self) {
         if let Ok(groups) = self.groups.lock() {
             for group in groups.iter() {
