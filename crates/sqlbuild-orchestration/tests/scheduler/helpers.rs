@@ -156,8 +156,8 @@ pub(crate) async fn store_old_job_definitions(store: &ControlStore, source: &str
     commit(transaction).await.expect("commit");
 }
 
-/// Rewrite every snapshot's stored `jobs` document as an older release published it, with each job's concurrency source.
-pub(crate) async fn store_old_jobs_documents(store: &ControlStore, source: &str) {
+/// Point each snapshot's `jobs` and `groups` documents at old-form bodies under hashes of their own, as an older release stored them.
+pub(crate) async fn store_old_documents(store: &ControlStore, source: &str) {
     use crate::runs::tests::helpers::rows;
     use crate::store::main::{
         begin::begin, commit::commit, compress::compress, decompress::decompress, query::query,
@@ -167,7 +167,7 @@ pub(crate) async fn store_old_jobs_documents(store: &ControlStore, source: &str)
     let documents = rows(
         store,
         "SELECT b.document_hash, b.body FROM sqb_snapshot_documents d \
-         JOIN sqb_documents b ON b.document_hash=d.document_hash WHERE d.kind='jobs'",
+         JOIN sqb_documents b ON b.document_hash=d.document_hash WHERE d.kind IN ('jobs', 'groups')",
         vec![],
     )
     .await;
@@ -175,21 +175,55 @@ pub(crate) async fn store_old_jobs_documents(store: &ControlStore, source: &str)
     for document in documents {
         let mut body: serde_json::Value =
             serde_json::from_slice(&decompress(&document["body"]).expect("body")).expect("JSON");
-        for job in body.as_object_mut().expect("jobs").values_mut() {
+        for job in body.as_object_mut().expect("jobs or groups").values_mut() {
             job["resolved_concurrency"]["source"] = serde_json::json!(source);
         }
+        let hash = document["document_hash"].as_str().expect("hash").to_owned();
+        let old_hash = format!("{hash}-published-before-0004");
         (transaction, _) = query(
             transaction,
-            "UPDATE sqb_documents SET body=$1 WHERE document_hash=$2",
+            "INSERT INTO sqb_documents (document_hash, body) VALUES ($1, $2)",
             vec![
+                Parameter::Text(old_hash.clone()),
                 Parameter::Bytes(
                     compress(&serde_json::to_vec(&body).expect("JSON")).expect("gzip"),
                 ),
-                Parameter::Text(document["document_hash"].as_str().expect("hash").to_owned()),
             ],
         )
         .await
         .expect("store the old document");
+        (transaction, _) = query(
+            transaction,
+            "UPDATE sqb_snapshot_documents SET document_hash=$1 WHERE document_hash=$2",
+            vec![Parameter::Text(old_hash), Parameter::Text(hash)],
+        )
+        .await
+        .expect("point the snapshots at it");
     }
     commit(transaction).await.expect("commit");
+}
+
+/// A control-store result as a test compares it: `ok`, or the error as `Invalid("...")` and the like.
+pub(crate) fn outcome<T>(result: Result<T, ControlError>) -> String {
+    result.map_or_else(|error| format!("{error:?}"), |_| "ok".to_owned())
+}
+
+/// The scheduled orders snapshot with job `orders`, a group `nightly_group` of it and `triggers`, as a release before 0004 published it once its source is stored.
+pub(crate) fn upgrade_snapshot(
+    location_id: Uuid,
+    triggers: serde_json::Value,
+) -> crate::snapshots::models::SnapshotInput {
+    let mut input = crate::scheduler::tests::contracts::ticks::helpers::snapshot(location_id);
+    input.documents.insert(
+        "jobs".into(),
+        serde_json::json!({"orders": {"description": "Build orders", "selection": ["orders"],
+            "resolved_concurrency": {"limit": 4}}}),
+    );
+    input.documents.insert(
+        "groups".into(),
+        serde_json::json!({"nightly_group": {"description": "Everything nightly",
+            "selection": ["orders"], "jobs": {"orders": []}, "resolved_concurrency": {"limit": 4}}}),
+    );
+    input.documents.insert("triggers".into(), triggers);
+    input
 }

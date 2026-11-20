@@ -314,11 +314,17 @@ afterwards, so back it up before you upgrade (see
 [Back up the control database](#back-up-the-control-database)). To roll back, restore that backup;
 runs recorded since the upgrade are lost.
 
-Before you upgrade, let queued and running runs finish, or cancel them. A run stays pinned to the
-snapshot it started on, and a snapshot an earlier release published can hold job definitions this
-release no longer reads: a group run or a retry from it fails with an error such as
-``jobs: unknown field `source`, expected `limit` ``, which stops the server's scheduler. After the server, upgrade and
-restart every location, so each publishes its project again with the new release.
+Before you upgrade, pause your schedules and sensors, or keep the scheduler off (set
+`scheduler = false` under `[server]` and stop any `sqb scheduler`), then let queued and running
+runs finish, or cancel them. A run stays pinned to the snapshot it started on, and a snapshot an
+earlier release published can hold job definitions this release no longer reads: a group run or a
+retry from it fails with `` jobs: unknown field `source`, expected `limit` ``, which stops the
+scheduler.
+
+After upgrading the server, upgrade and restart every location, so each publishes its project again
+with the new release. Until a location has published again, its job pages, group runs and ad hoc
+runs fail with the same error, and a group's schedule stops the scheduler; its job runs from
+schedules, sensors and manual requests work.
 
 To see what an upgrade changes before you start the server, run the new release with `--dry-run`:
 

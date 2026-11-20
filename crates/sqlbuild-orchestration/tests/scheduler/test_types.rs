@@ -20,6 +20,21 @@ pub(crate) struct MigratedConcurrencySourceTestCase {
     pub(crate) expected_ticks: usize,
     /// Runs queued after 0004, as `origin count`.
     pub(crate) expected_runs: &'static [&'static str],
+    /// A job page read and a group run request after 0004, before the location publishes again.
+    pub(crate) expected_until_republished: [&'static str; 2],
+    /// The same once the location has published again.
+    pub(crate) expected_after_republish: [&'static str; 2],
+}
+
+pub(crate) struct GroupScheduleOldDocumentTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The concurrency source an older release stored with each job.
+    pub(crate) stored_source: &'static str,
+    /// The scheduler cycle due to queue the group after 0004, before the location publishes again.
+    pub(crate) expected_until_republished: &'static str,
+    /// Ticks the cycle takes once the location has published again.
+    pub(crate) expected_ticks_after_republish: usize,
 }
 
 pub(crate) struct PinnedOldDocumentTestCase {
