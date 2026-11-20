@@ -25,11 +25,25 @@ function readersOf(key: string, selected: Set<string>): string[] {
 	return found;
 }
 
+/** `?secrets=sink`: the chat webhook's URL is missing too, and its run notifications sink runs with every command. */
+const CHAT_SINK: PlanCantRun = {
+	reason: 'missing_secret',
+	provider: 'chat_webhook',
+	path: 'providers/chat.py',
+	variables: ['CHAT_WEBHOOK_URL'],
+	nodes: [],
+	readers: [],
+	sinks: ['run_notifications'],
+	env_file: '.env'
+};
+
 /** What a plan of `selection` can't run: the orders loader, when selected, and the selected nodes that read it. */
-export function ordersApiCantRun(selection: string[]): PlanCantRun[] {
+export function ordersApiCantRun(selection: string[], sink = false): PlanCantRun[] {
 	const selected = new Set(selection);
-	if (!selected.has(BLOCKED_NODE)) return [];
+	const sinks = sink ? [CHAT_SINK] : [];
+	if (!selected.has(BLOCKED_NODE)) return sinks;
 	return [
+		...sinks,
 		{
 			reason: 'missing_secret',
 			provider: 'orders_api',
@@ -37,6 +51,7 @@ export function ordersApiCantRun(selection: string[]): PlanCantRun[] {
 			variables: ['ORDERS_API_KEY'],
 			nodes: [BLOCKED_NODE],
 			readers: readersOf(BLOCKED_NODE, selected),
+			sinks: [],
 			env_file: '.env'
 		}
 	];
@@ -75,7 +90,7 @@ function withMissingKeyItem(overview: Overview | null, scope: Scope): Overview |
 }
 
 /** The client whose build plans can't run what the orders API's missing key stops. */
-export function missingSecrets(client: ApiClient): ApiClient {
+export function missingSecrets(client: ApiClient, { sink = false }: { sink?: boolean } = {}): ApiClient {
 	return new Proxy(client, {
 		get(target, prop, receiver) {
 			const value = Reflect.get(target, prop, receiver);
@@ -90,8 +105,20 @@ export function missingSecrets(client: ApiClient): ApiClient {
 				const result = await target.planBuild(...args);
 				if (!result.plan) return result;
 				const check = await target.checkAdhocRun(args[0], { command: args[1], priority: 0 });
-				const cant_run = ordersApiCantRun(check.selection);
-				return cant_run.length ? { ...result, plan: { ...result.plan, cant_run } } : result;
+				const cant_run = ordersApiCantRun(check.selection, sink);
+				if (!cant_run.length) return result;
+				// A real plan loads the orders loader's source; the mock's plans list only models.
+				const source_loads = check.selection.includes(BLOCKED_NODE)
+					? [...result.plan.source_loads, { name: BLOCKED_NODE, kind: 'source', write_strategy: 'append', cursor_column: 'loaded_at', is_reload: false }]
+					: result.plan.source_loads;
+				// It also runs the Python nodes it selects, which the mock's plans leave out.
+				const python_nodes = [
+					...result.plan.python_nodes,
+					...check.selection
+						.filter((key) => SNAPSHOT_NODES.find((node) => node.key === key)?.kind === 'task')
+						.map((name) => ({ name, kind: 'task', phase: 'after_models', identity_status: 'unchanged' }))
+				];
+				return { ...result, plan: { ...result.plan, source_loads, python_nodes, cant_run } };
 			};
 		}
 	});

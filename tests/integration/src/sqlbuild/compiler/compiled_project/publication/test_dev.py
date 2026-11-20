@@ -38,6 +38,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     REGION_PROVIDER_FILES,
     current_snapshot,
     location_process,
+    request_development_run,
     stop_location,
     wait_for_connection_health,
     wait_for_development_ready,
@@ -323,37 +324,6 @@ def test_given_plain_development_when_a_warehouse_read_fails_then_a_warning_line
         assert process.wait(timeout=15) == 0, log.read_text()
 
     assert test_case.hidden_line not in log.read_text()
-
-
-def request_development_run(
-    executable: str, project: Path, identity: str, environment: dict[str, str]
-) -> str:
-    """Request a run of `annual_orders_job` from the development store; its run ID."""
-    run_id: str = str(uuid4())
-    requested: subprocess.CompletedProcess[str] = subprocess.run(
-        [
-            executable,
-            "--project-dir",
-            str(project),
-            "admin",
-            "request-run",
-            identity,
-            "annual_orders_job",
-            "--target",
-            "development",
-            "--run-id",
-            run_id,
-            "--reason",
-            "Development secret reload",
-        ],
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=10,
-        check=False,
-    )
-    assert requested.returncode == 0, requested.stderr
-    return run_id
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")

@@ -12,6 +12,3 @@ pub(crate) const HOOK_SETTINGS: [&str; 2] = ["pre_hooks", "post_hooks"];
 
 /// Set in a worker's environment; its run reports to the location's server.
 pub(crate) const RUN_TOKEN_VARIABLE: &str = "SQLBUILD_RUN_TOKEN";
-
-/// The prefix of a sink's key among a provider's users.
-pub(crate) const SINK_KEY_PREFIX: &str = "sink:";

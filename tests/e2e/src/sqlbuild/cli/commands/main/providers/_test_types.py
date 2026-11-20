@@ -1,4 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -175,3 +177,11 @@ class EnvFileE2ETestCase:
     # The region the provider read; empty when the task did not run.
     expected_region: str
     unexpected_output_fragments: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ProjectDirSpellingTestCase:
+    description: str
+    # The `--project-dir` argument for the project, such as a symlink to it or a relative path.
+    project_argument: Callable[[Path], Path]
+    expected_output_fragment: str

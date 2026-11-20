@@ -30,7 +30,7 @@
 	import { applySuggestion, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow, type Suggestion } from '$lib/run/command';
 	import DataRange from '$lib/run/data-range.svelte';
 	import PlanBrowser from '$lib/run/plan-browser.svelte';
-	import { cantRunKeys, cantRunReason, withoutNodes } from '$lib/run/cant-run';
+	import { cantRunKeys, cantRunReason, sinkBlocks, withoutNodes } from '$lib/run/cant-run';
 	import PlanTimings from '$lib/run/plan-timings.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
@@ -545,7 +545,7 @@
 		<div class="why">
 			{#if launchError}<span class="problem">{launchError}</span>{:else if !canLaunch && blockedReason && blockedReason !== problem}<span class="faint">{blockedReason}</span>{/if}
 		</div>
-		{#if blockedNodes.length}
+		{#if blockedNodes.length && !sinkBlocks(cantRun)}
 			<Button variant="outline" size="sm" data-testid="plan-without-blocked" onclick={() => (cmd = withoutNodes(cmd, blockedNodes))}>Plan without {blockedNodes.length === 1 ? 'this node' : `these ${blockedNodes.length} nodes`}</Button>
 		{/if}
 		<GatedButton requires={job ? 'job.run' : 'run.adhoc'} variant={canLaunch ? 'default' : 'outline'} disabled={!canLaunch} reason={blockedReason} busy={launching} onclick={launch}><PlayIcon class="size-3.5 fill-current stroke-none" />Run</GatedButton>

@@ -10,7 +10,6 @@ use sqlbuild_python_project::graph::models::ProjectSelection;
 
 use crate::provider_check::_helpers::readers::{downstream_readers, readers_by_key};
 use crate::provider_check::_helpers::users::provider_users;
-use crate::provider_check::constants::SINK_KEY_PREFIX;
 use crate::provider_check::models::SecretBlock;
 
 /// The providers missing secrets that the run of exactly `selected` node keys uses, with the nodes they stop.
@@ -26,22 +25,23 @@ pub(crate) fn blocks_for(
     let sinks: Vec<(String, String)> = sink_uses(discovered)?;
     let mut blocks: Vec<SecretBlock> = Vec::new();
     for (provider, path, variables) in missing {
-        let mut users: BTreeSet<String> =
-            provider_users((discovered, project), selection, &provider)?
-                .into_iter()
-                .filter(|key| selected.contains(key))
-                .collect();
+        let users: BTreeSet<String> = provider_users((discovered, project), selection, &provider)?
+            .into_iter()
+            .filter(|key| selected.contains(key))
+            .collect();
+        let mut using_sinks: BTreeSet<String> = BTreeSet::new();
         for (used, sink) in &sinks {
             if *used == provider {
-                users.insert(format!("{SINK_KEY_PREFIX}{sink}"));
+                using_sinks.insert(sink.clone());
             }
         }
-        if users.is_empty() {
+        if users.is_empty() && using_sinks.is_empty() {
             continue;
         }
         blocks.push(SecretBlock {
             readers: downstream_readers(&users, selected, &readers),
             users: users.into_iter().collect(),
+            sinks: using_sinks.into_iter().collect(),
             provider,
             path,
             variables,

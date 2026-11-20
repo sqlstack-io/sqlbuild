@@ -788,6 +788,8 @@ export type PlanCantRun = {
 	nodes: string[];
 	/** Selected node keys downstream of those, which can't run either. */
 	readers: string[];
+	/** Sinks that use the provider; every run uses sinks, so nothing in the plan can run. */
+	sinks: string[];
 	/** The env file the location loads, such as `.env`; null when it loads none. */
 	env_file: string | null;
 };

@@ -286,8 +286,14 @@ Can't run: provider partner_api needs PARTNER_API_TOKEN (missing from the enviro
 `variables`, the `nodes` that use it, the selected `readers` of those, and the `env_file` it looked
 in. Values are never included.
 
-In the web UI, the plan page lists these nodes under **Can't run** and disables **Run** until the
-secret is set. **Plan without these nodes** excludes them and plans the rest.
+In the web UI, the plan page lists these nodes under **Can't run**, leaves them out of the **Will
+run** count, and disables **Run** until the secret is set. **Plan without these nodes** excludes them
+and plans the rest.
+
+A [sink](/docs/concepts/observability/sinks) runs with every command, so when its provider is missing
+a secret nothing can run: the plan says `sink <name> needs <VARIABLE>; every run uses sinks`, `sqb
+build` lists the same line in its `D012` error, and there is no selection that leaves the sink out.
+In `--json`, `cant_run` names the sink under `sinks`.
 
 Nobody looks at a plan for a schedule or sensor, so its run checks the same thing on the worker,
 before compiling a plan or connecting. Each node that uses the provider fails with `D012`, the nodes

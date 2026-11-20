@@ -12,6 +12,8 @@ test('a missing provider secret lists what can’t run, disables Run, and planni
 	const pane = page.locator('.pane[data-section="cant_run"]');
 	await expect(pane).toBeVisible({ timeout: 30_000 });
 	await expect(page.getByTestId('index-cant-run')).toHaveText('Can’t run12');
+	// Will run leaves out what can't run: only stg_customers is left of the 13 planned.
+	await expect(page.getByTestId('index-will-run')).toHaveText('Will run1');
 	const problem = page.getByTestId('cant-run-problem');
 	await expect(problem).toContainText("Can't run: provider orders_api needs ORDERS_API_KEY");
 	await expect(problem).toContainText('raw__orders and the 11 nodes that read it');
@@ -28,4 +30,15 @@ test('a missing provider secret lists what can’t run, disables Run, and planni
 	await expect(page.getByRole('textbox', { name: 'Command' })).toHaveValue(/--exclude raw__orders stg_orders fact_orders/);
 	await expect(page.getByTestId('index-cant-run')).toHaveCount(0, { timeout: 30_000 });
 	await expect(run).toBeEnabled({ timeout: 30_000 });
+});
+
+test('a sink whose provider is missing a secret stops the whole plan, with no way around it', async ({ page }) => {
+	await page.goto(`/plan?mock&secrets=sink&cmd=${encodeURIComponent('sqb build --select stg_customers')}`);
+	await expect(page.locator('.pane[data-section="cant_run"]')).toBeVisible({ timeout: 30_000 });
+	await expect(page.getByTestId('index-cant-run')).toHaveText('Can’t runall');
+	await expect(page.getByTestId('index-will-run')).toHaveText('Will run0');
+	await expect(page.getByTestId('cant-run-sinks')).toHaveText('run_notifications: every run uses sinks, so nothing can run');
+	await expect(page.locator('.foot .why')).toHaveText('Run is disabled: sink run_notifications needs CHAT_WEBHOOK_URL; every run uses sinks. Fix it and plan again.');
+	await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeDisabled();
+	await expect(page.getByTestId('plan-without-blocked')).toHaveCount(0);
 });

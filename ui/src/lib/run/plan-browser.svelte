@@ -14,7 +14,7 @@
 	import { WARNINGS_SHOWN, diffPreview, planGroups, selectedGroup, withoutRows, type PlanGroupKey, type PlanRow, type WarningGroup } from './plan-index';
 	import PlanRenames from './plan-renames.svelte';
 	import PlanCantRun from './plan-cant-run.svelte';
-	import { cantRunKeys } from './cant-run';
+	import { cantRunKeys, sinkBlocks, willRunCount } from './cant-run';
 
 	/**
 	 * `section` is the group shown, kept in the address by the page; `more` adds the next page of a
@@ -51,6 +51,8 @@
 	const CANT_RUN = 'cant_run';
 	const cantRun = $derived(plan.cant_run ?? []);
 	const blocked = $derived(cantRunKeys(cantRun));
+	/** How many nodes can't run: all of them when a sink's provider is missing a secret. */
+	const cantCount = $derived(sinkBlocks(cantRun) ? 'all' : blocked.length.toLocaleString());
 	const cantRunShown = $derived(cantRun.length > 0 && (section === null || section === CANT_RUN));
 
 	/** Rows a group shows at first, and each "Show more" adds. */
@@ -291,7 +293,7 @@
 <div class="plan-browser">
 	<nav class="index" aria-label="Plan sections">
 		{#if runGroups.length}
-			<div class="heading" data-testid="index-will-run"><span>Will run</span><b>{totals.run.toLocaleString()}</b></div>
+			<div class="heading" data-testid="index-will-run"><span>Will run</span><b>{willRunCount(totals.run, cantRun).toLocaleString()}</b></div>
 			{#each runGroups as g (g.key)}{@render entry(g)}{/each}
 		{/if}
 		{#if wontGroups.length}
@@ -299,11 +301,11 @@
 			{#each wontGroups as g (g.key)}{@render entry(g)}{/each}
 		{/if}
 		{#if cantRun.length}
-			<div class="heading cant" data-testid="index-cant-run"><span>Can’t run</span><b>{blocked.length.toLocaleString()}</b></div>
+			<div class="heading cant" data-testid="index-cant-run"><span>Can’t run</span><b>{cantCount}</b></div>
 			<!-- raw-button: a table-of-contents entry with its count, highlighted while its section is shown -->
 			<button class="entry" class:selected={cantRunShown} aria-current={cantRunShown ? 'true' : undefined} data-section={CANT_RUN} onclick={() => onselect(CANT_RUN)}>
 				<span class="title">Missing secret</span>
-				<span class="count">{blocked.length.toLocaleString()}</span>
+				<span class="count">{cantCount}</span>
 			</button>
 		{/if}
 		{#if warningGroup}
@@ -314,7 +316,7 @@
 
 	{#if cantRunShown}
 		<section class="pane" data-section={CANT_RUN}>
-			<header><h3>Can’t run <span class="count">{blocked.length === 1 ? '1 node' : `${blocked.length.toLocaleString()} nodes`}</span></h3></header>
+			<header><h3>Can’t run <span class="count">{sinkBlocks(cantRun) ? 'every node' : blocked.length === 1 ? '1 node' : `${blocked.length.toLocaleString()} nodes`}</span></h3></header>
 			<PlanCantRun entries={cantRun} {kindOf} {upstreamOf} />
 		</section>
 	{:else if group}

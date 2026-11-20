@@ -2079,3 +2079,34 @@ def plan_before_sync(
         request_id: str = request_plan(control, [], settings)
         result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
     return result["result_json"]["outcome"], log.read_text()
+
+
+def request_development_run(
+    executable: str, project: Path, identity: str, environment: dict[str, str]
+) -> str:
+    """Request a run of `annual_orders_job` from the development store; its run ID."""
+    run_id: str = str(uuid4())
+    requested: subprocess.CompletedProcess[str] = subprocess.run(
+        [
+            executable,
+            "--project-dir",
+            str(project),
+            "admin",
+            "request-run",
+            identity,
+            "annual_orders_job",
+            "--target",
+            "development",
+            "--run-id",
+            run_id,
+            "--reason",
+            "Development secret reload",
+        ],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert requested.returncode == 0, requested.stderr
+    return run_id

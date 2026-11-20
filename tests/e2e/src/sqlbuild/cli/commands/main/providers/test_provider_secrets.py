@@ -9,8 +9,13 @@ from textwrap import dedent
 import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.providers._test_types import (
+    ProjectDirSpellingTestCase,
     ProviderCommandDiagnosticE2ETestCase,
     ProviderSecretE2ETestCase,
+)
+from tests.e2e.src.sqlbuild.cli.commands.main.providers.helpers import (
+    linked_project,
+    relative_project,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
@@ -397,8 +402,25 @@ BUILD: tuple[str, ...] = ("--no-color", "build", "--no-tests", "--no-audits", "-
             env={},
             extra_repo_files=API_SINK,
             expected_exit_code=1,
-            expected_output_fragments=(SELECTION_ERROR, "export_event", "nothing was run"),
+            expected_output_fragments=(
+                SELECTION_ERROR,
+                f"sink export_event needs {SECRET_VARIABLE}; every run uses sinks",
+                "nothing was run",
+            ),
             expected_marker_entries=(),
+            unexpected_output_fragments=("(sink:export_event", "(export_event)"),
+        ),
+        ProviderSecretE2ETestCase(
+            description="plan whose sink's provider is missing the secret can't run at all",
+            command=("--no-color", "plan", "--select", "no_api"),
+            env={},
+            extra_repo_files=API_SINK | TARGET_ALLOWS_API,
+            expected_exit_code=0,
+            expected_output_fragments=(
+                f"Can't run: sink export_event needs {SECRET_VARIABLE}; every run uses sinks",
+            ),
+            expected_marker_entries=(),
+            unexpected_output_fragments=("needs  export_event",),
         ),
         ProviderSecretE2ETestCase(
             description="debug with a sink lists the missing secret",
@@ -494,3 +516,41 @@ def test_given_project_file_allows_missing_secrets_when_compiling_then_fails(
 
     assert result.returncode != 0
     assert test_case.expected_error_fragment in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ProjectDirSpellingTestCase(
+            description="a symlinked project names its env file relative to the project",
+            project_argument=linked_project,
+            expected_output_fragment=SELECTION_ERROR,
+        ),
+        ProjectDirSpellingTestCase(
+            description="a relative project directory names its env file relative to the project",
+            project_argument=relative_project,
+            expected_output_fragment=SELECTION_ERROR,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_project_dir_spelling_when_a_secret_is_missing_then_the_env_file_shows_as_dot_env(
+    test_case: ProjectDirSpellingTestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="provider_secret_project",
+        repo_files={**PROJECT_FILES, ".env": "UNRELATED_SETTING=1\n"},
+    )
+    (project_dir / ".env").chmod(0o600)
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=(*BUILD, "uses_api"),
+        project_dir=test_case.project_argument(project_dir),
+        env={"MARKER_PATH": str(tmp_path / "marker.log")},
+    )
+
+    output: str = result.stdout + result.stderr
+    assert result.returncode == 1, output
+    assert test_case.expected_output_fragment in output, output

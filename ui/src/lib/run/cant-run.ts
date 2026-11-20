@@ -23,8 +23,21 @@ export function missingVariables(entries: PlanCantRun[]): string[] {
 /** "a", "a and b", "a, b and c". */
 const andList = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`);
 
+/** "sink run_log needs LOG_TOKEN; every run uses sinks", once per sink a missing secret stops. */
+export function sinkLines(entries: PlanCantRun[]): string[] {
+	return entries.flatMap((e) => (e.sinks ?? []).map((sink) => `sink ${sink} needs ${andList(e.variables)}; every run uses sinks`));
+}
+
+/** Whether a sink's missing secret stops the whole plan, so leaving nodes out can't help. */
+export const sinkBlocks = (entries: PlanCantRun[]) => entries.some((e) => (e.sinks ?? []).length > 0);
+
+/** The plan's Will run count without the nodes it can't run. */
+export const willRunCount = (run: number, entries: PlanCantRun[]) => (sinkBlocks(entries) ? 0 : Math.max(0, run - cantRunKeys(entries).length));
+
 /** Why Run is disabled: "Run is disabled: 1 missing secret. Fix it and plan again, or leave those 3 nodes out." */
 export function cantRunReason(entries: PlanCantRun[]): string {
+	const sinks = sinkLines(entries);
+	if (sinks.length) return `Run is disabled: ${sinks.join('; ')}. Fix ${sinks.length === 1 ? 'it' : 'them'} and plan again.`;
 	const missing = missingVariables(entries).length;
 	const nodes = cantRunKeys(entries).length;
 	return `Run is disabled: ${plural(missing, 'missing secret')}. Fix ${missing === 1 ? 'it' : 'them'} and plan again, or leave ${nodes === 1 ? 'that node' : `those ${nodes} nodes`} out.`;
@@ -97,7 +110,7 @@ export function runCantRun(nodes: RunNodeFacts[]): PlanCantRun[] {
 		if (!match) continue;
 		const [, provider, variables, places] = match;
 		const envFile = /and from (.+)$/.exec(places)?.[1] ?? null;
-		const entry = byProvider.get(provider) ?? { reason: 'missing_secret', provider, path: '', variables: variables.split(', '), nodes: [], readers: [], env_file: envFile };
+		const entry = byProvider.get(provider) ?? { reason: 'missing_secret', provider, path: '', variables: variables.split(', '), nodes: [], readers: [], sinks: [], env_file: envFile };
 		entry.nodes.push(node.nodeKey);
 		byProvider.set(provider, entry);
 		owner.set(node.nodeKey, entry);

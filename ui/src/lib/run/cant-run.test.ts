@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanCantRun } from '$lib/api';
-import { cantRunKeys, cantRunReason, cantRunRows, fixText, needsText, runCantRun, withoutNodes } from './cant-run';
+import { cantRunKeys, cantRunReason, cantRunRows, fixText, needsText, runCantRun, sinkBlocks, sinkLines, willRunCount, withoutNodes } from './cant-run';
 
 const payments: PlanCantRun = {
 	reason: 'missing_secret',
@@ -9,8 +9,10 @@ const payments: PlanCantRun = {
 	variables: ['PAYMENTS_API_TOKEN'],
 	nodes: ['source:raw_payments'],
 	readers: ['model:stg_payments', 'model:fct_payments'],
+	sinks: [],
 	env_file: '.env'
 };
+const chatSink: PlanCantRun = { ...payments, provider: 'chat', variables: ['CHAT_URL'], nodes: [], readers: [], sinks: ['run_log'] };
 
 describe('a plan with nodes that cannot run', () => {
 	it('lists the provider users before their readers, once each', () => {
@@ -57,5 +59,21 @@ describe('a run that hit missing secrets', () => {
 				{ nodeKey: 'model:orders', status: 'failed', errorCode: 'Q001', errorMessage: 'syntax error', skippedBecauseOf: null }
 			])
 		).toEqual([{ ...payments, path: '' }]);
+	});
+});
+
+describe('what a plan can run when secrets are missing', () => {
+	it('counts Will run without the nodes it can not run', () => {
+		expect(willRunCount(90, [payments])).toBe(87);
+		expect(willRunCount(2, [payments])).toBe(0);
+	});
+
+	it('says a sink stops the whole plan, counts it as no node, and offers no way around it', () => {
+		expect(cantRunKeys([chatSink])).toEqual([]);
+		expect(sinkBlocks([chatSink])).toBe(true);
+		expect(sinkBlocks([payments])).toBe(false);
+		expect(sinkLines([chatSink])).toEqual(['sink run_log needs CHAT_URL; every run uses sinks']);
+		expect(willRunCount(90, [payments, chatSink])).toBe(0);
+		expect(cantRunReason([payments, chatSink])).toBe('Run is disabled: sink run_log needs CHAT_URL; every run uses sinks. Fix it and plan again.');
 	});
 });

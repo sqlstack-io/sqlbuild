@@ -13,10 +13,24 @@ pub(crate) fn names(keys: &[String]) -> String {
     names.join(", ")
 }
 
-/// One row per variable: provider, variable, and the nodes that use it and that read those.
+/// One line per sink a block's provider stops: `sink <name> needs <VARS>; every run uses sinks`.
+pub(crate) fn sink_lines(blocks: &[SecretBlock]) -> Vec<String> {
+    let mut lines: Vec<String> = Vec::new();
+    for block in blocks {
+        for sink in &block.sinks {
+            lines.push(format!(
+                "sink {sink} needs {}; every run uses sinks",
+                block.variables.join(", ")
+            ));
+        }
+    }
+    lines
+}
+
+/// One row per variable of a provider that nodes use: provider, variable, and those nodes and their readers.
 pub(crate) fn rows(blocks: &[SecretBlock]) -> Vec<[String; 3]> {
     let mut rows: Vec<[String; 3]> = Vec::new();
-    for block in blocks {
+    for block in blocks.iter().filter(|block| !block.users.is_empty()) {
         let mut needed_by: String = names(&block.users);
         if !block.readers.is_empty() {
             needed_by.push_str(&format!("; read by {}", names(&block.readers)));

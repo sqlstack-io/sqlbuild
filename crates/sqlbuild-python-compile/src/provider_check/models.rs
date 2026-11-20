@@ -8,8 +8,10 @@ pub struct SecretBlock {
     pub path: String,
     /// The unset variables, sorted.
     pub variables: Vec<String>,
-    /// Selected node keys that run the provider, such as `source:raw_payments`; sinks as `sink:<name>`.
+    /// Selected node keys that run the provider, such as `source:raw_payments`.
     pub users: Vec<String>,
     /// Selected node keys downstream of the users, which can't run without them.
     pub readers: Vec<String>,
+    /// Sinks that use the provider; every run uses sinks, so none of it can run.
+    pub sinks: Vec<String>,
 }

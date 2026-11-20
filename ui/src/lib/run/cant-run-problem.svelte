@@ -1,5 +1,5 @@
 <script lang="ts">
-	// One provider whose missing secrets stop nodes: what it needs, what it stops and how to fix it.
+	// One provider whose missing secrets stop nodes, or every run through a sink: what it needs, what it stops and how to fix it.
 	// The plan page says Can't run; a run that hit it says Couldn't run.
 	import type { PlanCantRun } from '$lib/api';
 	import { to } from '$lib/paths';
@@ -15,8 +15,14 @@
 		<span class="tag">missing secret</span>
 	</div>
 	<dl>
-		<dt>needs</dt>
-		<dd>{needsText(entry)}</dd>
+		{#if entry.nodes.length}
+			<dt>needs</dt>
+			<dd>{needsText(entry)}</dd>
+		{/if}
+		{#if entry.sinks?.length}
+			<dt>sinks</dt>
+			<dd data-testid="cant-run-sinks">{entry.sinks.join(', ')}: every run uses sinks, so nothing can run</dd>
+		{/if}
 		<dt>fix</dt>
 		<dd>{fixText(entry, then)}</dd>
 	</dl>
