@@ -1,4 +1,4 @@
-"""Resume dynamic models through the adapter, and close the holds that paused them."""
+"""Resume dynamic models through the adapter under a claim, and close the holds that paused them."""
 
 from __future__ import annotations
 
@@ -53,38 +53,11 @@ def run_dynamic_operation(
         adapter.execute(connection=connection, sql=statement)
 
 
-def resume_holds(
-    *,
-    adapter: BaseAdapter,
-    connection: Any,
-    location: StateLocation,
-    holds: tuple[OpenHold, ...],
-    recorded_by: str,
-) -> HoldsResumed:
-    """Resume each held model still suspended and close its hold; a failure leaves only it open."""
-
-    resumed: list[OpenHold] = []
-    failures: list[tuple[OpenHold, Exception]] = []
-    for hold in holds:
-        try:
-            _resume_suspended(adapter=adapter, connection=connection, relation=hold.relation)
-        except Exception as error:
-            failures.append((hold, error))
-            continue
-        resumed.append(hold)
-    if resumed:
-        _close_holds(
-            adapter=adapter,
-            connection=connection,
-            location=location,
-            holds=(tuple(resumed), recorded_by),
-        )
-    return HoldsResumed(resumed=tuple(resumed), failures=tuple(failures))
-
-
 def _resume_suspended(
     *, adapter: BaseAdapter, connection: Any, relation: CompiledRelationLocation
 ) -> None:
+    """Resume if suspended; known gap: an ALTER sent just before a kill may land after its claim."""
+
     if scheduling_state(adapter=adapter, connection=connection, relation=relation) == (
         SUSPENDED_STATE
     ):
@@ -94,34 +67,6 @@ def _resume_suspended(
             relation=relation,
             operation=DynamicOperation.RESUME,
         )
-
-
-def _close_holds(
-    *,
-    adapter: BaseAdapter,
-    connection: Any,
-    location: StateLocation,
-    holds: tuple[tuple[OpenHold, ...], str],
-) -> None:
-    closed: tuple[OpenHold, ...]
-    recorded_by: str
-    closed, recorded_by = holds
-    adapter.execute(
-        connection=connection,
-        sql=insert_sql(
-            adapter=adapter,
-            location=location,
-            events=tuple(
-                DynamicPauseEvent(
-                    event_type=DynamicPauseEventType.RESUMED,
-                    run_id=hold.run_id,
-                    recorded_by=recorded_by,
-                    relation=hold.relation,
-                )
-                for hold in closed
-            ),
-        ),
-    )
 
 
 def resume_expired(

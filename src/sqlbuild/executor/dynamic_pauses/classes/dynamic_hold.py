@@ -14,7 +14,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.adapter.contract.types import DynamicOperation
 from sqlbuild.executor.dynamic_pauses._helpers.resume import (
-    resume_holds,
+    claim_and_resume,
     run_dynamic_operation,
     scheduling_state,
 )
@@ -241,12 +241,12 @@ class DynamicHold:
         elsewhere: tuple[OpenHold, ...] = tuple(
             hold for hold in expired if _key(hold.relation) not in held_keys
         )
-        resumed: HoldsResumed = resume_holds(
+        resumed: HoldsResumed = claim_and_resume(
             adapter=self._adapter,
             connection=connection,
             location=location,
             holds=elsewhere,
-            recorded_by=self._run_id,
+            holds_after=(self._grace_seconds, self._run_id),
         )
         self._report(holds=resumed.resumed, verb="Resumed")
         if resumed.failures:

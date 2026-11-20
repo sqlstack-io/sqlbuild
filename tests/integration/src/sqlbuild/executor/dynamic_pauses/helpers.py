@@ -22,6 +22,7 @@ from sqlbuild.executor.build.models import (
 )
 from sqlbuild.executor.dynamic_pauses._helpers.resume import run_dynamic_operation
 from sqlbuild.executor.dynamic_pauses._helpers.sql import insert_sql, setup_statements
+from sqlbuild.executor.dynamic_pauses.classes.dynamic_heartbeat import DynamicHeartbeat
 from sqlbuild.executor.dynamic_pauses.classes.dynamic_hold import DynamicHold
 from sqlbuild.executor.dynamic_pauses.constants import CLAIM_RUN_MARKER
 from sqlbuild.executor.dynamic_pauses.main.hold_dynamic_models import hold_dynamic_models
@@ -112,6 +113,7 @@ class ClaimHookAdapter(PausingDuckDbAdapter):
         super().__init__()
         self.after_claim_write: list[Callable[[Any], None]] = []
         self.after_claim_read: list[Callable[[Any], None]] = []
+        self.after_holds_read: list[Callable[[Any], None]] = []
         self.claim_reads: int = 0
 
     def execute(self, *, connection: Any, sql: str) -> Any:
@@ -125,10 +127,12 @@ class ClaimHookAdapter(PausingDuckDbAdapter):
     def query(self, *, connection: Any, sql: str, limit: int | None) -> Any:
         result: Any = super().query(connection=connection, sql=sql, limit=limit)
         read_claims: bool = "'resuming'" in sql
+        read_holds: bool = "'paused'" in sql and not read_claims
         self.claim_reads += int(read_claims)
         _run_next(
             steps={True: self.after_claim_read, False: []}[read_claims], connection=connection
         )
+        _run_next(steps={True: self.after_holds_read, False: []}[read_holds], connection=connection)
         return result
 
 
@@ -361,6 +365,29 @@ def held_by_dead_run(
     assert dead is not None
     dead.acquire(connection=connection, on_progress=None)
     return plan
+
+
+def other_model_hold(*, adapter: PausingDuckDbAdapter, database_path: Path) -> DynamicHold:
+    """`other_run`'s unacquired hold on `weekly_totals`, beside `daily_totals`' pause table."""
+
+    return DynamicHold(
+        adapter=adapter,
+        held={
+            "weekly_totals": CompiledRelationLocation(
+                database=None, schema="staging", name="weekly_totals", qualified_name=None
+            )
+        },
+        refreshed=frozenset(),
+        state_location=(None, "staging"),
+        settings=("other_run", False, 1800.0, False),
+        heartbeat=lambda write: DynamicHeartbeat(
+            adapter=adapter,
+            connection_config={"database": str(database_path)},
+            write=write,
+            interval_seconds=60.0,
+        ),
+        claim_wait=(60.0, 0.01),
+    )
 
 
 def seed_claim(

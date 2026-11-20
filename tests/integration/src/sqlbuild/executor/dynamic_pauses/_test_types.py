@@ -161,6 +161,15 @@ class AbandonedClaimTestCase:
 
 
 @dataclass(frozen=True)
+class TwoBuildsTestCase:
+    description: str
+    expected_operations: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]
+    expected_open_holds: tuple[str, ...]
+    expected_claims: tuple[tuple[str, str, str], ...]
+
+
+@dataclass(frozen=True)
 class TwoSyncsTestCase:
     description: str
     expected_operations: tuple[tuple[str, str], ...]

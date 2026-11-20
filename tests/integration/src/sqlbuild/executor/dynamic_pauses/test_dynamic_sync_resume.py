@@ -11,7 +11,7 @@ import pytest
 from sqlbuild._native import PlanOutput
 from sqlbuild.executor.build.models import BuildExecutionResult, BuildRuntimeParams
 from sqlbuild.executor.build.types import BuildStatus
-from sqlbuild.executor.dynamic_pauses._helpers.resume import claim_and_resume, resume_holds
+from sqlbuild.executor.dynamic_pauses._helpers.resume import claim_and_resume
 from sqlbuild.executor.dynamic_pauses._helpers.sql import (
     read_open_claims,
     read_open_holds,
@@ -33,6 +33,7 @@ from tests.integration.src.sqlbuild.executor.dynamic_pauses._test_types import (
     StaleSyncResumeTestCase,
     SyncDuringTakeoverTestCase,
     SyncResumeTestCase,
+    TwoBuildsTestCase,
     TwoSyncsTestCase,
 )
 from tests.integration.src.sqlbuild.executor.dynamic_pauses.helpers import (
@@ -48,6 +49,7 @@ from tests.integration.src.sqlbuild.executor.dynamic_pauses.helpers import (
     heartbeat_count,
     held_by_dead_run,
     lease_project_case,
+    other_model_hold,
     pause_event_ids,
     pause_events,
     pause_table_names,
@@ -279,12 +281,12 @@ def test_given_one_expired_hold_when_two_closers_resume_it_then_it_closes_once(
         adapter=adapter, connection=connection, location=(None, "staging")
     )
     for closer in test_case.closers:
-        resume_holds(
+        claim_and_resume(
             adapter=adapter,
             connection=connection,
             location=(None, "staging"),
             holds=read,
-            recorded_by=closer,
+            holds_after=(_GRACE_SECONDS, closer),
         )
 
     assert pause_events(connection=connection) == list(test_case.expected_events)
@@ -710,3 +712,78 @@ def test_given_two_syncs_claiming_one_model_when_both_pass_then_it_resumes_once_
     )
     assert read_open_holds(adapter=adapter, connection=connection, location=(None, "staging")) == ()
     adapter.close(connection)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        TwoBuildsTestCase(
+            description="a build resuming another model from a stale read leaves it to its new holder",
+            expected_operations=(),
+            expected_states={"daily_totals": "SUSPENDED"},
+            expected_open_holds=("second_run",),
+            expected_claims=(
+                ("resumed", "other_run", "daily_totals"),
+                ("resuming", "other_run", "daily_totals"),
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_two_builds_taking_over_one_expired_hold_when_one_holds_the_model_then_it_stays_paused(
+    test_case: TwoBuildsTestCase, database_path: Path
+) -> None:
+    adapter: ClaimHookAdapter = ClaimHookAdapter()
+    connection: Any = adapter.connect({"database": str(database_path)})
+    connection.execute("CREATE SCHEMA staging")
+    _ = build_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(
+            orders_query="SELECT 1 AS order_id", report_locations={}, refresh_on_build=False
+        ),
+        runtime=BuildRuntimeParams(run_id="first_run"),
+        database_path=database_path,
+    )
+    plan: PlanOutput = plan_lease_project(
+        adapter=adapter,
+        connection=connection,
+        case=lease_project_case(
+            orders_query="SELECT 1 AS order_id UNION ALL SELECT 2",
+            report_locations={},
+            refresh_on_build=False,
+        ),
+    )
+    seed_hold(
+        adapter=adapter,
+        connection=connection,
+        run_id="dead_run",
+        name="daily_totals",
+        idle_seconds=3600,
+    )
+    holder: DynamicHold | None = hold_dynamic_models(
+        plan=plan,
+        adapter=adapter,
+        runtime=BuildRuntimeParams(run_id="second_run"),
+        connection_config={"database": str(database_path)},
+    )
+    assert holder is not None
+    other: DynamicHold = other_model_hold(adapter=adapter, database_path=database_path)
+    adapter.after_holds_read.append(lambda read: holder.acquire(connection=read, on_progress=None))
+    adapter.operations.clear()
+
+    other.acquire(connection=connection, on_progress=None)
+
+    operations: tuple[tuple[str, str], ...] = tuple(adapter.operations)
+    states: dict[str, str] = dict(adapter.states)
+    holds: tuple[OpenHold, ...] = read_open_holds(
+        adapter=adapter, connection=connection, location=(None, "staging")
+    )
+    claims: list[tuple[str, str, str]] = claim_events(connection=connection)
+    other.release(connection=connection)
+    holder.release(connection=connection)
+    adapter.close(connection)
+    assert operations == test_case.expected_operations
+    assert states == test_case.expected_states
+    assert tuple(sorted(hold.run_id for hold in holds)) == test_case.expected_open_holds
+    assert claims == list(test_case.expected_claims)
