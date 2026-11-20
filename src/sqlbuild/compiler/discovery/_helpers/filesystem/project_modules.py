@@ -455,7 +455,7 @@ def provider_settings(*, provider_class: type) -> dict[str, object]:
 
 
 def _field_lines(provider_class: type) -> dict[str, int]:
-    """The line of each field the class itself annotates, in its source file; empty when unreadable."""
+    """The source line of each field the class annotates; empty when the source is unreadable."""
 
     import ast
     import textwrap

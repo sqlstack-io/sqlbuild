@@ -1085,6 +1085,50 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
 @pytest.mark.parametrize(
     "test_case",
     [
+        WorkerExecutionTestCase(
+            "a scheduled run whose provider is missing secrets fails before the warehouse",
+            'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")',
+            "",
+            "failed",
+            [],
+            default_job_files={},
+            files={path: text for path, text in ENV_FILE_REGION_FILES.items() if path != ".env"}
+            | duckshop_orchestration("upstream_loaded_orders"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_provider_missing_secrets_when_a_scheduled_run_starts_then_it_fails_before_the_warehouse(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
+        )
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        assert run["status_reason"] == (
+            "Couldn't run: provider region needs WORKER_ENV_REGION_CODE, WORKER_ENV_TOKEN "
+            "(missing from the location's environment and from .env); nothing ran"
+        ), worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            nodes: list[tuple[str, str, str | None, str | None, bool]] = [
+                (key, status, code, cause, started is not None)
+                for key, status, code, cause, started in control.execute(
+                    "SELECT node_key, status, error_code, skipped_because_of, started_at "
+                    "FROM sqb_run_nodes WHERE run_id=? AND kind='node' ORDER BY node_key",
+                    (run["run_id"],),
+                )
+            ]
+        assert nodes == [
+            ("model:orders", "skipped", None, "source:raw_regions", False),
+            ("source:raw_regions", "failed", "D012", None, False),
+        ], worker.log.read_text()
+        # Nothing connected: the run never opened, so never created, the DuckDB warehouse.
+        assert not (worker.project / "warehouse.duckdb").exists(), worker.log.read_text()
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
         ClaimedLoadTestCase(
             "a tag-selected job claims its loader chain and hook-read source, not unread ones",
             "",

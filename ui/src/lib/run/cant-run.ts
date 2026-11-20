@@ -77,3 +77,42 @@ export function cantRunRows(entries: PlanCantRun[], upstreamOf: (key: string) =>
 	}
 	return [...rows.values()];
 }
+
+/** A run node's `D012` message, as a worker writes it: `provider X: A, B not set (missing from the location's environment and from .env)`. */
+const MISSING_SECRET_MESSAGE = /^provider (\S+): (.+) not set \(missing from (.+)\)$/;
+
+/** The run's nodes, as much of them as this needs. */
+type RunNodeFacts = { nodeKey: string; status: string; errorCode: string | null; errorMessage: string | null; skippedBecauseOf: { nodeKey: string } | null };
+
+/**
+ * What a run couldn't run because a provider was missing secrets, read from its nodes: each provider's failed
+ * nodes, and the nodes skipped because of them, directly or through another skipped node.
+ */
+export function runCantRun(nodes: RunNodeFacts[]): PlanCantRun[] {
+	const byProvider = new Map<string, PlanCantRun>();
+	const owner = new Map<string, PlanCantRun>();
+	for (const node of nodes) {
+		if (node.status !== 'failed' || node.errorCode !== 'D012' || !node.errorMessage) continue;
+		const match = MISSING_SECRET_MESSAGE.exec(node.errorMessage);
+		if (!match) continue;
+		const [, provider, variables, places] = match;
+		const envFile = /and from (.+)$/.exec(places)?.[1] ?? null;
+		const entry = byProvider.get(provider) ?? { reason: 'missing_secret', provider, path: '', variables: variables.split(', '), nodes: [], readers: [], env_file: envFile };
+		entry.nodes.push(node.nodeKey);
+		byProvider.set(provider, entry);
+		owner.set(node.nodeKey, entry);
+	}
+	let added = true;
+	while (added) {
+		added = false;
+		for (const node of nodes) {
+			const cause = node.skippedBecauseOf?.nodeKey;
+			const entry = cause ? owner.get(cause) : undefined;
+			if (node.status !== 'skipped' || !entry || owner.has(node.nodeKey)) continue;
+			entry.readers.push(node.nodeKey);
+			owner.set(node.nodeKey, entry);
+			added = true;
+		}
+	}
+	return [...byProvider.values()];
+}

@@ -3,7 +3,8 @@
 	// provider (what it needs, what it stops, how to fix it), then a row per node with why it can't run.
 	import type { PlanCantRun } from '$lib/api';
 	import { to } from '$lib/paths';
-	import { cantRunRows, fixText, keyName, needsText, variablesText } from './cant-run';
+	import { cantRunRows, keyName } from './cant-run';
+	import CantRunProblem from './cant-run-problem.svelte';
 
 	/** `kindOf` and `upstreamOf` read the catalog; `then` ends the fix, such as "plan again". */
 	let {
@@ -23,21 +24,7 @@
 </script>
 
 <div class="cant-run" data-testid="plan-cant-run">
-	{#each entries as e (e.provider)}
-		<div class="problem" data-testid="cant-run-problem">
-			<div class="head">
-				<span class="mark" aria-hidden="true">✗</span><b>Can't run:</b>
-				<span>provider <a href={to(`/providers/${encodeURIComponent(e.provider)}`)} class="provider">{e.provider}</a> needs <code>{variablesText(e)}</code></span>
-				<span class="tag">missing secret</span>
-			</div>
-			<dl>
-				<dt>needs</dt>
-				<dd>{needsText(e)}</dd>
-				<dt>fix</dt>
-				<dd>{fixText(e, then)}</dd>
-			</dl>
-		</div>
-	{/each}
+	{#each entries as e (e.provider)}<CantRunProblem entry={e} {then} />{/each}
 	<table class="nodes">
 		<thead><tr><th class="st"></th><th>Node</th><th>Kind</th><th>Why it can't run</th></tr></thead>
 		<tbody>
@@ -58,50 +45,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
-	}
-	.problem {
-		border: 1px solid color-mix(in srgb, var(--sb-error) 40%, var(--border));
-		border-left: 3px solid var(--sb-error);
-		border-radius: 2px;
-		padding: 10px 14px;
-		background: color-mix(in srgb, var(--sb-error) 5%, transparent);
-	}
-	.head {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 6px;
-	}
-	.mark {
-		color: var(--sb-error);
-		font-weight: 600;
-	}
-	.provider {
-		font-weight: 600;
-	}
-	.tag {
-		margin-left: auto;
-		padding: 0 6px;
-		border: 1px solid color-mix(in srgb, var(--sb-error) 50%, var(--border));
-		border-radius: 2px;
-		color: var(--sb-error);
-		font-size: 11px;
-	}
-	dl {
-		display: grid;
-		grid-template-columns: max-content minmax(0, 1fr);
-		gap: 3px 14px;
-		margin: 8px 0 0;
-	}
-	dt {
-		color: var(--muted-foreground);
-	}
-	dd {
-		margin: 0;
-	}
-	code {
-		font-family: var(--font-mono);
-		font-size: 11.5px;
 	}
 	.nodes {
 		width: 100%;

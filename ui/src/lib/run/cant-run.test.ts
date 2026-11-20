@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanCantRun } from '$lib/api';
-import { cantRunKeys, cantRunReason, cantRunRows, fixText, needsText, withoutNodes } from './cant-run';
+import { cantRunKeys, cantRunReason, cantRunRows, fixText, needsText, runCantRun, withoutNodes } from './cant-run';
 
 const payments: PlanCantRun = {
 	reason: 'missing_secret',
@@ -43,5 +43,19 @@ describe('a plan with nodes that cannot run', () => {
 			{ key: 'model:stg_payments', uses: false, why: 'reads raw_payments' },
 			{ key: 'model:fct_payments', uses: false, why: 'reads stg_payments' }
 		]);
+	});
+});
+
+describe('a run that hit missing secrets', () => {
+	it('reads each provider, its failed nodes and what was skipped because of them', () => {
+		const message = "provider payments_api: PAYMENTS_API_TOKEN not set (missing from the location's environment and from .env)";
+		expect(
+			runCantRun([
+				{ nodeKey: 'source:raw_payments', status: 'failed', errorCode: 'D012', errorMessage: message, skippedBecauseOf: null },
+				{ nodeKey: 'model:stg_payments', status: 'skipped', errorCode: null, errorMessage: null, skippedBecauseOf: { nodeKey: 'source:raw_payments' } },
+				{ nodeKey: 'model:fct_payments', status: 'skipped', errorCode: null, errorMessage: null, skippedBecauseOf: { nodeKey: 'model:stg_payments' } },
+				{ nodeKey: 'model:orders', status: 'failed', errorCode: 'Q001', errorMessage: 'syntax error', skippedBecauseOf: null }
+			])
+		).toEqual([{ ...payments, path: '' }]);
 	});
 });

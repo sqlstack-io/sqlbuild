@@ -1,12 +1,15 @@
 //! Execute only the API's frozen request after compiling and verifying the unmodified baseline.
 
-use std::collections::BTreeMap;
+use crate::bindings::_helpers::provider_check::error::secret_block_error;
+use crate::bindings::_helpers::provider_check::selection::{SecretBlock, key_secret_blocks};
+use sqlbuild_python_front::discovery::main::sources::secret_places::secret_places;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::PyString;
 use serde_json::Value;
 use sqlbuild_cli::dispatch::main::command_dispatch::command_dispatch;
@@ -238,6 +241,35 @@ fn unconfigured_warehouse(
     ))
 }
 
+/// Each selected node that uses a provider missing secrets, with its failure message, and the run's status reason.
+fn missing_secret_failures(
+    blocks: &[SecretBlock],
+    project_dir: &std::path::Path,
+) -> (Vec<(String, String)>, String) {
+    let places: String =
+        secret_places(project_dir).replacen("the environment", "the location's environment", 1);
+    let mut failures: Vec<(String, String)> = Vec::new();
+    let mut needs: Vec<String> = Vec::new();
+    for block in blocks {
+        let variables: String = block.variables.join(", ");
+        needs.push(format!("provider {} needs {variables}", block.provider));
+        for key in block.users.iter().filter(|key| !key.starts_with("sink:")) {
+            failures.push((
+                key.clone(),
+                format!(
+                    "provider {}: {variables} not set (missing from {places})",
+                    block.provider
+                ),
+            ));
+        }
+    }
+    let reason: String = format!(
+        "Couldn't run: {} (missing from {places}); nothing ran",
+        needs.join("; ")
+    );
+    (failures, reason)
+}
+
 /// The heartbeat is native; only driver cancellation crosses the executor host boundary.
 fn run_cancellable<'py>(
     py: Python<'py>,
@@ -341,6 +373,17 @@ pub(super) fn execute_worker<'py>(
             worker.refuse(reason)?;
             write_stderr(py, &format!("Run refused: {reason}\n"))?;
             return Err(PyValueError::new_err(reason));
+        }
+        let project_dir: PathBuf = arguments.value("project_dir")?.extract()?;
+        let selected: BTreeSet<String> = frozen.selection.iter().cloned().collect();
+        let blocks: Vec<SecretBlock> =
+            key_secret_blocks((&discovered, &field(compiled, "project")?), &selected)?;
+        if !blocks.is_empty() {
+            let (failures, reason) = missing_secret_failures(&blocks, &project_dir);
+            worker.fail_missing_secrets(py, &failures, &reason)?;
+            let error: PyErr = secret_block_error(py, &blocks, &project_dir);
+            write_stderr(py, &format!("{}\n", error.value(py)))?;
+            return Err(error);
         }
         record_compiled_vars(py, (&owner, &frozen), (arguments, input, &project))?;
         let (request, scope, frozen_job) =

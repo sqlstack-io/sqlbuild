@@ -202,6 +202,25 @@ pub(crate) fn selection_secret_blocks(
     (discovered, project): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
     (select, exclude): (&[String], &[String]),
 ) -> PyResult<Vec<SecretBlock>> {
+    if missing_providers(discovered)?.is_empty() {
+        return Ok(Vec::new());
+    }
+    let py: Python<'_> = project.py();
+    let view: PyRef<'_, NativeProjectView> = project.extract()?;
+    let graph = view.lineage_graph(py)?;
+    let selection = ProjectSelection::new(project, discovered)?;
+    let selected: BTreeSet<String> = selection
+        .run_keys(graph.bind(py).get().graph(), select, exclude)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    drop(view);
+    key_secret_blocks((discovered, project), &selected)
+}
+
+/// The providers missing secrets that the run of exactly `selected` node keys uses, with the nodes they stop.
+pub(crate) fn key_secret_blocks(
+    (discovered, project): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    selected: &BTreeSet<String>,
+) -> PyResult<Vec<SecretBlock>> {
     let missing = missing_providers(discovered)?;
     if missing.is_empty() {
         return Ok(Vec::new());
@@ -211,9 +230,6 @@ pub(crate) fn selection_secret_blocks(
     let graph = view.lineage_graph(py)?;
     let graph = graph.bind(py).get().graph();
     let selection = ProjectSelection::new(project, discovered)?;
-    let selected: BTreeSet<String> = selection
-        .run_keys(graph, select, exclude)
-        .map_err(pyo3::exceptions::PyValueError::new_err)?;
     let readers = readers_by_key(graph, &selection);
     let sinks: Vec<(String, String)> = sink_uses(discovered)?;
     let mut blocks: Vec<SecretBlock> = Vec::new();
@@ -233,7 +249,7 @@ pub(crate) fn selection_secret_blocks(
             continue;
         }
         blocks.push(SecretBlock {
-            readers: downstream_readers(&users, &selected, &readers),
+            readers: downstream_readers(&users, selected, &readers),
             users: users.into_iter().collect(),
             provider,
             path,
