@@ -203,22 +203,22 @@ sqlbuild-scopes = { path = "crates/sqlbuild-scopes" }
 sqlbuild-sqltext = { path = "crates/sqlbuild-sqltext" }
 sqlbuild-state = { path = "crates/sqlbuild-state" }
 # SQL lint Rules, quality Rules and the formatter.
-sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "bbc94e556dc51e936e86fa4c85111c87a7915fc5" }
+sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "b0728bb990b7d8ff196cb00cc20545f2fa4df555" }
 # SQL change fingerprints over SQLQuack's tokenizers.
-sqlquack-fingerprint = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890", features = ["bigquery", "databricks", "duckdb", "postgres", "snowflake", "sqlite", "sqlserver"] }
+sqlquack-fingerprint = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "fe3d1caf5ed81981abf8abd1d00cc9d99462e6ed", features = ["bigquery", "databricks", "duckdb", "postgres", "snowflake", "sqlite", "sqlserver"] }
 # Scopes, name resolution, types and lineage for the native analysis route.
-sqlquack-semantics = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890", features = ["bigquery", "clickhouse", "databricks", "duckdb", "postgres", "snowflake", "sqlite", "sqlserver"] }
+sqlquack-semantics = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "fe3d1caf5ed81981abf8abd1d00cc9d99462e6ed", features = ["bigquery", "clickhouse", "databricks", "duckdb", "postgres", "snowflake", "sqlite", "sqlserver"] }
 # SQLQuack's Snowflake-family parser and tokenizer, reached as SQLQuack exposes them.
-sqlquack-parse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890" }
+sqlquack-parse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "fe3d1caf5ed81981abf8abd1d00cc9d99462e6ed" }
 # SQLQuack's syntax tree and lossless tokens.
-sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890" }
-sqlquack-syntax-bigquery = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890" }
-sqlquack-syntax-clickhouse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890" }
-sqlquack-syntax-databricks = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890" }
-sqlquack-syntax-duckdb = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890" }
-sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890" }
-sqlquack-syntax-sqlite = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890" }
-sqlquack-syntax-sqlserver = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "75d4c8486ab262a6c9c02a6c913334856367d890" }
+sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "fe3d1caf5ed81981abf8abd1d00cc9d99462e6ed" }
+sqlquack-syntax-bigquery = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "fe3d1caf5ed81981abf8abd1d00cc9d99462e6ed" }
+sqlquack-syntax-clickhouse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "fe3d1caf5ed81981abf8abd1d00cc9d99462e6ed" }
+sqlquack-syntax-databricks = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "fe3d1caf5ed81981abf8abd1d00cc9d99462e6ed" }
+sqlquack-syntax-duckdb = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "fe3d1caf5ed81981abf8abd1d00cc9d99462e6ed" }
+sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "fe3d1caf5ed81981abf8abd1d00cc9d99462e6ed" }
+sqlquack-syntax-sqlite = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "fe3d1caf5ed81981abf8abd1d00cc9d99462e6ed" }
+sqlquack-syntax-sqlserver = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "fe3d1caf5ed81981abf8abd1d00cc9d99462e6ed" }
 stacker = "0.1"
 # Counts heap allocations in growth tests, which measure work instead of time.
 stats_alloc = "0.1"

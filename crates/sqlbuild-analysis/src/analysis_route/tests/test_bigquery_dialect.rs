@@ -401,7 +401,7 @@ fn given_sql_bigquery_refuses_when_parsing_then_the_gap_says_whether_it_is_a_syn
         },
         ParseFailureTestCase {
             description: "the nesting limit is not a syntax error",
-            sql: format!("SELECT {}1{}", "(".repeat(300), ")".repeat(300)),
+            sql: format!("SELECT {}1{}", "(".repeat(600), ")".repeat(600)),
             expected_syntax: false,
             expected_offset: None,
         },

@@ -130,7 +130,9 @@ fn canonical(data_type: &DataType) -> Option<String> {
         DataType::String { .. } | DataType::Char { .. } | DataType::VarChar { .. } => {
             DATABRICKS_STRING_TYPE.to_owned()
         }
-        DataType::Decimal { precision, scale } => {
+        DataType::Decimal {
+            precision, scale, ..
+        } => {
             let (default_precision, default_scale) = DATABRICKS_DEFAULT_DECIMAL;
             format!(
                 "DECIMAL({},{})",

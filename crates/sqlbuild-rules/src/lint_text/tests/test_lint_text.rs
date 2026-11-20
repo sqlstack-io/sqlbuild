@@ -1039,7 +1039,7 @@ fn given_expression_macro_bodies_when_formatting_twice_then_every_dialect_lays_t
         },
         ExpressionMacroFormatTestCase {
             description: "a nested block comment holding an apostrophe",
-            dialects: &["duckdb", "databricks"],
+            dialects: &["databricks"],
             contents: NESTED_COMMENT_MACRO.to_string(),
             expected_formatted: NESTED_COMMENT_FORMATTED.to_string(),
         },

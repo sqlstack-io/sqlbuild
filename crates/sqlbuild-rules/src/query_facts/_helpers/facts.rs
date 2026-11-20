@@ -801,7 +801,9 @@ fn direct_column(expression: &Expression) -> Option<ColumnFact> {
 
 fn string_literal(literal: &Literal) -> Option<String> {
     match literal {
-        Literal::String(value) => Some(format!("'{}'", value.replace('\'', "''"))),
+        Literal::String(value) | Literal::JoinedString(value, _) => {
+            Some(format!("'{}'", value.replace('\'', "''")))
+        }
         Literal::NationalString(value) => Some(format!("N'{}'", value.replace('\'', "''"))),
         Literal::TripleQuotedString(value, quote) => {
             let delimiter = quote.to_string().repeat(TRIPLE_QUOTE_LENGTH);

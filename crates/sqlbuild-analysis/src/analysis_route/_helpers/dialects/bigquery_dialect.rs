@@ -139,8 +139,10 @@ impl LineageSchema for BigQueryTypes<'_> {
 /// A type BigQuery's dry run accepts, as BigQuery names it; `None` for one it refuses.
 fn native_type(data_type: &DataType) -> Option<String> {
     Some(match data_type {
-        DataType::BigInt { length: None } => "INT64".to_owned(),
-        DataType::Decimal { precision, scale } => {
+        DataType::BigInt { length: None, .. } => "INT64".to_owned(),
+        DataType::Decimal {
+            precision, scale, ..
+        } => {
             let given: Vec<u32> = [*precision, *scale].into_iter().flatten().collect();
             decimal("NUMERIC", &given, NUMERIC_DIGITS)?
         }
@@ -155,14 +157,17 @@ fn native_type(data_type: &DataType) -> Option<String> {
         DataType::Time {
             precision: None,
             timezone: false,
+            ..
         } => "TIME".to_owned(),
         DataType::Timestamp {
             precision: None,
             timezone: false,
+            ..
         } => "DATETIME".to_owned(),
         DataType::Timestamp {
             precision: None,
             timezone: true,
+            ..
         } => "TIMESTAMP".to_owned(),
         DataType::Interval {
             unit: None,
