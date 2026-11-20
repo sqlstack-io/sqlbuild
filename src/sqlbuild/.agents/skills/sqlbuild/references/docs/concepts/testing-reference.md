@@ -192,8 +192,8 @@ __table_fn_expected__ AS (
 )
 ```
 
-Table function tests run after the function is created. Models can't depend on table functions, so
-these tests check the function on its own.
+Table function tests run after the function is created. Call a Python table function with
+`OVER (PARTITION BY ...)` in the test, as in a model.
 
 ## Repeating test logic
 

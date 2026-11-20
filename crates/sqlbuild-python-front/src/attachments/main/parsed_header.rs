@@ -11,6 +11,7 @@ use sqlbuild_attachments::functions::models::{FunctionHeader, FunctionLanguage, 
 pub fn parsed_header(
     header_values: &Bound<'_, PyDict>,
     language: FunctionLanguage,
+    table_function: bool,
     relative_path: &str,
 ) -> FunctionHeader {
     let mut header: Vec<(String, HeaderValue)> = Vec::with_capacity(header_values.len());
@@ -23,5 +24,5 @@ pub fn parsed_header(
         }
         header.push((name, header_value(&value)));
     }
-    parse_function_header(&header, language, relative_path)
+    parse_function_header(&header, language, table_function, relative_path)
 }

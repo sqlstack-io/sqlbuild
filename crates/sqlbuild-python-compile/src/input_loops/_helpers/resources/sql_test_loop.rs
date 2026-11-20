@@ -26,6 +26,7 @@ use sqlbuild_attachments::ceremonial_select::models::OmittedSelect;
 use sqlbuild_attachments::cursor_intrinsics::main::intrinsic_free::intrinsic_free;
 use sqlbuild_attachments::cursor_intrinsics::models::IntrinsicCheck;
 use sqlbuild_attachments::functions::main::table_function_arity_error::table_function_arity_error;
+use sqlbuild_attachments::functions::main::table_function_partition_error::table_function_partition_error;
 use sqlbuild_attachments::test_parameters::main::parameter_references::parameter_references;
 use sqlbuild_attachments::test_targets::main::unknown_test_target::unknown_test_target;
 use sqlbuild_attachments::test_targets::models::{TargetCatalog, TestTargets};
@@ -80,6 +81,8 @@ pub(crate) struct TestScope<'a, 'py> {
     pub(crate) catalog: TargetCatalog,
     pub(crate) functions: HashSet<String>,
     pub(crate) table_function_arities: HashMap<String, usize>,
+    /// The Python table functions, whose calls need `OVER (PARTITION BY ...)`.
+    pub(crate) whole_partition: HashSet<String>,
 }
 
 /// One test case expanded before extraction.
@@ -461,6 +464,23 @@ impl<'py> TestScope<'_, 'py> {
                 &format!("SQL test file {relative_path}"),
                 &calls,
                 &self.table_function_arities,
+            ) {
+                return Err(self.error(&message));
+            }
+            let partitions: Vec<(&str, &str, bool)> = references
+                .iter()
+                .map(|reference| {
+                    (
+                        reference.kind,
+                        reference.name.as_str(),
+                        reference.call_partitioned,
+                    )
+                })
+                .collect();
+            if let Some(message) = table_function_partition_error(
+                &format!("SQL test file {relative_path}"),
+                &partitions,
+                &self.whole_partition,
             ) {
                 return Err(self.error(&message));
             }

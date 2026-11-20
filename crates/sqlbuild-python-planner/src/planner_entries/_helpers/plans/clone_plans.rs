@@ -473,6 +473,7 @@ fn clone_function_entries<'py>(
                 ("runtime_version", field("runtime_version")?),
                 ("entry_point", field("entry_point")?),
                 ("packages", field("packages")?),
+                ("dataframe", field("dataframe")?),
             ],
         )?;
         entries.set_item(

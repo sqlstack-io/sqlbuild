@@ -16,7 +16,7 @@
       "macro_source_sql": "'PIVOT __ref(\"order_amounts\") ON category USING MAX(amount)'",
       "macro_usages": "()",
       "query_sql": "'PIVOT __ref(\"order_amounts\") ON category USING MAX(amount)'",
-      "references": "(CompileSqlReference(ref_kind=<SqlReferenceKind.REF: 'ref'>, ref_name='order_amounts', ref_package=None, call_argument_count=None),)",
+      "references": "(CompileSqlReference(ref_kind=<SqlReferenceKind.REF: 'ref'>, ref_name='order_amounts', ref_package=None, call_argument_count=None, call_partitioned=False),)",
       "rejected_sql_analysis_opt_out": "None",
       "schema_entry": "SchemaModelEntry(name='category_amounts', model_schema=None, description=None, type_enforcement=True, meta={}, columns=(SchemaColumn(name='customer_id', type='INTEGER', nullable=None, description=None, meta={}, audits=(), location=SourceLocation(path=PosixPath('models/category_amounts.sql'), line=2, column=12, end_line=2, end_column=23), migrate_from=None),), dynamic_columns=(SchemaDynamicColumnFamily(name='category_amounts', pivot_column='category', value_column='amount', aggregate='MAX', type='INTEGER', name_pattern='^[a-z]+$'),), audits=(), tags=())",
       "sql_expansion": "CompiledSqlExpansion(authored_sql='PIVOT __ref(\"order_amounts\") ON category USING MAX(amount)', expanded_sql='PIVOT __ref(\"order_amounts\") ON category USING MAX(amount)', passes=((), ()))",

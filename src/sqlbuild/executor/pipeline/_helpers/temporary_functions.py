@@ -81,6 +81,7 @@ def create_temporary_test_functions(
                 runtime_version=entry.runtime_version,
                 entry_point=entry.entry_point,
                 packages=entry.packages,
+                dataframe=entry.dataframe,
                 source_file_path=entry.source_file_path,
             ),
         )

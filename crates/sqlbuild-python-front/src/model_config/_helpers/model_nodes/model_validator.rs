@@ -72,7 +72,14 @@ pub(crate) fn discovered_names(inputs: &Bound<'_, PyAny>) -> PyResult<ResourceNa
         }
         functions.insert(name);
     }
-    functions.extend(each(inputs, "python_function_files", model_stem)?);
+    for file in native_field(inputs, "python_function_files")?.try_iter()? {
+        let file: Bound<'_, PyAny> = file?;
+        let name: String = model_stem(&file)?;
+        if native_field(&file, "table_function")?.extract::<bool>()? {
+            table_functions.insert(name.clone());
+        }
+        functions.insert(name);
+    }
     Ok(ResourceNames {
         models,
         seeds,

@@ -208,6 +208,7 @@ pub(crate) fn attach_resources<'py>(
             target: target_namespace(&target_config)?,
             inherit: python_functions_inherit_default_namespace,
             kind: function_kind.unbind(),
+            dataframe: native_field(&defaults, "function_dataframe")?.extract()?,
         },
     )?;
     let mut source_rows: Vec<SourceRow> = Vec::new();

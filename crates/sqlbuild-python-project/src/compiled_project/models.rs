@@ -113,7 +113,7 @@ impl<'py> pyo3::FromPyObject<'py> for FunctionRow {
     }
 }
 
-/// Adapter, validation, raw default and target namespaces, inheritance and resource kind.
+/// Adapter, validation, raw default and target namespaces, inheritance, resource kind and frame.
 #[derive(Debug)]
 pub struct FunctionSettings {
     pub adapter_name: String,
@@ -122,11 +122,13 @@ pub struct FunctionSettings {
     pub target: Option<(Option<String>, Option<String>)>,
     pub inherit: bool,
     pub kind: Py<PyAny>,
+    /// The frame library of a Python table function whose parameter names none.
+    pub dataframe: String,
 }
 
 impl<'py> pyo3::FromPyObject<'py> for FunctionSettings {
     fn extract_bound(value: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
-        let (adapter_name, validate, defaults, target, inherit, kind): FunctionSettingsTuple =
+        let (adapter_name, validate, defaults, target, inherit, kind, dataframe): FunctionSettingsTuple =
             pyo3::types::PyAnyMethods::extract(value)?;
         Ok(Self {
             adapter_name,
@@ -135,6 +137,7 @@ impl<'py> pyo3::FromPyObject<'py> for FunctionSettings {
             target,
             inherit,
             kind,
+            dataframe,
         })
     }
 }

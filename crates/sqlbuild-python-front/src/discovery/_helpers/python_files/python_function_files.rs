@@ -1,5 +1,6 @@
 //! Python function files discovered natively, with CPython as the authority on syntax and values.
 
+use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PySyntaxError, PyTypeError, PyValueError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString, PyStringMethods};
@@ -8,7 +9,9 @@ use sqlbuild_discovery::models::{DiscoveredFile, FileOutcome};
 use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_pysource::udf_functions::constants::UDF_KEYS;
 use sqlbuild_pysource::udf_functions::main::udf_function::udf_function;
-use sqlbuild_pysource::udf_functions::models::{UdfFunction, UdfShape};
+use sqlbuild_pysource::udf_functions::models::{
+    DataFrameLibrary, FunctionDecorator, UdfFunction, UdfShape,
+};
 
 use crate::discovery::_helpers::failures::raised::{failure_error, read_error};
 use crate::discovery::_helpers::project::project_files::path_object;
@@ -24,6 +27,17 @@ const AST_MODULE: &str = "ast";
 const DESCRIPTION_KEY: &str = "description";
 const ENTRY_POINT_KEY: &str = "entry_point";
 const UDF_STATEMENT: &str = "@udf(...)";
+const TABLE_FN_STATEMENT: &str = "@table_fn(...)";
+const DATAFRAME_PANDAS: &str = "pandas";
+const DATAFRAME_POLARS: &str = "polars";
+
+/// The decorator call as messages name it.
+fn decorator_call(function: &UdfFunction) -> &'static str {
+    match function.decorator {
+        FunctionDecorator::Udf => UDF_STATEMENT,
+        FunctionDecorator::TableFn => TABLE_FN_STATEMENT,
+    }
+}
 
 /// One file's paths and text, as its messages and record name them.
 struct FunctionSource<'py> {
@@ -68,7 +82,7 @@ fn cpython_module<'py>(source: &FunctionSource<'py>) -> PyResult<Bound<'py, PyAn
     }
 }
 
-/// The literal `@udf(...)` keyword values, raising the first expansion or non-literal value.
+/// The literal decorator keyword values, raising the first expansion or non-literal value.
 fn keyword_values<'py>(
     source: &FunctionSource<'py>,
     function: &UdfFunction,
@@ -80,7 +94,10 @@ fn keyword_values<'py>(
     let nodes: Bound<'py, PyAny> = native_field(call, "keywords")?;
     for (keyword, node) in function.keywords.iter().zip(nodes.try_iter()?) {
         let Some(name) = &keyword.name else {
-            let detail: String = format!("{UDF_STATEMENT} must not use **kwargs expansion");
+            let detail: String = format!(
+                "{} must not use **kwargs expansion",
+                decorator_call(function)
+            );
             return Err(parse_error(source, &detail, None));
         };
         match literal_eval.call1((native_field(&node?, "value")?,)) {
@@ -89,7 +106,10 @@ fn keyword_values<'py>(
                 if error.is_instance_of::<PyValueError>(py)
                     || error.is_instance_of::<PyTypeError>(py) =>
             {
-                let detail: String = format!("{UDF_STATEMENT} value for '{name}' must be literal");
+                let detail: String = format!(
+                    "{} value for '{name}' must be literal",
+                    decorator_call(function)
+                );
                 return Err(parse_error(source, &detail, Some(error)));
             }
             Err(error) => return Err(error),
@@ -98,7 +118,7 @@ fn keyword_values<'py>(
     Ok(values)
 }
 
-/// The unsupported-keys error of the first keywords `@udf(...)` does not accept, if any.
+/// The unsupported-keys error of the first keywords the decorator does not accept, if any.
 fn unsupported_keys(source: &FunctionSource<'_>, function: &UdfFunction) -> PyResult<()> {
     let unsupported: Vec<(&str, usize)> = function
         .keywords
@@ -113,7 +133,8 @@ fn unsupported_keys(source: &FunctionSource<'_>, function: &UdfFunction) -> PyRe
     let keys: Vec<&str> = unsupported.iter().map(|(name, _)| *name).collect();
     let supported: Vec<String> = UDF_KEYS.iter().map(|key| (*key).to_owned()).collect();
     let message: String = format!(
-        "{UDF_STATEMENT} in '{}:{line}' has unsupported keys: {}",
+        "{} in '{}:{line}' has unsupported keys: {}",
+        decorator_call(function),
         source.file_path.str()?,
         keys.join(", ")
     );
@@ -125,7 +146,7 @@ fn unsupported_keys(source: &FunctionSource<'_>, function: &UdfFunction) -> PyRe
     Err(PyErr::from_value(error))
 }
 
-/// `ast.unparse` of the module without its `udf` imports and the function's `@udf` decorator.
+/// `ast.unparse` of the module without its `udf` and `table_fn` imports and the function's decorator.
 fn warehouse_body<'py>(
     module: &Bound<'py, PyAny>,
     function: &UdfFunction,
@@ -161,10 +182,8 @@ fn warehouse_body<'py>(
         .call_method0("strip")
 }
 
-/// `parse_python_function`: `(header_values, entry_point, body_python)` of one function file.
-fn parsed_function<'py>(
-    source: &FunctionSource<'py>,
-) -> PyResult<(Bound<'py, PyDict>, Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+/// `parse_python_function`: one function file's record, with its header, entry point, body and kind.
+fn parsed_record<'py>(source: &FunctionSource<'py>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = source.file_path.py();
     let module: Bound<'py, PyAny> = cpython_module(source)?;
     let version = py.version_info();
@@ -174,11 +193,12 @@ fn parsed_function<'py>(
     })?;
     let function: UdfFunction = match shape {
         UdfShape::Missing => {
-            let detail = "must define exactly one function decorated with @udf(...)";
+            let detail =
+                "must define exactly one function decorated with @udf(...) or @table_fn(...)";
             return Err(parse_error(source, detail, None));
         }
         UdfShape::Multiple => {
-            let detail = "must define only one function decorated with @udf(...)";
+            let detail = "must define only one function decorated with @udf(...) or @table_fn(...)";
             return Err(parse_error(source, detail, None));
         }
         UdfShape::Single(function) => function,
@@ -189,12 +209,15 @@ fn parsed_function<'py>(
         .removed_decorators
         .first()
         .copied()
-        .ok_or_else(|| compiler_error("a @udf(...) function without its decorator"))?;
+        .ok_or_else(|| compiler_error("a Python function file function without its decorator"))?;
     let call: Bound<'py, PyAny> =
         native_field(&statement, "decorator_list")?.get_item(decorator)?;
     let values: Bound<'py, PyDict> = keyword_values(source, &function, &call)?;
     if function.has_positional_arguments {
-        let detail: String = format!("{UDF_STATEMENT} must use keyword arguments only");
+        let detail: String = format!(
+            "{} must use keyword arguments only",
+            decorator_call(&function)
+        );
         return Err(parse_error(source, &detail, None));
     }
     unsupported_keys(source, &function)?;
@@ -217,10 +240,31 @@ fn parsed_function<'py>(
         Err(_) => None,
     };
     let Some(entry_point) = stripped else {
-        let detail: String = format!("{UDF_STATEMENT} entry_point must be a non-empty string");
+        let detail: String = format!(
+            "{} entry_point must be a non-empty string",
+            decorator_call(&function)
+        );
         return Err(parse_error(source, &detail, None));
     };
-    Ok((values, entry_point, warehouse_body(&module, &function)?))
+    let table_function: bool = function.decorator == FunctionDecorator::TableFn;
+    let dataframe: Option<&str> = function.dataframe.map(|library| match library {
+        DataFrameLibrary::Pandas => DATAFRAME_PANDAS,
+        DataFrameLibrary::Polars => DATAFRAME_POLARS,
+    });
+    new_record_with(
+        py,
+        RecordId::DiscoveredPythonFunctionFile,
+        &[
+            ("file_path", source.file_path.clone()),
+            ("relative_path", source.relative_path.clone()),
+            ("contents", source.contents.clone().into_any()),
+            ("header_values", values.into_any()),
+            ("entry_point", entry_point),
+            ("body_python", warehouse_body(&module, &function)?),
+            ("table_function", table_function.into_bound_py_any(py)?),
+            ("dataframe", dataframe.into_bound_py_any(py)?),
+        ],
+    )
 }
 
 pub(crate) fn function_record<'py>(
@@ -242,17 +286,5 @@ pub(crate) fn function_record<'py>(
         relative_path,
         contents: PyString::new(py, &contents),
     };
-    let (header_values, entry_point, body_python) = parsed_function(&source)?;
-    new_record_with(
-        py,
-        RecordId::DiscoveredPythonFunctionFile,
-        &[
-            ("file_path", source.file_path.clone()),
-            ("relative_path", source.relative_path.clone()),
-            ("contents", source.contents.clone().into_any()),
-            ("header_values", header_values.into_any()),
-            ("entry_point", entry_point),
-            ("body_python", body_python),
-        ],
-    )
+    parsed_record(&source)
 }

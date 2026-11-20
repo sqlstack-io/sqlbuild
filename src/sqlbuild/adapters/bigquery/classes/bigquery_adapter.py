@@ -1766,7 +1766,9 @@ class BigQueryAdapter(
         runtime_version: str | None = None,
         entry_point: str | None = None,
         packages: tuple[str, ...] = (),
+        dataframe: str | None = None,
     ) -> tuple[str, ...]:
+        del dataframe
         argument_sql: str = ", ".join(f"{argument.name} {argument.type}" for argument in arguments)
         if return_columns:
             if language != FunctionLanguage.SQL:

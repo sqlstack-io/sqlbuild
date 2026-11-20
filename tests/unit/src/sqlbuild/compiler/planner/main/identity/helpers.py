@@ -157,6 +157,7 @@ def build_identity_function() -> SimpleNamespace:
         runtime_version=None,
         entry_point=None,
         packages=(),
+        dataframe=None,
     )
 
 

@@ -12,6 +12,8 @@ use crate::functions::models::{
 /// Python's error messages for one function file.
 pub(crate) struct HeaderErrors<'path> {
     pub(crate) language: FunctionLanguage,
+    /// A Python `@table_fn(...)` file, whose `returns` maps each column to its type.
+    pub(crate) table_function: bool,
     pub(crate) relative_path: &'path str,
 }
 
@@ -51,6 +53,7 @@ pub(crate) fn parsed_header(
     errors: &HeaderErrors<'_>,
 ) -> FunctionHeader {
     let python: bool = errors.language == FunctionLanguage::Python;
+    let python_table: bool = python && errors.table_function;
     let mut parsed = FunctionHeader {
         arguments: Vec::new(),
         returns: None,
@@ -63,7 +66,7 @@ pub(crate) fn parsed_header(
     };
     let raw_returns: Option<&HeaderValue> = lookup(header, "returns");
     let scalar_returns: Option<String> = stripped_text(raw_returns);
-    if raw_returns.is_none() || (python && scalar_returns.is_none()) {
+    if raw_returns.is_none() || (python && !python_table && scalar_returns.is_none()) {
         return failed(
             parsed,
             errors.fail(HeaderStage::Start, "must declare returns"),
@@ -84,7 +87,13 @@ pub(crate) fn parsed_header(
             return failed(parsed, failure);
         }
     }
-    if let Some(text) = scalar_returns {
+    if python_table {
+        let (columns, failure) = python_table_returns(raw_returns, errors);
+        parsed.returns = Some(FunctionReturns::Table(columns));
+        if let Some(failure) = failure {
+            return failed(parsed, failure);
+        }
+    } else if let Some(text) = scalar_returns {
         parsed.returns = Some(FunctionReturns::Type(text));
     } else {
         let (columns, failure) = table_returns(raw_returns, errors);
@@ -133,6 +142,28 @@ fn failed(parsed: FunctionHeader, failure: HeaderFailure) -> FunctionHeader {
     FunctionHeader {
         failure: Some(failure),
         ..parsed
+    }
+}
+
+/// A `@table_fn(returns={...})` column map, which must name at least one column.
+fn python_table_returns(
+    raw_returns: Option<&HeaderValue>,
+    errors: &HeaderErrors<'_>,
+) -> (Vec<NamedType>, Option<HeaderFailure>) {
+    let shape_error = || {
+        errors.fail(
+            HeaderStage::Returns,
+            "returns must map each column name to its type",
+        )
+    };
+    match raw_returns {
+        Some(HeaderValue::Map(entries)) if !entries.is_empty() => {
+            let (columns, error) = named_types(entries);
+            let failure =
+                error.map(|error| errors.named_type(HeaderStage::Returns, error, "return column"));
+            (columns, failure)
+        }
+        _ => (Vec::new(), Some(shape_error())),
     }
 }
 

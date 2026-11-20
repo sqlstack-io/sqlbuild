@@ -632,6 +632,7 @@ class FunctionRenderFailingAdapter(DuckDbAdapter):
         runtime_version: str | None = None,
         entry_point: str | None = None,
         packages: tuple[str, ...] = (),
+        dataframe: str | None = None,
     ) -> tuple[str, ...]:
         raise ValueError(f"function rendering failed for {destination}")
 
@@ -651,6 +652,7 @@ class FunctionRenderInterruptedAdapter(DuckDbAdapter):
         runtime_version: str | None = None,
         entry_point: str | None = None,
         packages: tuple[str, ...] = (),
+        dataframe: str | None = None,
     ) -> tuple[str, ...]:
         raise KeyboardInterrupt(destination)
 

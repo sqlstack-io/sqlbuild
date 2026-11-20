@@ -232,24 +232,43 @@ fn given_deep_chain_when_walking_graph_then_does_not_overflow_the_stack() {
 
 #[test]
 fn given_function_fields_when_rendering_then_writes_one_field_per_line() {
-    let test_cases = [FunctionSqlTestCase {
-        description: "python function with packages and an unnamed argument",
-        fields: FunctionFingerprintFields {
-            language: "python".to_owned(),
-            arguments: vec![
-                ("x".to_owned(), "int".to_owned()),
-                (String::new(), "text".to_owned()),
-            ],
-            returns: "table".to_owned(),
-            return_columns: vec![("total".to_owned(), "double".to_owned())],
-            runtime_version: "3.12".to_owned(),
-            entry_point: String::new(),
-            packages: texts(&["numpy", "pandas"]),
-            body_sql: "return x\r\n".to_owned(),
+    let test_cases = [
+        FunctionSqlTestCase {
+            description: "python function with packages and an unnamed argument",
+            fields: FunctionFingerprintFields {
+                language: "python".to_owned(),
+                arguments: vec![
+                    ("x".to_owned(), "int".to_owned()),
+                    (String::new(), "text".to_owned()),
+                ],
+                returns: "table".to_owned(),
+                return_columns: vec![("total".to_owned(), "double".to_owned())],
+                runtime_version: "3.12".to_owned(),
+                entry_point: String::new(),
+                packages: texts(&["numpy", "pandas"]),
+                dataframe: None,
+                body_sql: "return x\r\n".to_owned(),
+            },
+            expected_sql: "language=python\narguments=x:int,:text\nreturns=table\nreturn_columns=total:double\n\
+                 runtime_version=3.12\nentry_point=\npackages=numpy,pandas\nbody=\nreturn x\r\n",
         },
-        expected_sql: "language=python\narguments=x:int,:text\nreturns=table\nreturn_columns=total:double\n\
-             runtime_version=3.12\nentry_point=\npackages=numpy,pandas\nbody=\nreturn x\r\n",
-    }];
+        FunctionSqlTestCase {
+            description: "a python table function's frame library changes its definition",
+            fields: FunctionFingerprintFields {
+                language: "python".to_owned(),
+                arguments: vec![("x".to_owned(), "int".to_owned())],
+                returns: "TABLE".to_owned(),
+                return_columns: vec![("total".to_owned(), "double".to_owned())],
+                runtime_version: "3.12".to_owned(),
+                entry_point: "main".to_owned(),
+                packages: Vec::new(),
+                dataframe: Some("pandas".to_owned()),
+                body_sql: "return x".to_owned(),
+            },
+            expected_sql: "language=python\narguments=x:int\nreturns=TABLE\nreturn_columns=total:double\n\
+                 runtime_version=3.12\nentry_point=main\npackages=\ndataframe=pandas\nbody=\nreturn x",
+        },
+    ];
     for test_case in test_cases {
         assert_eq!(
             function_fingerprint_sql(&test_case.fields),

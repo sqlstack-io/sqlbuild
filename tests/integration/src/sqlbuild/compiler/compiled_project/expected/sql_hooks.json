@@ -15,7 +15,7 @@
       "macro_source_sql": "'SELECT order_id FROM __ref(\"stg_orders\")'",
       "macro_usages": "()",
       "query_sql": "'SELECT order_id FROM __ref(\"stg_orders\")'",
-      "references": "(CompileSqlReference(ref_kind=<SqlReferenceKind.REF: 'ref'>, ref_name='stg_orders', ref_package=None, call_argument_count=None),)",
+      "references": "(CompileSqlReference(ref_kind=<SqlReferenceKind.REF: 'ref'>, ref_name='stg_orders', ref_package=None, call_argument_count=None, call_partitioned=False),)",
       "rejected_sql_analysis_opt_out": "None",
       "schema_entry": "None",
       "sql_expansion": "CompiledSqlExpansion(authored_sql='SELECT order_id FROM __ref(\"stg_orders\")', expanded_sql='SELECT order_id FROM __ref(\"stg_orders\")', passes=((), ()))",

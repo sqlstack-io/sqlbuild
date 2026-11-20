@@ -391,6 +391,7 @@ const R_COMPILED_FUNCTION: RecordSpec = RecordSpec {
         FieldSpec::new("runtime_version", FieldDefault::None),
         FieldSpec::new("entry_point", FieldDefault::None),
         FieldSpec::new("packages", FieldDefault::EmptyTuple),
+        FieldSpec::new("dataframe", FieldDefault::None),
         FieldSpec::new("tags", FieldDefault::EmptyTuple),
         FieldSpec::new("description", FieldDefault::None),
     ],
@@ -679,7 +680,7 @@ const R_DISCOVERED_MODEL_SCHEMA_FILE: RecordSpec = RecordSpec {
 };
 const R_DISCOVERED_PYTHON_FUNCTION_FILE: RecordSpec = RecordSpec {
     name: "DiscoveredPythonFunctionFile",
-    doc: "A discovered Python function file and its parsed UDF metadata.",
+    doc: "A discovered Python function file and its parsed UDF or table function metadata.",
     fields: &[
         FieldSpec::required("file_path"),
         FieldSpec::required("relative_path"),
@@ -687,6 +688,8 @@ const R_DISCOVERED_PYTHON_FUNCTION_FILE: RecordSpec = RecordSpec {
         FieldSpec::required("header_values"),
         FieldSpec::required("entry_point"),
         FieldSpec::required("body_python"),
+        FieldSpec::new("table_function", FieldDefault::False),
+        FieldSpec::new("dataframe", FieldDefault::None),
     ],
 };
 const R_DISCOVERED_SCHEMA_FILE: RecordSpec = RecordSpec {
@@ -1329,6 +1332,7 @@ const R_COMPILE_SQL_REFERENCE: RecordSpec = RecordSpec {
         FieldSpec::required("ref_name"),
         FieldSpec::new("ref_package", FieldDefault::None),
         FieldSpec::new("call_argument_count", FieldDefault::None),
+        FieldSpec::new("call_partitioned", FieldDefault::False),
     ],
 };
 const R_COMPILED_LINEAGE_SOURCE_FACT: RecordSpec = RecordSpec {

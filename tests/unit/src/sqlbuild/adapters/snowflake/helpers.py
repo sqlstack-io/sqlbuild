@@ -11,7 +11,10 @@ from itertools import cycle, islice
 from types import MappingProxyType, ModuleType, SimpleNamespace
 from typing import Any
 
-from sqlbuild._native import NativeProgressProjector
+import pandas
+import pytest
+
+from sqlbuild._native import FunctionArgument, FunctionReturnColumn, NativeProgressProjector
 from sqlbuild.adapter.contract.models import (
     ColumnInfo,
     RelationInfo,
@@ -24,6 +27,7 @@ from sqlbuild.adapter.relations.main.relation_metadata_cache_scope import (
 )
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.adapters.snowflake.classes.snowflake_connection import _SnowflakeConnection
+from sqlbuild.compiler.compile.types import FunctionLanguage
 from sqlbuild.observability import (
     EventDispatcher,
     LifecycleEvent,
@@ -709,3 +713,47 @@ def fail_statement() -> None:
     """A statement the warehouse rejects."""
 
     raise RuntimeError("statement failed")
+
+
+def run_python_table_function(
+    *, statement: str, returned_columns: tuple[str, ...], monkeypatch: pytest.MonkeyPatch
+) -> tuple[tuple[object, ...], ...]:
+    """Run a rendered pandas table function's handler on one partition, as Snowflake would."""
+
+    body: str = statement.split("AS $$\n", 1)[1].rsplit("\n$$", 1)[0]
+    snowflake_module: ModuleType = ModuleType("_snowflake")
+    vars(snowflake_module)["vectorized"] = lambda **_: lambda method: method
+    monkeypatch.setitem(sys.modules, "_snowflake", snowflake_module)
+    namespace: dict[str, Any] = {"__name__": "udtf"}
+    exec(body.replace("RETURNED_COLUMNS", repr(list(returned_columns))), namespace)
+    handler: Any = namespace["_SqbHandler"]
+    partition: pandas.DataFrame = pandas.DataFrame({0: [2, 1], 1: [10.0, 20.0]})
+    result: pandas.DataFrame = handler().end_partition(partition)
+    return tuple(tuple(row) for row in result.itertuples(index=False))
+
+
+def pandas_order_totals_statement() -> str:
+    """The Snowflake DDL of a pandas table function `result` doubling each order amount."""
+
+    return SnowflakeAdapter().render_create_function(
+        destination="analytics.order_totals",
+        arguments=(
+            FunctionArgument(name="ts", type="INTEGER"),
+            FunctionArgument(name="amount", type="FLOAT"),
+        ),
+        returns="TABLE",
+        body_sql=(
+            "def result(readings):\n"
+            "    readings = readings.sort_values('ts')\n"
+            "    readings['total'] = readings['amount'] * 2\n"
+            "    return readings[RETURNED_COLUMNS]"
+        ),
+        return_columns=(
+            FunctionReturnColumn(name="ts", type="INTEGER"),
+            FunctionReturnColumn(name="total", type="FLOAT"),
+        ),
+        language=FunctionLanguage.PYTHON,
+        runtime_version="3.12",
+        entry_point="result",
+        dataframe="pandas",
+    )[0]
