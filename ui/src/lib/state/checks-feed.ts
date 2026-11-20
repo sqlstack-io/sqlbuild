@@ -19,7 +19,8 @@ const message = (reason: unknown) => (reason instanceof Error ? reason.message :
  * state change, a warehouse sync, a new snapshot or a reconnect), signals of a burst coalesced into one
  * read. That read never joins one begun before the signal, which may have missed it. The client sends the
  * held ETag, so a read after a burst that changed no result is a 304 and returns the held list. While no
- * page watches, a signal only marks the list stale, and the next page to watch reads it once.
+ * page watches, a signal only marks the list stale, and the next page to watch reads it once. A failed
+ * read is retried by the next signal; after a refusal only a refresh or a new page reads again.
  */
 export class ChecksFeed {
 	#view: ChecksView = { checks: undefined, error: null, loading: false, revision: 0 };
@@ -34,6 +35,10 @@ export class ChecksFeed {
 	/** Pages showing the checks; with none, signals mark the list stale instead of reading it. */
 	#watchers = 0;
 	#stale = false;
+	/** Whether a read has started for this scope: signals before then have nothing to bring up to date. */
+	#started = false;
+	/** The last read was refused: signals do not read again, as each would be refused, and audited, too. */
+	#refused = false;
 	/** When the newest signal arrived (`performance.now()`); a read after it must begin later. */
 	#signalledAt = -Infinity;
 
@@ -75,7 +80,7 @@ export class ChecksFeed {
 
 	handle(signal: ChangedSignal): void {
 		const scope = this.#scope;
-		if (!scope || (!this.#view.checks && !this.#view.loading)) return;
+		if (!scope || !this.#started || this.#refused) return;
 		const location = scope.locationId;
 		const { channel } = signal;
 		const relevant =
@@ -92,6 +97,8 @@ export class ChecksFeed {
 		this.#inFlight = false;
 		this.#again = false;
 		this.#stale = false;
+		this.#started = false;
+		this.#refused = false;
 		this.#signalledAt = -Infinity;
 		if (this.#pause) clearTimeout(this.#pause);
 		this.#pause = null;
@@ -120,6 +127,7 @@ export class ChecksFeed {
 		const read = ++this.#read;
 		this.#inFlight = true;
 		this.#stale = false;
+		this.#started = true;
 		this.#set({ loading: true });
 		const settle = () => {
 			this.#inFlight = false;
@@ -134,6 +142,7 @@ export class ChecksFeed {
 				(checks) => {
 					if (epoch !== this.#epoch || read !== this.#read) return;
 					// A 304 returns the held list itself, so pages keyed on it do not redraw.
+					this.#refused = false;
 					const revision = this.#view.revision + 1;
 					if (checks === this.#view.checks) this.#set({ error: null, loading: false, revision });
 					else this.#set({ checks, error: null, loading: false, revision });
@@ -142,7 +151,8 @@ export class ChecksFeed {
 				(reason: unknown) => {
 					if (epoch !== this.#epoch || read !== this.#read) return;
 					// A refusal drops the held checks, so a person whose access went sees the refusal, not old data.
-					if (isRefusal(reason)) this.#set({ checks: undefined });
+					this.#refused = isRefusal(reason);
+					if (this.#refused) this.#set({ checks: undefined });
 					this.#set({ error: message(reason), loading: false, revision: this.#view.revision + 1 });
 					settle();
 				}
