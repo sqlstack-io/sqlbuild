@@ -7,6 +7,7 @@ use tokio::sync::broadcast;
 use tokio::task::JoinSet;
 use uuid::Uuid;
 
+use crate::node_states::_helpers::checks::drop_checks;
 use crate::node_states::_helpers::views::schedule_refresh;
 use crate::node_states::constants::NODE_STATE_UPDATES;
 use crate::node_states::models::{NodeStateCache, TargetCache};
@@ -70,7 +71,7 @@ pub(crate) fn start_node_states(
     (cache, task)
 }
 
-/// The watched targets a signal names, or every watched target; the unwatched ones it names are dropped once no refresh is pending or due, since one still pushes the old entry's versions.
+/// The watched targets a signal names, or every watched target, after dropping the check list of every target it names; the unwatched ones it names are dropped once no refresh is pending or due, since one still pushes the old entry's versions.
 fn watched_targets(
     cache: &NodeStateCache,
     scope: Option<(Uuid, &str)>,
@@ -81,6 +82,12 @@ fn watched_targets(
             *location_id == location && entry.target_hash == target_hash
         })
     };
+    // Every named target's check list is dropped, watched or not: any result may have changed.
+    for (key, entry) in targets.iter() {
+        if named(key, entry) {
+            drop_checks(entry);
+        }
+    }
     targets.retain(|key, entry| {
         !named(key, entry)
             || entry.watchers.load(Ordering::SeqCst) > 0

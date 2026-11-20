@@ -5125,7 +5125,10 @@ export interface operations {
     listPersonChecks: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description An ETag from an earlier response; 304 while every check's newest result is unchanged */
+                "If-None-Match"?: string | null;
+            };
             path: {
                 location_id: string;
                 target: string;
@@ -5137,11 +5140,21 @@ export interface operations {
             /** @description The newest result of every check */
             200: {
                 headers: {
+                    /** @description "<snapshot_id>:<digest of the body>", or "<digest>" before the first publication */
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["CheckResult"][];
                 };
+            };
+            /** @description Unchanged since the If-None-Match ETag */
+            304: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Session rejected */
             401: {
