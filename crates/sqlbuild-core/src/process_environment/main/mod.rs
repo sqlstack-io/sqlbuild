@@ -6,3 +6,4 @@ pub mod environment_vars_os;
 pub mod environment_without_env_file;
 pub mod install_environment_overlay;
 pub mod marker_json;
+pub mod project_relative_path;

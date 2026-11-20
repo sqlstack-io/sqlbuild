@@ -19,6 +19,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     DevelopmentTerminalTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    linked_project,
     read_terminal_until,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
@@ -145,6 +146,14 @@ ENV_PROBE: str = (
             ".env \u00b7 1 variable \u00b7 edit it, then press r to reload",
             ("location restarted", "env file changed"),
         ),
+        DevelopmentEnvFileTestCase(
+            "a symlinked project names its env file relative to the project",
+            "ORDERS_ENV_PROBE=first\n",
+            "ORDERS_ENV_PROBE=second\n",
+            ".env \u00b7 1 variable \u00b7 edit it, then press r to reload",
+            ("location restarted", "env file changed"),
+            project_argument=linked_project,
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -177,7 +186,14 @@ def test_given_an_env_file_when_developing_then_start_up_names_it_and_r_reloads_
     terminal, attached = pty.openpty()
     fcntl.ioctl(attached, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
     process: subprocess.Popen[bytes] = subprocess.Popen(
-        [executable, "dev", "--project-dir", str(project), "--port", "0"],
+        [
+            executable,
+            "dev",
+            "--project-dir",
+            str(test_case.project_argument(project)),
+            "--port",
+            "0",
+        ],
         stdin=attached,
         stdout=attached,
         stderr=attached,

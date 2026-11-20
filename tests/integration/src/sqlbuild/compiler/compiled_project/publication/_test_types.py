@@ -333,6 +333,8 @@ class DevelopmentEnvFileTestCase:
     expected_card_row: str
     # The parts of the restart event line, in order of appearance.
     expected_restart: tuple[str, ...]
+    # The `--project-dir` argument for the project, such as a symlink to it.
+    project_argument: Callable[[Path], Path] = lambda project: project
 
 
 @dataclass(frozen=True)

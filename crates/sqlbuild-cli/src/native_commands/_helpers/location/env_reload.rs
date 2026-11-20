@@ -1,5 +1,6 @@
 //! `sqb dev` re-reads the project env file before each publication, so `r` picks up an edit.
 
+use sqlbuild_core::process_environment::main::project_relative_path::project_relative_path;
 use std::path::Path;
 
 use sqlbuild_config::env_file::main::load_env_file::load_env_file;
@@ -58,13 +59,7 @@ pub(crate) fn env_file_summary(project: &Path) -> Option<String> {
     let Some(path) = marker.path else {
         return Some("off (env_file = \"\")".to_owned());
     };
-    let root = project
-        .canonicalize()
-        .unwrap_or_else(|_| project.to_path_buf());
-    let shown: String = Path::new(&path).strip_prefix(&root).map_or_else(
-        |_| path.clone(),
-        |relative| relative.to_string_lossy().into_owned(),
-    );
+    let shown: String = project_relative_path(project, Path::new(&path));
     if !marker.loaded {
         return Some(format!(
             "{shown} not found{SEPARATOR}create it, then press r to load it"

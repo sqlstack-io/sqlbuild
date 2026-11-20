@@ -2113,3 +2113,10 @@ def request_development_run(
     )
     assert requested.returncode == 0, requested.stderr
     return run_id
+
+
+def linked_project(project: Path) -> Path:
+    """A symlink to the project, beside it."""
+    link: Path = project.with_name(f"{project.name}_link")
+    link.symlink_to(project, target_is_directory=True)
+    return link
