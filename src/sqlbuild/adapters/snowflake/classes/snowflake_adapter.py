@@ -61,6 +61,7 @@ from sqlbuild.adapter.contract.main.is_quoted_identifier import is_quoted_identi
 from sqlbuild.adapter.contract.main.normalize_seed_csv_value import normalize_seed_csv_value
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
+from sqlbuild.adapter.contract.main.temporary_function_copy import temporary_function_copy
 from sqlbuild.adapter.contract.models import (
     ColumnInfo,
     ExpressionInferenceProfile,
@@ -3265,15 +3266,7 @@ class SnowflakeAdapter(
             packages=definition.packages,
             dataframe=definition.dataframe,
         )
-        return TemporaryFunction(
-            target=target,
-            statements=tuple(
-                statement.replace(
-                    "CREATE OR REPLACE FUNCTION ", "CREATE OR REPLACE TEMPORARY FUNCTION ", 1
-                )
-                for statement in statements
-            ),
-        )
+        return temporary_function_copy(target=target, statements=statements)
 
     def render_cursor_bound_literal(self, *, value: str, cursor_type: str | None) -> str:
         if cursor_type == CursorKind.INTEGER:
