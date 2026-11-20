@@ -722,9 +722,9 @@ def run_python_table_function(
 
     body: str = statement.split("AS $$\n", 1)[1].rsplit("\n$$", 1)[0]
     snowflake_module: ModuleType = ModuleType("_snowflake")
-    snowflake_module.vectorized = lambda **_: lambda method: method  # type: ignore[attr-defined]
+    vars(snowflake_module)["vectorized"] = lambda **_: lambda method: method
     monkeypatch.setitem(sys.modules, "_snowflake", snowflake_module)
-    namespace: dict[str, object] = {"__name__": "udtf"}
+    namespace: dict[str, Any] = {"__name__": "udtf"}
     exec(body.replace("RETURNED_COLUMNS", repr(list(returned_columns))), namespace)
     handler: Any = namespace["_SqbHandler"]
     partition: pandas.DataFrame = pandas.DataFrame({0: [2, 1], 1: [10.0, 20.0]})
