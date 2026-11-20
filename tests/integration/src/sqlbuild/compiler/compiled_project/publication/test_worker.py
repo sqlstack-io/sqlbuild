@@ -34,6 +34,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     ClaimedLoadTestCase,
     ClaimedWorker,
     GroupExecutionTestCase,
+    ProviderSecretsHealthTestCase,
     SnapshotWorkerTestCase,
     UnclaimedLoadTestCase,
     WorkerExecutionTestCase,
@@ -43,6 +44,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     LOADED_ORDER_FILES,
     cancel_running_statement,
     claimed_worker,
+    provider_secrets_health,
     run_write_set,
     running_statement,
     scheduled_worker,
@@ -1126,6 +1128,7 @@ def test_given_a_provider_missing_secrets_when_a_scheduled_run_starts_then_it_fa
         # Nothing connected: the run never opened, so never created, the DuckDB warehouse.
         assert not (worker.project / "warehouse.duckdb").exists(), worker.log.read_text()
 
+
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -1930,3 +1933,71 @@ def test_given_an_uncooperative_worker_when_scheduler_stops_then_the_fence_and_c
                 "SELECT json_extract(payload, '$.change.change.exit_code') FROM recall_events "
                 "WHERE event_type='run_terminated'"
             ).fetchone() == (137,)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ProviderSecretsHealthTestCase(
+            description="a provider the target doesn't allow to miss secrets is a health problem",
+            allowed=(),
+            expected_missing=2,
+            expected_allowed=False,
+            expected_output="runs that use them stop before the warehouse: region WORKER_ENV_",
+        ),
+        ProviderSecretsHealthTestCase(
+            description="a provider the target allows to miss secrets is reported but no problem",
+            allowed=("region",),
+            expected_missing=0,
+            expected_allowed=True,
+            expected_output="",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_provider_missing_secrets_when_a_location_publishes_then_its_health_names_them(
+    test_case: ProviderSecretsHealthTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    allowed: str = "".join(f'"{name}"' for name in test_case.allowed)
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "duckdb"\n'
+                '[connections.local]\ndatabase = "warehouse.duckdb"\n'
+                f'[targets.development]\nschema = "main"\nallow_missing_secrets = [{allowed}]\n'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Orders.', materialized table);\n"
+                'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")\n'
+            ),
+        }
+        | {path: text for path, text in ENV_FILE_REGION_FILES.items() if path != ".env"},
+    )
+
+    health, log = provider_secrets_health(tmp_path, project)
+
+    assert health["missing"] == test_case.expected_missing, log
+    assert [
+        (
+            provider["provider"],
+            provider["path"],
+            provider["allowed"],
+            provider["nodes"],
+            sorted(setting["variable"] for setting in provider["settings"]),
+        )
+        for provider in health["providers"]
+    ] == [
+        (
+            "region",
+            "providers/region.py",
+            test_case.expected_allowed,
+            ["loader:raw_regions", "source:raw_regions"],
+            ["WORKER_ENV_REGION_CODE", "WORKER_ENV_TOKEN"],
+        )
+    ], log
+    if test_case.expected_output:
+        assert test_case.expected_output in log, log
+    else:
+        assert "stop before the warehouse" not in log, log

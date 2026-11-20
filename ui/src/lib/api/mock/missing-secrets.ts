@@ -1,8 +1,9 @@
-// `?secrets`: the mock location runs without the orders API's key, so plans that run the orders loader
-// can't run it or what reads it.
+// `?secrets`: the mock location runs without the orders API's key, so its health says so, the Overview
+// lists it, and plans that run the orders loader can't run it or what reads it.
 
 import type { ApiClient } from '../client';
-import type { PlanCantRun, PlanResult } from '../types';
+import type { LocationDetail, Overview, PlanCantRun, PlanResult, Scope } from '../types';
+import type { MissingProviderSecrets } from '../types/platform';
 import { SNAPSHOT_NODES } from './operate-graph';
 
 /** The loader the orders API's missing key stops. */
@@ -41,11 +42,49 @@ export function ordersApiCantRun(selection: string[]): PlanCantRun[] {
 	];
 }
 
+/** The orders API as the location reports it: its key unset, and not a provider the target allows to miss it. */
+const ORDERS_API: MissingProviderSecrets = {
+	provider: 'orders_api',
+	path: 'providers/orders_api.py',
+	settings: [{ field: 'api_key', variable: 'ORDERS_API_KEY', line: 18 }],
+	nodes: [BLOCKED_NODE],
+	allowed: false
+};
+
+/** The location's health with the orders API's key missing. */
+function withMissingKey(detail: LocationDetail | null): LocationDetail | null {
+	if (!detail) return detail;
+	return { ...detail, health: detail.health === 'healthy' || detail.health === 'degraded' ? 'missing_secrets' : detail.health, missingSecrets: [ORDERS_API, ...detail.missingSecrets] };
+}
+
+/** The Overview with the location's missing key among what needs attention. */
+function withMissingKeyItem(overview: Overview | null, scope: Scope): Overview | null {
+	if (!overview) return overview;
+	const event = {
+		id: `secrets:${scope.locationId}`,
+		kind: 'location_missing_secrets' as const,
+		severity: 'warning' as const,
+		occurredAt: new Date(Date.now() - 12 * 60_000).toISOString(),
+		members: ['ORDERS_API_KEY'],
+		active: true,
+		locationId: scope.locationId,
+		subject: null,
+		message: "orders_api is missing ORDERS_API_KEY in the location's environment, so runs of the node that uses it stop before the warehouse."
+	};
+	return { ...overview, attention: [{ kind: 'platform_event', event }, ...overview.attention] };
+}
+
 /** The client whose build plans can't run what the orders API's missing key stops. */
 export function missingSecrets(client: ApiClient): ApiClient {
 	return new Proxy(client, {
 		get(target, prop, receiver) {
 			const value = Reflect.get(target, prop, receiver);
+			if (prop === 'getLocation') {
+				return async (...args: Parameters<ApiClient['getLocation']>) => withMissingKey(await target.getLocation(...args));
+			}
+			if (prop === 'overview') {
+				return async (...args: Parameters<ApiClient['overview']>) => withMissingKeyItem(await target.overview(...args), args[0]);
+			}
 			if (prop !== 'planBuild') return typeof value === 'function' ? value.bind(target) : value;
 			return async (...args: Parameters<ApiClient['planBuild']>): Promise<PlanResult> => {
 				const result = await target.planBuild(...args);

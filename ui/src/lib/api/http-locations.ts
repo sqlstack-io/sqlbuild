@@ -1,6 +1,6 @@
 import type { components } from '$control/schema.d.ts';
-import type { Location, LocationHealth, Snapshot, WarehouseSync } from './types';
-import type { ConnectionDetails, ConnectionTest, LocationDetail, PoolCapWarning, LocationInstance, LocationSummary, WarehouseConnection, WarehouseTableSync } from './types/platform';
+import type { Location, LocationHealth, PlatformEvent, Snapshot, WarehouseSync } from './types';
+import type { ConnectionDetails, ConnectionTest, LocationDetail, MissingProviderSecrets, PoolCapWarning, LocationInstance, LocationSummary, WarehouseConnection, WarehouseTableSync } from './types/platform';
 
 type Wire = components['schemas'];
 
@@ -30,6 +30,37 @@ export function healthOf(observations: Wire['LocationHealthObservation'][], now:
 					? 'degraded'
 					: 'healthy';
 	return { health, liveInstances: live.size, lastSeenAt };
+}
+
+/** The providers the newest provider check found missing secrets, problems before those the target allows. */
+export function missingSecretsOf(observations: Wire['LocationHealthObservation'][]): MissingProviderSecrets[] {
+	const latest = latestOf(observations, 'provider_secrets');
+	const providers = (latest?.report.health.providers ?? []).map((p) => ({ ...p, settings: p.settings.map((s) => ({ ...s, line: s.line ?? null })) }));
+	return [...providers.filter((p) => !p.allowed), ...providers.filter((p) => p.allowed)];
+}
+
+/**
+ * The Overview's problem for a location whose providers miss secrets its target doesn't allow, or null.
+ * Its members are the unset variables, so a newly missing one makes it worse.
+ */
+export function missingSecretsEventOf(locationKey: string, observations: Wire['LocationHealthObservation'][]): PlatformEvent | null {
+	const latest = latestOf(observations, 'provider_secrets');
+	const problems = missingSecretsOf(observations).filter((p) => !p.allowed);
+	if (!latest || !problems.length) return null;
+	const variables = problems.flatMap((p) => p.settings.map((s) => s.variable));
+	const nodes = new Set(problems.flatMap((p) => p.nodes)).size;
+	const providers = problems.map((p) => p.provider).join(', ');
+	return {
+		id: `secrets:${locationKey}`,
+		kind: 'location_missing_secrets',
+		severity: 'warning',
+		occurredAt: latest.received_at,
+		members: [...new Set(variables)].sort(),
+		active: true,
+		locationId: locationKey,
+		subject: null,
+		message: `${providers} ${problems.length === 1 ? 'is' : 'are'} missing ${variables.join(', ')} in the location's environment, so runs of ${nodes === 1 ? 'the node that uses' : `the ${nodes} nodes that use`} ${problems.length === 1 ? 'it' : 'them'} stop before the warehouse.`
+	};
 }
 
 /**
@@ -145,6 +176,7 @@ export function toLocationDetail(location: Location, observations: Wire['Locatio
 		failedDeploy: null,
 		lastLoadError: loadErrorOf(observations, health),
 		poolCapWarnings: poolCapWarningsOf(observations),
+		missingSecrets: missingSecretsOf(observations),
 		instances: instancesOf(observations, now),
 		target: location.target,
 		snapshot: snapshotOf(published),

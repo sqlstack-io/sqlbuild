@@ -599,3 +599,14 @@ class ChangedBuildReplanTestCase:
     edit: tuple[str, str]
     expected_published: dict[str, list[str]]
     expected_rebuilt: dict[str, list[str]]
+
+
+@dataclass(frozen=True)
+class ProviderSecretsHealthTestCase:
+    description: str
+    # Providers the target's allow_missing_secrets lists.
+    allowed: tuple[str, ...]
+    expected_missing: int
+    expected_allowed: bool
+    # What the location prints about them; empty when it should print nothing.
+    expected_output: str

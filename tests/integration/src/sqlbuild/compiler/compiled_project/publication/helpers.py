@@ -1987,6 +1987,39 @@ def failed_load(tmp_path: Path, project: Path) -> tuple[dict[str, Any], int, str
     return report["report"]["health"], missing.value.code, log.read_text()
 
 
+def provider_secrets_health(tmp_path: Path, project: Path) -> tuple[dict[str, Any], str]:
+    """Serve `project` until it reports which providers miss secrets: that health and the log."""
+    log: Path = tmp_path / "location.log"
+    environment: dict[str, str] = {
+        name: value for name, value in os.environ.items() if not name.startswith("WORKER_ENV_")
+    }
+    with (
+        snapshot_api(tmp_path / "control") as api,
+        location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=environment | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location,
+    ):
+        report: dict[str, Any] = wait_for_location_health(
+            api, "development", {"kind": "provider_secrets"}, location, log
+        )
+    return report["report"]["health"], log.read_text()
+
+
 def plan_before_sync(
     tmp_path: Path, project: Path, settings: dict[str, object]
 ) -> tuple[dict[str, Any], str]:

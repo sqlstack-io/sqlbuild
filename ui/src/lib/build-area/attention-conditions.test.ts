@@ -155,6 +155,8 @@ describe('acknowledgements of conditions that cleared', () => {
 		expect(read([built([])], elsewhere).clearedAcknowledgements).toEqual([]);
 		expect(read([built([])], [ack('event:scheduler_no_leader::')]).clearedAcknowledgements).toEqual([ack('event:scheduler_no_leader::')]);
 		expect(read([built([])], [ack('event:location_broken:loc-1:dev:shop · dev')]).clearedAcknowledgements).toHaveLength(1);
+		// Missing secrets come from a health read the Overview leaves out when it fails.
+		expect(read([built([])], [ack('event:location_missing_secrets:loc-1:dev:')]).clearedAcknowledgements).toEqual([]);
 	});
 
 	it('judges only the page’s own latest read, for the target now selected, shown and not failed', () => {

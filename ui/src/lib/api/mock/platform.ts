@@ -270,7 +270,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 	});
 	const loadError =
 		"ImportError: cannot import name 'campaign_touches' from 'models.attribution' (orchestration/jobs.py, line 12)";
-	type LocationExtras = Pick<LocationDetail, 'createdAt' | 'brokenDeployPolicy' | 'failedDeploy' | 'lastLoadError' | 'instances' | 'imageId' | 'warehouseConnection' | 'connectionTest' | 'poolCapWarnings'>;
+	type LocationExtras = Pick<LocationDetail, 'createdAt' | 'brokenDeployPolicy' | 'failedDeploy' | 'lastLoadError' | 'instances' | 'imageId' | 'warehouseConnection' | 'connectionTest' | 'poolCapWarnings' | 'missingSecrets'>;
 	const locationExtras: Record<string, LocationExtras> = {
 		[LOCATION_SHOP]: {
 			createdAt: ago(days(210)),
@@ -281,6 +281,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			warehouseConnection: 'prod',
 			// This mock server caps a pool below what a group asks for.
 			poolCapWarnings: poolCapWarnings(),
+			missingSecrets: [],
 			connectionTest: publishTest(190, 820, 'Connected as TRANSFORMER to WAFFLE_SHOP; warehouse TRANSFORMING_WH available'),
 			instances: [
 				{ id: 'location-waffle-shop-7c2d', imageId: 'sha256:4be1c07d9a52', gitRevision: '7d2e41a', startedAt: ago(192), lastSeenAt: ago(0.2), state: 'live' },
@@ -296,6 +297,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			imageId: 'sha256:9f02b6e4c1a8',
 			warehouseConnection: 'staging',
 			poolCapWarnings: [],
+			missingSecrets: [],
 			connectionTest: publishTest(35, 760, 'Connected as TRANSFORMER to WAFFLE_SHOP_STAGING'),
 			instances: [
 				{ id: 'location-waffle-shop-staging-c7e3', imageId: 'sha256:61d0a4f7b2e9', gitRevision: 'e09a6c3', startedAt: ago(1), lastSeenAt: ago(0.1), state: 'live' },
@@ -310,6 +312,16 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			imageId: null,
 			warehouseConnection: 'dev',
 			poolCapWarnings: [],
+			// The dev target lists export_bucket in allow_missing_secrets: nobody exports from a laptop.
+			missingSecrets: [
+				{
+					provider: 'export_bucket',
+					path: 'providers/storage.py',
+					settings: [{ field: 'secret_access_key', variable: 'EXPORT_BUCKET_SECRET_ACCESS_KEY', line: 14 }],
+					nodes: ['export_revenue_csv'],
+					allowed: true
+				}
+			],
 			connectionTest: publishTest(2, 12, 'Opened warehouse.duckdb'),
 			instances: [{ id: 'location-waffle-shop-dev-local', imageId: 'local', gitRevision: 'b81c09e', startedAt: ago(30), lastSeenAt: ago(0.3), state: 'live' }]
 		},
@@ -321,6 +333,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			imageId: 'sha256:3e5f7aa20c19',
 			warehouseConnection: 'prod',
 			poolCapWarnings: [],
+			missingSecrets: [],
 			connectionTest: publishTest(1440, 140, 'Connected to analytics as sqb_builder'),
 			instances: [
 				{ id: 'location-marketing-analytics-03f6', imageId: 'sha256:3e5f7aa20c19', gitRevision: '3e5f7aa', startedAt: ago(days(1) + 30), lastSeenAt: ago(0.5), state: 'live' },

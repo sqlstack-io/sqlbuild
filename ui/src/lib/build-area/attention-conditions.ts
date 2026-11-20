@@ -141,6 +141,8 @@ export const CLEARED_REASON = 'automatic: the condition cleared';
  */
 export function visibleEventKey(key: string, scopeKey: string): boolean {
 	if (key === boundedKey('event:scheduler_no_leader::')) return true;
+	// Not missing provider secrets: they come from a health read the Overview skips when it fails, so
+	// their absence says nothing either.
 	return ['location_broken', 'tick_overdue', 'calendar_horizon_low'].some((kind) => key.startsWith(`event:${kind}:${scopeKey}:`));
 }
 
