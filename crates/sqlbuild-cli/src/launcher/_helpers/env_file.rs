@@ -5,8 +5,11 @@ use std::io::Write;
 use std::path::Path;
 
 use sqlbuild_config::env_file::main::load_env_file::load_env_file;
+use sqlbuild_core::process_environment::constants::{ENV_FILE_ERROR_VARIABLE, RUN_TOKEN_VARIABLE};
 use sqlbuild_core::process_environment::main::env_file_marker::env_file_marker;
+use sqlbuild_core::process_environment::main::environment_var_os::environment_var_os;
 use sqlbuild_core::process_environment::main::install_environment_overlay::install_environment_overlay;
+use sqlbuild_core::process_environment::models::EnvironmentOverlay;
 
 use crate::argv::main::command_project_and_target::command_project_and_target;
 use crate::native_commands::main::effective_target::effective_target;
@@ -34,7 +37,7 @@ fn inherited(project_dir: &Path, target: Option<&str>) -> bool {
     Path::new(&marker.project_dir) == canonical && marker.target.as_deref() == target
 }
 
-/// Load the env file the project and target choose once per process tree; `Err` is the exit code after reporting why not.
+/// Load the env file the project and target choose once per process tree; `Err` is the exit code after reporting why not, except in a run worker, which records why for the run.
 pub(crate) fn load_project_env_file(arguments: &[OsString]) -> Result<(), i32> {
     let Some((named_dir, selected)) = command_line_project(arguments) else {
         return Ok(());
@@ -71,7 +74,17 @@ pub(crate) fn load_project_env_file(arguments: &[OsString]) -> Result<(), i32> {
                 error.message(),
                 error.help()
             );
-            Err(ENV_FILE_FAILURE_EXIT_CODE)
+            if environment_var_os(RUN_TOKEN_VARIABLE).is_none() {
+                return Err(ENV_FILE_FAILURE_EXIT_CODE);
+            }
+            install_environment_overlay(EnvironmentOverlay {
+                set: vec![(
+                    OsString::from(ENV_FILE_ERROR_VARIABLE),
+                    OsString::from(error.message()),
+                )],
+                remove: Vec::new(),
+            });
+            Ok(())
         }
     }
 }

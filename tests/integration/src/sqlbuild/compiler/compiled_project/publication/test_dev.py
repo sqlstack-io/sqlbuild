@@ -26,6 +26,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     DevelopmentDiscoveryTestCase,
+    DevelopmentInvalidEnvFileTestCase,
     DevelopmentSecretReloadTestCase,
     DevelopmentTestCase,
     DevelopmentWarningTestCase,
@@ -393,3 +394,66 @@ def test_given_a_missing_secret_when_it_is_added_to_the_env_file_then_the_next_r
     assert first["status"] == test_case.expected_first_status, log.read_text()
     assert node == test_case.expected_first_node, log.read_text()
     assert second["status"] == test_case.expected_second_status, log.read_text()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DevelopmentInvalidEnvFileTestCase(
+            "an unparsable .env fails the next run with its line, never its text",
+            "WORKER_ENV_REGION_CODE=42\nWORKER_ENV_TOKEN=worker-token\n",
+            "WORKER_ENV_REGION_CODE=42\nWORKER_ENV_TOKEN=worker-token\nnot a pair s3cr3t\n",
+            "failed",
+            "Couldn't run: env file .env line 3 is not KEY=value "
+            '(set by the default env_file = ".env"); nothing ran',
+            "s3cr3t",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_unparsable_env_file_when_a_run_starts_then_its_reason_names_the_line(
+    test_case: DevelopmentInvalidEnvFileTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "development"\n'
+                '[connections.local]\ndatabase = "warehouse.duckdb"\n'
+                '[targets.development]\nschema = "main"\n'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Orders.', materialized table);\n"
+                'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")\n'
+            ),
+            ".env": test_case.first_env_file,
+        }
+        | REGION_PROVIDER_FILES
+        | duckshop_orchestration("upstream_loaded_orders"),
+    )
+    (project / ".env").chmod(0o600)
+    executable: str = str(Path(sys.executable).with_name("sqb"))
+    environment: dict[str, str] = dict(os.environ)
+    for name in ("SQLBUILD_PLATFORM_WEBHOOK_URL", "SQLBUILD_CONTROL_DATABASE_URL"):
+        _ = environment.pop(name, None)
+    admin: dict[str, str] = environment | {
+        "SQLBUILD_CONTROL_DATABASE_URL": str(project / ".sqlbuild/control.sqlite3")
+    }
+    log: Path = tmp_path / "development.log"
+    output: Path = tmp_path / "publications.jsonl"
+    arguments: list[str] = [executable, "dev", "--project-dir", str(project), "--port", "0"]
+    with location_process(arguments, log, output, env=environment) as process:
+        url, identity = wait_for_development_ready(process, log)
+        api: SnapshotApi = SnapshotApi(url, identity, "local-development")
+        _ = wait_for_generation(api, "development", 1, process, log)
+        _ = (project / ".env").write_text(test_case.invalid_env_file)
+        wait_for_log(process, log, "env file not reloaded")
+        # Queued from outside the project, as the UI does, so the request itself reads no .env.
+        run_id: str = request_development_run(executable, tmp_path, identity, admin)
+        run: dict[str, Any] = wait_for_run(api, process, log, run_id=run_id)
+
+    assert run["status"] == test_case.expected_status, log.read_text()
+    assert run["status_reason"] == test_case.expected_reason, log.read_text()
+    assert test_case.secret_text not in log.read_text()

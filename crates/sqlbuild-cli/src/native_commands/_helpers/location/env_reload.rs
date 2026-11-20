@@ -46,7 +46,7 @@ pub(crate) fn reload_env_file(options: &LocationServe) -> bool {
         Err(error) => {
             location_warning(
                 "env file not reloaded",
-                format!("{}; runs keep the values read before", error.message()),
+                format!("{}; runs fail until it is fixed", error.message()),
             );
             false
         }

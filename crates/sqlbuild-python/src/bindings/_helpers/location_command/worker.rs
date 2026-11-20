@@ -1,5 +1,7 @@
 //! Execute only the API's frozen request after compiling and verifying the unmodified baseline.
 
+use sqlbuild_core::process_environment::constants::ENV_FILE_ERROR_VARIABLE;
+use sqlbuild_core::process_environment::main::environment_var_os::environment_var_os;
 use sqlbuild_python_compile::provider_check::main::key_secret_blocks::key_secret_blocks;
 use sqlbuild_python_compile::provider_check::main::missing_secret_failures::missing_secret_failures;
 use sqlbuild_python_compile::provider_check::main::secret_block_error::secret_block_error;
@@ -333,6 +335,13 @@ pub(super) fn execute_worker<'py>(
             Some(Arc::clone(&worker));
     }
     let result = (|| {
+        if let Some(message) = environment_var_os(ENV_FILE_ERROR_VARIABLE) {
+            let reason: String =
+                format!("Couldn't run: {}; nothing ran", message.to_string_lossy());
+            worker.refuse(&reason)?;
+            write_stderr(py, &format!("{reason}\n"))?;
+            return Err(PyValueError::new_err(reason));
+        }
         if !worker.has_work() {
             write_stderr(
                 py,

@@ -72,6 +72,7 @@ use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::main::sync_interval_seconds::sync_interval_seconds;
 use sqlbuild_config::project::models::ControlConfig;
 use sqlbuild_core::cli_text::models::CliStyle;
+use sqlbuild_core::process_environment::constants::RUN_TOKEN_VARIABLE;
 use sqlbuild_core::process_environment::main::apply_environment_overlay::apply_environment_overlay;
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use sqlbuild_core::screen_text::models::{DevHeader, ScreenFacts};
@@ -272,7 +273,7 @@ fn development_location_role(
         .env_remove("SQLBUILD_CONTROL_DATABASE_URL")
         .env_remove("SQLBUILD_PLATFORM_WEBHOOK_URL")
         .env_remove(SECURITY_AUDIT_WEBHOOK_VARIABLE)
-        .env_remove("SQLBUILD_RUN_TOKEN")
+        .env_remove(RUN_TOKEN_VARIABLE)
         .env_remove("SQLBUILD_DEVELOPMENT_CONTROL_FILE")
         .env(DEV_EVENTS_VARIABLE, DEV_EVENTS_ON)
         .stdin(Stdio::piped())

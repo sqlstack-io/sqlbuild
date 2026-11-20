@@ -633,3 +633,15 @@ class LocationCantRunTestCase:
     # The plan request's settings, such as variables that make the location compile again.
     settings: dict[str, object]
     expected_cant_run: list[dict[str, object]]
+
+
+@dataclass(frozen=True)
+class DevelopmentInvalidEnvFileTestCase:
+    description: str
+    # The project's .env at start, and the edit the parser rejects.
+    first_env_file: str
+    invalid_env_file: str
+    expected_status: str
+    expected_reason: str
+    # A value in the invalid line, which no output may show.
+    secret_text: str
