@@ -12,11 +12,10 @@ use sqlbuild_core::process_environment::models::{EnvFileMarker, EnvironmentOverl
 use crate::env_file::_helpers::read::{read_pairs, shared_read_warning};
 use crate::env_file::errors::EnvFileError;
 use crate::env_file::models::EnvFileChoice;
+use crate::env_file::types::ChosenPairs;
 
 /// The file's pairs and its permissions warning; `None` pairs when loading is off or an unconfigured file is absent.
-pub(crate) fn chosen_pairs(
-    choice: &EnvFileChoice,
-) -> Result<(Option<Vec<(String, String)>>, Option<String>), EnvFileError> {
+pub(crate) fn chosen_pairs(choice: &EnvFileChoice) -> Result<ChosenPairs, EnvFileError> {
     let Some(path) = &choice.path else {
         return Ok((None, None));
     };
@@ -45,7 +44,7 @@ pub(crate) fn taken_variables(
         if name == ENV_FILE_MARKER_VARIABLE {
             continue;
         }
-        let earlier: bool = previous.iter().any(|taken| *taken == name);
+        let earlier: bool = previous.contains(&name);
         if !earlier && environment_var_os(&name).is_some() {
             overridden.insert(name);
             continue;
