@@ -99,3 +99,97 @@ pub(crate) async fn leadership_contract(backend: Backend) -> Option<i64> {
     close_test_store(test_store).await;
     Some(epoch)
 }
+
+/// The operator a test's manual run requests come from.
+pub(crate) fn operator() -> crate::credentials::models::AuditContext {
+    crate::credentials::models::AuditContext {
+        actor: "test-operator".into(),
+        granting_role: "control-store-owner".into(),
+        request_id: Uuid::now_v7(),
+        ip_address: None,
+    }
+}
+
+/// A manual request for one run of `job_key` on the development target.
+pub(crate) fn manual_run(location_id: Uuid, job_key: &str) -> crate::runs::models::JobRunRequest {
+    crate::runs::models::JobRunRequest {
+        run_id: Uuid::now_v7(),
+        location_id,
+        target: "development".into(),
+        job_key: job_key.into(),
+        reason: "Build it now".into(),
+        priority: 0,
+        window: None,
+        full_refresh: false,
+        select: Vec::new(),
+        exclude: Vec::new(),
+    }
+}
+
+/// Write every published job's definition back with the concurrency source an older release recorded.
+pub(crate) async fn store_old_job_definitions(store: &ControlStore, source: &str) {
+    use crate::runs::tests::helpers::{json_column, rows};
+    use crate::store::main::{begin::begin, commit::commit, query::query};
+    use crate::store::models::{Parameter, TransactionMode};
+
+    let jobs = rows(
+        store,
+        "SELECT job_key, definition_json FROM sqb_jobs",
+        vec![],
+    )
+    .await;
+    let mut transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    for job in jobs {
+        let mut definition: serde_json::Value = json_column(&job["definition_json"]);
+        definition["resolved_concurrency"]["source"] = serde_json::json!(source);
+        (transaction, _) = query(
+            transaction,
+            "UPDATE sqb_jobs SET definition_json=$1 WHERE job_key=$2",
+            vec![
+                Parameter::Json(definition),
+                Parameter::Text(job["job_key"].as_str().expect("job key").to_owned()),
+            ],
+        )
+        .await
+        .expect("store the old definition");
+    }
+    commit(transaction).await.expect("commit");
+}
+
+/// Rewrite every snapshot's stored `jobs` document as an older release published it, with each job's concurrency source.
+pub(crate) async fn store_old_jobs_documents(store: &ControlStore, source: &str) {
+    use crate::runs::tests::helpers::rows;
+    use crate::store::main::{
+        begin::begin, commit::commit, compress::compress, decompress::decompress, query::query,
+    };
+    use crate::store::models::{Parameter, TransactionMode};
+
+    let documents = rows(
+        store,
+        "SELECT b.document_hash, b.body FROM sqb_snapshot_documents d \
+         JOIN sqb_documents b ON b.document_hash=d.document_hash WHERE d.kind='jobs'",
+        vec![],
+    )
+    .await;
+    let mut transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    for document in documents {
+        let mut body: serde_json::Value =
+            serde_json::from_slice(&decompress(&document["body"]).expect("body")).expect("JSON");
+        for job in body.as_object_mut().expect("jobs").values_mut() {
+            job["resolved_concurrency"]["source"] = serde_json::json!(source);
+        }
+        (transaction, _) = query(
+            transaction,
+            "UPDATE sqb_documents SET body=$1 WHERE document_hash=$2",
+            vec![
+                Parameter::Bytes(
+                    compress(&serde_json::to_vec(&body).expect("JSON")).expect("gzip"),
+                ),
+                Parameter::Text(document["document_hash"].as_str().expect("hash").to_owned()),
+            ],
+        )
+        .await
+        .expect("store the old document");
+    }
+    commit(transaction).await.expect("commit");
+}

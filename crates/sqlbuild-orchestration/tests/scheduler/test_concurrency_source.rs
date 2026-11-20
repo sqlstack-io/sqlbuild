@@ -3,135 +3,56 @@
 use std::collections::BTreeMap;
 
 use chrono::Utc;
-use serde_json::{Value, json};
+use serde_json::json;
 use uuid::Uuid;
 
-use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::main::{
     execution::advance_groups::advance_groups, requests::request_job_run::request_job_run,
 };
-use crate::runs::models::JobRunRequest;
 use crate::runs::tests::helpers::{json_column, rows, snapshot};
-use crate::scheduler::main::_scheduler_cycle::scheduler_cycle;
 use crate::scheduler::models::SchedulerState;
-use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::scheduler::tests::contracts::test_types::StoredConcurrencySourceTestCase;
+use crate::scheduler::tests::contracts::helpers::{
+    acquire_lease, manual_run, operator, scheduler_cycle, store_old_job_definitions,
+    store_old_jobs_documents,
+};
+use crate::scheduler::tests::contracts::test_types::{
+    MigratedConcurrencySourceTestCase, PinnedOldDocumentTestCase,
+};
 use crate::scheduler::tests::contracts::ticks::helpers::snapshot as scheduled_snapshot;
 use crate::sensors::tests::helpers::append_events;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
-use crate::store::main::compress::compress;
-use crate::store::main::decompress::decompress;
-use crate::store::main::query::query;
-use crate::store::main::{begin::begin, commit::commit, migrate_store::migrate_store};
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::store_migrations::_helpers::migration::MIGRATIONS;
 use crate::store_migrations::_helpers::migration_run::migrate_with;
 
-/// The field 0004 removes, as releases before it stored it.
-const OLD_SOURCE: &str = "project";
-
-const BACKENDS: [StoredConcurrencySourceTestCase; 2] = [
-    StoredConcurrencySourceTestCase {
-        description: "SQLite store",
-        backend: Backend::Sqlite,
-    },
-    StoredConcurrencySourceTestCase {
-        description: "PostgreSQL store",
-        backend: Backend::Postgres,
-    },
-];
-
-fn operator() -> AuditContext {
-    AuditContext {
-        actor: "test-operator".into(),
-        granting_role: "control-store-owner".into(),
-        request_id: Uuid::now_v7(),
-        ip_address: None,
-    }
-}
-
-fn manual_run(location_id: Uuid, job_key: &str) -> JobRunRequest {
-    JobRunRequest {
-        run_id: Uuid::now_v7(),
-        location_id,
-        target: "development".into(),
-        job_key: job_key.into(),
-        reason: "Build it now".into(),
-        priority: 0,
-        window: None,
-        full_refresh: false,
-        select: Vec::new(),
-        exclude: Vec::new(),
-    }
-}
-
-/// Write every published job's definition back with the source an older release recorded.
-async fn store_old_job_definitions(store: &ControlStore) {
-    let jobs = rows(
-        store,
-        "SELECT job_key, definition_json FROM sqb_jobs",
-        vec![],
-    )
-    .await;
-    let mut transaction = begin(store, TransactionMode::Write).await.expect("begin");
-    for job in jobs {
-        let mut definition: Value = json_column(&job["definition_json"]);
-        definition["resolved_concurrency"]["source"] = json!(OLD_SOURCE);
-        (transaction, _) = query(
-            transaction,
-            "UPDATE sqb_jobs SET definition_json=$1 WHERE job_key=$2",
-            vec![
-                Parameter::Json(definition),
-                Parameter::Text(job["job_key"].as_str().expect("job key").to_owned()),
-            ],
-        )
-        .await
-        .expect("store the old definition");
-    }
-    commit(transaction).await.expect("commit");
-}
-
-/// Rewrite the stored `jobs` document of every snapshot as an older release published it.
-async fn store_old_jobs_documents(store: &ControlStore) {
-    let documents = rows(
-        store,
-        "SELECT b.document_hash, b.body FROM sqb_snapshot_documents d \
-         JOIN sqb_documents b ON b.document_hash=d.document_hash WHERE d.kind='jobs'",
-        vec![],
-    )
-    .await;
-    let mut transaction = begin(store, TransactionMode::Write).await.expect("begin");
-    for document in documents {
-        let mut body: Value =
-            serde_json::from_slice(&decompress(&document["body"]).expect("body")).expect("JSON");
-        for job in body.as_object_mut().expect("jobs").values_mut() {
-            job["resolved_concurrency"]["source"] = json!(OLD_SOURCE);
-        }
-        (transaction, _) = query(
-            transaction,
-            "UPDATE sqb_documents SET body=$1 WHERE document_hash=$2",
-            vec![
-                Parameter::Bytes(
-                    compress(&serde_json::to_vec(&body).expect("JSON")).expect("gzip"),
-                ),
-                Parameter::Text(document["document_hash"].as_str().expect("hash").to_owned()),
-            ],
-        )
-        .await
-        .expect("store the old document");
-    }
-    commit(transaction).await.expect("commit");
-}
-
 #[test]
 fn given_a_job_stored_with_its_concurrency_source_when_migrating_then_schedules_sensors_and_manual_runs_read_it()
  {
-    let mut completed = 0;
-    for test_case in BACKENDS {
+    let test_cases = [
+        MigratedConcurrencySourceTestCase {
+            description: "SQLite store",
+            backend: Backend::Sqlite,
+            stored_source: "project",
+            expected_refused_before: true,
+            expected_resolved_concurrency: json!({"limit": 4}),
+            expected_ticks: 1,
+            expected_runs: &["manual 1", "schedule 1", "sensor 1"],
+        },
+        MigratedConcurrencySourceTestCase {
+            description: "PostgreSQL store",
+            backend: Backend::Postgres,
+            stored_source: "target",
+            expected_refused_before: true,
+            expected_resolved_concurrency: json!({"limit": 4}),
+            expected_ticks: 1,
+            expected_runs: &["manual 1", "schedule 1", "sensor 1"],
+        },
+    ];
+    for test_case in test_cases {
         run(async {
             let fixture = open_test_store(test_case.backend)
                 .await
@@ -155,11 +76,9 @@ fn given_a_job_stored_with_its_concurrency_source_when_migrating_then_schedules_
                 "minimum_interval_seconds": 1
             });
             publish_snapshot(store, &input).await.expect("publish");
-            store_old_job_definitions(store).await;
+            store_old_job_definitions(store, test_case.stored_source).await;
             let before =
-                request_job_run(store, (&operator(), None), &manual_run(location, "orders"))
-                    .await
-                    .map(|_| ());
+                request_job_run(store, (&operator(), None), &manual_run(location, "orders")).await;
 
             migrate_store(store).await.expect("migrate to version 4");
             let stored = rows(store, "SELECT definition_json FROM sqb_jobs", vec![]).await;
@@ -170,44 +89,45 @@ fn given_a_job_stored_with_its_concurrency_source_when_migrating_then_schedules_
             request_job_run(store, (&operator(), None), &manual_run(location, "orders"))
                 .await
                 .expect("a manual run of the migrated job");
-            let runs = rows(
+            let runs: Vec<String> = rows(
                 store,
                 "SELECT origin, COUNT(*) AS runs FROM sqb_runs GROUP BY origin ORDER BY origin",
                 vec![],
             )
-            .await;
+            .await
+            .iter()
+            .map(|row| {
+                format!(
+                    "{} {}",
+                    row["origin"].as_str().unwrap_or_default(),
+                    row["runs"]
+                )
+            })
+            .collect();
 
             assert_eq!(
                 (
                     matches!(&before, Err(ControlError::Invalid(message)) if message.contains("unknown field `source`")),
                     json_column(&stored[0]["definition_json"])["resolved_concurrency"].clone(),
                     cycle.ticks,
-                    runs.iter()
-                        .map(|row| format!(
-                            "{} {}",
-                            row["origin"].as_str().unwrap_or_default(),
-                            row["runs"]
-                        ))
-                        .collect::<Vec<_>>(),
+                    runs,
                 ),
                 (
-                    true,
-                    json!({"limit": 4}),
-                    1,
-                    vec![
-                        "manual 1".to_owned(),
-                        "schedule 1".to_owned(),
-                        "sensor 1".to_owned()
-                    ],
+                    test_case.expected_refused_before,
+                    test_case.expected_resolved_concurrency.clone(),
+                    test_case.expected_ticks,
+                    test_case
+                        .expected_runs
+                        .iter()
+                        .map(|run| (*run).to_owned())
+                        .collect::<Vec<_>>(),
                 ),
                 "{}: refused before 0004, then read by the scheduler, its sensor and a manual run",
                 test_case.description
             );
             close_test_store(fixture).await;
-            completed += 1;
         });
     }
-    assert_eq!(completed, BACKENDS.len(), "every backend ran");
 }
 
 // Runs pinned to a snapshot published before 0004 read its immutable documents, which 0004 can't
@@ -217,8 +137,21 @@ fn given_a_job_stored_with_its_concurrency_source_when_migrating_then_schedules_
 #[test]
 fn given_a_group_pinned_to_a_snapshot_document_in_the_old_form_when_advancing_it_then_it_fails_invalid()
  {
-    let mut completed = 0;
-    for test_case in BACKENDS {
+    let test_cases = [
+        PinnedOldDocumentTestCase {
+            description: "SQLite store",
+            backend: Backend::Sqlite,
+            stored_source: "project",
+            expected_error: "jobs: unknown field `source`, expected `limit`",
+        },
+        PinnedOldDocumentTestCase {
+            description: "PostgreSQL store",
+            backend: Backend::Postgres,
+            stored_source: "default",
+            expected_error: "jobs: unknown field `source`, expected `limit`",
+        },
+    ];
+    for test_case in test_cases {
         run(async {
             let fixture = open_test_store(test_case.backend)
                 .await
@@ -264,18 +197,20 @@ fn given_a_group_pinned_to_a_snapshot_document_in_the_old_form_when_advancing_it
             advance_groups(store, &lease, (&limits, scope))
                 .await
                 .expect("start the group");
-            store_old_jobs_documents(store).await;
+            store_old_jobs_documents(store, test_case.stored_source).await;
 
             let advanced = advance_groups(store, &lease, (&limits, scope)).await;
 
-            assert!(
-                matches!(&advanced, Err(ControlError::Invalid(message)) if message == "jobs: unknown field `source`, expected `limit`"),
-                "{}: {advanced:?}",
+            assert_eq!(
+                advanced.map_err(|error| match error {
+                    ControlError::Invalid(message) => message,
+                    other => format!("not Invalid: {other:?}"),
+                }),
+                Err(test_case.expected_error.to_owned()),
+                "{}: the group pinned to the old document fails Invalid",
                 test_case.description
             );
             close_test_store(fixture).await;
-            completed += 1;
         });
     }
-    assert_eq!(completed, BACKENDS.len(), "every backend ran");
 }

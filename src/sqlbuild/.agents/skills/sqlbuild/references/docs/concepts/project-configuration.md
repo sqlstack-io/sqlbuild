@@ -283,8 +283,7 @@ value set in this order:
 5. `[settings] concurrency` in `sqlbuild_project.toml` (default `1`)
 
 The value must be an integer of at least `1`; anything else fails with `D001`. `sqb build
---verbose` shows the effective limit and the setting it came from, for example
-`8 configured limit (targets.prod.concurrency)`. `sqb scenario test` has no `--target` option and
+--verbose` shows the build's effective limit, for example `8 configured limit`. `sqb scenario test` has no `--target` option and
 uses the active target's value.
 
 ### Planning from synced state

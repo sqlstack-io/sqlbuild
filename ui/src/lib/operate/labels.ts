@@ -7,7 +7,6 @@ import type {
 	NodeCounts,
 	OnFailure,
 	OverlapPolicy,
-	ResolvedConcurrency,
 	PoolUse,
 	QueueWait,
 	RunCost,
@@ -112,20 +111,14 @@ export const SHARED_SHOWN = 3;
 /** The docs page the Concurrency panel links to. */
 export const CONCURRENCY_DOCS = 'https://sqlbuild.com/docs/concepts/concurrency/';
 
-/** Which layer set a run's concurrency, as the panel names it; a target by its name when known. */
-export function concurrencySource(source: ResolvedConcurrency['source'], target: string | null): string {
-	switch (source) {
-		case 'job':
-			return 'job setting';
-		case 'target':
-			return target ? `target ${target}` : 'target setting';
-		case 'local':
-			return 'local setting';
-		case 'project':
-			return 'project setting';
-		case 'default':
-			return 'SQLBuild default';
-	}
+/**
+ * A run's concurrency as the panel states it. A group's limit is the target's, which each member
+ * job's run uses unless the job sets its own.
+ */
+export function runConcurrencyText(limit: number, kind: 'job' | 'group'): string {
+	return kind === 'group'
+		? `Members without their own limit: at most ${limit} nodes at once`
+		: `Inside a run: at most ${limit} of this job's nodes at once`;
 }
 
 /** What a job does when triggered while a run of it is active, finishing "If triggered while running: …". */
