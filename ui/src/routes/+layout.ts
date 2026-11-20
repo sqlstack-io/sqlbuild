@@ -2,6 +2,7 @@ import type { ApiClient, Scope } from '$lib/api';
 import { app } from '$lib/state/app.svelte';
 import { prefetch } from '$lib/state/prefetch';
 import { catalogNodes } from '$lib/state/catalog.svelte';
+import { sharedChecks } from '$lib/state/checks.svelte';
 import { appPath } from '$lib/paths';
 import { readParams, toQuery } from './runs/utils';
 import type { LayoutLoad } from './$types';
@@ -18,6 +19,8 @@ const part = (match: RegExpMatchArray) => decodeURIComponent(match[1]);
 
 /** The shared catalog store's listing, which these pages read; the store holds it, so pages never read it themselves. */
 const CATALOG_PAGES = /^\/(?:$|lineage$|catalog(?:\/[^/]+)?$|jobs\/[^/]+$|plan(?:\/rerun)?$)/;
+// Pages that read the shared checks.
+const CHECK_PAGES = /^\/(?:checks|plan|catalog\/[^/]+)$/;
 
 /** Each page's first reads, with the same arguments the page passes, so the page takes them over. */
 const PAGE_READS: [RegExp, Read][] = [
@@ -35,8 +38,8 @@ const PAGE_READS: [RegExp, Read][] = [
 	[/^\/triggers$/, (c, s) => [c.listTriggers(s)]],
 	[/^\/triggers\/([^/]+)$/, (c, s, m) => [c.getTrigger(s, part(m))]],
 	[/^\/catalog$/, () => []],
-	[/^\/catalog\/([^/]+)$/, (c, s, m) => [c.getCatalogNode(s, part(m), catalogNodes.view.nodes), c.getColumnLineage(s, part(m), catalogNodes.view.nodes)]],
-	[/^\/checks$/, (c, s) => [c.listChecks(s)]],
+	[/^\/catalog\/([^/]+)$/, (c, s, m) => [c.getCatalogNode(s, part(m), catalogNodes.view.nodes, sharedChecks.view.checks), c.getColumnLineage(s, part(m), catalogNodes.view.nodes)]],
+	[/^\/checks$/, () => []],
 	[/^\/checks\/([^/]+)$/, (c, s, m) => [c.getCheck(s, part(m))]],
 	[/^\/changes$/, (c, s) => [c.listSnapshotChanges(s)]],
 	[/^\/lineage$/, () => []],
@@ -60,6 +63,7 @@ export const load: LayoutLoad = async ({ url, untrack }) => {
 	const search = untrack(() => url.searchParams);
 	const path = appPath(url.pathname);
 	if (app.scope && CATALOG_PAGES.test(path) && app.client.supports('listCatalogNodes')) catalogNodes.ensure(app.scope);
+	if (app.scope && CHECK_PAGES.test(path)) sharedChecks.ensure(app.scope);
 	prefetch(app.scope, path, search, PAGE_READS);
 	await fontsReady;
 };

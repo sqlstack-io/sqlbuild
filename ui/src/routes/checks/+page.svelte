@@ -17,7 +17,7 @@
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import { planHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
-	import { createResource } from '$lib/state/resource.svelte';
+	import { useChecks } from '$lib/state/checks.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
 	import { attachmentLabel, evaluationModeHelp, evaluationModeLabel, runScopePhaseHelp, runScopePhaseLabel } from '$lib/build-area/labels';
@@ -28,7 +28,7 @@
 	import { createSelection } from '$lib/state/selection.svelte';
 	import { readSelectionParams } from '$lib/selection/command';
 
-	const checks = createResource((client, scope) => client.listChecks(scope), ['checks', 'runs', 'node_status']);
+	const checks = useChecks();
 	const all = $derived(checks.data ?? []);
 
 	let query = $state(page.url.searchParams.get('q') ?? '');

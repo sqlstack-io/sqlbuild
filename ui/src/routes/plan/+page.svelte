@@ -37,11 +37,12 @@
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { useChecks } from '$lib/state/checks.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 
 	const snapshotNodes = createResource((client, scope) => client.listSnapshotNodes(scope), ['snapshot']);
 	const catalog = useCatalogNodes();
-	const checkList = createResource((client, scope) => client.listChecks(scope), ['checks']);
+	const checkList = useChecks();
 	// A `--changed` plan names the job whose own run refreshes what it holds back, with that job's schedule.
 	const triggerList = createResource((client, scope) => client.listTriggers(scope), ['triggers']);
 	const schedulerStopped = $derived(app.platformEvents.some((e) => e.active && e.kind === 'scheduler_no_leader'));

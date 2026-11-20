@@ -19,6 +19,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
+	import { useChecks } from '$lib/state/checks.svelte';
 	import { untrack } from 'svelte';
 	import { formatAgo } from '$lib/format/time';
 	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
@@ -37,8 +38,14 @@
 	const COST_DAYS = 30;
 
 	const catalog = useCatalogNodes();
+	const checks = useChecks();
 	// The shared listing, when held, saves the detail read from listing every node again; it is not a dependency.
-	const res = createResource((client, scope) => client.getCatalogNode(scope, name, untrack(() => catalog.data)), ['runs', 'checks', 'snapshot', 'node_status', 'warehouse_sync']);
+	// The shared checks are: a new list reloads the detail, and their first read is waited for rather than repeated.
+	const res = createResource((client, scope) => {
+		const checkList = checks.data;
+		if (!checkList && untrack(() => checks.loading)) return new Promise<never>(() => {});
+		return client.getCatalogNode(scope, name, untrack(() => catalog.data), checkList);
+	}, ['runs', 'snapshot', 'node_status', 'warehouse_sync']);
 	const n = $derived(res.data ?? null);
 	// Checks and migrations link nodes by bare name; settle on the node key so the graph and links agree.
 	$effect(() => {

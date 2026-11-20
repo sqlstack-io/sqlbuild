@@ -295,6 +295,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 	const healthRefused = new Set<string>();
 	// The node listing per location with the server's ETag; the server answers a repeat with 304 until the snapshot changes.
 	const listings = new Map<string, { etag: string; nodes: CatalogNode[] }>();
+	// The check list per location with the server's ETag; the server answers a repeat with 304 until a check result changes.
+	const checkLists = new Map<string, { etag: string; checks: Check[] }>();
 	// Statistics samples per relation, oldest first, with the cursor after the newest; a refresh reads only newer samples.
 	const samples = new Map<string, { records: Wire['WarehouseStatisticsRecord'][]; after: Wire['WarehouseMirrorCursor'] }>();
 	async function relationStatistics(scope: Scope, relation: { database: string | null; schema: string; name: string }): Promise<Wire['WarehouseStatisticsRecord'][]> {
@@ -825,7 +827,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toColumnLineage(data, nodes);
 		},
-		async getCatalogNode(scope: Scope, ref: string, listing?: CatalogNode[]): Promise<CatalogNodeDetail | null> {
+		async getCatalogNode(scope: Scope, ref: string, listing?: CatalogNode[], checkList?: Check[]): Promise<CatalogNodeDetail | null> {
 			const nodes = listing ?? (await listingWithStates(scope));
 			const node = findNode(nodes, ref);
 			if (!node) return null;
@@ -836,7 +838,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				sqlLocations.has(scope.locationId) && !sqlRefused.has(`${scope.locationId}|${node.key}`)
 					? http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql', { params: { path: { ...path, node_key: node.key } } })
 					: null,
-				keptRead(`checks ${scope.locationId}`, () => checkResults(scope)).catch(() => []),
+				checkList ?? implemented.listChecks(scope).catch((): Check[] => []),
 				node.kind === 'source'
 					? null
 					: http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs', { params: { path: { ...path, node_key: node.key }, query: { limit: 100 } } }),
@@ -852,7 +854,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (status.response.status === 401 || sql?.response.status === 401 || runs?.response.status === 401) onUnauthorized();
 			if (sql?.response.status === 403) sqlRefused.add(`${scope.locationId}|${node.key}`);
 			// Status and SQL have their own permissions; a refusal leaves that part out rather than failing the page.
-			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks.map(toCheck), {
+			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks, {
 				runs: runs?.data ? toNodeRuns(runs.data) : null,
 				jobs,
 				statistics,
@@ -879,7 +881,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const [runs, checks, nodes, changes, events, acknowledgements, conditions] = read;
 			return overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now: Date.now(), scopeKey: scope.locationId });
 		},
-		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
+		listChecks: (scope: Scope): Promise<Check[]> => shared(`checks ${scope.locationId}`, () => checkListing(scope)),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
 		async getCheckSql(scope: Scope, checkId: string): Promise<CheckSql> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
@@ -1006,6 +1008,27 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		return nodes;
 	}
 
+	/** Sends the held check list's ETag, so unchanged results come back as a 304 and are not sent or converted again. */
+	async function checkListing(scope: Scope): Promise<Check[]> {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const held = checkLists.get(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/checks', {
+			params: { path: { location_id: locationId, target } },
+			headers: held ? { 'if-none-match': held.etag } : undefined
+		});
+		if (response.status === 401) onUnauthorized();
+		if (response.status === 304 && held) return held.checks;
+		if (!data) {
+			if (isRefusalStatus(response.status)) checkLists.delete(scope.locationId);
+			throw new ApiError(errorText(error, response), response.status);
+		}
+		const checks = data.map(toCheck);
+		const etag = response.headers.get('etag');
+		if (etag) checkLists.set(scope.locationId, { etag, checks });
+		else checkLists.delete(scope.locationId);
+		return checks;
+	}
+
 	const listedJobs = (scope: Scope) => shared(`jobs ${scope.locationId}`, () => fetchJobs(scope));
 
 	async function fetchJobs(scope: Scope) {
@@ -1129,14 +1152,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		return [health, snapshots.data?.[0] ?? null] as const;
 	}
 
-	/** The newest result of every check, or one check's results newest first. */
-	async function checkResults(scope: Scope, bindingKey?: string) {
+	/** One check's results, newest first. */
+	async function checkResults(scope: Scope, bindingKey: string) {
 		const { locationId, target } = parseLocationKey(scope.locationId);
-		const { data, error, response } = bindingKey
-			? await http.GET('/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}', {
-					params: { path: { location_id: locationId, target, binding_key: bindingKey } }
-				})
-			: await http.GET('/api/control/locations/{location_id}/targets/{target}/checks', { params: { path: { location_id: locationId, target } } });
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}', {
+			params: { path: { location_id: locationId, target, binding_key: bindingKey } }
+		});
 		if (response.status === 401) onUnauthorized();
 		if (!data) throw new ApiError(errorText(error, response), response.status);
 		return data;
