@@ -99,3 +99,184 @@ pub(crate) async fn leadership_contract(backend: Backend) -> Option<i64> {
     close_test_store(test_store).await;
     Some(epoch)
 }
+
+/// The operator a test's manual run requests come from.
+pub(crate) fn operator() -> crate::credentials::models::AuditContext {
+    crate::credentials::models::AuditContext {
+        actor: "test-operator".into(),
+        granting_role: "control-store-owner".into(),
+        request_id: Uuid::now_v7(),
+        ip_address: None,
+    }
+}
+
+/// A manual request for one run of `job_key` on the development target.
+pub(crate) fn manual_run(location_id: Uuid, job_key: &str) -> crate::runs::models::JobRunRequest {
+    crate::runs::models::JobRunRequest {
+        run_id: Uuid::now_v7(),
+        location_id,
+        target: "development".into(),
+        job_key: job_key.into(),
+        reason: "Build it now".into(),
+        priority: 0,
+        window: None,
+        full_refresh: false,
+        select: Vec::new(),
+        exclude: Vec::new(),
+    }
+}
+
+/// Write every published job's definition back with the concurrency source an older release recorded.
+pub(crate) async fn store_old_job_definitions(store: &ControlStore, source: &str) {
+    use crate::runs::tests::helpers::{json_column, rows};
+    use crate::store::main::{begin::begin, commit::commit, query::query};
+    use crate::store::models::{Parameter, TransactionMode};
+
+    let jobs = rows(
+        store,
+        "SELECT job_key, definition_json FROM sqb_jobs",
+        vec![],
+    )
+    .await;
+    let mut transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    for job in jobs {
+        let mut definition: serde_json::Value = json_column(&job["definition_json"]);
+        definition["resolved_concurrency"]["source"] = serde_json::json!(source);
+        (transaction, _) = query(
+            transaction,
+            "UPDATE sqb_jobs SET definition_json=$1 WHERE job_key=$2",
+            vec![
+                Parameter::Json(definition),
+                Parameter::Text(job["job_key"].as_str().expect("job key").to_owned()),
+            ],
+        )
+        .await
+        .expect("store the old definition");
+    }
+    commit(transaction).await.expect("commit");
+}
+
+/// Point each snapshot's `jobs` and `groups` documents at old-form bodies under hashes of their own, as an older release stored them.
+pub(crate) async fn store_old_documents(store: &ControlStore, source: &str) {
+    use crate::runs::tests::helpers::rows;
+    use crate::store::main::{
+        begin::begin, commit::commit, compress::compress, decompress::decompress, query::query,
+    };
+    use crate::store::models::{Parameter, TransactionMode};
+
+    let documents = rows(
+        store,
+        "SELECT b.document_hash, b.body FROM sqb_snapshot_documents d \
+         JOIN sqb_documents b ON b.document_hash=d.document_hash WHERE d.kind IN ('jobs', 'groups')",
+        vec![],
+    )
+    .await;
+    let mut transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    for document in documents {
+        let mut body: serde_json::Value =
+            serde_json::from_slice(&decompress(&document["body"]).expect("body")).expect("JSON");
+        for job in body.as_object_mut().expect("jobs or groups").values_mut() {
+            job["resolved_concurrency"]["source"] = serde_json::json!(source);
+        }
+        let hash = document["document_hash"].as_str().expect("hash").to_owned();
+        let old_hash = format!("{hash}-published-before-0004");
+        (transaction, _) = query(
+            transaction,
+            "INSERT INTO sqb_documents (document_hash, body) VALUES ($1, $2)",
+            vec![
+                Parameter::Text(old_hash.clone()),
+                Parameter::Bytes(
+                    compress(&serde_json::to_vec(&body).expect("JSON")).expect("gzip"),
+                ),
+            ],
+        )
+        .await
+        .expect("store the old document");
+        (transaction, _) = query(
+            transaction,
+            "UPDATE sqb_snapshot_documents SET document_hash=$1 WHERE document_hash=$2",
+            vec![Parameter::Text(old_hash), Parameter::Text(hash)],
+        )
+        .await
+        .expect("point the snapshots at it");
+    }
+    commit(transaction).await.expect("commit");
+}
+
+/// A control-store result as a test compares it: `ok`, or the error as `Invalid("...")` and the like.
+pub(crate) fn outcome<T>(result: Result<T, ControlError>) -> String {
+    result.map_or_else(|error| format!("{error:?}"), |_| "ok".to_owned())
+}
+
+/// The scheduled orders snapshot with job `orders`, a group `nightly_group` of it and `triggers`, as a release before 0004 published it once its source is stored.
+pub(crate) fn upgrade_snapshot(
+    location_id: Uuid,
+    triggers: serde_json::Value,
+) -> crate::snapshots::models::SnapshotInput {
+    let mut input = crate::scheduler::tests::contracts::ticks::helpers::snapshot(location_id);
+    input.documents.insert(
+        "jobs".into(),
+        serde_json::json!({"orders": {"description": "Build orders", "selection": ["orders"],
+            "resolved_concurrency": {"limit": 4}}}),
+    );
+    input.documents.insert(
+        "groups".into(),
+        serde_json::json!({"nightly_group": {"description": "Everything nightly",
+            "selection": ["orders"], "jobs": {"orders": []}, "resolved_concurrency": {"limit": 4}}}),
+    );
+    input.documents.insert("triggers".into(), triggers);
+    input
+}
+
+/// Report a claimed run as its worker does: started, each node with `node`, then finished with `run`; each report's outcome.
+pub(crate) async fn report_run(
+    store: &ControlStore,
+    claim: &crate::runs::models::RunClaim,
+    (node, run): (
+        crate::runs::models::NodeOutcome,
+        crate::runs::models::RunOutcome,
+    ),
+) -> Vec<String> {
+    use crate::runs::main::execution::change_run::change_run;
+    use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest};
+
+    let mut changes = vec![RunChange::Started];
+    changes.extend(
+        claim
+            .request
+            .selection
+            .iter()
+            .map(|node_key| RunChange::NodeFinished {
+                node_key: node_key.clone(),
+                outcome: node,
+                rows_affected: Some(1),
+                error_code: None,
+                skipped_because_of: None,
+                error_message: None,
+            }),
+    );
+    changes.push(RunChange::Finished {
+        outcome: run,
+        reason: "the worker finished".into(),
+        exit_code: Some(1),
+    });
+    let mut outcomes = Vec::new();
+    for change in changes {
+        let reported = change_run(
+            store,
+            RunAuthority::Worker {
+                run_id: claim.request.run_id,
+                claim_id: claim.claim_id,
+            },
+            &RunChangeRequest {
+                event_id: Uuid::now_v7(),
+                run_id: claim.request.run_id,
+                claim_id: Some(claim.claim_id),
+                change,
+            },
+        )
+        .await;
+        outcomes.push(outcome(reported));
+    }
+    outcomes
+}

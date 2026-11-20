@@ -16,28 +16,23 @@ pub fn resolve_configured_concurrency(
     selected_target: &Bound<'_, PyAny>,
 ) -> PyResult<EffectiveConcurrency> {
     let py = project_config.py();
-    let target: Option<(String, i64)> =
+    let target: Option<i64> =
         match resolve_target_name(py, project_config, local_config, selected_target)? {
             Some(name) => {
                 let config: Bound<'_, PyAny> =
                     resolve_target_config(py, project_config, local_config, name.as_any())?;
-                let limit: Option<i64> = native_field(&config, CONCURRENCY)?.extract()?;
-                limit.map(|limit| Ok::<_, pyo3::PyErr>((name.extract::<String>()?, limit)))
+                native_field(&config, CONCURRENCY)?.extract()?
             }
             None => None,
-        }
-        .transpose()?;
+        };
     let settings: i64 = native_field(
         &build_effective_settings(project_config, local_config)?,
         CONCURRENCY,
     )?
     .extract()?;
-    let local_override: bool =
-        native_field(local_config, "setting_overrides")?.contains(CONCURRENCY)?;
     Ok(effective_concurrency(&ConcurrencyLayers {
         requested: requested.extract()?,
-        target: target.as_ref().map(|(name, limit)| (name.as_str(), *limit)),
+        target,
         settings,
-        local_override,
     }))
 }

@@ -83,15 +83,13 @@ pub struct TargetChoice<K> {
 
 /// The concurrency each configuration layer sets, highest precedence first.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ConcurrencyLayers<'a> {
+pub struct ConcurrencyLayers {
     /// `--concurrency` on the command line.
     pub requested: Option<i64>,
-    /// The selected target's name and its `concurrency`, when it sets one.
-    pub target: Option<(&'a str, i64)>,
+    /// The selected target's `concurrency`, when it sets one.
+    pub target: Option<i64>,
     /// `[settings] concurrency` after any `sqlbuild_local.toml` override.
     pub settings: i64,
-    /// Whether `sqlbuild_local.toml` `[settings]` overrides `concurrency`.
-    pub local_override: bool,
 }
 
 /// Whether audit failures are ignored at each configuration layer, highest precedence first.
@@ -105,32 +103,8 @@ pub struct AuditFailureLayers {
     pub settings: bool,
 }
 
-/// Where the effective concurrency came from.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ConcurrencySource {
-    CommandLine,
-    Target(String),
-    LocalSettings,
-    ProjectSettings,
-    /// The named jobs' `concurrency` limits added together, when larger than the configured limit.
-    NamedJobs,
-}
-
-impl std::fmt::Display for ConcurrencySource {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::CommandLine => formatter.write_str("--concurrency"),
-            Self::Target(name) => write!(formatter, "targets.{name}.concurrency"),
-            Self::LocalSettings => formatter.write_str("sqlbuild_local.toml settings.concurrency"),
-            Self::ProjectSettings => formatter.write_str("settings.concurrency"),
-            Self::NamedJobs => formatter.write_str("named jobs' concurrency"),
-        }
-    }
-}
-
-/// One command's worker limit and the layer that set it.
+/// One command's worker limit.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EffectiveConcurrency {
     pub limit: i64,
-    pub source: ConcurrencySource,
 }

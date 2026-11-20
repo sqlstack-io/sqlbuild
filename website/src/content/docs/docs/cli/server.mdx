@@ -293,6 +293,20 @@ afterwards, so back it up before you upgrade (see
 [Back up the control database](#back-up-the-control-database)). To roll back, restore that backup;
 runs recorded since the upgrade are lost.
 
+A run stays pinned to the snapshot it started on, and a snapshot an earlier release published can
+hold job definitions this release no longer reads, which fail with
+`` jobs: unknown field `source`, expected `limit` ``. Upgrade in this order:
+
+1. Pause every schedule and sensor, and start no manual runs. Keep the scheduler running: it
+   launches queued runs and advances group runs.
+2. Let queued and running runs finish, or cancel them.
+3. Upgrade the server.
+4. Upgrade and restart every location, so each publishes its project again with the new release.
+5. Once every location has published again, resume schedules and sensors.
+
+Until a location has published again, its job pages, group runs and ad hoc runs fail, a group's
+schedule or sensor stops the scheduler, and a job run that fails can't record its failure.
+
 To see what an upgrade changes before you start the server, run the new release with `--dry-run`:
 
 ```bash
