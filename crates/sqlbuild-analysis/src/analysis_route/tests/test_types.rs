@@ -371,3 +371,11 @@ pub(super) struct RebaseRangesTestCase {
     /// The text of `member` each lineage row's rebased range covers.
     pub(super) expected_texts: &'static [Option<&'static str>],
 }
+
+pub(super) struct SameUnquotedNameTestCase {
+    pub(super) description: &'static str,
+    pub(super) dialect: Option<&'static str>,
+    pub(super) left: &'static str,
+    pub(super) right: &'static str,
+    pub(super) expected_same_name: bool,
+}

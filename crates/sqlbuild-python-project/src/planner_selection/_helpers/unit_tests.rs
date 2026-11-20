@@ -13,7 +13,7 @@ use sqlbuild_analysis::planner_selection::models::{
     SelectorGroups, UnitTestSelectorNames, UnitTestSelectorSplit,
 };
 
-use crate::compiled_project::main::job_names::job_names;
+use crate::job_settings::main::job_names::job_names;
 use crate::planner_selection::models::Carrier;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import replace
 from typing import Any
 
@@ -34,6 +35,10 @@ from sqlbuild.executor.build.models import (
     SeedExecutionResult,
 )
 from sqlbuild.executor.build.types import BuildStatus
+from sqlbuild.executor.dynamic_pauses.classes.dynamic_hold import DynamicHold
+from sqlbuild.executor.dynamic_pauses.main.hold_dynamic_models import (
+    hold_dynamic_models,
+)
 from sqlbuild.executor.load.models import LoadExecutionResult
 from sqlbuild.executor.migrations.main._apply import apply_model_migrations
 from sqlbuild.executor.migrations.main._apply_columns import apply_column_migrations
@@ -54,16 +59,27 @@ def execute_build_plan(
     initial_state: BuildInitialState | None = None,
     schema_prepared: bool = False,
 ) -> BuildExecutionResult:
-    """Execute a full build plan using the DAG scheduler."""
+    """Execute a build plan with the DAG scheduler, holding the dynamic models it touches."""
 
-    with relation_metadata_cache_scope(adapter=adapter):
+    hold: DynamicHold | None = hold_dynamic_models(
+        plan=plan, adapter=adapter, runtime=runtime, connection_config=connection_config
+    )
+    held: AbstractContextManager[object] = (
+        nullcontext()
+        if hold is None
+        else hold.holding(
+            connection=scheduler_connection,
+            on_progress=None if callbacks is None else callbacks.on_lifecycle_progress,
+        )
+    )
+    with relation_metadata_cache_scope(adapter=adapter), held:
         return _execute_build_plan(
             plan=plan,
             adapter=adapter,
             connection_config=connection_config,
             connections=connections,
             scheduler_connection=scheduler_connection,
-            runtime=runtime,
+            runtime=replace(runtime, dynamic_hold=hold),
             callbacks=callbacks,
             customizations=customizations,
             initial_state=initial_state,
@@ -109,14 +125,14 @@ def _execute_build_plan(
         adapter=adapter,
         connection=scheduler_connection,
         run_id=runtime.run_id,
-        on_progress=resolved_callbacks.on_migration_progress,
+        on_progress=resolved_callbacks.on_lifecycle_progress,
     )
     _ = apply_column_migrations(
         plan=plan,
         adapter=adapter,
         connection=scheduler_connection,
         run_id=runtime.run_id,
-        on_progress=resolved_callbacks.on_migration_progress,
+        on_progress=resolved_callbacks.on_lifecycle_progress,
     )
     _ = apply_retention_phase(
         plan=plan,

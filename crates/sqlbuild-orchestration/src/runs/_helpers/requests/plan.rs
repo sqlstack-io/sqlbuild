@@ -37,7 +37,8 @@ pub(in crate::runs) async fn request_plan_in(
             && previous.record.request_json.location_id == location_id
             && previous.record.request_json.target == target
             && matches!(&previous.record.request_json.work,
-                    LocationWork::Plan { command, .. } if *command == request.command);
+                    LocationWork::Plan { command, fresh, .. }
+                        if *command == request.command && *fresh == request.fresh);
         if !same {
             return Err(ControlError::Invalid(
                 "location work ID already has different content or actor".into(),
@@ -121,6 +122,7 @@ pub(in crate::runs) async fn request_plan_in(
                 .into_iter()
                 .filter(|(name, _)| name != PLAN_IGNORED_SETTING)
                 .collect(),
+            fresh: request.fresh,
         },
     };
     let transaction = enqueue_location_work(

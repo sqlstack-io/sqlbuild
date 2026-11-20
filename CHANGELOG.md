@@ -1,5 +1,59 @@
 # Changelog
 
+## [0.255.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.254.0...v0.255.0) (2026-11-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **plan:** plan requests (POST .../targets/{target}/plans) and plan location work now require a fresh field. Clients must send "fresh": false or true, and servers and locations must be upgraded together; a location from an earlier release rejects plan work from this server.
+
+### Performance Improvements
+
+* **plan:** faster plan previews and reuse of identical plans ([#1604](https://github.com/sqlstack-io/sqlbuild/issues/1604)) ([c0dbd13](https://github.com/sqlstack-io/sqlbuild/commit/c0dbd13364b0921ca54118f56a18a5d1f9b98624))
+
+## [0.254.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.253.0...v0.254.0) (2026-11-19)
+
+
+### Features
+
+* **plan:** will-run / won't-run summary and a clearer Renames section ([#1602](https://github.com/sqlstack-io/sqlbuild/issues/1602)) ([d715c7e](https://github.com/sqlstack-io/sqlbuild/commit/d715c7ebd6f33577b287fff99a67b26aa003cd3f))
+
+## [0.253.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.252.1...v0.253.0) (2026-11-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **jobs:** a job or job group file that still uses [on_failure], retries or retry_delay_seconds now fails to compile with an unknown-key error. Rename [on_failure] to [retry], replace retries = N with attempts = N + 1, and rename retry_delay_seconds to delay_seconds.
+
+### Features
+
+* **jobs:** apply named jobs' settings to the nodes they select ([#1597](https://github.com/sqlstack-io/sqlbuild/issues/1597)) ([559dda5](https://github.com/sqlstack-io/sqlbuild/commit/559dda5c91754582d88420ad023427f0edbbe943))
+
+## [0.252.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.252.0...v0.252.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* **analysis:** one 256 function-call depth for Polyglot and SQLQuack's shared parsers ([#1596](https://github.com/sqlstack-io/sqlbuild/issues/1596)) ([e4276d1](https://github.com/sqlstack-io/sqlbuild/commit/e4276d149ce8e1378c800874cb2d1de78b0e7a41))
+
+## [0.252.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.251.0...v0.252.0) (2026-11-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **build:** `materialized maintained`, `[maintained]`, `pause_maintained` and `--ignore-maintained-grace` are no longer accepted; use `materialized dynamic`, `[dynamic]`, `pause_dynamic` and `--ignore-dynamic-grace`. The materialization is part of a model's version identity, so each existing model is recreated once, with a full recompute, by its first build after the rename. Builds record pauses in `_sqlbuild_dynamic_pauses` and no longer read `_sqlbuild_maintained_pauses`: let builds on the previous version finish before upgrading, resume by hand any model a killed older build left suspended, then drop the old table.
+
+### Features
+
+* **build:** rename maintained models to dynamic and close their hold gaps ([#1594](https://github.com/sqlstack-io/sqlbuild/issues/1594)) ([1ccf4d9](https://github.com/sqlstack-io/sqlbuild/commit/1ccf4d995ab1dff9a8db3288cf03b89a59f440bc))
+
+## [0.251.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.250.0...v0.251.0) (2026-11-19)
+
+
+### Features
+
+* maintained models on Snowflake as dynamic tables, paused safely during builds ([#1591](https://github.com/sqlstack-io/sqlbuild/issues/1591)) ([7733deb](https://github.com/sqlstack-io/sqlbuild/commit/7733deb20532a17e4cf402a0a85a83310a70ec72))
+
 ## [0.250.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.249.1...v0.250.0) (2026-11-19)
 
 

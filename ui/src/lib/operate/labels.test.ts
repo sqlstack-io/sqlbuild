@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { concurrencySource, describeWait, onFailureText, overlapPlain, overlapWhileRunning, poolText, triggerKindLabel, waitTechnical } from './labels';
+import { describeWait, onFailureText, overlapPlain, overlapWhileRunning, poolText, runConcurrencyText, triggerKindLabel, waitTechnical } from './labels';
 import type { QueueWait } from '$lib/api';
 
 const text = (w: QueueWait) => describeWait(w).map((p) => p.text).join('');
@@ -49,13 +49,10 @@ describe('concurrency in plain words', () => {
 		expect(`${clamped.text} (${clamped.detail})`).toBe('Takes the whole warehouse_heavy pool on this server (capped at 1; the project asks for 3)');
 	});
 
-	it("names the layer that set a run's concurrency", () => {
-		expect(concurrencySource('job', 'dev')).toBe('job setting');
-		expect(concurrencySource('target', 'dev')).toBe('target dev');
-		expect(concurrencySource('target', null)).toBe('target setting');
-		expect(concurrencySource('local', 'dev')).toBe('local setting');
-		expect(concurrencySource('project', 'dev')).toBe('project setting');
-		expect(concurrencySource('default', 'dev')).toBe('SQLBuild default');
+	it("states a run's concurrency as the limit it applies, for a job and for a group's members", () => {
+		expect(runConcurrencyText(4, 'job')).toBe("Inside a run: at most 4 of this job's nodes at once");
+		expect(runConcurrencyText(1, 'job')).toBe("Inside a run: at most 1 of this job's nodes at once");
+		expect(runConcurrencyText(6, 'group')).toBe('Members without their own limit: at most 6 nodes at once');
 	});
 
 	it('says what a job triggered while it runs does', () => {

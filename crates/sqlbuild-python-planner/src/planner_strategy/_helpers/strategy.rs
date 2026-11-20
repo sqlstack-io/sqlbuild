@@ -30,6 +30,9 @@ pub(crate) fn action_value(action: PlanAction) -> &'static str {
         PlanAction::Snapshot => "snapshot",
         PlanAction::Skip => "skip",
         PlanAction::Custom => "custom",
+        PlanAction::CreateDynamic => "create_dynamic",
+        PlanAction::AlterDynamic => "alter_dynamic",
+        PlanAction::KeepDynamic => "keep_dynamic",
     }
 }
 

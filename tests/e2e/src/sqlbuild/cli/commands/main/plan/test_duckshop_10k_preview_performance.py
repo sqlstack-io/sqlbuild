@@ -108,8 +108,9 @@ def test_given_a_synced_10k_model_warehouse_when_previewing_a_changed_build_then
         mirror_synced_state(served, batches)
         selection: list[str] = published_keys(served.control)
         cold, _ = timed_plan(served, selection, {"changed": True})
-        warm, document = timed_plan(served, selection, {"changed": True})
-        _ = wait_for_log_count(served, PREVIEW_DONE, 2, 60.0)
+        warm, document = timed_plan(served, selection, {"changed": True}, fresh=True)
+        reused_seconds, reused = timed_plan(served, selection, {"changed": True})
+        _ = wait_for_log_count(served, PREVIEW_DONE, 3, 60.0)
         admin: dict[str, Any] = provision_person(
             served.control.parents[1], "create-user", "plan-admin"
         )
@@ -139,7 +140,8 @@ def test_given_a_synced_10k_model_warehouse_when_previewing_a_changed_build_then
     print(
         f"duckshop 10k preview ({test_case.description}): cold={cold:.2f}s warm={warm:.2f}s "
         f"publish={served.published_seconds:.2f}s warm_to_publish={warm_to_publish:.2f} "
-        f"check_median={check_seconds * 1000:.0f}ms runs={len(reasons)} unbuilt={unbuilt} "
+        f"reused={reused_seconds:.2f}s check_median={check_seconds * 1000:.0f}ms "
+        f"runs={len(reasons)} unbuilt={unbuilt} "
         f"definition_changes={definition_changes} models={len(document['models'])} "
         f"live={live.seconds:.2f}s live_to_publish={live.seconds / served.published_seconds:.2f} "
         f"live_entries={live.model_entries} rebinding={live.source_rebinding_analyses} "
@@ -161,6 +163,10 @@ def test_given_a_synced_10k_model_warehouse_when_previewing_a_changed_build_then
     assert warm < test_case.expected_max_warm_seconds, (
         "a warm preview of 10K models must stay under ten seconds"
     )
+    assert reused["timings"]["reused_from"] and reused["models"] == document["models"], (
+        "the same request again returns the plan the location kept"
+    )
+    assert reused_seconds < warm, "a kept plan comes back without planning again"
     assert warm_to_publish < test_case.expected_max_warm_to_publish, (
         "planning grew faster than compiling: look for a lookup over every model or relation"
     )

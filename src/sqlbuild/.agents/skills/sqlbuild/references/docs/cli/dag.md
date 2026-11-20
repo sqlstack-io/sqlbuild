@@ -105,7 +105,7 @@ Each node represents a source, seed, model, or function:
 | `description` | Model or source description, if declared |
 | `tags` | Model tags |
 | `columns` | Column metadata (name, type, nullable, description) |
-| `materialization_type` | For models: `view`, `table`, `incremental`, or custom name |
+| `materialization_type` | For models: `view`, `table`, `incremental`, `snapshot`, `dynamic`, or custom name |
 | `language` | For functions: `sql` or `python` |
 | `return_kind` | For functions: `scalar` or `table` |
 | `arguments` | For functions: argument name and type pairs |

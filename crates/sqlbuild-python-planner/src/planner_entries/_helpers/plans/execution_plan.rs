@@ -27,10 +27,12 @@ use crate::planner_phases::main::outputs::base_plan_output::base_plan_output;
 use crate::planner_phases::main::outputs::build_planner_identity_context::build_planner_identity_context;
 use crate::planner_phases::main::outputs::check_selected_scope_buildability::check_selected_scope_buildability;
 use crate::planner_phases::main::outputs::detect_stale_warning_changes::detect_stale_warning_changes;
+use crate::planner_phases::main::outputs::plan_dynamic_refresh::plan_dynamic_refresh;
 use crate::planner_phases::main::outputs::unselected_upstream_models::unselected_upstream_models;
 use crate::planner_phases::main::rebuilds::build_planner_entry_results::build_planner_entry_results;
 use crate::planner_phases::main::rebuilds::defer_to_migration_origins::defer_to_migration_origins;
 use crate::planner_phases::main::rebuilds::reconcile_execution_changes::reconcile_execution_changes;
+use crate::planner_phases::models::FullRefreshRequest;
 use crate::planner_phases::models::PlannerIdentityContext;
 use crate::planner_phases::models::{
     PlanOutputContext, PlanWarningContext, PlannedModelEntries, StoragePolicyContext,
@@ -87,13 +89,14 @@ fn change_results<'py>(
     let versions = class_field(identities, |i: &PlannerIdentityContext| {
         &i.version_identities
     })?;
+    let full_refresh: FullRefreshRequest = FullRefreshRequest::of(overrides)?;
     let changes = detect_changes(
         (
             project,
             &class_field(scopes, |s: &PlannerScopeResolution| &s.inspection_scope)?,
             snapshot,
         ),
-        native_field(overrides, "full_refresh")?.is_truthy()?,
+        (full_refresh.all, &full_refresh.functions),
         (
             native_field(&versions, "model_version_hashes")?,
             native_field(&versions, "model_metadata_jsons")?,
@@ -196,6 +199,7 @@ pub(crate) fn planned_output<'py>(
         (&inspection_scope, &reconciliation),
         &source_freshness,
     )?;
+    let entries = plan_dynamic_refresh(runtime, &inspection_scope, entries)?;
     record_step(BUILDING_ENTRIES, entries_started.elapsed().as_secs_f64());
     let planned_sql_tests = timed(TEST_FIXTURES, || test_planning.result(py))?.into_bound(py);
     let assembling_started = Instant::now();

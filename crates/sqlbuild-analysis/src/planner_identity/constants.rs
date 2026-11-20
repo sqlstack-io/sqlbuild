@@ -1,7 +1,7 @@
 //! Planner identity constants shared with the Python planner.
 
 /// Model config keys whose values participate in version identity, in Python's insertion order after `cursor_inputs`.
-pub const VERSION_IDENTITY_CONFIG_KEYS: [&str; 40] = [
+pub const VERSION_IDENTITY_CONFIG_KEYS: [&str; 41] = [
     "append_cursor_inclusive",
     "batch_size",
     "check_columns",
@@ -42,6 +42,7 @@ pub const VERSION_IDENTITY_CONFIG_KEYS: [&str; 40] = [
     "partition_by",
     "primary_key",
     "table_settings",
+    "refresh_mode",
 ];
 /// Model config key of cursor inputs, recorded before every other identity key.
 pub const CURSOR_INPUTS_CONFIG_KEY: &str = "cursor_inputs";

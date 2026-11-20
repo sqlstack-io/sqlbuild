@@ -3,7 +3,7 @@
 use chrono::{DateTime, Duration, Utc};
 use reqwest::StatusCode;
 use serde_json::json;
-use sqlbuild_core::constants::{RUNS_TABLE_NAME, STATE_TABLE_NAMES};
+use sqlbuild_core::constants::{DYNAMIC_PAUSES_TABLE_NAME, RUNS_TABLE_NAME, STATE_TABLE_NAMES};
 use uuid::Uuid;
 
 use crate::api::tests::changes_helpers::{connect, expect_topics};
@@ -36,10 +36,11 @@ use crate::warehouse_metadata::models::{MetadataBatch, WarehouseHistoryKind};
 
 #[test]
 fn given_state_tables_when_classified_then_each_is_mirrored_by_exactly_one_kind() {
-    // The runs table has no mirror until the control store decides where observed runs live.
+    // The runs table has no mirror until the control store decides where observed runs live;
+    // dynamic pauses are a lease that builds read from the warehouse, never a mirror.
     let mut written: Vec<&str> = STATE_TABLE_NAMES
         .into_iter()
-        .filter(|table| *table != RUNS_TABLE_NAME)
+        .filter(|table| ![RUNS_TABLE_NAME, DYNAMIC_PAUSES_TABLE_NAME].contains(table))
         .collect();
     written.sort_unstable();
     let test_cases = [StateTableClassificationTestCase {

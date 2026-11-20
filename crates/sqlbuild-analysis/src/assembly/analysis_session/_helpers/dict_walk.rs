@@ -2,20 +2,20 @@
 
 use polyglot_sql::expressions::Cte;
 use polyglot_sql::traversal::ExpressionWalk;
-use polyglot_sql::{ComplexityGuardOptions, DataType, Dialect, Expression, ParseOptions, ast_json};
-use serde_json::{Map, Value, json};
+use polyglot_sql::{DataType, Dialect, Expression, ParseOptions, ast_json};
+use serde_json::{Map, Value};
 
 use crate::assembly::analysis_session::models::ProjectionFacts;
+use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
 use crate::relation_markers::constants::MARKER_NAME_PREFIX;
 
 use crate::assembly::analysis_session::constants::{
     ALIAS_AST_KIND, ANNOTATED_AST_KIND, ARRAY_FIXTURE_TYPE, ARRAY_PAYLOAD_KIND, CATALOG_TABLE_ARG,
     COLUMN_AST_KIND, CTE_ALIAS_PAYLOAD_KEY, CTE_LIST_PAYLOAD_KEY, DEPENDENCY_FUNCTION_NAMES,
     FUNCTION_AST_KIND, FUNCTION_FIXTURE_TYPES, FUNCTION_PAYLOAD_KIND, HELPER_READS_DIALECT,
-    LITERAL_FIXTURE_TYPES, LITERAL_PAYLOAD_KIND, MAX_FUNCTION_CALL_DEPTH, NAME_PAYLOAD_KEY,
-    NULL_PAYLOAD_KIND, RENDERED_TYPE_NAMES, SCHEMA_TABLE_ARG, SELECT_PAYLOAD_KEY,
-    SET_OPERATION_PAYLOAD_KEYS, STAR_AST_KIND, STRUCTURED_PAYLOAD_KINDS, TABLE_AST_KIND,
-    VARIANT_FIXTURE_TYPE, WILDCARD,
+    LITERAL_FIXTURE_TYPES, LITERAL_PAYLOAD_KIND, NAME_PAYLOAD_KEY, NULL_PAYLOAD_KIND,
+    RENDERED_TYPE_NAMES, SCHEMA_TABLE_ARG, SELECT_PAYLOAD_KEY, SET_OPERATION_PAYLOAD_KEYS,
+    STAR_AST_KIND, STRUCTURED_PAYLOAD_KINDS, TABLE_AST_KIND, VARIANT_FIXTURE_TYPE, WILDCARD,
 };
 
 /// Python's `bool(value)`.
@@ -193,12 +193,7 @@ pub(crate) fn parse_one_or_error(
     sql: &str,
     dialect: &str,
 ) -> Result<Result<Expression, String>, String> {
-    let guard: ComplexityGuardOptions =
-        serde_json::from_value(json!({"maxFunctionCallDepth": MAX_FUNCTION_CALL_DEPTH}))
-            .map_err(|error| error.to_string())?;
-    let options: ParseOptions = ParseOptions {
-        complexity_guard: Some(guard),
-    };
+    let options: ParseOptions = polyglot_parse_options();
     let parsed: Result<Vec<Expression>, _> = Dialect::get_by_name(dialect)
         .ok_or_else(|| format!("unknown dialect {dialect}"))?
         .parse_with_options(sql, &options);

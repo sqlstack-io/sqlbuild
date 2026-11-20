@@ -14,17 +14,27 @@ use crate::plan_output::_helpers::plan_json::source_load_json;
 use crate::plan_output::_helpers::plan_json::table_type_json;
 use crate::plan_output::_helpers::plan_json::warning_json;
 use crate::plan_output::_helpers::values::mapped;
-use crate::plan_output::constants::CHANGED_KEY;
+use crate::plan_output::constants::{
+    CHANGED_KEY, FULL_REFRESH_JOBS_KEY, IGNORE_AUDIT_FAILURES_JOBS_KEY, RENAMED_REASON,
+    WAREHOUSE_JOBS_KEY,
+};
 use crate::plan_output::main::any::any;
 use crate::plan_output::main::dict::dict;
 use crate::plan_output::main::items::items;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
-use pyo3::types::{PyDict, PyDictMethods, PyList};
-use sqlbuild_core::plan_display::constants::SYNCED_COPY_KEY;
+use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods};
+use sqlbuild_core::plan_display::constants::{
+    IS_RENAME_FIELD, OLD_NAME_FIELD, ORIGIN_MODEL_FIELD, SYNCED_COPY_KEY,
+};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::compile_outputs::main::indented_json::indented_json;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
+use sqlbuild_python_project::compiled_project::constants::{
+    JOB_FULL_REFRESH_KEY, JOB_IGNORED_AUDIT_FAILURES_KEY, JOB_WAREHOUSES_KEY,
+};
+use std::collections::HashMap;
 
 /// The plan as one JSON document, `json.dumps(indent=2)`.
 #[pyfunction]
@@ -105,9 +115,10 @@ pub fn format_plan_json(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> P
             ),
         ],
     )?;
+    mark_renames(&result)?;
     let metadata: Bound<'_, PyAny> = native_field(&plan, "metadata")?;
     if metadata.is_truthy()? {
-        result.set_item("metadata", metadata)?;
+        result.set_item("metadata", &metadata)?;
     }
     let synced_copy: Bound<'_, PyAny> = arguments.value(SYNCED_COPY_KEY)?;
     if !synced_copy.is_none() {
@@ -119,5 +130,64 @@ pub fn format_plan_json(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> P
     if native_field(&plan, IGNORE_AUDIT_FAILURES_KEY)?.is_truthy()? {
         result.set_item(IGNORE_AUDIT_FAILURES_KEY, true)?;
     }
+    for (key, label) in [
+        (
+            JOB_IGNORED_AUDIT_FAILURES_KEY,
+            IGNORE_AUDIT_FAILURES_JOBS_KEY,
+        ),
+        (JOB_FULL_REFRESH_KEY, FULL_REFRESH_JOBS_KEY),
+    ] {
+        let jobs: Bound<'_, PyAny> = mapping_get(&metadata, key)?;
+        if !jobs.is_none() {
+            result.set_item(
+                label,
+                PyList::new(py, jobs.try_iter()?.collect::<PyResult<Vec<_>>>()?)?,
+            )?;
+        }
+    }
+    let warehouses: Bound<'_, PyAny> = mapping_get(&metadata, JOB_WAREHOUSES_KEY)?;
+    if !warehouses.is_none() {
+        result.set_item(WAREHOUSE_JOBS_KEY, warehouses)?;
+    }
     indented_json(result.as_any())
+}
+
+/// Marks renamed models' own migrations and copies their origin and old name onto the model rows.
+fn mark_renames(result: &Bound<'_, PyDict>) -> PyResult<()> {
+    let (Some(models), Some(migrations)) =
+        (result.get_item("models")?, result.get_item("migrations")?)
+    else {
+        return Ok(());
+    };
+    let mut renamed: HashMap<String, Bound<'_, PyDict>> = HashMap::new();
+    for model in models.downcast::<PyList>()?.iter() {
+        let model: Bound<'_, PyDict> = model.downcast_into::<PyDict>()?;
+        let reason: Option<String> = model.get_item("reason")?.map(|r| r.extract()).transpose()?;
+        if reason.as_deref() == Some(RENAMED_REASON)
+            && let Some(name) = model.get_item("name")?
+        {
+            renamed.insert(name.extract()?, model);
+        }
+    }
+    for migration in migrations.downcast::<PyList>()?.iter() {
+        let migration: Bound<'_, PyDict> = migration.downcast_into::<PyDict>()?;
+        let model: Option<String> = migration
+            .get_item("model")?
+            .map(|m| m.extract())
+            .transpose()?;
+        let row: Option<&Bound<'_, PyDict>> = model.as_deref().and_then(|name| renamed.get(name));
+        migration.set_item(IS_RENAME_FIELD, row.is_some())?;
+        let Some(row) = row else {
+            continue;
+        };
+        for field in [ORIGIN_MODEL_FIELD, OLD_NAME_FIELD] {
+            if let Some(value) = migration.get_item(field)?
+                && !value.is_none()
+                && !row.contains(field)?
+            {
+                row.set_item(field, value)?;
+            }
+        }
+    }
+    Ok(())
 }

@@ -56,7 +56,12 @@ from sqlbuild._native import (
     run_compile_pipeline,
     write_fingerprint,
 )
-from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo, RelationReadProbe
+from sqlbuild.adapter.contract.models import (
+    ColumnInfo,
+    RelationInfo,
+    RelationReadProbe,
+)
+from sqlbuild.adapter.contract.types import DynamicListing
 from sqlbuild.adapter.relations.classes.inspection_catalog import InspectionCatalog
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.compile.types import (
@@ -827,3 +832,95 @@ def planned_entries(result: CompilePipelineResult) -> list[tuple[str, str]]:
     """Each planned model's name and reason, in name order."""
 
     return sorted((entry.name, str(entry.reason)) for entry in result.plan_output.model_entries)
+
+
+CLEAN_ORDERS_QUERY: str = "SELECT 1 AS order_id"
+_DYNAMIC: dict[str, object] = {
+    "materialized": "dynamic",
+    "refresh": {"lag": "1h"},
+    "refresh_warehouse": "transform_wh",
+}
+
+
+class ListingDuckDbAdapter(DuckDbAdapter):
+    """DuckDB that lists every dynamic table the same way, as Snowflake's SHOW would."""
+
+    def __init__(self, listed: DynamicListing | None) -> None:
+        super().__init__()
+        self.listed: DynamicListing | None = listed
+        self.read_names: list[str] = []
+
+    def dynamic_listing(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> DynamicListing | None:
+        del connection, database, schema
+        self.read_names.append(name)
+        return self.listed
+
+
+def dynamic_project_case(
+    upstream_query: str, totals_config: dict[str, object] | None = None
+) -> BuildExecutionPlanTestCase:
+    """Clean orders and dynamic daily totals built from it, both refreshed within an hour."""
+
+    return BuildExecutionPlanTestCase(
+        description="clean orders and the daily totals built from it as a dynamic model",
+        setup_sql=(),
+        model_locations={"clean_orders": "staging", "daily_totals": "staging"},
+        model_configs={
+            "clean_orders": _DYNAMIC,
+            "daily_totals": {**_DYNAMIC, **(totals_config or {})},
+        },
+        model_queries={
+            "clean_orders": upstream_query,
+            "daily_totals": "SELECT count(*) AS orders FROM staging.clean_orders",
+        },
+        model_deps={"daily_totals": ("clean_orders",)},
+        full_refresh=False,
+        expected_action={},
+        expected_reason={},
+    )
+
+
+def change_tracking_project_case() -> BuildExecutionPlanTestCase:
+    """Dynamic daily totals read orders, and payments through a view; not customers."""
+
+    return BuildExecutionPlanTestCase(
+        description="tables a dynamic model reads, directly or via a view, and one it does not",
+        setup_sql=(),
+        model_locations={
+            "orders": "staging",
+            "customers": "staging",
+            "payments": "staging",
+            "settled_payments": "staging",
+            "daily_totals": "staging",
+        },
+        model_configs={
+            "orders": {"materialized": "table"},
+            "customers": {"materialized": "table"},
+            "payments": {"materialized": "table"},
+            "settled_payments": {"materialized": "view"},
+            "daily_totals": {
+                "materialized": "dynamic",
+                "refresh": {"lag": "1h"},
+                "refresh_on_build": True,
+            },
+        },
+        model_queries={
+            "orders": "SELECT 1 AS order_id",
+            "customers": "SELECT 1 AS customer_id",
+            "payments": "SELECT 1 AS order_id",
+            "settled_payments": "SELECT order_id FROM staging.payments",
+            "daily_totals": (
+                "SELECT count(*) AS orders FROM staging.orders "
+                "JOIN staging.settled_payments USING (order_id)"
+            ),
+        },
+        model_deps={
+            "daily_totals": ("orders", "settled_payments"),
+            "settled_payments": ("payments",),
+        },
+        full_refresh=False,
+        expected_action={},
+        expected_reason={},
+    )

@@ -54,3 +54,28 @@ def success_completion(*, key: str, result: str) -> tuple[str, str]:
 
 def failure_completion(*, key: str, error: BaseException) -> tuple[str, str]:
     return key, f"failed: {error}"
+
+
+class RecordingWarehouseAdapter:
+    """Records each warehouse switch; reports `session_warehouse` as the session's warehouse."""
+
+    def __init__(self, *, session_warehouse: str | None) -> None:
+        self.session_warehouse: str | None = session_warehouse
+        self.statements: list[tuple[Any, str]] = []
+        self.session_reads: int = 0
+
+    def use_session_warehouse(self, *, connection: Any, warehouse: str) -> None:
+        self.statements.append((connection, warehouse))
+
+    def current_session_warehouse(self, *, connection: Any) -> str | None:
+        del connection
+        self.session_reads += 1
+        return self.session_warehouse
+
+
+class MissingWarehouseAdapter(RecordingWarehouseAdapter):
+    """An adapter whose session cannot use any warehouse it is asked for; records each attempt."""
+
+    def use_session_warehouse(self, *, connection: Any, warehouse: str) -> None:
+        self.statements.append((connection, warehouse))
+        raise RuntimeError(f"Object does not exist: warehouse {warehouse}")

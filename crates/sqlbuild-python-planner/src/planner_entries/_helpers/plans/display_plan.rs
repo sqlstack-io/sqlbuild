@@ -24,6 +24,7 @@ use sqlbuild_python_project::planner_phases::main::object::object;
 const VIEW: &str = "view";
 const INCREMENTAL: &str = "incremental";
 const CUSTOM: &str = "custom";
+const DYNAMIC: &str = "dynamic";
 
 fn display_action(
     materialization_type: &Bound<'_, PyAny>,
@@ -39,6 +40,8 @@ fn display_action(
         }
     } else if materialization_type.eq(CUSTOM)? {
         "CUSTOM"
+    } else if materialization_type.eq(DYNAMIC)? {
+        "CREATE_DYNAMIC"
     } else {
         "CREATE_TABLE"
     })

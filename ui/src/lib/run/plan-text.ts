@@ -2,6 +2,7 @@
 // terminal read the same: work that runs first, one section per change reason with each model's detail,
 // then the routine models, functions, seeds and warnings.
 
+import { retentionStep } from './plan-steps';
 import type { PlanChanged, PlanDocument, PlanModel, PlanPageSection, PlanWarning, Trigger } from '$lib/api';
 import { formatIn } from '$lib/format/time';
 import { plural } from '$lib/format/plural';
@@ -97,6 +98,8 @@ export function materializationLabel(m: PlanModel): string {
 export function actionText(m: PlanModel): string {
 	if (m.action === 'create_view') return 'recreate view';
 	if (m.action === 'custom') return 'run custom materialization';
+	if (m.action === 'create_dynamic') return m.reason === 'first_run' ? 'create' : 'recreate, full recompute';
+	if (m.action === 'alter_dynamic') return 'change refresh settings in place';
 	if (m.backfill.action === 'bounded' && m.backfill.duration) return `rebuild last ${m.backfill.duration}`;
 	if (m.backfill.action === 'full' && m.reason !== 'first_run') return 'full rebuild';
 	return 'continue forward';
@@ -116,7 +119,7 @@ function cursorLines(m: PlanModel, showRange: boolean, windowStart?: string): st
 }
 
 function policyLine(m: PlanModel): string[] {
-	if (m.backfill.action === 'forward' || !(m.reason === 'query_changed' || m.reason === 'schema_changed')) return [];
+	if (m.backfill.action === 'forward' || m.action === 'create_dynamic' || !(m.reason === 'query_changed' || m.reason === 'schema_changed')) return [];
 	const value = m.backfill.action === 'bounded' ? `bounded-${m.backfill.duration ?? 'full'}` : m.backfill.action;
 	return [`policy: replay_on_change=${value}`];
 }
@@ -167,7 +170,7 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 	add('Migrations', plan.migrations.map((r) => ({ name: r.model, value: [r.origin_model && `from ${r.origin_model}`, r.decision, r.completed_at ? 'completed' : 'pending'].filter(Boolean).join(' · '), detail: [] })), true, 'migrations');
 	add('Column migrations', plan.column_migrations.map((r) => ({ name: r.model, value: `${r.origin_column} → ${r.destination_column} · ${r.decision}`, detail: [] })), true, 'column_migrations');
 	add('Table type changes', plan.table_type_conversions.map((r) => ({ name: r.model, value: [r.actual_type, r.desired_type].filter(Boolean).join(' → '), detail: [] })), true, 'table_type_conversions');
-	add('Retention', plan.retention.map((r) => ({ name: r.model, value: r.action ?? '', detail: [] })), true, 'retention');
+	add('Retention', plan.retention.map((r) => retentionStep(r)).map((r) => ({ name: r.node, value: r.what, detail: r.warning ? [r.warning] : [] })), true, 'retention');
 	for (const kind of ['loader', 'source'] as const) {
 		const loads = plan.source_loads.filter((s) => s.kind === kind);
 		const label = kind === 'loader' ? 'Loaders' : 'Sources';
@@ -187,7 +190,7 @@ export function planSections(plan: PlanDocument): PlanSection[] {
 		const why = changedRuns(plan);
 		add('Models', active.filter((m) => ROUTINE.has(m.reason)).map((m) => {
 			const run = why.get(m.name);
-			return { name: m.name, value: materializationLabel(m), detail: [...cursorLines(m, true, starts[m.name]), ...(run ? [run.downstream_of ? `reads ${keyName(run.downstream_of)}` : run.reason] : [])] };
+			return { name: m.name, value: materializationLabel(m), detail: [...cursorLines(m, true, starts[m.name]), ...(m.reinitialised_by ? [`recomputes in full: ${m.reinitialised_by} is rebuilt`] : []), ...(m.paused ? ['paused: scheduled refreshes are suspended'] : []), ...(run ? [run.downstream_of ? `reads ${keyName(run.downstream_of)}` : run.reason] : [])] };
 		}), false, 'routine_models');
 	}
 	add('Functions', plan.functions.filter((f) => !f.reason || f.reason === 'no_change').map(functionEntry), false, 'functions');

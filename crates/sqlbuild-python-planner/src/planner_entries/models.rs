@@ -1,5 +1,6 @@
 //! Public records of planner entries.
 
+use crate::planner_phases::models::FullRefreshRequest;
 use crate::planner_warehouse::models::PlannerReads;
 use pyo3::prelude::{Bound, Py, PyAny};
 use pyo3::pyclass;
@@ -31,7 +32,7 @@ pub struct PlanEntriesRequest<'py> {
     pub(crate) relations: Bound<'py, PyAny>,
     pub(crate) resolved_models: Bound<'py, PyAny>,
     pub(crate) cursor_overrides: Bound<'py, PyAny>,
-    pub(crate) full_refresh: bool,
+    pub(crate) full_refresh: FullRefreshRequest,
     pub(crate) build_inputs: Bound<'py, PyAny>,
     /// The effective worker limit execution will use.
     pub(crate) concurrency: i64,

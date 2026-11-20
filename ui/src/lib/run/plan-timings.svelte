@@ -5,15 +5,15 @@
 	import { cn } from '$lib/utils';
 	import TimerIcon from '@lucide/svelte/icons/timer';
 	import type { PlanDocument, PlanTimings } from '$lib/api';
-	import { seconds, timingFootnote, timingRows } from './plan-timings';
+	import { seconds, timingFootnote, timingRows, timingTitle } from './plan-timings';
 
-	let { plan, timings }: { plan: PlanDocument; timings: PlanTimings } = $props();
+	let { plan, timings, now }: { plan: PlanDocument; timings: PlanTimings; now: number } = $props();
 	const rows = $derived(timingRows(timings));
 </script>
 
 <Popover.Root>
 	<Popover.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'plan-timings-trigger')} data-testid="plan-timings">
-		<TimerIcon />Planned in {seconds(timings.total_seconds)} s
+		<TimerIcon />{timingTitle(timings, now)}
 	</Popover.Trigger>
 	<Popover.Content class="w-[520px] p-0" align="end">
 		<div class="timings">
@@ -32,7 +32,7 @@
 				</tbody>
 				<tfoot><tr><td>Total</td><td class="num">{seconds(timings.total_seconds)}</td><td></td></tr></tfoot>
 			</table>
-			<p class="foot">{timingFootnote(plan, timings)}</p>
+			<p class="foot">{timingFootnote(plan, timings, now)}</p>
 		</div>
 	</Popover.Content>
 </Popover.Root>

@@ -10,7 +10,7 @@ const model = (name: string, over: Partial<PlanModel> = {}): PlanModel => ({
 	backfill: { action: 'forward', duration: null },
 	...over
 });
-const plan = (models: PlanModel[], over: Partial<PlanDocument> = {}): PlanDocument => ({
+const plan = (models: PlanModel[], over: Partial<Omit<PlanDocument, 'sections' | 'migration_steps'>> = {}): PlanDocument => ({
 	selected_count: models.length,
 	models,
 	seeds: [],
@@ -33,6 +33,27 @@ describe('plan text, as sqb plan prints it', () => {
 		expect(actionText(model('a', { backfill: { action: 'bounded', duration: '7d' } }))).toBe('rebuild last 7d');
 		expect(actionText(model('a', { reason: 'query_changed', backfill: { action: 'full', duration: null } }))).toBe('full rebuild');
 		expect(actionText(model('a', { reason: 'first_run', backfill: { action: 'full', duration: null } }))).toBe('continue forward');
+	});
+
+	it('words dynamic models as the CLI does, with no replay policy', () => {
+		const recreated = model('a', { action: 'create_dynamic', reason: 'query_changed', backfill: { action: 'full', duration: null } });
+		expect(actionText(recreated)).toBe('recreate, full recompute');
+		expect(actionText(model('a', { action: 'create_dynamic', reason: 'first_run' }))).toBe('create');
+		expect(actionText(model('a', { action: 'alter_dynamic', reason: 'config_changed' }))).toBe('change refresh settings in place');
+		const [section] = planSections(plan([recreated]));
+		expect(section.entries[0].detail).toEqual([]);
+	});
+
+	it('says a kept dynamic model recomputes in full when an upstream it reads is rebuilt', () => {
+		const kept = model('daily_totals', { materialization_type: 'dynamic', action: 'keep_dynamic', reinitialised_by: 'orders' });
+		const [routine] = planSections(plan([kept]));
+		expect(routine.entries).toEqual([{ name: 'daily_totals', value: 'dynamic', detail: ['recomputes in full: orders is rebuilt'] }]);
+	});
+
+	it('says a kept dynamic model is paused when the warehouse lists it as suspended', () => {
+		const kept = model('daily_totals', { materialization_type: 'dynamic', action: 'keep_dynamic', paused: true });
+		const [routine] = planSections(plan([kept]));
+		expect(routine.entries).toEqual([{ name: 'daily_totals', value: 'dynamic', detail: ['paused: scheduled refreshes are suspended'] }]);
 	});
 
 	it('puts each change in its own section in reason order, then the routine models, and leaves skipped ones out', () => {
@@ -88,7 +109,7 @@ describe('plan text, as sqb plan prints it', () => {
 
 	it('shows a warning once, under the first entry for its model, when the model is in more than one changed section', () => {
 		const lag = { severity: 'warning', message: 'lag', model_name: 'orders' };
-		const p = plan([model('orders', { reason: 'query_changed' })], { warnings: [lag], retention: [{ model: 'orders', action: 'drop' }] });
+		const p = plan([model('orders', { reason: 'query_changed' })], { warnings: [lag], retention: [{ scope: 'table', name: 'analytics.orders', models: ['orders'], direction: 'decrease', actual_days: 7, desired_days: 1 }] });
 		expect(planSections(p).flatMap((s) => s.entries.map((e) => [s.title, e.warnings?.length ?? 0]))).toEqual([
 			['Retention', 1],
 			['Query changed', 0]

@@ -2,8 +2,8 @@
 
 use polyglot_sql::Dialect;
 
-use crate::compiler::_helpers::polyglot::parse_options::guarded_parse_options;
 use crate::compiler::constants::FUNCTION_TYPE_DIALECTS;
+use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
 
 /// The error for a type the adapter's dialect cannot parse; adapters without a dialect pass.
 pub(crate) fn function_type_error(
@@ -17,9 +17,8 @@ pub(crate) fn function_type_error(
     else {
         return Ok(None);
     };
-    let options = guarded_parse_options().map_err(|error| error.to_string())?;
     Ok(Dialect::get(*dialect)
-        .parse_data_type_with_options(type_sql, &options)
+        .parse_data_type_with_options(type_sql, &polyglot_parse_options())
         .err()
         .map(|error| {
             format!(

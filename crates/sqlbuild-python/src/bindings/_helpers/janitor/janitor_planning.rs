@@ -6,7 +6,6 @@ use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::{PyBool, PyDict, PyDictMethods};
-use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
 use sqlbuild_analysis::janitor_planning::constants::OLD_NAME_VIEW_REASON;
 use sqlbuild_analysis::janitor_planning::main::build_archive_name::build_archive_name;
 use sqlbuild_analysis::janitor_planning::main::query_diff_artifact_name::query_diff_artifact_name;
@@ -48,6 +47,7 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_items::mapping_items;
+use sqlbuild_python_project::native_host::main::target_location::target_location;
 use sqlbuild_python_project::relation_naming::main::shared_error::shared_error;
 
 const LIFECYCLE: ExecutorHost = ExecutorHost::OperationLifecycle;
@@ -137,13 +137,6 @@ fn scan_schemas(managed: &[SchemaKey], scope: &RelationScope) -> Vec<SchemaKey> 
 
 fn candidate_records<'py>(candidates: &[Candidate<'py>]) -> PyResult<Vec<Bound<'py, PyAny>>> {
     candidates.iter().map(Candidate::to_python).collect()
-}
-
-/// The active target's database or schema as a location: `preserve` names none, since each model keeps its own.
-fn target_location(project: &Bound<'_, PyAny>, field: &str) -> PyResult<Option<String>> {
-    Ok(native_field(project, field)?
-        .extract::<Option<String>>()?
-        .filter(|value| value != PRESERVE_TARGET_VALUE))
 }
 
 /// Review schemas whose markers the active target schema holds and that outlived any review run.

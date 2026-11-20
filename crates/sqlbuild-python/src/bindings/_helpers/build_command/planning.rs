@@ -96,6 +96,8 @@ fn request_options<'py>(context: &BuildContext<'py>) -> PyResult<Bound<'py, PyAn
                     )?,
                 ),
             ),
+            ("cli_ignore_audit_failures", field("ignore_audit_failures")?),
+            ("job_settings", field("job_settings")?),
             ("accepts_unit_test_selectors", boolean(py, true)),
         ],
     )

@@ -230,6 +230,13 @@ pub(crate) fn model_json<'py>(entry: &Bound<'py, PyAny>) -> PyResult<Bound<'py, 
     if changed_functions.is_truthy()? {
         model.set_item("changed_functions", list(&changed_functions)?)?;
     }
+    let reinitialised_by: Bound<'py, PyAny> = native_field(entry, "reinitialised_by")?;
+    if !reinitialised_by.is_none() {
+        model.set_item("reinitialised_by", reinitialised_by)?;
+    }
+    if native_field(entry, "dynamic_paused")?.is_truthy()? {
+        model.set_item("paused", true)?;
+    }
     let qualified: Bound<'py, PyAny> =
         native_field(&native_field(entry, "destination")?, "qualified_name")?;
     if !qualified.is_none() {

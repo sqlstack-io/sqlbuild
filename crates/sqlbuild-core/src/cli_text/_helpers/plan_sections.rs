@@ -6,12 +6,13 @@ use crate::cli_text::_helpers::bounded_sections::{
 };
 use crate::cli_text::_helpers::layout::tree_connector;
 use crate::cli_text::constants::{
-    BOUNDED_BACKFILL, CHANGED_IDENTITY, COLUMN_ADDED, COLUMN_REMOVED, COLUMN_TYPE_CHANGED,
-    CONFIG_CHANGED_REASON, CREATE_VIEW_ACTION, CUSTOM_ACTION, DIFF_HEADER_MARKER,
-    EFFECTIVE_BATCH_SIZE_TOKEN, ERROR_SEVERITY_VALUE, FIRST_RUN_REASON, FORWARD_BACKFILL,
-    FULL_BACKFILL, FULL_REFRESH_REASON, INFO_SEVERITY_VALUE, NO_CHANGE_REASON,
-    NORMAL_INCREMENTAL_REASON, QUERY_CHANGED_REASON, REASON_GROUPS, SCHEMA_CHANGED_REASON,
-    SKIP_ACTION, SOURCE_FRESHNESS_UNKNOWN_WARNING_TITLE, STALE_INPUT_WARNING_TITLE,
+    ALTER_DYNAMIC_ACTION, BOUNDED_BACKFILL, CHANGED_IDENTITY, COLUMN_ADDED, COLUMN_REMOVED,
+    COLUMN_TYPE_CHANGED, CONFIG_CHANGED_REASON, CREATE_DYNAMIC_ACTION, CREATE_VIEW_ACTION,
+    CUSTOM_ACTION, DIFF_HEADER_MARKER, EFFECTIVE_BATCH_SIZE_TOKEN, ERROR_SEVERITY_VALUE,
+    FIRST_RUN_REASON, FORWARD_BACKFILL, FULL_BACKFILL, FULL_REFRESH_REASON, INFO_SEVERITY_VALUE,
+    NO_CHANGE_REASON, NORMAL_INCREMENTAL_REASON, QUERY_CHANGED_REASON, REASON_GROUPS,
+    SCHEMA_CHANGED_REASON, SKIP_ACTION, SOURCE_FRESHNESS_UNKNOWN_WARNING_TITLE,
+    STALE_INPUT_WARNING_TITLE,
 };
 use crate::cli_text::models::{
     CliStyle, CursorPlanText, DisplayLimit, FunctionPlanText, ModelPlanText, PlanTextReport,
@@ -429,6 +430,16 @@ fn action_text(model: &ModelPlanText) -> String {
     if model.action == CREATE_VIEW_ACTION {
         return "recreate view".to_owned();
     }
+    if model.action == CREATE_DYNAMIC_ACTION {
+        return if model.reason == FIRST_RUN_REASON {
+            "create".to_owned()
+        } else {
+            "recreate, full recompute".to_owned()
+        };
+    }
+    if model.action == ALTER_DYNAMIC_ACTION {
+        return "change refresh settings in place".to_owned();
+    }
     if model.action == CUSTOM_ACTION {
         let materialization: &str = model
             .custom_materialization_name
@@ -454,6 +465,7 @@ fn action_text(model: &ModelPlanText) -> String {
 
 fn policy_lines(model: &ModelPlanText) -> Vec<String> {
     if model.backfill_action == FORWARD_BACKFILL
+        || model.action == CREATE_DYNAMIC_ACTION
         || !(model.reason == QUERY_CHANGED_REASON || model.reason == SCHEMA_CHANGED_REASON)
     {
         return Vec::new();
@@ -618,6 +630,12 @@ pub(crate) fn routine_model_lines(
             true,
         )];
         lines.extend(cursor_lines(model, true));
+        if let Some(upstream) = &model.reinitialised_by {
+            lines.push(format!("    recomputes in full: {upstream} is rebuilt"));
+        }
+        if model.paused {
+            lines.push("    paused: scheduled refreshes are suspended".to_owned());
+        }
         lines
     })
 }

@@ -1,7 +1,8 @@
 //! Parse SQL into statements with node spans.
 
-use sqlquack_syntax::{CallMode, Expression, ParseOptions};
+use sqlquack_syntax::{CallMode, Expression};
 
+use crate::parse_guard::main::sqlquack_parse_options::sqlquack_parse_options;
 use crate::sql_tree::constants::GUARD_CODE_PREFIX;
 use crate::sql_tree::errors::SqlTreeError;
 use crate::sql_tree::models::TreeParser;
@@ -12,7 +13,7 @@ pub(crate) fn parse(sql: &str, parser: TreeParser) -> Result<Vec<Expression>, Sq
         TreeParser::Shared(dialect) => sqlquack_parse::parse_statements_with(
             sql,
             dialect,
-            &ParseOptions::default(),
+            &sqlquack_parse_options(),
             CallMode::FaithfulLocated,
         )
         .map_err(|error| shared_error(&error.to_string())),

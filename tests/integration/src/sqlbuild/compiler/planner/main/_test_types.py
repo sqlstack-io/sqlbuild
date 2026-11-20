@@ -7,6 +7,7 @@ from sqlbuild._native import (
     PlanReason,
     WarningSeverity,
 )
+from sqlbuild.adapter.contract.types import DynamicListing
 from sqlbuild.compiler.compile.types import FunctionLanguage
 
 
@@ -205,3 +206,25 @@ class SyncedScanTestCase:
     last_ddl_after_scan_start: timedelta
     expected_live_describe: bool
     location_clock_ahead: timedelta = timedelta()
+
+
+@dataclass(frozen=True)
+class DynamicRefreshPlanTestCase:
+    description: str
+    listed_settings: DynamicListing | None
+    upstream_query: str
+    expected_upstream_action: PlanAction
+    expected_action: PlanAction
+    expected_reason: PlanReason
+    expected_reinitialised_by: str | None
+    expected_read_names: tuple[str, ...]
+    expected_paused: bool = False
+    totals_config: dict[str, object] | None = None
+
+
+@dataclass(frozen=True)
+class ChangeTrackingPlanTestCase:
+    description: str
+    select: tuple[str, ...]
+    expected_dynamic_readers: dict[str, tuple[str, ...]]
+    expected_refresh_on_build: dict[str, bool]

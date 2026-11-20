@@ -133,6 +133,8 @@
 	let plannedKey = $state('');
 	let planning = $state(false);
 	let planError = $state<{ key: string; message: string } | null>(null);
+	/** Set by "Plan again": the next plan skips the plan the location kept for the same command. */
+	let planFresh = false;
 	const wantsPlan = $derived(fresh && check?.verb === 'build' && !check.error);
 	$effect(() => {
 		const key = requestKey;
@@ -141,7 +143,9 @@
 		const timer = setTimeout(async () => {
 			planning = true;
 			try {
-				const result = await app.client.planBuild(scope, request.command);
+				const replanned = planFresh;
+				planFresh = false;
+				const result = await app.client.planBuild(scope, request.command, { fresh: replanned });
 				if (result.plan) {
 					plan = result.plan;
 					planRequestId = result.requestId ?? null;
@@ -179,6 +183,7 @@
 		return app.client.planDiff(scope, requestId, model);
 	}
 	function replan() {
+		planFresh = true;
 		plannedKey = '';
 		planError = null;
 	}
@@ -212,7 +217,7 @@
 			if (planRequestId === requestId) skippedKeys = { requestId, keys: null, failed: true };
 		});
 	});
-	/** Node keys `--changed` skips; a whole plan lists them, a server plan's are read above (null until then). */
+	/** Node keys `--changed` skips; the default mock's whole plan lists them, a server plan's are read above (null until then). */
 	const planSkipped = $derived.by(() => {
 		if (!plan?.changed) return [];
 		if (!plan.sections) return [...plan.changed.held_back.map((h) => h.node), ...plan.changed.unchanged];
@@ -254,7 +259,7 @@
 			if (planRequestId === requestId) changedKeys = { requestId, keys };
 		})().catch(() => {});
 	});
-	/** The models the plan changes: read from the server a section at a time, or from a whole plan's rows. */
+	/** The models the plan changes: read from the server a section at a time, or from the default mock's whole plan's rows. */
 	const planChanged = $derived(plan?.sections ? (changedKeys?.requestId === planRequestId ? changedKeys.keys : []) : plan ? changedModelKeys(plan) : []);
 	const graphKeys = $derived(picked.length > GRAPH_LIMIT && plan ? planChanged : picked);
 
@@ -445,7 +450,7 @@
 		<div class="stage">
 		<PageBody class={!!shown && (!!problem || !fresh || (planning && !!plan)) ? 'plan-main stale' : 'plan-main'} padding="14px 24px" inner="flex min-h-full flex-col">
 			{#if shown?.verb}
-				<div class="summary">
+				<div class="summary" class:capped={shown.verb === 'build' && tab !== 'graph'}>
 					{#if shown.verb !== 'build'}
 						<b>{picked.length}</b> {noun(picked.length, 'node')}{#if shown.writeSet.length}<span>·</span> updates <b>{shown.writeSet.length}</b>{/if}
 					{/if}
@@ -455,7 +460,7 @@
 						<SegmentedFilter label="View" value={tab} options={[{ value: 'plan' as const, label: shown.verb === 'build' ? 'Plan' : 'Nodes' }, { value: 'graph' as const, label: 'Graph' }, ...(shown.verb === 'build' && selectedChecks.length && planChecks?.length !== 0 ? [{ value: 'checks' as const, label: 'Checks', ...(planChecks ? { count: planChecks.length } : {}) }] : [])]} onselect={(v) => (view = v)} />
 					</div>
 					{#if shown.verb === 'build' && plan}
-						{#if plan.timings}<span class="ml-auto"><PlanTimings {plan} timings={plan.timings} /></span>{/if}
+						{#if plan.timings}<span class="ml-auto"><PlanTimings {plan} timings={plan.timings} now={app.now} /></span>{/if}
 						<Button variant="ghost" size="sm" class={plan.timings ? '' : 'ml-auto'} onclick={replan} disabled={planning}><RotateCwIcon class={planning ? 'animate-spin' : ''} />{planning ? 'Planning…' : 'Plan again'}</Button>
 					{/if}
 				</div>
@@ -468,6 +473,7 @@
 					<div class="graph"><ScopeGraph keys={graphKeys} catalog={catalog.data} onselect={() => {}} /></div>
 				{/if}
 			{:else if tab === 'checks' && shown?.verb === 'build' && plan}
+				<div class="checks">
 				<p class="faint graph-note">{planChecks ? plural(planChecks.length, 'check') : skippedKeys?.failed ? "Couldn't read the nodes --changed skips; plan again." : 'Reading the nodes --changed skips…'} <HelpTip text="Checks run after the models they check, and a failing error check stops what depends on it." /></p>
 				<DataTable class="static compact" embedded columns={checkColumns} rows={planChecks ?? []} key={(c) => c.id} empty="No checks in this plan.">
 					{#snippet row(c)}
@@ -479,6 +485,7 @@
 						</tr>
 					{/snippet}
 				</DataTable>
+				</div>
 			{:else if shown?.verb === 'build' && plan}
 				<PlanBrowser {plan} {refresh} {section} onselect={(key) => (section = key)} more={planRequestId ? morePlan : undefined} load={planRequestId ? findPlanRows : undefined} diff={planRequestId ? planDiff : undefined} />
 			{:else if shown?.verb && shown.verb !== 'build'}
@@ -654,6 +661,11 @@
 		margin-bottom: 10px;
 		color: var(--muted-foreground);
 		font-size: 12.5px;
+	}
+	/* A build's toolbar ends where its plan does: the index, the gap and the capped pane (plan-browser). */
+	.summary.capped,
+	.checks {
+		max-width: calc(230px + 24px + 1100px);
 	}
 	.summary b {
 		color: var(--foreground);

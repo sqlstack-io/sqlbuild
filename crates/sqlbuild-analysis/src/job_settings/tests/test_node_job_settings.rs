@@ -1,0 +1,272 @@
+use std::collections::BTreeMap;
+
+use serde_json::json;
+
+use crate::job_settings::_helpers::node_values::node_values;
+use crate::job_settings::errors::NodeJobSettingsError;
+use crate::job_settings::models::NodeJobSettings;
+use crate::job_settings::tests::helpers::{declared, resolved_settings, strings};
+use crate::job_settings::tests::test_types::{
+    JobSelectorFailureTestCase, NodeJobConflictTestCase, NodeJobSettingsTestCase,
+    PythonNodeValuesTestCase,
+};
+
+#[test]
+fn given_named_jobs_when_resolving_node_settings_then_only_their_own_selected_nodes_take_them() {
+    let orders_values =
+        || BTreeMap::from([("run_tests", json!(false)), ("full_refresh", json!(true))]);
+    let orders_wh_values = || {
+        BTreeMap::from([
+            ("run_tests", json!(false)),
+            ("warehouse", json!("ORDERS_WH")),
+        ])
+    };
+    let test_cases = [
+        NodeJobSettingsTestCase {
+            description: "a named job gives each of its nodes its settings and limit",
+            select: &["job:orders_job"],
+            exclude: &[],
+            expected_node_jobs: BTreeMap::from([
+                ("orders", vec!["orders_job"]),
+                ("stg_orders", vec!["orders_job"]),
+            ]),
+            expected_values: BTreeMap::from([
+                ("orders", orders_values()),
+                ("stg_orders", orders_values()),
+            ]),
+            expected_job_limits: BTreeMap::from([("orders_job", 2)]),
+        },
+        NodeJobSettingsTestCase {
+            description: "an intersection gives the job's settings to just the nodes it selects",
+            select: &["job:orders_job,orders"],
+            exclude: &[],
+            expected_node_jobs: BTreeMap::from([("orders", vec!["orders_job"])]),
+            expected_values: BTreeMap::from([("orders", orders_values())]),
+            expected_job_limits: BTreeMap::from([("orders_job", 2)]),
+        },
+        NodeJobSettingsTestCase {
+            description: "nodes added beside the job, or by + around it, take none of its settings",
+            select: &["job:orders_job customers", "job:orders_job+"],
+            exclude: &[],
+            expected_node_jobs: BTreeMap::from([
+                ("orders", vec!["orders_job"]),
+                ("stg_orders", vec!["orders_job"]),
+            ]),
+            expected_values: BTreeMap::from([
+                ("orders", orders_values()),
+                ("stg_orders", orders_values()),
+            ]),
+            expected_job_limits: BTreeMap::from([("orders_job", 2)]),
+        },
+        NodeJobSettingsTestCase {
+            description: "an excluded node takes nothing",
+            select: &["orders_job"],
+            exclude: &["stg_orders"],
+            expected_node_jobs: BTreeMap::from([("orders", vec!["orders_job"])]),
+            expected_values: BTreeMap::from([("orders", orders_values())]),
+            expected_job_limits: BTreeMap::from([("orders_job", 2)]),
+        },
+        NodeJobSettingsTestCase {
+            description: "naming a group names its jobs; a shared node keeps both jobs' limits",
+            select: &["job:daily_group"],
+            exclude: &[],
+            expected_node_jobs: BTreeMap::from([
+                ("orders", vec!["orders_job"]),
+                ("refunds", vec!["refunds_job"]),
+                ("stg_orders", vec!["orders_job", "refunds_job"]),
+            ]),
+            expected_values: BTreeMap::from([
+                ("orders", orders_values()),
+                ("stg_orders", orders_values()),
+            ]),
+            expected_job_limits: BTreeMap::from([("orders_job", 2), ("refunds_job", 4)]),
+        },
+        NodeJobSettingsTestCase {
+            description: "jobs that agree, or where only one sets a setting, do not conflict",
+            select: &["job:quiet_job job:orders_job"],
+            exclude: &[],
+            expected_node_jobs: BTreeMap::from([
+                ("orders", vec!["orders_job"]),
+                ("stg_orders", vec!["quiet_job", "orders_job"]),
+            ]),
+            expected_values: BTreeMap::from([
+                ("orders", orders_values()),
+                ("stg_orders", orders_values()),
+            ]),
+            expected_job_limits: BTreeMap::from([("orders_job", 2)]),
+        },
+        NodeJobSettingsTestCase {
+            description: "jobs on different warehouses give each its own nodes its warehouse",
+            select: &["job:orders_wh_job", "refunds"],
+            exclude: &[],
+            expected_node_jobs: BTreeMap::from([
+                ("orders", vec!["orders_wh_job"]),
+                ("stg_orders", vec!["orders_wh_job"]),
+            ]),
+            expected_values: BTreeMap::from([
+                ("orders", orders_wh_values()),
+                ("stg_orders", orders_wh_values()),
+            ]),
+            expected_job_limits: BTreeMap::new(),
+        },
+        NodeJobSettingsTestCase {
+            description: "a selection that names no job takes no settings",
+            select: &["+orders"],
+            exclude: &[],
+            expected_node_jobs: BTreeMap::new(),
+            expected_values: BTreeMap::new(),
+            expected_job_limits: BTreeMap::new(),
+        },
+    ];
+    for test_case in test_cases {
+        let resolved: NodeJobSettings =
+            resolved_settings(test_case.select, test_case.exclude).expect(test_case.description);
+        let node_jobs: BTreeMap<&str, Vec<&str>> = resolved
+            .node_jobs
+            .iter()
+            .map(|(key, jobs)| (key.1.as_str(), jobs.iter().map(String::as_str).collect()))
+            .collect();
+        let values: BTreeMap<&str, BTreeMap<&str, serde_json::Value>> = resolved
+            .values
+            .iter()
+            .map(|(key, values)| {
+                (
+                    key.1.as_str(),
+                    values
+                        .iter()
+                        .map(|(name, value)| (name.as_str(), value.clone()))
+                        .collect(),
+                )
+            })
+            .collect();
+        let limits: BTreeMap<&str, i64> = resolved
+            .job_limits
+            .iter()
+            .map(|(job, limit)| (job.as_str(), *limit))
+            .collect();
+        assert_eq!(
+            node_jobs, test_case.expected_node_jobs,
+            "{}",
+            test_case.description
+        );
+        assert_eq!(
+            values, test_case.expected_values,
+            "{}",
+            test_case.description
+        );
+        assert_eq!(
+            limits, test_case.expected_job_limits,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_two_named_jobs_setting_one_node_differently_when_resolving_then_it_is_a_conflict() {
+    let test_cases = [
+        NodeJobConflictTestCase {
+            description: "a node-level setting",
+            select: &["job:staging_job", "job:orders_job"],
+            expected_message: "model:stg_orders is selected through jobs staging_job and orders_job, \
+                 which set run_tests differently (true and false)",
+        },
+        NodeJobConflictTestCase {
+            description: "a warehouse",
+            select: &["job:orders_wh_job job:refunds_wh_job"],
+            expected_message: "model:stg_orders is selected through jobs orders_wh_job and \
+                 refunds_wh_job, which set warehouse differently (\"ORDERS_WH\" and \
+                 \"REFUNDS_WH\")",
+        },
+        NodeJobConflictTestCase {
+            description: "a retry policy",
+            select: &["job:retried_job job:retried_fast_job"],
+            expected_message: "model:stg_orders is selected through jobs retried_job and \
+                 retried_fast_job, which set [retry] differently (3 attempts, 60s apart and 2 \
+                 attempts, 0s apart)",
+        },
+    ];
+    for test_case in test_cases {
+        let Err(NodeJobSettingsError::Conflict(conflict)) =
+            resolved_settings(test_case.select, &[])
+        else {
+            panic!("{}: expected a conflict", test_case.description);
+        };
+        assert_eq!(
+            conflict.message, test_case.expected_message,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_named_job_whose_selection_fails_when_resolving_then_it_fails_naming_the_job() {
+    let test_cases = [JobSelectorFailureTestCase {
+        description: "a job selecting a node that does not exist",
+        select: &["job:broken_job"],
+        expected_failure: (vec!["broken_job"], "job:broken_job", "S007"),
+    }];
+    for test_case in test_cases {
+        let Err(NodeJobSettingsError::Selector(failure)) = resolved_settings(test_case.select, &[])
+        else {
+            panic!("{}: expected a selector failure", test_case.description);
+        };
+        let jobs: Vec<&str> = failure.jobs.iter().map(String::as_str).collect();
+        assert_eq!(
+            (jobs, failure.selector.as_str(), failure.error.code),
+            test_case.expected_failure,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_python_node_in_named_jobs_when_resolving_then_it_takes_only_their_warehouse() {
+    let test_cases = [
+        PythonNodeValuesTestCase {
+            description: "the warehouse applies; run_tests and [retry] do not",
+            jobs: &["orders_wh_job"],
+            expected_values: Some(BTreeMap::from([("warehouse", json!("ORDERS_WH"))])),
+            expected_conflict: None,
+        },
+        PythonNodeValuesTestCase {
+            description: "jobs that agree on everything Python nodes take do not conflict",
+            jobs: &["orders_wh_job", "orders_job"],
+            expected_values: Some(BTreeMap::from([("warehouse", json!("ORDERS_WH"))])),
+            expected_conflict: None,
+        },
+        PythonNodeValuesTestCase {
+            description: "two warehouses conflict",
+            jobs: &["orders_wh_job", "refunds_wh_job"],
+            expected_values: None,
+            expected_conflict: Some(
+                "asset:daily_report is selected through jobs orders_wh_job and refunds_wh_job, \
+                 which set warehouse differently (\"ORDERS_WH\" and \"REFUNDS_WH\")",
+            ),
+        },
+    ];
+    let key = ("asset".to_owned(), "daily_report".to_owned());
+    for test_case in test_cases {
+        let resolved = node_values(&key, &strings(test_case.jobs), &declared());
+        let values: Option<BTreeMap<&str, serde_json::Value>> =
+            resolved.as_ref().ok().map(|(values, _)| {
+                values
+                    .iter()
+                    .map(|(name, value)| (name.as_str(), value.clone()))
+                    .collect()
+            });
+        let retry = resolved.as_ref().ok().and_then(|(_, retry)| *retry);
+        let conflict: Option<&str> = resolved
+            .as_ref()
+            .err()
+            .map(|conflict| conflict.message.as_str());
+        assert_eq!(
+            (values, retry, conflict),
+            (test_case.expected_values, None, test_case.expected_conflict),
+            "{}",
+            test_case.description
+        );
+    }
+}

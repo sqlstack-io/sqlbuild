@@ -49,6 +49,14 @@ pub(crate) const SKIP_ACTION: &str = "skip";
 pub(crate) const NO_CHANGE_REASON: &str = "no_change";
 /// The reason of a model or seed without a recorded build.
 pub(crate) const FIRST_RUN_REASON: &str = "first_run";
+/// The field naming the model a renamed model was renamed from, on its row and on its migration's.
+pub const ORIGIN_MODEL_FIELD: &str = "origin_model";
+/// The field saying what stays at a moved model's old name, on its migration's row and a renamed model's.
+pub const OLD_NAME_FIELD: &str = "old_name";
+/// The migration row field saying the migration is a renamed model's own.
+pub const IS_RENAME_FIELD: &str = "is_rename";
+/// The summary field counting migration steps other than renamed models' own migrations.
+pub(crate) const MIGRATION_STEPS_FIELD: &str = "migration_steps";
 /// The plan document field of per-model metadata, which a summary leaves out.
 pub(crate) const METADATA_FIELD: &str = "metadata";
 /// The plan document's row lists, which a summary empties and counts by section instead.

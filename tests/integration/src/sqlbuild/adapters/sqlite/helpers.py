@@ -54,7 +54,7 @@ def stage_contract_relation(
             ColumnInfo("payment_id", "INTEGER"),
             ColumnInfo("amount", "DECIMAL(10,2)"),
         ),
-        table_type="table",
+        table_config={"table_type": "table", "physical_storage": {}},
         statement_recorder=recorder(),
     )
 

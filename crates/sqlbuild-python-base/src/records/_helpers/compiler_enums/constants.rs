@@ -585,6 +585,9 @@ const E_PLAN_ACTION: EnumSpec = EnumSpec {
         ("LOAD_SEED", "load_seed"),
         ("SKIP", "skip"),
         ("CUSTOM", "custom"),
+        ("CREATE_DYNAMIC", "create_dynamic"),
+        ("ALTER_DYNAMIC", "alter_dynamic"),
+        ("KEEP_DYNAMIC", "keep_dynamic"),
     ],
 };
 const E_PLAN_REASON: EnumSpec = EnumSpec {
@@ -682,6 +685,7 @@ const E_MATERIALIZATION_TYPE: EnumSpec = EnumSpec {
         ("SNAPSHOT", "snapshot"),
         ("SEED", "seed"),
         ("CUSTOM", "custom"),
+        ("DYNAMIC", "dynamic"),
     ],
 };
 const E_SCENARIO_ARTIFACT_KIND: EnumSpec = EnumSpec {

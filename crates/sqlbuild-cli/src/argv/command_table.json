@@ -1889,6 +1889,18 @@
         "group": 1
        },
        {
+        "kind": "store_false",
+        "options": [
+         "--no-job-settings"
+        ],
+        "dest": "job_settings",
+        "nargs": 0,
+        "const": false,
+        "default": true,
+        "help": "ignore the settings of the jobs the selection names, using only the command line's, the target's and the project's",
+        "group": 1
+       },
+       {
         "kind": "store",
         "options": [
          "--changed"
@@ -2549,6 +2561,18 @@
         "group": 1
        },
        {
+        "kind": "store_false",
+        "options": [
+         "--no-job-settings"
+        ],
+        "dest": "job_settings",
+        "nargs": 0,
+        "const": false,
+        "default": true,
+        "help": "ignore the settings of the jobs the selection names, using only the command line's, the target's and the project's",
+        "group": 1
+       },
+       {
         "kind": "store",
         "options": [
          "--changed"
@@ -2625,6 +2649,17 @@
          "--allow-snapshot-schema-change"
         ],
         "dest": "allow_snapshot_schema_change",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--ignore-dynamic-grace"
+        ],
+        "dest": "ignore_dynamic_grace",
         "nargs": 0,
         "const": true,
         "default": false,

@@ -19,8 +19,8 @@ use sqlbuild_orchestration::declarations::main::group_dependencies::group_depend
 use sqlbuild_orchestration::declarations::main::group_wait_reasons::group_wait_reasons;
 use sqlbuild_orchestration::declarations::main::snapshot_definitions::snapshot_definitions;
 use sqlbuild_orchestration::declarations::models::{
-    ConcurrencySource, DeclaredAt, Definitions, GroupDefinition, JobDefinition, PoolSlots,
-    ResolvedConcurrency, Schedule, TriggerDeclaration, TriggerDefinition, TriggerStatus,
+    DeclaredAt, Definitions, GroupDefinition, JobDefinition, PoolSlots, ResolvedConcurrency,
+    Schedule, TriggerDeclaration, TriggerDefinition, TriggerStatus,
 };
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
@@ -156,10 +156,7 @@ fn job_concurrency(
     target: ResolvedConcurrency,
 ) -> ResolvedConcurrency {
     match settings.get("concurrency").and_then(Value::as_u64) {
-        Some(limit) => ResolvedConcurrency {
-            limit,
-            source: ConcurrencySource::Job,
-        },
+        Some(limit) => ResolvedConcurrency { limit },
         None => target,
     }
 }

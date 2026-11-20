@@ -8,6 +8,7 @@ use polyglot_sql::{
 };
 use sqlbuild_core::text::main::python_casefold::python_casefold;
 
+use crate::parse_guard::main::polyglot_complexity_guard::polyglot_complexity_guard;
 use crate::planner_fixtures::_helpers::stub_markers::stub_markers;
 use crate::planner_fixtures::models::FixtureStarRelation;
 
@@ -48,7 +49,7 @@ pub fn star_keys(
             tables,
             strict: None,
         }),
-        complexity_guard: None,
+        complexity_guard: Some(polyglot_complexity_guard()),
     };
     let Ok(sql) = stub_markers(sql) else {
         return Vec::new();

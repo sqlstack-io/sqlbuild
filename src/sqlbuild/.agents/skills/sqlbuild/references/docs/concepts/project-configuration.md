@@ -20,6 +20,7 @@ Online: https://sqlbuild.com/docs/concepts/project-configuration/
 - Project variables
 - Janitor
 - Migrations
+- Dynamic
 - Scenario
 - Git
 - Review
@@ -189,6 +190,7 @@ A target is a named build context - the database and schema you build into, plus
 | `concurrency` | Worker limit for commands run against this target, replacing `[settings] concurrency` (see below) |
 | `ignore_audit_failures` | Whether builds on this target let audit failures through, replacing `[settings] ignore_audit_failures`; see [Ignoring audit failures](audits.md#ignoring-audit-failures) |
 | `plan_from` | Where `sqb plan` and `sqb build` read warehouse state: `live` (default) or `synced_state`; see [Planning from synced state](#planning-from-synced-state) |
+| `pause_dynamic` | `true` keeps this target's [dynamic models](models/dynamic.md) suspended between builds; each build refreshes the ones it selects. Default `false` |
 
 ```toml
 [connections.warehouse]
@@ -273,14 +275,16 @@ concurrency = 8
 value set in this order:
 
 1. `--concurrency` on the command line, for that invocation only
-2. The selected target's `concurrency`, from `[targets.<name>]` in either file
-3. `[settings] concurrency` in `sqlbuild_local.toml`
-4. `[settings] concurrency` in `sqlbuild_project.toml` (default `1`)
+2. For `sqb build`, the named jobs' `concurrency` added together, when larger than the limit the
+   layers below give; each job's own limit still applies to its nodes. See
+   [Settings when a build names a job](orchestration.md#settings-when-a-build-names-a-job)
+3. The selected target's `concurrency`, from `[targets.<name>]` in either file
+4. `[settings] concurrency` in `sqlbuild_local.toml`
+5. `[settings] concurrency` in `sqlbuild_project.toml` (default `1`)
 
 The value must be an integer of at least `1`; anything else fails with `D001`. `sqb build
---verbose` shows the effective limit and the setting it came from, for example
-`8 configured limit (targets.prod.concurrency)`. `sqb scenario test` has no `--target` option and
-uses the active target's value.
+--verbose` shows the build's effective limit, for example `8 configured limit`. `sqb scenario
+test` has no `--target` option and uses the active target's value.
 
 ### Planning from synced state
 
@@ -694,6 +698,21 @@ old_name_views = "30d"
 | Field | Default | Description |
 |-------|---------|-------------|
 | `old_name_views` | `"30d"` | How long a renamed model's old name keeps working through a [compatibility view](models/migrations.md#old-names) before janitor drops it. `false` keeps the old relation in place instead. A model's `old_name_view` header overrides it. |
+
+## Dynamic
+
+How builds pause [dynamic models](models/dynamic.md) while they run:
+
+```toml
+[dynamic]
+heartbeat_grace = "30m"
+allow_ignore_grace = false
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `heartbeat_grace` | `"30m"` | How long a build that paused dynamic models may go silent before another build resumes them or takes them over. A fixed duration longer than `"1m"`, such as `"30m"` or `"2h"`; a build writes a heartbeat every minute |
+| `allow_ignore_grace` | `false` | Allow `sqb build --ignore-dynamic-grace`, which takes over models another build holds without waiting for the grace. Without it the flag fails with `A719` |
 
 ## Scenario
 

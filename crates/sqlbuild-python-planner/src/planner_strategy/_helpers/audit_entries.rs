@@ -5,7 +5,7 @@ use sqlbuild_analysis::graph::models::GraphIndexes;
 use sqlbuild_python_base::native_host::models::Dialect;
 
 use crate::planner_strategy::_helpers::audits::{
-    attachment, outside_target_lineage, resolve_effective_run_scope,
+    attachment, outside_target_lineage, outside_target_lineages, resolve_effective_run_scope,
 };
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
@@ -114,13 +114,30 @@ pub(crate) fn plan_audit_of<'py>(
                 })),
             )?,
         },
+        None,
     )
 }
 
-/// One audit's plan entry, rendered against the planning relations.
+/// Plan entries of `audits`, walking each target's lineage at most once.
+pub(crate) fn plan_audits<'py>(
+    audits: &[Bound<'py, PyAny>],
+    planning: &AuditPlanning<'py>,
+) -> PyResult<Vec<Bound<'py, PyAny>>> {
+    let py = planning.model_locations.py();
+    let outside: Vec<bool> =
+        outside_target_lineages(audits, planning.lineage.bind(py).borrow().graph())?;
+    let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
+    for (audit, outside) in audits.iter().zip(outside) {
+        entries.push(plan_audit(audit, planning, Some(outside))?);
+    }
+    Ok(entries)
+}
+
+/// One audit's plan entry, rendered against the planning relations, with `outside_lineage` if known.
 pub(crate) fn plan_audit<'py>(
     audit: &Bound<'py, PyAny>,
     request: &AuditPlanning<'py>,
+    outside_lineage: Option<bool>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = audit.py();
     let audit = audit.clone();
@@ -215,9 +232,15 @@ pub(crate) fn plan_audit<'py>(
         ("attached_target_name", target),
         (
             "reads_outside_target_lineage",
-            PyBool::new(py, outside_target_lineage(&audit, lineage.graph())?)
-                .to_owned()
-                .into_any(),
+            PyBool::new(
+                py,
+                match outside_lineage {
+                    Some(outside) => outside,
+                    None => outside_target_lineage(&audit, lineage.graph())?,
+                },
+            )
+            .to_owned()
+            .into_any(),
         ),
     ] {
         values.set_item(field, value)?;

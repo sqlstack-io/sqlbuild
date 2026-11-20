@@ -468,11 +468,6 @@ symbols = ["LoadCallbacks", "LoadExecutionResult", "LoadRuntimeParams"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
-modules = ["sqlbuild.executor.migrations._helpers.relation_for_location"]
-symbols = ["migration_relation_for_location"]
-reason = "Native code resolves these through the sqlbuild._native_host name table."
-
-[[targets.python.dead_code.roots]]
 modules = ["sqlbuild.executor.old_name_views._helpers.janitor"]
 symbols = ["is_compatibility_view"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
@@ -765,6 +760,11 @@ reason = "Native code resolves these through the sqlbuild._native_host name tabl
 [[targets.python.dead_code.roots]]
 modules = ["sqlbuild.runtime.execution_limits.main.execution_deadline_scope"]
 symbols = ["execution_deadline_scope"]
+reason = "Native code resolves these through the sqlbuild._native_host name table."
+
+[[targets.python.dead_code.roots]]
+modules = ["sqlbuild.runtime.execution_limits.main.execution_deadlines_suspended"]
+symbols = ["execution_deadlines_suspended"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
@@ -1345,6 +1345,10 @@ reason = "The SQLite adapter intentionally keeps overrideable backend behavior o
 rule = "FFR601"
 path = "src/sqlbuild/adapters/sqlserver/classes/sqlserver_adapter.py"
 reason = "The SQL Server adapter intentionally keeps overrideable backend behavior on one class."
+
+[[dupes.allowlist]]
+paths = ["scripts/native_layering/_helpers/layering.py", "src/sqlbuild/executor/dynamic_pauses/_helpers/scope.py"]
+reason = "A ten-line depth-first walk in two packages that must not import each other: the dependency-layering tool walks Cargo.lock packages, the build's dynamic-model hold walks plan edges between models."
 
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-python-planner/src/planner_changes/_helpers/detect.rs", "crates/sqlbuild-python-project/src/graph/_helpers/python_nodes/python_selection.rs"]
@@ -2554,27 +2558,28 @@ pending_budgets = [
     "crates/sqlbuild-python-planner/src/planner_identity/main/hook_version_hashes.rs=1",
     "crates/sqlbuild-python-planner/src/planner_identity/main/merge_recomputed_model_changes.rs=1",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/column/column_candidates.rs=3",
-    "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/column/column_entries.rs=3",
+    "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/column/column_entries.rs=2",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/column/column_objects.rs=1",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/column/column_overlay.rs=8",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/column/column_planning.rs=1",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/column/column_warnings.rs=1",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/column/columns.rs=1",
-    "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/discovery/discovery_events.rs=6",
+    "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/discovery/discovery_events.rs=4",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/discovery/discovery_models.rs=1",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/discovery/discovery_requests.rs=2",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/discovery/model_discovery.rs=1",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/discovery/state_inspection.rs=2",
-    "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/model/model_entries.rs=9",
+    "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/model/model_entries.rs=8",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/model/model_handover.rs=5",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/model/model_overlay.rs=4",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/model/model_planning.rs=1",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/model/model_warnings.rs=2",
-    "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/old_name/old_name_entries.rs=9",
-    "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/old_name/old_name_objects.rs=4",
+    "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/old_name/identity_index.rs=1",
+    "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/old_name/old_name_entries.rs=8",
+    "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/old_name/old_name_objects.rs=3",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/old_name/old_name_planning.rs=2",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/old_name/old_name_references.rs=7",
-    "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/old_name/old_names.rs=7",
+    "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/old_name/old_names.rs=5",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/planning/planning_execution.rs=2",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/planning/planning_origin.rs=6",
     "crates/sqlbuild-python-planner/src/planner_migrations/_helpers/projections/fingerprint.rs=1",
@@ -3002,7 +3007,7 @@ pending_budgets = [
     "crates/sqlbuild-python-planner/src/planner_warehouse/models.rs=8",
     "crates/sqlbuild-python-project/src/analysis/models.rs=9",
     "crates/sqlbuild-python-project/src/analysis_session/models.rs=1",
-    "crates/sqlbuild-python-project/src/compiled_project/models.rs=36",
+    "crates/sqlbuild-python-project/src/compiled_project/models.rs=37",
     "crates/sqlbuild-python-project/src/compiled_views/_helpers/compiled_models/compiled_model_view.rs=3",
     "crates/sqlbuild-python-project/src/compiled_views/_helpers/model_inputs/inputs_view.rs=24",
     "crates/sqlbuild-python-project/src/compiled_views/_helpers/project/project_view.rs=26",

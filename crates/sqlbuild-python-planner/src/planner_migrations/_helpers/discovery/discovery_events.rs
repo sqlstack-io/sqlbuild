@@ -1,13 +1,12 @@
 //! Preserve event and declared-origin precedence at the inspection boundary.
 
-use sqlbuild_host::entries::models::ExecutorHost;
+use crate::planner_migrations::_helpers::planning::location_relation::location_relation;
 
 use crate::planner_migrations::_helpers::column::column_objects::config;
 use crate::planner_migrations::models::ModelMigrationDeclaration;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyTuple};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::state_rows::main::migrations::newest_move::newest_move;
 use sqlbuild_python_project::compiled_views::main::compiled_models::name_object::name_object;
@@ -26,13 +25,12 @@ pub(crate) fn newest<'py>(
     events: &Bound<'py, PyAny>,
     location: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let relation = host_entry(location.py(), ExecutorHost::MigrationRelationForLocation)?
-        .call1((location,))?;
+    let relation = location_relation(location)?;
     newest_move(events, &relation)
 }
 
 pub(crate) fn relation<'py>(location: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    host_entry(location.py(), ExecutorHost::MigrationRelationForLocation)?.call1((location,))
+    location_relation(location)
 }
 
 pub(crate) fn declared<'py>(

@@ -120,7 +120,6 @@ pub(crate) fn orchestration_snapshot<'py>(
         validate_orchestration_names(&facts).map_err(|failure| validation_error(py, failure))?;
         let declarations = python_declarations(py, &project_dir, &inventory)?;
         let concurrency = published_concurrency(
-            &project_dir,
             &discovered_inputs,
             project.effective_target_name().as_deref(),
         )?;

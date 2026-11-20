@@ -85,6 +85,8 @@ const R_PLANNER_OVERRIDES: RecordSpec = RecordSpec {
     fields: &[
         FieldSpec::new("cursor_overrides", FieldDefault::None),
         FieldSpec::new("full_refresh", FieldDefault::False),
+        FieldSpec::new("full_refresh_models", FieldDefault::EmptyFrozenset),
+        FieldSpec::new("full_refresh_functions", FieldDefault::EmptyFrozenset),
         FieldSpec::new("reload_sources", FieldDefault::False),
         FieldSpec::new("forced_stale_model_names", FieldDefault::EmptyTuple),
         FieldSpec::new("external_blocked_model_names", FieldDefault::EmptyTuple),
@@ -666,6 +668,13 @@ const R_MODEL_PLAN_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("max_duration", FieldDefault::None),
         FieldSpec::new("max_duration_seconds", FieldDefault::None),
         FieldSpec::new("max_duration_source", FieldDefault::None),
+        FieldSpec::new("reinitialised_by", FieldDefault::None),
+        FieldSpec::new("target_lag", FieldDefault::None),
+        FieldSpec::new("refresh_mode", FieldDefault::None),
+        FieldSpec::new("refresh_warehouse", FieldDefault::None),
+        FieldSpec::new("refresh_on_build", FieldDefault::False),
+        FieldSpec::new("dynamic_readers", FieldDefault::EmptyTuple),
+        FieldSpec::new("dynamic_paused", FieldDefault::False),
     ],
 };
 const R_CLONE_SOURCE_PLAN_ENTRY: RecordSpec = RecordSpec {

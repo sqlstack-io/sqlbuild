@@ -32,7 +32,12 @@ export type TargetState = {
 	failWithdrawals: boolean;
 	/** Delays the sync status, so it arrives after the page's first read has begun. */
 	healthDelayMs: number;
+	/** Published jobs and groups, with the concurrency limit their runs get. */
+	jobs: FakeJob[];
 };
+
+/** A published job or group: its key, kind, own `concurrency` setting and the limit its runs get; a group's members are the target's jobs. */
+export type FakeJob = { key: string; kind: 'job' | 'group'; concurrency: number | null; limit: number };
 
 const MODELS = ['orders', 'order_items', 'customers', 'payments', 'refunds'];
 
@@ -49,7 +54,7 @@ export class FakeControl {
 	#lease = new Date(Date.now() - 60_000).toISOString();
 
 	constructor(overrides: Partial<Record<TargetName, Partial<TargetState>>> = {}) {
-		const base = (): TargetState => ({ changed: [], sync: 'settled', schedulerLeader: true, acks: [], failedRun: false, readDelayMs: 0, failReads: false, failWithdrawals: false, healthDelayMs: 0 });
+		const base = (): TargetState => ({ changed: [], sync: 'settled', schedulerLeader: true, acks: [], failedRun: false, readDelayMs: 0, failReads: false, failWithdrawals: false, healthDelayMs: 0, jobs: [] });
 		this.targets = { shop: { ...base(), ...overrides.shop }, returns: { ...base(), ...overrides.returns } };
 	}
 
@@ -73,6 +78,12 @@ export class FakeControl {
 		// The first location is the one the page opens on.
 		await page.addInitScript(() => localStorage.clear());
 		await page.route('**/api/**', (route) => this.#answer(route));
+	}
+
+	/** A job as the server lists it: every model, and the concurrency limit its runs get. */
+	#job(job: FakeJob) {
+		const selection = MODELS.map((m) => `model:${m}`);
+		return { job_key: job.key, kind: job.kind, description: `Builds ${job.key}.`, selection, pools: [], concurrency: job.concurrency, resolved_concurrency: { limit: job.limit }, overlap: 'queue', snapshot_id: SNAPSHOT };
 	}
 
 	async #answer(route: Route) {
@@ -120,7 +131,12 @@ export class FakeControl {
 			return json(route, { snapshot_id: SNAPSHOT, version: this.#states[name].version, states });
 		}
 		if (rest.startsWith('snapshots')) return json(route, [{ snapshot_id: SNAPSHOT, generation: 1, git_revision: null, git_dirty: false, git_author: null, environment_hash: 'e'.repeat(64), sqb_version: '0.0.0', published_at: '2026-11-01T00:00:00Z', changes: [], connection: null }]);
-		if (rest === 'jobs' || rest === 'triggers' || rest === 'checks' || rest === 'acknowledgements') return json(route, []);
+		if (rest === 'jobs') return json(route, target.jobs.map((job) => this.#job(job)));
+		const job = rest.startsWith('jobs/') ? target.jobs.find((j) => `jobs/${j.key}` === rest) : undefined;
+		// A group's members are the target's jobs, all starting together.
+		const members = job?.kind === 'group' ? target.jobs.filter((j) => j.kind === 'job').map((j) => ({ job_key: j.key, waits_for: [], reasons: [] })) : [];
+		if (job) return json(route, { ...this.#job(job), critical_nodes: [], member_of: [], members, settings: job.concurrency === null ? {} : { concurrency: job.concurrency }, targets: [] });
+		if (rest === 'triggers' || rest === 'checks' || rest === 'acknowledgements') return json(route, []);
 		if (rest.startsWith('cost')) return json(route, { since: '2026-11-01T00:00:00Z', credits: 0, usd: null, runs: 0, incomplete_runs: 0, by_job: [], by_warehouse_size: [], by_node: [] });
 		// The Overview's own reads: answered as things stood when the request arrived, then slowed or
 		// refused as the test asks.

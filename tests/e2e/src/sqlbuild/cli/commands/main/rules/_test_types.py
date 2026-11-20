@@ -48,6 +48,15 @@ class SnowflakeBodyShapeCase:
 
 
 @dataclass(frozen=True)
+class SharedDepthModelRuleCase:
+    description: str
+    template: str
+    rule: str
+    expected_evaluated_models: int
+    expected_unevaluated_resources: int
+
+
+@dataclass(frozen=True)
 class UnevaluatedResourceCase:
     description: str
     path: str

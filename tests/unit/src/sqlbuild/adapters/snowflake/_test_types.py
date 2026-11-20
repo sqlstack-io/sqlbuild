@@ -3,8 +3,16 @@ from datetime import datetime
 
 from sqlbuild._native import InferredNullability
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
-from sqlbuild.adapter.contract.models import FunctionInfo, RelationUsageReport, SchemaDiffResult
-from sqlbuild.adapter.contract.types import TableFreshnessStatus
+from sqlbuild.adapter.contract.models import (
+    FunctionInfo,
+    RelationUsageReport,
+    SchemaDiffResult,
+)
+from sqlbuild.adapter.contract.types import (
+    DynamicListing,
+    DynamicOperation,
+    TableFreshnessStatus,
+)
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.cost.types import CostStatus
 from tests.unit.src.sqlbuild.adapters.snowflake.inspection.helpers import FakeRelation
@@ -453,3 +461,41 @@ class SnowflakeKeyedDeleteInsertFailureTestCase:
 class SnowflakeWarehouseUserTestCase:
     description: str
     expected_expression: str
+
+
+@dataclass(frozen=True)
+class SnowflakeDynamicRefreshTestCase:
+    description: str
+    rows: tuple[tuple[object, ...], ...]
+    expected_settings: DynamicListing | None
+
+
+@dataclass(frozen=True)
+class SnowflakeDynamicCreateTestCase:
+    description: str
+    target_lag: str
+    refresh_mode: str
+    warehouse: str
+    expected_sql: str
+
+
+@dataclass(frozen=True)
+class SnowflakeDynamicAlterTestCase:
+    description: str
+    target_lag: str
+    warehouse: str | None
+    expected_sql: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SnowflakeDynamicOperationTestCase:
+    description: str
+    operation: DynamicOperation
+    expected_sql: str
+
+
+@dataclass(frozen=True)
+class SnowflakeChangeTrackingTestCase:
+    description: str
+    config: dict[str, object]
+    expected_sql: str

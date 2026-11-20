@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -28,6 +28,10 @@ from sqlbuild.executor.python_nodes.constants import (
     PYTHON_NODE_RELATION_QUALIFIER_SEPARATOR,
 )
 from sqlbuild.executor.python_nodes.types import PythonIdentityRecorder
+from sqlbuild.executor.scheduling.classes.session_warehouses import (
+    SessionWarehouses,
+    configured_warehouse,
+)
 from sqlbuild.provider.main.runtime import ProviderContainer, _empty_provider_container
 from sqlbuild.python_nodes.models import SqlResourceRef
 from sqlbuild.python_nodes.types import PythonCheckSeverity
@@ -147,6 +151,19 @@ class PythonNodeRuntime:
     providers: ProviderContainer | None = None
     result_store: Any | None = None
     persist_node_results: bool = True
+    node_warehouses: Mapping[str, str] = field(default_factory=dict)
+    session_warehouses: SessionWarehouses | None = None
+
+    def __post_init__(self) -> None:
+        if self.node_warehouses and self.session_warehouses is None:
+            object.__setattr__(
+                self,
+                "session_warehouses",
+                SessionWarehouses(
+                    adapter=self.adapter,
+                    home=configured_warehouse(connection_config=self.connection_config),
+                ),
+            )
 
     @property
     def resolved_relation_targets(self) -> dict[SqlResourceRef, str]:

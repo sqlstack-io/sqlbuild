@@ -477,11 +477,18 @@ def mirror_synced_state(served: ServedLocation, batches: dict[str, list[dict[str
 
 
 def timed_plan(
-    served: ServedLocation, selection: list[str], settings: dict[str, Any]
+    served: ServedLocation,
+    selection: list[str],
+    settings: dict[str, Any],
+    *,
+    fresh: bool = False,
 ) -> tuple[float, dict[str, Any]]:
-    """A person's plan from the moment the server queues it until the location stored it."""
+    """A person's plan from the moment the server queues it until the location stored it.
+
+    `fresh` is Plan again, so the location plans anew instead of returning a plan it kept.
+    """
     started: float = time.monotonic()
-    request_id: str = request_plan(served.control, selection, settings)
+    request_id: str = request_plan(served.control, selection, settings, fresh=fresh)
     deadline: float = started + 600.0
     result: str | None = None
     while result is None:

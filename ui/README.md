@@ -60,3 +60,13 @@ browser saving a HAR, then ask the server for every read the pages made:
 node scripts/record-demo.mjs demo/recording.json.gz --server http://127.0.0.1:<port> \
   --replace <project path>=/home/demo/duckshop --replace <location name>=duckshop session.har
 ```
+
+To record only the plan previews again, through the server's plan summary, rows and diff reads,
+keep the rest of the recording and plan each recorded command anew on `sqb dev`:
+
+```sh
+node scripts/record-demo-plans.mjs demo/recording.json.gz --server http://127.0.0.1:<port> \
+  --replace <project path>=/home/demo/duckshop --ask job:marts_build=job:marts_build_job
+```
+
+`--ask` rewrites only the command sent to the server, for a job renamed since the recording.

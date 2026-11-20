@@ -41,6 +41,9 @@ from sqlbuild.executor.run._helpers.execution.table_targets import resolve_table
 from sqlbuild.executor.run._helpers.materializations.custom import (
     execute_custom_entry as execute_custom_entry,
 )
+from sqlbuild.executor.run._helpers.materializations.dynamic import (
+    execute_dynamic_entry as execute_dynamic_entry,
+)
 from sqlbuild.executor.run._helpers.materializations.incremental import (
     execute_incremental_entry as execute_incremental_entry,
 )
@@ -243,8 +246,11 @@ def _staged_lifecycle(
                     staging_schema=targets.target_schema,
                     staging_table=targets.staging_table,
                     declared_columns=declared_columns,
-                    table_type=entry.table_type,
-                    physical_storage=entry.physical_storage,
+                    table_config={
+                        "table_type": entry.table_type,
+                        "physical_storage": entry.physical_storage,
+                        "change_tracking": bool(entry.dynamic_readers),
+                    },
                     statement_recorder=statement_recorder,
                 )
         except Exception as exc:

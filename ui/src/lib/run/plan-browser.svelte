@@ -8,13 +8,19 @@
 	import { to } from '$lib/paths';
 	import { mergePlanPage, type PlanDiff, type PlanDocument, type PlanPage, type PlanPageSection, type PlanWarning } from '$lib/api';
 	import { warningText } from './plan-text';
-	import { AFTER_DIVIDER, WARNINGS_SHOWN, diffPreview, planGroups, planSummaryLine, selectedGroup, withoutRows, type PlanGroupKey, type PlanRow, type WarningGroup } from './plan-index';
+	import { plural } from '$lib/format/plural';
+	import { planSectionCounts, planTotals } from './plan-totals';
+	import { migrationSteps } from './plan-steps';
+	import { WARNINGS_SHOWN, diffPreview, planGroups, selectedGroup, withoutRows, type PlanGroupKey, type PlanRow, type WarningGroup } from './plan-index';
+	import PlanRenames from './plan-renames.svelte';
 
 	/**
 	 * `section` is the group shown, kept in the address by the page; `more` adds the next page of a
 	 * section to `plan`, of `limit` rows; `load` reads a page of rows whose name contains `name`, for the
 	 * filter; `diff` reads a model's diff, null when the server has none to give; `refresh` words what
 	 * refreshes a held-back job's nodes.
+	 * The index groups the sections under Will run and Won't run, each heading the nodes counted once
+	 * (plan-totals.ts), with warnings apart.
 	 */
 	let {
 		plan,
@@ -55,6 +61,8 @@
 
 	const groups = $derived(planGroups(plan, refresh, diffs));
 	const group = $derived(selectedGroup(groups, section));
+	/** The Renames and migrations pane lists renamed models and migration steps apart, and loads its own sections. */
+	const renamesPane = $derived(group?.key === 'renames');
 	const warningGroups = $derived(group?.warningGroups ?? []);
 	/** A server summary's groups come counted; each one's warnings are read when it opens, by where they start. */
 	let readWarnings = $state<Record<number, PlanWarning[]>>({});
@@ -90,7 +98,7 @@
 			})
 			.catch((e: unknown) => {
 				if (read === readWarnings) readingWarnings.delete(w.offset);
-				loadError = e instanceof Error ? e.message : String(e);
+				if (read === readWarnings) loadErrors.warnings = e instanceof Error ? e.message : String(e);
 			});
 	}
 	function toggleWarnings(w: WarningGroup) {
@@ -109,11 +117,26 @@
 	let askedOf = $state<Record<string, string>>({});
 	let openDiff = $state<Record<string, 'preview' | 'full'>>({});
 	let loading = $state(false);
-	let loadError = $state<string | null>(null);
+	/** Failed reads, by group: shown there with Retry, and that group reads nothing more until then. */
+	let loadErrors = $state<Record<string, string>>({});
+	const failed = (e: unknown) => (e instanceof Error ? e.message : String(e));
+	// Another plan (a re-plan) starts with no failed reads: its rows are read from scratch.
+	let erroredFor: unknown = null;
+	$effect.pre(() => {
+		if (plan.sections === erroredFor) return;
+		erroredFor = plan.sections;
+		loadErrors = {};
+	});
+	/** Reads a group's rows again after a failure; a filter's view starts over. */
+	function retry(key: string) {
+		delete loadErrors[key];
+		if (view?.key === key) view = null;
+		if (key === 'warnings') for (const w of warningGroups) if (openWarnings[w.offset]) readGroup(w, allWarnings[w.offset] ? WARNINGS_READ : WARNINGS_SHOWN);
+	}
 
 	const shown = $derived(group ? (shownOf[group.key] ?? PAGE) : PAGE);
 	const filter = $derived(group ? (filterOf[group.key] ?? '') : '');
-	/** The server finds rows by name, a page at a time; a whole plan, with every row, is filtered here. */
+	/** The server finds rows by name, a page at a time; the default mock's whole plan, with every row, is filtered here. */
 	const serverFilter = $derived(!!plan.sections && !!load);
 	const asked = $derived(group ? (askedOf[group.key] ?? '') : '');
 
@@ -135,10 +158,9 @@
 	 */
 	type View = { key: string; name: string; doc: PlanDocument; matches: Partial<Record<PlanPageSection, number>>; sections: PlanDocument['sections'] };
 	let view = $state.raw<View | null>(null);
-	const viewDoc = (matches: View['matches'], doc: PlanDocument): PlanDocument => ({
-		...doc,
-		sections: (plan.sections ?? []).map((c) => ({ section: c.section, total: matches[c.section] ?? 0, notes: [] }))
-	});
+	/** Only a server summary is filtered by the server, so a view's document is always a summary. */
+	const viewDoc = (matches: View['matches'], doc: PlanDocument): PlanDocument =>
+		doc.sections ? { ...doc, sections: (plan.sections ?? []).map((c) => ({ section: c.section, total: matches[c.section] ?? 0, notes: [] })) } : doc;
 
 	// A new filter starts its view: the first page of each of the group's sections, for how many each matches.
 	$effect(() => {
@@ -149,7 +171,7 @@
 		const start: View = { key: g.key, name, doc: viewDoc({}, withoutRows(plan)), matches: {}, sections: plan.sections };
 		view = start;
 		loading = true;
-		loadError = null;
+		delete loadErrors[g.key];
 		(async () => {
 			let current = start;
 			for (const s of g.sections) {
@@ -160,7 +182,7 @@
 				view = current;
 			}
 		})()
-			.catch((e: unknown) => (loadError = e instanceof Error ? e.message : String(e)))
+			.catch((e: unknown) => (loadErrors[g.key] = failed(e)))
 			.finally(() => (loading = false));
 	});
 
@@ -182,7 +204,8 @@
 	$effect(() => {
 		const g = shownGroup;
 		const page = nextPage;
-		if (!g || !page || loading || g.key === 'warnings' || g.rows.length >= Math.min(shown, g.count)) return;
+		// After a failed read nothing more is read until Retry, so a lasting failure doesn't repeat its request.
+		if (!g || !page || loading || loadErrors[g.key] || renamesPane || g.key === 'warnings' || g.rows.length >= Math.min(shown, g.count)) return;
 		if (filtering && !serverFilter) return;
 		const current = view;
 		const step = filtering
@@ -195,8 +218,7 @@
 			: (more?.(page.section, PAGE) ?? null);
 		if (!step) return;
 		loading = true;
-		loadError = null;
-		step.catch((e: unknown) => (loadError = e instanceof Error ? e.message : String(e))).finally(() => (loading = false));
+		step.catch((e: unknown) => (loadErrors[g.key] = failed(e))).finally(() => (loading = false));
 	});
 
 	function showMore() {
@@ -212,29 +234,71 @@
 			if (r.fetch === 'diff') readDiff(r.name);
 		}
 	}
-	/** The index's divider goes before the first quiet group, unless nothing comes before it. */
-	const dividerBefore = $derived(groups.findIndex((g) => g.key === AFTER_DIVIDER || g.key === 'unchanged' || g.key === 'skipped'));
 	const href = (r: PlanRow) => (r.linked && !/^\d+$/.test(r.name) ? to(`/catalog/model:${r.name}`) : null);
 	const remaining = $derived(rowCount - visible.length);
+
+	// The index under Will run and Won't run, each entry counting nodes once (plan-totals.ts), warnings apart.
+	const counts = $derived(planSectionCounts(plan));
+	const totals = $derived(planTotals(counts, migrationSteps(plan)));
+	const WONT_GROUPS = new Set<PlanGroupKey>(['held_back', 'skipped']);
+	const FUNCTION_SECTIONS = new Set<PlanPageSection>(['functions', 'changed_functions']);
+	const runGroups = $derived(groups.filter((g) => !WONT_GROUPS.has(g.key) && g.key !== 'warnings'));
+	const wontGroups = $derived(groups.filter((g) => WONT_GROUPS.has(g.key)));
+	const warningGroup = $derived(groups.find((g) => g.key === 'warnings'));
+	/** A group's nodes, as its heading counts them; warnings count themselves. */
+	const nodesOf = (g: (typeof groups)[number]) => [...totals.runParts, ...totals.wontParts].filter((p) => p.group === g.key).reduce((n, p) => n + p.count, 0);
+	/** A group's functions, which are listed but are not nodes the build runs. */
+	const functionsOf = (g: (typeof groups)[number]) => counts.filter((c) => FUNCTION_SECTIONS.has(c.section) && g.sections.includes(c.section)).reduce((n, c) => n + c.total, 0);
+	/**
+	 * What an index entry counts: its nodes, or when it has none, muted, what it lists instead: the
+	 * Renames group's migration steps, or a group's functions.
+	 */
+	function entryCount(g: (typeof groups)[number]): { text: string; muted: boolean } {
+		if (g.key === 'warnings') return { text: g.count.toLocaleString(), muted: false };
+		const nodes = nodesOf(g);
+		if (nodes) return { text: nodes.toLocaleString(), muted: false };
+		if (g.key === 'renames' && totals.steps) return { text: plural(totals.steps, 'step'), muted: true };
+		const functions = functionsOf(g);
+		return { text: functions ? plural(functions, 'function') : '', muted: true };
+	}
+	/** A pane's count: its nodes, and its functions after them, muted. */
+	const paneCount = (g: (typeof groups)[number]) => ({ nodes: nodesOf(g), functions: functionsOf(g) });
 </script>
+
+{#snippet entry(g: (typeof groups)[number], title = g.title)}
+	{@const selected = g.key === group?.key}
+	{@const count = entryCount(g)}
+	<!-- raw-button: a table-of-contents entry with its count, highlighted while its section is shown -->
+	<button class="entry" class:selected aria-current={selected ? 'true' : undefined} data-section={g.key} onclick={() => onselect(g.key)}>
+		<span class="title">{title}</span>
+		<span class="count" class:muted={count.muted}>{count.text}</span>
+	</button>
+{/snippet}
 
 <div class="plan-browser">
 	<nav class="index" aria-label="Plan sections">
-		<p class="summary">{planSummaryLine(groups)}</p>
-		{#each groups as g, i (g.key)}
-			{#if i === dividerBefore && i > 0}<hr />{/if}
-			<!-- raw-button: a table-of-contents entry with its count, highlighted while its section is shown -->
-			<button class="entry" class:selected={g.key === group?.key} aria-current={g.key === group?.key ? 'true' : undefined} data-section={g.key} onclick={() => onselect(g.key)}>
-				<span class="title">{g.title}</span>
-				<span class="count">{g.count.toLocaleString()}</span>
-			</button>
-		{/each}
+		{#if runGroups.length}
+			<div class="heading" data-testid="index-will-run"><span>Will run</span><b>{totals.run.toLocaleString()}</b></div>
+			{#each runGroups as g (g.key)}{@render entry(g)}{/each}
+		{/if}
+		{#if wontGroups.length}
+			<div class="heading wont" data-testid="index-wont-run"><span>Won’t run</span><b>{totals.wont.toLocaleString()}</b></div>
+			{#each wontGroups as g (g.key)}{@render entry(g)}{/each}
+		{/if}
+		{#if warningGroup}
+			{#if runGroups.length || wontGroups.length}<hr />{/if}
+			{@render entry(warningGroup)}
+		{/if}
 	</nav>
 
 	{#if group}
 		<section class="pane" data-section={group.key}>
+			{#if renamesPane}
+				<PlanRenames {plan} {counts} {more} {load} />
+			{:else}
+			{@const c = group.key === 'warnings' ? null : paneCount(group)}
 			<header>
-				<h3>{group.title} <span class="count">{group.count.toLocaleString()}</span></h3>
+				<h3>{group.title} <span class="count">{#if c}{#if c.nodes || !c.functions}{plural(c.nodes, 'node')}{/if}{#if c.functions}<span class="muted">{c.nodes ? ' · ' : ''}{plural(c.functions, 'function')}</span>{/if}{:else}{group.count.toLocaleString()}{/if}</span></h3>
 				{#if group.subtitle}<p class="subtitle">{group.subtitle}</p>{/if}
 			</header>
 
@@ -260,6 +324,7 @@
 						{/if}
 					</div>
 				{/each}
+				{#if loadErrors.warnings}<p class="hint err" data-testid="plan-rows-error">Couldn't read the warnings: {loadErrors.warnings} <Button variant="link" size="inline" class="text-[12px]" onclick={() => retry('warnings')}>Retry</Button></p>{/if}
 			{:else}
 				<label class="filter">
 					<SearchIcon size={13} />
@@ -298,20 +363,23 @@
 					{#if filtering && !shownGroup}<p class="hint">Finding {group.title.toLowerCase()}…</p>
 					{:else if filtering && !rowCount && !loading}<p class="hint">No {group.title.toLowerCase()} match “{filter.trim()}”.</p>{/if}
 				</div>
-				{#if loadError}<p class="hint err">Couldn't load more rows: {loadError}</p>{/if}
+				{#if loadErrors[group.key]}<p class="hint err" data-testid="plan-rows-error">Couldn't load more rows: {loadErrors[group.key]} <Button variant="link" size="inline" class="text-[12px]" onclick={() => retry(group.key)}>Retry</Button></p>{/if}
 				{#if remaining > 0}
 					<Button variant="link" size="inline" class="show-more mt-2 self-start text-[12px]" disabled={loading} onclick={showMore}>
 						{loading ? 'Loading…' : `Show more · ${remaining.toLocaleString()} not shown`}
 					</Button>
 				{:else if loading}<p class="hint">Loading…</p>{/if}
 			{/if}
+			{/if}
 		</section>
 	{/if}
 </div>
 
 <style>
+	/* The pane stops at 1,100 px, as wide lines read badly; the page's toolbar ends with it. */
 	.plan-browser {
 		display: grid;
+		max-width: calc(230px + 24px + 1100px);
 		grid-template-columns: 230px minmax(0, 1fr);
 		gap: 24px;
 		align-items: start;
@@ -324,11 +392,29 @@
 		flex-direction: column;
 		gap: 1px;
 	}
-	.summary {
-		margin: 0 0 10px;
+	.heading {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		margin: 2px 0 3px;
+		padding: 0 8px 0 10px;
 		color: var(--muted-foreground);
-		font-size: 12px;
-		line-height: 1.45;
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+	.heading b {
+		color: var(--foreground);
+		font-size: 13px;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: 0;
+	}
+	.heading.wont {
+		margin-top: 14px;
+	}
+	.heading.wont b {
+		color: var(--muted-foreground);
 	}
 	.index hr {
 		margin: 6px 0;
@@ -361,6 +447,10 @@
 		color: var(--sb-text-faint);
 		font-variant-numeric: tabular-nums;
 		font-weight: 400;
+	}
+	.count.muted,
+	.count .muted {
+		color: color-mix(in srgb, var(--sb-text-faint) 70%, transparent);
 	}
 	.pane {
 		display: flex;

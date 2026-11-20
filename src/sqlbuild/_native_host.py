@@ -420,10 +420,6 @@ _TARGETS: dict[str, tuple[str, str]] = {
     "LoadCallbacks": ("sqlbuild.executor.load.models", "LoadCallbacks"),
     "LoadExecutionResult": ("sqlbuild.executor.load.models", "LoadExecutionResult"),
     "LoadRuntimeParams": ("sqlbuild.executor.load.models", "LoadRuntimeParams"),
-    "migration_relation_for_location": (
-        "sqlbuild.executor.migrations._helpers.relation_for_location",
-        "migration_relation_for_location",
-    ),
     "is_compatibility_view": (
         "sqlbuild.executor.old_name_views._helpers.janitor",
         "is_compatibility_view",
@@ -585,6 +581,10 @@ _TARGETS: dict[str, tuple[str, str]] = {
     "execution_deadline_scope": (
         "sqlbuild.runtime.execution_limits.main.execution_deadline_scope",
         "execution_deadline_scope",
+    ),
+    "execution_deadlines_suspended": (
+        "sqlbuild.runtime.execution_limits.main.execution_deadlines_suspended",
+        "execution_deadlines_suspended",
     ),
     "audit_evidence_scope": (
         "sqlbuild.executor.auditing.main._audit_evidence_scope",

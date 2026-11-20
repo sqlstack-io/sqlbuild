@@ -310,11 +310,6 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Executor,
     },
     HostEntry {
-        name: "migration_relation_for_location",
-        kind: HostKind::Function,
-        edge: HostEdge::Executor,
-    },
-    HostEntry {
         name: "is_compatibility_view",
         kind: HostKind::Function,
         edge: HostEdge::Executor,
@@ -701,6 +696,11 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
     },
     HostEntry {
         name: "execution_deadline_scope",
+        kind: HostKind::Function,
+        edge: HostEdge::Executor,
+    },
+    HostEntry {
+        name: "execution_deadlines_suspended",
         kind: HostKind::Function,
         edge: HostEdge::Executor,
     },

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from sqlbuild._native import fit_auxiliary_relation_name
@@ -26,9 +27,8 @@ def enforce_types_staged(
     staging_schema: str | None,
     staging_table: str,
     declared_columns: tuple[ColumnInfo, ...],
-    table_type: str,
+    table_config: Mapping[str, object],
     statement_recorder: StatementRecorder,
-    physical_storage: dict[str, object] | None = None,
 ) -> None:
     """Inspect staging columns and rebuild with casts for declared types."""
 
@@ -76,11 +76,7 @@ def enforce_types_staged(
         connection=connection,
         destination=enforced_qualified,
         sql=f"SELECT {projection_sql} FROM {staging_qualified}",
-        config={
-            "table_type": table_type,
-            "column_types": declared_map,
-            "physical_storage": physical_storage or {},
-        },
+        config={**table_config, "column_types": declared_map},
         statement_recorder=statement_recorder,
     )
     adapter.drop_table(

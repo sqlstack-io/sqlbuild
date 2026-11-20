@@ -23,8 +23,24 @@ pub(crate) static QUERY_FINGERPRINTS: Mutex<Option<QueryFingerprints>> = Mutex::
 /// Distinct SQL texts the memo keeps before starting over; a 10K-model project holds about 10K.
 const QUERY_FINGERPRINTS_LIMIT: usize = 100_000;
 
-/// Fingerprint results by `(dialect, SQL text)`.
-pub(crate) type QueryFingerprints = HashMap<(Option<String>, String), Result<String, String>>;
+/// Fingerprint results by dialect, then by SQL text, so a lookup borrows the SQL text.
+pub(crate) type QueryFingerprints = Vec<(Option<String>, HashMap<String, Result<String, String>>)>;
+
+/// The remembered fingerprint of `sql` under `dialect`, if any.
+fn remembered(
+    memo: &Mutex<Option<QueryFingerprints>>,
+    sql: &str,
+    dialect: Option<&str>,
+) -> Option<Result<String, String>> {
+    memo.lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .as_ref()?
+        .iter()
+        .find(|(known, _)| known.as_deref() == dialect)?
+        .1
+        .get(sql)
+        .cloned()
+}
 
 /// `compiler_query_fingerprint`, remembered by dialect and SQL text.
 pub(crate) fn query_fingerprint(
@@ -32,22 +48,27 @@ pub(crate) fn query_fingerprint(
     sql: &str,
     dialect: Option<&str>,
 ) -> Result<String, String> {
-    let key: (Option<String>, String) = (dialect.map(str::to_owned), sql.to_owned());
-    if let Some(known) = memo
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .as_ref()
-        .and_then(|memo| memo.get(&key))
-    {
-        return known.clone();
+    if let Some(known) = remembered(memo, sql, dialect) {
+        return known;
     }
     let fingerprint: Result<String, String> = compiler_query_fingerprint(sql, dialect);
     let mut memo = memo.lock().unwrap_or_else(PoisonError::into_inner);
-    let entries: &mut QueryFingerprints = memo.get_or_insert_with(HashMap::new);
-    if entries.len() > QUERY_FINGERPRINTS_LIMIT {
-        entries.clear();
+    let dialects: &mut QueryFingerprints = memo.get_or_insert_with(Vec::new);
+    if dialects.iter().map(|(_, texts)| texts.len()).sum::<usize>() > QUERY_FINGERPRINTS_LIMIT {
+        dialects.clear();
     }
-    entries.insert(key, fingerprint.clone());
+    match dialects
+        .iter_mut()
+        .find(|(known, _)| known.as_deref() == dialect)
+    {
+        Some((_, texts)) => {
+            texts.insert(sql.to_owned(), fingerprint.clone());
+        }
+        None => dialects.push((
+            dialect.map(str::to_owned),
+            HashMap::from([(sql.to_owned(), fingerprint.clone())]),
+        )),
+    }
     fingerprint
 }
 
@@ -57,8 +78,11 @@ pub(crate) fn model_query_hash(
     model_name: &str,
     (query_sql, dialect): (&str, Option<&str>),
 ) -> PyResult<String> {
-    py.compiler_detach(|| query_fingerprint(&QUERY_FINGERPRINTS, query_sql, dialect))
-        .map_err(|error| fingerprint_error(py, &format!("Model '{model_name}' SQL"), error))
+    match remembered(&QUERY_FINGERPRINTS, query_sql, dialect) {
+        Some(known) => known,
+        None => py.compiler_detach(|| query_fingerprint(&QUERY_FINGERPRINTS, query_sql, dialect)),
+    }
+    .map_err(|error| fingerprint_error(py, &format!("Model '{model_name}' SQL"), error))
 }
 
 /// `current`, or the fingerprint recorded with a `Fingerprint` row whose definition fingerprints to `current`.
@@ -73,6 +97,9 @@ pub(crate) fn recorded_baseline(
     }
     let definition: String = native_field(recorded, "definition")?.extract()?;
     let recorded_hash: String = native_field(recorded, "definition_hash")?.extract()?;
+    if recorded_hash == current || recorded_hash.is_empty() || definition.is_empty() {
+        return Ok(current);
+    }
     py.compiler_detach(|| {
         Ok(baseline_fingerprint(
             current,

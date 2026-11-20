@@ -8,7 +8,7 @@ use serde_json::{Map, Value};
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
 use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
-use sqlquack_syntax::{CallMode, Dialect, Expression, ParseOptions};
+use sqlquack_syntax::{CallMode, Dialect, Expression};
 
 use crate::assembly::analysis_session::_helpers::dict_walk::{
     casefold, column_name, dict_list, identifier_name, is_single_wildcard, nested, node_key,
@@ -25,6 +25,7 @@ use crate::assembly::analysis_session::models::{
     ColumnFact, ContractProof, DynamicFamily, PivotModel, PivotOutcome, PivotTables,
 };
 use crate::assembly::analysis_session::types::Shapes;
+use crate::parse_guard::main::sqlquack_parse_options::sqlquack_parse_options;
 use crate::relation_markers::constants::MARKER_NAME_PREFIX;
 use crate::relation_markers::main::markers_as_names::markers_as_names;
 use crate::relation_markers::types::MarkerCall;
@@ -134,7 +135,7 @@ fn parsed(sql: &str, dialect: &str) -> Result<Result<Value, String>, String> {
     let parsed = sqlquack_parse::parse_statements_with(
         &named,
         dialect,
-        &ParseOptions::default(),
+        &sqlquack_parse_options(),
         CallMode::Faithful,
     );
     let mut statements: Vec<Expression> = match parsed {

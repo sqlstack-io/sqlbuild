@@ -2,3 +2,6 @@
 
 pub mod constants;
 pub mod main;
+
+#[cfg(test)]
+mod tests;

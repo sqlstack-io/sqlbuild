@@ -1,5 +1,6 @@
 //! SQLBuild codes and dialect-specific diagnostic evidence.
 
+use crate::parse_guard::main::polyglot_parse_options::polyglot_parse_options;
 use crate::semantic_validation::_helpers::catalog::diagnostic_row;
 use crate::semantic_validation::_helpers::function_names;
 use crate::semantic_validation::_helpers::sqlite_temporal_casts;
@@ -76,8 +77,9 @@ struct DiagnosticContext<'a> {
 
 impl DiagnosticContext<'_> {
     fn parsed(&mut self) -> &polyglot_sql::Result<Vec<Expression>> {
-        self.statements
-            .get_or_insert_with(|| Dialect::get(self.dialect).parse(self.sql))
+        self.statements.get_or_insert_with(|| {
+            Dialect::get(self.dialect).parse_with_options(self.sql, &polyglot_parse_options())
+        })
     }
 
     fn map(&mut self, mut error: ValidationError) -> Result<Option<ValidationError>, String> {

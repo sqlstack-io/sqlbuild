@@ -41,6 +41,11 @@ const SQLITE_CHECKSUMS: &[(i64, &str)] = &[
         3,
         "734163e22863ff86fbcf1329540736f279806d4ce5ea04f6d6ecb1703b3468c8",
     ),
+    // 0004 rewrites stored job definitions and leaves the schema as it is.
+    (
+        4,
+        "734163e22863ff86fbcf1329540736f279806d4ce5ea04f6d6ecb1703b3468c8",
+    ),
 ];
 const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
     (
@@ -53,6 +58,11 @@ const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
     ),
     (
         3,
+        "b1250935a5adf1d4691836a2125bb57360c1ff0a2a296a77e4d11bf6a80a99d9",
+    ),
+    // 0004 rewrites stored job definitions and leaves the schema as it is.
+    (
+        4,
         "b1250935a5adf1d4691836a2125bb57360c1ff0a2a296a77e4d11bf6a80a99d9",
     ),
 ];

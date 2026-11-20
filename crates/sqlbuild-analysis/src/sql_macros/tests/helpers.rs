@@ -233,3 +233,18 @@ pub(super) fn raw_prefix_rules() -> sqlbuild_sqltext::sql_scan::models::LexicalS
         ..sqlbuild_sqltext::sql_scan::models::LexicalSyntax::default()
     }
 }
+
+/// An expression macro whose body nests `depth` `REPLACE` calls around its argument.
+pub(super) fn nested_replace_macro(depth: usize) -> String {
+    let mut source: String = String::from(
+        "MACRO (description \"Cleaned name\", arguments (column_name VARCHAR), returns VARCHAR);\n\n",
+    );
+    let closings: String = (0..depth)
+        .map(|level| format!(", 'a{level}', 'b')"))
+        .collect();
+    source.push_str(&format!(
+        "{}@column_name{closings}\n",
+        "REPLACE(".repeat(depth)
+    ));
+    source
+}

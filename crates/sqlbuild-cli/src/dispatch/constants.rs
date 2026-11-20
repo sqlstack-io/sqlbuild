@@ -110,7 +110,7 @@ pub(crate) const DAG_ROUTE: Route = routed(
     },
 );
 
-const PLAN_FIELDS: [Field; 25] = [
+const PLAN_FIELDS: [Field; 26] = [
     PROJECT_DIR,
     NO_SQL_VALIDATION,
     same("no_cache"),
@@ -121,6 +121,7 @@ const PLAN_FIELDS: [Field; 25] = [
     CURSOR_OVERRIDES,
     JSON_OUTPUT,
     same("full_refresh"),
+    same("job_settings"),
     same("changed"),
     same("changed_counts"),
     same("reach"),
@@ -145,7 +146,7 @@ pub(crate) const PLAN_ROUTE: Route = routed(
     REQUEST_KEYWORD_SHAPE,
 );
 
-const BUILD_FIELDS: [Field; 40] = [
+const BUILD_FIELDS: [Field; 42] = [
     PROJECT_DIR,
     NO_SQL_VALIDATION,
     same("no_cache"),
@@ -158,6 +159,7 @@ const BUILD_FIELDS: [Field; 40] = [
     NO_COLOR,
     same("fail_fast"),
     same("full_refresh"),
+    same("job_settings"),
     same("changed"),
     same("changed_counts"),
     same("reach"),
@@ -169,6 +171,7 @@ const BUILD_FIELDS: [Field; 40] = [
     same("allow_retention_decrease"),
     same("allow_missing_migration_origin"),
     same("allow_snapshot_schema_change"),
+    same("ignore_dynamic_grace"),
     same("concurrency"),
     SELECT,
     field("selector_files", Source::SelectorFiles),

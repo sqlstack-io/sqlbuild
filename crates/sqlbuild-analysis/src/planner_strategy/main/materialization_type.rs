@@ -10,6 +10,7 @@ pub fn materialization_type(materialized: Option<&str>) -> MaterializationType {
         Some("incremental") => MaterializationType::Incremental,
         Some("snapshot") => MaterializationType::Snapshot,
         Some("seed") => MaterializationType::Seed,
+        Some("dynamic") => MaterializationType::Dynamic,
         Some(_) => MaterializationType::Custom,
     }
 }

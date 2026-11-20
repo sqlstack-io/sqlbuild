@@ -7,5 +7,6 @@ pub mod build_planner_identity_context;
 pub mod check_selected_scope_buildability;
 pub mod detect_stale_warning_changes;
 pub mod detect_stale_warning_changes_of_function;
+pub mod plan_dynamic_refresh;
 pub mod planner_identity_work_info_function;
 pub mod unselected_upstream_models;

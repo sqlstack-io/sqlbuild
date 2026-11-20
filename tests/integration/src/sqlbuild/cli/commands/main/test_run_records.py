@@ -1,31 +1,52 @@
-"""Every build records its start and end in the target's runs table, and a failed write never fails it."""
+"""Every build records its start and end in each schema it writes, and a failed write never fails it."""
 
 from __future__ import annotations
 
 import os
+import signal
 import subprocess
 import sys
+import threading
+import time
+from collections.abc import Callable
 from pathlib import Path
+from types import FrameType
+from typing import Any
 
 import pytest
 
 from sqlbuild._native import run_cli as main
 from sqlbuild.adapter.contract.classes.runs_table import RunsTableMixin
+from sqlbuild.runtime.execution_limits.main._cancel_running_statements import (
+    cancel_running_statements,
+)
 from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     InterruptedRunRecordTestCase,
     KilledRunRecordTestCase,
+    RecalledRunRecordTestCase,
     RunRecordFailureTestCase,
+    RunRecordSchemasTestCase,
     RunRecordTestCase,
     SeedRunRecordTestCase,
+    SignalledRunRecordTestCase,
 )
 from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
     RUN_RECORD_COLUMNS,
+    RUN_RECORD_MARTS_FILES,
+    RUN_RECORD_MARTS_SCHEMA,
     built_tables,
     prepare_warehouse,
+    recalled_run_inserts,
     run_rows,
+    runs_tables,
+    schema_run_ids,
+    schema_run_phases,
+    schema_run_statuses,
+    warehouse_schemas,
     write_run_record_project,
 )
 
+_PAIR: list[str] = ["started", "finished"]
 _SUCCEEDED_TWO: str = '{"succeeded":2,"warned":0,"failed":0,"skipped":0,"not_started":0}'
 
 
@@ -275,6 +296,103 @@ def test_given_an_interrupt_while_recording_when_building_then_the_build_stops(
 @pytest.mark.parametrize(
     "test_case",
     [
+        SignalledRunRecordTestCase(
+            description="a real SIGINT while a run-record insert hangs stops the build promptly",
+            blocking_warehouse_user_sql=(
+                "CAST((SELECT SUM(a.range * b.range) "
+                "FROM range(100000000) AS a, range(100000000) AS b) AS VARCHAR)"
+            ),
+            signal_after_seconds=1.0,
+            max_stop_seconds=15.0,
+            expected_tables=frozenset(),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_hanging_run_record_when_sigint_arrives_then_the_build_stops_promptly(
+    test_case: SignalledRunRecordTestCase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    write_run_record_project(project_dir=tmp_path, settings="")
+    monkeypatch.setattr(
+        RunsTableMixin,
+        "render_current_warehouse_user",
+        lambda self: test_case.blocking_warehouse_user_sql,
+    )
+    previous: Callable[[int, FrameType | None], Any] | int | signal.Handlers | None = signal.signal(
+        signal.SIGINT, signal.default_int_handler
+    )
+    signalled_at: list[float] = []
+
+    def interrupt() -> None:
+        signalled_at.append(time.monotonic())
+        os.kill(os.getpid(), signal.SIGINT)
+
+    sender: threading.Timer = threading.Timer(test_case.signal_after_seconds, interrupt)
+    # A broken stop would hang on the insert forever; cancel it later so the test fails instead.
+    watchdog: threading.Timer = threading.Timer(
+        test_case.max_stop_seconds * 4, cancel_running_statements
+    )
+    sender.start()
+    watchdog.start()
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            main(
+                [
+                    "--project-dir",
+                    str(tmp_path),
+                    "--no-color",
+                    "build",
+                    "--no-tests",
+                    "-s",
+                    "stg_orders",
+                ]
+            )
+        stopped_at: float = time.monotonic()
+    finally:
+        sender.cancel()
+        watchdog.cancel()
+        signal.signal(signal.SIGINT, previous)
+    captured: str = "".join(capfd.readouterr())
+
+    assert signalled_at, captured
+    assert stopped_at - signalled_at[0] < test_case.max_stop_seconds, captured
+    assert "could not record" not in captured, captured
+    assert built_tables(project_dir=tmp_path) == test_case.expected_tables
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RecalledRunRecordTestCase(
+            description="a build's run-record inserts reach its own recalled statements",
+            build_args=("--select", "stg_orders"),
+            expected_run_inserts=2,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_recorded_build_when_recalled_then_its_run_record_statements_are_its_own(
+    test_case: RecalledRunRecordTestCase,
+    tmp_path: Path,
+) -> None:
+    write_run_record_project(project_dir=tmp_path, settings="")
+
+    exit_code: int = main(
+        ["--project-dir", str(tmp_path), "--no-color", "build", "--no-tests", *test_case.build_args]
+    )
+
+    assert exit_code == 0
+    [(statements, run_inserts)] = recalled_run_inserts(project_dir=tmp_path)
+    assert statements > run_inserts
+    assert run_inserts == test_case.expected_run_inserts
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
         KilledRunRecordTestCase(
             description="a build killed mid-run leaves only its started row",
             expected_phases=["started"],
@@ -310,3 +428,146 @@ def test_given_a_killed_build_when_reading_its_runs_then_only_started_remains(
     assert [row[0] for row in run_rows(project_dir=tmp_path, columns="phase")] == (
         test_case.expected_phases
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RunRecordSchemasTestCase(
+            description="a build writing two schemas records its pair in each under one run id",
+            command_args=("build", "--no-tests", "--select", "stg_orders", "revenue"),
+            settings=RUN_RECORD_MARTS_SCHEMA,
+            warehouse_setup="",
+            expected_exit_code=0,
+            expected_phases={"main": _PAIR, "marts": _PAIR},
+            expected_absent_schemas=frozenset(),
+            expected_warnings=(),
+        ),
+        RunRecordSchemasTestCase(
+            description="a build writing only a custom schema never creates the target's schema",
+            command_args=("build", "--no-tests", "--select", "revenue"),
+            settings='\n[defaults]\nschema = "analytics"\n' + RUN_RECORD_MARTS_SCHEMA,
+            warehouse_setup="",
+            expected_exit_code=0,
+            expected_phases={"marts": _PAIR},
+            expected_absent_schemas=frozenset({"analytics"}),
+            expected_warnings=(),
+        ),
+        RunRecordSchemasTestCase(
+            description="an unwritable schema warns naming it while the other schema records",
+            command_args=("build", "--no-tests", "--select", "stg_orders", "revenue"),
+            settings=RUN_RECORD_MARTS_SCHEMA,
+            warehouse_setup="CREATE VIEW main._sqlbuild_runs AS SELECT 1 AS run_id",
+            expected_exit_code=0,
+            expected_phases={"marts": _PAIR},
+            expected_absent_schemas=frozenset(),
+            expected_warnings=(
+                " started in main._sqlbuild_runs: ",
+                " finished in main._sqlbuild_runs: ",
+            ),
+        ),
+        RunRecordSchemasTestCase(
+            description="a build loading a source records in the source's schema too",
+            command_args=("build", "--no-tests", "--select", "+daily_events"),
+            settings=RUN_RECORD_MARTS_SCHEMA,
+            warehouse_setup="",
+            expected_exit_code=0,
+            expected_phases={"landing": _PAIR, "marts": _PAIR},
+            expected_absent_schemas=frozenset(),
+            expected_warnings=(),
+        ),
+        RunRecordSchemasTestCase(
+            description="case spellings of one schema record once",
+            command_args=("build", "--no-tests", "--select", "revenue", "revenue_upper"),
+            settings=RUN_RECORD_MARTS_SCHEMA,
+            warehouse_setup="",
+            expected_exit_code=0,
+            expected_phases={"marts": _PAIR},
+            expected_absent_schemas=frozenset(),
+            expected_warnings=(),
+        ),
+        RunRecordSchemasTestCase(
+            description="a skipped model's schema records nothing",
+            command_args=("build", "--no-tests", "--select", "stg_orders", "old_orders"),
+            settings=RUN_RECORD_MARTS_SCHEMA,
+            warehouse_setup="",
+            expected_exit_code=0,
+            expected_phases={"main": _PAIR},
+            expected_absent_schemas=frozenset(),
+            expected_warnings=(),
+            expected_finished_status="partial",
+        ),
+        RunRecordSchemasTestCase(
+            description="a function's schema records the run that deploys it",
+            command_args=("build", "--no-tests", "--select", "doubled"),
+            settings=RUN_RECORD_MARTS_SCHEMA,
+            warehouse_setup="",
+            expected_exit_code=0,
+            expected_phases={"marts": _PAIR, "udfs": _PAIR},
+            expected_absent_schemas=frozenset(),
+            expected_warnings=(),
+        ),
+        RunRecordSchemasTestCase(
+            description="a build that raises finishes failed in each schema",
+            command_args=("build", "--no-tests", "--select", "stg_orders", "slow_total"),
+            settings=RUN_RECORD_MARTS_SCHEMA
+            + '\n[targets.dev.execution_limits]\nmax_duration = "2s"\n',
+            warehouse_setup="",
+            expected_exit_code=1,
+            expected_phases={"main": _PAIR, "marts": _PAIR},
+            expected_absent_schemas=frozenset(),
+            expected_warnings=(),
+            expected_finished_status="failed",
+        ),
+        RunRecordSchemasTestCase(
+            description="a task-only run records in the target's default schema",
+            command_args=("build", "--no-tests", "--select", "task:noop"),
+            settings='\n[defaults]\nschema = "analytics"\n' + RUN_RECORD_MARTS_SCHEMA,
+            warehouse_setup="",
+            expected_exit_code=0,
+            expected_phases={"analytics": _PAIR},
+            expected_absent_schemas=frozenset(),
+            expected_warnings=(),
+        ),
+        RunRecordSchemasTestCase(
+            description="a seed run records in its seeds' schema and not the target's",
+            command_args=("seed",),
+            settings='\n[defaults]\nseed_schema = "reference"\n',
+            warehouse_setup="",
+            expected_exit_code=0,
+            expected_phases={"reference": _PAIR},
+            expected_absent_schemas=frozenset(),
+            expected_warnings=(),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_run_writing_schemas_when_it_runs_then_each_schema_records_it(
+    test_case: RunRecordSchemasTestCase,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_run_record_project(
+        project_dir=tmp_path, settings=test_case.settings, extra_files=RUN_RECORD_MARTS_FILES
+    )
+    prepare_warehouse(project_dir=tmp_path, sql=test_case.warehouse_setup or "SELECT 1")
+
+    exit_code: int = main(["--project-dir", str(tmp_path), "--no-color", *test_case.command_args])
+    captured: str = "".join(capsys.readouterr())
+
+    assert exit_code == test_case.expected_exit_code, captured
+    assert runs_tables(project_dir=tmp_path) == frozenset(test_case.expected_phases), captured
+    assert (
+        schema_run_phases(project_dir=tmp_path, schemas=test_case.expected_phases)
+        == test_case.expected_phases
+    )
+    assert len(schema_run_ids(project_dir=tmp_path, schemas=test_case.expected_phases)) == 1
+    assert schema_run_statuses(project_dir=tmp_path, schemas=test_case.expected_phases) == {
+        None,
+        test_case.expected_finished_status,
+    }
+    assert not test_case.expected_absent_schemas & warehouse_schemas(project_dir=tmp_path)
+    assert captured.count("Warning: could not record that run") == len(
+        test_case.expected_warnings
+    ), captured
+    assert all(warning in captured for warning in test_case.expected_warnings), captured

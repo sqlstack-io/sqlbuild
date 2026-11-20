@@ -41,6 +41,13 @@ pub fn model_plan_action(
                 refreshed(PlanReason::NormalIncremental, false),
             ));
         }
+        MaterializationType::Dynamic => {
+            let reason: PlanReason = refreshed(PlanReason::NoChange, true);
+            if reason == PlanReason::NoChange {
+                return Ok((PlanAction::KeepDynamic, reason));
+            }
+            return Ok((PlanAction::CreateDynamic, reason));
+        }
         MaterializationType::Table
         | MaterializationType::Incremental
         | MaterializationType::Seed => {}

@@ -293,6 +293,20 @@ afterwards, so back it up before you upgrade (see
 [Back up the control database](#back-up-the-control-database)). To roll back, restore that backup;
 runs recorded since the upgrade are lost.
 
+A run stays pinned to the snapshot it started on, and a snapshot an earlier release published can
+hold job definitions this release no longer reads, which fail with
+`` jobs: unknown field `source`, expected `limit` ``. Upgrade in this order:
+
+1. Pause every schedule and sensor, and start no manual runs. Keep the scheduler running: it
+   launches queued runs and advances group runs.
+2. Let queued and running runs finish, or cancel them.
+3. Upgrade the server.
+4. Upgrade and restart every location, so each publishes its project again with the new release.
+5. Once every location has published again, resume schedules and sensors.
+
+Until a location has published again, its job pages, group runs and ad hoc runs fail, a group's
+schedule or sensor stops the scheduler, and a job run that fails can't record its failure.
+
 To see what an upgrade changes before you start the server, run the new release with `--dry-run`:
 
 ```bash
@@ -759,6 +773,10 @@ warehouse_heavy = 1
 `max_workers`, write claims, `overlap` and pools are compared on
 [Concurrency](/docs/concepts/concurrency).
 
+A job's run builds `--select job:<name>`, as `sqb build --select job:<name>` would on the command
+line, so the job's `concurrency`, `full_refresh`, `run_tests` and `ignore_audit_failures` apply to
+its nodes the same way. A group runs each of its jobs as its own run.
+
 ## Run ad-hoc commands
 
 People with `run.adhoc` can run a `sqb` command on the current publication without declaring a
@@ -867,11 +885,18 @@ These stay unknown until it does:
 - the columns of an expression source whose SQL changed since it was last described, which the
   plan takes as declared.
 
-Over the API, queue a plan, then read it until `result_json` is set:
+A location keeps its last 16 plans for the current publication and synced copy, in memory, and
+answers an identical request with the plan it kept instead of planning again, for up to 10
+minutes: a plan's incremental windows and expiry follow the time it was made. A newer publication
+or synced copy drops them all. A kept plan's `timings` say so in `reused_from`, the time it was
+made, and the page shows its age. The page's **Plan again** asks for a fresh plan.
+
+Over the API, queue a plan, then read it until `result_json` is set. `fresh` is required: `true`
+plans again even when the location kept a plan for the same command.
 
 ```json
 POST /api/control/locations/{location_id}/targets/{target}/plans
-{ "request_id": "0191f0aa-0000-7000-8000-0000000000a1", "command": ["build", "--select", "+orders"] }
+{ "request_id": "0191f0aa-0000-7000-8000-0000000000a1", "command": ["build", "--select", "+orders"], "fresh": false }
 
 GET /api/control/locations/{location_id}/targets/{target}/plans/{request_id}
 ```

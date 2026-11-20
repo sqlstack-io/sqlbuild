@@ -2,6 +2,7 @@
 
 import type { PlanDocument, PlanTimings } from '$lib/api';
 import { plural } from '$lib/format/plural';
+import { formatAgo } from '$lib/format/time';
 
 export type TimingRow = { name: string; seconds: string; share: number; percent: string };
 
@@ -19,8 +20,14 @@ export function timingRows(timings: PlanTimings): TimingRow[] {
 	});
 }
 
-/** Where the plan ran and from what, with the nodes it planned. */
-export function timingFootnote(plan: PlanDocument, timings: PlanTimings): string {
+/** The popover's label: how long planning took, or how old the kept plan the location answered with is. */
+export function timingTitle(timings: PlanTimings, now: number): string {
+	return timings.reused_from ? `Reused plan from ${formatAgo(timings.reused_from, now)}` : `Planned in ${seconds(timings.total_seconds)} s`;
+}
+
+/** Where the plan ran and from what, with the nodes it planned and, for a kept plan, when it was made. */
+export function timingFootnote(plan: PlanDocument, timings: PlanTimings, now: number): string {
 	const from = timings.planned_from === 'live' ? 'On the location, live from the warehouse' : 'On the location, from the synced warehouse state';
-	return `${from} · ${plural(plan.selected_count, 'node')}`;
+	const reused = timings.reused_from ? ` · the location's plan from ${formatAgo(timings.reused_from, now)}; Plan again for a new one` : '';
+	return `${from} · ${plural(plan.selected_count, 'node')}${reused}`;
 }

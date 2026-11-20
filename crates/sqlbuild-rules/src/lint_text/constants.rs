@@ -67,7 +67,6 @@ pub(crate) const UNIT_TEST_ROOT: [&str; 2] = ["tests", "unit"];
 pub(crate) const SQL_SUFFIX: &str = ".sql";
 
 pub(crate) const FORMAT_API_VERSION: u32 = 1;
-pub(crate) const MAX_FUNCTION_CALL_DEPTH: usize = 512;
 pub(crate) const OMITTED_CEREMONIAL_SELECT_SQL: &str = "\nSELECT 1";
 pub(crate) const OMITTED_SELECT_SUFFIX_PATTERN: &str = r"(?i)\s*\bSELECT\s+1\s*\z";
 pub(crate) const FIXTURE_HEADER_KINDS: [&str; 2] = ["TEST", "SCENARIO"];

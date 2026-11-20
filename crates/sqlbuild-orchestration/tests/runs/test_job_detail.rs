@@ -72,7 +72,7 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                     "declared_at": {"path": "orchestration/jobs.py", "line": 7},
                     "owner": "Orders team", "overlap": "skip",
                     "pools": {"warehouse": {"amount": 3, "limit": 4}},
-                    "resolved_concurrency": {"limit": 4, "source": "job"},
+                    "resolved_concurrency": {"limit": 4},
                     "on_failure": {"retries": 2, "retry_delay_seconds": 300}},
                 "customers": {"description": "Build customers", "selection": ["customers"]},
             }));
@@ -231,10 +231,10 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                     json!([{"upstream_job": "daily_orders", "from_node": "orders", "to_node": "customers"}]),
                     json!([{"pool": "warehouse", "amount": 3, "limit": 4, "cap": 2, "server_limit": 2,
                         "clamped": true, "shared_with": ["orders_group"]}]),
-                    (Some(4), json!({"limit": 4, "source": "job"})),
+                    (Some(4), json!({"limit": 4})),
                     json!([{"pool": "warehouse", "amount": 3, "limit": 4, "cap": 2, "server_limit": 2,
                         "clamped": true, "shared_with": ["orders_group"]}]),
-                    (Some(4), json!({"limit": 4, "source": "job"})),
+                    (Some(4), json!({"limit": 4})),
                     json!([{"pool": "warehouse", "amount": 1, "limit": 4, "cap": 2, "server_limit": 2,
                         "clamped": false, "shared_with": ["daily_orders"]}]),
                     json!(null)

@@ -31,6 +31,8 @@ from sqlbuild.adapter.contract.models import (
     TemporaryFunction,
 )
 from sqlbuild.adapter.contract.types import (
+    DynamicListing,
+    DynamicOperation,
     FrameworkType,
     LoaderLogicalType,
     PromotionStrategy,
@@ -320,6 +322,71 @@ class StrictAdapter(
             code="A714",
             help="sqb review needs a warehouse that can drop a schema it created",
         )
+
+    def session_warehouse(self, *, connection: Any) -> str | None:
+        """Optional: the warehouse the session runs on, or None when the adapter has none."""
+
+        del connection
+        return None
+
+    def use_session_warehouse(self, *, connection: Any, warehouse: str) -> None:
+        """Optional: run the session's next statements on `warehouse`, where the adapter has one."""
+
+        del connection, warehouse
+        raise AdapterUserError(
+            f"the '{self.adapter_name}' adapter has no warehouse to select", code="C260"
+        )
+
+    def current_session_warehouse(self, *, connection: Any) -> str | None:
+        """Optional: the session's warehouse, as an identifier `use_session_warehouse` accepts."""
+
+        del connection
+        return None
+
+    def render_create_dynamic(
+        self, *, destination: str, sql: str, target_lag: str, refresh_mode: str, warehouse: str
+    ) -> tuple[str, ...]:
+        """Optional: SQL that creates or replaces a dynamic model; unsupported by default."""
+
+        del sql, target_lag, refresh_mode, warehouse
+        raise self._dynamic_unsupported(destination)
+
+    def render_alter_dynamic(
+        self, *, destination: str, target_lag: str, warehouse: str | None
+    ) -> tuple[str, ...]:
+        """Optional: SQL that changes a dynamic model's refresh settings in place."""
+
+        del target_lag, warehouse
+        raise self._dynamic_unsupported(destination)
+
+    def render_dynamic_operation(
+        self, *, destination: str, operation: DynamicOperation
+    ) -> tuple[str, ...]:
+        """Optional: SQL that suspends, resumes or refreshes a dynamic model."""
+
+        del operation
+        raise self._dynamic_unsupported(destination)
+
+    def render_track_changes(self, *, destination: str) -> tuple[str, ...]:
+        """Optional: SQL that turns on change tracking for a table a dynamic model reads."""
+
+        del destination
+        return ()
+
+    def _dynamic_unsupported(self, destination: str) -> AdapterUserError:
+        return AdapterUserError(
+            f"the {self.adapter_name} adapter cannot build dynamic model '{destination}'",
+            code="A716",
+            help="materialized dynamic needs an adapter whose warehouse refreshes it",
+        )
+
+    def dynamic_listing(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> DynamicListing | None:
+        """Optional: how the warehouse lists a dynamic model, or None when it lists none."""
+
+        del connection, database, schema, name
+        return None
 
     @abstractmethod
     def render_create_table_as(self, *, destination: str, sql: str) -> tuple[str, ...]:

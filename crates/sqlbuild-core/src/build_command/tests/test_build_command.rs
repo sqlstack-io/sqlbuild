@@ -121,13 +121,12 @@ fn given_run_context_when_rendering_then_sanitizes_and_groups_counts() {
                 command: "sqb build".to_owned(),
                 run_id: Some("run\u{1b}1".to_owned()),
                 concurrency: 4,
-                concurrency_source: "targets.prod.concurrency".to_owned(),
                 selected_count: 1200,
                 total_count: 1_234_567,
                 date_vars: (Some("2026-01-01".to_owned()), Some("2026-01-31".to_owned())),
                 ..RunContextFacts::default()
             },
-            expected_text: "Execution\n  command      sqb build\n  run_id       run\\x1b1\n  target       not set\n  database     not set\n  schema       not set\n  warehouse    not set\n  concurrency  4 configured limit (targets.prod.concurrency)\n  full_refresh false\n  selected     1,200 of 1,234,567 build resources\n  date vars    2026-01-01 to 2026-01-31\n\n",
+            expected_text: "Execution\n  command      sqb build\n  run_id       run\\x1b1\n  target       not set\n  database     not set\n  schema       not set\n  warehouse    not set\n  concurrency  4 configured limit\n  full_refresh false\n  selected     1,200 of 1,234,567 build resources\n  date vars    2026-01-01 to 2026-01-31\n\n",
         },
         ContextTestCase {
             description: "a warehouse, one date and selector files",
@@ -150,6 +149,19 @@ fn given_run_context_when_rendering_then_sanitizes_and_groups_counts() {
                 ..RunContextFacts::default()
             },
             expected_text: "Execution\n  command      sqb build\n  run_id       not set\n  target       dev\n  database     not set\n  schema       not set\n  warehouse    small (connection warehouse)\n  concurrency  0 configured limit\n  full_refresh true\n  selected     0 of 0 build resources\n  date vars    end_date=2026-01-31\n\nSelection files\n  selector_file a.txt (1 selector)\n  selector_file b.txt (2 selectors)\n\n",
+        },
+        ContextTestCase {
+            description: "named jobs whose nodes run on their own warehouses",
+            facts: RunContextFacts {
+                command: "sqb build".to_owned(),
+                warehouse: Some(("small".to_owned(), "connection warehouse".to_owned())),
+                job_warehouses: vec![
+                    ("orders_job".to_owned(), "ORDERS_WH".to_owned()),
+                    ("refunds_job".to_owned(), "REFUNDS_WH".to_owned()),
+                ],
+                ..RunContextFacts::default()
+            },
+            expected_text: "Execution\n  command      sqb build\n  run_id       not set\n  target       not set\n  database     not set\n  schema       not set\n  warehouse    small (connection warehouse); nodes of job orders_job on ORDERS_WH; nodes of job refunds_job on REFUNDS_WH\n  concurrency  0 configured limit\n  full_refresh false\n  selected     0 of 0 build resources\n  date vars    not set\n\n",
         },
     ];
 

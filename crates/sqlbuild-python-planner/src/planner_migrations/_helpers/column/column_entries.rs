@@ -1,8 +1,8 @@
 //! Materialize column decisions from native proofs and live evidence.
 
+use crate::planner_migrations::_helpers::planning::location_relation::location_relation;
 use crate::planner_phases::main::inputs::runtime_reads::runtime_reads;
 use crate::planner_warehouse::models::{AdapterRead, Read};
-use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::planner_migrations::_helpers::column::column_candidates::declared_names;
 use crate::planner_migrations::_helpers::column::column_objects::lower;
@@ -19,7 +19,6 @@ use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyListMethods, PyTuple};
 use sqlbuild_analysis::planner_migrations::main::column_decision::column_decision;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
-use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::enum_from_value::enum_from_value;
 use sqlbuild_python_base::records::main::construct::enum_member::enum_member;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -74,11 +73,11 @@ pub(crate) fn decide<'py>(
             outputs.push(name.to_lowercase());
         }
     }
-    let relation = host_entry(py, ExecutorHost::MigrationRelationForLocation)?.call1((
-        sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
+    let relation = location_relation(
+        &sqlbuild_python_project::compiled_views::main::compiled_models::destination::destination(
             &candidate.model,
         )?,
-    ))?;
+    )?;
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
     for (origin_name, destination, discovery) in pairs {
         let origin_key = lower(&origin_name)?;

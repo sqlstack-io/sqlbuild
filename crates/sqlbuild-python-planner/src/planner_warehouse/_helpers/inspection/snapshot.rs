@@ -1,6 +1,7 @@
 //! Gather a frozen point-in-time warehouse snapshot for planning.
 
 use crate::planner_phases::main::rebuilds::effectively_full_refreshed_model_names::effectively_full_refreshed_model_names;
+use crate::planner_phases::models::FullRefreshRequest;
 use crate::planner_warehouse::_helpers::inspection::cursors::{CursorInputs, cursor_snapshots};
 use crate::planner_warehouse::constants::{
     FUNCTION_NODE_TYPES, METADATA_NAME_FILTER_LIMIT, MIGRATE_FROM_CONFIG_KEY,
@@ -705,7 +706,13 @@ pub(crate) fn warehouse_snapshot<'py>(
         (&states.fingerprints, &relevant),
     )?;
     let full_refresh_names = if request.full_refresh_model_names.is_none() {
-        effectively_full_refreshed_model_names(project, request.full_refresh)?
+        effectively_full_refreshed_model_names(
+            project,
+            &FullRefreshRequest {
+                all: request.full_refresh,
+                ..FullRefreshRequest::default()
+            },
+        )?
     } else {
         request.full_refresh_model_names.clone()
     };

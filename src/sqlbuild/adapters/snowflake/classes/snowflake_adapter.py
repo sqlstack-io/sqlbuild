@@ -6,6 +6,7 @@ import csv
 import json
 import logging
 import os
+import re
 import time
 from collections.abc import Callable
 from dataclasses import replace
@@ -94,6 +95,8 @@ from sqlbuild.adapter.contract.models import (
 from sqlbuild.adapter.contract.types import (
     BuiltinAdapter,
     CursorKind,
+    DynamicListing,
+    DynamicOperation,
     FrameworkType,
     HistoricalSnapshotCloseStyle,
     HistoricalSnapshotInsertStyle,
@@ -197,6 +200,7 @@ _SCHEMA_OBJECTS_REUSE_SECONDS: float = 60.0
 _SHOW_OBJECT_RELATION_TYPES: dict[str, str] = {"TABLE": "base table", "VIEW": "view"}
 _COST_LOGIN_TIMEOUT_SECONDS: int = 5
 _COST_NETWORK_TIMEOUT_SECONDS: int = 15
+_UNQUOTED_WAREHOUSE: re.Pattern[str] = re.compile(r"[A-Z_][A-Z0-9_$]*")
 _SHOW_COLUMN_KIND: str = "COLUMN"
 _SHOW_COLUMN_KINDS: frozenset[str] = frozenset({_SHOW_COLUMN_KIND, "VIRTUAL_COLUMN"})
 _UNRESOLVED: object = object()
@@ -204,6 +208,7 @@ _RELATION_LISTING_COLUMNS: str = (
     "table_name, table_schema, table_type, is_transient, created, last_altered, retention_time"
 )
 _BULK_COLUMN_RELATION_CHUNK_SIZE: int = 2_000
+_PLAIN_WAREHOUSE_NAME: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_$]*")
 _RELATION_CHANGE_COLUMNS: str = (
     "table_name, table_schema, table_type, is_transient, created, last_altered, last_ddl, "
     "retention_time"
@@ -235,7 +240,7 @@ class SnowflakeAdapter(
     max_identifier_length: ClassVar[int] = 255
     supports_session_warehouse: ClassVar[bool] = True
     connection_routing_keys: ClassVar[frozenset[str]] = frozenset(
-        {"source", "profile", "target", "project_dir", "profiles_dir"}
+        {"source", "profile", "target", "project_dir", "profiles_dir", "configured_warehouse"}
     )
     _snapshot_sql_dialect: ClassVar[SnapshotSqlDialect] = SnapshotSqlDialect(
         timestamp_type="TIMESTAMP",
@@ -1158,10 +1163,11 @@ class SnowflakeAdapter(
         )
 
     def _render_create_table_as_type(
-        self, *, destination: str, sql: str, table_type: str
+        self, *, destination: str, sql: str, table_type: str, change_tracking: bool = False
     ) -> tuple[str, ...]:
         table_kind: str = "TABLE" if table_type == TableType.PERMANENT else "TRANSIENT TABLE"
-        return (f"CREATE OR REPLACE {table_kind} {destination} AS {sql}",)
+        tracking: str = " CHANGE_TRACKING = TRUE" if change_tracking else ""
+        return (f"CREATE OR REPLACE {table_kind} {destination}{tracking} AS {sql}",)
 
     def render_create_view_as(self, *, destination: str, sql: str) -> tuple[str, ...]:
         return (f"CREATE OR REPLACE VIEW {destination} AS {sql}",)
@@ -1318,6 +1324,20 @@ class SnowflakeAdapter(
     def render_current_warehouse_user(self) -> str | None:
         return "CURRENT_USER()"
 
+    def use_session_warehouse(self, *, connection: Any, warehouse: str) -> None:
+        self.execute(connection=connection, sql=f"USE WAREHOUSE {warehouse}")
+
+    def current_session_warehouse(self, *, connection: Any) -> str | None:
+        rows: tuple[tuple[object, ...], ...] = self.query(
+            connection=connection, sql="SELECT CURRENT_WAREHOUSE()", limit=None
+        ).rows
+        name: object = rows[0][0] if rows else None
+        if not isinstance(name, str) or not name:
+            return None
+        if _UNQUOTED_WAREHOUSE.fullmatch(name):
+            return name
+        return '"' + name.replace('"', '""') + '"'
+
     def create_table_as(
         self,
         *,
@@ -1329,7 +1349,10 @@ class SnowflakeAdapter(
     ) -> None:
         table_type: str = str((config or {}).get("table_type", "transient"))
         statements: tuple[str, ...] = self._render_create_table_as_type(
-            destination=destination, sql=sql, table_type=table_type
+            destination=destination,
+            sql=sql,
+            table_type=table_type,
+            change_tracking=bool((config or {}).get("change_tracking", False)),
         )
         statement_recorder.record_many(statements)
         stmt: str
@@ -3665,6 +3688,105 @@ class SnowflakeAdapter(
         del connection, destination
         return None
 
+    def session_warehouse(self, *, connection: Any) -> str | None:
+        """The session's warehouse, which refreshes a dynamic model that names none."""
+
+        rows: tuple[tuple[object, ...], ...] = self.query(
+            connection=connection, sql="SELECT CURRENT_WAREHOUSE()", limit=None
+        ).rows
+        return None if not rows or rows[0][0] is None else str(rows[0][0])
+
+    def render_create_dynamic(
+        self, *, destination: str, sql: str, target_lag: str, refresh_mode: str, warehouse: str
+    ) -> tuple[str, ...]:
+        """A dynamic table with an explicit mode and ON_CREATE, so it is readable at once."""
+
+        return (
+            f"CREATE OR REPLACE DYNAMIC TABLE {destination} TARGET_LAG = {target_lag} "
+            f"WAREHOUSE = {self._warehouse_name(warehouse)} "
+            f"REFRESH_MODE = {refresh_mode.upper()} INITIALIZE = ON_CREATE AS {sql}",
+        )
+
+    def render_alter_dynamic(
+        self, *, destination: str, target_lag: str, warehouse: str | None
+    ) -> tuple[str, ...]:
+        """The lag, and a declared warehouse, set in place."""
+
+        statements: list[str] = [f"ALTER DYNAMIC TABLE {destination} SET TARGET_LAG = {target_lag}"]
+        if warehouse is not None:
+            statements.append(
+                f"ALTER DYNAMIC TABLE {destination} "
+                f"SET WAREHOUSE = {self._warehouse_name(warehouse)}"
+            )
+        return tuple(statements)
+
+    def render_dynamic_operation(
+        self, *, destination: str, operation: DynamicOperation
+    ) -> tuple[str, ...]:
+        return (f"ALTER DYNAMIC TABLE {destination} {operation.value.upper()}",)
+
+    def render_track_changes(self, *, destination: str) -> tuple[str, ...]:
+        return (f"ALTER TABLE {destination} SET CHANGE_TRACKING = TRUE",)
+
+    def _warehouse_name(self, warehouse: str) -> str:
+        """A plain warehouse name as written, resolved without case; any other quoted exactly."""
+
+        if _PLAIN_WAREHOUSE_NAME.fullmatch(warehouse):
+            return warehouse
+        return '"' + warehouse.replace('"', '""') + '"'
+
+    def dynamic_listing(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> DynamicListing | None:
+        """The dynamic table's lag, warehouse and scheduling state from SHOW DYNAMIC TABLES."""
+
+        row: dict[str, object] | None = self._listed_dynamic_table(
+            connection=connection, database=database, schema=schema, name=name
+        )
+        if row is None:
+            return None
+        return DynamicListing(
+            target_lag=str(row.get("target_lag")),
+            warehouse=str(row.get("warehouse")),
+            scheduling_state=str(row.get("scheduling_state")),
+        )
+
+    def _listed_dynamic_table(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> dict[str, object] | None:
+        if schema is None:
+            return None
+        return self._show_named_row(
+            connection=connection,
+            listing="DYNAMIC TABLES",
+            database=database,
+            schema=schema,
+            name=name,
+        )
+
+    def _show_named_row(
+        self, *, connection: Any, listing: str, database: str | None, schema: str, name: str
+    ) -> dict[str, object] | None:
+        """The SHOW <listing> row for exactly this name in the schema, if it lists one."""
+
+        stored_name: str = self._information_schema_identifier(name)
+        rows: list[dict[str, object]] = self._fetch_schema_show_rows(
+            connection=connection,
+            query=(
+                f"SHOW {listing} LIKE '{show_like_pattern(stored_name)}' IN SCHEMA "
+                + self._show_schema_scope(connection=connection, database=database, schema=schema)
+            ),
+            show_database=self._show_database(
+                connection=connection, database=database, schema=schema
+            ),
+            schema=schema,
+        )
+        row: dict[str, object]
+        for row in rows:
+            if str(row.get("name")) == stored_name:
+                return row
+        return None
+
     def widen_target_nullability(
         self,
         *,
@@ -3797,27 +3919,14 @@ class SnowflakeAdapter(
     ) -> tuple[Any, Any] | None:
         """Rows and bytes of one table; a view or other object lists neither."""
 
-        stored_name: str = self._information_schema_identifier(name)
-        rows: list[dict[str, object]] = self._fetch_schema_show_rows(
-            connection=connection,
-            query=(
-                f"SHOW OBJECTS LIKE '{show_like_pattern(stored_name)}' IN SCHEMA "
-                + self._show_schema_scope(connection=connection, database=database, schema=schema)
-            ),
-            show_database=self._show_database(
-                connection=connection, database=database, schema=schema
-            ),
-            schema=schema,
+        row: dict[str, object] | None = self._show_named_row(
+            connection=connection, listing="OBJECTS", database=database, schema=schema, name=name
         )
-        row: dict[str, object]
-        for row in rows:
-            if str(row.get("name")) == stored_name:
-                return (
-                    (row.get("rows"), row.get("bytes"))
-                    if str(row.get("kind")) == SHOW_OBJECTS_TABLE_KIND
-                    else (None, None)
-                )
-        return None
+        if row is None:
+            return None
+        if str(row.get("kind")) != SHOW_OBJECTS_TABLE_KIND:
+            return (None, None)
+        return (row.get("rows"), row.get("bytes"))
 
     def inspect_row_diff_coverage(
         self,

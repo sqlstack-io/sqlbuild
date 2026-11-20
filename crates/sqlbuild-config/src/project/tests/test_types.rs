@@ -1,5 +1,5 @@
 use crate::project::errors::ConfigFailure;
-use crate::project::models::{ChangesConfig, ControlConfig, ReviewConfig};
+use crate::project::models::{ChangesConfig, ControlConfig, DynamicConfig, ReviewConfig};
 
 pub(super) struct ProjectFailureTestCase {
     pub(super) description: &'static str,
@@ -56,5 +56,17 @@ pub(crate) struct PoolsErrorTestCase {
     pub(crate) description: &'static str,
     pub(crate) project: &'static str,
     pub(crate) local: &'static str,
+    pub(crate) expected_fragment: &'static str,
+}
+
+pub(crate) struct DynamicConfigTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) project: &'static str,
+    pub(crate) expected_config: DynamicConfig,
+}
+
+pub(crate) struct DynamicConfigErrorTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) project: &'static str,
     pub(crate) expected_fragment: &'static str,
 }

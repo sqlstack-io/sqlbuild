@@ -74,10 +74,14 @@ def test_given_large_microbatch_phase_when_workers_are_blocked_then_future_submi
     scheduler: Any = object.__new__(BuildScheduler)
     scheduler._max_concurrency = test_case.global_concurrency
     scheduler._microbatch_coordinator_lock = threading.Lock()
+    scheduler._job_lock = threading.Lock()
+    scheduler._job_limits = {}
+    scheduler._job_running = {}
     scheduler._microbatch_coordinators = {"orders"}
     scheduler._microbatch_coordinator_demand = 1
     scheduler._microbatch_subworkers = 0
     scheduler._connection_pool = Queue()
+    scheduler._session_warehouses = None
     for index in range(test_case.expected_max_subworker_futures):
         scheduler._connection_pool.put(f"worker-{index}")
 
@@ -113,6 +117,7 @@ def test_given_large_microbatch_phase_when_workers_are_blocked_then_future_submi
                 results.append(
                     BuildScheduler._run_microbatch_subwork(
                         scheduler,
+                        jobs=(),
                         pool=pool,
                         coordinator_connection="coordinator",
                         batches=batches,
@@ -162,10 +167,14 @@ def test_given_coordinator_failure_when_subworkers_are_running_then_pending_batc
     scheduler: Any = object.__new__(BuildScheduler)
     scheduler._max_concurrency = test_case.global_concurrency
     scheduler._microbatch_coordinator_lock = threading.Lock()
+    scheduler._job_lock = threading.Lock()
+    scheduler._job_limits = {}
+    scheduler._job_running = {}
     scheduler._microbatch_coordinators = {"orders"}
     scheduler._microbatch_coordinator_demand = 1
     scheduler._microbatch_subworkers = 0
     scheduler._connection_pool = Queue()
+    scheduler._session_warehouses = None
     for index in range(test_case.expected_max_subworker_futures):
         scheduler._connection_pool.put(f"worker-{index}")
 
@@ -202,6 +211,7 @@ def test_given_coordinator_failure_when_subworkers_are_running_then_pending_batc
     with _TrackingThreadPoolExecutor(max_workers=test_case.expected_max_subworker_futures) as pool:
         outcomes: tuple[MicrobatchPhaseOutcome, ...] = BuildScheduler._run_microbatch_subwork(
             scheduler,
+            jobs=(),
             pool=pool,
             coordinator_connection="coordinator",
             batches=batches,

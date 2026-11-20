@@ -192,6 +192,7 @@ MICROBATCH_TABLE_NAME: str
 NODE_RESULTS_TABLE_NAME: str
 OBSERVATIONS_TABLE_NAME: str
 RUNS_TABLE_NAME: str
+DYNAMIC_PAUSES_TABLE_NAME: str
 AUDIT_RESULTS_TABLE_NAME: str
 JANITOR_EVENTS_TABLE_NAME: str
 COLUMN_NODE_TYPE: str
@@ -226,6 +227,7 @@ CURRENT_EVENT_LOG_SCHEMA_VERSION: int
 CURRENT_RUN_STORAGE_SCHEMA_VERSION: int
 COMPUTE_LOG_FORMAT_VERSION: int
 DEFAULT_RETENTION_COUNT: int
+MAX_FUNCTION_CALL_DEPTH: int
 MAX_READ_BYTES: int
 CURRENT_COMMAND_OUTPUT_SCHEMA_VERSION: int
 MIGRATION_WRITE_ATTEMPTS: int
@@ -4316,6 +4318,7 @@ class NativeModelValidator:
         names: tuple[set[str], set[str], set[str], set[str], set[str]],
         custom_materializations: set[str],
         microbatch_concurrency: bool,
+        adapter: str | None = None,
     ) -> None: ...
     @staticmethod
     def from_inputs(
@@ -6580,6 +6583,7 @@ class BuildCommandRequest(NativeRecord):
     no_color: bool
     fail_fast: bool
     full_refresh: bool
+    job_settings: bool
     changed: bool
     changed_counts: tuple[str, ...] | None
     reach: str | None
@@ -6591,6 +6595,7 @@ class BuildCommandRequest(NativeRecord):
     allow_retention_decrease: bool
     allow_missing_migration_origin: bool
     allow_snapshot_schema_change: bool
+    ignore_dynamic_grace: bool
     concurrency: int | None
     select: tuple[str, ...]
     exclude: tuple[str, ...]
@@ -6624,6 +6629,7 @@ class BuildCommandRequest(NativeRecord):
         no_color: bool = False,
         fail_fast: bool = False,
         full_refresh: bool = False,
+        job_settings: bool = True,
         changed: bool = False,
         changed_counts: tuple[str, ...] | None = None,
         reach: str | None = None,
@@ -6635,6 +6641,7 @@ class BuildCommandRequest(NativeRecord):
         allow_retention_decrease: bool = False,
         allow_missing_migration_origin: bool = False,
         allow_snapshot_schema_change: bool = False,
+        ignore_dynamic_grace: bool = False,
         concurrency: int | None = None,
         select: tuple[str, ...] = (),
         exclude: tuple[str, ...] = (),
@@ -6993,6 +7000,7 @@ class PlanCommandRequest(NativeRecord):
     cursor_overrides: CursorOverrides | None
     json_output: bool
     full_refresh: bool
+    job_settings: bool
     changed: bool
     changed_counts: tuple[str, ...] | None
     reach: str | None
@@ -7020,6 +7028,7 @@ class PlanCommandRequest(NativeRecord):
         cursor_overrides: CursorOverrides | None = None,
         json_output: bool = False,
         full_refresh: bool = False,
+        job_settings: bool = True,
         changed: bool = False,
         changed_counts: tuple[str, ...] | None = None,
         reach: str | None = None,
@@ -10253,6 +10262,8 @@ class CompilePipelineOptions(NativeRecord):
     source_lexical_syntax: SqlLexicalSyntax | None
     plan_from: str | None
     ignore_audit_failures: bool
+    cli_ignore_audit_failures: bool | None
+    job_settings: bool
     def __init__(
         self,
         selected_target: str | None = ...,
@@ -10282,6 +10293,8 @@ class CompilePipelineOptions(NativeRecord):
         source_lexical_syntax: SqlLexicalSyntax | None = ...,
         plan_from: str | None = ...,
         ignore_audit_failures: bool = ...,
+        cli_ignore_audit_failures: bool | None = ...,
+        job_settings: bool = ...,
     ) -> None: ...
 
 class PythonPlanEntry(NativeRecord):
@@ -10499,6 +10512,8 @@ class PlannerOverrides(NativeRecord):
 
     cursor_overrides: CursorOverrides | None
     full_refresh: bool
+    full_refresh_models: frozenset[str]
+    full_refresh_functions: frozenset[str]
     reload_sources: bool
     forced_stale_model_names: tuple[str, ...]
     external_blocked_model_names: tuple[str, ...]
@@ -10508,6 +10523,8 @@ class PlannerOverrides(NativeRecord):
         self,
         cursor_overrides: CursorOverrides | None = ...,
         full_refresh: bool = ...,
+        full_refresh_models: frozenset[str] = ...,
+        full_refresh_functions: frozenset[str] = ...,
         reload_sources: bool = ...,
         forced_stale_model_names: tuple[str, ...] = ...,
         external_blocked_model_names: tuple[str, ...] = ...,
@@ -12004,6 +12021,7 @@ class TargetConfig(NativeRecord):
     catalog_connection: str | None
     ignore_audit_failures: bool | None
     plan_from: str | None
+    pause_dynamic: bool | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -12030,6 +12048,7 @@ class TargetConfig(NativeRecord):
         catalog_connection: str | None = ...,
         ignore_audit_failures: bool | None = ...,
         plan_from: str | None = ...,
+        pause_dynamic: bool | None = ...,
     ) -> None: ...
 
 class LocalTargetConfig(NativeRecord):
@@ -12059,6 +12078,7 @@ class LocalTargetConfig(NativeRecord):
     catalog_connection: str | None
     ignore_audit_failures: bool | None
     plan_from: str | None
+    pause_dynamic: bool | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -12086,6 +12106,7 @@ class LocalTargetConfig(NativeRecord):
         catalog_connection: str | None = ...,
         ignore_audit_failures: bool | None = ...,
         plan_from: str | None = ...,
+        pause_dynamic: bool | None = ...,
     ) -> None: ...
 
 class SettingsConfig(NativeRecord):
@@ -13510,6 +13531,9 @@ class PlanAction(StrEnum):
     LOAD_SEED = "load_seed"
     SKIP = "skip"
     CUSTOM = "custom"
+    CREATE_DYNAMIC = "create_dynamic"
+    ALTER_DYNAMIC = "alter_dynamic"
+    KEEP_DYNAMIC = "keep_dynamic"
 
 class PlanReason(StrEnum):
     FIRST_RUN = "first_run"
@@ -13577,6 +13601,7 @@ class MaterializationType(StrEnum):
     SNAPSHOT = "snapshot"
     SEED = "seed"
     CUSTOM = "custom"
+    DYNAMIC = "dynamic"
     @classmethod
     def is_table_backed(cls, *, materialized: object | None) -> bool: ...
 
@@ -14098,6 +14123,13 @@ class ModelPlanEntry(NativeRecord):
     max_duration: str | None
     max_duration_seconds: int | None
     max_duration_source: str | None
+    reinitialised_by: str | None
+    target_lag: str | None
+    refresh_mode: str | None
+    refresh_warehouse: str | None
+    refresh_on_build: bool
+    dynamic_readers: tuple[str, ...]
+    dynamic_paused: bool
     def __init__(
         self,
         key: CompiledObjectKey,
@@ -14187,6 +14219,13 @@ class ModelPlanEntry(NativeRecord):
         max_duration: str | None = ...,
         max_duration_seconds: int | None = ...,
         max_duration_source: str | None = ...,
+        reinitialised_by: str | None = ...,
+        target_lag: str | None = ...,
+        refresh_mode: str | None = ...,
+        refresh_warehouse: str | None = ...,
+        refresh_on_build: bool = ...,
+        dynamic_readers: tuple[str, ...] = ...,
+        dynamic_paused: bool = ...,
     ) -> None: ...
 
 class CloneSourcePlanEntry(NativeRecord):
@@ -15247,6 +15286,10 @@ class CompilePipelineResult(NativeRecord):
     custom_materializations: dict[str, Callable[..., Any]]
     python_node_names: frozenset[str]
     python_plan_entries: tuple[PythonPlanEntry, ...]
+    job_limits: dict[str, int]
+    node_jobs: dict[CompiledObjectKey, tuple[str, ...]]
+    node_warehouses: dict[CompiledObjectKey, str]
+    python_node_warehouses: dict[str, str]
     compile_seconds: float | None
     planning_seconds: float | None
     def __init__(
@@ -15256,6 +15299,10 @@ class CompilePipelineResult(NativeRecord):
         custom_materializations: dict[str, Callable[..., Any]] = ...,
         python_node_names: frozenset[str] = ...,
         python_plan_entries: tuple[PythonPlanEntry, ...] = ...,
+        job_limits: dict[str, int] = ...,
+        node_jobs: dict[CompiledObjectKey, tuple[str, ...]] = ...,
+        node_warehouses: dict[CompiledObjectKey, str] = ...,
+        python_node_warehouses: dict[str, str] = ...,
         compile_seconds: float | None = ...,
         planning_seconds: float | None = ...,
     ) -> None: ...

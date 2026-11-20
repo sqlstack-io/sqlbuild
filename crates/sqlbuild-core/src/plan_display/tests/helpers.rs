@@ -38,6 +38,9 @@ pub(super) fn full_plan() -> serde_json::Value {
     let mut payments = planned_model("payments", ("create_table", "query_changed"));
     payments["query_diff"] = serde_json::json!(["-select id", "+SELECT id"]);
     payments["config_diff"] = serde_json::json!(["-  \"tags\": []", "+  \"tags\": [\"finance\"]"]);
+    let mut old_orders = planned_model("old_orders", ("create_table", "renamed"));
+    old_orders["origin_model"] = serde_json::json!("orders_v1");
+    old_orders["old_name"] = serde_json::json!({"action": "view_only", "view": "main.orders_v1", "expires_at": "2026-12-18T00:00:00Z"});
     let mut totals = planned_model("totals", ("create_table", "config_changed"));
     totals["config_diff"] = serde_json::json!([
         "--- a",
@@ -85,7 +88,7 @@ pub(super) fn full_plan() -> serde_json::Value {
             ledger,
             daily_orders,
             daily_payments,
-            planned_model("old_orders", ("create_table", "renamed")),
+            old_orders,
             planned_model("archive", ("create_table", "full_refresh")),
             planned_model("customers", ("create_view", "no_change")),
             planned_model("Customer_Notes", ("create_view", "no_change")),
@@ -118,10 +121,13 @@ pub(super) fn full_plan() -> serde_json::Value {
             {"severity": "warning", "message": "model stg__customers_3 has no tests."},
             {"severity": "warning", "message": "scenario 'returns' step `refund` is stale", "code": "W1"},
         ],
-        "migrations": [{"model": "old_orders", "origin_model": "orders_v1", "decision": "rename", "completed_at": null}],
+        "migrations": [
+            {"model": "old_orders", "origin_model": "orders_v1", "decision": "renamed", "completed_at": null, "is_rename": true},
+            {"model": "totals", "origin_model": "totals_legacy", "decision": "forced_replace", "completed_at": null, "is_rename": false},
+        ],
         "column_migrations": [{"model": "ledger", "origin_column": "amt", "destination_column": "amount", "decision": "rename"}],
         "table_type_conversions": [{"model": "totals", "actual_type": "view", "desired_type": "table"}],
-        "retention": [{"model": "events", "action": "set"}],
+        "retention": [{"scope": "table", "name": "main.events", "models": ["events"], "desired_days": 7, "actual_days": 1, "direction": "increase"}],
         "metadata": {"orders": {"columns": 3}},
         "synced_copy": {"synced_at": null, "cursor_window_starts": {"events": "2026-11-01"}, "unknown_until_run": []},
         "changed": {

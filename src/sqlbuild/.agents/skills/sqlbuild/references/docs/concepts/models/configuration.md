@@ -36,7 +36,7 @@ which accepts any keys.
 
 | Field | Description |
 |-------|-------------|
-| `materialized` | `view`, `table`, `incremental`, `snapshot`, or a custom materialization name |
+| `materialized` | `view`, `table`, `incremental`, `snapshot`, `dynamic`, or a custom materialization name; see [Materializations](materializations.md) |
 | `tags` | Tags used by selectors |
 | `critical` | `true` marks the model as critical, so [`sqb review`](../../cli/review.md) builds and compares it whenever something upstream of it changes (default `false`) |
 | `description` | Required human-readable model description; see [Descriptions](#descriptions) |

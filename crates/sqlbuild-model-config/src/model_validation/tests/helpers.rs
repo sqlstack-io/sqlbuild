@@ -80,6 +80,7 @@ pub(super) fn project() -> ProjectValidationFacts {
         sources: names(&["raw.orders"]),
         functions: names(&["cents", "order_lines"]),
         table_functions: names(&["order_lines"]),
+        adapter: Some("snowflake".to_owned()),
     }
 }
 

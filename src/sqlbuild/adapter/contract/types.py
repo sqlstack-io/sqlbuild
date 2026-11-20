@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from enum import StrEnum
-from typing import Literal, Protocol
+from typing import Literal, NamedTuple, Protocol
 
 from sqlbuild._native import InferredNullability
 
@@ -80,6 +80,14 @@ class RetentionChangePhase(StrEnum):
     PREPARE = "prepare"
     ALTER = "alter"
     FINALIZE = "finalize"
+
+
+class DynamicOperation(StrEnum):
+    """What a build does to a dynamic model's scheduled refreshes."""
+
+    SUSPEND = "suspend"
+    RESUME = "resume"
+    REFRESH = "refresh"
 
 
 class RelationType(StrEnum):
@@ -164,3 +172,11 @@ class HistoricalSnapshotInsertStyle(StrEnum):
     WITH_INSERT = "with_insert"
     INSERT_WITH = "insert_with"
     TSQL = "tsql"
+
+
+class DynamicListing(NamedTuple):
+    """A dynamic model as the warehouse lists it: lag, refresh warehouse and schedule state."""
+
+    target_lag: str
+    warehouse: str
+    scheduling_state: str

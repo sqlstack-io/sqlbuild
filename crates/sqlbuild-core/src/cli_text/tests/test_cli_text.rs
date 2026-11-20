@@ -227,6 +227,48 @@ fn given_plan_report_when_rendering_then_groups_models_by_reason() {
             expected_completion: "\u{2713} Plan complete  1 selected",
         },
         PlanTextTestCase {
+            description: "dynamic models recompute on a query change and alter refresh settings in place",
+            report: plan_report(vec![
+                ModelPlanText {
+                    action: "create_dynamic".to_owned(),
+                    materialization_label: "dynamic".to_owned(),
+                    ..table_model("daily_totals", "query_changed")
+                },
+                ModelPlanText {
+                    action: "alter_dynamic".to_owned(),
+                    materialization_label: "dynamic".to_owned(),
+                    ..table_model("clean_orders", "config_changed")
+                },
+            ]),
+            expected_text: "Plan ready  2 selected\n\nQuery changed (1)\n\u{2514}\u{2500}\u{2500} daily_totals         recreate, full recompute\n\nConfig changed (1)\n\u{2514}\u{2500}\u{2500} clean_orders         change refresh settings in place",
+            expected_completion: "\u{2713} Plan complete  2 selected",
+        },
+        PlanTextTestCase {
+            description: "a kept dynamic model whose upstream is rebuilt says it recomputes in full",
+            report: plan_report(vec![
+                table_model("orders", "query_changed"),
+                ModelPlanText {
+                    action: "keep_dynamic".to_owned(),
+                    materialization_label: "dynamic".to_owned(),
+                    reinitialised_by: Some("orders".to_owned()),
+                    ..table_model("daily_totals", "no_change")
+                },
+            ]),
+            expected_text: "Plan ready  2 selected\n\nQuery changed (1)\n\u{2514}\u{2500}\u{2500} orders               full rebuild\n    \u{2514}\u{2500}\u{2500} policy  replay_on_change=full\n\nModels (1)\n\u{2514}\u{2500}\u{2500} daily_totals         dynamic\n    \u{2514}\u{2500}\u{2500} recomputes in full  orders is rebuilt",
+            expected_completion: "\u{2713} Plan complete  2 selected",
+        },
+        PlanTextTestCase {
+            description: "a kept dynamic model that is suspended is reported as paused",
+            report: plan_report(vec![ModelPlanText {
+                action: "keep_dynamic".to_owned(),
+                materialization_label: "dynamic".to_owned(),
+                paused: true,
+                ..table_model("daily_totals", "no_change")
+            }]),
+            expected_text: "Plan ready  1 selected\n\nModels (1)\n\u{2514}\u{2500}\u{2500} daily_totals         dynamic\n    \u{2514}\u{2500}\u{2500} paused  scheduled refreshes are suspended",
+            expected_completion: "\u{2713} Plan complete  1 selected",
+        },
+        PlanTextTestCase {
             description: "every active model is a full refresh",
             report: plan_report(vec![
                 table_model("orders", "full_refresh"),

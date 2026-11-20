@@ -7,6 +7,7 @@ use chrono_tz::Tz;
 use pyo3::prelude::Python;
 use serde_json::Value;
 use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
+use sqlbuild_analysis::job_settings::main::group_setting_mismatch::group_setting_mismatch;
 use sqlbuild_cli::argv::main::job_settings_arguments::job_settings_arguments;
 use sqlbuild_discovery::models::{DiscoveryFailure, FailureKind};
 use sqlbuild_discovery::orchestration_files::models::{
@@ -17,13 +18,16 @@ use sqlbuild_orchestration::store::errors::ControlError;
 
 use sqlbuild_python_base::orchestration_reads::main::run_resources::run_resources;
 
+/// The job setting that takes over held dynamic models, which `[dynamic]` must allow.
+const IGNORE_DYNAMIC_GRACE: &str = "ignore_dynamic_grace";
+
 /// A `D017` at `position` of `path`, worded as discovery words its own.
 type ValueError = (FilePosition, String);
 
 /// The first invalid schedule, setting, resource limit or selector, as `D017` at its file, line and column.
 pub(crate) fn check_orchestration_values(
     py: Python<'_>,
-    inventory: &OrchestrationInventory,
+    (inventory, allow_ignore_grace): (&OrchestrationInventory, bool),
 ) -> Result<(), DiscoveryFailure> {
     let runs = inventory
         .jobs
@@ -48,6 +52,18 @@ pub(crate) fn check_orchestration_values(
             job_settings_arguments(&BTreeMap::from([(key.clone(), value.clone())]))
                 .map_err(|message| failure(path, (job.setting_positions[key], message)))?;
         }
+        if !allow_ignore_grace && job.settings.get(IGNORE_DYNAMIC_GRACE) == Some(&Value::Bool(true))
+        {
+            return Err(failure(
+                path,
+                (
+                    job.setting_positions[IGNORE_DYNAMIC_GRACE],
+                    "ignore_dynamic_grace needs [dynamic] allow_ignore_grace = true in \
+                     sqlbuild_project.toml"
+                        .to_owned(),
+                ),
+            ));
+        }
         if let Some(first) = job.setting_positions.values().min() {
             job_settings_arguments(&settings)
                 .map_err(|message| failure(path, (*first, message)))?;
@@ -56,6 +72,11 @@ pub(crate) fn check_orchestration_values(
             run_resources(&job.run.name.value, &resources.value).map_err(|error| {
                 failure(path, (resources.position, error.value(py).to_string()))
             })?;
+        }
+    }
+    for (path, group) in &inventory.groups {
+        if let Some(message) = group_setting_mismatch(inventory, group) {
+            return Err(failure(path, (group.run.name.position, message)));
         }
     }
     Ok(())

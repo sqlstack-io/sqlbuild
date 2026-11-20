@@ -322,6 +322,10 @@ pub struct ModelPlanText {
     pub config_diff: Option<Vec<String>>,
     /// The rendered query diff, when the query changed and the previous query is known.
     pub query_diff: Option<Vec<String>>,
+    /// The rebuilt upstream that makes this kept dynamic model recompute in full.
+    pub reinitialised_by: Option<String>,
+    /// Whether the warehouse lists this kept dynamic model as suspended.
+    pub paused: bool,
 }
 
 /// One planned function.
@@ -426,6 +430,10 @@ pub struct PlanTextReport {
     pub pre_build_lines: Vec<String>,
     /// Audit failures hold nothing back in the build this plan previews.
     pub ignore_audit_failures: bool,
+    /// The named jobs whose own audit failures hold nothing back.
+    pub ignore_audit_failure_jobs: Vec<String>,
+    /// Each named job whose nodes run on its own warehouse, and that warehouse.
+    pub job_warehouses: Vec<(String, String)>,
 }
 
 /// The structural kind of a rendered plan line.

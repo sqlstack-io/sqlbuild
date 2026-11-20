@@ -6,8 +6,8 @@ use pyo3::prelude::{
 use pyo3::types::{PyDict, PyDictMethods, PyMapping, PyString};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_config::command_connection::constants::{
-    CLI_WAREHOUSE_SOURCE, CONNECTION_DEFAULT_WAREHOUSE_SOURCE, CONNECTION_WAREHOUSE_KEY,
-    CONNECTION_WAREHOUSE_SOURCE,
+    CLI_WAREHOUSE_SOURCE, CONFIGURED_WAREHOUSE_KEY, CONNECTION_DEFAULT_WAREHOUSE_SOURCE,
+    CONNECTION_WAREHOUSE_KEY, CONNECTION_WAREHOUSE_SOURCE,
 };
 use sqlbuild_config::command_connection::main::authored_warehouse::authored_warehouse;
 use sqlbuild_config::command_connection::main::check_cli_warehouse::check_cli_warehouse;
@@ -384,6 +384,10 @@ pub(crate) fn apply_warehouse<'py>(
     let applied: Bound<'py, PyDict> = PyDict::new(py);
     applied.update(&config.cast::<PyMapping>()?.clone())?;
     applied.set_item(CONNECTION_WAREHOUSE_KEY, warehouse)?;
+    if scope.cli_warehouse.is_some() {
+        let own = resolve_warehouse(inputs, (&scope.group, None), (config, &scope.cli_vars))?;
+        applied.set_item(CONFIGURED_WAREHOUSE_KEY, own.0)?;
+    }
     Ok(applied.into_any())
 }
 

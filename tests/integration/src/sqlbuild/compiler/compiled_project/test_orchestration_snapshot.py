@@ -909,7 +909,7 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
                     'overlap = "skip"\n'
                     "pools = { order_reporting = 2 }\n"
                     f"schedule = {schedule}\n"
-                    "\n[on_failure]\nretries = 2\nretry_delay_seconds = 600\n"
+                    "\n[retry]\nattempts = 3\ndelay_seconds = 600\n"
                     '\n[settings]\nrun_tests = false\nvars = { batch = 3 }\nwarehouse = "reporting"\n'
                     "concurrency = 4\n"
                 ),
@@ -943,7 +943,7 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
                 "warehouse": "reporting",
             },
             "pools": {"order_reporting": {"amount": 2, "limit": 2}},
-            "resolved_concurrency": {"limit": 4, "source": "job"},
+            "resolved_concurrency": {"limit": 4},
             "select": "+orders",
             "exclude": "stg_orders",
             "targets": ["development"],
@@ -979,8 +979,8 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
             local_files={},
             job_settings="",
             selected_target=None,
-            expected_job={"limit": 1, "source": "default"},
-            expected_group={"limit": 1, "source": "default"},
+            expected_job={"limit": 1},
+            expected_group={"limit": 1},
         ),
         SnapshotConcurrencyTestCase(
             description="the project's setting",
@@ -988,8 +988,8 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
             local_files={},
             job_settings="",
             selected_target=None,
-            expected_job={"limit": 3, "source": "project"},
-            expected_group={"limit": 3, "source": "project"},
+            expected_job={"limit": 3},
+            expected_group={"limit": 3},
         ),
         SnapshotConcurrencyTestCase(
             description="the location's local setting over the project's",
@@ -997,8 +997,8 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
             local_files={"sqlbuild_local.toml": "[settings]\nconcurrency = 5\n"},
             job_settings="",
             selected_target=None,
-            expected_job={"limit": 5, "source": "local"},
-            expected_group={"limit": 5, "source": "local"},
+            expected_job={"limit": 5},
+            expected_group={"limit": 5},
         ),
         SnapshotConcurrencyTestCase(
             description="the target's concurrency over the settings",
@@ -1006,8 +1006,8 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
             local_files={},
             job_settings="",
             selected_target="development",
-            expected_job={"limit": 6, "source": "target"},
-            expected_group={"limit": 6, "source": "target"},
+            expected_job={"limit": 6},
+            expected_group={"limit": 6},
         ),
         SnapshotConcurrencyTestCase(
             description="the job's own setting over the target's; its group keeps the target's",
@@ -1015,8 +1015,8 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
             local_files={},
             job_settings="\n[settings]\nconcurrency = 2\n",
             selected_target="development",
-            expected_job={"limit": 2, "source": "job"},
-            expected_group={"limit": 6, "source": "target"},
+            expected_job={"limit": 2},
+            expected_group={"limit": 6},
         ),
     ],
     ids=lambda case: case.description,
@@ -1075,23 +1075,10 @@ def test_given_concurrency_layers_when_publishing_then_each_job_and_group_carrie
             expected_on_failure={"retries": 2, "retry_delay_seconds": 900},
             expected_warnings=(),
         ),
-        SnapshotRetryTestCase(
-            description="deprecated on_failure names",
-            tables="[on_failure]\nretries = 2\nretry_delay_seconds = 600\n",
-            expected_on_failure={"retries": 2, "retry_delay_seconds": 600},
-            expected_warnings=(
-                "Warning: orchestration/jobs/daily_build_job.toml:6:1: "
-                "`[on_failure]` is deprecated; rename it to `[retry]`",
-                "Warning: orchestration/jobs/daily_build_job.toml:7:11: "
-                "`retries` is deprecated; rename it to `attempts`",
-                "Warning: orchestration/jobs/daily_build_job.toml:8:23: "
-                "`retry_delay_seconds` is deprecated; rename it to `delay_seconds`",
-            ),
-        ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_a_job_retry_table_when_compiling_then_both_names_publish_one_policy_and_old_ones_warn(
+def test_given_a_job_retry_table_when_compiling_then_it_publishes_one_policy_without_warnings(
     tmp_path: Path, capfd: pytest.CaptureFixture[str], test_case: SnapshotRetryTestCase
 ) -> None:
     text: str = "".join(f"{key} = {value}\n" for key, value in _DAILY_BUILD.items())
@@ -1220,19 +1207,24 @@ def test_given_a_job_retry_table_when_compiling_then_both_names_publish_one_poli
             expected_message="unknown variant `coalesce`, expected `queue` or `skip`",
         ),
         SnapshotDeclarationRejectionTestCase(
-            description="no retries",
-            tables="[on_failure]\nretries = 0\n",
-            expected_message="retries must be a whole number from 1 to 10",
+            description="a single attempt",
+            tables="[retry]\nattempts = 1\n",
+            expected_message="attempts must be a whole number from 2 to 11",
         ),
         SnapshotDeclarationRejectionTestCase(
-            description="too many retries",
-            tables="[on_failure]\nretries = 11\n",
-            expected_message="retries must be a whole number from 1 to 10",
+            description="too many attempts",
+            tables="[retry]\nattempts = 12\n",
+            expected_message="attempts must be a whole number from 2 to 11",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="retry delay over a day",
-            tables="[on_failure]\nretries = 1\nretry_delay_seconds = 86401\n",
-            expected_message="retry_delay_seconds must be a whole number from 0 to 86400",
+            tables="[retry]\nattempts = 2\ndelay_seconds = 86401\n",
+            expected_message="delay_seconds must be a whole number from 0 to 86400",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="the removed on_failure table",
+            tables="[on_failure]\nretries = 2\n",
+            expected_message="unknown job key 'on_failure'",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="concurrency belongs under settings",

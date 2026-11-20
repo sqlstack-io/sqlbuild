@@ -21,6 +21,8 @@ pub struct ProjectValidationFacts {
     pub functions: HashSet<String>,
     /// Discovered table function names.
     pub table_functions: HashSet<String>,
+    /// The effective adapter name, when the project names one.
+    pub adapter: Option<String>,
 }
 
 /// One extracted SQL reference: its `SqlReferenceKind` value and name.
