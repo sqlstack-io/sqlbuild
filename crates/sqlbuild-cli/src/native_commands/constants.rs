@@ -152,9 +152,7 @@ pub(crate) const EXIT_FLUSH_FAILURE_STATUS: i32 = 120;
 
 pub(crate) const UNCAUGHT_EXCEPTION_STATUS: i32 = 1;
 
-/// Reserve half the location work claim for acknowledgement retries after killing a callback.
-pub(crate) const SENSOR_EVALUATION_SECONDS: u64 = 30;
-
+/// The largest answer a sensor's interpreter may send back.
 pub(crate) const SENSOR_RESULT_BYTES: u64 = 1_048_576;
 
 /// Read timeout, and the delay before retrying a failed page of an unfinished synchronization.

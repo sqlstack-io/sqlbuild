@@ -1,4 +1,4 @@
-//! Custom callbacks cross only the existing location-scoped outbound-work boundary.
+//! A sensor's function runs on its location; only this location-scoped work crosses to it, and only data comes back.
 
 use std::collections::BTreeSet;
 
@@ -7,38 +7,45 @@ use serde_json::json;
 
 use crate::platform::main::work::read_location_work::read_location_work;
 use crate::platform::models::{LocationWork, LocationWorkOutcome, LocationWorkRequest};
-use crate::sensors::_helpers::requests::queue_sensor_run;
-use crate::sensors::models::SensorRequests;
+use crate::sensors::_helpers::requests::{queue_sensor_run, unknown_job};
+use crate::sensors::constants::SENSOR_WORK_GRACE_SECONDS;
 use crate::sensors::models::{
-    CustomSensorOutcome, SensorCondition, SensorEvaluationOutcome, SensorEvaluationRequest,
+    RequestedRun, SensorEvaluationOutcome, SensorEvaluationRequest, SensorFunctionOutcome,
+    SensorRequests,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
+/// The failure code of a tick whose function raised.
+const FUNCTION_FAILED: &str = "sensor_function_failed";
+/// The failure code of a tick whose function asked for a job the target doesn't publish.
+const UNKNOWN_JOB: &str = "unknown_job";
+
 pub(crate) async fn request_evaluation_work(
     transaction: ControlTransaction,
     evaluation: &SensorEvaluationRequest,
 ) -> Result<ControlTransaction, ControlError> {
-    if !matches!(evaluation.definition.when, SensorCondition::Custom { .. }) {
-        return Ok(transaction);
-    }
     let request = LocationWorkRequest {
         request_id: evaluation.evaluation_id,
         location_id: evaluation.location_id,
         target: evaluation.target.clone(),
-        reason: "Evaluate custom sensor".into(),
+        reason: format!("Run sensor {}", evaluation.sensor),
         work: LocationWork::EvaluateSensor {
             evaluation: Box::new(evaluation.clone()),
         },
     };
+    let expires_at = evaluation.requested_at
+        + TimeDelta::seconds(
+            i64::from(evaluation.definition.timeout_seconds.get()) + SENSOR_WORK_GRACE_SECONDS,
+        );
     let (transaction, _) = query(transaction,
         "INSERT INTO sqb_location_work \
          (request_id,location_id,target,snapshot_id,generation,request_json,requested_by,requested_at,expires_at) \
          SELECT $1,$2,$3,snapshot_id,generation,$4,'system:sensor',$5,$6 FROM sqb_snapshots WHERE snapshot_id=$7",
         vec![Parameter::Id(request.request_id), Parameter::Id(request.location_id), Parameter::Text(request.target.clone()),
             Parameter::Json(json!(request)), Parameter::Time(evaluation.requested_at),
-            Parameter::Time(evaluation.requested_at + TimeDelta::minutes(5)), Parameter::Id(evaluation.snapshot_id)]).await?;
+            Parameter::Time(expires_at), Parameter::Id(evaluation.snapshot_id)]).await?;
     Ok(transaction)
 }
 
@@ -68,32 +75,54 @@ pub(crate) async fn read_evaluation_result(
     }
 }
 
+/// The tick's outcome from what the function returned; a refused request queues nothing.
 async fn apply_result(
     mut transaction: ControlTransaction,
     evaluation: &SensorEvaluationRequest,
-    outcome: CustomSensorOutcome,
+    outcome: SensorFunctionOutcome,
 ) -> Result<(ControlTransaction, Option<SensorEvaluationOutcome>), ControlError> {
-    let (custom, run_keys) = match outcome {
-        CustomSensorOutcome::Completed { cursor, run_keys } => (cursor, run_keys),
-        CustomSensorOutcome::Skipped { cursor, .. } => (cursor, Vec::new()),
-        CustomSensorOutcome::Failed => {
+    let (custom, runs, skip_reason) = match outcome {
+        SensorFunctionOutcome::Handled { cursor } => (cursor, Vec::new(), None),
+        SensorFunctionOutcome::Skipped { cursor, reason } => (cursor, Vec::new(), Some(reason)),
+        SensorFunctionOutcome::Requested { cursor, runs } => (cursor, runs, None),
+        SensorFunctionOutcome::Failed { error } => {
             return Ok((
                 transaction,
                 Some(SensorEvaluationOutcome::Failed {
-                    code: "custom_sensor_failed".into(),
+                    code: FUNCTION_FAILED.into(),
+                    error: Some(error),
                 }),
             ));
         }
-        CustomSensorOutcome::TimedOut => {
+        SensorFunctionOutcome::TimedOut => {
             return Ok((transaction, Some(SensorEvaluationOutcome::TimedOut)));
         }
     };
-    let mut cursor = evaluation.cursor.clone();
-    cursor.custom = custom;
+    let runs: Vec<RequestedRun> = distinct(runs);
+    let unknown;
+    (transaction, unknown) = unknown_job(transaction, evaluation, &runs).await?;
+    if let Some(job) = unknown {
+        return Ok((
+            transaction,
+            Some(SensorEvaluationOutcome::Failed {
+                code: UNKNOWN_JOB.into(),
+                error: Some(format!(
+                    "RunRequest names {job}, which target {} doesn't publish as a job or job group",
+                    evaluation.target
+                )),
+            }),
+        ));
+    }
+    let mut cursor = evaluation
+        .cursor_after
+        .clone()
+        .unwrap_or_else(|| evaluation.cursor.clone());
+    if evaluation.event.is_none() {
+        cursor.custom = custom;
+    }
     let mut requests = SensorRequests::default();
-    let run_keys: BTreeSet<String> = run_keys.into_iter().collect();
-    for key in run_keys {
-        (transaction, requests) = queue_sensor_run(transaction, evaluation, &key, requests).await?;
+    for run in &runs {
+        (transaction, requests) = queue_sensor_run(transaction, evaluation, run, requests).await?;
     }
     Ok((
         transaction,
@@ -101,6 +130,15 @@ async fn apply_result(
             cursor,
             run_ids: requests.run_ids,
             skipped: requests.skipped,
+            skip_reason,
         }),
     ))
+}
+
+/// `runs` without repeated run keys, in the order the function returned them.
+fn distinct(runs: Vec<RequestedRun>) -> Vec<RequestedRun> {
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    runs.into_iter()
+        .filter(|run| seen.insert(run.run_key.clone()))
+        .collect()
 }

@@ -1,49 +1,137 @@
-//! Each native condition consumes its bounded page inside the evaluation transaction.
+//! Each condition reads its matching events a bounded page at a time, forward for ticks or back for a person's look.
 
-use crate::sensors::_helpers::nodes::{
-    consume_node_events, consume_source_events, consume_stale_sources,
-};
-use crate::sensors::_helpers::platform::consume_platform_events;
-use crate::sensors::_helpers::runs::consume_run_events;
+use crate::sensors::_helpers::nodes::{scan_check_events, scan_node_events};
+use crate::sensors::_helpers::platform::scan_platform_events;
+use crate::sensors::_helpers::runs::scan_run_events;
+use crate::sensors::_helpers::sources::{next_source_event, recent_source_events};
+use crate::sensors::constants::RECENT_EVENT_PAGES;
 use crate::sensors::models::{
-    SensorCondition, SensorCursor, SensorEvaluationRequest, SensorRequests,
+    Direction, EventScope, NextEvent, Scanned, SensorCondition, SensorCursor, SensorEvent,
 };
 use crate::store::errors::ControlError;
-use crate::store::models::ControlTransaction;
+use crate::store::models::{ControlTransaction, Parameter};
 
-pub(crate) async fn consume_condition(
+/// The oldest event after `cursor` the sensor has not handled.
+pub(crate) async fn next_event(
     transaction: ControlTransaction,
-    evaluation: &SensorEvaluationRequest,
-) -> Result<(ControlTransaction, (SensorCursor, SensorRequests)), ControlError> {
-    match &evaluation.definition.when {
-        SensorCondition::Custom { .. } => Err(ControlError::Invalid(
-            "custom sensors require a location result".into(),
-        )),
+    scope: EventScope<'_>,
+    (condition, cursor): (&SensorCondition, &SensorCursor),
+) -> Result<(ControlTransaction, NextEvent), ControlError> {
+    if matches!(
+        condition,
+        SensorCondition::SourceNewData { .. } | SensorCondition::SourceStale { .. }
+    ) {
+        return next_source_event(transaction, scope, (condition, cursor)).await;
+    }
+    let (transaction, mut scanned) = scan(
+        transaction,
+        scope,
+        condition,
+        (Direction::After(cursor.event_storage_id), 1),
+    )
+    .await?;
+    let after = SensorCursor {
+        event_storage_id: scanned.last.unwrap_or(cursor.event_storage_id),
+        ..cursor.clone()
+    };
+    Ok((
+        transaction,
+        match scanned.events.pop() {
+            Some(event) => NextEvent::Found {
+                event,
+                cursor_after: after,
+            },
+            None => NextEvent::Nothing {
+                cursor: after,
+                more: scanned.full,
+            },
+        },
+    ))
+}
+
+/// Up to `limit` of the newest events matching `condition`, newest first, whether or not the sensor handled them.
+pub(crate) async fn recent_events(
+    mut transaction: ControlTransaction,
+    scope: EventScope<'_>,
+    (condition, limit): (&SensorCondition, usize),
+) -> Result<(ControlTransaction, Vec<SensorEvent>), ControlError> {
+    if matches!(
+        condition,
+        SensorCondition::SourceNewData { .. } | SensorCondition::SourceStale { .. }
+    ) {
+        return recent_source_events(transaction, scope, (condition, limit)).await;
+    }
+    let mut events: Vec<SensorEvent> = Vec::new();
+    let mut before: i64 = i64::MAX;
+    for _ in 0..RECENT_EVENT_PAGES {
+        let scanned: Scanned;
+        (transaction, scanned) = scan(
+            transaction,
+            scope,
+            condition,
+            (Direction::Before(before), limit - events.len()),
+        )
+        .await?;
+        events.extend(scanned.events);
+        match scanned.last {
+            Some(last) if scanned.full && events.len() < limit => before = last,
+            _ => break,
+        }
+    }
+    Ok((transaction, events))
+}
+
+/// One page of a storage-ordered condition's matching events, at most `limit`.
+async fn scan(
+    transaction: ControlTransaction,
+    scope: EventScope<'_>,
+    condition: &SensorCondition,
+    page: (Direction, usize),
+) -> Result<(ControlTransaction, Scanned), ControlError> {
+    match condition {
         SensorCondition::PlatformEvent { kinds } => {
-            consume_platform_events(transaction, evaluation, kinds).await
+            scan_platform_events(transaction, page, kinds).await
         }
         SensorCondition::NodeEvent { selection, kinds } => {
-            consume_node_events(transaction, evaluation, selection, kinds).await
+            scan_node_events(transaction, scope, page, (selection, kinds)).await
         }
-        SensorCondition::SourceNewData { selection } => {
-            consume_source_events(transaction, evaluation, selection).await
+        SensorCondition::CheckEvent { selection, kinds } => {
+            scan_check_events(transaction, scope, page, (selection, kinds)).await
         }
-        SensorCondition::SourceStale {
-            selection,
-            after_seconds,
-        } => consume_stale_sources(transaction, evaluation, selection, *after_seconds).await,
         SensorCondition::RunEvent {
             job_key,
             kinds,
             executed_successfully,
         } => {
-            consume_run_events(
+            scan_run_events(
                 transaction,
-                evaluation,
-                (job_key, kinds),
-                executed_successfully.as_ref(),
+                scope,
+                page,
+                (job_key, kinds, executed_successfully.as_ref()),
             )
             .await
         }
+        SensorCondition::SourceNewData { .. } | SensorCondition::SourceStale { .. } => Err(
+            ControlError::Invalid("source conditions have no storage order".into()),
+        ),
     }
+}
+
+/// The predicate and order a page reads `column` in, with the position as parameter `$index`.
+pub(crate) fn page_clause(direction: Direction, column: &str, index: usize) -> (String, Parameter) {
+    match direction {
+        Direction::After(position) => (
+            format!("{column}>${index} ORDER BY {column}"),
+            Parameter::Integer(position),
+        ),
+        Direction::Before(position) => (
+            format!("{column}<${index} ORDER BY {column} DESC"),
+            Parameter::Integer(position),
+        ),
+    }
+}
+
+/// The UI page of `run_id`, when the server knows the address people reach it at.
+pub(crate) fn run_url(origin: Option<&str>, run_id: uuid::Uuid) -> Option<String> {
+    origin.map(|origin| format!("{}/runs/{run_id}", origin.trim_end_matches('/')))
 }

@@ -3,28 +3,29 @@
 use std::collections::BTreeSet;
 
 use crate::runs::models::NodeOutcome;
-use crate::sensors::models::{NodeEventKind, NodeSensorEvent, SensorEvaluationRequest};
+use crate::sensors::models::{EventScope, NodeEventKind, NodeSensorEvent};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-pub(crate) async fn matches_transition(
+/// The kind of event the node's outcome is for the sensor's `kinds`, if any; a recovery is a success after a failure.
+pub(crate) async fn matching_transition(
     transaction: ControlTransaction,
-    evaluation: &SensorEvaluationRequest,
+    scope: EventScope<'_>,
     node: &NodeSensorEvent,
     kinds: &BTreeSet<NodeEventKind>,
-) -> Result<(ControlTransaction, bool), ControlError> {
+) -> Result<(ControlTransaction, Option<NodeEventKind>), ControlError> {
     let outcome = node.status;
     if outcome == NodeOutcome::Success && kinds.contains(&NodeEventKind::Success) {
-        return Ok((transaction, true));
+        return Ok((transaction, Some(NodeEventKind::Success)));
     }
     let kind = match outcome {
         NodeOutcome::Success => NodeEventKind::Recovered,
         NodeOutcome::Failed => NodeEventKind::Failed,
-        _ => return Ok((transaction, false)),
+        _ => return Ok((transaction, None)),
     };
     if !kinds.contains(&kind) {
-        return Ok((transaction, false));
+        return Ok((transaction, None));
     }
     let (transaction, rows) = query(
         transaction,
@@ -35,13 +36,16 @@ pub(crate) async fn matches_transition(
         vec![
             Parameter::Text(node.node_key.clone()),
             Parameter::Integer(node.finished_storage_id),
-            Parameter::Id(evaluation.location_id),
-            Parameter::Text(evaluation.target.clone()),
+            Parameter::Id(scope.location_id),
+            Parameter::Text(scope.target.into()),
         ],
     )
     .await?;
     let failed = rows
         .first()
         .is_some_and(|row| row["status"] == NodeOutcome::Failed.as_str());
-    Ok((transaction, (outcome == NodeOutcome::Success) == failed))
+    Ok((
+        transaction,
+        ((outcome == NodeOutcome::Success) == failed).then_some(kind),
+    ))
 }

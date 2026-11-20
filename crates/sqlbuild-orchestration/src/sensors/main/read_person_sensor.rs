@@ -1,4 +1,4 @@
-//! A person sees a sensor's cursor, recent checks and run requests only with view on every current node; values the sensor computed also need view.evidence.
+//! A person sees a sensor's cursor, recent ticks and run requests only with view on every current node; what the function wrote also needs view.evidence.
 
 use std::collections::BTreeMap;
 
@@ -9,10 +9,21 @@ use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::authorization::main::decisions::person_holds_target::person_holds_target;
 use crate::credentials::models::{Action, AuditContext, DefaultRole};
 use crate::sensors::_helpers::facts::definition_fingerprint;
+use crate::sensors::_helpers::failing::sensor_failing;
 use crate::sensors::models::{
     PersonSensorCursor, PersonSensorEvaluation, PersonSensorRunRequest, PersonSensorState,
-    SensorCursor, SensorEvaluationOutcome, StoredEvaluationEvent, StoredRunRequest, StoredSensor,
+    SensorCursor, SensorEvaluationOutcome, SensorEvent, StoredEvaluationEvent, StoredRunRequest,
+    StoredSensor,
 };
+
+/// A tick the location hasn't answered yet.
+const RUNNING: &str = "running";
+/// A tick whose function returned `None`.
+const HANDLED: &str = "handled";
+/// A tick whose function returned a `SkipReason`.
+const SKIPPED: &str = "skipped";
+/// A tick whose function asked for runs.
+const STARTED: &str = "started";
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query_records::query_records};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
@@ -65,8 +76,10 @@ pub async fn read_person_sensor(
         vec![Parameter::Id(trigger_id), limit],
     )
     .await?;
+    let (transaction, failing) = sensor_failing(transaction, trigger_id).await?;
     commit(transaction).await?;
     Ok(Some(PersonSensorState {
+        failing,
         cursor: sensor
             .cursor_json
             .as_ref()
@@ -90,7 +103,7 @@ pub async fn read_person_sensor(
     }))
 }
 
-/// The newest `limit` checks, each projected from its recorded phases.
+/// The newest `limit` ticks, each projected from its recorded phases.
 async fn evaluations(
     transaction: ControlTransaction,
     (trigger_id, limit): (Uuid, Parameter),
@@ -112,12 +125,17 @@ async fn evaluations(
             .or_insert_with(|| PersonSensorEvaluation {
                 evaluation_id: request.evaluation_id,
                 phase: SensorEvaluationOutcome::Requested.phase().into(),
+                outcome: RUNNING.into(),
                 requested_at: request.requested_at,
                 finished_at: None,
                 cursor_before: shown_cursor(&request.cursor, evidence),
                 cursor_after: None,
-                run_count: 0,
+                event_id: request.event.as_ref().map(|event| event.id().to_owned()),
+                event_summary: request.event.as_ref().map(SensorEvent::summary),
+                run_ids: Vec::new(),
+                skip_reason: None,
                 failure_code: None,
+                error: None,
                 skipped_for: Vec::new(),
                 definition_fingerprint: request.definition_fingerprint.clone(),
             });
@@ -126,18 +144,34 @@ async fn evaluations(
             continue;
         }
         check.phase = outcome.phase().into();
+        check.outcome = outcome.phase().into();
         check.finished_at = Some(event.occurred_at);
         match outcome {
             SensorEvaluationOutcome::Completed {
                 cursor,
                 run_ids,
                 skipped,
+                skip_reason,
             } => {
                 check.cursor_after = Some(shown_cursor(&cursor, evidence));
-                check.run_count = run_ids.len();
+                check.outcome = if !run_ids.is_empty() || !skipped.is_empty() {
+                    STARTED
+                } else if skip_reason.is_some() {
+                    SKIPPED
+                } else {
+                    HANDLED
+                }
+                .into();
+                check.run_ids = run_ids;
                 check.skipped_for = skipped.iter().map(|skip| skip.active_run_id).collect();
+                check.skip_reason = skip_reason
+                    .filter(|_| evidence)
+                    .map(|reason| redact_text(&reason));
             }
-            SensorEvaluationOutcome::Failed { code } => check.failure_code = Some(code),
+            SensorEvaluationOutcome::Failed { code, error } => {
+                check.failure_code = Some(code);
+                check.error = error.filter(|_| evidence).map(|error| redact_text(&error));
+            }
             _ => {}
         }
     }

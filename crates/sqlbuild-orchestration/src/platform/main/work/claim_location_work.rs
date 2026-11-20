@@ -3,7 +3,7 @@
 use chrono::Duration;
 use uuid::Uuid;
 
-use crate::platform::constants::PLAN_LEASE_SECONDS;
+use crate::platform::constants::{PLAN_LEASE_SECONDS, WORK_LEASE_SECONDS};
 use crate::platform::main::installation::require_instance::require_instance;
 use crate::platform::main::work::read_location_work::read_location_work;
 use crate::platform::models::{LocationWork, LocationWorkClaim, LocationWorkPoll};
@@ -46,10 +46,13 @@ pub async fn claim_location_work(
         .map_err(|error| ControlError::Invalid(format!("invalid work identity: {error}")))?;
     let (transaction, stored) = read_location_work(transaction, request_id).await?;
     let stored = stored.ok_or_else(|| ControlError::Invalid("location work disappeared".into()))?;
-    let lease = if matches!(stored.record.request_json.work, LocationWork::Plan { .. }) {
-        PLAN_LEASE_SECONDS
-    } else {
-        60
+    let lease = match &stored.record.request_json.work {
+        LocationWork::Plan { .. } => PLAN_LEASE_SECONDS,
+        LocationWork::EvaluateSensor { evaluation } => (2 * i64::from(
+            evaluation.definition.timeout_seconds.get(),
+        ))
+        .max(WORK_LEASE_SECONDS),
+        _ => WORK_LEASE_SECONDS,
     };
     let retained = stored.session_id == Some(poll.session_id)
         && stored.claimed_until.is_some_and(|until| until > now);

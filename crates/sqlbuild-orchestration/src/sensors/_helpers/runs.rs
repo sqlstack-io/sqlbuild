@@ -5,54 +5,193 @@ use std::collections::BTreeSet;
 use uuid::Uuid;
 
 use crate::runs::constants::SUPERSEDED_CHILD;
-use crate::sensors::_helpers::requests::queue_sensor_run;
-use crate::sensors::constants::EXECUTION_NODE_BATCH_SIZE;
-use crate::sensors::models::SensorRequests;
+use crate::runs::models::RunOutcome;
+use crate::sensors::_helpers::conditions::{page_clause, run_url};
+use crate::sensors::constants::{EVENT_PAGE_SIZE, EXECUTION_NODE_BATCH_SIZE};
 use crate::sensors::models::{
-    RunEventKind, SensorCursor, SensorEvaluationRequest, TerminalSensorRun,
+    Direction, EventScope, RunEventKind, Scanned, SensorEvent, TerminalSensorRun,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-pub(crate) async fn consume_run_events(
+pub(crate) async fn scan_run_events(
     transaction: ControlTransaction,
-    evaluation: &SensorEvaluationRequest,
-    (job_key, kinds): (&str, &BTreeSet<RunEventKind>),
-    executed_successfully: Option<&BTreeSet<String>>,
-) -> Result<(ControlTransaction, (SensorCursor, SensorRequests)), ControlError> {
+    scope: EventScope<'_>,
+    (direction, limit): (Direction, usize),
+    (job_key, kinds, executed_successfully): (
+        &str,
+        &BTreeSet<RunEventKind>,
+        Option<&BTreeSet<String>>,
+    ),
+) -> Result<(ControlTransaction, Scanned), ControlError> {
+    let (clause, position) = page_clause(direction, "r.last_event_storage_id", 4);
     let (mut transaction, rows) = query(
         transaction,
         &format!("SELECT r.run_id,r.status,r.last_event_storage_id FROM sqb_runs r \
-         WHERE r.location_id=$1 AND r.target=$2 AND r.job_key=$3 AND r.last_event_storage_id>$4 \
+         WHERE r.location_id=$1 AND r.target=$2 AND r.job_key=$3 \
          AND r.status IN ('success','warn','partial','failed','cancelled','skipped') AND NOT {SUPERSEDED_CHILD} \
-         ORDER BY r.last_event_storage_id LIMIT 100"),
+         AND {clause} LIMIT {EVENT_PAGE_SIZE}"),
         vec![
-            Parameter::Id(evaluation.location_id),
-            Parameter::Text(evaluation.target.clone()),
+            Parameter::Id(scope.location_id),
+            Parameter::Text(scope.target.into()),
             Parameter::Text(job_key.into()),
-            Parameter::Integer(evaluation.cursor.event_storage_id),
+            position,
         ],
     )
     .await?;
+    let mut scanned = Scanned {
+        full: rows.len() >= EVENT_PAGE_SIZE,
+        ..Scanned::default()
+    };
     let runs: Vec<TerminalSensorRun> =
         rows.into_iter().map(decode_row).collect::<Result<_, _>>()?;
     let mut eligible: BTreeSet<Uuid> = runs.iter().map(|run| run.run_id).collect();
     if let Some(nodes) = executed_successfully {
         (transaction, eligible) = matching_executions(transaction, eligible, nodes).await?;
     }
-    let mut cursor = evaluation.cursor.clone();
-    let mut requests = SensorRequests::default();
     for run in runs {
-        cursor.event_storage_id = run.last_event_storage_id;
+        scanned.last = Some(run.last_event_storage_id);
         if eligible.contains(&run.run_id) && kinds.iter().any(|kind| kind.matches(run.status)) {
-            (transaction, requests) =
-                queue_sensor_run(transaction, evaluation, &run.run_id.to_string(), requests)
-                    .await?;
+            let event;
+            (transaction, event) = run_event(transaction, scope, (job_key, &run)).await?;
+            scanned.events.push(event);
+            if scanned.events.len() >= limit {
+                break;
+            }
         }
     }
-    Ok((transaction, (cursor, requests)))
+    Ok((transaction, scanned))
+}
+
+/// The terminal event of one run of the sensor's job, or why the sensor's condition doesn't match it.
+pub(crate) async fn run_event_for(
+    transaction: ControlTransaction,
+    scope: EventScope<'_>,
+    run_id: Uuid,
+    (job_key, kinds, executed_successfully): (
+        &str,
+        &BTreeSet<RunEventKind>,
+        Option<&BTreeSet<String>>,
+    ),
+) -> Result<(ControlTransaction, Result<SensorEvent, String>), ControlError> {
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT r.run_id,r.status,r.last_event_storage_id,r.job_key FROM sqb_runs r \
+         WHERE r.run_id=$1 AND r.location_id=$2 AND r.target=$3",
+        vec![
+            Parameter::Id(run_id),
+            Parameter::Id(scope.location_id),
+            Parameter::Text(scope.target.into()),
+        ],
+    )
+    .await?;
+    let Some(row) = rows.into_iter().next() else {
+        return Ok((
+            transaction,
+            Err(format!(
+                "run {run_id} is not a run of target {}",
+                scope.target
+            )),
+        ));
+    };
+    if row["job_key"].as_str() != Some(job_key) {
+        return Ok((
+            transaction,
+            Err(format!(
+                "run {run_id} is a run of {}, but the sensor watches {job_key}",
+                row["job_key"].as_str().unwrap_or("an ad-hoc command")
+            )),
+        ));
+    }
+    let Ok(run) = decode_row::<TerminalSensorRun>(row.clone()) else {
+        return Ok((
+            transaction,
+            Err(format!(
+                "run {run_id} hasn't finished; it is {}",
+                row["status"].as_str().unwrap_or("unknown")
+            )),
+        ));
+    };
+    if !kinds.iter().any(|kind| kind.matches(run.status)) {
+        let watched: Vec<&str> = kinds.iter().map(|kind| kind.as_str()).collect();
+        return Ok((
+            transaction,
+            Err(format!(
+                "run {run_id} ended {}, which the sensor's kinds ({}) don't match",
+                run.status.as_str(),
+                watched.join(", ")
+            )),
+        ));
+    }
+    let mut transaction = transaction;
+    if let Some(nodes) = executed_successfully {
+        let eligible;
+        (transaction, eligible) =
+            matching_executions(transaction, BTreeSet::from([run_id]), nodes).await?;
+        if eligible.is_empty() {
+            return Ok((
+                transaction,
+                Err(format!(
+                    "run {run_id} didn't run and succeed every node the sensor's executed_successfully names"
+                )),
+            ));
+        }
+    }
+    let (transaction, event) = run_event(transaction, scope, (job_key, &run)).await?;
+    Ok((transaction, Ok(event)))
+}
+
+/// The run's outcome with its error and the nodes and checks that failed, its group members' included.
+async fn run_event(
+    transaction: ControlTransaction,
+    scope: EventScope<'_>,
+    (job_key, run): (&str, &TerminalSensorRun),
+) -> Result<(ControlTransaction, SensorEvent), ControlError> {
+    let (transaction, reasons) = query(
+        transaction,
+        "SELECT status_reason, COALESCE(ended_at, queued_at) AS occurred_at FROM sqb_runs WHERE run_id=$1",
+        vec![Parameter::Id(run.run_id)],
+    )
+    .await?;
+    let reason = reasons.first();
+    let error = reason
+        .and_then(|row| row["status_reason"].as_str())
+        .filter(|_| run.status != RunOutcome::Success)
+        .map(str::to_owned);
+    let occurred_at = reason
+        .and_then(|row| serde_json::from_value(row["occurred_at"].clone()).ok())
+        .unwrap_or(transaction.now);
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT DISTINCT n.node_key, n.kind FROM sqb_run_nodes n WHERE n.status='failed' \
+         AND (n.run_id=$1 OR n.run_id IN (SELECT c.run_id FROM sqb_runs c WHERE c.parent_run_id=$1)) \
+         ORDER BY n.node_key",
+        vec![Parameter::Id(run.run_id)],
+    )
+    .await?;
+    let failed = |kind: &str| -> Vec<String> {
+        rows.iter()
+            .filter(|row| row["kind"] == kind)
+            .filter_map(|row| row["node_key"].as_str().map(str::to_owned))
+            .collect()
+    };
+    Ok((
+        transaction,
+        SensorEvent::Run {
+            id: format!("run:{}", run.run_id),
+            occurred_at,
+            job: job_key.into(),
+            run_id: run.run_id,
+            status: run.status,
+            error,
+            failed_nodes: failed("node"),
+            failed_checks: failed("check"),
+            target: scope.target.into(),
+            url: run_url(scope.origin, run.run_id),
+        },
+    ))
 }
 
 /// Each chunk narrows the previous matches; a member's node qualifies from any attempt in its group run.

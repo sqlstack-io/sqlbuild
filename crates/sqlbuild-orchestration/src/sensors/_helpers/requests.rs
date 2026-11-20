@@ -9,18 +9,41 @@ use crate::runs::main::requests::frozen_job_request::frozen_job_request;
 use crate::runs::main::requests::queue_run::queue_run;
 use crate::runs::models::{JobRunRequest, RunOrigin};
 use crate::scheduler::main::active_job_run::active_job_run;
-use crate::sensors::models::{SensorEvaluationRequest, SensorRequests, SkippedRequest};
+use crate::sensors::models::{
+    RequestedRun, SensorEvaluationRequest, SensorRequests, SkippedRequest,
+};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// Queue the run for `run_key` once, or record it skipped while a run of a `skip` job is active.
+/// The first requested job or group the evaluated snapshot doesn't publish, so the tick queues nothing.
+pub(crate) async fn unknown_job(
+    mut transaction: ControlTransaction,
+    evaluation: &SensorEvaluationRequest,
+    runs: &[RequestedRun],
+) -> Result<(ControlTransaction, Option<String>), ControlError> {
+    for run in runs {
+        let job;
+        (transaction, job) = published_job(
+            transaction,
+            (evaluation.location_id, &evaluation.target, &run.job),
+        )
+        .await?;
+        if job.is_none_or(|job| job.snapshot_id != evaluation.snapshot_id) {
+            return Ok((transaction, Some(run.job.clone())));
+        }
+    }
+    Ok((transaction, None))
+}
+
+/// Queue the run for its key once, or record it skipped while a run of a `skip` job is active.
 pub(crate) async fn queue_sensor_run(
     transaction: ControlTransaction,
     evaluation: &SensorEvaluationRequest,
-    run_key: &str,
+    run: &RequestedRun,
     mut requests: SensorRequests,
 ) -> Result<(ControlTransaction, SensorRequests), ControlError> {
+    let (run_key, job_key) = (run.run_key.as_str(), run.job.as_str());
     let (transaction, rows) = query(
         transaction,
         "SELECT run_id FROM sqb_run_requests WHERE trigger_id=$1 AND run_key=$2",
@@ -37,8 +60,7 @@ pub(crate) async fn queue_sensor_run(
         );
         return Ok((transaction, requests));
     }
-    let job_key = &evaluation.definition.job_key;
-    let (transaction, overlap) = job_overlap(transaction, evaluation).await?;
+    let (transaction, overlap) = job_overlap(transaction, evaluation, job_key).await?;
     let (transaction, active) = if overlap.is_queue() {
         (transaction, None)
     } else {
@@ -66,8 +88,8 @@ pub(crate) async fn queue_sensor_run(
         run_id,
         location_id: evaluation.location_id,
         target: evaluation.target.clone(),
-        job_key: evaluation.definition.job_key.clone(),
-        reason: "Sensor condition matched".into(),
+        job_key: job_key.into(),
+        reason: format!("Requested by sensor {}", evaluation.sensor),
         priority: 0,
         window: None,
         full_refresh: false,
@@ -89,18 +111,15 @@ pub(crate) async fn queue_sensor_run(
     Ok((transaction, requests))
 }
 
-/// The overlap the sensor's job declares in the evaluated snapshot, which the target currently publishes.
+/// The overlap the requested job declares in the evaluated snapshot, which the target currently publishes.
 async fn job_overlap(
     transaction: ControlTransaction,
     evaluation: &SensorEvaluationRequest,
+    job_key: &str,
 ) -> Result<(ControlTransaction, Overlap), ControlError> {
     let (transaction, job) = published_job(
         transaction,
-        (
-            evaluation.location_id,
-            &evaluation.target,
-            &evaluation.definition.job_key,
-        ),
+        (evaluation.location_id, &evaluation.target, job_key),
     )
     .await?;
     Ok((

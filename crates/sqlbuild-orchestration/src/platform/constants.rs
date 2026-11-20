@@ -35,6 +35,8 @@ pub(crate) const PLAN_TIMINGS_KEY: &str = "timings";
 
 /// How long a location may hold a plan before another instance may claim it.
 pub(crate) const PLAN_LEASE_SECONDS: i64 = 300;
+/// How long a location holds other work; a sensor's holds twice its function's timeout, leaving half to report.
+pub(crate) const WORK_LEASE_SECONDS: i64 = 60;
 
 /// A plan nobody claims or finishes by then is reported as expired.
 pub(crate) const PLAN_EXPIRY_SECONDS: i64 = 600;

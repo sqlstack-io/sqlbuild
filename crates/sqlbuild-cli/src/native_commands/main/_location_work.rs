@@ -21,7 +21,7 @@ use crate::native_commands::_helpers::location::execution::check_location_connec
 use crate::native_commands::_helpers::location::plan_reuse::keep_plan;
 use crate::native_commands::_helpers::location::work::work_error;
 use crate::native_commands::main::_location_plan::plan_location;
-use crate::native_commands::main::_location_sensor::evaluate_location_sensor;
+use crate::native_commands::main::_location_sensor::run_sensor_function;
 use crate::native_commands::models::{
     LocationRuntimeRequest, LocationServe, LocationWatch, LocationWorkTurn, PlanToKeep,
 };
@@ -165,7 +165,7 @@ async fn perform_work(
     let message = match &work {
         LocationWork::CheckConnection {} => "Checking requested location connection...\n",
         LocationWork::SyncWarehouse {} => "Synchronizing warehouse history on request...\n",
-        LocationWork::EvaluateSensor { .. } => "Evaluating requested custom sensor...\n",
+        LocationWork::EvaluateSensor { .. } => "Running a sensor's function...\n",
         LocationWork::Plan { .. } => "Planning requested command...\n",
     };
     drop(write_output(&[(Stream::Stderr, message)]));
@@ -181,8 +181,15 @@ async fn perform_work(
                 })
         }
         LocationWork::EvaluateSensor { evaluation } => {
-            evaluate_location_sensor(options, script, &evaluation, expires)
-                .await?
+            run_sensor_function(
+                (options, script),
+                (
+                    &*evaluation,
+                    evaluation.definition.timeout_seconds.get(),
+                ),
+                expires,
+            )
+            .await?
                 .map(|outcome| {
                     (
                         LocationWorkOutcome::SensorEvaluation { outcome },
