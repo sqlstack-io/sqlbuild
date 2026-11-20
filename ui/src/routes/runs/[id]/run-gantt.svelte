@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { plural } from '$lib/format/plural';
 	import MinusIcon from '@lucide/svelte/icons/minus';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -20,6 +19,7 @@
 		groups = [],
 		active = false,
 		skipText: causeOf = () => null,
+		tag = () => null,
 		onselect,
 		onopen
 	}: {
@@ -32,6 +32,8 @@
 		groups?: GanttGroup[];
 		/** The run is still going, so a node that hasn't started is waiting, not left out. */
 		active?: boolean;
+		/** A quiet tag after the name: a group run's member job. */
+		tag?: (n: RunNode) => string | null;
 		/** Why a node was skipped, on one line, chain included; null for the plain status. */
 		skipText?: (nodeKey: string) => string | null;
 		/** The tick box: adds the node to the selection, or takes it out. */
@@ -81,7 +83,8 @@
 		const ctx = document.createElement('canvas').getContext('2d');
 		if (!ctx) return 250;
 		ctx.font = '12px "IBM Plex Mono", ui-monospace, monospace';
-		const widest = Math.max(0, ...nodes.map((n) => ctx.measureText(nodeLabel(n.nodeKey)).width));
+		// A member tag adds about 7px a character (11px sans) and its gap.
+		const widest = Math.max(0, ...nodes.map((n) => ctx.measureText(nodeLabel(n.nodeKey)).width + (tag(n) ? tag(n)!.length * 6.2 + 12 : 0)));
 		// Names are never cut: the column fits the longest, up to the most it may take.
 		return Math.min(GUTTER_MAX, Math.max(GUTTER_MIN, Math.ceil(widest) + 84));
 	}
@@ -141,7 +144,6 @@
 
 <div class="gantt">
 <div class="gantt-head">
-	<span class="count">{plural(nodes.length, 'node')}</span>
 	<div class="zoom">
 		<Button variant="ghost" size="icon-sm" onclick={() => zoomBy(1 / 1.5)} disabled={zoom <= ZOOM_MIN} title="Zoom out" aria-label="Zoom out"><MinusIcon /></Button>
 		<input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step="0.1" bind:value={zoom} title="Zoom" />
@@ -222,14 +224,15 @@
 								aria-label="Select {n.nodeKey}"
 								title="Add to the selection, or take it out"
 							/>
-							{nodeLabel(n.nodeKey)}{#if n.critical}<em title="Marked critical: if it fails, the whole group stops">critical</em>{/if}
+							{nodeLabel(n.nodeKey)}{#if tag(n)}<span class="mtag">{tag(n)}</span>{/if}{#if n.critical}<em title="Marked critical: if it fails, the whole group stops">critical</em>{/if}
 						</span>
 						<span class="track">
 							{#if s == null || e == null}
 								<span class="note">{skipText(n)}</span>
 							{:else}
 								<span class="bar" class:live={n.status === 'running'} style:--s={s} style:--e={e} style:background={nodeStatusTone[n.status]}></span>
-								{@const dur = `${formatSpan(e - s)}${n.status === 'running' ? ' so far' : ''}`}
+								<!-- A building node's live progress, on its bar (CHI-1591, change 4). -->
+								{@const dur = `${formatSpan(e - s)}${n.status === 'running' ? ` so far${n.rowsAffected != null ? ` · ${n.rowsAffected.toLocaleString('en-GB')} rows` : ''}` : ''}`}
 								<span class="dur" style:--s={s} style:--e={e} class:flip={durFlips(dur, s, e)}>{dur}</span>
 							{/if}
 						</span>
@@ -243,23 +246,26 @@
 
 <style>
 	.gantt {
+		position: relative;
 		display: flex;
 		min-height: 0;
 		flex: 1;
 		flex-direction: column;
 	}
+	/* The zoom sits on the axis row (CHI-1591), so the chart keeps the row a toolbar would take. */
 	.gantt-head {
+		position: absolute;
+		top: 0;
+		right: 12px;
+		z-index: 40;
 		display: flex;
-		justify-content: flex-end;
+		height: 28px;
 		align-items: center;
 		gap: 6px;
-		padding: 4px 14px;
-		border-bottom: 1px solid var(--border-subtle);
-	}
-	.count {
-		margin-right: 6px;
-		color: var(--sb-text-faint);
-		font-size: 11px;
+		padding-left: 8px;
+		background: var(--card);
+		transform-origin: right center;
+		scale: 0.86;
 	}
 	.zoom {
 		display: flex;
@@ -520,6 +526,11 @@
 	}
 	.note {
 		left: 8px;
+	}
+	.mtag {
+		color: var(--sb-text-faint);
+		font-family: var(--font-sans);
+		font-size: 11px;
 	}
 	.tick {
 		flex: none;

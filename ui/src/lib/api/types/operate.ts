@@ -38,6 +38,8 @@ export type NodeCounts = {
 	skipped: number;
 	running: number;
 	pending: number;
+	/** Of `skipped`, the nodes that never ran because the run stopped first (prototype, CHI-1591): "not run", not "skipped". */
+	notRun?: number;
 };
 
 /** Compute estimate for a finished run; null where the adapter reports no cost. */
@@ -412,6 +414,8 @@ export type RunOutputLine = {
 	text: string;
 	/** The error the invocation recorded when it failed, rather than a line it printed. */
 	error: boolean;
+	/** The node the line is about, when sqb printed it for one (prototype, CHI-1591). */
+	nodeKey?: string | null;
 };
 
 export type RunInvocation = {

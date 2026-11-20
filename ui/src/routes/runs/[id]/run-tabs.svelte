@@ -12,6 +12,7 @@
 	import { bottomTabs, logEntries } from './utils';
 	import { tick } from 'svelte';
 	import { plural } from '$lib/format/plural';
+	import { skipCause } from './utils/proto';
 
 	let { view }: { view: RunDetailState } = $props();
 
@@ -28,9 +29,11 @@
 	const filterKeys = $derived(view.focus ? view.focus.keys : ignoreSelection ? [] : view.selected);
 	const sel = $derived(new Set(filterKeys));
 	const filtering = $derived(sel.size > 0);
-	const entries = $derived(logEntries(view.eventsRes.data ?? [], view.outputRes.data ?? []));
+	// One line per node outcome, with its checks folded in (CHI-1591, change 3); `app.now` keeps a building node's line current.
+	const edges = $derived(view.detail?.edges ?? []);
+	const entries = $derived(logEntries(view.eventsRes.data ?? [], view.outputRes.data ?? [], { nodes: view.nodes, skipCause: (n) => skipCause(n, view.nodes, edges), now: app.now }));
 	const statements = $derived(filtering ? view.statements.filter((s) => sel.has(s.nodeKey)) : view.statements);
-	// Printed lines name no node, so a node filter keeps the lines that mention one of the selected nodes.
+	// Printed lines carry their node when sqb printed them for one; others are kept when they mention it.
 	const shownEntries = $derived(filtering ? entries.filter((e) => (e.nodeKey ? sel.has(e.nodeKey) : filterKeys.some((k) => e.text.includes(k)))) : entries);
 	const grouped = $derived((view.detail?.children.length ?? 0) > 0);
 	// Kept here so the choice survives switching tabs, and the Log count matches the rows shown.
@@ -115,7 +118,7 @@
 			<p class="err">Couldn't load this run's cost: {view.costRes.error}</p>
 		{/if}
 	{:else}
-		<LogTab entries={shownEntries} {grouped} bind:printed runId={view.run?.id ?? ''} filteredBy={filterKeys} onnode={(key) => view.focusNode(key, 'log')} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
+		<LogTab entries={shownEntries} {grouped} memberOf={(id) => view.detail?.children.find((c) => c.id === id)?.jobKey ?? null} bind:printed runId={view.run?.id ?? ''} filteredBy={filterKeys} onnode={(key) => view.focusNode(key, 'log')} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
 	{/if}
 </PageBody>
 {#if view.tab === 'log' && !atBottom && fresh > 0}

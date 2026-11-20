@@ -10,7 +10,8 @@
 	import { app } from '$lib/state/app.svelte';
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import type { RunDetailState } from './state.svelte';
-	import { attemptLabel } from './utils';
+	import { attemptLabel, costSummary } from './utils';
+	import Button from '$lib/components/ui/button/button.svelte';
 
 	let { view }: { view: RunDetailState } = $props();
 
@@ -36,28 +37,6 @@
 </script>
 
 {#if d}
-	{#if related.length}
-		<div class="strip">
-			<span class="label">Related</span>
-			<ul>
-				{#each related as r (`${r.role}-${r.run.id}`)}
-					<li>
-						<a href={to(`/runs/${r.run.id}`)} title="{r.role} {r.run.id} · {runStatusLabel[r.run.status]} · queued {formatStamp(r.run.queuedAt)}">
-							<span class="faint">{r.role}</span>
-							<i style:background={runStatusTone[r.run.status]}></i>
-							<span class="mono">{shortRunId(r.run.id)}</span>
-							{#if r.role === 'Job run' && r.run.jobKey}<span>{r.run.jobKey}</span>{/if}
-							{#if r.role === 'Job run'}
-								{@const attempt = attemptLabel(r.run, d.children)}
-								{#if attempt}<span class="faint" data-testid="member-attempt">{attempt}</span>{/if}
-							{/if}
-							<span class="faint">{runStatusLabel[r.run.status].toLowerCase()}</span>
-						</a>
-					</li>
-				{/each}
-			</ul>
-		</div>
-	{/if}
 	<!-- A long selection folds behind its count, so the rest of the details stay in view. -->
 {#snippet selection(keys: string[])}
 	{#if keys.length > 12}
@@ -71,6 +50,35 @@
 		{@const p = d.provenance}
 		<div class="details">
 			<dl>
+				<!-- Moved here from the header (CHI-1591): nodes, cost and related runs. -->
+				{#if view.progress.total}<div><dt>Nodes</dt><dd>{view.progress.done}/{view.progress.total} finished</dd></div>{/if}
+				{#if view.cost && view.cost.status !== 'none'}
+					<div><dt>Cost</dt><dd><Button variant="link" size="inline" onclick={() => (view.tab = 'cost')}>{costSummary(view.cost).text}</Button></dd></div>
+				{/if}
+				{#if related.length}
+					<div>
+						<dt>Related runs</dt>
+						<dd>
+			<ul>
+				{#each related as r (`${r.role}-${r.run.id}`)}
+					<li>
+						<a href={to(`/runs/${r.run.id}`)} title="{r.role} {r.run.id} · {runStatusLabel[r.run.status]} · queued {formatStamp(r.run.queuedAt)}">
+							<span class="faint">{r.role}</span>
+							<i style:background={runStatusTone[r.run.status]}></i>
+							<span class="mono">{shortRunId(r.run.id)}</span>
+							{#if r.role === 'Job run' && r.run.jobKey}<span>{r.run.jobKey}</span>{/if}
+							{#if r.role === 'Job run'}
+								{@const attempt = attemptLabel(r.run, d.children)}
+								{#if attempt}<span class="faint" data-testid="member-attempt">{attempt}</span>{/if}
+							{/if}
+							<span class="faint">{r.run.status === 'skipped' && r.run.parentRunId && !r.run.startedAt ? 'not started' : runStatusLabel[r.run.status].toLowerCase()}</span>
+						</a>
+					</li>
+				{/each}
+			</ul>
+						</dd>
+					</div>
+				{/if}
 				{#if p}
 				<div><dt>Project version</dt><dd>Version {p.snapshotGeneration}{#if p.gitRevision} · commit <code>{p.gitRevision}</code>{/if}{#if p.gitDirty}<span title="Published with uncommitted changes"> · dirty</span>{/if} <span class="faint">· snapshot <code>{p.snapshotId}</code></span></dd></div>
 				{#if p.command}<div><dt>Command</dt><dd><code>{p.command}</code> <CopyButton value={p.command} label="Copy command" /></dd></div>{/if}
@@ -116,19 +124,6 @@
 {/if}
 
 <style>
-	.strip {
-		display: flex;
-		flex: 0 0 auto;
-		align-items: center;
-		gap: 10px;
-		padding: 6px 24px;
-		border-bottom: 1px solid var(--border);
-		font-size: 12.5px;
-	}
-	.label {
-		color: var(--sb-text-faint);
-		font-weight: 500;
-	}
 	ul {
 		display: flex;
 		min-width: 0;

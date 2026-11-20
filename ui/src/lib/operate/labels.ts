@@ -96,7 +96,10 @@ export type WaitPart = { text: string; href?: string; code?: boolean };
 
 /** What went wrong in a finished run, such as "3 failed, 12 skipped"; empty when nothing did. */
 export function outcomeCounts(c: NodeCounts): string {
-	return [c.failed ? `${c.failed} failed` : null, c.skipped ? `${c.skipped} skipped` : null].filter(Boolean).join(', ');
+	// Skipped (an upstream failed) and not run (the run stopped first) are different words everywhere.
+	const notRun = c.notRun ?? 0;
+	const skipped = c.skipped - notRun;
+	return [c.failed ? `${c.failed} failed` : null, skipped ? `${skipped} skipped` : null, notRun ? `${notRun} not run` : null].filter(Boolean).join(', ');
 }
 
 /** `run-4f2a` → `4f2a`, a UUID → its first 8 digits: the short form shown in lists; the full ID stays in links and copies. */

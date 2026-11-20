@@ -5,7 +5,7 @@
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
 	import { to } from '$lib/paths';
 	import { formatAgo } from '$lib/format/time';
-	import { runStatusLabel, runStatusTone } from '$lib/status';
+	import { memberRunLabel, runStatusTone } from '$lib/status';
 	import { app } from '$lib/state/app.svelte';
 	import type { MemberCardData } from './member-graph';
 	import CompactFace from '$lib/components/graph/compact-face.svelte';
@@ -47,7 +47,7 @@
 	<div class="status" style:--tone={tone}>
 		<i></i>
 		{#if d.lastRun}
-			<span class="label">{runStatusLabel[d.lastRun.status]}</span>
+			<span class="label">{memberRunLabel(d.lastRun)}</span>
 			{#if when}<span class="when">{when}</span>{/if}
 		{:else}
 			<span class="label faint">No runs yet</span>

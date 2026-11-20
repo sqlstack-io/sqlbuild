@@ -12,7 +12,6 @@
 	import { folderTree, layoutFolderGraph, withFolderClosed } from '$lib/lineage/folder-graph';
 	import { lineageGraph } from '$lib/lineage/folder-selection';
 	import { folderOf } from '$lib/lineage/catalog-graph';
-	import { READABLE_ZOOM } from '$lib/lineage/fit';
 	import type { CatalogNode, RunNode } from '$lib/api';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
@@ -107,6 +106,7 @@
 			(view.detail?.children ?? []).flatMap((c) => (c.jobKey ? [[c.jobKey, { nodeCount: view.nodes.filter((n) => n.runId === c.id).length || null, lastRun: { id: c.id, status: c.status, startedAt: c.startedAt, endedAt: c.endedAt }, nodes: memberNodes.data?.get(c.jobKey) ?? null }]] : []))
 		)
 	);
+	const failedMembers = $derived((view.detail?.children ?? []).filter((c) => c.status === 'failed' || c.status === 'partial').filter((c) => view.nodes.some((n) => n.runId === c.id && n.status === 'failed')).flatMap((c) => (c.jobKey ? [c.jobKey] : [])));
 	let memberSelection = $state<MemberSelection | null>(null);
 	$effect(() => {
 		const node = memberSelection?.node;
@@ -116,15 +116,18 @@
 
 {#if isGroup}
 	<div class="sb-flow relative flex min-h-0 flex-1 flex-col">
-		{#if groupJob.data?.groupMembers}
-			<MemberGraph members={groupJob.data.groupMembers} {info} catalog={runCatalog} bind:selection={memberSelection} />
+		<!-- Drawn once its members' nodes and the catalog are in, so its first fit is the whole graph. -->
+		{#if groupJob.data?.groupMembers && memberNodes.data && catalog.data}
+			<!-- The failed members open in place, showing their nodes by folder; the others stay closed. -->
+			<MemberGraph members={groupJob.data.groupMembers} {info} catalog={runCatalog} bind:selection={memberSelection} initialExpanded={failedMembers} fitWhole />
 		{:else}
 			<div class="wait">Loading the group's lineage…</div>
 		{/if}
 	</div>
 {:else}
 	<div class="sb-flow relative flex-1" style="background: var(--sb-inset)">
-		<GraphCanvas bind:nodes bind:edges bind:fit fitOnInit readable fitFloor={READABLE_ZOOM} controls="fit" {nodeTypes} elementsSelectable nodesDraggable {onnodeclick} fitViewOptions={{ padding: 0.08, maxZoom: 1, minZoom: READABLE_ZOOM }} minZoom={0.05} />
+		<!-- Opens zoomed to fit the whole run (CHI-1591), compact cards and all; zoom in to read them. -->
+		<GraphCanvas bind:nodes bind:edges bind:fit fitOnInit readable={false} fitFloor={0.1} controls="fit" {nodeTypes} elementsSelectable nodesDraggable {onnodeclick} fitViewOptions={{ padding: 0.06, maxZoom: 1, minZoom: 0.1 }} minZoom={0.05} />
 	</div>
 {/if}
 

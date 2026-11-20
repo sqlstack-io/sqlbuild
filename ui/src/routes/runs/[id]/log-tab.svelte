@@ -22,6 +22,7 @@
 		runId,
 		filteredBy,
 		printed = $bindable(false),
+		memberOf = () => null,
 		onnode,
 		onstatement
 	}: {
@@ -33,6 +34,8 @@
 		printed?: boolean;
 		/** A node name clicked: the log shows only that node. */
 		onnode?: (nodeKey: string) => void;
+		/** A group run's member job, by member run, for the quiet tag beside a node. */
+		memberOf?: (runId: string) => string | null;
 		/** Opens a query's statement, with its SQL. */
 		onstatement?: (nodeKey: string) => void;
 	} = $props();
@@ -90,8 +93,8 @@
 	const logColumns = $derived<TableColumn[]>([
 		// Full timestamps, never cropped (CHI-1591, change 6).
 		{ id: 'time', label: 'Time', width: '206px' },
-		...(grouped ? [{ id: 'run', label: 'Job run', width: '100px' }] : []),
-		{ id: 'node', label: 'Node', width: '220px' },
+		// A group run's member job is a quiet tag beside the node, not a column of its own.
+		{ id: 'node', label: 'Node', width: grouped ? '320px' : '230px' },
 		{ id: 'what', label: 'What happened', minWidth: 300, truncate: false }
 	]);
 </script>
@@ -115,9 +118,9 @@
 	{#snippet row(e)}
 			<tr class:error={e.level === 'error'} class:warn={e.level === 'warn'}>
 				<td class="faint nowrap mono stamp" title={formatStamp(e.at)}>{fullStamp(e.at)}</td>
-				{#if grouped}<td class="mono faint"><a href={to(`/runs/${e.runId}`)}>{shortRunId(e.runId)}</a></td>{/if}
 				<td class="mono" class:faint={!e.nodeKey} title={e.nodeKey ? `Show only ${e.nodeKey} in the log` : undefined}>
 					{#if e.nodeKey && onnode}<Button variant="link" size="inline" class="font-mono text-[12px]" onclick={() => onnode(e.nodeKey!)}>{nodeLabel(e.nodeKey)}</Button>{:else}{e.nodeKey ? nodeLabel(e.nodeKey) : (e.stream ?? 'run')}{/if}
+					{#if grouped && memberOf(e.runId)}<a class="member" href={to(`/runs/${e.runId}`)} title="In member job run {shortRunId(e.runId)}">{memberOf(e.runId)}</a>{/if}
 				</td>
 				<td class:out={e.stream}>
 					{#if e.stream}
@@ -125,7 +128,12 @@
 						<span title={e.title}>{open.has(e.id) || lines.length <= FOLD ? e.text : lines.slice(0, FOLD).join('\n')}</span>
 						{#if lines.length > FOLD}<Button variant="link" size="inline" class="mt-0.5 flex font-sans text-[11.5px]" onclick={() => (open = toggle(open, e.id))}>{open.has(e.id) ? 'Show less' : `Show all ${lines.length} lines`}</Button>{/if}
 					{:else}
-						<span class="dot" style:background={e.tone}></span><span title={e.title}>{e.text}</span>
+						{#if e.category === 'nodes' && e.id.startsWith('node-')}
+							<!-- A node's outcome line: its glyph in its colour, then what it did. -->
+							<span title={e.title}><b class="glyph" style:color={e.tone}>{e.text.slice(0, 1)}</b>{e.text.slice(1)}</span>
+						{:else}
+							<span class="dot" style:background={e.tone}></span><span title={e.title}>{e.text}</span>
+						{/if}
 						{#if e.queries.length}
 							<DisclosureButton open={expanded.has(e.id)} onclick={() => (expanded = toggle(expanded, e.id))} class="ml-2 gap-0.5 text-[11.5px]">{plural(e.queries.length, 'query', 'queries')}</DisclosureButton>
 						{/if}
@@ -139,7 +147,6 @@
 				{#each e.queries as x (x.id)}
 					<tr class="query" class:error={x.level === 'error'}>
 						<td class="faint nowrap mono stamp" title={formatStamp(x.at)}>{fullStamp(x.at)}</td>
-						{#if grouped}<td></td>{/if}
 						<td></td>
 						<td>
 							<span class="dot" style:background={x.tone}></span><span title={x.title}>{x.text}</span>
@@ -154,6 +161,20 @@
 </DataTable>
 
 <style>
+	.member {
+		margin-left: 8px;
+		color: var(--sb-text-faint);
+		font-family: var(--font-sans);
+		font-size: 11px;
+	}
+	.member:hover {
+		color: var(--primary);
+	}
+	.glyph {
+		display: inline-block;
+		width: 1.1em;
+		font-weight: 600;
+	}
 	.filters {
 		position: sticky;
 		top: 0;

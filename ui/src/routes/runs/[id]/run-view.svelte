@@ -5,8 +5,6 @@
 	import Loading from '$lib/components/loading.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import { app } from '$lib/state/app.svelte';
-	import { runStatusTone } from '$lib/status';
-	import { shortRunId } from '$lib/operate/labels';
 	import FailuresPanel from './failures-panel.svelte';
 	import IgnoredAuditsPanel from './ignored-audits-panel.svelte';
 	import LiveStatements from './live-statements.svelte';
@@ -15,7 +13,6 @@
 	import SelectionBar from '$lib/components/selection/selection-bar.svelte';
 	import { to } from '$lib/paths';
 	import { nodeLabel } from '$lib/operate/labels';
-	import { plural } from '$lib/format/plural';
 	import { skipCause, QUICK_PICKS } from './utils/proto';
 	import RelatedRuns from './related-runs.svelte';
 	import RunBanners from './run-banners.svelte';
@@ -33,6 +30,13 @@
 	const detail = $derived(view.detail);
 	const nodes = $derived(view.nodes);
 	let topView = $state<'timeline' | 'graph'>('timeline');
+	// A group run opens on its Graph: when groups get big, the graph is how you see them (CHI-1591).
+	let viewChosen = false;
+	$effect(() => {
+		if (viewChosen || !detail) return;
+		viewChosen = true;
+		if (detail.run.kind === 'group') topView = 'graph';
+	});
 	// A graph needs room: choosing it gives the top pane most of the height.
 	$effect(() => {
 		if (topView === 'graph') untrack(() => (topFrac = Math.max(topFrac, 0.68)));
@@ -54,9 +58,8 @@
 		if (Number.isFinite(first)) return first;
 		return view.run?.startedAt ? Date.parse(view.run.startedAt) : app.now;
 	});
-	const groups = $derived(
-		(detail?.children ?? []).map((c) => ({ runId: c.id, label: `${c.jobKey} · ${shortRunId(c.id)}`, tone: runStatusTone[c.status], href: `/runs/${c.id}` }))
-	);
+	// A group run's nodes carry their member job as a quiet tag; the timeline is not split into sections.
+	const memberOf = (runId: string) => detail?.children.find((c) => c.id === runId)?.jobKey ?? null;
 
 	// ---- resizable split between the timeline and the bottom tabs ----
 	let topFrac = $state(0.5);
@@ -67,8 +70,8 @@
 	$effect(() => {
 		if (sized || !splitEl || !nodes.length || !hasBottom || !splitEl.clientHeight) return;
 		sized = true;
-		const rows = nodes.length + (groups.length > 1 ? groups.length : 0);
-		topFrac = Math.min(0.6, Math.max(0.22, (125 + rows * 32) / splitEl.clientHeight));
+		const rows = nodes.length;
+		topFrac = untrack(() => topView) === 'graph' ? 0.68 : Math.min(0.6, Math.max(0.22, (125 + rows * 32) / splitEl.clientHeight));
 	});
 	function onDrag(e: PointerEvent) {
 		if (!dragging || !splitEl) return;
@@ -94,46 +97,42 @@
 
 		<div bind:this={splitEl} class="flex min-h-0 flex-1 flex-col" class:select-none={dragging}>
 			<div class="flex min-h-0 flex-col" style:flex={hasBottom ? topFrac : 1}>
-				<div class="exec-head">
-					<span class="label">Nodes over time</span>
+				{#if nodes.length}
+					<!-- One toolbar row above the chart (CHI-1591): the view, the selection to plan with its quick picks, and Plan these. -->
+					<div class="pick">
+						<SelectionBar selection={view.selection} {names} total={nodes.length} build={false} copy={false}>
+							{#snippet leading()}
+								<SegmentedFilter label="View" bind:value={topView} options={[{ value: 'timeline', label: 'Timeline' }, { value: 'graph', label: 'Graph' }]} />
+							{/snippet}
+							{#snippet trailing()}
+								<span class="picks">
+									<span class="faint">Pick</span>
+									{#each QUICK_PICKS as q (q.value)}
+										<Button variant="link" size="inline" class="text-[12.5px]" onclick={() => view.pick(q.value)}>{q.label}</Button>
+									{/each}
+								</span>
+								{#if view.planLink && planCount}
+									<a class="plan" href={to(view.planLink)} data-testid="plan-these" title="Open the plan page for this selection{view.run?.jobKey && view.run.kind !== 'group' ? ` as ${view.run.jobKey} builds it` : ''}">Plan these {planCount} →</a>
+								{:else}
+									<span class="plan off" title="Select nodes first">Plan these →</span>
+								{/if}
+							{/snippet}
+						</SelectionBar>
+					</div>
 					{#if view.statusFilter}
 						{@const g = view.nodeGroups.find((x) => x.key === view.statusFilter)}
-						<span class="faint" data-testid="timeline-filter">{g?.label} only · {g?.nodes.length} of {nodes.length}</span>
-						<Button variant="link" size="inline" class="text-[12px]" onclick={() => view.clearFocus()}>Show all</Button>
-					{/if}
-					{#if detail.children.length}<span class="faint">{detail.children.length} job runs · nodes from all of them</span>{/if}
-					{#if hasGraph}
-					<div class="seg"><SegmentedFilter label="View" bind:value={topView} options={[{ value: 'timeline', label: 'Timeline' }, { value: 'graph', label: 'Graph' }]} /></div>
-					{/if}
-				</div>
-				{#if nodes.length}
-					<!-- Selection → Plan (CHI-1591, change 3): the Lineage page's selection, with quick picks. -->
-					<div class="pick">
-						<SelectionBar selection={view.selection} {names} total={nodes.length} build={false} />
-						<div class="picks">
-							<span class="faint">Pick</span>
-							{#each QUICK_PICKS as q (q.value)}
-								<Button variant="link" size="inline" class="text-[12.5px]" onclick={() => view.pick(q.value)}>{q.label}</Button>
-							{/each}
-							{#if view.selection.active}
-								<span class="faint">· {view.selected.length} of this run's {plural(nodes.length, 'node')} selected</span>
-								<Button variant="link" size="inline" class="text-[12.5px]" onclick={() => view.clearSelection()}>Clear</Button>
-							{/if}
-							<span class="grow"></span>
-							{#if view.planLink && planCount}
-								<a class="plan" href={to(view.planLink)} data-testid="plan-these" title="Open the plan page for this selection{view.run?.jobKey && view.run.kind !== 'group' ? ` as ${view.run.jobKey} builds it` : ''}">Plan these {planCount} →</a>
-							{:else}
-								<span class="plan off" title="Select nodes first">Plan these →</span>
-							{/if}
+						<div class="filtered" data-testid="timeline-filter">
+							Showing {g?.label.toLowerCase()} only · {g?.nodes.length} of {nodes.length}
+							<Button variant="link" size="inline" class="text-[12px]" onclick={() => view.clearFocus()}>Show all</Button>
 						</div>
-					</div>
+					{/if}
 				{/if}
 				<div class="flex min-h-0 flex-1">
 					<div class="relative flex min-h-0 flex-1 flex-col">
 						{#if !nodes.length}
 							<div class="empty">{detail.children.length ? 'No nodes yet.' : 'Not started.'}</div>
 						{:else if topView === 'timeline' || !hasGraph}
-							<RunGantt nodes={view.shownNodes} {origin} now={app.now} active={view.active} selected={view.selected} {groups} skipText={causeOf} onselect={(key) => view.selectNode(key)} onopen={(key) => view.openDrawer(key)} />
+							<RunGantt nodes={view.shownNodes} {origin} now={app.now} active={view.active} selected={view.selected} tag={detail.children.length ? (n) => memberOf(n.runId) : undefined} skipText={causeOf} onselect={(key) => view.selectNode(key)} onopen={(key) => view.openDrawer(key)} />
 						{:else}
 							<RunLineage {view} />
 						{/if}
@@ -177,24 +176,8 @@
 </div>
 
 <style>
-	.exec-head {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		padding: 6px 24px;
-		border-bottom: 1px solid var(--border);
-		font-size: 11.5px;
-	}
-	.exec-head .label {
-		color: var(--sb-text-faint);
-		font-size: 12px;
-		font-weight: 600;
-	}
 	.faint {
 		color: var(--sb-text-faint);
-	}
-	.seg {
-		margin-left: auto;
 	}
 	.pick {
 		border-bottom: 1px solid var(--border);
@@ -204,14 +187,21 @@
 		background: transparent;
 	}
 	.picks {
-		display: flex;
+		display: inline-flex;
+		flex: none;
 		align-items: center;
 		gap: 10px;
-		padding: 0 20px 6px;
+		margin: 0 6px 0 8px;
 		font-size: 12.5px;
 	}
-	.grow {
-		flex: 1;
+	.plan {
+		flex: none;
+	}
+	.filtered {
+		padding: 4px 24px;
+		border-bottom: 1px solid var(--border);
+		color: var(--sb-text-faint);
+		font-size: 12px;
 	}
 	.plan {
 		padding: 3px 10px;

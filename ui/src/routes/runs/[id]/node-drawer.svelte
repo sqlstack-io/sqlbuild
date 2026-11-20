@@ -3,6 +3,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import { formatDuration } from '$lib/format/time';
+	import { app } from '$lib/state/app.svelte';
 	import { nodeLabel, nodeStatusTone, shortRunId } from '$lib/operate/labels';
 	import type { RunDetailState } from './state.svelte';
 	import { fullStamp, skipCause } from './utils/proto';
@@ -17,8 +18,9 @@
 	const cause = $derived(n ? skipCause(n, view.nodes, view.detail?.edges ?? []) : null);
 	const checks = $derived(key ? (view.eventsRes.data ?? []).filter((e) => e.type === 'audit_completed' && e.nodeKey === key) : []);
 	const selected = $derived(!!key && view.selected.includes(key));
-	const STATUS: Record<string, string> = { success: 'Built', warn: 'Built, with warnings', failed: 'Failed', skipped: 'Skipped', running: 'Running', pending: 'Waiting', not_run: 'Not run', cancelled: 'Cancelled' };
-	const rows = $derived(n?.rowsAffected == null ? null : `${n.kind === 'incremental' ? '+' : ''}${n.rowsAffected.toLocaleString('en-GB')} rows${n.kind === 'incremental' ? ' inserted' : ''}`);
+	const STATUS: Record<string, string> = { success: 'Built', warn: 'Built, with warnings', failed: 'Failed', skipped: 'Skipped', running: 'Building', pending: 'Waiting', not_run: 'Not run', cancelled: 'Not run (cancelled)' };
+	// While it builds, the rows written so far: the node's live progress (CHI-1591, change 4).
+	const rows = $derived(n?.rowsAffected == null ? null : `${n.kind === 'incremental' ? '+' : ''}${n.rowsAffected.toLocaleString('en-GB')} rows${n.status === 'running' ? ' so far' : n.kind === 'incremental' ? ' inserted' : ''}`);
 
 	function onkey(e: KeyboardEvent) {
 		if (e.key === 'Escape' && key) view.openDrawer(null);
@@ -40,7 +42,7 @@
 			<dt>Kind</dt><dd>{n.kind}</dd>
 			{#if n.jobKey && view.detail?.children.length}<dt>Job run</dt><dd><a href={to(`/runs/${n.runId}`)}>{n.jobKey} · {shortRunId(n.runId)}</a></dd>{/if}
 			{#if n.startedAt}<dt>Started</dt><dd class="mono">{fullStamp(n.startedAt)}</dd>{/if}
-			{#if n.startedAt}<dt>Took</dt><dd>{formatDuration(n.startedAt, n.endedAt, Date.now())}{n.status === 'running' ? ' so far' : ''}</dd>{/if}
+			{#if n.startedAt}<dt>Took</dt><dd>{formatDuration(n.startedAt, n.endedAt, app.now)}{n.status === 'running' ? ' so far' : ''}</dd>{/if}
 			{#if rows}<dt>Rows</dt><dd>{rows}</dd>{/if}
 			{#if n.attempt > 1}<dt>Attempt</dt><dd>{n.attempt}</dd>{/if}
 		</dl>
