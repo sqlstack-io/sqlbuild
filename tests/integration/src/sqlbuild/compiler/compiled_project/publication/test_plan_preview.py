@@ -189,6 +189,20 @@ _FUNCTION_CALLER_FILES: dict[str, str] = {
 }
 
 
+_CANT_RUN: list[dict[str, object]] = [
+    {
+        "reason": "missing_secret",
+        "provider": "region",
+        "path": "providers/region.py",
+        "variables": ["WORKER_ENV_REGION_CODE", "WORKER_ENV_TOKEN"],
+        "nodes": ["source:raw_regions"],
+        "readers": ["model:orders"],
+        "sinks": [],
+        "env_file": ".env",
+    }
+]
+
+
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -642,20 +656,6 @@ def test_given_a_plan_that_fails_when_the_location_plans_it_then_its_own_error_i
     assert test_case.expected_reason in plan["error"]["message"], plan
     assert published["changed"] == [] and published["downstream"] == [], published
     assert published["failing"] == plan["error"]["message"], published
-
-
-_CANT_RUN: list[dict[str, object]] = [
-    {
-        "reason": "missing_secret",
-        "provider": "region",
-        "path": "providers/region.py",
-        "variables": ["WORKER_ENV_REGION_CODE", "WORKER_ENV_TOKEN"],
-        "nodes": ["source:raw_regions"],
-        "readers": ["model:orders"],
-        "sinks": [],
-        "env_file": ".env",
-    }
-]
 
 
 @pytest.mark.parametrize(
