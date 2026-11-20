@@ -77,6 +77,9 @@ executable = "/usr/local/bin/sqb"
   listens on port 9000.
 - Keep secrets in environment variables. The file names the variable, as `database_env` and
   `client_secret_env` do, never the secret itself.
+- A worker loads its project's [env file](../concepts/project-configuration.md#env-file) for its
+  target when it starts, so provider secrets can live there instead of in the launcher's
+  environment. Variables already in that environment win.
 - Each launcher names a location by the name you gave `sqb admin create-location`. Create the
   location before you start the server; an unknown name stops it.
 - `sqb scheduler --config server.toml` reads the same file for its control database and launchers.

@@ -32,6 +32,7 @@ use crate::native_commands::_helpers::command::terminal::{
 };
 use crate::native_commands::_helpers::command::terminal::{live_screen, stderr_columns};
 use crate::native_commands::_helpers::location::dynamic_resume::resume_expired_holds;
+use crate::native_commands::_helpers::location::env_reload::env_file_summary;
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_timeout_seconds, rows_text, scan_line,
 };
@@ -72,6 +73,8 @@ use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::main::sync_interval_seconds::sync_interval_seconds;
 use sqlbuild_config::project::models::ControlConfig;
 use sqlbuild_core::cli_text::models::CliStyle;
+use sqlbuild_core::process_environment::constants::RUN_TOKEN_VARIABLE;
+use sqlbuild_core::process_environment::main::apply_environment_overlay::apply_environment_overlay;
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use sqlbuild_core::screen_text::models::{DevHeader, ScreenFacts};
 use sqlbuild_orchestration::api::constants::BODY_BYTES;
@@ -93,6 +96,7 @@ use sqlbuild_orchestration::dev_events::main::parse_dev_event::parse_dev_event;
 use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::health::report_remote_location_health::report_remote_location_health;
+use sqlbuild_orchestration::platform::main::health::unallowed_secret_count::unallowed_secret_count;
 use sqlbuild_orchestration::platform::main::installation::run_maintenance::run_maintenance;
 use sqlbuild_orchestration::platform::models::ConnectionCheckTrigger;
 use sqlbuild_orchestration::platform::models::LocationRuleFailure;
@@ -100,6 +104,7 @@ use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
     WarehouseSyncFailure,
 };
+use sqlbuild_orchestration::platform::models::{MissingProviderSecrets, PublishedGeneration};
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
@@ -251,6 +256,7 @@ fn development_location_role(
     ControlError,
 > {
     let mut command = Command::new(executable);
+    apply_environment_overlay(command.as_std_mut());
     command
         .args(["--project-dir"])
         .arg(project)
@@ -268,7 +274,7 @@ fn development_location_role(
         .env_remove("SQLBUILD_CONTROL_DATABASE_URL")
         .env_remove("SQLBUILD_PLATFORM_WEBHOOK_URL")
         .env_remove(SECURITY_AUDIT_WEBHOOK_VARIABLE)
-        .env_remove("SQLBUILD_RUN_TOKEN")
+        .env_remove(RUN_TOKEN_VARIABLE)
         .env_remove("SQLBUILD_DEVELOPMENT_CONTROL_FILE")
         .env(DEV_EVENTS_VARIABLE, DEV_EVENTS_ON)
         .stdin(Stdio::piped())
@@ -356,7 +362,13 @@ pub(crate) async fn compile_generation(
             }
         }
     };
-    let Some((record, refresh, locations)) = load.published else {
+    let Some(PublishedGeneration {
+        record,
+        refresh_at: refresh,
+        state_locations: locations,
+        missing_secrets,
+    }) = load.published
+    else {
         if let Some(rules) = &load.rules {
             dev_failure(dev_events, generation, rule_failure_text(rules));
         }
@@ -383,7 +395,7 @@ pub(crate) async fn compile_generation(
             record.snapshot_id
         )));
     }
-    Ok(Some(Ok((refresh_at, locations))))
+    Ok(Some(Ok((refresh_at, locations, missing_secrets))))
 }
 
 /// Under `sqb dev`, tell the screen a generation failed; the last good generation keeps serving.
@@ -787,6 +799,45 @@ pub(crate) fn location_warning(title: &str, detail: String) {
     }));
 }
 
+/// Report the providers a publication shows missing secrets; under `sqb dev`, also warn about them.
+pub(crate) async fn report_provider_secrets(
+    options: &LocationServe,
+    (bearer, session_id): (&str, Uuid),
+    (generation, providers): (i64, Vec<MissingProviderSecrets>),
+) {
+    let missing: u64 = unallowed_secret_count(&providers);
+    if missing > 0 {
+        let mut variables: Vec<String> = Vec::new();
+        for provider in providers.iter().filter(|provider| !provider.allowed) {
+            for setting in &provider.settings {
+                variables.push(format!("{} {}", provider.provider, setting.variable));
+            }
+        }
+        drop(write_output(&[(
+            Stream::Stderr,
+            &format!(
+                "Providers are missing secrets in this location's environment; runs that use them stop before the warehouse: {}\n",
+                variables.join(", ")
+            ),
+        )]));
+        location_warning(
+            "provider secrets unset",
+            format!("{missing} unset; runs that use them fail; sqb debug lists them"),
+        );
+    }
+    report_location_health(
+        options,
+        bearer,
+        session_id,
+        LocationHealth::ProviderSecrets {
+            generation,
+            missing,
+            providers,
+        },
+    )
+    .await;
+}
+
 /// Health IO remains native even while a user-code child holds its interpreter's GIL.
 pub(crate) async fn report_location_health(
     options: &LocationServe,
@@ -958,7 +1009,7 @@ pub(crate) async fn check_published_location(
     )]));
     tokio::pin!(stopped);
     let started = Instant::now();
-    let Some((connected, (missing, wakes_compute), files)) =
+    let Some((connected, wakes_compute, files)) =
         check_location_connection((options, script, connect), stopped.as_mut()).await?
     else {
         return Ok(None);
@@ -973,22 +1024,6 @@ pub(crate) async fn check_published_location(
         result = &mut stopped => { result?; return Ok(None); },
         () = report_location_health(options, bearer, session_id, health) => {},
     }
-    tokio::select! {
-        result = &mut stopped => { result?; return Ok(None); },
-        () = report_location_health(options, bearer, session_id, LocationHealth::ProviderSecrets { generation, missing }) => {},
-    }
-    if missing > 0 {
-        drop(write_output(&[(
-            Stream::Stderr,
-            &format!(
-                "{missing} provider secret(s) are unset in this location's environment; runs that use them fail. Run sqb debug for the list.\n"
-            ),
-        )]));
-        location_warning(
-            "provider secrets unset",
-            format!("{missing} unset; runs that use them fail; sqb debug lists them"),
-        );
-    }
     drop(write_output(&[(
         Stream::Stderr,
         if connected {
@@ -1000,11 +1035,11 @@ pub(crate) async fn check_published_location(
     Ok(Some((files, wakes_compute)))
 }
 
-/// Capture the debug check's local file paths, missing secret count and whether history reads wake billed compute; under `sqb dev` it never connects, so nobody signs in twice.
+/// Capture the debug check's local file paths and whether history reads wake billed compute; under `sqb dev` it never connects, so nobody signs in twice.
 pub(crate) async fn check_location_connection(
     (options, script, connect): (&LocationServe, &Path, bool),
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<(bool, (u64, bool), Vec<PathBuf>)>, ControlError> {
+) -> Result<Option<(bool, bool, Vec<PathBuf>)>, ControlError> {
     let mut command = location_child(options, script);
     command.args(["debug", "--target", &options.target, "--json"]);
     if !connect || options.dev_events {
@@ -1025,13 +1060,12 @@ pub(crate) async fn check_location_connection(
         },
         result = async { tokio::try_join!(child.wait(), stdout.read_to_end(&mut output)) } => result?.0.success(),
     };
-    let (files, missing, wakes_compute): (Vec<String>, u64, bool) = match serde_json::from_slice::<
+    let (files, wakes_compute): (Vec<String>, bool) = match serde_json::from_slice::<
         serde_json::Value,
     >(&output)
     .and_then(|report| {
         Ok((
             serde_json::from_value(report["local_files"].clone())?,
-            report["missing_secrets"].as_u64().unwrap_or_default(),
             report["history_reads_wake_compute"]
                 .as_bool()
                 .unwrap_or_default(),
@@ -1043,18 +1077,19 @@ pub(crate) async fn check_location_connection(
                 Stream::Stderr,
                 "Location connection check did not produce a valid report; retaining the published snapshot.\n",
             )]));
-            return Ok(Some((false, (0, false), Vec::new())));
+            return Ok(Some((false, false, Vec::new())));
         }
     };
     Ok(Some((
         connect && connected,
-        (missing, wakes_compute),
+        wakes_compute,
         location_database_files(&options.project_dir, files),
     )))
 }
 
 pub(crate) fn location_child(options: &LocationServe, script: &Path) -> Command {
     let mut command = Command::new(script);
+    apply_environment_overlay(command.as_std_mut());
     command.arg("--project-dir").arg(&options.project_dir);
     if terminal_columns().is_err() {
         command.env(COLUMNS_VARIABLE, FALLBACK_COLUMNS.to_string());
@@ -1756,6 +1791,7 @@ pub(crate) fn screen_setup(project: &Path, target: &str) -> ScreenSetup {
         },
         watching: format!("{}/", project_directory_name(project)),
         project_root: project.to_string_lossy().into_owned(),
+        env_file: env_file_summary(project),
     }
 }
 
@@ -1807,7 +1843,7 @@ pub(crate) async fn finish_compile(
     ),
 ) -> Result<Option<Settled>, ControlError> {
     tokio::pin!(stopped);
-    let (refresh_at, locations) = match load {
+    let (refresh_at, locations, missing_secrets) = match load {
         Ok(published) => published,
         Err(rules) => {
             watch.retry_at = Some(Instant::now() + Duration::from_secs(30));
@@ -1823,6 +1859,10 @@ pub(crate) async fn finish_compile(
         }
     };
     watch.retry_at = refresh_at;
+    tokio::select! {
+        result = &mut stopped => { result?; return Ok(None); },
+        () = report_provider_secrets(options, session, (generation, missing_secrets)) => {},
+    }
     let trigger = if watch.checked {
         ConnectionCheckTrigger::Publish
     } else {

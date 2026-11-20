@@ -9,6 +9,7 @@ Online: https://sqlbuild.com/docs/cli/dev/
 ## Contents
 
 - Options
+- Set provider secrets
 - Sign in to the warehouse
 - Keys
 - Plain output
@@ -31,6 +32,7 @@ sqb dev
   ➜  Warehouse   ● duckdb · /work/shop/warehouse.duckdb
   ➜  Triggers    3 paused
   ➜  Watching    shop/
+  ➜  Env file    .env · 2 variables · edit it, then press r to reload
 
   o open UI · r recompile · s retry warehouse · l logs · q quit
 ```
@@ -51,6 +53,14 @@ version published, and its failure line names the error or the first finding.
 | `--no-scheduler` | Off | Serve and reload without running scheduled work |
 | `--triggers` | Off | Keep each trigger's default status and your changes to it, instead of pausing every trigger at start-up |
 
+## Set provider secrets
+
+`sqb dev` loads the project's [env file](../concepts/project-configuration.md#env-file), `.env`
+by default, when it starts, and the **Env file** row on the ready card says how many variables
+it set. After editing the file, press `r`: the location reads it again and restarts its Python
+interpreter when a value changed, so the next compile and run use the new values. Variables set
+in the shell that started `sqb dev` still win.
+
 ## Sign in to the warehouse
 
 Once the first version is published, `sqb dev` connects to the target's warehouse in the
@@ -65,7 +75,7 @@ The location reads warehouse history once the connection succeeds.
 | Key | Effect |
 | --- | --- |
 | `o` | Open the UI in your browser |
-| `r` | Compile and publish again |
+| `r` | Read the [env file](../concepts/project-configuration.md#env-file) again, then compile and publish |
 | `s` | Retry the warehouse connection in the foreground |
 | `l` | Show or hide the detailed log, the latest 500 lines |
 | `q` | Stop, like Ctrl+C |
@@ -80,6 +90,7 @@ sqlbuild dev: control store ready (0.1s)
 sqlbuild dev: location 01a1d7ff-0b3a-7631-ba35-e44d44d072f2 · target dev
 sqlbuild dev: discovered 4 python nodes, 38 models (0.6s)
 sqlbuild dev: published gen 1 01a1d7ff (0.1s)
+sqlbuild dev: env file .env · 2 variables · edit it, then press r to reload
 sqlbuild dev: ready http://127.0.0.1:8000
 sqlbuild dev: warehouse read failed: retrying in 30s: CatalogException: Table _sqlbuild_fingerprints does not exist
 ```

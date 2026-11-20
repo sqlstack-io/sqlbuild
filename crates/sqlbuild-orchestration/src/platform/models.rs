@@ -5,7 +5,7 @@ use crate::credentials::models::AuditRetention;
 use crate::declarations::models::TriggerDefinition;
 use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
 use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
-use crate::snapshots::models::SnapshotRetention;
+use crate::snapshots::models::{SnapshotRecord, SnapshotRetention};
 use crate::warehouse_metadata::models::StateHistoryRetention;
 use crate::warehouse_metadata::models::{
     StatisticsRetention, WarehouseHistoryKind, WarehouseStateLocation,
@@ -53,10 +53,13 @@ pub enum LocationHealth {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         elapsed_millis: Option<u64>,
     },
-    /// How many provider secret settings the location's environment leaves unset.
+    /// The providers whose required secrets the location's environment leaves unset.
     ProviderSecrets {
         generation: i64,
+        /// Unset secrets of providers the target doesn't allow to miss them; above zero is a health problem.
         missing: u64,
+        /// Every provider missing a secret, including those the target allows; names only, never values.
+        providers: Vec<MissingProviderSecrets>,
     },
     /// Jobs and groups this server's `pool_caps` clamp, derived by the server, never reported by a location.
     PoolCapped {
@@ -89,6 +92,41 @@ pub enum LocationHealth {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         mirrored_records: Option<u64>,
     },
+}
+
+/// A location's published generation, as its interpreter hands it to the supervisor.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PublishedGeneration {
+    pub record: SnapshotRecord,
+    /// The earliest calendar refresh deadline.
+    pub refresh_at: Option<DateTime<Utc>>,
+    /// The state locations its nodes write.
+    pub state_locations: Vec<WarehouseStateLocation>,
+    /// The providers whose required secrets the location's environment leaves unset.
+    pub missing_secrets: Vec<MissingProviderSecrets>,
+}
+
+/// A provider whose required secrets are unset: what is missing and which nodes need it, never a value.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MissingProviderSecrets {
+    pub provider: String,
+    /// The provider's file, relative to the project directory.
+    pub path: String,
+    pub settings: Vec<MissingProviderSetting>,
+    /// Snapshot node keys that run the provider, such as `source:raw_payments`.
+    pub nodes: Vec<String>,
+    /// The target's `allow_missing_secrets` lists the provider, so its location shows a note, not a problem.
+    pub allowed: bool,
+}
+
+/// One unset required setting: the field, the variable it reads and the field's line in the provider file.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MissingProviderSetting {
+    pub field: String,
+    pub variable: String,
+    pub line: Option<u64>,
 }
 
 /// The stage a warehouse sync failed at; only a failed read also reports its redacted error.

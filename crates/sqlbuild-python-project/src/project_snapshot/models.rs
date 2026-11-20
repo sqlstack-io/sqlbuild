@@ -59,6 +59,8 @@ use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
 use uuid::Uuid;
 
+use crate::project_snapshot::constants::MISSING_SECRET_CODE;
+
 /// A data-only publication; this object never contains adapters, connections or user callables.
 #[pyclass(frozen, module = "sqlbuild._native")]
 #[derive(Debug)]
@@ -254,6 +256,27 @@ impl WorkerBuild {
     pub fn refuse(&self, reason: &str) -> PyResult<()> {
         *self.refusal.lock().map_err(|_| poisoned())? = Some(reason.to_owned());
         Ok(())
+    }
+
+    /// Fail the selected nodes whose providers are missing secrets, each with its `D012` message, before anything runs; the terminal report carries `reason`.
+    pub fn fail_missing_secrets(
+        &self,
+        py: Python<'_>,
+        failures: &[(String, String)],
+        reason: &str,
+    ) -> PyResult<()> {
+        for (key, message) in failures {
+            self.complete(
+                py,
+                key,
+                (
+                    NodeOutcome::Failed,
+                    None,
+                    (Some(MISSING_SECRET_CODE.to_owned()), Some(message.clone())),
+                ),
+            )?;
+        }
+        self.refuse(reason)
     }
 
     pub fn check_cancelled(&self, py: Python<'_>) -> PyResult<()> {
@@ -1041,4 +1064,13 @@ impl Drop for NativeOrchestrationWorker {
             owner.close();
         }
     }
+}
+
+/// How a consumer's code runs inside other snapshot nodes, besides its own node.
+#[derive(Clone, Copy)]
+pub(crate) enum RunsIn {
+    Itself,
+    ModelHooks,
+    ModelMaterialization,
+    SourceLoader,
 }

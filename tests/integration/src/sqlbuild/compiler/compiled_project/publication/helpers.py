@@ -87,6 +87,37 @@ class RejectedPublicationOutput(StringIO):
         raise OSError("synthetic publication result delivery failure")
 
 
+# A provider whose settings only the project's .env sets; the worker must see them.
+REGION_PROVIDER_FILES: dict[str, str] = {
+    "providers/region.py": (
+        "from pydantic import Field, SecretStr\n"
+        "from sqlbuild.providers import Provider\n\n\n"
+        "class Region(Provider):\n"
+        '    """Region settings from the environment."""\n'
+        "    token: SecretStr = Field(validation_alias='WORKER_ENV_TOKEN')\n"
+        "    code: int = Field(validation_alias='WORKER_ENV_REGION_CODE')\n"
+    ),
+    "sources/regions.yml": (
+        "sources:\n"
+        "  - name: raw_regions\n"
+        "    description: The region code the provider reads.\n"
+        "    managed: true\n"
+        "    write_strategy: table\n"
+        "    columns:\n"
+        "      - name: code\n"
+        "        type: BIGINT\n"
+    ),
+    "python/loaders/regions.py": (
+        "from providers.region import Region\n"
+        "from sqlbuild.loaders import loader\n\n\n"
+        "@loader\n"
+        "def raw_regions(ctx, region: Region):\n"
+        '    """Load the provider\'s region code."""\n'
+        "    return [{'code': region.code}]\n"
+    ),
+}
+
+
 @contextmanager
 def location_process(
     arguments: list[str], log: Path, publications: Path, *, env: dict[str, str] | None = None
@@ -1987,8 +2018,41 @@ def failed_load(tmp_path: Path, project: Path) -> tuple[dict[str, Any], int, str
     return report["report"]["health"], missing.value.code, log.read_text()
 
 
+def provider_secrets_health(tmp_path: Path, project: Path) -> tuple[dict[str, Any], str]:
+    """Serve `project` until it reports which providers miss secrets: that health and the log."""
+    log: Path = tmp_path / "location.log"
+    with (
+        snapshot_api(tmp_path / "control") as api,
+        location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location,
+    ):
+        report: dict[str, Any] = wait_for_location_health(
+            api, "development", {"kind": "provider_secrets"}, location, log
+        )
+    return report["report"]["health"], log.read_text()
+
+
 def plan_before_sync(
-    tmp_path: Path, project: Path, settings: dict[str, object]
+    tmp_path: Path,
+    project: Path,
+    settings: dict[str, object],
+    selection: tuple[str, ...] = (),
 ) -> tuple[dict[str, Any], str]:
     """Serve `project` until it publishes, then plan from its copy without waiting for a sync."""
     control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
@@ -2015,6 +2079,44 @@ def plan_before_sync(
         ) as location,
     ):
         _ = wait_for_generation(api, "dev", 1, location, log)
-        request_id: str = request_plan(control, [], settings)
+        request_id: str = request_plan(control, list(selection), settings)
         result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
     return result["result_json"]["outcome"], log.read_text()
+
+
+def request_development_run(
+    executable: str, project: Path, identity: str, environment: dict[str, str]
+) -> str:
+    """Request a run of `annual_orders_job` from the development store; its run ID."""
+    run_id: str = str(uuid4())
+    requested: subprocess.CompletedProcess[str] = subprocess.run(
+        [
+            executable,
+            "--project-dir",
+            str(project),
+            "admin",
+            "request-run",
+            identity,
+            "annual_orders_job",
+            "--target",
+            "development",
+            "--run-id",
+            run_id,
+            "--reason",
+            "Development secret reload",
+        ],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert requested.returncode == 0, requested.stderr
+    return run_id
+
+
+def linked_project(project: Path) -> Path:
+    """A symlink to the project, beside it."""
+    link: Path = project.with_name(f"{project.name}_link")
+    link.symlink_to(project, target_is_directory=True)
+    return link

@@ -61,6 +61,7 @@ export const eventKindLabel: Record<PlatformEventKind, string> = {
 	calendar_horizon_low: 'Calendar running out of dates',
 	scheduler_no_leader: 'Scheduler stopped',
 	location_broken: 'Location not checking in',
+	location_missing_secrets: 'Provider secrets missing',
 	launch_failed: 'Couldn’t start runs',
 	connection_test_failed: 'Connection test failed',
 	warehouse_sync_failed: 'Warehouse sync failing',

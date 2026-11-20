@@ -10,6 +10,7 @@ Online: https://sqlbuild.com/docs/concepts/project-configuration/
 
 - sqlbuild_project.toml
 - Targets
+- Env file
 - Defaults
 - Constants
 - Path defaults
@@ -81,6 +82,7 @@ materialized = "view"
 | Field | Description |
 |-------|-------------|
 | `default_target` | Name of the target to build against when none is selected (see [Selecting a target](#selecting-a-target)). |
+| `env_file` | File of provider settings and secrets loaded at start-up; default `.env`, `""` turns it off (see [Env file](#env-file)). |
 
 ### Named connections
 
@@ -191,6 +193,8 @@ A target is a named build context - the database and schema you build into, plus
 | `ignore_audit_failures` | Whether builds on this target let audit failures through, replacing `[settings] ignore_audit_failures`; see [Ignoring audit failures](audits.md#ignoring-audit-failures) |
 | `plan_from` | Where `sqb plan` and `sqb build` read warehouse state: `live` (default) or `synced_state`; see [Planning from synced state](#planning-from-synced-state) |
 | `pause_dynamic` | `true` keeps this target's [dynamic models](models/dynamic.md) suspended between builds; each build refreshes the ones it selects. Default `false` |
+| `env_file` | File of provider settings and secrets for this target, replacing the project's `env_file`; see [Env file](#env-file) |
+| `allow_missing_secrets` | Providers whose missing secrets are expected on this target; see [Allowed missing secrets](#allowed-missing-secrets) |
 
 ```toml
 [connections.warehouse]
@@ -399,6 +403,83 @@ that target:
 max_full_rows = 100_000_000
 ```
 
+## Env file
+
+`sqb` loads provider settings and secrets from the project's `.env` when a command starts, so you
+don't have to export them first. Put the file beside `sqlbuild_project.toml` and keep it out of
+git:
+
+```bash
+# .env
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T000/B000/XXXX
+PAYMENTS_API_TOKEN="tok_live_..."
+```
+
+Choose another file for the project, or for one target:
+
+```toml
+env_file = ".env"            # the default; "" turns loading off
+
+[targets.uat]
+env_file = "/etc/opt/sqlbuild/sqlbuild.env"
+```
+
+| Setting | Effect |
+| --- | --- |
+| `env_file` | The file every command loads. Default `.env`; `""` turns loading off |
+| `[targets.<name>] env_file` | The file for that target. It replaces the project's `env_file`; the two don't merge |
+
+Variables already set in the environment win over the file, so CI, deployments and a one-off
+`export` keep working.
+
+A configured file must exist. The default `.env` may be missing:
+
+```text
+$ sqb build --target uat
+error: env file /etc/opt/sqlbuild/sqlbuild.env does not exist (set by [targets.uat] env_file in sqlbuild_project.toml)
+  = help: create /etc/opt/sqlbuild/sqlbuild.env, or change env_file in sqlbuild_project.toml ("" turns it off)
+```
+
+`sqb` warns when the file's group or other users can read it:
+
+```text
+warning: env file .env is readable by group or others (mode 644); restrict it with chmod 600 .env
+```
+
+Details:
+
+- A relative path is relative to the project directory.
+- Every command that reads the project loads the file once, at start-up: CLI commands,
+  [`sqb dev`](../cli/dev.md), [`sqb location`](../cli/location.md) and the workers they start.
+  The processes they start get the same variables. `sqb dev` reloads it when you press `r`.
+- The format is dotenv: `KEY=value` lines, optional `export`, single or double quotes, and `#`
+  comments. `$NAME` and `${NAME}` expand, except in single quotes. Nothing runs commands. When a
+  name appears twice, the later line wins.
+- No command prints a value from the file. A line that isn't `KEY=value` is reported by its line
+  number only.
+- [`sqb debug`](../cli/debug.md) shows the file it loaded and how many variables came from it,
+  and marks the provider secrets the file set.
+- `sqb init` and `sqb playground` add `.env` to `.gitignore`.
+- `sqlbuild_local.toml` can't set `env_file`.
+
+### Allowed missing secrets
+
+A target can expect some providers' secrets to be missing, such as a dev target that never has the
+production export keys:
+
+```toml
+[targets.dev]
+schema = "dev"
+allow_missing_secrets = ["export_bucket"]
+```
+
+On that target, static commands such as `compile` don't fail on those providers' missing secrets,
+and a location shows them as a note instead of a health problem. Builds and runs still stop the nodes
+that use them, before the warehouse. The list holds provider names; `sqlbuild_local.toml` can't set
+it. To allow any provider on one machine, use the local
+[`allow_missing_secrets`](#settings) setting or `--allow-missing-secrets` instead; see
+[Secrets](python-nodes/providers.md#allowing-missing-secrets).
+
 ## Defaults
 
 Project-wide defaults for models, seeds, and functions:
@@ -554,7 +635,7 @@ delta_compile = true
 | `test_timeout` | `30s` | Time limit for each SQL unit test, or `"disabled"` |
 | `scenario_timeout` | none | Time limit for each scenario, or `"disabled"` |
 | `delta_compile` | `true` | After an edit to model SQL or SQL test files only, compile just the changed files against the previous compile. See [Compiling after an edit](../cli/compile.md#compiling-after-an-edit). |
-| `allow_missing_secrets` | `false` | Let `compile`, `rules run`, `format`, `dag`, `lineage` and `scope` run without provider secrets. `sqlbuild_local.toml` only. See [Secrets](python-nodes/providers.md#secrets). |
+| `allow_missing_secrets` | `false` | Let `compile`, `rules run`, `format`, `dag`, `lineage` and `scope` run without any provider's secrets on this machine. `sqlbuild_local.toml` only; a target lists the providers it expects to miss in [`[targets.<name>] allow_missing_secrets`](#allowed-missing-secrets). See [Secrets](python-nodes/providers.md#allowing-missing-secrets). |
 | `allow_warehouse_round_trips` | `false` | Allow a loader to depend on a task or asset that reads SQL, so data can leave the warehouse and come back through a source. Project file only. See [The SQL boundary](python-nodes/overview.md#warehouse-round-trips). |
 | `ignore_audit_failures` | `false` | Let builds go on past failing audits: they still run and record `fail`, but promote, apply and build downstream as if they passed. A target, a job and `--ignore-audit-failures` / `--no-ignore-audit-failures` override it. See [Ignoring audit failures](audits.md#ignoring-audit-failures). |
 | `record_run_host` | `true` | Record the machine name in each run's rows in `_sqlbuild_runs`. See [Run records](../cli/build.md#run-records). |

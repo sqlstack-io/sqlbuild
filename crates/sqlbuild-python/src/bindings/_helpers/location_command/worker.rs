@@ -1,12 +1,18 @@
 //! Execute only the API's frozen request after compiling and verifying the unmodified baseline.
 
-use std::collections::BTreeMap;
+use sqlbuild_core::process_environment::constants::ENV_FILE_ERROR_VARIABLE;
+use sqlbuild_core::process_environment::main::environment_var_os::environment_var_os;
+use sqlbuild_python_compile::provider_check::main::key_secret_blocks::key_secret_blocks;
+use sqlbuild_python_compile::provider_check::main::missing_secret_failures::missing_secret_failures;
+use sqlbuild_python_compile::provider_check::main::secret_block_error::secret_block_error;
+use sqlbuild_python_compile::provider_check::models::SecretBlock;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::PyString;
 use serde_json::Value;
 use sqlbuild_cli::dispatch::main::command_dispatch::command_dispatch;
@@ -342,6 +348,13 @@ pub(super) fn execute_worker<'py>(
             Some(Arc::clone(&worker));
     }
     let result = (|| {
+        if let Some(message) = environment_var_os(ENV_FILE_ERROR_VARIABLE) {
+            let reason: String =
+                format!("Couldn't run: {}; nothing ran", message.to_string_lossy());
+            worker.refuse(&reason)?;
+            write_stderr(py, &format!("{reason}\n"))?;
+            return Err(PyValueError::new_err(reason));
+        }
         if !worker.has_work() {
             write_stderr(
                 py,
@@ -354,6 +367,17 @@ pub(super) fn execute_worker<'py>(
             worker.refuse(reason)?;
             write_stderr(py, &format!("Run refused: {reason}\n"))?;
             return Err(PyValueError::new_err(reason));
+        }
+        let project_dir: PathBuf = arguments.value("project_dir")?.extract()?;
+        let selected: BTreeSet<String> = frozen.selection.iter().cloned().collect();
+        let blocks: Vec<SecretBlock> =
+            key_secret_blocks((&discovered, &field(compiled, "project")?), &selected)?;
+        if !blocks.is_empty() {
+            let (failures, reason) = missing_secret_failures(&blocks, &project_dir);
+            worker.fail_missing_secrets(py, &failures, &reason)?;
+            let error: PyErr = secret_block_error(py, &blocks, &project_dir);
+            write_stderr(py, &format!("{}\n", error.value(py)))?;
+            return Err(error);
         }
         record_compiled_vars(py, (&owner, &frozen), (arguments, input, &project))?;
         let (request, scope, frozen_job) =

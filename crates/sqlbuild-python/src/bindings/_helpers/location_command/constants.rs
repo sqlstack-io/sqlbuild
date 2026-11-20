@@ -15,15 +15,9 @@ pub(crate) const COMMAND_IMPLEMENTATIONS: [(RunCommand, &str); 5] = [
     (RunCommand::Freshness, "run_freshness_command"),
 ];
 
-/// Snapshot node kinds a provider consumer can run inside.
-pub(crate) const MODEL_NODE_KIND: &str = "model";
-pub(crate) const SOURCE_NODE_KIND: &str = "source";
-
 /// DuckDB's message when another process, such as a running build, holds the database file.
 pub(crate) const DUCKDB_LOCK_CONFLICT: &str = "Conflicting lock is held";
 
-/// The setting-row field the published providers document leaves out: secret matching reads it, the UI does not.
-pub(crate) const SNAPSHOT_HIDDEN_SETTING: &str = "alias";
 /// The runtime request key of a plan preview: `{"plan": {"argv", "copy"}}`.
 pub(crate) const PLAN_REQUEST: &str = "plan";
 /// The code of a failed plan preview whose error names none.

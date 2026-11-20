@@ -772,6 +772,26 @@ type PlanFields = {
 	warning_groups?: PlanWarningGroup[];
 	/** Rows of each paged section loaded so far, which is the offset of its next page. */
 	loaded?: Partial<Record<PlanPageSection, number>>;
+	/** Providers missing secrets, with the selected nodes they stop; absent when every node can run. */
+	cant_run?: PlanCantRun[];
+};
+
+/** A provider whose missing secrets stop part of a plan: the nodes that use it and those that read them. */
+export type PlanCantRun = {
+	reason: 'missing_secret';
+	provider: string;
+	/** The provider file, relative to the project. */
+	path: string;
+	/** The unset environment variables, by name; values are never sent. */
+	variables: string[];
+	/** Node keys that run the provider, such as `source:raw_payments`. */
+	nodes: string[];
+	/** Selected node keys downstream of those, which can't run either. */
+	readers: string[];
+	/** Sinks that use the provider; every run uses sinks, so nothing in the plan can run. */
+	sinks: string[];
+	/** The env file the location loads, such as `.env`; null when it loads none. */
+	env_file: string | null;
 };
 
 /** Every plan section a server summary counts and pages, in plan order. */

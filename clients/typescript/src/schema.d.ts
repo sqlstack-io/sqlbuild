@@ -2224,8 +2224,13 @@ export interface components {
             generation: number;
             /** @enum {string} */
             kind: "provider_secrets";
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Unset secrets of providers the target doesn't allow to miss them; above zero is a health problem.
+             */
             missing: number;
+            /** @description Every provider missing a secret, including those the target allows; names only, never values. */
+            providers: components["schemas"]["MissingProviderSecrets"][];
         } | {
             /** Format: int64 */
             generation: number;
@@ -2489,6 +2494,24 @@ export interface components {
             model: string;
             physical_generation_id: string;
             target_name: string;
+        };
+        /** @description A provider whose required secrets are unset: what is missing and which nodes need it, never a value. */
+        MissingProviderSecrets: {
+            /** @description The target's `allow_missing_secrets` lists the provider, so its location shows a note, not a problem. */
+            allowed: boolean;
+            /** @description Snapshot node keys that run the provider, such as `source:raw_payments`. */
+            nodes: string[];
+            /** @description The provider's file, relative to the project directory. */
+            path: string;
+            provider: string;
+            settings: components["schemas"]["MissingProviderSetting"][];
+        };
+        /** @description One unset required setting: the field, the variable it reads and the field's line in the provider file. */
+        MissingProviderSetting: {
+            field: string;
+            /** Format: int64 */
+            line?: number | null;
+            variable: string;
         };
         MutationResponse: {
             applied: boolean;

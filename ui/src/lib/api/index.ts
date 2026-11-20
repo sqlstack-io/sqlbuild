@@ -4,6 +4,7 @@ import { MockApiClient, type MockOptions } from './mock/mock-client';
 import { largeProject } from './mock/large-project';
 import { hugeProject } from './mock/huge-project';
 import { awkward } from './mock/awkward';
+import { missingSecrets } from './mock/missing-secrets';
 import { replayFetch, type Recording } from './replay';
 import { LocalChangeBus } from './signals';
 import { to } from '$lib/paths';
@@ -39,7 +40,7 @@ async function loadRecording(): Promise<Recording> {
  * adjust it for demos, `?awkward` stretches every list to thousands of rows with very long
  * names, for the layout test, `?large` swaps in a catalog the size of a real project, `?huge` one
  * of about 10,000 nodes in nested folders, for the Overview's and the folder view's performance budgets,
- * and `?still` keeps runs from advancing on their own.
+ * `?secrets` runs the location without the orders API's key (`?secrets=sink` also without a sink's secret), and `?still` keeps runs from advancing on their own.
  */
 export function createClient(search: URLSearchParams, onUnauthorized: () => void = () => {}): ApiClient {
 	if (DEMO) return createHttpClient({ onUnauthorized, fetch: replayFetch(loadRecording), changes: new LocalChangeBus() });
@@ -56,7 +57,8 @@ export function createClient(search: URLSearchParams, onUnauthorized: () => void
 	// `?summary`: the large project with a plan shaped like a large real one's summary (CHI-1563).
 	const summary = search.has('summary');
 	const sized = search.has('huge') ? hugeProject(mock) : search.has('large') || summary ? largeProject(mock, { summary }) : mock;
-	return countedReads(search.has('awkward') ? awkward(sized) : sized);
+	const secrets = search.has('secrets') ? missingSecrets(sized, { sink: search.get('secrets') === 'sink' }) : sized;
+	return countedReads(search.has('awkward') ? awkward(secrets) : secrets);
 }
 
 /** Calls to each mock client method so far, by name, for the browser suite's work budgets. */

@@ -11,6 +11,7 @@ Online: https://sqlbuild.com/docs/cli/plan/
 - Usage
 - Flags
 - Output
+- Nodes that can't run
 - Timings
 - Exit codes
 - Missing upstream dependencies
@@ -138,6 +139,14 @@ Column migrations (1)
 ```
 
 When a removed column and an added column look related but are not an exact rename, the schema diff shows a hint such as `similar to amount; if this is a rename, add revenue (migrate_from amount)` until the change is built.
+
+## Nodes that can't run
+
+When a selected node uses a provider whose secrets are missing from the environment and the
+project's env file, the plan still plans everything and then lists what can't run: the provider,
+its unset variables, the nodes that use it and the selected nodes that read them. `sqb build` on
+the same selection stops before connecting to the warehouse. In `--json`, the `cant_run` list
+carries the same; see [Secrets](../concepts/python-nodes/providers.md#plans-and-runs).
 
 ## Timings
 

@@ -326,6 +326,18 @@ class DevelopmentTerminalTestCase:
 
 
 @dataclass(frozen=True)
+class DevelopmentEnvFileTestCase:
+    description: str
+    first_env_file: str
+    second_env_file: str
+    expected_card_row: str
+    # The parts of the restart event line, in order of appearance.
+    expected_restart: tuple[str, ...]
+    # The `--project-dir` argument for the project, such as a symlink to it.
+    project_argument: Callable[[Path], Path] = lambda project: project
+
+
+@dataclass(frozen=True)
 class ComposeDeploymentTestCase:
     description: str
     expected_warehouse_rows: list[list[int]]
@@ -596,3 +608,47 @@ class ChangedBuildReplanTestCase:
     edit: tuple[str, str]
     expected_published: dict[str, list[str]]
     expected_rebuilt: dict[str, list[str]]
+
+
+@dataclass(frozen=True)
+class ProviderSecretsHealthTestCase:
+    description: str
+    # Providers the target's allow_missing_secrets lists.
+    allowed: tuple[str, ...]
+    expected_missing: int
+    expected_allowed: bool
+    # What the location prints about them, and what it must not print.
+    expected_output_fragments: tuple[str, ...]
+    unexpected_output_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DevelopmentSecretReloadTestCase:
+    description: str
+    # The project's .env before and after the secret is added.
+    first_env_file: str
+    second_env_file: str
+    expected_first_status: str
+    # (node key, status, error code) of the node that uses the provider in the first run.
+    expected_first_node: tuple[str, str, str | None]
+    expected_second_status: str
+
+
+@dataclass(frozen=True)
+class LocationCantRunTestCase:
+    description: str
+    # The plan request's settings, such as variables that make the location compile again.
+    settings: dict[str, object]
+    expected_cant_run: list[dict[str, object]]
+
+
+@dataclass(frozen=True)
+class DevelopmentInvalidEnvFileTestCase:
+    description: str
+    # The project's .env at start, and the edit the parser rejects.
+    first_env_file: str
+    invalid_env_file: str
+    expected_status: str
+    expected_reason: str
+    # A value in the invalid line, which no output may show.
+    secret_text: str

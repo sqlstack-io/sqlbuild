@@ -1,5 +1,6 @@
 pub(crate) mod changed_build;
 pub(crate) mod dynamic_resume;
+pub(crate) mod env_reload;
 pub(crate) mod execution;
 pub(crate) mod held_copy;
 pub(crate) mod plan_document;

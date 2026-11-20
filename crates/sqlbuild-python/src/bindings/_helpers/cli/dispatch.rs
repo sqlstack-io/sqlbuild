@@ -1,5 +1,6 @@
 //! `sqb` command dispatch: the native route table applied to a parsed namespace.
 
+use crate::bindings::_helpers::review_command::support::attribute;
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::path::PathBuf;
 
@@ -466,6 +467,7 @@ pub(crate) fn with_routed_request<'py, T>(
         let _secrets = MissingSecretsScope::enter(
             args.getattr_opt(ALLOW_MISSING_SECRETS_DEST)?
                 .is_some_and(|allowed| allowed.is_truthy().unwrap_or(false)),
+            attribute(args, "target")?,
         );
         let route = match command_dispatch(&command_facts(args)?) {
             Dispatch::Run(route, None) => route,
@@ -494,6 +496,7 @@ fn routed_command<'py>(
     let _secrets = MissingSecretsScope::enter(
         args.getattr_opt(ALLOW_MISSING_SECRETS_DEST)?
             .is_some_and(|allowed| allowed.is_truthy().unwrap_or(false)),
+        attribute(args, "target")?,
     );
     match command_dispatch(&command_facts(args)?) {
         Dispatch::Nothing => 0.into_bound_py_any(py),

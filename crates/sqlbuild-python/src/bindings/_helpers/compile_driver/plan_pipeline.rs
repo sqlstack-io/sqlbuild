@@ -37,6 +37,8 @@ use sqlbuild_python_compile::compile_driver::main::stages::apply_unit_test_selec
 use sqlbuild_python_compile::compile_driver::main::stages::monotonic::monotonic;
 use sqlbuild_python_compile::compile_driver::main::stages::resolve_configured_rule_selection::resolve_configured_rule_selection;
 use sqlbuild_python_compile::frontier::main::write_plan_capture::write_plan_capture;
+use sqlbuild_python_compile::provider_check::main::secret_block_error::secret_block_error;
+use sqlbuild_python_compile::provider_check::main::selection_secret_blocks::selection_secret_blocks;
 use sqlbuild_python_compile::rules::constants::DEFAULT_RULES_NOTICE_ATTR;
 use sqlbuild_python_compile::rules::main::checking::format_rules_result::format_rules_result;
 use sqlbuild_python_compile::rules::main::checking::rules_progress::rules_progress;
@@ -68,14 +70,16 @@ pub(crate) fn run_compile_pipeline<'py>(
         ),
         (&arguments.value("options")?, arguments.value("hooks")?),
         (None, None),
+        SecretCheck::Report,
     )
 }
 
-/// Compile unless `held` is compiled, gate on rules unless they ran at load, and plan.
+/// Compile unless `held` is compiled, gate on rules unless they ran at load, check secrets when `secrets` says so, and plan.
 pub(crate) fn planned_project<'py>(
     (discovered, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (options, hooks): (&Bound<'py, PyAny>, Bound<'py, PyAny>),
     (held, planned_through): (Option<&Bound<'py, PyAny>>, Option<&Bound<'py, PyAny>>),
+    secrets: SecretCheck,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = discovered.py();
     let options: Bound<'py, PyAny> = apply_unit_test_selectors(options, discovered)?;
@@ -124,11 +128,53 @@ pub(crate) fn planned_project<'py>(
             )
         })?;
     }
+    if secrets == SecretCheck::FailBeforeConnecting {
+        require_selected_secrets(discovered, &options, &native_field(&compiled, "project")?)?;
+    }
     planned(
         (discovered, adapter),
         (&options, &hooks),
         (&compiled, planned_through),
     )
+}
+
+/// Whether planning first stops a selection whose providers are missing secrets.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SecretCheck {
+    /// A run: fail before connecting to the warehouse.
+    FailBeforeConnecting,
+    /// A plan: plan everything; the plan reports what can't run.
+    Report,
+}
+
+/// The selectors a plan's options carry, empty when unset.
+pub(crate) fn selectors(options: &Bound<'_, PyAny>, name: &str) -> PyResult<Vec<String>> {
+    let value = native_field(options, name)?;
+    if value.is_none() {
+        return Ok(Vec::new());
+    }
+    value.try_iter()?.map(|item| item?.extract()).collect()
+}
+
+/// Fail with `D012` before any warehouse connection when the selection needs secrets that are missing.
+fn require_selected_secrets(
+    discovered: &Bound<'_, PyAny>,
+    options: &Bound<'_, PyAny>,
+    project: &Bound<'_, PyAny>,
+) -> PyResult<()> {
+    let blocks = selection_secret_blocks(
+        (discovered, project),
+        (
+            &selectors(options, "select")?,
+            &selectors(options, "exclude")?,
+        ),
+        &std::collections::BTreeSet::new(),
+    )?;
+    if blocks.is_empty() {
+        return Ok(());
+    }
+    let project_dir: std::path::PathBuf = native_field(discovered, "project_dir")?.extract()?;
+    Err(secret_block_error(discovered.py(), &blocks, &project_dir))
 }
 
 /// The failing findings' `RulesResult`, their rendered text and the default-rules notice.

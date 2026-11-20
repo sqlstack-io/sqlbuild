@@ -34,6 +34,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     ClaimedLoadTestCase,
     ClaimedWorker,
     GroupExecutionTestCase,
+    ProviderSecretsHealthTestCase,
     SnapshotWorkerTestCase,
     UnclaimedLoadTestCase,
     WorkerExecutionTestCase,
@@ -41,8 +42,10 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     INTERMEDIATE_LOADER_FILES,
     LOADED_ORDER_FILES,
+    REGION_PROVIDER_FILES,
     cancel_running_statement,
     claimed_worker,
+    provider_secrets_health,
     run_write_set,
     running_statement,
     scheduled_worker,
@@ -53,6 +56,10 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     worker_result,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+
+ENV_FILE_REGION_FILES: dict[str, str] = {
+    ".env": "WORKER_ENV_REGION_CODE=42\nWORKER_ENV_TOKEN=worker-token\n"
+} | REGION_PROVIDER_FILES
 
 
 @pytest.mark.parametrize(
@@ -1003,6 +1010,16 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
             [(0,)],
         ),
         WorkerExecutionTestCase(
+            "a worker reads provider settings from the project env file",
+            'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")',
+            "SELECT amount FROM orders",
+            "success",
+            [(42,)],
+            expected_node_count=2,
+            default_job_files={},
+            files=ENV_FILE_REGION_FILES | duckshop_orchestration("upstream_loaded_orders"),
+        ),
+        WorkerExecutionTestCase(
             "scalar function dependency is claimed and executed",
             'SELECT __udf("order_total")(23) AS amount',
             "SELECT amount FROM orders",
@@ -1039,6 +1056,50 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         run: dict[str, Any] = worker_result(worker, test_case)
         assert run["status"] == test_case.expected_status, worker.log.read_text()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
+            "a scheduled run whose provider is missing secrets fails before the warehouse",
+            'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")',
+            "",
+            "failed",
+            [],
+            default_job_files={},
+            files=REGION_PROVIDER_FILES | duckshop_orchestration("upstream_loaded_orders"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_provider_missing_secrets_when_a_scheduled_run_starts_then_it_fails_before_the_warehouse(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
+        )
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        assert run["status_reason"] == (
+            "Couldn't run: provider region needs WORKER_ENV_REGION_CODE, WORKER_ENV_TOKEN "
+            "(missing from the location's environment and from .env); nothing ran"
+        ), worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            nodes: list[tuple[str, str, str | None, str | None, bool]] = [
+                (key, status, code, cause, started is not None)
+                for key, status, code, cause, started in control.execute(
+                    "SELECT node_key, status, error_code, skipped_because_of, started_at "
+                    "FROM sqb_run_nodes WHERE run_id=? AND kind='node' ORDER BY node_key",
+                    (run["run_id"],),
+                )
+            ]
+        assert nodes == [
+            ("model:orders", "skipped", None, "source:raw_regions", False),
+            ("source:raw_regions", "failed", "D012", None, False),
+        ], worker.log.read_text()
+        # Nothing connected: the run never opened, so never created, the DuckDB warehouse.
+        assert not (worker.project / "warehouse.duckdb").exists(), worker.log.read_text()
 
 
 @pytest.mark.parametrize(
@@ -1845,3 +1906,70 @@ def test_given_an_uncooperative_worker_when_scheduler_stops_then_the_fence_and_c
                 "SELECT json_extract(payload, '$.change.change.exit_code') FROM recall_events "
                 "WHERE event_type='run_terminated'"
             ).fetchone() == (137,)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ProviderSecretsHealthTestCase(
+            description="a provider the target doesn't allow to miss secrets is a health problem",
+            allowed=(),
+            expected_missing=2,
+            expected_allowed=False,
+            expected_output_fragments=(
+                "runs that use them stop before the warehouse: "
+                "region WORKER_ENV_TOKEN, region WORKER_ENV_REGION_CODE",
+            ),
+            unexpected_output_fragments=(),
+        ),
+        ProviderSecretsHealthTestCase(
+            description="a provider the target allows to miss secrets is reported but no problem",
+            allowed=("region",),
+            expected_missing=0,
+            expected_allowed=True,
+            expected_output_fragments=(),
+            unexpected_output_fragments=("stop before the warehouse",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_provider_missing_secrets_when_a_location_publishes_then_its_health_names_them(
+    test_case: ProviderSecretsHealthTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    allowed: str = "".join(f'"{name}"' for name in test_case.allowed)
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "duckdb"\n'
+                '[connections.local]\ndatabase = "warehouse.duckdb"\n'
+                f'[targets.development]\nschema = "main"\nallow_missing_secrets = [{allowed}]\n'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Orders.', materialized table);\n"
+                'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")\n'
+            ),
+        }
+        | REGION_PROVIDER_FILES,
+    )
+
+    health, log = provider_secrets_health(tmp_path, project)
+
+    assert health["missing"] == test_case.expected_missing, log
+    assert health["providers"] == [
+        {
+            "provider": "region",
+            "path": "providers/region.py",
+            "settings": [
+                {"field": "token", "variable": "WORKER_ENV_TOKEN", "line": 7},
+                {"field": "code", "variable": "WORKER_ENV_REGION_CODE", "line": 8},
+            ],
+            "nodes": ["loader:raw_regions", "source:raw_regions"],
+            "allowed": test_case.expected_allowed,
+        }
+    ], log
+    for fragment in test_case.expected_output_fragments:
+        assert fragment in log, log
+    for fragment in test_case.unexpected_output_fragments:
+        assert fragment not in log, log

@@ -35,6 +35,7 @@ pub(super) fn screen(columns: Option<usize>, start: Instant) -> DevScreen {
             },
             watching: "project/".to_owned(),
             project_root: "/work/shop".to_owned(),
+            env_file: None,
         },
         start,
     )

@@ -33,7 +33,7 @@ sqb location health --server https://control.example.com --location-id "$LOCATIO
 | --- | --- | --- |
 | `healthy` | An instance checked in within 90 seconds and its last load published | `0` |
 | `degraded` | The warehouse connection check after the last load failed | `0` |
-| `missing_secrets` | A provider [secret](/docs/concepts/python-nodes/providers#secrets) is unset in the location's environment, so runs that use it fail | `1` |
+| `missing_secrets` | A provider [secret](/docs/concepts/python-nodes/providers#secrets) is unset in the location's environment, and the target's [`allow_missing_secrets`](/docs/concepts/project-configuration#allowed-missing-secrets) doesn't list the provider, so runs that use it fail | `1` |
 | `falling_back` | The last load failed, so runs use the previous snapshot | `1` |
 | `broken` | No instance has checked in for 90 seconds | `1` |
 
@@ -65,5 +65,26 @@ Runs and plan previews on a published snapshot don't evaluate the Rules again; t
 loaded. After a SQLBuild upgrade that adds Rules to a family you select, a location keeps running
 its last good snapshot until the project passes them.
 
-A `missing_secrets` location publishes and runs jobs whose nodes have their secrets. Set the
-missing variables in its environment and restart it; `sqb debug` in the location lists them.
+A `missing_secrets` location publishes and runs jobs whose nodes have their secrets. Each time it
+publishes it reports the providers missing secrets, with their variables and the nodes that use
+them, and prints them in its output. Its page in the UI lists them, and the Overview shows the
+problem. A run that needs one fails those nodes with `D012` before connecting to the warehouse and
+skips the nodes that read them. Set the missing variables in its environment or env file and
+restart it; `sqb debug` in the location lists them too. A provider the target allows to miss its
+secrets shows as a note on the location's page instead.
+
+## Provide settings and secrets
+
+A location reads provider settings from its environment and from the project's
+[env file](/docs/concepts/project-configuration#env-file), which it loads once when it starts.
+For a deployment, point the target at a file outside the project:
+
+```toml
+[targets.production]
+env_file = "/etc/opt/sqlbuild/sqlbuild.env"
+```
+
+The location stops at start-up with an error naming the file when it doesn't exist. Variables
+set in the container or service environment win over the file. After changing the file, restart
+the location so its compiles and plan previews use the new values. Each
+[worker](/docs/cli/server/) reads the file when its run starts.

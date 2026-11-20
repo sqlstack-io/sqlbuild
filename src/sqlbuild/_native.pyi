@@ -12033,6 +12033,8 @@ class TargetConfig(NativeRecord):
     ignore_audit_failures: bool | None
     plan_from: str | None
     pause_dynamic: bool | None
+    env_file: str | None
+    allow_missing_secrets: tuple[str, ...]
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -12060,6 +12062,8 @@ class TargetConfig(NativeRecord):
         ignore_audit_failures: bool | None = ...,
         plan_from: str | None = ...,
         pause_dynamic: bool | None = ...,
+        env_file: str | None = ...,
+        allow_missing_secrets: tuple[str, ...] = ...,
     ) -> None: ...
 
 class LocalTargetConfig(NativeRecord):
@@ -12090,6 +12094,8 @@ class LocalTargetConfig(NativeRecord):
     ignore_audit_failures: bool | None
     plan_from: str | None
     pause_dynamic: bool | None
+    env_file: str | None
+    allow_missing_secrets: tuple[str, ...] | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -12118,6 +12124,8 @@ class LocalTargetConfig(NativeRecord):
         ignore_audit_failures: bool | None = ...,
         plan_from: str | None = ...,
         pause_dynamic: bool | None = ...,
+        env_file: str | None = ...,
+        allow_missing_secrets: tuple[str, ...] | None = ...,
     ) -> None: ...
 
 class SettingsConfig(NativeRecord):
@@ -12513,6 +12521,7 @@ class ProjectConfig(NativeRecord):
     scenario: ScenarioConfig
     dbt: DbtConfig
     sinks: SinksConfig
+    env_file: str | None
     def __init__(
         self,
         name: str,
@@ -12539,6 +12548,7 @@ class ProjectConfig(NativeRecord):
         scenario: ScenarioConfig = ...,
         dbt: DbtConfig = ...,
         sinks: SinksConfig = ...,
+        env_file: str | None = ...,
     ) -> None: ...
 
 class LocalConfig(NativeRecord):

@@ -6,7 +6,9 @@ use crate::discovery::_helpers::records::model_file_record::HeaderValues;
 use crate::discovery::_helpers::records::model_file_record::Locations;
 use crate::discovery::_helpers::records::model_file_record::ModelFileFields;
 use crate::discovery::_helpers::records::model_file_record::ModelFilePaths;
-use crate::discovery::_helpers::sources::provider_secrets::INVOCATION_ALLOWS_MISSING_SECRETS;
+use crate::discovery::_helpers::sources::provider_secrets::{
+    INVOCATION_ALLOWS_MISSING_SECRETS, INVOCATION_TARGET, TARGET_ALLOWED_MISSING_SECRETS,
+};
 use crate::discovery::main::records::projected_text::projected_text;
 use pyo3::FromPyObject;
 use pyo3::IntoPyObjectExt;
@@ -332,23 +334,47 @@ pub struct NodeRow {
     pub(crate) depends_on: Vec<DependencyRow>,
 }
 
-/// `--allow-missing-secrets` for one invocation, restored when the invocation ends.
+/// `--allow-missing-secrets` and `--target` for one invocation, restored when the invocation ends.
 #[derive(Debug)]
 pub struct MissingSecretsScope {
-    pub(crate) previous: bool,
+    pub(crate) previous: (bool, Option<String>),
 }
 
 impl MissingSecretsScope {
-    pub fn enter(allowed: bool) -> Self {
+    pub fn enter(allowed: bool, target: Option<String>) -> Self {
         Self {
-            previous: INVOCATION_ALLOWS_MISSING_SECRETS.replace(allowed),
+            previous: (
+                INVOCATION_ALLOWS_MISSING_SECRETS.replace(allowed),
+                INVOCATION_TARGET.replace(target),
+            ),
         }
     }
 }
 
 impl Drop for MissingSecretsScope {
     fn drop(&mut self) {
-        INVOCATION_ALLOWS_MISSING_SECRETS.set(self.previous);
+        INVOCATION_ALLOWS_MISSING_SECRETS.set(self.previous.0);
+        INVOCATION_TARGET.replace(self.previous.1.take());
+    }
+}
+
+/// The providers a target's `allow_missing_secrets` lists, for one discovery, restored when it ends.
+#[derive(Debug)]
+pub struct TargetAllowedSecretsScope {
+    pub(crate) previous: (Option<String>, Vec<String>),
+}
+
+impl TargetAllowedSecretsScope {
+    pub fn enter(target: Option<String>, providers: Vec<String>) -> Self {
+        Self {
+            previous: TARGET_ALLOWED_MISSING_SECRETS.replace((target, providers)),
+        }
+    }
+}
+
+impl Drop for TargetAllowedSecretsScope {
+    fn drop(&mut self) {
+        TARGET_ALLOWED_MISSING_SECRETS.replace(std::mem::take(&mut self.previous));
     }
 }
 

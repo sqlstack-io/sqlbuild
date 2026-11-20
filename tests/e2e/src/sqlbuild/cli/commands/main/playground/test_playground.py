@@ -140,6 +140,10 @@ def test_given_playground_template_when_compiling_and_building_then_it_succeeds(
         == 0
     )
     project_dir: Path = tmp_path / "playground" / test_case.project_subdir
+    ignored: list[str] = (
+        (tmp_path / "playground" / ".gitignore").read_text(encoding="utf-8").splitlines()
+    )
+    assert ".env" in ignored
 
     compile_result: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "compile"), project_dir=project_dir

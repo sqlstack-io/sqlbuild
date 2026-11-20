@@ -64,7 +64,7 @@ fn given_location_health_reports_when_checking_health_then_down_falling_back_or_
             description: "a provider secret is unset, even with a failed connection check",
             reports: &[
                 r#"{"kind":"connection","generation":2,"healthy":false}"#,
-                r#"{"kind":"provider_secrets","generation":2,"missing":1}"#,
+                r#"{"kind":"provider_secrets","generation":2,"missing":1,"providers":[]}"#,
             ],
             other_target_connections: 0,
             expected_state: "missing_secrets",
@@ -73,8 +73,8 @@ fn given_location_health_reports_when_checking_health_then_down_falling_back_or_
         LocationHealthTestCase {
             description: "a later load found every provider secret set",
             reports: &[
-                r#"{"kind":"provider_secrets","generation":2,"missing":2}"#,
-                r#"{"kind":"provider_secrets","generation":3,"missing":0}"#,
+                r#"{"kind":"provider_secrets","generation":2,"missing":2,"providers":[]}"#,
+                r#"{"kind":"provider_secrets","generation":3,"missing":0,"providers":[]}"#,
             ],
             other_target_connections: 0,
             expected_state: "healthy",
