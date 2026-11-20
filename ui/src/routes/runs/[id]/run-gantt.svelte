@@ -16,6 +16,7 @@
 		origin,
 		now,
 		selected = [],
+		excluded = [],
 		groups = [],
 		active = false,
 		skipText: causeOf = () => null,
@@ -28,6 +29,8 @@
 		origin: number;
 		now: number;
 		selected?: string[];
+		/** Nodes the selection leaves out (`--exclude`): struck through, faintly. */
+		excluded?: string[];
 		/** Child runs of a group, to section the rows. */
 		groups?: GanttGroup[];
 		/** The run is still going, so a node that hasn't started is waiting, not left out. */
@@ -224,7 +227,7 @@
 								aria-label="Select {n.nodeKey}"
 								title="Add to the selection, or take it out"
 							/>
-							<a class="name" href={to(`/catalog/${n.nodeKey}`)} onclick={(ev) => ev.stopPropagation()} title="Open {n.nodeKey} in the Catalog">{nodeLabel(n.nodeKey)}</a>{#if tag(n)}<span class="mtag">{tag(n)}</span>{/if}{#if n.critical}<em title="Marked critical: if it fails, the whole group stops">critical</em>{/if}
+							<a class="name" class:excluded={excluded.includes(n.nodeKey)} href={to(`/catalog/${n.nodeKey}`)} onclick={(ev) => ev.stopPropagation()} title="Open {n.nodeKey} in the Catalog">{nodeLabel(n.nodeKey)}</a>{#if tag(n)}<span class="mtag">{tag(n)}</span>{/if}{#if n.critical}<em title="Marked critical: if it fails, the whole group stops">critical</em>{/if}
 						</span>
 						<span class="track">
 							{#if s == null || e == null}
@@ -526,6 +529,10 @@
 	}
 	.note {
 		left: 8px;
+	}
+	.name.excluded {
+		opacity: 0.55;
+		text-decoration: line-through;
 	}
 	.name:hover {
 		color: var(--primary);

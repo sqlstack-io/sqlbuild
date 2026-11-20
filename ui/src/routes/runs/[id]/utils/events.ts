@@ -3,6 +3,7 @@
 import type { RunEvent, RunEventLevel, RunNode, RunOutputLine } from '$lib/api';
 import { eventTone } from '$lib/operate/labels';
 import { fullStamp } from './proto';
+import { checksOf, checksText, worstCheck, type CheckResult } from './checks';
 import type { EventCategory } from '../types';
 
 export const EVENT_CATEGORIES: { value: EventCategory; label: string }[] = [
@@ -92,6 +93,8 @@ export type LogEntry = {
 	pinned: boolean;
 	/** A short tag in plain words (built, merged, failed, skipped, check, run) and its colour. */
 	tag?: { text: string; tone: string };
+	/** A node line's checks, problems first, for the table its details open to (CHI-1591). */
+	checks?: CheckResult[];
 	/** A capped live view's marker: this many earlier lines of the node's output are in the viewer (CHI-1597). */
 	omitted?: number;
 	/** Structured details the row opens to in place, as key and value; `long` is text behind "show more". */
@@ -194,10 +197,14 @@ export type NodeOutcomes = {
 };
 
 /** A node line's tag: built or merged, a warned check, failed, skipped, building or not run. */
+/**
+ * A node line's tag names its build (built, merged, failed…), coloured by its worst outcome, checks
+ * included; never `check`, which is for checks run on their own, as in a `sqb test` run.
+ */
 function nodeTag(n: RunNode, checks: readonly RunEvent[]): LogEntry['tag'] {
 	if (n.status === 'success' || n.status === 'warn') {
-		if (n.status === 'warn' || checks.some((c) => c.level !== 'info')) return { text: 'check', tone: TAG_TONE.warn };
-		return { text: n.kind === 'incremental' ? 'merged' : 'built', tone: TAG_TONE.ok };
+		const warned = n.status === 'warn' || checks.some((c) => c.level !== 'info');
+		return { text: n.kind === 'incremental' ? 'merged' : 'built', tone: warned ? TAG_TONE.warn : TAG_TONE.ok };
 	}
 	if (n.status === 'failed') return { text: 'failed', tone: TAG_TONE.err };
 	if (n.status === 'skipped') return { text: 'skipped', tone: TAG_TONE.quiet };
@@ -210,11 +217,6 @@ const secsText = (ms: number) => (ms < 60_000 ? `${(ms / 1000).toFixed(1)}s` : `
 const BUILT: Record<string, string> = { table: 'rebuilt table', view: 'rebuilt view', incremental: 'incremental merge', seed: 'loaded seed', loader: 'loaded', task: 'ran task' };
 const BUILDING: Record<string, string> = { table: 'building table', view: 'building view', incremental: 'incremental merge', seed: 'loading seed', loader: 'loading', task: 'running task' };
 
-/** A check result as the node's line names it: `check unique(sku) warned: 3 failing rows`. */
-function checkText(e: RunEvent): string {
-	const m = e.message.match(/^(.*?): (.*?)(?: \(severity \w+\))?$/);
-	return `check ${m?.[1] ?? e.message} ${e.level === 'error' ? 'failed' : 'warned'}${m ? `: ${m[2]}` : ''}`;
-}
 
 /** What a node did, on one line: its outcome, rows, time and checks, with a warning or failed check named on it. */
 export function outcomeText(n: RunNode, checks: readonly RunEvent[], skip: string | null, now: number): { text: string; level: RunEventLevel; tone: string } {
@@ -224,13 +226,14 @@ export function outcomeText(n: RunNode, checks: readonly RunEvent[], skip: strin
 	switch (n.status) {
 		case 'success':
 		case 'warn': {
-			const bad = checks.filter((c) => c.level !== 'info');
-			const passed = checks.length - bad.length;
-			const checkPart = bad.length ? bad.map(checkText).join('; ') : passed ? `${passed} ${passed === 1 ? 'check' : 'checks'} passed` : null;
-			const warned = n.status === 'warn' || bad.length > 0;
-			return { text: join([`${warned ? '⚠' : '✓'} ${BUILT[n.kind ?? 'table'] ?? `built ${n.kind}`}`, rows, took, checkPart]), level: warned ? 'warn' : 'info', tone: warned ? 'var(--sb-warning)' : 'var(--sb-success)' };
+			// One line however many checks: the worst outcome sets its colour (CHI-1591).
+			const results = checksOf(checks);
+			const warned = n.status === 'warn' || worstCheck(results) === 'warned' || worstCheck(results) === 'failed';
+			return { text: join([`${warned ? '⚠' : '✓'} ${BUILT[n.kind ?? 'table'] ?? `built ${n.kind}`}`, rows, took, checksText(results)]), level: warned ? 'warn' : 'info', tone: warned ? 'var(--sb-warning)' : 'var(--sb-success)' };
 		}
 		case 'failed': {
+			// Built, then failed by an error-severity check: the build's line, with its checks.
+			if (n.errorCode === 'check_failed') return { text: join([`✗ ${BUILT[n.kind ?? 'table'] ?? `built ${n.kind}`}`, rows, took, checksText(checksOf(checks))]), level: 'error', tone: 'var(--sb-error)' };
 			const where = n.errorLocation ? (n.errorLocation.line == null ? n.errorLocation.file : `${n.errorLocation.file}:${n.errorLocation.line}`) : null;
 			return { text: join(['✗ failed', n.errorMessage ?? n.errorCode, where]), level: 'error', tone: 'var(--sb-error)' };
 		}
@@ -274,7 +277,6 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 			...(n.errorMessage ? [['Error', n.errorMessage] as [string, string]] : []),
 			...(where ? [['Location', where] as [string, string]] : []),
 			...(n.status === 'skipped' && skipCause(n) ? [['Why', skipCause(n)!.replace(/^skipped: /, '')] as [string, string]] : []),
-			...checks.map((c): [string, string] => ['Check', c.message.replace(/ \(severity (\w+)\)$/, ' · severity $1')])
 		];
 		return [
 			{
@@ -293,6 +295,7 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 				pinned: false,
 				tag: nodeTag(n, checks),
 				details,
+				checks: checksOf(checks),
 				long: n.errorDetail ?? undefined
 			}
 		];

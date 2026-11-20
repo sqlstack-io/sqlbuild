@@ -54,7 +54,8 @@
 		const opened = open ?? allFolders(data);
 		const graph = lineageGraph(data, { grouped: true, open: opened, selected: [], tree: folderTree(data), onclose: (f) => setOpen(withFolderClosed(opened, f)), onadd: () => {} });
 		const selected = new Set(view.selected);
-		return { nodes: graph.nodes.map((n) => (selected.has(n.id) ? { ...n, selected: true } : n)), edges: graph.edges };
+		const excluded = new Set(view.excluded);
+		return { nodes: graph.nodes.map((n) => ({ ...n, selected: selected.has(n.id), class: excluded.has(n.id) ? 'excluded' : undefined })), edges: graph.edges };
 	}
 	function setOpen(next: ReadonlySet<string>) {
 		open = next;
@@ -66,6 +67,7 @@
 	$effect(() => {
 		if (isGroup || !runCatalog.length) return;
 		void view.selected;
+		void view.excluded;
 		const data = runCatalog;
 		untrack(() => {
 			const g = draw(data);
@@ -74,7 +76,7 @@
 				const fresh = new Map(g.nodes.map((n) => [n.id, n]));
 				nodes = nodes.map((n) => {
 					const f = fresh.get(n.id);
-					return f ? { ...n, data: f.data, selected: f.selected } : n;
+					return f ? { ...n, data: f.data, selected: f.selected, class: f.class } : n;
 				});
 				return;
 			}
@@ -132,6 +134,11 @@
 {/if}
 
 <style>
+	/* A node the selection leaves out: faint and struck through (CHI-1591). */
+	:global(.svelte-flow__node.excluded) {
+		opacity: 0.5;
+		text-decoration: line-through;
+	}
 	.wait {
 		padding: 32px;
 		color: var(--sb-text-faint);

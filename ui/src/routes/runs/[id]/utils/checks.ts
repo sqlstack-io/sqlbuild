@@ -1,0 +1,67 @@
+// Several checks on one node (CHI-1591): each check's outcome from its event, problems first, and the
+// short form a node's one log line uses. Pure.
+
+import type { RunEvent } from '$lib/api';
+
+export type CheckOutcome = 'failed' | 'warned' | 'passed';
+export type CheckResult = {
+	id: string;
+	/** As declared, such as `not_null(payment_id)`. */
+	name: string;
+	outcome: CheckOutcome;
+	/** Rows it found, and what they are, such as `14` and `duplicate rows`; null when it passed. */
+	count: number | null;
+	noun: string | null;
+	/** The check's own query, for its SQL, query ID and failing rows. */
+	statementId: string | null;
+};
+
+const RANK: Record<CheckOutcome, number> = { failed: 0, warned: 1, passed: 2 };
+
+/** A node's checks from its `audit_completed` events, problems first (failed, then warned), then passed. */
+export function checksOf(events: readonly RunEvent[]): CheckResult[] {
+	return events
+		.filter((e) => e.type === 'audit_completed')
+		.map((e): CheckResult => {
+			const m = e.message.match(/^(.*?): ([\d,]+) (.*?) \(severity (\w+)\)$/);
+			if (m) return { id: e.id, name: m[1], outcome: m[4] === 'error' ? 'failed' : 'warned', count: Number(m[2].replace(/,/g, '')), noun: m[3], statementId: e.statementId };
+			return { id: e.id, name: e.message.replace(/ passed$/, ''), outcome: 'passed', count: null, noun: null, statementId: e.statementId };
+		})
+		.sort((a, b) => RANK[a.outcome] - RANK[b.outcome]);
+}
+
+/** The worst outcome among the checks, or null without any. */
+export function worstCheck(checks: readonly CheckResult[]): CheckOutcome | null {
+	return checks.length ? checks.reduce((w, c) => (RANK[c.outcome] < RANK[w] ? c.outcome : w), 'passed' as CheckOutcome) : null;
+}
+
+const rows = (c: CheckResult) => `${(c.count ?? 0).toLocaleString('en-GB')} ${c.count === 1 ? 'row' : 'rows'}`;
+
+/**
+ * The checks on a node's one line: all passing is counted ("5 checks passed"); one or two problems are
+ * named ("not_null(payment_id) warned: 2 rows", "2 checks warned (a, b)"); more are counted
+ * ("1 failed · 3 warned"); passing checks beside problems are only counted ("4 passed").
+ */
+export function checksText(checks: readonly CheckResult[]): string | null {
+	if (!checks.length) return null;
+	const failed = checks.filter((c) => c.outcome === 'failed');
+	const warned = checks.filter((c) => c.outcome === 'warned');
+	const passed = checks.length - failed.length - warned.length;
+	const problems = failed.length + warned.length;
+	if (!problems) return `${passed} ${passed === 1 ? 'check' : 'checks'} passed`;
+	const parts: string[] = [];
+	if (problems === 1) {
+		const c = failed[0] ?? warned[0];
+		parts.push(`${c.name} ${c.outcome}: ${rows(c)}`);
+	} else if (problems === 2 && (failed.length === 2 || warned.length === 2)) {
+		const same = failed.length === 2 ? failed : warned;
+		parts.push(`2 checks ${same[0].outcome} (${same.map((c) => c.name).join(', ')})`);
+	} else if (problems === 2) {
+		parts.push(`${failed[0].name} failed: ${rows(failed[0])}`, `${warned[0].name} warned: ${rows(warned[0])}`);
+	} else {
+		if (failed.length) parts.push(`${failed.length} failed`);
+		if (warned.length) parts.push(`${warned.length} warned`);
+	}
+	if (passed) parts.push(`${passed} passed`);
+	return parts.join(' · ');
+}

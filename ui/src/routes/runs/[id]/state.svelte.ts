@@ -72,6 +72,11 @@ export function createRunDetailState(runId: string) {
 	/** The run's nodes the selection selects, by key. */
 	const selected = $derived(selection.keys ? nodes.filter((n) => selection.keys!.has(n.nodeKey)).map((n) => n.nodeKey) : []);
 	let tab = $state<BottomTab>('log');
+	/** The run's nodes the selection leaves out by name (`--exclude`), struck through on the timeline and graph. */
+	const excluded = $derived.by(() => {
+		const out = new Set(selection.exclude.split(/\s+/).filter(Boolean));
+		return nodes.filter((n) => out.has(nodeLabel(n.nodeKey))).map((n) => n.nodeKey);
+	});
 
 	/**
 	 * Ticking a node always toggles whether it is shown (CHI-1591): its plain name comes out of, or goes
@@ -118,6 +123,8 @@ export function createRunDetailState(runId: string) {
 
 	// ---- the node drawer ----
 	let drawer = $state<string | null>(null);
+	/** The statement a check's "In Statements" opened. */
+	let statementFocus = $state<string | null>(null);
 
 	const summary = $derived(summaryOf(nodes, eventsRes.data ?? [], active));
 	/** Plan these: the plan page for the selection, as the job (or the group) would build it. */
@@ -223,6 +230,18 @@ export function createRunDetailState(runId: string) {
 		},
 		openDrawer(key: string | null) {
 			drawer = key;
+		},
+		get excluded() {
+			return excluded;
+		},
+		get statementFocus() {
+			return statementFocus;
+		},
+		/** A check's query: the Statements tab, filtered to its node, with that statement open. */
+		showStatement(statementId: string, nodeKey: string) {
+			focus = { label: nodeLabel(nodeKey), keys: [nodeKey] };
+			statementFocus = statementId;
+			tab = 'statements';
 		},
 		/** A click on a node's row, bar or card: ticks it in the selection (or unticks it) and shows it in the drawer. */
 		clickNode(key: string) {

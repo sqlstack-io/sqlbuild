@@ -178,10 +178,10 @@ export function computeNodes(record: RunRecord, siblings: RunRecord[], now: numb
 				...base(key, status),
 				startedAt: iso(s),
 				endedAt: iso(e),
-				rowsAffected: fails || snapshotNode(key)?.kind === 'view' ? null : PROTO.test(run.id) ? finishedRows(key, e - s) : 120 + (hash(key + run.id) % 48000),
-				errorCode: fails ? 'E2103' : null,
+				rowsAffected: (fails && !CHECK_FAILS.has(key)) || snapshotNode(key)?.kind === 'view' ? null : PROTO.test(run.id) ? finishedRows(key, e - s) : 120 + (hash(key + run.id) % 48000),
+				errorCode: fails ? (CHECK_FAILS.has(key) ? 'check_failed' : 'E2103') : null,
 				errorMessage: message,
-				...(fails ? failureDetail(key, run, message ?? '') : {})
+				...(fails ? (CHECK_FAILS.has(key) ? checkFailureDetail(key) : failureDetail(key, run, message ?? '')) : {})
 			};
 		};
 		if (terminal && script.end === 'complete') return finish();
@@ -203,6 +203,57 @@ export function computeNodes(record: RunRecord, siblings: RunRecord[], now: numb
 		if (!terminal) return base(key, 'pending');
 		return base(key, script.end === 'cancelled' ? 'cancelled' : 'not_run');
 	});
+}
+
+// ---- several checks on one node (CHI-1591) ----
+
+/** Checks that fail or warn on a node that warns or fails by a check: severity and the rows they found. */
+const CHECK_PROFILE: Record<string, Record<string, readonly ['warn' | 'error', number]>> = {
+	stg_inventory: { 'not_null(product_id)': ['warn', 3] },
+	fct_shipments: { 'not_null(shipment_id)': ['warn', 4] },
+	fct_payment_daily: { 'not_null(payment_id)': ['warn', 2] },
+	fct_order_lines: { 'not_null(payment_id)': ['warn', 2], 'unique(order_id)': ['warn', 6] },
+	fct_refunds: { 'unique(order_id)': ['error', 14], 'not_null(payment_id)': ['warn', 2], 'accepted_values(status)': ['warn', 5], 'not_null(reason)': ['warn', 9] }
+};
+/** Nodes that built but failed on an error-severity check. */
+const CHECK_FAILS = new Set(['fct_refunds']);
+
+export const auditStatementId = (run: Run, nodeKey: string, i: number) => `${statementIdOf(run, nodeKey)}-audit-${i}`;
+
+/** A node's checks, as `name(column)`, in declaration order. */
+export function auditsOf(key: string): string[] {
+	return (NODE_SPECS[key]?.columns ?? []).flatMap((c) => (c.audits ?? []).map((a) => `${a}(${c.name})`));
+}
+
+/** A check's query as it ran, compiled. */
+export function auditSql(nodeKey: string, statementId: string, target: string): string {
+	const i = Number(statementId.split('-audit-')[1] ?? 0);
+	const audit = auditsOf(nodeKey)[i] ?? 'not_null(id)';
+	const [, name, col] = audit.match(/^(\w+)\((\w+)\)$/) ?? [];
+	const rel = `${target === 'dev' ? 'dev_demo' : 'analytics'}.${nodeKey}`;
+	if (name === 'unique') return `select ${col}, count(*) as n\nfrom ${rel}\nwhere ${col} is not null\ngroup by ${col}\nhaving count(*) > 1`;
+	if (name === 'accepted_values') return `select ${col}, count(*) as n\nfrom ${rel}\nwhere ${col} not in ('paid', 'pending', 'refunded', 'void')\ngroup by ${col}`;
+	return `select *\nfrom ${rel}\nwhere ${col} is null`;
+}
+
+/** The failing rows a check found, as a small sample (the server keeps the first 100). */
+export function auditSample(nodeKey: string, statementId: string, count: number): { columns: string[]; rows: (string | number | null)[][]; total: number } {
+	const i = Number(statementId.split('-audit-')[1] ?? 0);
+	const audit = auditsOf(nodeKey)[i] ?? 'not_null(id)';
+	const [, name, col] = audit.match(/^(\w+)\((\w+)\)$/) ?? [];
+	const n = Math.min(count, 8);
+	const id = (j: number) => 10_400 + ((hash(`${statementId}${j}`) % 9_000) | 0);
+	if (name === 'unique') return { columns: [col, 'n'], rows: Array.from({ length: n }, (_, j) => [id(j), 2 + (j % 2)]), total: count };
+	if (name === 'accepted_values') return { columns: [col, 'n'], rows: ['paid ', 'PAID', 'refund', 'unknown', 'n/a'].slice(0, n).map((v, j) => [v, 1 + j]), total: count };
+	return { columns: ['order_id', col, 'created_at'], rows: Array.from({ length: n }, (_, j) => [id(j), null, `2026-11-${String(10 + j).padStart(2, '0')} 0${j}:14:0${j}`]), total: count };
+}
+
+function checkFailureDetail(key: string): Pick<RunNode, 'errorLocation' | 'errorDetail'> {
+	const file = (snapshotNode(key)?.path ?? `models/${key}.sql`).replace(/\.sql$/, '.yml');
+	return {
+		errorLocation: { file, line: 12 },
+		errorDetail: ['check unique(order_id) failed: 14 duplicate rows (severity error)', `  --> ${file}:12`, '', 'The table was built, then its error-severity check failed, so the node failed and its downstream was skipped.'].join('\n')
+	};
 }
 
 /** Mock failure location and full text: the model file, and a line inside its main statement. */
@@ -489,7 +540,12 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 			producer: d.producer ?? 'sqb',
 			type: d.type,
 			occurredAt: d.occurredAt,
-			level: (d.type === 'audit_completed' && /failing rows/.test(d.message)) || (d.type === 'node_log' && d.message.startsWith('[warning] ')) ? 'warn' : LEVEL[d.type],
+			level:
+				d.type === 'audit_completed' && /\(severity error\)$/.test(d.message)
+					? 'error'
+					: (d.type === 'audit_completed' && /\(severity warn\)$/.test(d.message)) || (d.type === 'node_log' && d.message.startsWith('[warning] '))
+						? 'warn'
+						: LEVEL[d.type],
 			invocationId: d.invocationId,
 			nodeKey: d.nodeKey,
 			statementId: d.statementId,
@@ -536,7 +592,8 @@ function pythonOutput(key: string, s: number, e: number | null, now: number, out
 		const n = { nodeKey: key, startedAt: new Date(s).toISOString(), status: e == null ? 'running' : 'success' } as RunNode;
 		const big = bigAvailable(n, until);
 		if (!big) return;
-		const LIVE = 40;
+		// Capped only past about 1,000 lines: then the last 40, and the rest in the viewer.
+		const LIVE = big.available > 1_000 ? 40 : big.available;
 		const first = Math.max(1, big.available - LIVE + 1);
 		if (first > 1) out('stdout', until - 1_000, `${(first - 1).toLocaleString('en-GB')} earlier lines`, false, key, first - 1);
 		for (let i = first; i <= big.available; i++) {
@@ -586,7 +643,7 @@ function protoExecution(record: RunRecord, nodes: RunNode[], now: number, { ev, 
 	out('stdout', start + 450, `✓ Project compiled  ${script.nodes.length} models  0.4s`);
 	out('stdout', start + 900, '✓ Warehouse connected  snowflake  0.1s');
 	out('stdout', start + 1100, `Building ${script.nodes.length} nodes, 4 at a time`);
-	const audits = (key: string) => (NODE_SPECS[key]?.columns ?? []).flatMap((c) => (c.audits ?? []).map((a) => `${a}(${c.name})`));
+	const audits = auditsOf;
 	for (const n of nodes) {
 		const k = snapshotNode(n.nodeKey)?.kind ?? 'table';
 		const key = n.nodeKey;
@@ -617,7 +674,8 @@ function protoExecution(record: RunRecord, nodes: RunNode[], now: number, { ev, 
 			// The node's warehouse statement, with its query ID, for the Statements tab, the cost and the drawer.
 			const statementId = statementIdOf(run, key);
 			const stEnd = e != null ? e - 120 : null;
-			const failed = n.status === 'failed';
+			// A node failed by a check built fine: its build query completed.
+			const failed = n.status === 'failed' && !CHECK_FAILS.has(key);
 			statements.push({
 				id: statementId,
 				runId: run.id,
@@ -643,20 +701,46 @@ function protoExecution(record: RunRecord, nodes: RunNode[], now: number, { ev, 
 		}
 		if (e == null) continue;
 		const took = secs(e - s);
-		if (n.status === 'failed') {
+		const checkFailed = CHECK_FAILS.has(key) && n.status === 'failed';
+		if (n.status === 'failed' && !checkFailed) {
 			ev('resource_attempt_failed', e, key, `${n.errorCode}: ${n.errorMessage}`);
 			out('stderr', e, `  ✗ ${key}  ${k}  ${took}  ${n.errorMessage}`, true, key);
 			continue;
 		}
 		const added = k === 'incremental' && n.rowsAffected != null ? `  +${rows(n.rowsAffected)} rows` : n.rowsAffected != null ? `  ${rows(n.rowsAffected)} rows` : '';
-		ev('resource_attempt_completed', e, key, `${n.status === 'warn' ? 'Completed with warnings' : 'Completed'} in ${took}${added ? ` ·${added.replace(/^ +/, ' ')}` : ''}`);
+		if (!checkFailed) ev('resource_attempt_completed', e, key, `${n.status === 'warn' ? 'Completed with warnings' : 'Completed'} in ${took}${added ? ` ·${added.replace(/^ +/, ' ')}` : ''}`);
 		out('stdout', e, `  ✓ ${key}  ${k}  ${took}${added}`, false, key);
+		// Each check is its own query: an event with its statement, so its SQL, query ID and failing rows can be read.
+		const profile = n.status === 'warn' || checkFailed ? (CHECK_PROFILE[key] ?? null) : null;
 		audits(key).forEach((audit, i) => {
-			const warns = n.status === 'warn' && i === 0;
-			const failing = 2 + (hash(key) % 5);
-			ev('audit_completed', e + 40 + i * 10, key, warns ? `${audit}: ${failing} failing rows (severity warn)` : `${audit} passed`);
-			if (warns) out('stderr', e + 40, `    ! ${key}  check ${audit}: ${failing} failing rows (warn)`, false, key);
+			const problem = profile ? profile[audit] : n.status === 'warn' && i === 0 ? (['warn', 2 + (hash(key) % 5)] as const) : undefined;
+			const at = e + 40 + i * 120;
+			const statementId = auditStatementId(run, key, i);
+			statements.push({
+				id: statementId,
+				runId: run.id,
+				invocationId: inv,
+				sequence: statements.length + 1,
+				nodeKey: key,
+				kind: 'audit',
+				status: 'completed',
+				startedAt: iso(at - 90 - (hash(statementId) % 300)),
+				endedAt: iso(at),
+				rowsAffected: problem ? problem[1] : 0,
+				rowsSoFar: null,
+				queryId: queryIdOf(statementId),
+				sqlRecorded: true,
+				error: null
+			});
+			const noun = audit.startsWith('unique') ? 'duplicate rows' : 'failing rows';
+			ev('audit_completed', at, key, problem ? `${audit}: ${problem[1]} ${noun} (severity ${problem[0]})` : `${audit} passed`, statementId);
+			if (problem) out('stderr', at, `    ${problem[0] === 'error' ? '✗' : '!'} ${key}  check ${audit}: ${problem[1]} ${noun} (${problem[0]})`, problem[0] === 'error', key);
 		});
+		if (checkFailed) {
+			const at = e + 60 + audits(key).length * 120;
+			ev('resource_attempt_failed', at, key, `check_failed: ${n.errorMessage}`);
+			out('stderr', at, `  ✗ ${key}  ${k}  ${took}  ${n.errorMessage}`, true, key);
+		}
 	}
 	// One combined heartbeat line for whatever is still running, backing off: 30 s, 1 min, 2 min, then every 5 min.
 	const firstStart = Math.min(...nodes.map((n) => (n.startedAt ? Date.parse(n.startedAt) : Infinity)));

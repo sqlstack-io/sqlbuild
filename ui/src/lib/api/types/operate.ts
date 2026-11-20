@@ -441,8 +441,10 @@ export type NodeOutputLine = { n: number; stream: 'stdout' | 'stderr'; text: str
 export type NodeOutputRow = { kind: 'line'; line: NodeOutputLine } | { kind: 'similar'; from: number; count: number; sample: NodeOutputLine };
 /** Rows covering lines `from` to `to` (exclusive, 1-based). */
 export type NodeOutputPage = { total: number; from: number; to: number; rows: NodeOutputRow[] };
-/** A search over the whole output: how many lines match, and the next match from where the search started. */
-export type NodeOutputSearch = { count: number; line: number | null };
+/** A search over the whole output: how many lines match, and the next match and its place among them (1-based). */
+export type NodeOutputSearch = { count: number; line: number | null; rank: number | null };
+/** The rows a failing check found: a sample, and how many there were in all (prototype, CHI-1591). */
+export type CheckSample = { columns: string[]; rows: (string | number | null)[][]; total: number };
 
 export type RunInvocation = {
 	invocationId: string;

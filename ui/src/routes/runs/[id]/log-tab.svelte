@@ -7,7 +7,8 @@
 	import { to } from '$lib/paths';
 	import DisclosureButton from '$lib/components/disclosure-button.svelte';
 	import DownloadIcon from '@lucide/svelte/icons/download';
-	import type { RunEventLevel } from '$lib/api';
+	import type { RunEventLevel, RunStatement } from '$lib/api';
+	import CheckList from './check-list.svelte';
 	import { formatStamp } from '$lib/format/time';
 	import { nodeLabel, shortRunId } from '$lib/operate/labels';
 	import type { LogEntry } from './utils';
@@ -24,6 +25,8 @@
 		filteredBy,
 		printed = $bindable(false),
 		memberOf = () => null,
+		statements = [],
+		onquery,
 		onnode,
 		onstatement
 	}: {
@@ -35,6 +38,10 @@
 		printed?: boolean;
 		/** A node name clicked: the log shows only that node. */
 		onnode?: (nodeKey: string) => void;
+		/** The run's statements, for a check's query ID and duration. */
+		statements?: readonly RunStatement[];
+		/** Shows a check's query in the Statements tab. */
+		onquery?: (statementId: string, nodeKey: string) => void;
 		/** A group run's member job, by member run, for the quiet tag beside a node. */
 		memberOf?: (runId: string) => string | null;
 		/** Opens a query's statement, with its SQL. */
@@ -234,6 +241,9 @@
 						<dl>
 							{#each e.details as [k, v], i (i)}<dt>{k}</dt><dd>{v}</dd>{/each}
 						</dl>
+						{#if e.checks?.length}
+							<div class="checks-wrap"><CheckList checks={e.checks} runId={e.runId} {statements} onstatement={onquery && e.nodeKey ? (id) => onquery(id, e.nodeKey!) : undefined} /></div>
+						{/if}
 						{#if e.long}
 							{@const lines = e.long.split('\n')}
 							<pre>{longOpen.has(e.id) ? e.long : lines.slice(0, 3).join('\n')}</pre>
@@ -394,6 +404,11 @@
 		padding-top: 3px;
 		padding-bottom: 3px;
 		color: var(--muted-foreground);
+	}
+	.checks-wrap {
+		margin: 8px 0 0;
+		padding: 8px 12px;
+		border-left: 2px solid var(--border-subtle);
 	}
 	.omitted {
 		color: var(--primary);

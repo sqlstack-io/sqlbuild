@@ -36,6 +36,7 @@ import type {
 	NodeOutputIndex,
 	NodeOutputPage,
 	NodeOutputSearch,
+	CheckSample,
 	RunStatement,
 	RunCostRow,
 	IgnoredAuditFailure,
@@ -303,7 +304,7 @@ export class MockApiClient implements ApiClient {
 		this.#location(scope);
 		return this.#operate.getNodeOutputIndex(scope, runId, nodeKey);
 	}
-	async getNodeOutputPage(scope: Scope, runId: string, nodeKey: string, at: { from: number; rows: number; direction: 'forward' | 'backward'; collapse: boolean }): Promise<NodeOutputPage> {
+	async getNodeOutputPage(scope: Scope, runId: string, nodeKey: string, at: { from: number; rows: number; direction: 'forward' | 'backward'; collapse: boolean; stream?: 'all' | 'stdout' | 'stderr'; around?: number }): Promise<NodeOutputPage> {
 		this.#location(scope);
 		return this.#operate.getNodeOutputPage(scope, runId, nodeKey, at);
 	}
@@ -311,9 +312,12 @@ export class MockApiClient implements ApiClient {
 		this.#location(scope);
 		return this.#operate.searchNodeOutput(scope, runId, nodeKey, query, from, direction);
 	}
-	async downloadNodeOutput(scope: Scope, runId: string, nodeKey: string, onProgress?: (done: number) => void): Promise<Blob> {
+	nodeOutputDownloadUrl(scope: Scope, runId: string, nodeKey: string): string {
+		return this.#operate.nodeOutputDownloadUrl(scope, runId, nodeKey);
+	}
+	async getCheckSample(scope: Scope, runId: string, statementId: string): Promise<CheckSample | null> {
 		this.#location(scope);
-		return this.#operate.downloadNodeOutput(scope, runId, nodeKey, onProgress);
+		return this.#operate.getCheckSample(scope, runId, statementId);
 	}
 
 	async getRunNodeError(scope: Scope, runId: string, nodeKey: string): Promise<RunNodeError> {

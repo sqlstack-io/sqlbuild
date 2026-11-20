@@ -110,7 +110,7 @@
 <div class="log-area">
 <PageBody padding="0" bind:scroller {onscroll}>
 	{#if view.tab === 'statements'}
-		<StatementsTab {statements} total={view.statements.length} {grouped} />
+		<StatementsTab {statements} total={view.statements.length} {grouped} focusId={view.statementFocus} />
 	{:else if view.tab === 'cost'}
 		{#if view.cost}
 			<CostTab cost={view.cost} filteredBy={filterKeys} onnode={(key) => view.focusNode(key, 'cost')} />
@@ -118,7 +118,7 @@
 			<p class="err">Couldn't load this run's cost: {view.costRes.error}</p>
 		{/if}
 	{:else}
-		<LogTab entries={shownEntries} {grouped} memberOf={(id) => view.detail?.children.find((c) => c.id === id)?.jobKey ?? null} bind:printed runId={view.run?.id ?? ''} filteredBy={filterKeys} onnode={(key) => view.focusNode(key, 'log')} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
+		<LogTab entries={shownEntries} {grouped} statements={view.statements} onquery={(id, key) => view.showStatement(id, key)} memberOf={(id) => view.detail?.children.find((c) => c.id === id)?.jobKey ?? null} bind:printed runId={view.run?.id ?? ''} filteredBy={filterKeys} onnode={(key) => view.focusNode(key, 'log')} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
 	{/if}
 </PageBody>
 {#if view.tab === 'log' && !atBottom && fresh > 0}

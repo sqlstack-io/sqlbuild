@@ -69,17 +69,49 @@ export function bigIndex(available: number, live: boolean): NodeOutputIndex {
 	return { total: available, stdout: available - stderr, stderr, bytes: Math.round(available * 46.3), marks, live };
 }
 
-/** Up to `rows` rows from line `from`, forwards, or backwards ending just before `from`; similar lines folded when `collapse`. */
-export function bigPage(available: number, at: { from: number; rows: number; direction: 'forward' | 'backward'; collapse: boolean }): NodeOutputPage {
+export type PageAt = { from: number; rows: number; direction: 'forward' | 'backward'; collapse: boolean; stream?: 'all' | 'stdout' | 'stderr'; around?: number };
+
+/**
+ * Up to `rows` rows from line `from`, forwards, or backwards ending just before `from`; similar lines
+ * folded when `collapse`, except the block holding `around` (a jump's target), which opens around it.
+ * `stream` keeps only stdout or stderr lines, keeping their line numbers.
+ */
+export function bigPage(available: number, at: PageAt): NodeOutputPage {
 	const step = at.direction === 'forward' ? 1 : -1;
-	let n = at.direction === 'forward' ? Math.max(1, at.from) : Math.min(available, at.from - 1);
 	const rows: NodeOutputRow[] = [];
-	while (rows.length < at.rows && n >= 1 && n <= available) {
-		const first = bigLine(n);
-		const count = at.collapse ? similarRun(n, step, available) : 1;
-		if (count >= 4) rows.push({ kind: 'similar', from: step > 0 ? n : n - count + 1, count, sample: step > 0 ? first : bigLine(n - count + 1) });
-		else for (let i = 0; i < count; i++) rows.push({ kind: 'line', line: bigLine(n + step * i) });
-		n += step * count;
+	if (at.stream === 'stderr') {
+		// stderr lines are the index's marks: read them from the index, not by walking the output.
+		const lines = bigIndex(available, false).marks.map((m) => m.line);
+		const picked = step > 0 ? lines.filter((l) => l >= at.from).slice(0, at.rows) : lines.filter((l) => l < at.from).slice(-at.rows);
+		for (const l of picked) rows.push({ kind: 'line', line: bigLine(l) });
+	} else {
+		let n = step > 0 ? Math.max(1, at.from) : Math.min(available, at.from - 1);
+		while (rows.length < at.rows && n >= 1 && n <= available) {
+			const first = bigLine(n);
+			if (at.stream === 'stdout' && first.stream === 'stderr') {
+				n += step;
+				continue;
+			}
+			let count = at.collapse ? similarRun(n, step, available) : 1;
+			const lo = step > 0 ? n : n - count + 1;
+			if (count >= 4 && at.around != null && at.around >= lo && at.around < lo + count) {
+				// The jump's target is inside this block: fold what comes before it, then show its lines.
+				const before = step > 0 ? at.around - 3 - n : n - (at.around + 3);
+				if (before >= 4) {
+					rows.push({ kind: 'similar', from: step > 0 ? n : at.around + 4, count: before, sample: bigLine(step > 0 ? n : at.around + 4) });
+					n += step * before;
+				}
+				const near = Math.min(7, Math.abs(n - (step > 0 ? at.around + 4 : at.around - 4)));
+				for (let i = 0; i < near && n >= 1 && n <= available; i++, n += step) rows.push({ kind: 'line', line: bigLine(n) });
+				continue;
+			}
+			if (count >= 4) rows.push({ kind: 'similar', from: lo, count, sample: bigLine(lo) });
+			else {
+				count = 1;
+				rows.push({ kind: 'line', line: first });
+			}
+			n += step * count;
+		}
 	}
 	if (step < 0) rows.reverse();
 	const firstLine = (r: NodeOutputRow) => (r.kind === 'line' ? r.line.n : r.from);
@@ -92,7 +124,7 @@ export function bigPage(available: number, at: { from: number; rows: number; dir
 const searches = new Map<string, number[]>();
 export function bigSearch(available: number, query: string, from: number, direction: 'forward' | 'backward'): NodeOutputSearch {
 	const q = query.toLowerCase();
-	if (!q) return { count: 0, line: null };
+	if (!q) return { count: 0, line: null, rank: null };
 	const key = `${available}|${q}`;
 	let hits = searches.get(key);
 	if (!hits) {
@@ -102,24 +134,16 @@ export function bigSearch(available: number, query: string, from: number, direct
 		searches.set(key, hits);
 	}
 	const line = direction === 'forward' ? (hits.find((h) => h >= from) ?? hits[0] ?? null) : ([...hits].reverse().find((h) => h <= from) ?? hits[hits.length - 1] ?? null);
-	return { count: hits.length, line };
+	return { count: hits.length, line, rank: line == null ? null : hits.indexOf(line) + 1 };
 }
 
-/** The whole output as a file, built in parts so the page stays responsive (the server would stream it). */
-export async function bigDownload(available: number, onProgress?: (done: number) => void): Promise<Blob> {
-	const parts: string[] = [];
-	const CHUNK = 50_000;
-	for (let start = 1; start <= available; start += CHUNK) {
-		const lines: string[] = [];
-		for (let n = start; n < Math.min(available + 1, start + CHUNK); n++) {
-			const l = bigLine(n);
-			lines.push(l.stream === 'stderr' ? `[stderr] ${l.text}` : l.text);
-		}
-		parts.push(lines.join('\n') + '\n');
-		onProgress?.(Math.min(available, start + CHUNK - 1) / available);
-		await new Promise((resolve) => setTimeout(resolve, 0));
-	}
-	return new Blob(parts, { type: 'text/plain' });
+/**
+ * Where the server streams the whole output as a file. The mock has no file server, so its link opens a
+ * short note in place of the file.
+ */
+export function bigDownloadUrl(runId: string, nodeKey: string, available: number): string {
+	const note = `Mock: the server streams ${runId}'s ${nodeKey} output here, ${available.toLocaleString('en-GB')} lines, as a file.\n`;
+	return URL.createObjectURL(new Blob([note], { type: 'text/plain' }));
 }
 
 /** How many lines the node has printed by `now`: all of them once it finished, else so far. */

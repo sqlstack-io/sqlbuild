@@ -14,6 +14,8 @@
 	import { relationName } from '$lib/build-area/labels';
 	import { nodeLabel, nodeStatusTone, shortRunId } from '$lib/operate/labels';
 	import type { RunDetailState } from './state.svelte';
+	import CheckList from './check-list.svelte';
+	import { checksOf } from './utils/checks';
 	import { formatQueryCost } from './utils';
 	import { fullStamp, skipCause, warehouseQueryUrl } from './utils/proto';
 
@@ -109,7 +111,7 @@
 				<div class="stats">
 					<div><span>Duration</span><b>{n.startedAt ? `${formatDuration(n.startedAt, n.endedAt, app.now)}${n.status === 'running' ? ' so far' : ''}` : '—'}</b></div>
 					<div><span>Rows</span><b>{rows ?? '—'}</b></div>
-					<div><span>Checks</span><b>{checks.length ? `${checks.filter((c) => c.level === 'info').length}/${checks.length}` : '—'}</b></div>
+					<div><span>Checks</span><b>{checks.length ? `${checks.filter((c) => c.level === 'info').length}/${checks.length} passed` : '—'}</b></div>
 					<div><span>Cost</span><b>{cost ? formatQueryCost(cost) : '—'}</b></div>
 				</div>
 				{#if cause}<p class="why">{cause}</p>{/if}
@@ -132,11 +134,7 @@
 					{/if}
 				</dl>
 				{#if checks.length}
-					<ul class="checks">
-						{#each checks as c (c.id)}
-							<li><i style:background={c.level === 'warn' ? 'var(--sb-warning)' : c.level === 'error' ? 'var(--sb-error)' : 'var(--sb-success)'}></i><span class="mono">{c.message}</span></li>
-						{/each}
-					</ul>
+					<div class="checks-wrap"><CheckList checks={checksOf(checks)} runId={n.runId} statements={view.statements} onstatement={(id) => view.showStatement(id, key)} /></div>
 				{/if}
 			</InspectorSection>
 
@@ -254,6 +252,7 @@
 		color: var(--sb-text-faint);
 	}
 	.body {
+		overflow-x: hidden;
 		overflow-y: auto;
 		flex: 1;
 		padding: 4px 8px 24px;
@@ -308,20 +307,8 @@
 		border-left: 2px solid var(--sb-error);
 		background: color-mix(in srgb, var(--sb-error) 6%, transparent);
 	}
-	.checks {
-		display: flex;
-		flex-direction: column;
-		gap: 3px;
-		margin: 8px 0 0;
-		padding: 0;
-		list-style: none;
-	}
-	.checks i {
-		display: inline-block;
-		width: 7px;
-		height: 7px;
-		margin-right: 6px;
-		border-radius: 50%;
+	.checks-wrap {
+		margin-top: 10px;
 	}
 	.output {
 		max-height: 260px;

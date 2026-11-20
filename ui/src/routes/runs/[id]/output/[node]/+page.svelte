@@ -4,6 +4,7 @@
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import PageBody from '$lib/components/page-body.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import type { NodeOutputIndex, NodeOutputPage, NodeOutputRow } from '$lib/api';
@@ -28,9 +29,9 @@
 	let target = $state<number | null>(null);
 	let lineInput = $state('');
 	let query = $state('');
-	let hits = $state<{ query: string; count: number; line: number | null } | null>(null);
+	let hits = $state<{ query: string; count: number; line: number | null; rank: number | null } | null>(null);
 	let searching = $state(false);
-	let downloading = $state<number | null>(null);
+	let stream = $state<'all' | 'stdout' | 'stderr'>('all');
 	let scroller = $state<HTMLDivElement>();
 	const supported = $derived(!!app.client.getNodeOutputPage && !!app.client.getNodeOutputIndex);
 
@@ -44,7 +45,8 @@
 		loading = true;
 		failed = null;
 		try {
-			view = await app.client.getNodeOutputPage(app.scope, runId, nodeKey, { from, rows: ROWS, direction, collapse });
+			// A jump's target opens the folded block it lands in.
+			view = await app.client.getNodeOutputPage(app.scope, runId, nodeKey, { from, rows: ROWS, direction, collapse, stream, around: point ?? undefined });
 			target = point;
 			await tick();
 			// The tail sits at the bottom; a jump puts its line in the middle of the view.
@@ -86,7 +88,7 @@
 		searching = true;
 		const from = hits?.query === query && hits.line != null ? hits.line + (direction === 'forward' ? 1 : -1) : direction === 'forward' ? (view?.from ?? 1) : (view?.to ?? total);
 		const res = await app.client.searchNodeOutput(app.scope, runId, nodeKey, query.trim(), from, direction);
-		hits = { query, count: res.count, line: res.line };
+		hits = { query, count: res.count, line: res.line, rank: res.rank };
 		searching = false;
 		if (res.line != null) await load(Math.max(1, res.line - 3), 'forward', res.line);
 	}
@@ -97,18 +99,11 @@
 	}
 	const errors = $derived((index?.marks ?? []).filter((m) => m.level === 'error').length);
 	const warnings = $derived((index?.marks ?? []).filter((m) => m.level === 'warn').length);
-	async function download() {
-		if (!app.scope || !app.client.downloadNodeOutput) return;
-		downloading = 0;
-		const blob = await app.client.downloadNodeOutput(app.scope, runId, nodeKey, (done) => (downloading = done));
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `${runId}-${nodeKey}.log`;
-		a.click();
-		URL.revokeObjectURL(url);
-		downloading = null;
-	}
+	// Download is a plain link: the server streams the whole output as a file.
+	let downloadUrl = $state<string | null>(null);
+	$effect(() => {
+		if (app.scope && app.client.nodeOutputDownloadUrl) downloadUrl = app.client.nodeOutputDownloadUrl(app.scope, runId, nodeKey);
+	});
 	const has = (r: NodeOutputRow, n: number | null) => n != null && (r.kind === 'line' ? r.line.n === n : n >= r.from && n < r.from + r.count);
 	const mb = (bytes: number) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${(bytes / 1e6).toFixed(0)} MB`);
 	/** A search word highlighted in a line. */
@@ -153,6 +148,17 @@
 		<p class="empty">This server doesn't serve paged output yet.</p>
 	{:else}
 		<div class="toolbar">
+			<SegmentedFilter
+				label="Stream"
+				bind:value={stream}
+				onselect={(v) => ((stream = v), load(1))}
+				options={[
+					{ value: 'all', label: 'All' },
+					{ value: 'stdout', label: 'stdout' },
+					{ value: 'stderr', label: 'stderr' }
+				]}
+			/>
+			<span class="divider"></span>
 			<Button size="sm" variant="ghost" onclick={() => load(1)} disabled={loading}>Start</Button>
 			<Button size="sm" variant="ghost" onclick={() => view && load(view.from, 'backward')} disabled={loading || !view || view.from <= 1}>‹ Previous</Button>
 			<Button size="sm" variant="ghost" onclick={() => view && load(view.to)} disabled={loading || !view || view.to > total}>Next ›</Button>
@@ -166,7 +172,7 @@
 				<input bind:value={query} placeholder="Search the whole output" aria-label="Search the whole output" />
 			</form>
 			{#if searching}<span class="faint">Searching {fmt(total)} lines…</span>
-			{:else if hits && hits.query === query}<span class="faint">{hits.count ? `${fmt(hits.count)} ${hits.count === 1 ? 'match' : 'matches'}${hits.line != null ? ` · at line ${fmt(hits.line)}` : ''}` : 'No matches'}</span>{/if}
+			{:else if hits && hits.query === query}<span class="faint">{hits.count ? (hits.rank != null ? `hit ${fmt(hits.rank)} of ${fmt(hits.count)} · line ${fmt(hits.line ?? 0)}` : `${fmt(hits.count)} matches`) : 'No matches'}</span>{/if}
 			<Button size="sm" variant="ghost" onclick={() => search('backward')} disabled={!query.trim() || searching} title="Previous match">↑</Button>
 			<Button size="sm" variant="ghost" onclick={() => search('forward')} disabled={!query.trim() || searching} title="Next match">↓</Button>
 			<span class="divider"></span>
@@ -175,7 +181,7 @@
 			<Button size="sm" variant="ghost" onclick={() => mark('warn', 'backward')} disabled={!warnings} title="Previous warning">↑</Button>
 			<span class="grow"></span>
 			<label class="fold"><input type="checkbox" class="sb-check" bind:checked={collapse} onchange={() => view && load(view.from, 'forward', target)} /> Fold similar lines</label>
-			<Button size="sm" variant="ghost" onclick={download} disabled={downloading != null} title="Download the whole output as a text file"><DownloadIcon />{downloading != null ? `Preparing ${Math.round(downloading * 100)}%` : 'Download'}</Button>
+			{#if downloadUrl}<a class="download" href={downloadUrl} download="{runId}-{nodeKey}.log" title="Download the whole output as a file"><DownloadIcon size={14} />Download</a>{/if}
 		</div>
 		{#if view}<div class="where">Lines {fmt(view.from)}–{fmt(Math.max(view.from, view.to - 1))} of {fmt(total)}{#if loading}<span class="faint"> · loading…</span>{/if}</div>{/if}
 
@@ -268,6 +274,16 @@
 		height: 18px;
 		margin: 0 6px;
 		background: var(--border-subtle);
+	}
+	.download {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 3px 8px;
+		color: var(--muted-foreground);
+	}
+	.download:hover {
+		color: var(--foreground);
 	}
 	.grow {
 		flex: 1;

@@ -134,7 +134,7 @@
 						{#if !nodes.length}
 							<div class="empty">{detail.children.length ? 'No nodes yet.' : 'Not started.'}</div>
 						{:else if topView === 'timeline' || !hasGraph}
-							<RunGantt nodes={view.shownNodes} {origin} now={app.now} active={view.active} selected={view.selected} tag={detail.children.length ? (n) => memberOf(n.runId) : undefined} skipText={causeOf} onselect={(key) => view.selectNode(key)} onopen={(key) => view.clickNode(key)} />
+							<RunGantt nodes={view.shownNodes} {origin} now={app.now} active={view.active} selected={view.selected} excluded={view.excluded} tag={detail.children.length ? (n) => memberOf(n.runId) : undefined} skipText={causeOf} onselect={(key) => view.selectNode(key)} onopen={(key) => view.clickNode(key)} />
 						{:else}
 							<RunLineage {view} />
 						{/if}
