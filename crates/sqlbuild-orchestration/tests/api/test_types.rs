@@ -124,9 +124,19 @@ pub(crate) struct WarehouseMetadataTestCase {
     pub(crate) expected_observations: usize,
 }
 
-pub(crate) struct CheckListCacheTestCase {
+pub(crate) struct CheckListRerunTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
+    pub(crate) expected_before: (&'static str, &'static str),
+    pub(crate) expected_after: (&'static str, &'static str),
+    pub(crate) expected_revalidated: u16,
+}
+
+pub(crate) struct CheckListRebuildTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_listed: (&'static str, &'static str),
+    pub(crate) expected_revalidated: u16,
 }
 
 pub(crate) struct MirrorConflictTestCase {

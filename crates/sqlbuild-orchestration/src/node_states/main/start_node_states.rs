@@ -82,7 +82,6 @@ fn watched_targets(
             *location_id == location && entry.target_hash == target_hash
         })
     };
-    // Every named target's check list is dropped, watched or not: any result may have changed.
     for (key, entry) in targets.iter() {
         if named(key, entry) {
             drop_checks(entry);

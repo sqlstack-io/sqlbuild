@@ -2,156 +2,55 @@
 
 use std::time::Duration;
 
-use reqwest::{Client, StatusCode, header};
-use serde_json::Value;
-use uuid::Uuid;
+use reqwest::StatusCode;
 
-use crate::api::tests::helpers::stop_api;
-use crate::api::tests::test_types::CheckListCacheTestCase;
-use crate::api::tests::warehouse_history_helpers::{
-    ORIGIN, batch, fixture, login, seed_target, start_password_api,
+use crate::api::tests::check_list_helpers::{
+    ingest_result, read_changed_checks, read_checks, watch_changes,
 };
-use crate::store::models::ControlStore;
+use crate::api::tests::helpers::stop_api;
+use crate::api::tests::test_types::{CheckListRebuildTestCase, CheckListRerunTestCase};
+use crate::api::tests::warehouse_history_helpers::{login, seed_target, start_password_api};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
-use crate::warehouse_metadata::main::ingest::ingest_audit_results::ingest_audit_results;
 
-const CASES: [CheckListCacheTestCase; 2] = [
-    CheckListCacheTestCase {
-        description: "SQLite check list",
-        backend: Backend::Sqlite,
-    },
-    CheckListCacheTestCase {
-        description: "PostgreSQL check list",
-        backend: Backend::Postgres,
-    },
-];
-
-/// One result of the fixture check, as a run that `outcome`d at `occurred_at`.
-async fn ingest_result(
-    store: &ControlStore,
-    (location, session_id): (Uuid, Uuid),
-    (result_id, run_id, occurred_at, outcome): (&str, &str, &str, &str),
-) {
-    let mut record = fixture("audit_result_history.json")["record"].clone();
-    record["result_id"] = result_id.into();
-    record["run_id"] = run_id.into();
-    record["invocation_id"] = run_id.into();
-    record["occurred_at"] = occurred_at.into();
-    record["outcome"] = outcome.into();
-    let applied = ingest_audit_results(
-        store,
-        (location, "development"),
-        &batch(session_id, "audit_results", vec![record]),
-    )
-    .await
-    .expect("ingest a check result")
-    .applied;
-    assert!(applied, "{result_id} is a new result");
-}
-
-/// The list's status, ETag and body, revalidating `tag` when given.
-async fn read_checks(
-    client: &Client,
-    (url, cookie, location): (&str, &str, Uuid),
-    tag: Option<&str>,
-) -> (StatusCode, Option<String>, Value) {
-    let request = client
-        .get(format!(
-            "{url}/api/control/locations/{location}/targets/development/checks"
-        ))
-        .header(header::HOST, "control.example.com")
-        .header(header::ORIGIN, ORIGIN)
-        .header(header::COOKIE, cookie);
-    let response = tag
-        .into_iter()
-        .fold(request, |request, tag| {
-            request.header(header::IF_NONE_MATCH, tag)
-        })
-        .send()
-        .await
-        .expect("check list read");
-    let status = response.status();
-    let etag = response
-        .headers()
-        .get(header::ETAG)
-        .map(|tag| tag.to_str().expect("ASCII ETag").to_owned());
-    (status, etag, response.json().await.unwrap_or(Value::Null))
-}
-
-/// The target's change stream, as every open page holds one, once its first notice has arrived; the target stays watched while it is open.
-async fn watch_changes(
-    client: &Client,
-    (url, cookie, location): (&str, &str, Uuid),
-) -> reqwest::Response {
-    let mut feed = client
-        .get(format!(
-            "{url}/api/control/locations/{location}/targets/development/changes"
-        ))
-        .header(header::HOST, "control.example.com")
-        .header(header::ORIGIN, ORIGIN)
-        .header(header::COOKIE, cookie)
-        .header(header::ACCEPT, "text/event-stream")
-        .send()
-        .await
-        .expect("change stream");
-    assert_eq!(feed.status(), StatusCode::OK, "change stream opens");
-    feed.chunk().await.expect("first notice");
-    feed
-}
-
-fn runs_listed(list: &Value) -> Vec<(String, String)> {
-    list.as_array()
-        .map(|checks| {
-            checks
-                .iter()
-                .map(|check| {
-                    (
-                        check["run_id"].as_str().unwrap_or_default().to_owned(),
-                        check["outcome"].as_str().unwrap_or_default().to_owned(),
-                    )
-                })
-                .collect()
-        })
-        .unwrap_or_default()
-}
+const FIRST_RUN: (&str, &str, &str, &str) = ("result-1", "run-1", "2026-02-03T04:05:06Z", "pass");
 
 #[test]
 fn given_a_held_check_list_when_a_rerun_passes_again_then_the_newer_result_is_served_under_a_new_tag()
  {
-    for test_case in CASES {
+    let test_cases = [
+        CheckListRerunTestCase {
+            description: "SQLite check list",
+            backend: Backend::Sqlite,
+            expected_before: ("run-1", "pass"),
+            expected_after: ("run-2", "pass"),
+            expected_revalidated: 304,
+        },
+        CheckListRerunTestCase {
+            description: "PostgreSQL check list",
+            backend: Backend::Postgres,
+            expected_before: ("run-1", "pass"),
+            expected_after: ("run-2", "pass"),
+            expected_revalidated: 304,
+        },
+    ];
+    for test_case in test_cases {
         run(async {
             let Some(fixture_store) = open_test_store(test_case.backend).await else {
                 return;
             };
             let store = &fixture_store.store;
             let (location, session_id) = seed_target(store).await;
-            ingest_result(
-                store,
-                (location, session_id),
-                ("result-1", "run-1", "2026-02-03T04:05:06Z", "pass"),
-            )
-            .await;
+            ingest_result(store, (location, session_id), FIRST_RUN).await;
             let (api, client) = start_password_api(store).await;
             let viewer = login(&client, &api.url, "orders-viewer").await;
             let scope = (api.url.as_str(), viewer.as_str(), location);
+            // A page holds the target's change stream open, which keeps its views held across signals.
             let feed = watch_changes(&client, scope).await;
 
             let (status, first_tag, first) = read_checks(&client, scope, None).await;
             let first_tag = first_tag.expect("the list is tagged");
             let (unchanged, unchanged_tag, _) = read_checks(&client, scope, Some(&first_tag)).await;
-            assert_eq!(
-                (status, runs_listed(&first), unchanged, unchanged_tag),
-                (
-                    StatusCode::OK,
-                    vec![("run-1".to_owned(), "pass".to_owned())],
-                    StatusCode::NOT_MODIFIED,
-                    Some(first_tag.clone())
-                ),
-                "{}: the first result, then a 304 for its tag",
-                test_case.description
-            );
-
             // A re-run whose check passes again: same outcome, so no node's check counts change.
             ingest_result(
                 store,
@@ -159,31 +58,29 @@ fn given_a_held_check_list_when_a_rerun_passes_again_then_the_newer_result_is_se
                 ("result-2", "run-2", "2026-02-04T04:05:06Z", "pass"),
             )
             .await;
-            let mut served = (StatusCode::NOT_MODIFIED, None, Value::Null);
-            for _ in 0..50 {
-                served = read_checks(&client, scope, Some(&first_tag)).await;
-                if served.0 != StatusCode::NOT_MODIFIED {
-                    break;
-                }
-                tokio::time::sleep(Duration::from_millis(100)).await;
-            }
-            let (status, rerun_tag, rerun) = served;
-            assert_eq!(
-                (status, runs_listed(&rerun)),
-                (
-                    StatusCode::OK,
-                    vec![("run-2".to_owned(), "pass".to_owned())]
-                ),
-                "{}: the re-run's result replaces the held list",
-                test_case.description
-            );
+            let (status_after, rerun_tag, rerun) =
+                read_changed_checks(&client, scope, &first_tag).await;
             let rerun_tag = rerun_tag.expect("the new list is tagged");
-            assert_ne!(rerun_tag, first_tag, "{}", test_case.description);
             let (revalidated, _, _) = read_checks(&client, scope, Some(&rerun_tag)).await;
+            let expected =
+                |(run_id, outcome): (&str, &str)| vec![(run_id.to_owned(), outcome.to_owned())];
             assert_eq!(
-                revalidated,
-                StatusCode::NOT_MODIFIED,
-                "{}",
+                (
+                    (status, first, unchanged, unchanged_tag),
+                    (status_after, rerun, rerun_tag != first_tag),
+                    revalidated.as_u16()
+                ),
+                (
+                    (
+                        StatusCode::OK,
+                        expected(test_case.expected_before),
+                        StatusCode::NOT_MODIFIED,
+                        Some(first_tag.clone())
+                    ),
+                    (StatusCode::OK, expected(test_case.expected_after), true),
+                    test_case.expected_revalidated
+                ),
+                "{}: the first result and a 304 for its tag, then the re-run's result under a new tag",
                 test_case.description
             );
             drop(feed);
@@ -195,19 +92,28 @@ fn given_a_held_check_list_when_a_rerun_passes_again_then_the_newer_result_is_se
 
 #[test]
 fn given_a_check_list_tag_when_the_list_is_rebuilt_unchanged_then_it_still_revalidates() {
-    for test_case in CASES {
+    let test_cases = [
+        CheckListRebuildTestCase {
+            description: "SQLite check list",
+            backend: Backend::Sqlite,
+            expected_listed: ("run-1", "pass"),
+            expected_revalidated: 304,
+        },
+        CheckListRebuildTestCase {
+            description: "PostgreSQL check list",
+            backend: Backend::Postgres,
+            expected_listed: ("run-1", "pass"),
+            expected_revalidated: 304,
+        },
+    ];
+    for test_case in test_cases {
         run(async {
             let Some(fixture_store) = open_test_store(test_case.backend).await else {
                 return;
             };
             let store = &fixture_store.store;
             let (location, session_id) = seed_target(store).await;
-            ingest_result(
-                store,
-                (location, session_id),
-                ("result-1", "run-1", "2026-02-03T04:05:06Z", "pass"),
-            )
-            .await;
+            ingest_result(store, (location, session_id), FIRST_RUN).await;
             let (api, client) = start_password_api(store).await;
             let viewer = login(&client, &api.url, "orders-viewer").await;
             let (_, tag, _) = read_checks(&client, (&api.url, &viewer, location), None).await;
@@ -231,13 +137,16 @@ fn given_a_check_list_tag_when_the_list_is_rebuilt_unchanged_then_it_still_reval
             let (late, _, _) = read_checks(&client, scope, Some(&tag)).await;
             let (status, fresh_tag, list) = read_checks(&client, scope, None).await;
             assert_eq!(
-                (rebuilt, late, status, fresh_tag, runs_listed(&list)),
+                (rebuilt.as_u16(), late.as_u16(), status, fresh_tag, list),
                 (
-                    StatusCode::NOT_MODIFIED,
-                    StatusCode::NOT_MODIFIED,
+                    test_case.expected_revalidated,
+                    test_case.expected_revalidated,
                     StatusCode::OK,
                     Some(tag.clone()),
-                    vec![("run-1".to_owned(), "pass".to_owned())]
+                    vec![(
+                        test_case.expected_listed.0.to_owned(),
+                        test_case.expected_listed.1.to_owned()
+                    )]
                 ),
                 "{}: a rebuild with the same results keeps the tag",
                 test_case.description
