@@ -177,7 +177,6 @@ fn run_context_facts(
         schema: display_text(&native_field(&project, "effective_target_schema")?)?,
         warehouse,
         concurrency: concurrency.limit,
-        concurrency_source: concurrency.source.to_string(),
         full_refresh: context.request_flag("full_refresh")?,
         full_refresh_jobs,
         job_warehouses,

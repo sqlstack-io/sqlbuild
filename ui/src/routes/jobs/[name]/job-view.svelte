@@ -23,7 +23,7 @@
 	import { formatNodeCounts, isActiveRun, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
 	import { kindLine, shortName } from '$lib/build-area/labels';
 	import { planHref } from '$lib/run/command';
-	import { CONCURRENCY_DOCS, concurrencySource, formatCost, narrowingText, onFailureText, overlapHelp, overlapWhileRunning, poolText, shortRunId } from '$lib/operate/labels';
+	import { CONCURRENCY_DOCS, formatCost, narrowingText, onFailureText, overlapHelp, overlapWhileRunning, poolText, runConcurrencyText, shortRunId } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import MemberGraph from '$lib/lineage/member-graph.svelte';
 	import { memberLinks, publishedLinks, waitReasons, type MemberInfo, type MemberSelection } from '$lib/lineage/member-graph';
@@ -313,7 +313,7 @@
 							{@const resolved = def.resolvedConcurrency}
 							<ul class="concurrency">
 								{#if resolved}
-									<li>Inside a run: {resolved.limit} at once <span class="muted">({concurrencySource(resolved.source, app.target?.name ?? null)})</span></li>
+									<li>{runConcurrencyText(resolved.limit, def.kind)}</li>
 								{/if}
 								<li>Never alongside runs writing the same tables <span class="muted">(automatic)</span></li>
 								{#if def.overlap}
@@ -531,7 +531,7 @@
 	.picked li {
 		padding: 2px 0;
 	}
-	/* The Concurrency panel: one plain fact per line, where it came from quieter beside it. */
+	/* The Concurrency panel: one plain fact per line, any detail quieter beside it. */
 	.concurrency {
 		display: flex;
 		flex-direction: column;

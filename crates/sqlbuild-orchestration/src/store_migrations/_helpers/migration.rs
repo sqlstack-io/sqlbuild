@@ -25,6 +25,11 @@ pub(crate) const MIGRATIONS: &[StoreMigration] = &[
         sqlite: include_str!("../sql/0003_attention_acknowledgement_index.sqlite.sql"),
         postgres: include_str!("../sql/0003_attention_acknowledgement_index.postgres.sql"),
     },
+    StoreMigration {
+        name: "drop_concurrency_source",
+        sqlite: include_str!("../sql/0004_drop_concurrency_source.sqlite.sql"),
+        postgres: include_str!("../sql/0004_drop_concurrency_source.postgres.sql"),
+    },
 ];
 
 /// The schema version a store created by this build has.

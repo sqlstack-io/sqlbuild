@@ -439,14 +439,14 @@ def test_given_a_job_concurrency_when_building_then_its_nodes_never_exceed_it(
             description="the run context says the named jobs set the limit",
             command_args=("build", "--verbose", "--select", "job:wide_job", "+orders"),
             expected_exit_code=0,
-            expected_present=("6 configured limit (named jobs' concurrency)",),
+            expected_present=("concurrency  6 configured limit\n",),
             expected_absent=(),
         ),
         JobOutputTestCase(
             description="a configured limit above the named jobs' stays the build's limit",
             command_args=("build", "--verbose", "--select", "job:orders_job", "customers"),
             expected_exit_code=0,
-            expected_present=("4 configured limit (settings.concurrency)",),
+            expected_present=("concurrency  4 configured limit\n",),
             expected_absent=(),
         ),
         JobOutputTestCase(

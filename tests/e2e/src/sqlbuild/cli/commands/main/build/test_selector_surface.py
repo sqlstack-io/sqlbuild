@@ -136,7 +136,7 @@ def test_given_selector_commands_when_running_cli_then_behavior_matches_expectat
                 "run_id       ",
                 "target       not set",
                 "warehouse    not set",
-                "concurrency  3 configured limit",
+                "concurrency  3 configured limit\n",
                 "full_refresh false",
                 "selected     2 of 19 build resources",
                 "date vars    1970-01-01 to 2030-12-31",
