@@ -13,7 +13,7 @@ Online: https://sqlbuild.com/docs/concepts/functions/
 - References inside functions
 - Change propagation
 - Project layout
-- Python UDF options
+- Python function options
 - Adapter support
 
 Functions are SQL or Python definitions under `functions/` that SQLBuild compiles and deploys to the warehouse alongside your models. They participate in the DAG: if a function definition changes, SQLBuild redeploys it, and every model that calls it directly treats the change as a change to its own query.
@@ -74,7 +74,11 @@ The function name is the file stem (filename without extension). `__udf()` resol
 
 ## Table functions
 
-Table functions return multiple rows and columns. They are written in SQL under `functions/sql/` with a `returns table(...)` declaration:
+Table functions return multiple rows and columns. Write them in SQL under `functions/sql/` with a `returns table(...)` declaration, or in Python under `functions/python/` with `@table_fn(...)`.
+
+### SQL table functions
+
+A SQL table function's body is a query:
 
 ```sql
 -- functions/sql/table_fn__customer_orders.sql
@@ -102,6 +106,52 @@ FROM __ref("fact_orders")
 WHERE customer_id = p_customer_id
 ```
 
+### Python table functions
+
+A Python table function receives one whole partition of its input rows as a data frame and returns a data frame of rows. Use it for per-group numerics that SQL expresses badly, such as smoothing a series or fitting a curve per customer. Place it under `functions/python/`, with exactly one function decorated with `@table_fn(...)`:
+
+```python
+# functions/python/smooth_payments.py
+import polars as pl
+from sqlbuild.functions import table_fn
+
+@table_fn(
+    arguments={"customer_id": "INTEGER", "paid_at": "FLOAT", "amount": "FLOAT"},
+    returns={"customer_id": "INTEGER", "paid_at": "FLOAT", "amount_smoothed": "FLOAT"},
+    runtime_version="3.12",
+)
+def main(payments: pl.DataFrame) -> pl.DataFrame:
+    """Payment amounts smoothed over each customer's last three payments."""
+    return payments.sort("paid_at").select(
+        "customer_id",
+        "paid_at",
+        pl.col("amount").rolling_mean(3, min_samples=1).alias("amount_smoothed"),
+    )
+```
+
+Call it with `OVER (PARTITION BY ...)` after the arguments. Each partition is one call of `main`:
+
+```sql
+SELECT s.*
+FROM __ref("payments") p,
+  __table_fn("smooth_payments")(p.customer_id, p.paid_at, p.amount)
+    OVER (PARTITION BY p.customer_id) s
+```
+
+- `main` is a plain function: its frame has one column per argument, named after the argument. Test it with pytest like any other Python code.
+- The frame is a polars `DataFrame` by default. Annotate the parameter as a pandas `pd.DataFrame` to receive pandas, or set `function_dataframe = "pandas"` under [`[defaults]`](project-configuration.md#defaults) to make pandas the project default. An annotation wins over the default.
+- SQLBuild generates the warehouse handler and adds the packages the frame needs: `pandas`, and `polars` and `pyarrow` for polars.
+- The returned frame must have exactly the `returns` columns. Otherwise the call fails with an error naming the missing and extra columns.
+- Rows arrive in no particular order. Sort inside `main` when order matters.
+
+| Problem | Fix |
+|---------|-----|
+| A call without `OVER (PARTITION BY ...)` fails compilation | Add `OVER (PARTITION BY <columns>)` after the call |
+| A polars function's `NUMBER(p, s)` argument with a scale above zero fails compilation | Declare it as `FLOAT`, or as `INTEGER` when it has no fraction |
+| `returns` is not a column-to-type mapping, so compilation fails | Map each output column to its type |
+
+Python table functions deploy on Snowflake only; other adapters reject them when the function is created (see [Adapter support](#adapter-support)).
+
 ### Why table functions exist
 
 Table functions are designed as an alternative to final-layer views for cases where views don't push predicates efficiently. A view over `fact_orders` with a `WHERE customer_id = ?` filter may scan the entire table if the engine doesn't push the predicate down. A table function accepts the filter as an argument and guarantees the predicate is applied at execution time.
@@ -115,7 +165,7 @@ SELECT customer_id, order_id
 FROM __table_fn("table_fn__customer_orders")(42)
 ```
 
-The name must be double quoted and the second argument list is required, including for a zero-argument function. SQLBuild validates that the target exists, is a table function, and receives the declared number of arguments.
+The name must be double quoted and the second argument list is required, including for a zero-argument function. SQLBuild validates that the target exists, is a table function, and receives the declared number of arguments. A Python table function call also needs `OVER (PARTITION BY ...)`.
 
 The reference creates a typed dependency in the project DAG. Selecting a consuming model also selects the required function, function changes propagate to consumers, and cycles through models and functions are rejected. SQLBuild treats the call as an opaque relation for SQL analysis and uses the function's declared `returns table(...)` columns for star expansion and terminal lineage.
 
@@ -161,19 +211,20 @@ functions/
     udf__is_completed_order.sql        # scalar SQL UDF
     table_fn__customer_orders.sql     # table function (returns table)
   python/
-    is_completed_order_py.py      # scalar Python UDF
+    is_completed_order_py.py      # scalar Python UDF (@udf)
+    smooth_payments.py            # Python table function (@table_fn)
 ```
 
-## Python UDF options
+## Python function options
 
-The `@udf` decorator accepts these keyword arguments:
+The `@udf` and `@table_fn` decorators accept these keyword arguments:
 
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `description` | Yes, unless the function has a docstring | What the function returns; overrides the docstring |
 | `arguments` | Yes | Dict mapping argument names to SQL types |
-| `returns` | Yes | SQL return type string |
-| `runtime_version` | No | Python runtime version (e.g. `"3.11"`) |
+| `returns` | Yes | `@udf`: SQL return type string. `@table_fn`: dict mapping each output column to its SQL type |
+| `runtime_version` | Yes | Python runtime version (e.g. `"3.11"`) |
 | `entry_point` | No | Function name to use as the entry point (defaults to the decorated function name) |
 | `packages` | No | List of Python packages required at runtime |
 
@@ -181,12 +232,11 @@ The `@udf` decorator accepts these keyword arguments:
 
 ## Adapter support
 
-All four supported adapters implement SQL UDFs, Python UDFs, and table functions:
+| Feature | DuckDB, MotherDuck | Snowflake | BigQuery | Databricks | PostgreSQL | SQL Server | ClickHouse | SQLite |
+|---------|--------------------|-----------|----------|------------|------------|------------|------------|--------|
+| SQL UDFs | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No |
+| Python UDFs | Yes | Yes | Yes | Yes | No | No | No | No |
+| SQL table functions | Yes | Yes | Yes | Yes | No | No | No | No |
+| Python table functions | No | Yes | No | No | No | No | No | No |
 
-| Feature | DuckDB | Snowflake | BigQuery | Databricks |
-|---------|--------|-----------|----------|------------|
-| SQL UDFs | Yes | Yes | Yes | Yes |
-| Python UDFs | Yes | Yes | Yes | Yes |
-| Table functions | Yes | Yes | Yes | Yes |
-
-Future adapters may not support all function types. SQLBuild raises a clear error if a function type is unsupported by the configured adapter.
+Creating a function the adapter doesn't support fails with an error naming the adapter and the function type.

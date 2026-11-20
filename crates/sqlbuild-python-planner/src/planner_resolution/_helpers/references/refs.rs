@@ -18,6 +18,7 @@ use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::sqltext::models::SqlCodeScanner;
+use sqlbuild_sqltext::resolution::main::over_clause_open::over_clause_open;
 use sqlbuild_sqltext::resolution::main::{ref_alias::ref_alias, reference_spans::reference_spans};
 
 #[pyfunction]
@@ -189,6 +190,11 @@ fn resolve_function_calls(
             .char_indices()
             .nth(end + 1)
             .map_or(query_sql.len(), |(index, _)| index);
+        let end = if table {
+            over_clause_end(query_sql, end, &scanner, py)?
+        } else {
+            end
+        };
         let hook = if table {
             "render_table_function_call"
         } else {
@@ -215,6 +221,23 @@ fn resolve_function_calls(
     }
     output.push_str(&query_sql[last..]);
     Ok(output)
+}
+
+/// The end of an `OVER (...)` clause right after a table function call, or `end` without one.
+fn over_clause_end(
+    query_sql: &str,
+    end: usize,
+    scanner: &SqlCodeScanner,
+    py: Python<'_>,
+) -> PyResult<usize> {
+    let Some(open) = over_clause_open(query_sql, end) else {
+        return Ok(end);
+    };
+    let close: usize = scanner.matching_paren(py, query_sql[..open].chars().count())?;
+    Ok(query_sql
+        .char_indices()
+        .nth(close + 1)
+        .map_or(query_sql.len(), |(index, _)| index))
 }
 
 #[pyfunction]

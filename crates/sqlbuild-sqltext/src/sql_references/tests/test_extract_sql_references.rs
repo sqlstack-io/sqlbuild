@@ -1,7 +1,7 @@
 use crate::sql_references::main::extract_sql_references::extract_sql_references;
 use crate::sql_references::tests::helpers::{
-    backslash_hash_comments, dbt_reference, extracted, failed, generic, invalid_call, reference,
-    rejected, table_function,
+    backslash_hash_comments, dbt_reference, extracted, failed, generic, invalid_call,
+    partitioned_table_function, reference, rejected, table_function,
 };
 use crate::sql_references::tests::test_types::ExtractSqlReferencesTestCase;
 
@@ -28,6 +28,18 @@ fn given_sql_when_extracting_references_then_matches_python_scanner() {
             sql: "SELECT * FROM __table_fn(\"expand_orders\") ( 1, f(2, 3), 'a,b' /* , */ )",
             syntax: generic(),
             expected_extraction: extracted(vec![table_function("expand_orders", 3)]),
+        },
+        ExtractSqlReferencesTestCase {
+            description: "a partition clause after the call marks it partitioned",
+            sql: "SELECT s.* FROM r, __table_fn(\"smooth\")(r.a, r.b)\n  over ( partition\tby r.device_id ORDER BY r.ts) AS s",
+            syntax: generic(),
+            expected_extraction: extracted(vec![partitioned_table_function("smooth", 2)]),
+        },
+        ExtractSqlReferencesTestCase {
+            description: "an empty window or a following OVER word is not a partition clause",
+            sql: "SELECT * FROM __table_fn(\"a\")(1) OVER () , __table_fn(\"b\")(2) overflow (partition by x)",
+            syntax: generic(),
+            expected_extraction: extracted(vec![table_function("a", 1), table_function("b", 1)]),
         },
         ExtractSqlReferencesTestCase {
             description: "table function without call arguments",

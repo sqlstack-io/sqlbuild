@@ -189,6 +189,7 @@ fn function_sql(adapter: &Bound<'_, PyAny>, function: &Bound<'_, PyAny>) -> PyRe
         "runtime_version",
         "entry_point",
         "packages",
+        "dataframe",
     ] {
         arguments.push((field, native_field(function, field)?));
     }

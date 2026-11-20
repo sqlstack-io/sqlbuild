@@ -4,6 +4,7 @@ use crate::relation_markers::main::lateral_start::lateral_start;
 use crate::semantic_checks::constants::UDF_NAME_PREFIX;
 use regex::Regex;
 use sqlbuild_sqltext::compiler::main::placeholder_default_edits::placeholder_default_edits;
+use sqlbuild_sqltext::resolution::main::over_clause_open::over_clause_open;
 use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use sqlbuild_sqltext::sql_scan::main::dialect_non_code_ranges::dialect_non_code_ranges;
 use sqlbuild_sqltext::sql_scan::main::matching_paren::matching_paren;
@@ -169,6 +170,11 @@ pub(super) fn normalize(
             end = matching_paren(result.sql.as_bytes(), whole.end(), QuotePolicy::COMPILER)
                 .map_err(|error| format!("invalid table-function analysis input: {error:?}"))?
                 + 1;
+            if let Some(open) = over_clause_open(&result.sql, end) {
+                end = matching_paren(result.sql.as_bytes(), open, QuotePolicy::COMPILER).map_err(
+                    |error| format!("invalid table-function partition clause: {error:?}"),
+                )? + 1;
+            }
             start = lateral_start(&result.sql, start, |index| {
                 !non_code
                     .iter()

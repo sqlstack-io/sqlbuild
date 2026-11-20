@@ -317,6 +317,7 @@ class FunctionDefinition:
     runtime_version: str | None = None
     entry_point: str | None = None
     packages: tuple[str, ...] = ()
+    dataframe: str | None = None
     source_file_path: Path | None = None
 
 

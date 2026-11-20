@@ -392,6 +392,9 @@ instead.
 
 - Placement: `database`, `schema`, `seed_database`, `seed_schema`, `function_database`,
   `function_schema`
+- Functions: `function_dataframe`, the frame library of Python table functions whose parameter
+  names none: `"polars"` (default) or `"pandas"` (see
+  [Python table functions](/docs/concepts/functions#python-table-functions))
 - Materialization: `materialized`, `contract`, `full_refresh`, `replay_on_change`, `tags`
 - Incremental: `incremental_strategy`, `incremental_mode`, `merge_exclude_columns`,
   `append_cursor_inclusive`, `lookback`, `unaccounted_partition_policy`

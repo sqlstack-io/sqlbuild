@@ -39,6 +39,7 @@ from sqlbuild._native import (
 )
 from sqlbuild.adapter.contract.models import ExpressionInferenceProfile
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
+from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.compiler.compile.types import (
     CompiledAuditView,
     CompiledFunctionView,
@@ -572,6 +573,32 @@ FUNCTION_PROJECT_FILES: dict[str, str] = {
 }
 
 
+TABLE_FUNCTION_PROJECT_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": 'name = "orders"\nadapter = "snowflake"\n',
+    "models/readings.sql": (
+        "MODEL (description 'Readings.');\nSELECT 1 AS device_id, 1.0 AS ts, 2.0 AS reading\n"
+    ),
+    "functions/python/smooth.py": (
+        "import polars as pl\nfrom sqlbuild.functions import table_fn\n\n"
+        "@table_fn(arguments={'device_id': 'INTEGER', 'reading': 'FLOAT'},"
+        " returns={'device_id': 'INTEGER', 'smoothed': 'FLOAT'}, runtime_version='3.12')\n"
+        "def main(readings: pl.DataFrame) -> pl.DataFrame:\n"
+        '    """Smooth."""\n    return readings\n'
+    ),
+    "functions/python/rank_readings.py": (
+        "import pandas as pd\nfrom sqlbuild.functions import table_fn\n\n"
+        "@table_fn(arguments={'reading': 'FLOAT'}, returns={'position': 'INTEGER'},"
+        " runtime_version='3.12')\n"
+        "def main(readings: pd.DataFrame) -> pd.DataFrame:\n"
+        '    """Rank."""\n    return readings\n'
+    ),
+    "models/smoothed.sql": (
+        "MODEL (description 'Smoothed.');\nSELECT s.* FROM __ref(\"readings\") r,\n"
+        '  __table_fn("smooth")(r.device_id, r.reading) OVER (PARTITION BY r.device_id) s\n'
+    ),
+}
+
+
 def compile_function_project(
     *, project_dir: Path, files: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> tuple[CompiledProjectView, CompileInputsView]:
@@ -585,6 +612,30 @@ def compile_function_project(
     )
     inputs: CompileInputsView = build_inputs_with_native_loop(project_dir=project_dir)
     return project, inputs
+
+
+def compile_snowflake_project(*, project_dir: Path, files: dict[str, str]) -> CompiledProjectView:
+    """Compile a Snowflake project of `files`, the adapter Python table functions deploy on."""
+
+    write_files(project_dir=project_dir, files=files)
+    return build_compiled_project(
+        discovered_inputs=discover_project_inputs(project_dir=project_dir),
+        adapter=SnowflakeAdapter(),
+        resolved_connection=_SOURCE_CONNECTION,
+    )
+
+
+def table_function_summary(function: CompiledFunctionView) -> tuple[object, ...]:
+    """A compiled Python table function's kind, columns and partition frame."""
+
+    return (
+        str(function.key.resource_type),
+        function.language.value,
+        function.returns,
+        tuple((column.name, column.type) for column in function.return_columns),
+        function.entry_point,
+        function.dataframe,
+    )
 
 
 def function_summary(function: CompiledFunctionView) -> tuple[object, ...]:

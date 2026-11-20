@@ -6,6 +6,7 @@ use regex::{Captures, Regex};
 
 use crate::compiler::_helpers::sql_tests::planning::compile_error;
 use crate::relation_markers::main::lateral_start::lateral_start;
+use sqlbuild_sqltext::resolution::main::over_clause_open::over_clause_open;
 use sqlbuild_sqltext::sql_scan::main::dialect_matching_paren::dialect_matching_paren;
 use sqlbuild_sqltext::sql_scan::main::dialect_non_code_ranges::dialect_non_code_ranges;
 use sqlbuild_sqltext::sql_scan::main::skip_whitespace::skip_whitespace;
@@ -13,7 +14,7 @@ use sqlbuild_sqltext::sql_scan::models::{LexicalSyntax, Unclosed};
 
 pub(crate) fn replace_callable_markers<F>(
     sql: &str,
-    (pattern, drop_lateral): (&Regex, bool),
+    (pattern, drop_lateral, table_call): (&Regex, bool, bool),
     syntax: &LexicalSyntax,
     mut replacement: F,
 ) -> Result<(String, HashSet<String>), String>
@@ -35,7 +36,13 @@ where
         if !sql[suffix_start..].starts_with('(') {
             continue;
         }
-        let suffix_end = matching_paren_end(sql, suffix_start, syntax)?;
+        let mut suffix_end = matching_paren_end(sql, suffix_start, syntax)?;
+        if table_call
+            && let Some(open) = over_clause_open(sql, suffix_end)
+            && !protected.contains(open)
+        {
+            suffix_end = matching_paren_end(sql, open, syntax)?;
+        }
         let Some(name) = captures.get(1).map(|value| value.as_str()) else {
             continue;
         };

@@ -10,6 +10,7 @@ pub fn reference_row_tuple(row: ReferenceRow) -> ReferenceTuple {
         name,
         package,
         call_argument_count,
+        ..
     } = row;
     ReferenceTuple {
         kind,

@@ -81,7 +81,7 @@ pub(crate) const SETTINGS_KEYS: [&str; 19] = [
     IGNORE_AUDIT_FAILURES_KEY,
     RECORD_RUN_HOST_KEY,
 ];
-pub(crate) const DEFAULTS_KEYS: [&str; 33] = [
+pub(crate) const DEFAULTS_KEYS: [&str; 34] = [
     "append_cursor_inclusive",
     "batch_concurrency",
     "batch_size",
@@ -96,6 +96,7 @@ pub(crate) const DEFAULTS_KEYS: [&str; 33] = [
     "database",
     "full_refresh",
     "function_database",
+    "function_dataframe",
     "function_schema",
     "incremental_mode",
     "incremental_strategy",
@@ -310,6 +311,8 @@ pub(crate) const COLLECTION_RENDERINGS: [&str; 2] = ["value_list", "array"];
 pub(crate) const FUTURE_CURSOR_ACTIONS: [&str; 2] = ["cap", "error"];
 pub(crate) const MICROBATCH_LIMIT_ACTIONS: [&str; 2] = ["error", "warn"];
 pub(crate) const CONTRACT_POLICIES: [&str; 2] = ["none", "enforced"];
+/// The frame libraries a Python table function's partition arrives in, the default first.
+pub(crate) const FUNCTION_DATAFRAMES: [&str; 2] = ["polars", "pandas"];
 pub(crate) const TABLE_TYPES: [&str; 2] = ["permanent", "transient"];
 pub(crate) const CONFIRMATION_POLICIES: [&str; 3] = ["deny", "require_confirmation", "allow"];
 pub(crate) const INHERIT_VALUE: &str = "inherit";

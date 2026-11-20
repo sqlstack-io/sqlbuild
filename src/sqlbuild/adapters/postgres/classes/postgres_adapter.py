@@ -558,8 +558,9 @@ class PostgresAdapter(
         runtime_version: str | None = None,
         entry_point: str | None = None,
         packages: tuple[str, ...] = (),
+        dataframe: str | None = None,
     ) -> tuple[str, ...]:
-        del runtime_version, entry_point, packages
+        del runtime_version, entry_point, packages, dataframe
         arg_sql: str = ", ".join(f"{arg.name} {arg.type}" for arg in arguments)
         if language != FunctionLanguage.SQL:
             raise AdapterUserError(

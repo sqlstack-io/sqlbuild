@@ -37,6 +37,7 @@ from tests.unit.src.sqlbuild.adapters.snowflake._test_types import (
     SnowflakeMoveOrCopyRelationTestCase,
     SnowflakePlatformDetectionTestCase,
     SnowflakePruneSqlTestCase,
+    SnowflakePythonTableFunctionTestCase,
     SnowflakeQualifiedColumnInspectionTestCase,
     SnowflakeQueryColumnNamesTestCase,
     SnowflakeQueryColumnTypesTestCase,
@@ -53,6 +54,8 @@ from tests.unit.src.sqlbuild.adapters.snowflake._test_types import (
     SnowflakeTableFreshnessMetadataErrorTestCase,
     SnowflakeTableFreshnessMetadataTestCase,
     SnowflakeTableFreshnessOutcomeTestCase,
+    SnowflakeTableFunctionColumnsErrorTestCase,
+    SnowflakeTableFunctionRunTestCase,
     SnowflakeTableTypeDdlTestCase,
 )
 from tests.unit.src.sqlbuild.adapters.snowflake.helpers import (
@@ -71,6 +74,8 @@ from tests.unit.src.sqlbuild.adapters.snowflake.helpers import (
     describe_equivalent_numeric_relation,
     expected_qualified_columns,
     install_fake_snowflake_connector,
+    pandas_order_totals_statement,
+    run_python_table_function,
 )
 
 
@@ -1160,6 +1165,166 @@ def test_given_table_function_when_rendering_then_snowflake_returns_expected_ddl
     )
 
     assert statements == (test_case.expected_sql,)
+
+
+PYTHON_TABLE_FUNCTION_BODY: str = (
+    "def main(readings):\n"
+    "    readings = readings.sort_values('ts')\n"
+    "    readings['total'] = readings['amount'] * 2\n"
+    "    return readings[RETURNED_COLUMNS]"
+)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnowflakePythonTableFunctionTestCase(
+            description="a polars function converts each partition and adds polars and pyarrow",
+            dataframe="polars",
+            packages=("numpy", "polars==1.20.0"),
+            expected_sql=(
+                "CREATE OR REPLACE FUNCTION analytics.order_totals(ts INTEGER, amount FLOAT)\n"
+                "RETURNS TABLE (ts INTEGER, total FLOAT)\n"
+                "LANGUAGE PYTHON\n"
+                "RUNTIME_VERSION = '3.12'\n"
+                "HANDLER = '_SqbHandler'\n"
+                "PACKAGES = ('numpy','polars==1.20.0','pandas','pyarrow')\n"
+                "AS $$\n"
+                f"{PYTHON_TABLE_FUNCTION_BODY}\n"
+                "\n"
+                "import pandas as _sqb_pandas\n"
+                "import polars as _sqb_polars\n"
+                "from _snowflake import vectorized as _sqb_vectorized\n"
+                "\n"
+                "\n"
+                "class _SqbHandler:\n"
+                "    @_sqb_vectorized(input=_sqb_pandas.DataFrame)\n"
+                "    def end_partition(self, partition):\n"
+                "        partition.columns = ['ts', 'amount']\n"
+                "        result = main(_sqb_polars.from_pandas(partition))\n"
+                "        returned = list(result.columns)\n"
+                "        expected = ['ts', 'total']\n"
+                "        missing = [name for name in expected if name not in returned]\n"
+                "        extra = [name for name in returned if name not in expected]\n"
+                "        if missing or extra:\n"
+                "            raise ValueError(\n"
+                '                f"table function main returned columns {returned}, but its "\n'
+                '                f"returns declare {expected}: missing {missing}, extra {extra}"\n'
+                "            )\n"
+                "        return result.select(expected).to_pandas()\n"
+                "$$"
+            ),
+        ),
+        SnowflakePythonTableFunctionTestCase(
+            description="a pandas function receives the partition as it arrives",
+            dataframe="pandas",
+            packages=(),
+            expected_sql=(
+                "CREATE OR REPLACE FUNCTION analytics.order_totals(ts INTEGER, amount FLOAT)\n"
+                "RETURNS TABLE (ts INTEGER, total FLOAT)\n"
+                "LANGUAGE PYTHON\n"
+                "RUNTIME_VERSION = '3.12'\n"
+                "HANDLER = '_SqbHandler'\n"
+                "PACKAGES = ('pandas')\n"
+                "AS $$\n"
+                f"{PYTHON_TABLE_FUNCTION_BODY}\n"
+                "\n"
+                "import pandas as _sqb_pandas\n"
+                "from _snowflake import vectorized as _sqb_vectorized\n"
+                "\n"
+                "\n"
+                "class _SqbHandler:\n"
+                "    @_sqb_vectorized(input=_sqb_pandas.DataFrame)\n"
+                "    def end_partition(self, partition):\n"
+                "        partition.columns = ['ts', 'amount']\n"
+                "        result = main(partition)\n"
+                "        returned = list(result.columns)\n"
+                "        expected = ['ts', 'total']\n"
+                "        missing = [name for name in expected if name not in returned]\n"
+                "        extra = [name for name in returned if name not in expected]\n"
+                "        if missing or extra:\n"
+                "            raise ValueError(\n"
+                '                f"table function main returned columns {returned}, but its "\n'
+                '                f"returns declare {expected}: missing {missing}, extra {extra}"\n'
+                "            )\n"
+                "        return result[expected]\n"
+                "$$"
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_python_table_function_when_rendering_then_snowflake_wraps_it_in_a_partition_handler(
+    test_case: SnowflakePythonTableFunctionTestCase,
+) -> None:
+    statements: tuple[str, ...] = SnowflakeAdapter().render_create_function(
+        destination="analytics.order_totals",
+        arguments=(
+            FunctionArgument(name="ts", type="INTEGER"),
+            FunctionArgument(name="amount", type="FLOAT"),
+        ),
+        returns="TABLE",
+        body_sql=PYTHON_TABLE_FUNCTION_BODY,
+        return_columns=(
+            FunctionReturnColumn(name="ts", type="INTEGER"),
+            FunctionReturnColumn(name="total", type="FLOAT"),
+        ),
+        language=FunctionLanguage.PYTHON,
+        runtime_version="3.12",
+        entry_point="main",
+        packages=test_case.packages,
+        dataframe=test_case.dataframe,
+    )
+
+    assert statements == (test_case.expected_sql,)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnowflakeTableFunctionRunTestCase(
+            description="arguments are named and the declared columns return in their order",
+            returned_columns=("total", "ts"),
+            expected_rows=((1, 40.0), (2, 20.0)),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_pandas_table_function_when_a_partition_runs_then_declared_columns_return_in_order(
+    test_case: SnowflakeTableFunctionRunTestCase, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rows: tuple[tuple[object, ...], ...] = run_python_table_function(
+        statement=pandas_order_totals_statement(),
+        returned_columns=test_case.returned_columns,
+        monkeypatch=monkeypatch,
+    )
+
+    assert rows == test_case.expected_rows
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnowflakeTableFunctionColumnsErrorTestCase(
+            description="a missing and an extra column are both named",
+            returned_columns=("ts", "amount"),
+            expected_error=(
+                r"table function main returned columns \['ts', 'amount'\], but its returns "
+                r"declare \['ts', 'total'\]: missing \['total'\], extra \['amount'\]"
+            ),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_pandas_table_function_when_columns_differ_then_missing_and_extra_are_named(
+    test_case: SnowflakeTableFunctionColumnsErrorTestCase, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(ValueError, match=test_case.expected_error):
+        run_python_table_function(
+            statement=pandas_order_totals_statement(),
+            returned_columns=test_case.returned_columns,
+            monkeypatch=monkeypatch,
+        )
 
 
 @pytest.mark.parametrize(

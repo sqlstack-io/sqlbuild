@@ -117,6 +117,15 @@ class NativeFunctionAttachmentTestCase:
 
 
 @dataclass(frozen=True)
+class PythonTableFunctionCompileTestCase:
+    """Python table functions and the columns and frame each compiles to."""
+
+    description: str
+    files: dict[str, str]
+    expected_summaries: dict[str, tuple[object, ...]]
+
+
+@dataclass(frozen=True)
 class NativeFunctionErrorTestCase:
     """Function files the native loop rejects while attaching them."""
 

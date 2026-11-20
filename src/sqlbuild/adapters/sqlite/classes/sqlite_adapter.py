@@ -665,8 +665,18 @@ class SqliteAdapter(
         runtime_version: str | None = None,
         entry_point: str | None = None,
         packages: tuple[str, ...] = (),
+        dataframe: str | None = None,
     ) -> tuple[str, ...]:
-        del arguments, returns, body_sql, return_columns, runtime_version, entry_point, packages
+        del (
+            arguments,
+            returns,
+            body_sql,
+            return_columns,
+            runtime_version,
+            entry_point,
+            packages,
+            dataframe,
+        )
         raise AdapterUserError(
             message=(
                 f"SQLite cannot create function '{destination}': SQLite has no CREATE FUNCTION, "

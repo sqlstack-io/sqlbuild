@@ -21,6 +21,7 @@ pub fn reference_tuple(
                 name,
                 package,
                 call_argument_count: count,
+                call_partitioned: partitioned,
             } in rows
             {
                 let fields: Bound<'_, PyDict> = PyDict::new(py);
@@ -28,6 +29,7 @@ pub fn reference_tuple(
                 fields.set_item("ref_name", name)?;
                 fields.set_item("ref_package", package)?;
                 fields.set_item("call_argument_count", count)?;
+                fields.set_item("call_partitioned", partitioned)?;
                 references.push(classes.sql_reference.call((), Some(&fields))?);
             }
             Ok::<_, pyo3::PyErr>(PyTuple::new(py, references)?.unbind())

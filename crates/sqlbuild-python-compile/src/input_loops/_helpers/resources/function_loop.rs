@@ -18,9 +18,11 @@ use sqlbuild_analysis::compiled_project::models::ScanFaultOrigin;
 use sqlbuild_analysis::compiler::main::function_type_validation::function_type_error;
 use sqlbuild_attachments::cursor_intrinsics::main::intrinsic_free::intrinsic_free;
 use sqlbuild_attachments::cursor_intrinsics::models::IntrinsicCheck;
+use sqlbuild_attachments::functions::main::frame_argument_error::frame_argument_error;
 use sqlbuild_attachments::functions::main::function_reference_error::function_reference_error;
 use sqlbuild_attachments::functions::main::resolve_function_namespace::resolve_function_namespace;
 use sqlbuild_attachments::functions::main::table_function_arity_error::table_function_arity_error;
+use sqlbuild_attachments::functions::main::table_function_partition_error::table_function_partition_error;
 use sqlbuild_attachments::functions::models::{
     FunctionHeader, FunctionLanguage, FunctionNamespace, FunctionReturns, HeaderStage,
     KnownResources, NamedType, NamespaceInputs,
@@ -44,6 +46,7 @@ use sqlbuild_project::models::PythonRuntime;
 use sqlbuild_project::models::ReferenceRow;
 use sqlbuild_project::types::NamedTypeRow;
 use sqlbuild_python_base::compile_context::main::delta::record_source_reads::record_source_reads;
+use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_front::attachments::main::parsed_header::parsed_header;
 use sqlbuild_python_front::model_config::models::NativeModelValidator;
 use sqlbuild_python_project::analysis_session::main::query_columns_error::query_columns_error;
@@ -72,6 +75,7 @@ struct FunctionScope<'a, 'py> {
     target: Option<TargetNamespace>,
     inherit: bool,
     function_kind: Bound<'py, PyAny>,
+    dataframe: String,
 }
 
 /// Attach every SQL function, then every Python function, in discovery order.
@@ -89,6 +93,7 @@ pub(crate) fn attached_functions<'py>(
         target,
         inherit,
         kind,
+        dataframe,
     } = settings;
     let defaults = (
         optional_template(context, default_database, "default function database")?,
@@ -115,6 +120,7 @@ pub(crate) fn attached_functions<'py>(
         }),
         inherit,
         function_kind: kind.into_bound(py),
+        dataframe,
     };
     let (sql_rows, python_rows) = rows;
     let mut names: HashSet<String> = HashSet::new();
@@ -153,25 +159,14 @@ fn sql_function(scope: &FunctionScope<'_, '_>, row: FunctionRow) -> PyResult<Att
     let header_values: Bound<'_, PyDict> = header_values.into_bound(py);
     let label: String = format!("SQL function {relative_path}");
     let header: FunctionHeader =
-        parsed_header(&header_values, FunctionLanguage::Sql, &relative_path);
+        parsed_header(&header_values, FunctionLanguage::Sql, false, &relative_path);
     raise_stage(context, &header, HeaderStage::Start)?;
     let arguments: Vec<NamedTypeRow> = expanded_types(context, &header.arguments, |raw| {
         format!("{label} argument '{raw}' type")
     })?;
     raise_stage(context, &header, HeaderStage::Arguments)?;
-    let (returns, return_columns): (String, Vec<NamedTypeRow>) = match &header.returns {
-        Some(FunctionReturns::Table(columns)) => (
-            TABLE_RETURNS.to_owned(),
-            expanded_types(context, columns, |raw| {
-                format!("{label} return column '{raw}' type")
-            })?,
-        ),
-        Some(FunctionReturns::Type(text)) => (
-            header_template(context, text, &format!("{label} returns"))?,
-            Vec::new(),
-        ),
-        None => (String::from("None"), Vec::new()),
-    };
+    let (returns, return_columns): (String, Vec<NamedTypeRow>) =
+        expanded_returns(context, &header, &label)?;
     raise_stage(context, &header, HeaderStage::Returns)?;
     let namespace: FunctionNamespace =
         function_namespace(scope, &header_values, &label, FunctionLanguage::Sql)?;
@@ -249,19 +244,26 @@ fn python_function(scope: &FunctionScope<'_, '_>, row: FunctionRow) -> PyResult<
     } = row;
     let header_values: Bound<'_, PyDict> = header_values.into_bound(py);
     let label: String = format!("Python function {relative_path}");
-    let header: FunctionHeader =
-        parsed_header(&header_values, FunctionLanguage::Python, &relative_path);
+    let file: &Bound<'_, PyAny> = function_file.bind(py);
+    let table_function: bool = native_field(file, "table_function")?.extract()?;
+    let dataframe: Option<String> = table_function
+        .then(|| native_field(file, "dataframe")?.extract::<Option<String>>())
+        .transpose()?
+        .map(|annotated| annotated.unwrap_or_else(|| scope.dataframe.clone()));
+    let header: FunctionHeader = parsed_header(
+        &header_values,
+        FunctionLanguage::Python,
+        table_function,
+        &relative_path,
+    );
     raise_stage(context, &header, HeaderStage::Start)?;
     let arguments: Vec<NamedTypeRow> = expanded_types(context, &header.arguments, |raw| {
         format!("{label} argument '{raw}' type")
     })?;
     raise_stage(context, &header, HeaderStage::Arguments)?;
-    let returns: String = match &header.returns {
-        Some(FunctionReturns::Type(text)) => {
-            header_template(context, text, &format!("{label} returns"))?
-        }
-        _ => String::from("None"),
-    };
+    let (returns, return_columns): (String, Vec<NamedTypeRow>) =
+        expanded_returns(context, &header, &label)?;
+    raise_stage(context, &header, HeaderStage::Returns)?;
     raise_stage(context, &header, HeaderStage::PythonValues)?;
     let namespace: FunctionNamespace =
         function_namespace(scope, &header_values, &label, FunctionLanguage::Python)?;
@@ -274,7 +276,10 @@ fn python_function(scope: &FunctionScope<'_, '_>, row: FunctionRow) -> PyResult<
         ),
     )?;
     if scope.validate {
-        validated_types(scope, &label, &arguments, (&returns, &[]))?;
+        validated_types(scope, &label, &arguments, (&returns, &return_columns))?;
+    }
+    if let Some(message) = frame_argument_error(&label, dataframe.as_deref(), &arguments) {
+        return Err(compile_error(context.classes, &message, None));
     }
     raise_stage(context, &header, HeaderStage::Metadata)?;
     Ok(AttachedFunction {
@@ -284,13 +289,14 @@ fn python_function(scope: &FunctionScope<'_, '_>, row: FunctionRow) -> PyResult<
         name,
         arguments,
         returns,
-        return_columns: Vec::new(),
+        return_columns,
         body,
         references: Vec::new(),
         python: Some(PythonRuntime {
             runtime_version: header.runtime_version,
             entry_point: header.entry_point,
             packages: header.packages,
+            dataframe,
         }),
         tags: header.tags,
         description: header.description,
@@ -298,6 +304,27 @@ fn python_function(scope: &FunctionScope<'_, '_>, row: FunctionRow) -> PyResult<
             function_file,
             usages: PyTuple::empty(py).unbind(),
         },
+    })
+}
+
+/// The scalar return type, or `TABLE` and its columns, with their templates expanded.
+fn expanded_returns(
+    context: &LoopContext<'_, '_>,
+    header: &FunctionHeader,
+    label: &str,
+) -> PyResult<(String, Vec<NamedTypeRow>)> {
+    Ok(match &header.returns {
+        Some(FunctionReturns::Table(columns)) => (
+            TABLE_RETURNS.to_owned(),
+            expanded_types(context, columns, |raw| {
+                format!("{label} return column '{raw}' type")
+            })?,
+        ),
+        Some(FunctionReturns::Type(text)) => (
+            header_template(context, text, &format!("{label} returns"))?,
+            Vec::new(),
+        ),
+        None => (String::from("None"), Vec::new()),
     })
 }
 
@@ -576,7 +603,17 @@ fn destination(name: &str, namespace: &FunctionNamespace, fingerprint: bool) -> 
     }
 }
 
-/// `validate_table_function_call_arities` over each model's, then each function's, calls.
+/// The Python table functions, which receive one whole partition per call.
+pub(crate) fn whole_partition_functions<'a>(
+    functions: impl Iterator<Item = &'a AttachedFunction>,
+) -> HashSet<String> {
+    functions
+        .filter(|function| function.python.is_some() && !function.return_columns.is_empty())
+        .map(|function| function.name.clone())
+        .collect()
+}
+
+/// Call arities and whole-partition clauses over each model's, then each function's, calls.
 pub(crate) fn checked_table_function_arities(
     context: &LoopContext<'_, '_>,
     models: &[(String, Vec<ReferenceRow>)],
@@ -587,6 +624,7 @@ pub(crate) fn checked_table_function_arities(
         .filter(|function| !function.return_columns.is_empty())
         .map(|function| (function.name.clone(), function.arguments.len()))
         .collect();
+    let whole_partition: HashSet<String> = whole_partition_functions(functions.iter());
     let mut owners: Vec<(String, &[ReferenceRow])> = Vec::new();
     for (path, references) in models {
         owners.push((format!("Model file {path}"), references));
@@ -610,6 +648,20 @@ pub(crate) fn checked_table_function_arities(
             )
             .collect();
         if let Some(message) = table_function_arity_error(&owner, &calls, &counts) {
+            return Err(compile_error(context.classes, &message, None));
+        }
+        let partitions: Vec<(&str, &str, bool)> = references
+            .iter()
+            .map(|reference| {
+                (
+                    reference.kind.as_str(),
+                    reference.name.as_str(),
+                    reference.call_partitioned,
+                )
+            })
+            .collect();
+        if let Some(message) = table_function_partition_error(&owner, &partitions, &whole_partition)
+        {
             return Err(compile_error(context.classes, &message, None));
         }
     }

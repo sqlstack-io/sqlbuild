@@ -7,6 +7,7 @@ use sqlbuild_analysis::planner_identity::main::function_fingerprint_sql::functio
 use sqlbuild_analysis::planner_identity::models::FunctionFingerprintFields;
 use sqlbuild_python_project::resource_views::main::function_reads::arguments::arguments;
 use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
+use sqlbuild_python_project::resource_views::main::function_reads::dataframe::dataframe;
 use sqlbuild_python_project::resource_views::main::function_reads::entry_point::entry_point;
 use sqlbuild_python_project::resource_views::main::function_reads::packages::packages;
 use sqlbuild_python_project::resource_views::main::function_reads::return_columns::return_columns;
@@ -31,6 +32,7 @@ pub fn compiled_function_fingerprint_sql(function: &Bound<'_, PyAny>) -> PyResul
             .try_iter()?
             .map(|package| package?.extract::<String>())
             .collect::<PyResult<_>>()?,
+        dataframe: dataframe(function)?.extract()?,
         body_sql: body_sql(function)?.extract()?,
     }))
 }

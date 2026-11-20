@@ -218,6 +218,17 @@ macro_rules! function_getters {
             }
 
             #[getter]
+            pub(crate) fn dataframe(&self, py: Python<'_>) -> PyResult<Option<String>> {
+                read_function(&self.owner, self.index, py, |function, _| {
+                    Ok(function
+                        .attached
+                        .python
+                        .as_ref()
+                        .and_then(|python| python.dataframe.clone()))
+                })
+            }
+
+            #[getter]
             pub(crate) fn tags<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
                 read_function(&self.owner, self.index, py, |function, py| {
                     PyTuple::new(py, &function.attached.tags)
