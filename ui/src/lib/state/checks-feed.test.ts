@@ -206,6 +206,31 @@ describe('ChecksFeed', () => {
 		expect(feed.view.scopeKey).toBe(OTHER.locationId);
 	});
 
+	it('retries a failed first read on the next signal, counting both reads, until the list recovers', async () => {
+		const s = server();
+		s.fail(new ApiError('Internal Server Error', 500));
+		const { feed } = feedOver(s.client);
+		feed.watch(SCOPE);
+		await settle();
+		expect([feed.view.checks, feed.view.error, feed.view.revision]).toEqual([undefined, 'Internal Server Error', 1]);
+		s.fail(null);
+		feed.handle(signal('runs'));
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(s.reads).toBe(2);
+		expect([feed.view.checks?.map((c) => c.id), feed.view.error, feed.view.revision]).toEqual([['orders_not_null'], null, 2]);
+	});
+
+	it('reads nothing for signals after a refusal, which a reread would only repeat', async () => {
+		const s = server();
+		s.fail(new ApiError('Missing permission: view', 403));
+		const { feed } = feedOver(s.client);
+		feed.watch(SCOPE);
+		await settle();
+		feed.handle(signal('runs'));
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(s.reads).toBe(1);
+	});
+
 	it('drops answers for a scope it has left', async () => {
 		const s = server();
 		const { feed } = feedOver(s.client);
