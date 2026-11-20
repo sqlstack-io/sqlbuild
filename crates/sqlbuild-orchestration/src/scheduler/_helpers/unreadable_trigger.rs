@@ -3,7 +3,8 @@
 use chrono::TimeDelta;
 use uuid::Uuid;
 
-use crate::platform::main::health::record_trigger_skipped::record_trigger_skipped;
+use crate::platform::main::health::record_trigger_problem::record_trigger_problem;
+use crate::platform::models::PlatformEvent;
 use crate::scheduler::constants::{UNREADABLE_TRIGGER, UNREADABLE_TRIGGER_RETRY_SECONDS};
 use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::SchedulerLease;
@@ -36,7 +37,14 @@ pub(crate) async fn skip_unreadable_trigger(
     };
     let snapshot_id = serde_json::from_value::<Uuid>(row["snapshot_id"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
-    let transaction =
-        record_trigger_skipped(transaction, (trigger_id, snapshot_id), UNREADABLE_TRIGGER).await?;
+    let transaction = record_trigger_problem(
+        transaction,
+        PlatformEvent::TriggerSkipped {
+            trigger_id,
+            snapshot_id,
+            reason: UNREADABLE_TRIGGER.to_owned(),
+        },
+    )
+    .await?;
     commit(check_lease(transaction, lease).await?).await
 }

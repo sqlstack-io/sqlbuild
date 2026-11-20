@@ -2922,15 +2922,26 @@ export interface components {
             snapshot_id: string;
             /** Format: uuid */
             trigger_id: string;
+        } | {
+            /** Format: uuid */
+            evaluation_id: string;
+            /** @enum {string} */
+            kind: "sensor_rechecked";
+            /** Format: uuid */
+            snapshot_id: string;
+            /** Format: uuid */
+            trigger_id: string;
         };
         /** @enum {string} */
-        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed" | "run_failed" | "trigger_skipped";
+        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed" | "run_failed" | "trigger_skipped" | "sensor_rechecked";
         /** @description Problems derived from live state when read; nothing here is stored. */
         PlatformProblems: {
             broken_locations: components["schemas"]["BrokenLocation"][];
             /** @description Running calendar schedules whose dates run out within a day. */
             low_calendars?: components["schemas"]["LowCalendar"][];
             overdue_ticks: components["schemas"]["OverdueTick"][];
+            /** @description Sensors checked again from scratch because their last check can't be read, until a check completes. */
+            rechecked_sensors?: components["schemas"]["RecheckedSensor"][];
             scheduler_leader: boolean;
             /**
              * Format: date-time
@@ -3171,6 +3182,18 @@ export interface components {
             /** @enum {string} */
             kind: "blob";
             value: number[];
+        };
+        /** @description A sensor whose last check, recorded by an earlier release, can't be read, so it is checked again from scratch; it clears once a check completes. */
+        RecheckedSensor: {
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            name: string;
+            /** Format: date-time */
+            rechecked_at: string;
+            target: string;
+            /** Format: uuid */
+            trigger_id: string;
         };
         /** @description A retry derives its execution scope from a terminal run, never from caller selectors. */
         RerunRequest: {

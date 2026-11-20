@@ -7,7 +7,7 @@ type Wire = components['schemas'];
 
 const placeOf = (name: string, target: string) => `${name} · ${target}`;
 
-/** Live problems as active banner events: a stopped scheduler, each broken location, and late schedules, low calendars and skipped triggers per location. */
+/** Live problems as active banner events: a stopped scheduler, each broken location, and late schedules, low calendars, skipped triggers and sensors checked again from scratch per location. */
 export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number): PlatformEvent[] {
 	const events: PlatformEvent[] = [];
 	if (!problems.scheduler_leader) {
@@ -106,6 +106,29 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 					: `${triggers.length} triggers in ${place} need attention, starting with ${first.name}: ${first.reason}.`
 		});
 	}
+	const rechecked = new Map<string, Wire['RecheckedSensor'][]>();
+	for (const sensor of problems.rechecked_sensors ?? []) {
+		const key = keyOf(sensor.location_id, sensor.target);
+		rechecked.set(key, [...(rechecked.get(key) ?? []), sensor]);
+	}
+	for (const [key, sensors] of rechecked) {
+		const first = sensors.reduce((a, b) => (a.rechecked_at <= b.rechecked_at ? a : b));
+		const place = placeOf(first.location_name, first.target);
+		events.push({
+			id: `rechecked:${key}`,
+			kind: 'sensor_rechecked',
+			severity: 'info',
+			occurredAt: first.rechecked_at,
+			members: [...new Set(sensors.map((s) => s.trigger_id))].sort(),
+			active: true,
+			locationId: key,
+			subject: place,
+			message:
+				sensors.length === 1
+					? `${first.name} in ${place} is being checked again from scratch: its last check was recorded by an earlier SQLBuild release and can’t be read.`
+					: `${sensors.length} sensors in ${place} are being checked again from scratch, starting with ${first.name}: their last checks were recorded by an earlier SQLBuild release and can’t be read.`
+		});
+	}
 	return events;
 }
 
@@ -147,6 +170,8 @@ function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, stri
 			return { ...base, kind: event.kind, severity: 'warning', message: `A calendar in ${place ?? 'a location'} was running out of dates.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'calendar', locationId: key }] : [], payload: { refresh_at: event.refresh_at, ...(event.horizon_end ? { horizon_end: event.horizon_end } : {}) } };
 		case 'trigger_skipped':
 			return { ...base, kind: event.kind, severity: 'warning', message: `A trigger in ${place ?? 'a location'} was skipped: ${event.reason}.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'trigger', locationId: key }] : [], payload: { snapshot_id: event.snapshot_id } };
+		case 'sensor_rechecked':
+			return { ...base, kind: event.kind, severity: 'info', message: `A sensor in ${place ?? 'a location'} was checked again from scratch: its last check was recorded by an earlier SQLBuild release and couldn’t be read.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'sensor', locationId: key }] : [], payload: { snapshot_id: event.snapshot_id, evaluation_id: event.evaluation_id } };
 		case 'launch_failed':
 			return { ...base, kind: event.kind, severity: 'critical', message: `A run in ${place ?? 'a location'} couldn't start (${event.code}).`, links: key ? [{ kind: 'run', id: event.run_id, locationId: key }] : [], payload: { code: event.code } };
 		case 'heartbeat':

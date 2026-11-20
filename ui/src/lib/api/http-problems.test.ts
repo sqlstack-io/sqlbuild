@@ -81,6 +81,21 @@ describe('toPlatformEvents', () => {
 		]);
 	});
 
+	it('lists sensors checked again from scratch apart from skipped triggers, under their own kind', () => {
+		const events = toPlatformEvents(
+			{
+				scheduler_leader: true,
+				broken_locations: [],
+				overdue_ticks: [],
+				rechecked_sensors: [{ trigger_id: 's-health', name: 'health_orders', location_id: 'l1', location_name: 'orders', target: 'development', rechecked_at: '2026-11-08T11:30:00Z' }]
+			},
+			NOW
+		);
+		expect(events.map((e) => [e.kind, e.severity, e.locationId, e.members, e.message])).toEqual([
+			['sensor_rechecked', 'info', 'l1:development', ['s-health'], 'health_orders in orders · development is being checked again from scratch: its last check was recorded by an earlier SQLBuild release and can’t be read.']
+		]);
+	});
+
 	it('groups late ticks per location, dated and named by the oldest', () => {
 		const events = toPlatformEvents(
 			{

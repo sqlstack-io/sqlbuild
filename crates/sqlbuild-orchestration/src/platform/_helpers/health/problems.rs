@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 use crate::platform::constants::SKIPPED_TRIGGER_EVENTS;
 use crate::platform::models::{
     LateTarget, LowCalendar, OverdueTick, PlatformEvent, PlatformEventEnvelope, ProblemScan,
-    PublishedTrigger, RunningSchedule, SkippedTrigger,
+    PublishedTrigger, RecheckedSensor, RunningSchedule, SkippedTrigger,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
@@ -57,7 +57,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
         vec![],
     )
     .await?;
-    let (transaction, skipped_triggers) = skipped_triggers(transaction).await?;
+    let (transaction, skipped_triggers, rechecked_sensors) = trigger_problems(transaction).await?;
     commit(transaction).await?;
     let schedules: Vec<RunningSchedule> = schedules
         .into_iter()
@@ -81,6 +81,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
     Ok(ProblemScan {
         low_calendars,
         skipped_triggers,
+        rechecked_sensors,
         now,
         lease: leases.into_iter().next().map(decode_row).transpose()?,
         broken: locations
@@ -97,61 +98,144 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
     })
 }
 
-/// Triggers whose newest `trigger_skipped` event names the snapshot they are still published in, and that have not ticked successfully since it was published: their location has not published again, and no tick has run since.
-async fn skipped_triggers(
+/// Triggers whose newest `trigger_skipped` event names the snapshot they are still published in and that have not ticked successfully since it was published, and sensors whose newest `sensor_rechecked` event does and whose re-check, or a later check, has not completed.
+async fn trigger_problems(
     transaction: ControlTransaction,
-) -> Result<(ControlTransaction, Vec<SkippedTrigger>), ControlError> {
-    let (mut transaction, events): (ControlTransaction, Vec<PlatformEventEnvelope>) =
-        query_records(
-            transaction,
-            "SELECT storage_id,event_id,occurred_at,payload FROM recall_events WHERE producer='platform' \
-             AND event_type='platform_trigger_skipped' ORDER BY storage_id DESC LIMIT $1",
-            vec![Parameter::Integer(SKIPPED_TRIGGER_EVENTS)],
-        )
-        .await?;
-    let mut seen: BTreeSet<Uuid> = BTreeSet::new();
-    let mut skipped: Vec<SkippedTrigger> = Vec::new();
-    for envelope in events {
-        let PlatformEvent::TriggerSkipped {
-            trigger_id,
-            snapshot_id,
-            reason,
-        } = envelope.payload.platform
-        else {
-            continue;
-        };
-        if !seen.insert(trigger_id) {
-            continue;
-        }
-        let rows;
-        (transaction, rows) = query(
-            transaction,
-            "SELECT t.name, t.location_id, l.name AS location_name, t.target, t.snapshot_id \
-             FROM sqb_triggers t JOIN sqb_locations l ON l.location_id=t.location_id \
-             JOIN sqb_snapshots p ON p.snapshot_id=t.snapshot_id \
-             WHERE t.trigger_id=$1 AND t.removed_in_snapshot_id IS NULL AND l.archived_at IS NULL \
-             AND NOT EXISTS (SELECT 1 FROM sqb_ticks k WHERE k.trigger_id=t.trigger_id \
-             AND k.outcome IN ('requested','covered') AND k.evaluated_at>=p.published_at)",
-            vec![Parameter::Id(trigger_id)],
-        )
-        .await?;
-        let Some(row) = rows.into_iter().next() else {
-            continue;
-        };
-        let trigger: PublishedTrigger = decode_row(row)?;
-        if trigger.snapshot_id == snapshot_id {
-            skipped.push(SkippedTrigger {
-                trigger_id,
+) -> Result<
+    (
+        ControlTransaction,
+        Vec<SkippedTrigger>,
+        Vec<RecheckedSensor>,
+    ),
+    ControlError,
+> {
+    let (transaction, skipped) = open_problems(
+        transaction,
+        "platform_trigger_skipped",
+        "NOT EXISTS (SELECT 1 FROM sqb_ticks k WHERE k.trigger_id=t.trigger_id \
+         AND k.outcome IN ('requested','covered') AND k.evaluated_at>=p.published_at)",
+    )
+    .await?;
+    let (transaction, rechecked) = open_problems(
+        transaction,
+        "platform_sensor_rechecked",
+        "NOT EXISTS (SELECT 1 FROM sqb_sensor_evaluation_events e WHERE e.trigger_id=t.trigger_id \
+         AND e.phase='completed' AND e.evaluation_id>=$2)",
+    )
+    .await?;
+    let skipped: Vec<SkippedTrigger> = skipped
+        .into_iter()
+        .filter_map(|(envelope, trigger)| match envelope.payload.platform {
+            PlatformEvent::TriggerSkipped { reason, .. } => Some(SkippedTrigger {
+                trigger_id: trigger.trigger_id,
                 name: trigger.name,
                 location_id: trigger.location_id,
                 location_name: trigger.location_name,
                 target: trigger.target,
                 skipped_at: envelope.occurred_at,
                 reason,
-            });
+            }),
+            _ => None,
+        })
+        .collect();
+    let rechecked: Vec<RecheckedSensor> = rechecked
+        .into_iter()
+        .map(|(envelope, trigger)| RecheckedSensor {
+            trigger_id: trigger.trigger_id,
+            name: trigger.name,
+            location_id: trigger.location_id,
+            location_name: trigger.location_name,
+            target: trigger.target,
+            rechecked_at: envelope.occurred_at,
+        })
+        .collect();
+    Ok((transaction, skipped, rechecked))
+}
+
+/// Each trigger's newest `event_type` event whose trigger is still published in the event's snapshot and whose `open` condition holds, with `$2` bound to a re-check's evaluation.
+async fn open_problems(
+    transaction: ControlTransaction,
+    event_type: &str,
+    open: &str,
+) -> Result<
+    (
+        ControlTransaction,
+        Vec<(PlatformEventEnvelope, PublishedTrigger)>,
+    ),
+    ControlError,
+> {
+    let (mut transaction, events) = newest_events(transaction, event_type).await?;
+    let mut seen: BTreeSet<Uuid> = BTreeSet::new();
+    let mut problems: Vec<(PlatformEventEnvelope, PublishedTrigger)> = Vec::new();
+    for envelope in events {
+        let (trigger_id, snapshot_id, bound) = match &envelope.payload.platform {
+            PlatformEvent::TriggerSkipped {
+                trigger_id,
+                snapshot_id,
+                ..
+            } => (*trigger_id, *snapshot_id, None),
+            PlatformEvent::SensorRechecked {
+                trigger_id,
+                snapshot_id,
+                evaluation_id,
+            } => (*trigger_id, *snapshot_id, Some(*evaluation_id)),
+            _ => continue,
+        };
+        if !seen.insert(trigger_id) {
+            continue;
+        }
+        let trigger;
+        (transaction, trigger) =
+            open_trigger(transaction, (trigger_id, snapshot_id), (open, bound)).await?;
+        if let Some(trigger) = trigger {
+            problems.push((envelope, trigger));
         }
     }
-    Ok((transaction, skipped))
+    Ok((transaction, problems))
+}
+
+/// The newest `event_type` platform events, newest first; each trigger's first is the one that counts.
+async fn newest_events(
+    transaction: ControlTransaction,
+    event_type: &str,
+) -> Result<(ControlTransaction, Vec<PlatformEventEnvelope>), ControlError> {
+    query_records(
+        transaction,
+        "SELECT storage_id,event_id,occurred_at,payload FROM recall_events WHERE producer='platform' \
+         AND event_type=$2 ORDER BY storage_id DESC LIMIT $1",
+        vec![
+            Parameter::Integer(SKIPPED_TRIGGER_EVENTS),
+            Parameter::Text(event_type.to_owned()),
+        ],
+    )
+    .await
+}
+
+/// Trigger `trigger_id` while it is still published in `snapshot_id` (as `t`, its snapshot as `p`) and the `open` condition holds, with `$2` bound to the given ID.
+async fn open_trigger(
+    transaction: ControlTransaction,
+    (trigger_id, snapshot_id): (Uuid, Uuid),
+    (open, bound): (&str, Option<Uuid>),
+) -> Result<(ControlTransaction, Option<PublishedTrigger>), ControlError> {
+    let (transaction, rows) = query(
+        transaction,
+        &format!(
+            "SELECT t.trigger_id, t.name, t.location_id, l.name AS location_name, t.target, t.snapshot_id \
+             FROM sqb_triggers t JOIN sqb_locations l ON l.location_id=t.location_id \
+             JOIN sqb_snapshots p ON p.snapshot_id=t.snapshot_id \
+             WHERE t.trigger_id=$1 AND t.removed_in_snapshot_id IS NULL AND l.archived_at IS NULL AND {open}"
+        ),
+        [Parameter::Id(trigger_id)]
+            .into_iter()
+            .chain(bound.map(Parameter::Id))
+            .collect(),
+    )
+    .await?;
+    let trigger: Option<PublishedTrigger> = rows.into_iter().next().map(decode_row).transpose()?;
+    Ok((
+        transaction,
+        trigger.filter(|trigger| trigger.snapshot_id == snapshot_id),
+    ))
 }
 
 /// At most 100 late ticks per target, oldest first.

@@ -6,7 +6,8 @@ use crate::declarations::_helpers::trigger_state::{
     dropped_times_reason, previous_state, retain_calendar_ticks, trigger_timing,
 };
 use crate::declarations::models::{Definitions, StoredTriggerState};
-use crate::platform::main::health::record_trigger_skipped::record_trigger_skipped;
+use crate::platform::main::health::record_trigger_problem::record_trigger_problem;
+use crate::platform::models::PlatformEvent;
 use crate::sensors::main::publish_sensors::publish_sensors;
 use crate::snapshots::models::SnapshotRecord;
 use crate::store::errors::ControlError;
@@ -69,10 +70,13 @@ pub(crate) async fn publish_projections(
              ON CONFLICT (trigger_id) DO UPDATE SET status=excluded.status, next_due_at=excluded.next_due_at",
             vec![Parameter::Id(id), Parameter::Text(status.as_str().into()), Parameter::Time(started_at), Parameter::OptionalTime(next)]).await?;
         if !dropped.is_empty() {
-            transaction = record_trigger_skipped(
+            transaction = record_trigger_problem(
                 transaction,
-                (id, snapshot.snapshot_id),
-                &dropped_times_reason(&dropped),
+                PlatformEvent::TriggerSkipped {
+                    trigger_id: id,
+                    snapshot_id: snapshot.snapshot_id,
+                    reason: dropped_times_reason(&dropped),
+                },
             )
             .await?;
         }

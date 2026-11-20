@@ -60,6 +60,7 @@ export const eventKindLabel: Record<PlatformEventKind, string> = {
 	tick_overdue: 'Schedule overdue',
 	calendar_horizon_low: 'Calendar running out of dates',
 	trigger_skipped: 'Trigger skipped',
+	sensor_rechecked: 'Sensor checked again from scratch',
 	scheduler_no_leader: 'Scheduler stopped',
 	location_broken: 'Location not checking in',
 	launch_failed: 'Couldn’t start runs',

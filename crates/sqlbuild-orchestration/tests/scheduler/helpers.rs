@@ -317,22 +317,84 @@ pub(crate) async fn run_states(store: &ControlStore) -> Vec<String> {
     .collect()
 }
 
-/// The triggers the live problems list as skipped for `principal_id`, as `name: reason`.
-pub(crate) async fn skipped_triggers(
+/// The triggers the live problems list for `principal_id`: skipped ones as `name: reason`, then sensors checked again from scratch by name.
+pub(crate) async fn trigger_problems(
     store: &ControlStore,
     principal_id: uuid::Uuid,
-) -> Vec<String> {
-    crate::platform::main::person_reads::read_person_problems::read_person_problems(
+) -> (Vec<String>, Vec<String>) {
+    let problems = crate::platform::main::person_reads::read_person_problems::read_person_problems(
         store,
         principal_id,
         crate::credentials::models::DefaultRole::None,
     )
     .await
-    .expect("problems")
-    .skipped_triggers
-    .into_iter()
-    .map(|trigger| format!("{}: {}", trigger.name, trigger.reason))
-    .collect()
+    .expect("problems");
+    (
+        problems
+            .skipped_triggers
+            .into_iter()
+            .map(|trigger| format!("{}: {}", trigger.name, trigger.reason))
+            .collect(),
+        problems
+            .rechecked_sensors
+            .into_iter()
+            .map(|sensor| sensor.name)
+            .collect(),
+    )
+}
+
+/// The triggers the live problems list as skipped for `principal_id`, as `name: reason`.
+pub(crate) async fn skipped_triggers(
+    store: &ControlStore,
+    principal_id: uuid::Uuid,
+) -> Vec<String> {
+    trigger_problems(store, principal_id).await.0
+}
+
+/// Publish sensor `health_orders` in `location_id`, let it check once, apply `earlier_form`, then make it due again with a new overdue tick to see; the scheduler's state and the sensor.
+pub(crate) async fn sensor_due_again(
+    store: &ControlStore,
+    location_id: uuid::Uuid,
+    earlier_form: &str,
+) -> (crate::scheduler::models::SchedulerState, uuid::Uuid) {
+    let mut input = upgrade_snapshot(
+        location_id,
+        serde_json::json!({"health_orders": {"description": "Refresh orders on overdue ticks",
+            "job_key": "orders",
+            "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
+            "minimum_interval_seconds": 1}}),
+    );
+    input.generation = 2;
+    crate::snapshots::main::publication::publish_snapshot::publish_snapshot(store, &input)
+        .await
+        .expect("publish");
+    crate::sensors::tests::helpers::append_events(store, 0..1, chrono::Utc::now()).await;
+    let (state, _) = scheduler_cycle(
+        store,
+        crate::scheduler::models::SchedulerState::new(uuid::Uuid::now_v7()),
+    )
+    .await
+    .expect("the sensor's first check");
+    execute(store, earlier_form).await;
+    tokio::time::sleep(std::time::Duration::from_millis(1_100)).await;
+    crate::sensors::tests::helpers::append_events(store, 6..7, chrono::Utc::now()).await;
+    execute(
+        store,
+        "UPDATE sqb_trigger_state SET next_due_at='2000-01-01T00:00:00Z' \
+         WHERE trigger_id IN (SELECT trigger_id FROM sqb_triggers WHERE kind='sensor')",
+    )
+    .await;
+    let trigger_id = serde_json::from_value(
+        crate::runs::tests::helpers::rows(
+            store,
+            "SELECT trigger_id FROM sqb_triggers WHERE kind='sensor'",
+            vec![],
+        )
+        .await[0]["trigger_id"]
+            .clone(),
+    )
+    .expect("sensor ID");
+    (state, trigger_id)
 }
 
 /// Give `snapshot_id` a `jobs` document in the form an older release published, which no longer decodes.

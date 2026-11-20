@@ -328,6 +328,7 @@ pub enum PlatformEventKind {
     LaunchFailed,
     RunFailed,
     TriggerSkipped,
+    SensorRechecked,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -378,6 +379,12 @@ pub enum PlatformEvent {
         snapshot_id: Uuid,
         reason: String,
     },
+    /// A sensor's last check was recorded by an earlier release in a form that can't be read, so evaluation `evaluation_id` checked it again from scratch; withdrawn once a check completes.
+    SensorRechecked {
+        trigger_id: Uuid,
+        snapshot_id: Uuid,
+        evaluation_id: Uuid,
+    },
 }
 
 impl PlatformEvent {
@@ -392,6 +399,7 @@ impl PlatformEvent {
             Self::LaunchFailed { .. } => PlatformEventKind::LaunchFailed,
             Self::RunFailed { .. } => PlatformEventKind::RunFailed,
             Self::TriggerSkipped { .. } => PlatformEventKind::TriggerSkipped,
+            Self::SensorRechecked { .. } => PlatformEventKind::SensorRechecked,
         }
     }
 
@@ -406,6 +414,7 @@ impl PlatformEvent {
             Self::LaunchFailed { .. } => "platform_launch_failed",
             Self::RunFailed { .. } => "platform_run_failed",
             Self::TriggerSkipped { .. } => "platform_trigger_skipped",
+            Self::SensorRechecked { .. } => "platform_sensor_rechecked",
         }
     }
 }
@@ -487,6 +496,20 @@ pub struct PlatformProblems {
     /// Triggers skipped because their stored job or pinned snapshot can't be read, until their location publishes again.
     #[serde(default)]
     pub skipped_triggers: Vec<SkippedTrigger>,
+    /// Sensors checked again from scratch because their last check can't be read, until a check completes.
+    #[serde(default)]
+    pub rechecked_sensors: Vec<RecheckedSensor>,
+}
+
+/// A sensor whose last check, recorded by an earlier release, can't be read, so it is checked again from scratch; it clears once a check completes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RecheckedSensor {
+    pub trigger_id: Uuid,
+    pub name: String,
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    pub rechecked_at: DateTime<Utc>,
 }
 
 /// A trigger the scheduler skips because its stored job or pinned snapshot can't be read; it clears once its location publishes again.
@@ -505,6 +528,7 @@ pub struct SkippedTrigger {
 /// A live trigger and the snapshot it was published in.
 #[derive(Debug, Deserialize)]
 pub(crate) struct PublishedTrigger {
+    pub(crate) trigger_id: Uuid,
     pub(crate) name: String,
     pub(crate) location_id: Uuid,
     pub(crate) location_name: String,
@@ -577,6 +601,7 @@ pub(crate) struct ProblemScan {
     pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
     pub(crate) low_calendars: Vec<LowCalendar>,
     pub(crate) skipped_triggers: Vec<SkippedTrigger>,
+    pub(crate) rechecked_sensors: Vec<RecheckedSensor>,
 }
 
 /// Where the control store keeps its data.

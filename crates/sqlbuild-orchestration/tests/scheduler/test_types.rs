@@ -92,6 +92,8 @@ pub(crate) struct UnreadableSensorTestCase {
     pub(crate) expected_skipped: &'static [&'static str],
     /// Runs the sensor has queued by then.
     pub(crate) expected_sensor_runs: i64,
+    /// `sensor_rechecked` events recorded by then; a completed re-check withdraws its problem.
+    pub(crate) expected_rechecked_events: i64,
 }
 
 pub(crate) struct RunningMemberOldDocumentTestCase {
@@ -124,4 +126,13 @@ pub(crate) struct UnreadableScheduleRepublishTestCase {
     pub(crate) expected_same_next_due: bool,
     /// The live problems after the republish, as `name: reason`, then after the next scheduler cycle.
     pub(crate) expected_problems: [Vec<String>; 2],
+}
+
+pub(crate) struct SensorRecheckTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The live problems while the re-check runs: skipped triggers as `name: reason`, then re-checked sensors.
+    pub(crate) expected_while_checking: (&'static [&'static str], &'static [&'static str]),
+    /// The re-checked sensors once it completes.
+    pub(crate) expected_after: &'static [&'static str],
 }
