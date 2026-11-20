@@ -518,15 +518,6 @@ pub(crate) fn pool_limits_config(paths: &ConfigPaths) -> Result<PoolLimits, Load
     Ok(pool_limits(table.as_map().unwrap_or_default())?)
 }
 
-/// The `[settings]` keys `sqlbuild_project.toml` sets, under their current names.
-pub(crate) fn project_setting_keys(paths: &ConfigPaths) -> Result<Vec<String>, LoadFailure> {
-    let file = resolve(paths, false)?;
-    let table = load_toml_mapping(paths, file)?;
-    let settings =
-        get(table.as_map().unwrap_or_default(), "settings").and_then(ConfigValue::as_map);
-    Ok(settings.map(setting_overrides).unwrap_or_default())
-}
-
 /// `[git] base_ref` of `sqlbuild_project.toml`.
 pub(crate) fn git_base_ref(paths: &ConfigPaths) -> Result<Option<String>, LoadFailure> {
     project_section(paths, "git", load_git)

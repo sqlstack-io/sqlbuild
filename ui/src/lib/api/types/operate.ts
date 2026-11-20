@@ -929,8 +929,8 @@ export type PoolUse = {
 	sharedWith: string[];
 };
 
-/** Models a run builds at once, and the layer that set it. */
-export type ResolvedConcurrency = { limit: number; source: 'job' | 'target' | 'local' | 'project' | 'default' };
+/** The most of a job's nodes a run of it builds at once. */
+export type ResolvedConcurrency = { limit: number };
 
 /** One reason a member waits: `fromNode` of `upstreamJob` feeds its `toNode`, directly or through nodes no member selects. */
 export type WaitReason = { upstreamJob: string; fromNode: string; toNode: string };

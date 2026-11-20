@@ -305,38 +305,23 @@ fn given_concurrency_layers_when_resolving_then_cli_beats_target_beats_settings(
         ConcurrencyTestCase {
             description: "the command line beats the target",
             requested: Some(2),
-            target: Some(("prod", 8)),
+            target: Some(8),
             settings: 16,
-            local_override: true,
             expected_limit: 2,
-            expected_source: "--concurrency",
         },
         ConcurrencyTestCase {
-            description: "the target beats a local settings override",
+            description: "the target beats the settings",
             requested: None,
-            target: Some(("prod", 8)),
+            target: Some(8),
             settings: 4,
-            local_override: true,
             expected_limit: 8,
-            expected_source: "targets.prod.concurrency",
         },
         ConcurrencyTestCase {
-            description: "a local settings override applies without a target value",
-            requested: None,
-            target: None,
-            settings: 4,
-            local_override: true,
-            expected_limit: 4,
-            expected_source: "sqlbuild_local.toml settings.concurrency",
-        },
-        ConcurrencyTestCase {
-            description: "the project setting is the default",
+            description: "the settings apply without a target value",
             requested: None,
             target: None,
             settings: 16,
-            local_override: false,
             expected_limit: 16,
-            expected_source: "settings.concurrency",
         },
     ];
 
@@ -345,11 +330,9 @@ fn given_concurrency_layers_when_resolving_then_cli_beats_target_beats_settings(
             requested: test_case.requested,
             target: test_case.target,
             settings: test_case.settings,
-            local_override: test_case.local_override,
         });
         assert_eq!(
-            (resolved.limit, resolved.source.to_string().as_str()),
-            (test_case.expected_limit, test_case.expected_source),
+            resolved.limit, test_case.expected_limit,
             "{}",
             test_case.description
         );

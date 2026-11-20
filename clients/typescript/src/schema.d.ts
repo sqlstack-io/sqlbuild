@@ -1890,11 +1890,6 @@ export interface components {
             /** Format: uuid */
             snapshot_id?: string | null;
         };
-        /**
-         * @description The layer that set a run's concurrency.
-         * @enum {string}
-         */
-        ConcurrencySource: "job" | "target" | "local" | "project" | "default";
         /** @description A row whose key was already stored with different content; the first row is kept. */
         ConflictEvidence: {
             existing_sha256: string;
@@ -3183,11 +3178,10 @@ export interface components {
             /** Format: uuid */
             source_run_id: string;
         };
-        /** @description The models a run builds at once on its target, and the layer that set it. */
+        /** @description The most of a job's nodes a run of it builds at once on its target. */
         ResolvedConcurrency: {
             /** Format: int64 */
             limit: number;
-            source: components["schemas"]["ConcurrencySource"];
         };
         RoleAssignmentRequest: {
             /** Format: uuid */

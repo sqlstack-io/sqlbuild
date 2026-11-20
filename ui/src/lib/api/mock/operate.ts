@@ -53,11 +53,10 @@ export const POOL_CAPS: Record<string, number> = { warehouse_heavy: 1 };
 /** A pool's limit on this server: the project's, lowered to the cap. */
 export const serverLimitOf = (pool: string) => Math.min(POOL_LIMITS[pool] ?? 1, POOL_CAPS[pool] ?? Infinity);
 
-/** Where each job's run concurrency comes from, when not its own setting: one of every layer. */
+/** The run concurrency of jobs without their own setting, where it differs from the mock project's 4. */
 const CONCURRENCY_FROM: Record<string, ResolvedConcurrency> = {
-	marts_only: { limit: 6, source: 'target' },
-	activity_microbatch: { limit: 2, source: 'local' },
-	load_sources: { limit: 4, source: 'default' }
+	marts_only: { limit: 6 },
+	activity_microbatch: { limit: 2 }
 };
 
 const decl = (sourceFile: string, line: number, code: string) => ({ sourceFile, line, code });
@@ -410,10 +409,10 @@ export function poolHoldersOf(job: JobDef | undefined): PoolHolders[] {
 	return Object.keys(job?.pools ?? {}).map((pool) => ({ pool, limit: serverLimitOf(pool), holders: [] }));
 }
 
-/** What a run of the job uses: its own setting, else the layer the mock gives it, else the mock project's 4. */
+/** What a run of the job uses: its own setting, else the limit the mock gives it, else the mock project's 4. */
 export function resolvedConcurrencyOf(job: JobDef | undefined): ResolvedConcurrency {
 	const own = runConcurrencyOf(job);
-	return own ? { limit: own, source: 'job' } : (CONCURRENCY_FROM[job?.key ?? ''] ?? { limit: 4, source: 'project' });
+	return own ? { limit: own } : (CONCURRENCY_FROM[job?.key ?? ''] ?? { limit: 4 });
 }
 
 /** The jobs and groups asking a pool for more than this server allows, as the server's pool_capped warning names them. */
