@@ -9,6 +9,8 @@ pub struct SqlReference {
     pub package: Option<String>,
     /// Top-level arguments of a table function's call suffix; `None` for other kinds.
     pub call_argument_count: Option<usize>,
+    /// Whether a table function's call is followed by `OVER (PARTITION BY ...)`.
+    pub call_partitioned: bool,
 }
 
 /// One reference call compile cannot replace, with Python's P012 message and help.

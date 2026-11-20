@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D001",
-     "message": "<project>/sqlbuild_project.toml [defaults] contains unknown key(s): description. Allowed keys: append_cursor_inclusive, batch_concurrency, batch_size, contract, cursor_end, cursor_future_action, cursor_future_max_distance, cursor_start, cursor_start_max_action, cursor_start_max_ahead, cursor_watermark_mode, database, full_refresh, function_database, function_schema, incremental_mode, incremental_strategy, lookback, materialized, max_duration, max_microbatches, merge_exclude_columns, microbatch_strategy, replay_on_change, row_diff_exclude_columns, row_diff_sample_rows, row_diff_sample_seed, row_diff_tolerances, schema, seed_database, seed_schema, tags, unaccounted_partition_policy",
+     "message": "<project>/sqlbuild_project.toml [defaults] contains unknown key(s): description. Allowed keys: append_cursor_inclusive, batch_concurrency, batch_size, contract, cursor_end, cursor_future_action, cursor_future_max_distance, cursor_start, cursor_start_max_action, cursor_start_max_ahead, cursor_watermark_mode, database, full_refresh, function_database, function_dataframe, function_schema, incremental_mode, incremental_strategy, lookback, materialized, max_duration, max_microbatches, merge_exclude_columns, microbatch_strategy, replay_on_change, row_diff_exclude_columns, row_diff_sample_rows, row_diff_sample_seed, row_diff_tolerances, schema, seed_database, seed_schema, tags, unaccounted_partition_policy",
      "help": "remove the key; see the reference for supported keys"
     }
    ]

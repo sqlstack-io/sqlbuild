@@ -658,8 +658,9 @@ class BaseAdapter(RetentionAdapterMixin, RunsTableMixin, StrictAdapter):
         runtime_version: str | None = None,
         entry_point: str | None = None,
         packages: tuple[str, ...] = (),
+        dataframe: str | None = None,
     ) -> tuple[str, ...]:
-        del runtime_version, entry_point, packages
+        del runtime_version, entry_point, packages, dataframe
         if return_columns:
             raise AdapterUserError(
                 message=f"Adapter '{type(self).__name__}' does not support SQL table functions"
@@ -1283,6 +1284,7 @@ class BaseAdapter(RetentionAdapterMixin, RunsTableMixin, StrictAdapter):
             runtime_version=definition.runtime_version,
             entry_point=definition.entry_point,
             packages=definition.packages,
+            dataframe=definition.dataframe,
         )
         statement_recorder.record_many(statements)
         stmt: str

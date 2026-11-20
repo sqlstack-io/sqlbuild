@@ -367,6 +367,7 @@ fn function_statements(
             ("runtime_version", native_field(entry, "runtime_version")?),
             ("entry_point", native_field(entry, "entry_point")?),
             ("packages", native_field(entry, "packages")?),
+            ("dataframe", native_field(entry, "dataframe")?),
         ],
     )?;
     Ok(FunctionStatements {

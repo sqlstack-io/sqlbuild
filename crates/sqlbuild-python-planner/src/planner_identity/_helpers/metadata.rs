@@ -31,6 +31,7 @@ use sqlbuild_python_project::planner_identity::main::baselined_function_definiti
 use sqlbuild_python_project::planner_identity::main::function_definition_hash::function_definition_hash;
 use sqlbuild_python_project::resource_views::main::function_reads::arguments::arguments;
 use sqlbuild_python_project::resource_views::main::function_reads::body_sql::body_sql;
+use sqlbuild_python_project::resource_views::main::function_reads::dataframe::dataframe;
 use sqlbuild_python_project::resource_views::main::function_reads::entry_point::entry_point;
 use sqlbuild_python_project::resource_views::main::function_reads::packages::packages;
 use sqlbuild_python_project::resource_views::main::function_reads::return_columns::return_columns;
@@ -319,6 +320,10 @@ pub(crate) fn function_local_hashes<'py>(
         payload.set_item("runtime_version", runtime_version(&function)?)?;
         payload.set_item("entry_point", entry_point(&function)?)?;
         payload.set_item("packages", packages(&function)?)?;
+        let frame: Bound<'py, PyAny> = dataframe(&function)?;
+        if !frame.is_none() {
+            payload.set_item("dataframe", frame)?;
+        }
         let mut local_hash: String =
             stable_identity_hash(&sorted_dumps(payload.as_any(), SPACED, true)?);
         if recorded_function_unchanged(&function, (&name, dialect), recorded)? {

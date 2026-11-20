@@ -826,8 +826,9 @@ class SqlServerAdapter(
         runtime_version: str | None = None,
         entry_point: str | None = None,
         packages: tuple[str, ...] = (),
+        dataframe: str | None = None,
     ) -> tuple[str, ...]:
-        del return_columns, runtime_version, entry_point, packages
+        del return_columns, runtime_version, entry_point, packages, dataframe
         if language != FunctionLanguage.SQL:
             raise AdapterUserError(
                 message="Python functions require an engine-specific implementation"

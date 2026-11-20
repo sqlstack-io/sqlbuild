@@ -1422,8 +1422,9 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
         runtime_version: str | None = None,
         entry_point: str | None = None,
         packages: tuple[str, ...] = (),
+        dataframe: str | None = None,
     ) -> tuple[str, ...]:
-        del runtime_version, entry_point, packages
+        del runtime_version, entry_point, packages, dataframe
         if language == FunctionLanguage.PYTHON:
             if return_columns:
                 raise AdapterUserError(message="DuckDB table functions must use SQL language")

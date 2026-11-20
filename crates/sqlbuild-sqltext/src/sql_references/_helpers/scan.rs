@@ -1,9 +1,11 @@
 //! The general reference scan of Python `extract_sql_references`, reproduced exactly.
 
+use crate::resolution::main::code_start::code_start;
+use crate::resolution::main::over_clause_open::over_clause_open;
 use crate::sql_references::constants::{
-    DBT_REFERENCE_KIND, NAME_QUOTE_BYTES, NON_CODE_START_BYTES, PLACEHOLDER_NAMES, QUOTE_BYTES,
-    QUOTED_NAME_MINIMUM_BYTES, REFERENCE_CONTEXT, REFERENCE_PREFIXES, TABLE_FUNCTION_CALL_CONTEXT,
-    TABLE_FUNCTION_REFERENCE_KIND,
+    DBT_REFERENCE_KIND, NAME_QUOTE_BYTES, NON_CODE_START_BYTES, PARTITION_CLAUSE_WORDS,
+    PLACEHOLDER_NAMES, QUOTE_BYTES, QUOTED_NAME_MINIMUM_BYTES, REFERENCE_CONTEXT,
+    REFERENCE_PREFIXES, TABLE_FUNCTION_CALL_CONTEXT, TABLE_FUNCTION_REFERENCE_KIND,
 };
 use crate::sql_references::models::{InvalidReferenceCall, ReferenceScan, SqlReference};
 use crate::sql_references::types::ReferencePrefix;
@@ -104,6 +106,7 @@ fn parse_reference(
         return Ok((Parsed::Invalid(invalid), close + 1));
     };
     let mut call_argument_count = None;
+    let mut call_partitioned = false;
     if kind == TABLE_FUNCTION_REFERENCE_KIND {
         let suffix = python_whitespace_end(text, close + 1);
         if sql.get(suffix) != Some(&b'(') {
@@ -126,6 +129,7 @@ fn parse_reference(
         }
         let suffix_close = matching_paren(sql, suffix, syntax, TABLE_FUNCTION_CALL_CONTEXT)?;
         call_argument_count = Some(split_arguments(text, suffix + 1, suffix_close, syntax)?.len());
+        call_partitioned = partition_clause_follows(text, suffix_close + 1, syntax);
     }
     Ok((
         Parsed::Reference(SqlReference {
@@ -133,6 +137,7 @@ fn parse_reference(
             name,
             package,
             call_argument_count,
+            call_partitioned,
         }),
         close + 1,
     ))
@@ -343,6 +348,36 @@ fn stripped_argument(argument: &str) -> Scan<String> {
 
 fn empty_argument() -> String {
     format!("{REFERENCE_CONTEXT} contains an empty argument")
+}
+
+/// Whether `OVER (PARTITION BY` follows `start`, in any case, with whitespace or comments between.
+fn partition_clause_follows(text: &str, start: usize, syntax: &LexicalSyntax) -> bool {
+    let comments: &[String] = &syntax.line_comment_prefixes;
+    let Some(open) = over_clause_open(text, start, comments) else {
+        return false;
+    };
+    let mut position: usize = open + 1;
+    for word in PARTITION_CLAUSE_WORDS {
+        let Some(word_start) = code_start(text, position, comments) else {
+            return false;
+        };
+        position = word_start;
+        let Some(candidate) = text.get(position..position + word.len()) else {
+            return false;
+        };
+        if !candidate.eq_ignore_ascii_case(word) {
+            return false;
+        }
+        position += word.len();
+        if text[position..]
+            .chars()
+            .next()
+            .is_some_and(|character| character.is_alphanumeric() || character == '_')
+        {
+            return false;
+        }
+    }
+    true
 }
 
 /// Python `_skip_whitespace`, which skips `str.isspace()` characters.

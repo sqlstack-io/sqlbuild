@@ -27,6 +27,7 @@ pub(crate) fn reference(kind: &'static str, name: &str) -> SqlReference {
         name: name.to_string(),
         package: None,
         call_argument_count: None,
+        call_partitioned: false,
     }
 }
 
@@ -34,6 +35,13 @@ pub(crate) fn table_function(name: &str, call_argument_count: usize) -> SqlRefer
     SqlReference {
         call_argument_count: Some(call_argument_count),
         ..reference("table_fn", name)
+    }
+}
+
+pub(crate) fn partitioned_table_function(name: &str, call_argument_count: usize) -> SqlReference {
+    SqlReference {
+        call_partitioned: true,
+        ..table_function(name, call_argument_count)
     }
 }
 

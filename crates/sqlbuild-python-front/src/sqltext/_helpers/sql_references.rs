@@ -150,6 +150,7 @@ pub(crate) fn scanned<'py>(
                         "call_argument_count",
                         text(py, reference.call_argument_count)?,
                     ),
+                    ("call_partitioned", text(py, reference.call_partitioned)?),
                 ],
             )
         })

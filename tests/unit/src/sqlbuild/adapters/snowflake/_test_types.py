@@ -130,6 +130,28 @@ class SnowflakeRenderTableFunctionTestCase:
 
 
 @dataclass(frozen=True)
+class SnowflakeTableFunctionRunTestCase:
+    description: str
+    returned_columns: tuple[str, ...]
+    expected_rows: tuple[tuple[object, ...], ...]
+
+
+@dataclass(frozen=True)
+class SnowflakeTableFunctionColumnsErrorTestCase:
+    description: str
+    returned_columns: tuple[str, ...]
+    expected_error: str
+
+
+@dataclass(frozen=True)
+class SnowflakePythonTableFunctionTestCase:
+    description: str
+    dataframe: str
+    packages: tuple[str, ...]
+    expected_sql: str
+
+
+@dataclass(frozen=True)
 class SnowflakeQueryColumnTypesTestCase:
     description: str
     cursor_description: tuple[tuple[object, ...], ...]

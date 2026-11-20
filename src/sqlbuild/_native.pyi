@@ -459,6 +459,8 @@ class FunctionInput(Protocol):
     @property
     def packages(self) -> tuple[str, ...]: ...
     @property
+    def dataframe(self) -> str | None: ...
+    @property
     def tags(self) -> tuple[str, ...]: ...
     @property
     def description(self) -> str | None: ...
@@ -1616,6 +1618,8 @@ class NativeFunctionInput:
     @property
     def packages(self) -> tuple[str, ...]: ...
     @property
+    def dataframe(self) -> str | None: ...
+    @property
     def tags(self) -> tuple[str, ...]: ...
     @property
     def description(self) -> str | None: ...
@@ -1667,6 +1671,8 @@ class NativeCompiledFunction:
     def entry_point(self) -> str | None: ...
     @property
     def packages(self) -> tuple[str, ...]: ...
+    @property
+    def dataframe(self) -> str | None: ...
     @property
     def tags(self) -> tuple[str, ...]: ...
     @property
@@ -9615,6 +9621,7 @@ class CompiledFunction(NativeRecord):
     runtime_version: str | None
     entry_point: str | None
     packages: tuple[str, ...]
+    dataframe: str | None
     tags: tuple[str, ...]
     description: str | None
     def __init__(
@@ -9635,6 +9642,7 @@ class CompiledFunction(NativeRecord):
         runtime_version: str | None = ...,
         entry_point: str | None = ...,
         packages: tuple[str, ...] = ...,
+        dataframe: str | None = ...,
         tags: tuple[str, ...] = ...,
         description: str | None = ...,
     ) -> None: ...
@@ -10060,7 +10068,7 @@ class DiscoveredModelSchemaFile(NativeRecord):
     ) -> None: ...
 
 class DiscoveredPythonFunctionFile(NativeRecord):
-    """A discovered Python function file and its parsed UDF metadata."""
+    """A discovered Python function file and its parsed UDF or table function metadata."""
 
     file_path: Path
     relative_path: Path
@@ -10068,6 +10076,8 @@ class DiscoveredPythonFunctionFile(NativeRecord):
     header_values: dict[str, object]
     entry_point: str
     body_python: str
+    table_function: bool
+    dataframe: str | None
     def __init__(
         self,
         file_path: Path,
@@ -10076,6 +10086,8 @@ class DiscoveredPythonFunctionFile(NativeRecord):
         header_values: dict[str, object],
         entry_point: str,
         body_python: str,
+        table_function: bool = ...,
+        dataframe: str | None = ...,
     ) -> None: ...
 
 class DiscoveredSchemaFile(NativeRecord):
@@ -12271,6 +12283,7 @@ class DefaultsConfig(NativeRecord):
     seed_schema: str | None
     function_database: str | None
     function_schema: str | None
+    function_dataframe: str
     incremental_strategy: str | None
     incremental_mode: str | None
     microbatch_strategy: str | None
@@ -12308,6 +12321,7 @@ class DefaultsConfig(NativeRecord):
         seed_schema: str | None = ...,
         function_database: str | None = ...,
         function_schema: str | None = ...,
+        function_dataframe: str = ...,
         incremental_strategy: str | None = ...,
         incremental_mode: str | None = ...,
         microbatch_strategy: str | None = ...,
@@ -14325,6 +14339,7 @@ class FunctionPlanEntry(NativeRecord):
     runtime_version: str | None
     entry_point: str | None
     packages: tuple[str, ...]
+    dataframe: str | None
     previous_query_sql: str | None
     reason: PlanReason
     def __init__(
@@ -14344,6 +14359,7 @@ class FunctionPlanEntry(NativeRecord):
         runtime_version: str | None = ...,
         entry_point: str | None = ...,
         packages: tuple[str, ...] = ...,
+        dataframe: str | None = ...,
         previous_query_sql: str | None = ...,
         reason: PlanReason = ...,
     ) -> None: ...
@@ -15537,12 +15553,14 @@ class CompileSqlReference(NativeRecord):
     ref_name: str
     ref_package: str | None
     call_argument_count: int | None
+    call_partitioned: bool
     def __init__(
         self,
         ref_kind: SqlReferenceKind | str,
         ref_name: str,
         ref_package: str | None = ...,
         call_argument_count: int | None = ...,
+        call_partitioned: bool = ...,
     ) -> None: ...
 
 class CompiledLineageSourceFact(NativeRecord):

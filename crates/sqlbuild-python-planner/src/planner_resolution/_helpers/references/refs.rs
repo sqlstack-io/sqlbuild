@@ -15,10 +15,13 @@ use pyo3::pyfunction;
 use pyo3::types::PyDict;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::native_host::types::Syntax;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_front::sqltext::models::SqlCodeScanner;
+use sqlbuild_sqltext::resolution::main::over_clause_open::over_clause_open;
 use sqlbuild_sqltext::resolution::main::{ref_alias::ref_alias, reference_spans::reference_spans};
+use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 
 #[pyfunction]
 #[pyo3(signature = (**kwargs))]
@@ -149,6 +152,9 @@ fn resolve_function_calls(
         return Ok(query_sql.to_owned());
     }
     let scan = SqlCodeScanner::new(query_sql, None, "SQL reference resolution".to_owned());
+    let dialect_name: Option<String> = dialect.syntax("sql_analysis_dialect_name")?.extract()?;
+    let line_comments: Vec<String> =
+        dialect_lexical_syntax(dialect_name.as_deref().unwrap_or_default()).line_comment_prefixes;
     let mut output = String::new();
     let mut last = 0;
     let mut code_index = 0;
@@ -189,6 +195,13 @@ fn resolve_function_calls(
             .char_indices()
             .nth(end + 1)
             .map_or(query_sql.len(), |(index, _)| index);
+        let end = match table
+            .then(|| over_clause_open(query_sql, end, &line_comments))
+            .flatten()
+        {
+            Some(open) => over_clause_close(query_sql, open, &scanner, py)?,
+            None => end,
+        };
         let hook = if table {
             "render_table_function_call"
         } else {
@@ -215,6 +228,20 @@ fn resolve_function_calls(
     }
     output.push_str(&query_sql[last..]);
     Ok(output)
+}
+
+/// The end of the `OVER (...)` clause whose `(` is at byte `open`.
+fn over_clause_close(
+    query_sql: &str,
+    open: usize,
+    scanner: &SqlCodeScanner,
+    py: Python<'_>,
+) -> PyResult<usize> {
+    let close: usize = scanner.matching_paren(py, query_sql[..open].chars().count())?;
+    Ok(query_sql
+        .char_indices()
+        .nth(close + 1)
+        .map_or(query_sql.len(), |(index, _)| index))
 }
 
 #[pyfunction]

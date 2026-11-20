@@ -31,6 +31,7 @@ use sqlbuild_python_project::planner_scope::main::build_source_load_entries::bui
 use sqlbuild_python_project::planner_scope::main::upstream_loader_dependency_names::upstream_loader_dependency_names;
 use sqlbuild_python_project::planner_strategy::main::planning_context::planning_context;
 use sqlbuild_python_project::resource_views::main::function_reads::arguments::arguments;
+use sqlbuild_python_project::resource_views::main::function_reads::dataframe::dataframe;
 use sqlbuild_python_project::resource_views::main::function_reads::entry_point::entry_point;
 use sqlbuild_python_project::resource_views::main::function_reads::fingerprint_destination::fingerprint_destination;
 use sqlbuild_python_project::resource_views::main::function_reads::language::language;
@@ -424,6 +425,7 @@ pub(crate) fn function_entry<'py>(
             ),
             ("entry_point", entry_point(function)?),
             ("packages", packages(function)?),
+            ("dataframe", dataframe(function)?),
             ("previous_query_sql", previous_query_sql),
             ("reason", reason),
         ],

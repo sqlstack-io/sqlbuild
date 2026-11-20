@@ -134,6 +134,7 @@ pub(crate) fn function_entry<'py>(
         "runtime_version",
         "entry_point",
         "packages",
+        "dataframe",
     ] {
         fields.push((name, native_field(function, name)?));
     }

@@ -421,6 +421,7 @@ class StrictAdapter(
         runtime_version: str | None = None,
         entry_point: str | None = None,
         packages: tuple[str, ...] = (),
+        dataframe: str | None = None,
     ) -> tuple[str, ...]:
         """Render SQL statements that create or replace a SQL function."""
         ...

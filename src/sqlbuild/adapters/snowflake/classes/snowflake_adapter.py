@@ -61,6 +61,7 @@ from sqlbuild.adapter.contract.main.is_quoted_identifier import is_quoted_identi
 from sqlbuild.adapter.contract.main.normalize_seed_csv_value import normalize_seed_csv_value
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
+from sqlbuild.adapter.contract.main.temporary_function_copy import temporary_function_copy
 from sqlbuild.adapter.contract.models import (
     ColumnInfo,
     ExpressionInferenceProfile,
@@ -158,6 +159,9 @@ from sqlbuild.adapters.snowflake._helpers.show_metadata import (
 from sqlbuild.adapters.snowflake._helpers.state_table_retention import (
     is_invalid_retention_error,
 )
+from sqlbuild.adapters.snowflake.classes.python_table_function_handler import (
+    PythonTableFunctionHandler,
+)
 from sqlbuild.adapters.snowflake.classes.snowflake_connection import _SnowflakeConnection
 from sqlbuild.adapters.snowflake.classes.state_table_retention_fallbacks import (
     StateTableRetentionFallbacks,
@@ -172,6 +176,7 @@ from sqlbuild.adapters.snowflake.constants import (
     OAUTH_AUTHORIZATION_CODE_AUTHENTICATOR,
     PLATFORM_DETECTION_DISABLED,
     PLATFORM_DETECTION_VARIABLE,
+    PYTHON_TABLE_FUNCTION_HANDLER,
     SECONDARY_ROLES_ALL,
     SECONDARY_ROLES_NONE,
     SHOW_LIKE_ESCAPE_CHARACTER,
@@ -1390,6 +1395,7 @@ class SnowflakeAdapter(
             runtime_version=definition.runtime_version,
             entry_point=definition.entry_point,
             packages=definition.packages,
+            dataframe=definition.dataframe,
         )
         statement_recorder.record_many(statements)
         stmt: str
@@ -3180,18 +3186,43 @@ class SnowflakeAdapter(
         runtime_version: str | None = None,
         entry_point: str | None = None,
         packages: tuple[str, ...] = (),
+        dataframe: str | None = None,
     ) -> tuple[str, ...]:
         argument_sql: str = ", ".join(f"{argument.name} {argument.type}" for argument in arguments)
         if return_columns:
-            if language != FunctionLanguage.SQL:
-                raise AdapterUserError(message="Snowflake table functions must use SQL language")
             column_sql: str = ", ".join(f"{column.name} {column.type}" for column in return_columns)
-            del returns, runtime_version, entry_point, packages
+            if language == FunctionLanguage.PYTHON:
+                if runtime_version is None or entry_point is None or dataframe is None:
+                    raise AdapterUserError(
+                        message=(
+                            "Snowflake Python table functions require runtime_version, "
+                            "entry_point and a dataframe library"
+                        )
+                    )
+                handler: PythonTableFunctionHandler = PythonTableFunctionHandler(
+                    body=body_sql,
+                    entry_point=entry_point,
+                    argument_names=tuple(str(argument.name) for argument in arguments),
+                    column_names=tuple(str(column.name) for column in return_columns),
+                    dataframe=dataframe,
+                )
+                table_packages: str = "','".join(handler.packages(declared=packages))
+                return (
+                    f"CREATE OR REPLACE FUNCTION {destination}({argument_sql})\n"
+                    f"RETURNS TABLE ({column_sql})\n"
+                    "LANGUAGE PYTHON\n"
+                    f"RUNTIME_VERSION = '{runtime_version}'\n"
+                    f"HANDLER = '{PYTHON_TABLE_FUNCTION_HANDLER}'\n"
+                    f"PACKAGES = ('{table_packages}')\n"
+                    f"AS $$\n{handler.module()}\n$$",
+                )
+            del returns, runtime_version, entry_point, packages, dataframe
             return (
                 f"CREATE OR REPLACE FUNCTION {destination}({argument_sql})\n"
                 f"RETURNS TABLE ({column_sql})\n"
                 f"AS $$\n{body_sql}\n$$",
             )
+        del dataframe
         if language == FunctionLanguage.PYTHON:
             if runtime_version is None or entry_point is None:
                 raise AdapterUserError(
@@ -3233,16 +3264,9 @@ class SnowflakeAdapter(
             runtime_version=definition.runtime_version,
             entry_point=definition.entry_point,
             packages=definition.packages,
+            dataframe=definition.dataframe,
         )
-        return TemporaryFunction(
-            target=target,
-            statements=tuple(
-                statement.replace(
-                    "CREATE OR REPLACE FUNCTION ", "CREATE OR REPLACE TEMPORARY FUNCTION ", 1
-                )
-                for statement in statements
-            ),
-        )
+        return temporary_function_copy(target=target, statements=statements)
 
     def render_cursor_bound_literal(self, *, value: str, cursor_type: str | None) -> str:
         if cursor_type == CursorKind.INTEGER:

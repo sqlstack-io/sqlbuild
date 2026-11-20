@@ -55,31 +55,57 @@ fn given_a_lateral_table_function_call_when_replacing_it_with_a_relation_then_la
             description: "a mock after a comma LATERAL stands alone",
             sql: "SELECT l.a FROM b, LATERAL __table_fn(\"f\")(b.id) AS l",
             drop_lateral: true,
-            expected_sql: "SELECT l.a FROM b, mock_f AS l",
+            table_call: true,
+            expected_sql: "SELECT l.a FROM b, mock_f[(b.id)] AS l",
         },
         CallableMarkerTestCase {
             description: "a mock after JOIN lateral, in any case, stands alone",
             sql: "SELECT l.a FROM b JOIN lateral __table_fn(\"f\")(b.id) AS l ON TRUE",
             drop_lateral: true,
-            expected_sql: "SELECT l.a FROM b JOIN mock_f AS l ON TRUE",
+            table_call: true,
+            expected_sql: "SELECT l.a FROM b JOIN mock_f[(b.id)] AS l ON TRUE",
         },
         CallableMarkerTestCase {
             description: "a rendered call keeps its LATERAL",
             sql: "SELECT l.a FROM b, LATERAL __table_fn(\"f\")(b.id) AS l",
             drop_lateral: false,
-            expected_sql: "SELECT l.a FROM b, LATERAL mock_f AS l",
+            table_call: true,
+            expected_sql: "SELECT l.a FROM b, LATERAL mock_f[(b.id)] AS l",
         },
         CallableMarkerTestCase {
             description: "lateral ending a comment before the call is kept",
             sql: "SELECT l.a FROM b, -- not lateral\n__table_fn(\"f\")(1) AS l",
             drop_lateral: true,
-            expected_sql: "SELECT l.a FROM b, -- not lateral\nmock_f AS l",
+            table_call: true,
+            expected_sql: "SELECT l.a FROM b, -- not lateral\nmock_f[(1)] AS l",
         },
         CallableMarkerTestCase {
             description: "a word ending in lateral before the call is kept",
             sql: "SELECT l.a FROM collateral, __table_fn(\"f\")(1) AS l",
             drop_lateral: true,
-            expected_sql: "SELECT l.a FROM collateral, mock_f AS l",
+            table_call: true,
+            expected_sql: "SELECT l.a FROM collateral, mock_f[(1)] AS l",
+        },
+        CallableMarkerTestCase {
+            description: "a table function call's suffix takes its OVER clause with it",
+            sql: "SELECT l.a FROM b, __table_fn(\"f\")(b.id) OVER (PARTITION BY (b.x)) AS l",
+            drop_lateral: true,
+            table_call: true,
+            expected_sql: "SELECT l.a FROM b, mock_f[(b.id) OVER (PARTITION BY (b.x))] AS l",
+        },
+        CallableMarkerTestCase {
+            description: "an OVER clause in any case and across lines belongs to the call",
+            sql: "SELECT l.a FROM b, __table_fn(\"f\")(b.id)\n  over (partition by b.x) l",
+            drop_lateral: false,
+            table_call: true,
+            expected_sql: "SELECT l.a FROM b, mock_f[(b.id)\n  over (partition by b.x)] l",
+        },
+        CallableMarkerTestCase {
+            description: "a scalar call keeps a window clause after it",
+            sql: "SELECT __table_fn(\"f\")(b.id) OVER (ORDER BY b.x) FROM b",
+            drop_lateral: false,
+            table_call: false,
+            expected_sql: "SELECT mock_f[(b.id)] OVER (ORDER BY b.x) FROM b",
         },
     ];
     let pattern = Regex::new(r#"(?i)__table_fn\("([^"]+)"\)"#).expect("valid marker pattern");
@@ -90,9 +116,9 @@ fn given_a_lateral_table_function_call_when_replacing_it_with_a_relation_then_la
     for test_case in test_cases {
         let replaced = replace_callable_markers(
             test_case.sql,
-            (&pattern, test_case.drop_lateral),
+            (&pattern, test_case.drop_lateral, test_case.table_call),
             &syntax,
-            |name, _| Some((format!("mock_{name}"), true)),
+            |name, suffix| Some((format!("mock_{name}[{suffix}]"), true)),
         )
         .map(|(sql, _)| sql);
         assert_eq!(

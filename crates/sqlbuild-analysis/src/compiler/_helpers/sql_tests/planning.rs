@@ -1709,7 +1709,7 @@ fn resolve_table_function_fixtures<'a>(
     }
     let (replaced, reached) = replace_callable_markers(
         sql,
-        (&patterns.table_function, true),
+        (&patterns.table_function, true, true),
         &patterns.lexical,
         |name, _call_suffix| {
             fixtures
@@ -1750,7 +1750,7 @@ fn resolve_function_calls(
     };
     let (result, _) = replace_callable_markers(
         sql,
-        (pattern, false),
+        (pattern, false, table_function),
         &patterns.lexical,
         |name, call_suffix| {
             let function = functions.get(name)?;
