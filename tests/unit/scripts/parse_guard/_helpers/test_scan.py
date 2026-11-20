@@ -62,6 +62,18 @@ _REPOSITORY_ROOT: Path = Path(__file__).resolve().parents[5]
             expected_sites=(),
         ),
         UnguardedSiteTestCase(
+            description="a SQLClean lint request without the shared depth",
+            text="fn n() { lint_batch_json(&payload.to_string()) }",
+            expected_sites=(r"x.rs:1 lint_batch_json\(",),
+        ),
+        UnguardedSiteTestCase(
+            description="a SQLClean lint request that sends the shared depth",
+            text=(
+                "fn o() { insert(MAX_FUNCTION_CALL_DEPTH); lint_batch_json(&payload.to_string()) }"
+            ),
+            expected_sites=(),
+        ),
+        UnguardedSiteTestCase(
             description="the shared options and constant",
             text=(
                 "fn e() -> AnalyzeQueryOptions { AnalyzeQueryOptions { complexity_guard: g } }\n"

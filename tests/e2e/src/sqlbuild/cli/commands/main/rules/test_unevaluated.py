@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from sqlbuild._native import MAX_FUNCTION_CALL_DEPTH
 from tests.e2e.src.sqlbuild.cli.commands.main.rules._test_types import (
     EvaluatedModelRulesCase,
     EvaluatedPredicateCase,
@@ -17,6 +18,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules._test_types import (
     UnevaluatedRuleCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
+    rules_unevaluated,
     run_unevaluated_rules_cli,
     write_unevaluated_rules_project,
 )
@@ -35,24 +37,6 @@ _SNOWFLAKE_RULES_PROJECT: str = (
             "models/staging/orders.sql",
             "MODEL (description 'Test model orders.');\nSELECT {expression} AS order_id",
             0,
-        ),
-        UnevaluatedResourceCase(
-            "audit guard",
-            "models/staging/_sqlbuild/audits/singular/orders.sql",
-            "AUDIT ();\nSELECT {expression} AS order_id "
-            'FROM __ref("orders") JOIN __ref("customers") USING (order_id)',
-            expected_evaluated_models=2,
-            extra_files=(
-                (
-                    "models/staging/customers.sql",
-                    "MODEL (description 'Test model customers.');\nSELECT 1 AS order_id\n",
-                ),
-            ),
-        ),
-        UnevaluatedResourceCase(
-            "SQL-test guard",
-            "tests/unit/test_orders.sql",
-            "TEST ();\nWITH __ref__orders AS (SELECT {expression} AS order_id), __expected__orders AS (SELECT 1 AS order_id) SELECT 1",
         ),
     ],
     ids=lambda case: case.description,
@@ -112,6 +96,30 @@ def test_given_guarded_resource_when_running_rules_then_reports_failure_and_cove
             expected_evaluated_models=1,
             expected_unevaluated_resources=0,
         ),
+        SharedDepthModelRuleCase(
+            "a SQLClean rule lints an audit nested as deep as the compiler accepts",
+            "AUDIT ();\nSELECT {expression} AS order_id "
+            'FROM __ref("orders") JOIN __ref("customers") USING (order_id)',
+            "SQLCLEAN035",
+            expected_evaluated_models=2,
+            expected_unevaluated_resources=0,
+            path="models/staging/_sqlbuild/audits/singular/orders.sql",
+            extra_files=(
+                (
+                    "models/staging/customers.sql",
+                    "MODEL (description 'Test model customers.');\nSELECT 1 AS order_id\n",
+                ),
+            ),
+        ),
+        SharedDepthModelRuleCase(
+            "a SQLClean rule lints a SQL test nested as deep as the compiler accepts",
+            "TEST ();\nWITH __ref__orders AS (SELECT {expression} AS order_id), "
+            "__expected__orders AS (SELECT 1 AS order_id) SELECT 1",
+            "SQLCLEAN035",
+            expected_evaluated_models=1,
+            expected_unevaluated_resources=0,
+            path="tests/unit/test_orders.sql",
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -121,9 +129,11 @@ def test_given_calls_nested_within_the_shared_depth_when_running_model_rules_the
 ) -> None:
     write_unevaluated_rules_project(
         project_dir=tmp_path,
-        resource_path="models/staging/orders.sql",
+        resource_path=test_case.path,
         resource_template=test_case.template,
+        extra_files=test_case.extra_files,
         selected_rules=(test_case.rule,),
+        call_depth=MAX_FUNCTION_CALL_DEPTH,
     )
 
     result: subprocess.CompletedProcess[str] = run_unevaluated_rules_cli(
@@ -272,7 +282,7 @@ def test_given_explicit_escape_hatch_when_running_rules_then_honors_policy(
         tmp_path, "compile", "--no-cache", "--json"
     )
     assert compiled.returncode == test_case.expected_exit, compiled.stdout + compiled.stderr
-    assert json.loads(compiled.stdout)["diagnostics"] == []
+    assert rules_unevaluated(json.loads(compiled.stdout)["diagnostics"]) == []
 
 
 @pytest.mark.parametrize(
@@ -315,7 +325,7 @@ def test_given_one_failed_resource_and_multiple_rules_when_running_cli_then_grou
         )
         assert result.returncode == 1, result.stdout + result.stderr
         payload: dict[str, Any] = json.loads(result.stdout)
-        (finding,) = payload[test_case.result_key]
+        (finding,) = rules_unevaluated(payload[test_case.result_key])
         assert finding["code"] == "rules-unevaluated"
         assert finding["affected_rules"] == list(test_case.expected_rules)
         assert finding["message"].startswith(

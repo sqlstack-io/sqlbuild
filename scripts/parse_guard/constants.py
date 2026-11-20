@@ -21,4 +21,9 @@ GUARDED_OPTION_LITERALS: tuple[str, ...] = (
     "ParseOptions {",
 )
 GUARD_FIELD: str = "complexity_guard"
+SQLCLEAN_REQUESTS: tuple[str, ...] = (
+    r"lint_batch_json\(",
+    r"sqlclean::sql_lint::models::[^;]*\bFormatRequest\b",
+)
+SHARED_DEPTH: str = "MAX_FUNCTION_CALL_DEPTH"
 TYPE_POSITION_SUFFIXES: tuple[str, ...] = ("->", "struct")
