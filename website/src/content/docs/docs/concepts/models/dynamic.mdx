@@ -69,7 +69,8 @@ whether it succeeds or fails.
   `[dynamic] heartbeat_grace`, 30 minutes by default, the next completed sync of a served location
   resumes its models and closes its hold, and the location's log says which. It leaves alone the
   models another build held live when it read the holds, and models suspended outside SQLBuild.
-  See
+  A model it fails to resume, for example for a missing privilege, keeps its hold and is retried
+  on the next sync. See
   [Dynamic](/docs/concepts/project-configuration#dynamic) and
   [location syncs](/docs/cli/server#sync-from-the-warehouse-now).
 - **Or the next build does.** Without a served location, the next build that pauses dynamic

@@ -742,12 +742,14 @@ pub struct DynamicResumeLocation {
     pub quiet_token: Option<String>,
 }
 
-/// The holds a pass closed, and each requested location's new quiet token, in request order.
+/// The holds a pass closed, each location it resumed in with its new quiet token, and its failures.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DynamicResumed {
     pub holds: Vec<ResumedHold>,
-    pub quiet_tokens: Vec<Option<String>>,
+    pub quiet_tokens: Vec<DynamicResumeLocation>,
+    /// Each hold or location the pass could not resume, with the warehouse's error.
+    pub failures: Vec<String>,
 }
 
 /// A location runtime's reply to a dynamic resume: what it closed, or its redacted error.

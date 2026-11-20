@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from sqlbuild._native import PlanOutput
 from sqlbuild.executor.build.models import BuildExecutionResult, BuildRuntimeParams
 from sqlbuild.executor.build.types import BuildStatus
 from sqlbuild.executor.dynamic_pauses._helpers.resume import resume_holds
@@ -417,7 +418,7 @@ def test_given_a_sync_resuming_after_the_takeover_state_check_when_the_build_hol
         runtime=BuildRuntimeParams(run_id="first_run"),
         database_path=database_path,
     )
-    plan = plan_lease_project(
+    plan: PlanOutput = plan_lease_project(
         adapter=adapter,
         connection=connection,
         case=lease_project_case(

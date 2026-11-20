@@ -47,9 +47,9 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     AutomaticHistoryTestCase,
     CatalogConnectionTestCase,
-    ExpiredHoldSyncTestCase,
     FingerprintHistoryTestCase,
     NewestVersionsTestCase,
+    NoDynamicAdapterSyncTestCase,
     PageBytesTestCase,
     ReadFailureTestCase,
     StateEventsTestCase,
@@ -1081,16 +1081,19 @@ def test_given_a_served_location_when_warehouse_history_changes_then_periodic_re
 @pytest.mark.parametrize(
     "test_case",
     [
-        ExpiredHoldSyncTestCase(
-            description="a sync closes the hold silent past the project's grace, not the live one",
-            fixture="benchmarks/duckshop/edge_cases/orchestration/dynamic_expired_hold.json",
-            expected_resumed=(("stopped-build", "daily_totals"),),
+        NoDynamicAdapterSyncTestCase(
+            description="an expired hold in a DuckDB pause table stays open after the sync",
+            fixture=(
+                "benchmarks/duckshop/edge_cases/orchestration/"
+                "dynamic_hold_without_dynamic_adapter.json"
+            ),
+            expected_open_holds=("running-build", "stopped-build"),
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_a_build_that_stopped_heartbeating_when_a_served_location_syncs_then_only_its_expired_hold_is_closed(
-    test_case: ExpiredHoldSyncTestCase, tmp_path: Path
+def test_given_a_duckdb_location_when_its_sync_completes_then_it_opens_no_resume_session(
+    test_case: NoDynamicAdapterSyncTestCase, tmp_path: Path
 ) -> None:
     project: Path = tmp_path / "project"
     fixture: dict[str, Any] = json.loads(Path(test_case.fixture).read_text())
@@ -1153,28 +1156,22 @@ def test_given_a_build_that_stopped_heartbeating_when_a_served_location_syncs_th
                 record_finished_run(tmp_path / "control/.sqlbuild/control.sqlite3")
                 time.sleep(0.5)
             wait_for_idle_sync(served, log)
-        recorder: str = f"location-sync:{api.location_id}"
     text: str = log.read_text()
     connection = adapter.connect({"database": str(project / "warehouse.db")})
-    resumed: list[tuple[Any, ...]] = adapter.query(
+    events: list[tuple[Any, ...]] = adapter.query(
         connection=connection,
         sql=(
-            "SELECT run_id, recorded_by, relation_name FROM main._sqlbuild_dynamic_pauses "
-            "WHERE event_type = 'resumed' ORDER BY run_id"
+            "SELECT run_id, event_type FROM main._sqlbuild_dynamic_pauses "
+            "ORDER BY run_id, event_type"
         ),
         limit=10,
     ).rows
     adapter.close(connection)
-    expected: list[tuple[str, str, str]] = [
-        (run_id, recorder, model) for run_id, model in test_case.expected_resumed
-    ]
-    assert [tuple(row) for row in resumed] == expected, text
-    for hold in fixture["holds"]:
-        line: str = (
-            f"Resumed dynamic model main.{hold['model']}: run {hold['run_id']} "
-            "stopped heartbeating."
-        )
-        assert (line in text) == hold["resumed"], text
+    assert [tuple(row) for row in events] == [
+        (run_id, "paused") for run_id in test_case.expected_open_holds
+    ], text
+    assert "Resumed dynamic model" not in text, text
+    assert "Resuming an expired dynamic hold failed" not in text, text
 
 
 @pytest.mark.parametrize(

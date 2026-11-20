@@ -22,8 +22,8 @@ pub trait ConsumptionReads {
 /// One state location's database and schema, and the pause table token its last quiet pass left.
 pub type ResumeLocation = ((Option<String>, String), Option<String>);
 
-/// Each resumed hold's run ID and dotted relation, and each location's new quiet token.
-pub type ResumedHolds = (Vec<(String, String)>, Vec<Option<String>>);
+/// Each resumed hold's run ID and dotted relation, each location's new quiet token, and failures.
+pub type ResumedHolds = (Vec<(String, String)>, Vec<ResumeLocation>, Vec<String>);
 
 /// A project's adapter and the connection configuration of its selected target.
 pub type ResumeConnection<'a, 'py> = (&'a Bound<'py, PyAny>, &'a Bound<'py, PyAny>);

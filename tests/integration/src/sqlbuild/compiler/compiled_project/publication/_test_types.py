@@ -584,10 +584,10 @@ class ChangedBuildPublicationTestCase:
 
 
 @dataclass(frozen=True)
-class ExpiredHoldSyncTestCase:
+class NoDynamicAdapterSyncTestCase:
     description: str
     fixture: str
-    expected_resumed: tuple[tuple[str, str], ...]
+    expected_open_holds: tuple[str, ...]
 
 
 @dataclass(frozen=True)

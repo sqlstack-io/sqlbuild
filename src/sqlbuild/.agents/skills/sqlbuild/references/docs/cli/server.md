@@ -572,11 +572,16 @@ Details:
   interval, add one more sync after it, not one each.
 - The interval restarts after every completed sync, so a location that syncs often for other
   reasons never syncs extra.
-- A sync reads the warehouse and writes only one thing: after it completes, it resumes the
-  [dynamic models](../concepts/models/dynamic.md#when-a-build-dies) whose pausing build has been
-  silent past `[dynamic] heartbeat_grace`, and records that in the pause table as
-  `location-sync:<location ID>`. On Snowflake, it skips state tables that haven't changed since the
-  last sync, the pause table included, so a sync with nothing new doesn't resume the warehouse.
+- A sync reads the warehouse and writes only one thing: on Snowflake, after it completes, it
+  resumes the [dynamic models](../concepts/models/dynamic.md#when-a-build-dies) whose pausing build
+  has been silent past `[dynamic] heartbeat_grace`, and records that in the pause table as
+  `location-sync:<location ID>`. It checks the pause table in the target's schema and in every
+  schema the location's models write to. A model that fails to resume is logged as
+  `Resuming an expired dynamic hold failed: <model>: <error>`, keeps its hold, and is retried on
+  the next sync; the others still resume. Other adapters can't build dynamic models, so their
+  syncs don't open a session for this.
+- On Snowflake, a sync skips state tables that haven't changed since the last sync, the pause
+  table included, so a sync with nothing new doesn't resume the warehouse.
 - When a read fails, the Connections page shows the warehouse error. A read that ran out of memory
   or time retries a smaller page. Any other error, such as a missing permission or table, retries
   after 30 seconds, then waits twice as long after each failure in a row. After 5 failures in a row

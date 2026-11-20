@@ -25,6 +25,12 @@ pub(crate) async fn resume_expired_holds(mut state: LocationMetadataSync) -> Loc
     let locations: Vec<DynamicResumeLocation> = state
         .locations
         .iter()
+        .chain(
+            state
+                .dynamic_quiet_tokens
+                .keys()
+                .filter(|location| !state.locations.contains(location)),
+        )
         .map(|location| DynamicResumeLocation {
             location: location.clone(),
             quiet_token: state.dynamic_quiet_tokens.get(location).cloned(),
@@ -39,11 +45,16 @@ pub(crate) async fn resume_expired_holds(mut state: LocationMetadataSync) -> Loc
     {
         Ok((reader, Ok(DynamicResumeReply::Resumed(resumed)))) => {
             state.reader = Some(reader);
-            for (location, token) in state.locations.iter().zip(resumed.quiet_tokens) {
-                match token {
-                    Some(token) => state.dynamic_quiet_tokens.insert(location.clone(), token),
-                    None => state.dynamic_quiet_tokens.remove(location),
-                };
+            state.dynamic_quiet_tokens = resumed
+                .quiet_tokens
+                .into_iter()
+                .filter_map(|resume| Some((resume.location, resume.quiet_token?)))
+                .collect();
+            for failure in &resumed.failures {
+                drop(write_output(&[(
+                    Stream::Stderr,
+                    &format!("Resuming an expired dynamic hold failed: {failure}\n"),
+                )]));
             }
             for hold in resumed.holds {
                 drop(write_output(&[(

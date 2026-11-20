@@ -3,13 +3,14 @@
 use crate::discovery::main::project::configured_dynamic_grace::configured_dynamic_grace;
 use crate::native_host::types::{ResumeConnection, ResumeLocation, ResumedHolds};
 use pyo3::IntoPyObjectExt;
+use pyo3::exceptions::PyException;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
-/// Resume holds silent past `[dynamic] heartbeat_grace` over a session closed before returning.
+/// Resume holds silent past `[dynamic] heartbeat_grace`, each location on its own, over one session.
 pub fn resume_expired_dynamic_holds<'py>(
     (adapter, connection_config): ResumeConnection<'_, 'py>,
     project_dir: &Bound<'py, PyAny>,
@@ -36,9 +37,10 @@ fn resume_each<'py>(
     let grace_seconds: u64 = configured_dynamic_grace(project_dir)?;
     let resume: Bound<'py, PyAny> = host_entry(py, ExecutorHost::ResumeExpiredDynamicHolds)?;
     let mut resumed: Vec<(String, String)> = Vec::new();
-    let mut quiet_tokens: Vec<Option<String>> = Vec::new();
+    let mut quiet_tokens: Vec<ResumeLocation> = Vec::new();
+    let mut failures: Vec<String> = Vec::new();
     for (location, quiet_token) in locations {
-        let outcome: Bound<'py, PyAny> = call_with(
+        let outcome: PyResult<Bound<'py, PyAny>> = call_with(
             &resume,
             &[
                 ("adapter", adapter.clone()),
@@ -51,7 +53,23 @@ fn resume_each<'py>(
                 ("recorded_by", recorded_by.into_bound_py_any(py)?),
                 ("quiet_token", quiet_token.clone().into_bound_py_any(py)?),
             ],
-        )?;
+        );
+        let outcome: Bound<'py, PyAny> = match outcome {
+            Ok(outcome) => outcome,
+            Err(error) if error.is_instance_of::<PyException>(py) => {
+                let (database, schema) = location;
+                let dotted: String = database
+                    .iter()
+                    .chain([schema])
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(".");
+                failures.push(format!("{dotted}: {error}"));
+                quiet_tokens.push((location.clone(), None));
+                continue;
+            }
+            Err(error) => return Err(error),
+        };
         for hold in native_field(&outcome, "resumed")?.try_iter()? {
             let hold: Bound<'py, PyAny> = hold?;
             let relation: Bound<'py, PyAny> = native_field(&hold, "relation")?;
@@ -61,7 +79,11 @@ fn resume_each<'py>(
             }
             resumed.push((native_field(&hold, "run_id")?.extract()?, parts.join(".")));
         }
-        quiet_tokens.push(native_field(&outcome, "quiet_token")?.extract()?);
+        failures.extend(native_field(&outcome, "failures")?.extract::<Vec<String>>()?);
+        quiet_tokens.push((
+            location.clone(),
+            native_field(&outcome, "quiet_token")?.extract()?,
+        ));
     }
-    Ok((resumed, quiet_tokens))
+    Ok((resumed, quiet_tokens, failures))
 }
