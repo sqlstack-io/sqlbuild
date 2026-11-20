@@ -82,15 +82,16 @@
 
 	const ROW_H = 52;
 	const tableColumns = $derived<TableColumn[]>([
-		{ id: 'check', label: 'Check', minWidth: 220 },
+		// Check and Attached to share what is left; together the columns fit a 1,440 px window without scrolling sideways.
+		{ id: 'check', label: 'Check', minWidth: 200 },
 		{ id: 'outcome', label: 'Outcome', width: '160px' },
-		{ id: 'node', label: 'Attached to', width: '240px' },
+		{ id: 'node', label: 'Attached to', minWidth: 160 },
 		{ id: 'severity', label: 'Severity', width: '100px' },
 		{ id: 'phase', label: 'Scope', width: '150px' },
-		{ id: 'mode', label: 'Result type', width: '130px' },
+		{ id: 'mode', label: 'Result type', width: '120px' },
 		{ id: 'result', label: 'Result', width: '100px', align: 'right' },
 		...(hasRecent ? [{ id: 'recent', label: 'Recent', width: '100px' }] : []),
-		{ id: 'checked', label: 'Last checked', width: '130px' }
+		{ id: 'checked', label: 'Last checked', width: '120px' }
 	]);
 </script>
 
