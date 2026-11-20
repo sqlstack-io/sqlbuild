@@ -42,7 +42,7 @@ pub(crate) struct PythonIndex {
     /// Node names, which a bare selector may name instead of a job.
     pub(crate) names: Vec<String>,
     pub(crate) graph: PythonSelectionGraph,
-    /// Node name to kind, such as `task`.
+    /// Node name to kind, such as `asset`.
     pub(crate) kinds: BTreeMap<String, String>,
 }
 

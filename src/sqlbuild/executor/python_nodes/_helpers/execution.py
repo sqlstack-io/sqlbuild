@@ -1,4 +1,4 @@
-"""Serial executor helpers for Python task and asset nodes."""
+"""Serial executor helpers for Python asset nodes."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ def execute_ready_python_node(
     monotonic: Callable[[], float] = time.monotonic,
     on_result: OwnedResultCallback | None = None,
 ) -> PythonNodeExecutionResult:
-    """Execute one scheduler-ready task/asset node."""
+    """Execute one scheduler-ready asset node."""
 
     return _execute_ready_node(
         node=node,

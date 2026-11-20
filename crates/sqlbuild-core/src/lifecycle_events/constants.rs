@@ -223,8 +223,9 @@ pub const OPERATION_KINDS: [&str; 10] = [
     "warehouse",
 ];
 
-/// Includes retired names, such as the removed dlt and ingestr loads, so stored history still decodes.
-pub const OPERATION_NAMES: [&str; 56] = [
+/// Includes retired names, such as the removed dlt and ingestr loads and Python tasks, so stored history
+/// still decodes.
+pub const OPERATION_NAMES: [&str; 57] = [
     "adbc_driver_install",
     "audit_evaluation",
     "clone_execution",
@@ -258,6 +259,7 @@ pub const OPERATION_NAMES: [&str; 56] = [
     "python_check",
     "python_hook",
     "python_materialization",
+    "python_task",
     "relation_promotion",
     "retention_application",
     "retention_inspection",

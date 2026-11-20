@@ -520,8 +520,8 @@ def test_given_a_killed_build_when_reading_its_runs_then_only_started_remains(
             expected_finished_status="failed",
         ),
         RunRecordSchemasTestCase(
-            description="a task-only run records in the target's default schema",
-            command_args=("build", "--no-tests", "--select", "task:noop"),
+            description="an asset-only run records in the target's default schema",
+            command_args=("build", "--no-tests", "--select", "asset:noop"),
             settings='\n[defaults]\nschema = "analytics"\n' + RUN_RECORD_MARTS_SCHEMA,
             warehouse_setup="",
             expected_exit_code=0,

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P027",
-     "message": "task 'export_orders' description exceeds 10 lines",
+     "message": "asset 'export_orders' description exceeds 10 lines",
      "resource_name": "export_orders",
      "path": "python/tasks/exports.py",
      "line": 4,

@@ -25,7 +25,7 @@ pub(crate) fn validate_loaders(facts: &ProjectFacts) -> Result<(), ValidationFai
     unique_named(&node_paths, |name, existing, path| {
         format!(
             "Duplicate Python node found for '{name}' in {existing} and {path}; loader, \
-             task, asset, and check names must be globally unique"
+             asset, and check names must be globally unique"
         )
     })?;
     source_loader_name_collisions(&facts.sources, &loaders)?;

@@ -67,7 +67,7 @@ def execute_ingress_python_loader_nodes(
     runtime: PythonNodeRuntime,
     callbacks: IngressCallbacks | None = None,
 ) -> PythonIngressLoaderExecutorResult:
-    """Execute Python ingress task/asset/loader nodes in lifecycle topological order."""
+    """Execute Python ingress asset and loader nodes in lifecycle topological order."""
 
     resolved_callbacks: IngressCallbacks = IngressCallbacks() if callbacks is None else callbacks
     run_state: PythonNodeRunState = PythonNodeRunState()

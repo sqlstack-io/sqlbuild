@@ -90,7 +90,7 @@ pub(crate) fn validate_python_node_dependencies(
                     if node.kind == NodeKind::Loader {
                         return Err(conflict(format!(
                             "Loader '{}' depends on SQL resource '{name}'; loaders may depend on \
-                             Python loader/task/asset functions only",
+                             Python loader/asset functions only",
                             node.name
                         )));
                     }

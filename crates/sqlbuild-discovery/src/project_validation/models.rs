@@ -61,12 +61,12 @@ pub enum DependencyFact {
     Object {
         /// The index of the discovered node whose function this object is.
         owner: Option<usize>,
-        /// The name a loader, task, asset or check decorator records on the object.
+        /// The name a loader, asset or check decorator records on the object.
         decorated_name: Option<String>,
     },
 }
 
-/// A decorated Python loader, task, asset or check function.
+/// A decorated Python loader, asset or check function.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NodeFact {
     pub kind: NodeKind,

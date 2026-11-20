@@ -105,7 +105,7 @@ pub(super) fn collision(message: &str, advice: &str) -> Result<(), String> {
     failure(
         FailureKind::Conflict,
         &format!(
-            "{message}; model, source, seed, function, loader, task, asset, check, provider, \
+            "{message}; model, source, seed, function, loader, asset, check, provider, \
              hook, unit test, scenario, job, job group, sensor, and calendar names must \
              be globally unique; rename one of them{advice}"
         ),
