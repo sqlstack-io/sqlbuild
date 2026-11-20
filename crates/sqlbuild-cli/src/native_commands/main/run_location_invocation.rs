@@ -9,6 +9,7 @@ use sqlbuild_orchestration::platform::models::LocationState;
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream};
+use crate::dev_stop::constants::{RUNTIME_SHUTDOWN, START_FAILURE_STATUS};
 use crate::native_commands::_helpers::command::decision::text;
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::location_options;
@@ -29,13 +30,13 @@ pub(crate) fn run_location_invocation(namespace: &Namespace, script: Option<&Pat
         return None;
     }
     let script = script?;
+    if development {
+        return Some(run_development(namespace));
+    }
     let result = (|| {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?;
-        if development {
-            return runtime.block_on(run_dev(namespace));
-        }
         let options = location_options(namespace)?;
         let bearer = std::env::var("SQLBUILD_LOCATION_TOKEN").map_err(|_| {
             std::io::Error::other(
@@ -51,29 +52,38 @@ pub(crate) fn run_location_invocation(namespace: &Namespace, script: Option<&Pat
         Ok(()) => {
             drop(write_output(&[(
                 Stream::Stderr,
-                if development {
-                    "Development services stopped successfully\n"
-                } else {
-                    "Code location stopped successfully\n"
-                },
+                "Code location stopped successfully\n",
             )]));
             0
         }
         Err(error) => {
             drop(write_output(&[(
                 Stream::Stderr,
-                &format!(
-                    "{} failed: {error}\n",
-                    if development {
-                        "Development services"
-                    } else {
-                        "Code location"
-                    }
-                ),
+                &format!("Code location failed: {error}\n"),
             )]));
             1
         }
     })
+}
+
+/// `sqb dev`: its own result line and exit status; leftover tasks get a moment, never a hang.
+fn run_development(namespace: &Namespace) -> i32 {
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            drop(write_output(&[(
+                Stream::Stderr,
+                &format!("\u{2717} sqb dev did not start  {error}\n"),
+            )]));
+            return START_FAILURE_STATUS;
+        }
+    };
+    let status: i32 = runtime.block_on(run_dev(namespace));
+    runtime.shutdown_timeout(RUNTIME_SHUTDOWN);
+    status
 }
 
 /// `sqb location health`: 0 when healthy or degraded, 1 when down or falling back, 2 when unanswered.

@@ -1,27 +1,26 @@
 //! Table rows for the `sqb dev` screen.
 
-use crate::dev_screen::models::{ScreenAction, ScreenMessage};
+use crate::dev_screen::models::{ScreenAction, ScreenEnd, ScreenMessage};
 
-/// What a terminal shows after a session, and the action each message asked for.
+/// What a terminal shows after a session, everything it kept, and the action each message asked for.
 pub(super) struct Transcript {
-    pub(super) rows: Vec<String>,
+    pub(super) viewport: Vec<String>,
+    pub(super) scrollback: Vec<String>,
     pub(super) actions: Vec<ScreenAction>,
 }
 
-/// A session at `columns` (`None` for plain output) and every row it leaves on the terminal.
+/// A session at `size` (`None` for plain output) and the screen it leaves.
 pub(super) struct ScreenTestCase {
     pub(super) description: &'static str,
-    pub(super) columns: Option<usize>,
+    pub(super) size: Option<(usize, usize)>,
     pub(super) messages: Vec<ScreenMessage>,
-    pub(super) expected_rows: Vec<String>,
+    pub(super) end: Option<ScreenEnd>,
+    pub(super) expected_viewport: Vec<&'static str>,
 }
 
-/// A session ending in keys: the actions the keys ask for and the log lines left on screen.
+/// Keys after ready: the actions they ask for.
 pub(super) struct KeyTestCase {
     pub(super) description: &'static str,
-    pub(super) columns: Option<usize>,
-    pub(super) messages: Vec<ScreenMessage>,
     pub(super) keys: &'static str,
     pub(super) expected_actions: Vec<ScreenAction>,
-    pub(super) expected_log: Vec<String>,
 }

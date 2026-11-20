@@ -27,3 +27,11 @@ pub(super) struct RunPollTestCase {
     pub(super) runs: Vec<RunRecord>,
     pub(super) expected_messages: Vec<String>,
 }
+
+/// `sqb debug` stdout in chunks: the client's text each chunk shows, and the report left.
+pub(super) struct ReportSplitTestCase {
+    pub(super) description: &'static str,
+    pub(super) chunks: Vec<&'static str>,
+    pub(super) expected_client: Vec<&'static str>,
+    pub(super) expected_report: &'static str,
+}

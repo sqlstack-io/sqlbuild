@@ -2,6 +2,7 @@ pub mod redraw_rows;
 pub mod render_dev_header;
 pub mod render_event_line;
 pub mod render_key_line;
+pub mod render_labelled_parts;
 pub mod render_log_line;
 pub mod render_problem;
 pub mod render_prompt;

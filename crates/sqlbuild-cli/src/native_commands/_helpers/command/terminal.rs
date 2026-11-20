@@ -4,9 +4,9 @@ use crate::argv::models::Stream;
 use crate::native_commands::_helpers::command::argv_host::python_int;
 use crate::native_commands::constants::CLEAR_TERMINAL_LINE;
 use crate::native_commands::constants::{
-    BROKEN_PIPE_EXCEPTION, CI_VARIABLE, COLUMNS_VARIABLE, EXIT_FLUSH_FAILURE,
-    EXIT_FLUSH_FAILURE_STATUS, FALLBACK_COLUMNS, NO_COLOR_VARIABLE, NO_PROGRESS_VARIABLE,
-    PASSWORD_INPUT_BYTES, PYTHON_STDOUT_BUFFER_SIZE, UNCAUGHT_EXCEPTION_STATUS,
+    BROKEN_PIPE_EXCEPTION, CI_VARIABLE, COLUMNS_VARIABLE, DUMB_TERMINAL, EXIT_FLUSH_FAILURE,
+    EXIT_FLUSH_FAILURE_STATUS, FALLBACK_COLUMNS, NO_COLOR_VARIABLE, NO_PROGRESS_VARIABLE, PASSWORD_INPUT_BYTES,
+    PYTHON_STDOUT_BUFFER_SIZE, TERM_VARIABLE, UNCAUGHT_EXCEPTION_STATUS,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::LostStdout;
@@ -204,28 +204,39 @@ pub(crate) fn finish_lost_stdout(lost: Option<&LostStdout>, exit_code: i32) -> i
     }
 }
 
-/// Whether the `sqb dev` screen can redraw in place: on Unix, stderr is a terminal and nothing asks for plain lines.
-pub(crate) fn live_screen() -> bool {
+/// Whether the `sqb dev` screen redraws in place: on Unix, unless `--plain` asks for appended lines, stdout or stderr is not a terminal, `TERM=dumb`, or `CI` or `SQLBUILD_NO_PROGRESS` is set.
+pub(crate) fn live_screen(plain: bool) -> bool {
     cfg!(unix)
+        && !plain
+        && io::stdout().is_terminal()
         && io::stderr().is_terminal()
-        && [NO_COLOR_VARIABLE, CI_VARIABLE, NO_PROGRESS_VARIABLE]
+        && std::env::var(TERM_VARIABLE).as_deref() != Ok(DUMB_TERMINAL)
+        && [CI_VARIABLE, NO_PROGRESS_VARIABLE]
             .iter()
             .all(|variable| std::env::var_os(variable).is_none())
 }
 
-/// The width of the terminal on stderr, or the fallback when stderr is not one.
-#[cfg(unix)]
-pub(crate) fn stderr_columns() -> usize {
-    match rustix::termios::tcgetwinsize(io::stderr()) {
-        Ok(size) if size.ws_col > 0 => usize::from(size.ws_col),
-        _ => usize::try_from(FALLBACK_COLUMNS).unwrap_or(80),
-    }
+/// Whether a live `sqb dev` screen is coloured: `NO_COLOR` turns colour off and nothing else.
+pub(crate) fn screen_colour(live: bool) -> bool {
+    live && std::env::var_os(NO_COLOR_VARIABLE).is_none()
 }
 
-/// Without the console API, the fallback width.
+/// The width and height of the terminal `terminal` (or stderr) is, or `None` when it is not one.
+#[cfg(unix)]
+pub(crate) fn terminal_size(terminal: Option<&std::fs::File>) -> Option<(usize, usize)> {
+    let size = match terminal {
+        Some(terminal) => rustix::termios::tcgetwinsize(terminal),
+        None => rustix::termios::tcgetwinsize(io::stderr()),
+    }
+    .ok()?;
+    (size.ws_col > 0 && size.ws_row > 0)
+        .then(|| (usize::from(size.ws_col), usize::from(size.ws_row)))
+}
+
+/// Without the console API, no size.
 #[cfg(not(unix))]
-pub(crate) fn stderr_columns() -> usize {
-    usize::try_from(FALLBACK_COLUMNS).unwrap_or(80)
+pub(crate) fn terminal_size(_terminal: Option<&std::fs::File>) -> Option<(usize, usize)> {
+    None
 }
 
 /// A child interpreter now writes to this terminal; later writes clear its spinner line first.

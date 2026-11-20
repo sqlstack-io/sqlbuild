@@ -1,151 +1,252 @@
-//! The `sqb dev` screen: checklist, framed sign-in, ready card, event lines, plain mode and keys.
-
 use sqlbuild_core::text::main::cell_len::cell_len;
 
-use crate::dev_screen::constants::LOG_RING_LINES;
-use crate::dev_screen::models::{ScreenAction, ScreenMessage};
+use crate::dev_screen::models::ScreenAction;
 use crate::dev_screen::tests::helpers::{
-    after_startup, card, checklist, connected, edits, framed_sign_in, lines_of, log_rows,
-    not_connected, play, shown_log, startup,
+    connecting, failed_compile, interrupted, interrupted_end, not_started_end, play, ready,
+    removed_key, signing_in,
 };
 use crate::dev_screen::tests::test_types::{KeyTestCase, ScreenTestCase};
 
-const HOTKEY_BAR: &str =
-    "  o open UI \u{b7} r recompile \u{b7} s retry warehouse \u{b7} l logs \u{b7} q quit";
+const SHORT: Option<(usize, usize)> = Some((80, 10));
+const TALL: Option<(usize, usize)> = Some((80, 24));
 
 #[test]
-fn given_a_session_when_each_message_is_applied_then_the_terminal_shows_stable_uncut_rows() {
-    let edited: Vec<String> = [
-        card("\u{25cf} duckdb \u{b7} main", "1.7s"),
-        lines_of([
-            "",
-            "  09:41:17  ~ models/orders/int_orders.sql",
-            "  09:41:19  \u{2713} gen 2 published                 1 file changed       0.1s",
-            "  09:41:20  ~ models/finance/fct_revenue.sql",
-            "  09:41:20  ~ 2 more files",
-            "  09:41:22  \u{2717} gen 3 failed \u{b7} still serving gen 2",
-            "            models/finance/fct_revenue.sql:42:7  unknown column net_amount_usd",
-            "            r retry \u{b7} l full log",
-            "  09:41:23  \u{26a0} warehouse sync stopped",
-            "            5 failed reads in a row: ProgrammingError: insufficient privileges",
-            "",
-            HOTKEY_BAR,
-        ]),
-    ]
-    .concat();
-    let rule: String = "\u{2500}".repeat(78);
+fn given_a_session_when_drawn_then_the_viewport_matches_the_snapshot() {
     let test_cases = [
         ScreenTestCase {
-            description: "starting at 80 columns cuts the long control store path with an ellipsis",
-            columns: Some(80),
-            messages: startup(),
-            expected_rows: checklist(
-                "sqlite \u{b7} /home/analyst/projects/shop/.sqlbuil\u{2026}",
-                46,
-            ),
+            description: "start-up at 80x24",
+            size: TALL,
+            messages: connecting(),
+            end: None,
+            expected_viewport: vec![
+                "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
+                "\u{2713} Opened control store    0.1s   sqlite",
+                "\u{2713} Started UI server       0.1s   http://127.0.0.1:8640",
+                "\u{2713} Started scheduler       0.1s   triggers start paused",
+                "\u{2713} Discovered project      0.2s   118 models \u{b7} 24 seeds \u{b7} 2 Python nodes",
+                "\u{2713} Compiled project        0.1s   0 errors \u{b7} 1 warning",
+                "\u{2713} Published snapshot      0.1s   snapshot b429729b",
+                "\u{2839} Connecting warehouse    0.1s   connecting",
+                "keys  l full log \u{b7} q quit",
+            ],
         },
         ScreenTestCase {
-            description: "starting at 120 columns shows the whole path",
-            columns: Some(120),
-            messages: startup(),
-            expected_rows: checklist(
-                "sqlite \u{b7} /home/analyst/projects/shop/.sqlbuild/control.sqlite3",
-                62,
-            ),
+            description: "start-up at 80x10",
+            size: SHORT,
+            messages: connecting(),
+            end: None,
+            expected_viewport: vec![
+                "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
+                "\u{2713} Opened control store    0.1s   sqlite",
+                "\u{2713} Started UI server       0.1s   http://127.0.0.1:8640",
+                "\u{2713} Started scheduler       0.1s   triggers start paused",
+                "\u{2713} Discovered project      0.2s   118 models \u{b7} 24 seeds \u{b7} 2 Python nodes",
+                "\u{2713} Compiled project        0.1s   0 errors \u{b7} 1 warning",
+                "\u{2713} Published snapshot      0.1s   snapshot b429729b",
+                "\u{2839} Connecting warehouse    0.1s   connecting",
+                "keys  l full log \u{b7} q quit",
+            ],
         },
         ScreenTestCase {
-            description: "at 80 columns the checklist collapses into the card and events print above the hotkeys",
-            columns: Some(80),
-            messages: after_startup([vec![connected()], edits()].concat()),
-            expected_rows: edited.clone(),
+            description: "a failed step with a long error at 80x24",
+            size: TALL,
+            messages: failed_compile(),
+            end: None,
+            expected_viewport: vec![
+                "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
+                "\u{2713} Opened control store    0.1s   sqlite",
+                "\u{2713} Started UI server       0.1s   http://127.0.0.1:8640",
+                "\u{2713} Started scheduler       0.1s   triggers start paused",
+                "\u{2717} Discovering project     0.2s   1 error",
+                "\u{2717} error  models/marts/fct_orders.sql                                       D001",
+                "  at     models/marts/fct_orders.sql:42:7",
+                "  why    column net_amount_usd does not exist in stg_payments; the column was",
+                "         renamed to amount_usd_net when the payments source moved to the v2",
+                "         export, and fct_orders still selects the old name",
+                "  fix    select amount_usd_net instead, or alias it as net_amount_usd",
+                "\u{b7} Discover project               waiting for a fix (r recompiles)",
+                "\u{b7} Compile project                waiting",
+                "\u{b7} Publish snapshot               waiting",
+                "\u{b7} Connect warehouse              waiting",
+                "keys  l full log \u{b7} q quit",
+            ],
         },
         ScreenTestCase {
-            description: "at 120 columns event lines keep their columns",
-            columns: Some(120),
-            messages: after_startup([vec![connected()], edits()].concat()),
-            expected_rows: edited,
+            description: "a failed step with a long error at 80x10",
+            size: SHORT,
+            messages: failed_compile(),
+            end: None,
+            expected_viewport: vec![
+                "  why    column net_amount_usd does not exist in stg_payments; the column was",
+                "         renamed to amount_usd_net when the payments source moved to the v2",
+                "         export, and fct_orders still selects the old name",
+                "  fix    select amount_usd_net instead, or alias it as net_amount_usd",
+                "\u{b7} Discover project               waiting for a fix (r recompiles)",
+                "\u{b7} Compile project                waiting",
+                "\u{b7} Publish snapshot               waiting",
+                "\u{b7} Connect warehouse              waiting",
+                "keys  l full log \u{b7} q quit",
+            ],
         },
         ScreenTestCase {
-            description: "an unavailable warehouse says not connected and how to retry",
-            columns: Some(80),
-            messages: after_startup(vec![not_connected()]),
-            expected_rows: [
-                card(
-                    "\u{25cb} not connected \u{b7} sign-in skipped \u{b7} press s to retry",
-                    "1.7s",
-                ),
-                lines_of(["", HOTKEY_BAR]),
-            ]
-            .concat(),
+            description: "the sign-in prompt at 80x24",
+            size: TALL,
+            messages: signing_in(),
+            end: None,
+            expected_viewport: vec![
+                "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
+                "\u{2713} Opened control store    0.1s   sqlite",
+                "\u{2713} Started UI server       0.1s   http://127.0.0.1:8640",
+                "\u{2713} Started scheduler       0.1s   triggers start paused",
+                "\u{2713} Discovered project      0.2s   118 models \u{b7} 24 seeds \u{b7} 2 Python nodes",
+                "\u{2713} Compiled project        0.1s   0 errors \u{b7} 1 warning",
+                "\u{2713} Published snapshot      0.1s   snapshot b429729b",
+                "\u{25cc} sign in  snowflake needs you to sign in",
+                "  Go to https://xy12345.snowflakecomputing.com/oauth/authorize?client_id=SQLBUI",
+                "  LD&state=8f3a21c0&redirect_uri=http%3A%2F%2Flocalhost%3A8001 to sign in",
+                "  Enter the URL the OAuth flow redirected you to: http://localhost:8001/?code=a",
+                "  b",
+                "  wait   0:00 \u{b7} Ctrl+C cancels and stops sqb dev",
+                "\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}",
+                "\u{2838} Connecting warehouse    0.5s   waiting for the sign-in above",
+                "keys  l full log \u{b7} q quit",
+            ],
         },
         ScreenTestCase {
-            description: "a client prompting for sign-in is framed verbatim and ticks never redraw over it",
-            columns: Some(80),
-            messages: after_startup(framed_sign_in()),
-            expected_rows: [
-                checklist(
-                    "sqlite \u{b7} /home/analyst/projects/shop/.sqlbuil\u{2026}",
-                    46,
-                )[..8]
-                    .to_vec(),
-                lines_of([
-                    "  \u{280b} Warehouse            duckdb \u{b7} connecting                                0.1s",
-                    "",
-                ]),
-                vec![format!(
-                    "  \u{2500}\u{2500} warehouse {}",
-                    "\u{2500}".repeat(65)
-                )],
-                lines_of([
-                    "Initiating login request with your identity provider...",
-                    "Enter the URL the OAuth flow redirected you to: ",
-                ]),
-                vec![format!("  {rule}"), String::new()],
-                card("\u{25cf} duckdb \u{b7} main", "2.2s"),
-                lines_of(["", HOTKEY_BAR]),
-            ]
-            .concat(),
+            description: "the sign-in prompt at 80x10",
+            size: SHORT,
+            messages: signing_in(),
+            end: None,
+            expected_viewport: vec![
+                "\u{25cc} sign in  snowflake needs you to sign in",
+                "  Go to https://xy12345.snowflakecomputing.com/oauth/authorize?client_id=SQLBUI",
+                "  LD&state=8f3a21c0&redirect_uri=http%3A%2F%2Flocalhost%3A8001 to sign in",
+                "  Enter the URL the OAuth flow redirected you to: http://localhost:8001/?code=a",
+                "  b",
+                "  wait   0:00 \u{b7} Ctrl+C cancels and stops sqb dev",
+                "\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}",
+                "\u{2838} Connecting warehouse    0.5s   waiting for the sign-in above",
+                "keys  l full log \u{b7} q quit",
+            ],
         },
         ScreenTestCase {
-            description: "plain output is stable unstyled lines that ignore ticks and keys",
-            columns: None,
-            messages: after_startup(
-                [
-                    vec![ScreenMessage::Tick, ScreenMessage::Key('q'), not_connected()],
-                    edits(),
-                ]
-                .concat(),
-            ),
-            expected_rows: lines_of([
-                "sqlbuild dev: control store ready (0.1s)",
-                "sqlbuild dev: location 01a1d7ff-0b3a-7631-ba35-e44d44d072f2 \u{b7} target dev",
-                "sqlbuild dev: discovered 412 python nodes, 2280 models (0.3s)",
-                "sqlbuild dev: published gen 1 b429729b (0.1s)",
-                "sqlbuild dev: warehouse not connected: sign-in skipped",
-                "sqlbuild dev: ready http://127.0.0.1:8000",
-                "sqlbuild dev: changed models/orders/int_orders.sql",
-                "sqlbuild dev: published gen 2 c01d2e3f (0.1s)",
-                "sqlbuild dev: changed models/finance/fct_revenue.sql",
-                "sqlbuild dev: changed 2 more files",
-                "sqlbuild dev: gen 3 failed \u{b7} still serving gen 2: models/finance/fct_revenue.sql:42:7 unknown column net_amount_usd",
-                "sqlbuild dev: warehouse sync stopped: 5 failed reads in a row: ProgrammingError: insufficient privileges",
-            ]),
+            description: "ready at 80x24",
+            size: TALL,
+            messages: ready(),
+            end: None,
+            expected_viewport: vec![
+                "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
+                "\u{2713} Opened control store    0.1s   sqlite",
+                "\u{2713} Started UI server       0.1s   http://127.0.0.1:8640",
+                "\u{2713} Started scheduler       0.1s   triggers start paused",
+                "\u{2713} Discovered project      0.2s   118 models \u{b7} 24 seeds \u{b7} 2 Python nodes",
+                "\u{2713} Compiled project        0.1s   0 errors \u{b7} 1 warning",
+                "\u{2713} Published snapshot      0.1s   snapshot b429729b",
+                "\u{2713} Connected warehouse     0.6s   snowflake \u{b7} browser sign-in (OAuth)",
+                "\u{256d}\u{2500} ready \u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{256e}",
+                "\u{2502} UI         http://127.0.0.1:8640                                           \u{2502}",
+                "\u{2502} Project    shop \u{b7} /home/analyst/projects/shop \u{b7} target dev                 \u{2502}",
+                "\u{2502} Warehouse  snowflake \u{b7} account xy12345 \u{b7} auth browser sign-in (OAuth)      \u{2502}",
+                "\u{2502}            role TRANSFORMER \u{b7} warehouse TRANSFORM_XS                       \u{2502}",
+                "\u{2502} Triggers   41 paused                                                       \u{2502}",
+                "\u{2570}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{256f}",
+                "keys  o open UI \u{b7} l full log \u{b7} r recompile \u{b7} q quit",
+            ],
+        },
+        ScreenTestCase {
+            description: "Ctrl+C at 80x24",
+            size: TALL,
+            messages: interrupted(),
+            end: Some(interrupted_end()),
+            expected_viewport: vec![
+                "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
+                "\u{2713} Opened control store    0.1s   sqlite",
+                "\u{2713} Started UI server       0.1s   http://127.0.0.1:8640",
+                "\u{2713} Started scheduler       0.1s   triggers start paused",
+                "\u{2713} Discovered project      0.2s   118 models \u{b7} 24 seeds \u{b7} 2 Python nodes",
+                "\u{2713} Compiled project        0.1s   0 errors \u{b7} 1 warning",
+                "\u{2713} Published snapshot      0.1s   snapshot b429729b",
+                "\u{2713} Connected warehouse     0.6s   snowflake \u{b7} browser sign-in (OAuth)",
+                "\u{256d}\u{2500} ready \u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{256e}",
+                "\u{2502} UI         http://127.0.0.1:8640                                           \u{2502}",
+                "\u{2502} Project    shop \u{b7} /home/analyst/projects/shop \u{b7} target dev                 \u{2502}",
+                "\u{2502} Warehouse  snowflake \u{b7} account xy12345 \u{b7} auth browser sign-in (OAuth)      \u{2502}",
+                "\u{2502}            role TRANSFORMER \u{b7} warehouse TRANSFORM_XS                       \u{2502}",
+                "\u{2502} Triggers   41 paused                                                       \u{2502}",
+                "\u{2570}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{256f}",
+                "\u{b7} Stopped code location   0.3s",
+                "\u{b7} Stopped scheduler       0.4s",
+                "\u{b7} Stopped UI server       0.5s",
+                "\u{b7} sqb dev stopped (interrupted)  ran 42m 10s   1.1s",
+            ],
+        },
+        ScreenTestCase {
+            description: "Ctrl+C at 80x10",
+            size: SHORT,
+            messages: interrupted(),
+            end: Some(interrupted_end()),
+            expected_viewport: vec![
+                "\u{2502} Project    shop \u{b7} /home/analyst/projects/shop \u{b7} target dev                 \u{2502}",
+                "\u{2502} Warehouse  snowflake \u{b7} account xy12345 \u{b7} auth browser sign-in (OAuth)      \u{2502}",
+                "\u{2502}            role TRANSFORMER \u{b7} warehouse TRANSFORM_XS                       \u{2502}",
+                "\u{2502} Triggers   41 paused                                                       \u{2502}",
+                "\u{2570}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{256f}",
+                "\u{b7} Stopped code location   0.3s",
+                "\u{b7} Stopped scheduler       0.4s",
+                "\u{b7} Stopped UI server       0.5s",
+                "\u{b7} sqb dev stopped (interrupted)  ran 42m 10s   1.1s",
+            ],
+        },
+        ScreenTestCase {
+            description: "a configuration error at 80x10",
+            size: SHORT,
+            messages: removed_key(),
+            end: Some(not_started_end()),
+            expected_viewport: vec![
+                "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
+                "\u{2717} Read configuration      0.0s   1 error",
+                "\u{2717} error  sqlbuild_project.toml                                             D001",
+                "  why    [dbt] option(s) were removed: defer_clone_from; use dbt-native",
+                "         --state/--defer",
+                "  fix    remove defer_clone_from from [dbt]",
+                "\u{2717} sqb dev did not start  configuration error in sqlbuild_project.toml   0.1s",
+                "Next",
+                "  sqb debug                     check the configuration on its own",
+            ],
+        },
+        ScreenTestCase {
+            description: "--plain appends finished lines only",
+            size: None,
+            messages: interrupted(),
+            end: Some(interrupted_end()),
+            expected_viewport: vec![
+                "sqb dev  shop \u{b7} target dev \u{b7} sqb 0.256.0",
+                "\u{2713} Opened control store    0.1s   sqlite",
+                "\u{2713} Started UI server       0.1s   http://127.0.0.1:8640",
+                "\u{2713} Started scheduler       0.1s   triggers start paused",
+                "\u{2713} Discovered project      0.2s   118 models \u{b7} 24 seeds \u{b7} 2 Python nodes",
+                "\u{2713} Compiled project        0.1s   0 errors \u{b7} 1 warning",
+                "\u{2713} Published snapshot      0.1s   snapshot b429729b",
+                "Go to https://xy12345.snowflakecomputing.com/oauth/authorize?client_id=SQLBUILD&state=8f3a21c0&redirect_uri=http%3A%2F%2Flocalhost%3A8001 to sign in",
+                "Enter the URL the OAuth flow redirected you to: http://localhost:8001/?code=ab",
+                "\u{2713} Connected warehouse     0.6s   snowflake \u{b7} browser sign-in (OAuth)",
+                "\u{2713} ready  http://127.0.0.1:8640",
+                "  warehouse  snowflake \u{b7} account xy12345 \u{b7} auth browser sign-in (OAuth)",
+                "             role TRANSFORMER \u{b7} warehouse TRANSFORM_XS",
+                "  triggers   41 paused",
+                "\u{b7} Stopped code location   0.3s",
+                "\u{b7} Stopped scheduler       0.4s",
+                "\u{b7} Stopped UI server       0.5s",
+                "\u{b7} sqb dev stopped (interrupted)  ran 42m 10s   1.1s",
+            ],
         },
     ];
 
     for test_case in test_cases {
-        let transcript = play(test_case.columns, test_case.messages);
+        let transcript = play(test_case.size, test_case.messages, test_case.end);
 
         assert_eq!(
-            transcript.rows, test_case.expected_rows,
-            "{}",
-            test_case.description
-        );
-        assert!(
-            transcript
-                .rows
-                .iter()
-                .all(|row| cell_len(row) <= test_case.columns.unwrap_or(usize::MAX)),
+            transcript.viewport, test_case.expected_viewport,
             "{}",
             test_case.description
         );
@@ -153,58 +254,68 @@ fn given_a_session_when_each_message_is_applied_then_the_terminal_shows_stable_u
 }
 
 #[test]
-fn given_keys_after_ready_when_pressed_then_they_ask_for_actions_and_l_shows_the_newest_log_lines()
-{
-    let flood: Vec<ScreenMessage> = (0..=LOG_RING_LINES)
-        .map(|index| ScreenMessage::Log(format!("log line {index}")))
-        .collect();
-    let test_cases = [
-        KeyTestCase {
-            description: "l opens the ring's newest lines, x does nothing, l closes, then o r s q act",
-            columns: Some(80),
-            messages: after_startup([vec![connected()], flood.clone()].concat()),
-            keys: "lxlorsq",
-            expected_actions: vec![
-                ScreenAction::None,
-                ScreenAction::None,
-                ScreenAction::None,
-                ScreenAction::OpenUi,
-                ScreenAction::Recompile,
-                ScreenAction::RetryWarehouse,
-                ScreenAction::Quit,
-            ],
-            expected_log: log_rows(1, LOG_RING_LINES),
-        },
-        KeyTestCase {
-            description: "plain output has no hotkeys",
-            columns: None,
-            messages: after_startup([vec![connected()], flood].concat()),
-            keys: "lq",
-            expected_actions: vec![ScreenAction::None, ScreenAction::None],
-            expected_log: Vec::new(),
-        },
-    ];
+fn given_any_session_when_drawn_then_the_header_is_printed_once_and_no_row_overflows() {
+    let sessions = [connecting(), failed_compile(), signing_in(), ready(), interrupted()];
+    let mut problems: Vec<String> = Vec::new();
+    for size in [SHORT, TALL, Some((40, 6)), Some((120, 30))] {
+        for messages in sessions.clone() {
+            let transcript = play(size, messages, Some(interrupted_end()));
+            let (columns, rows) = size.unwrap_or((80, 24));
+            let headers: usize = transcript
+                .scrollback
+                .iter()
+                .filter(|line| line.starts_with("sqb dev  shop"))
+                .count();
+            if headers != 1 {
+                problems.push(format!("{columns}x{rows}: header printed {headers} times"));
+            }
+            if transcript.viewport.len() > rows {
+                problems.push(format!("{columns}x{rows}: {} rows shown", transcript.viewport.len()));
+            }
+            for line in &transcript.scrollback {
+                if cell_len(line) >= columns && columns >= 60 {
+                    problems.push(format!("{columns}x{rows}: too wide: {line}"));
+                }
+            }
+        }
+    }
+
+    assert_eq!(problems, Vec::<String>::new());
+}
+
+#[test]
+fn given_keys_after_ready_when_pressed_then_they_ask_for_actions() {
+    let test_cases = [KeyTestCase {
+        description: "o, r and s act; l toggles the log; other keys do nothing",
+        keys: "olrsx",
+        expected_actions: vec![
+            ScreenAction::OpenUi,
+            ScreenAction::None,
+            ScreenAction::Recompile,
+            ScreenAction::RetryWarehouse,
+            ScreenAction::None,
+        ],
+    }];
 
     for test_case in test_cases {
         let keys: usize = test_case.keys.len();
         let transcript = play(
-            test_case.columns,
+            TALL,
             [
-                test_case.messages,
-                test_case.keys.chars().map(ScreenMessage::Key).collect(),
+                ready(),
+                test_case
+                    .keys
+                    .chars()
+                    .map(crate::dev_screen::models::ScreenMessage::Key)
+                    .collect(),
             ]
             .concat(),
+            None,
         );
 
         assert_eq!(
             transcript.actions[transcript.actions.len() - keys..],
             test_case.expected_actions,
-            "{}",
-            test_case.description
-        );
-        assert_eq!(
-            shown_log(&transcript.rows),
-            test_case.expected_log,
             "{}",
             test_case.description
         );

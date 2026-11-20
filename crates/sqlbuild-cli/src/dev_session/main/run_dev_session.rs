@@ -1,5 +1,10 @@
-//! Feed the `sqb dev` screen from the location child, open the warehouse in the foreground and act on hotkeys.
+//! Feed the `sqb dev` screen from the location child, open the warehouse in the foreground and act on keys.
 
+use std::future::Future;
+use std::pin::Pin;
+use std::time::Duration;
+
+use sqlbuild_core::screen_text::models::WarehouseState;
 use sqlbuild_orchestration::declarations::main::list_triggers::list_triggers;
 use sqlbuild_orchestration::dev_events::main::parse_dev_event::parse_dev_event;
 use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
@@ -16,11 +21,17 @@ use crate::dev_session::_helpers::child::{publish_record, relay_logs, send_contr
 use crate::dev_session::_helpers::foreground::connect_in_foreground;
 use crate::dev_session::_helpers::runs::{SeenRuns, run_messages};
 use crate::dev_session::_helpers::triggers::trigger_summary;
-use crate::dev_session::constants::{RUN_PAGE, RUN_POLL};
+use crate::dev_session::constants::{
+    CANCELLED_CONNECT, LOCATION_STOPPED, RUN_PAGE, RUN_POLL, WAREHOUSE_FAILED,
+};
 use crate::dev_session::models::{DevProject, LocationPipes};
+use crate::dev_stop::main::stop_switch::stop_switch;
 use crate::person_login::main::open_browser::open_browser;
 
-/// Run until `q`, shutdown or the location child closing its output.
+/// A foreground connection that is still open.
+type Connecting<'a> = Pin<Box<dyn Future<Output = WarehouseState> + Send + 'a>>;
+
+/// Run until shutdown; the location child closing its output, or the first connection failing, is an error.
 pub(crate) async fn run_dev_session(
     (screen, mut actions, keys): DevScreenParts,
     (pipes, dev): (LocationPipes, DevProject),
@@ -36,17 +47,30 @@ pub(crate) async fn run_dev_session(
     let mut events = BufReader::new(stdout).lines();
     let mut runs: Option<SeenRuns> = None;
     let mut connected: Option<bool> = None;
+    let mut connecting: Option<Connecting<'_>> = None;
     let mut poll = tokio::time::interval(RUN_POLL);
+    let connect = || -> Connecting<'_> {
+        Box::pin(connect_in_foreground(&screen, keys.as_deref(), &dev))
+    };
     loop {
         tokio::select! {
             changed = shutdown.changed() => {
                 if changed.is_err() || *shutdown.borrow() {
+                    if connecting.take().is_some() {
+                        drop(screen.send(ScreenMessage::Stopped {
+                            label: CANCELLED_CONNECT.to_owned(),
+                            elapsed: Duration::ZERO,
+                        }));
+                    }
                     return Ok(());
                 }
             }
             line = events.next_line() => {
                 let Some(line) = line? else {
-                    return Ok(());
+                    if *shutdown.borrow() {
+                        return Ok(());
+                    }
+                    return Err(ControlError::Invalid(LOCATION_STOPPED.into()));
                 };
                 let Some(event) = parse_dev_event(&line) else {
                     drop(screen.send(ScreenMessage::Log(line)));
@@ -58,24 +82,33 @@ pub(crate) async fn run_dev_session(
                         trigger_summary(&list_triggers(&store, location_id, &dev.target).await?),
                     )));
                 }
-                let first: bool = matches!(event, DevEvent::Published { .. }) && connected.is_none();
+                let first: bool = matches!(event, DevEvent::Published { .. })
+                    && connected.is_none()
+                    && connecting.is_none();
                 drop(screen.send(ScreenMessage::Child(event)));
                 if first {
-                    let verdict: bool = connect_in_foreground(&screen, keys.as_deref(), &dev).await;
-                    connected = Some(verdict);
-                    send_control(&mut stdin, DevControl::Warehouse { connected: verdict }).await?;
+                    connecting = Some(connect());
                 }
             }
-            action = actions.recv() => match action {
-                Some(ScreenAction::Quit) | None => return Ok(()),
-                Some(ScreenAction::OpenUi) => drop(open_browser(&url)),
-                Some(ScreenAction::Recompile) => send_control(&mut stdin, DevControl::Recompile).await?,
-                Some(ScreenAction::RetryWarehouse) => {
-                    let verdict: bool = connect_in_foreground(&screen, keys.as_deref(), &dev).await;
-                    connected = Some(verdict);
-                    send_control(&mut stdin, DevControl::Warehouse { connected: verdict }).await?;
+            state = settle(&mut connecting), if connecting.is_some() => {
+                connecting = None;
+                let verdict: bool = matches!(state, WarehouseState::Connected { .. });
+                if !verdict && connected.is_none() {
+                    return Err(ControlError::Invalid(WAREHOUSE_FAILED.into()));
                 }
-                Some(ScreenAction::None) => {}
+                connected = Some(verdict);
+                stop_switch().mark_ready();
+                send_control(&mut stdin, DevControl::Warehouse { connected: verdict }).await?;
+            }
+            Some(action) = actions.recv() => match action {
+                ScreenAction::OpenUi => drop(open_browser(&url)),
+                ScreenAction::Recompile => send_control(&mut stdin, DevControl::Recompile).await?,
+                ScreenAction::RetryWarehouse => {
+                    if connecting.is_none() {
+                        connecting = Some(connect());
+                    }
+                }
+                ScreenAction::None => {}
             },
             _ = poll.tick(), if connected.is_some() => {
                 let records = list_runs(&store, (location_id, &dev.target), RUN_PAGE).await?;
@@ -89,5 +122,13 @@ pub(crate) async fn run_dev_session(
                 }
             }
         }
+    }
+}
+
+/// The open connection's state once it settles; without one, never.
+async fn settle(connecting: &mut Option<Connecting<'_>>) -> WarehouseState {
+    match connecting {
+        Some(future) => future.await,
+        None => std::future::pending().await,
     }
 }

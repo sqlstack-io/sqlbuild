@@ -1,20 +1,24 @@
 //! The state of the `sqb dev` screen and the messages that change it.
 
 use std::collections::VecDeque;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::fs::File;
+use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
-use sqlbuild_core::screen_text::models::{DevHeader, PhaseState, ScreenFacts, WarehouseState};
+use sqlbuild_core::screen_text::models::{
+    DevHeader, PhaseState, Problem, ResultLine, ScreenFacts, WarehouseState,
+};
 use sqlbuild_orchestration::dev_events::models::DevEvent;
 
-/// One startup step of the checklist, in the order it is drawn.
+/// One start-up step, in the order pending steps are listed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum DevStep {
+    Config,
     ControlStore,
     Api,
     Scheduler,
@@ -24,10 +28,10 @@ pub(crate) enum DevStep {
     Warehouse,
 }
 
-/// What the screen hears about: its own steps, the location child, the warehouse, logs and keys.
+/// What the screen hears about: its own steps, the location child, the warehouse, logs, keys and the stop.
 #[derive(Clone, Debug)]
 pub(crate) enum ScreenMessage {
-    /// A step began; `detail` says what it waits on, such as `snowflake \u{b7} waiting for sign-in`.
+    /// A step began; `detail` says what it waits on.
     Started {
         step: DevStep,
         detail: String,
@@ -36,9 +40,13 @@ pub(crate) enum ScreenMessage {
         step: DevStep,
         detail: String,
     },
+    /// A step of `sqb dev` itself failed, with the problem to show under it.
+    Failed {
+        step: DevStep,
+        detail: String,
+        problem: Problem,
+    },
     Child(DevEvent),
-    /// The development location's ID, known once the control store is open.
-    Location(String),
     /// The dev target's triggers, such as `41 paused`, read after the first publication.
     Triggers(String),
     /// The foreground warehouse connection's outcome.
@@ -46,9 +54,9 @@ pub(crate) enum ScreenMessage {
         adapter: String,
         state: WarehouseState,
     },
-    /// A line of the warehouse client's own output, drawn inside the framed block.
+    /// Text the warehouse client wrote while it connects, such as a sign-in prompt.
     ClientOutput(String),
-    /// A run started, or finished with `ok`; `detail` names its origin or node count.
+    /// A run started, or finished with `ok`; `detail` names its origin or outcome.
     Run {
         name: String,
         detail: String,
@@ -57,8 +65,15 @@ pub(crate) enum ScreenMessage {
     /// A detailed log line, kept for `l`.
     Log(String),
     Key(char),
-    /// Redraw the running step's spinner and timer.
+    /// Redraw the running steps' spinners and timers.
     Tick,
+    /// The session is stopping; the live rows give way to one line per stopped service.
+    Stopping,
+    /// A service stopped, such as `Stopped UI server`, after `elapsed`.
+    Stopped {
+        label: String,
+        elapsed: Duration,
+    },
 }
 
 /// What the screen asks its owner to do after a key.
@@ -68,7 +83,6 @@ pub(crate) enum ScreenAction {
     OpenUi,
     Recompile,
     RetryWarehouse,
-    Quit,
 }
 
 /// The text one message writes and the action it asks for.
@@ -78,7 +92,7 @@ pub(crate) struct ScreenOutput {
     pub(crate) action: ScreenAction,
 }
 
-/// One checklist row: its state, detail and when it started.
+/// One step: its state, detail and when it started.
 #[derive(Clone, Debug)]
 pub(crate) struct StepRow {
     pub(crate) step: DevStep,
@@ -88,77 +102,72 @@ pub(crate) struct StepRow {
     pub(crate) elapsed: Option<Duration>,
 }
 
+/// The warehouse client's text while it waits for the person, and since when.
+#[derive(Clone, Debug)]
+pub(crate) struct Prompt {
+    pub(crate) text: String,
+    pub(crate) since: Instant,
+}
+
 /// What the screen knows before the first step starts.
 #[derive(Clone, Debug)]
 pub(crate) struct ScreenSetup {
     pub(crate) live: bool,
     pub(crate) facts: ScreenFacts,
     pub(crate) header: DevHeader,
-    pub(crate) watching: String,
+    /// The configured adapter, such as `snowflake`, for the sign-in prompt; empty when unknown.
+    pub(crate) adapter: String,
     pub(crate) project_root: String,
 }
 
-/// Everything the screen draws, and how many live rows sit below the last printed line.
+/// Everything the screen draws, and the live rows it last drew below the printed lines.
 #[derive(Clone, Debug)]
 pub(crate) struct DevScreen {
-    /// Redraws in place with a spinner and hotkeys; otherwise plain stable lines.
+    /// Redraws in place with spinners and keys; otherwise appended lines only.
     pub(crate) live: bool,
     pub(crate) facts: ScreenFacts,
     pub(crate) header: DevHeader,
+    pub(crate) header_printed: bool,
     pub(crate) ui_url: String,
-    pub(crate) watching: String,
     pub(crate) triggers: String,
-    pub(crate) started: Instant,
     pub(crate) steps: Vec<StepRow>,
     pub(crate) ready: bool,
-    pub(crate) location: String,
     pub(crate) adapter: String,
     pub(crate) warehouse: Option<WarehouseState>,
     /// When the generation being compiled started, for its event line's time.
     pub(crate) generation_started: Option<Instant>,
     /// Changed files since the last generation finished.
     pub(crate) pending_changes: usize,
-    /// The newest published generation, which keeps serving after a failure.
-    pub(crate) serving: Option<i64>,
+    /// The snapshot that serves, which keeps serving after a failure.
+    pub(crate) serving: Option<String>,
     /// The last compile's summary, such as `412 python nodes, 2280 models`.
     pub(crate) compile_detail: String,
     /// The project directory, which error positions link into.
     pub(crate) project_root: String,
-    /// The warehouse client is writing inside the framed block; nothing is redrawn until it ends.
-    pub(crate) client_output: bool,
-    /// The client's last output ended mid-line, such as at a prompt.
+    pub(crate) prompt: Option<Prompt>,
+    /// Plain mode: the client's last text ended mid-line, such as at a prompt.
     pub(crate) client_partial: bool,
-    /// The ready card was printed and no line follows it yet; the first one is set apart by a blank row.
-    pub(crate) event_gap: bool,
+    pub(crate) stopping: Option<Instant>,
     pub(crate) log: VecDeque<String>,
     pub(crate) show_log: bool,
     pub(crate) frame: usize,
-    /// Rows drawn below the last permanent line, redrawn by the next message.
-    pub(crate) drawn: usize,
+    /// The live rows drawn below the last printed line, redrawn by the next message.
+    pub(crate) drawn: Vec<String>,
 }
 
-/// Who may read stdin: the hotkey thread, or a foreground child while the gate is closed.
+/// Keys from the terminal: where they go while a foreground child reads them, and when to stop.
 #[derive(Debug, Default)]
-pub(crate) struct KeyGate {
-    pub(crate) closed: AtomicBool,
-    /// Whether stdin is in raw mode and the thread reads it.
-    pub(crate) reading: AtomicBool,
+pub(crate) struct KeyInput {
+    /// A sign-in prompt's pseudo-terminal; typed keys go there instead of to the screen.
+    pub(crate) forward: Mutex<Option<File>>,
     pub(crate) stop: AtomicBool,
 }
 
-impl KeyGate {
-    /// Restore the terminal and stop reading keys; returns once the thread has let go of stdin.
-    pub(crate) async fn close(&self) {
-        self.closed.store(true, Ordering::SeqCst);
-        while self.reading.load(Ordering::SeqCst) {
-            tokio::time::sleep(crate::dev_screen::constants::KEY_POLL).await;
-        }
-    }
-
-    /// Read keys again.
-    pub(crate) fn open(&self) {
-        self.closed.store(false, Ordering::SeqCst);
-    }
+/// How the session ended: the result line, and whether to leave the newest log lines above it.
+#[derive(Clone, Debug)]
+pub(crate) struct ScreenEnd {
+    pub(crate) result: ResultLine,
+    pub(crate) show_log: bool,
 }
 
 /// A running screen: where to send messages, the actions its keys ask for, and how to stop it.
@@ -166,8 +175,8 @@ impl KeyGate {
 pub(crate) struct DevScreenHandle {
     pub(crate) messages: UnboundedSender<ScreenMessage>,
     pub(crate) actions: UnboundedReceiver<ScreenAction>,
-    /// Closed while a foreground child owns the terminal's input; `None` without hotkeys.
-    pub(crate) keys: Option<Arc<KeyGate>>,
-    pub(crate) finish: oneshot::Sender<bool>,
+    /// The key reader's input; `None` without a terminal to read keys from.
+    pub(crate) keys: Option<std::sync::Arc<KeyInput>>,
+    pub(crate) finish: oneshot::Sender<ScreenEnd>,
     pub(crate) task: JoinHandle<()>,
 }

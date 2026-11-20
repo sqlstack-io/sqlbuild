@@ -41,9 +41,9 @@ fn given_runs_since_the_last_poll_when_read_then_each_start_and_end_is_reported_
                 ),
             ],
             expected_messages: vec![
-                "new_orders_file | started from sensor | running".to_owned(),
-                "new_orders_file | 4 nodes | failed 12s".to_owned(),
-                "orders_daily | started from schedule | running".to_owned(),
+                "new_orders_file | started by sensor | running".to_owned(),
+                "new_orders_file | failed \u{b7} 4 nodes | failed 12s".to_owned(),
+                "orders_daily | started by schedule | running".to_owned(),
             ],
         },
         RunPollTestCase {
@@ -58,7 +58,7 @@ fn given_runs_since_the_last_poll_when_read_then_each_start_and_end_is_reported_
                     (5, 3),
                 ),
             ],
-            expected_messages: vec!["adhoc | 5 nodes | ok 90s".to_owned()],
+            expected_messages: vec!["adhoc | succeeded \u{b7} 5 nodes | ok 90s".to_owned()],
         },
         RunPollTestCase {
             description: "a run already seen ending is not reported again",
