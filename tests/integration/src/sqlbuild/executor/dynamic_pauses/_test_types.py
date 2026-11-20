@@ -161,6 +161,16 @@ class AbandonedClaimTestCase:
 
 
 @dataclass(frozen=True)
+class LongClaimWaitTestCase:
+    description: str
+    grace_seconds: int
+    waited_seconds: int
+    expected_open_holds: tuple[str, ...]
+    expected_states: dict[str, str]
+    expected_released_states: dict[str, str]
+
+
+@dataclass(frozen=True)
 class TwoBuildsTestCase:
     description: str
     expected_operations: tuple[tuple[str, str], ...]

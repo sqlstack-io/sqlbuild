@@ -142,6 +142,8 @@ class DynamicHold:
         self._yield_to_rivals(
             connection=connection, location=location, names=tuple(self._paused), window=window
         )
+        self._heartbeat = self._new_heartbeat(self._write_heartbeat)
+        self._heartbeat.start()
         claimed: frozenset[_RelationKey] = self._await_claims(
             connection=connection, location=location, names=tuple(self._paused)
         )
@@ -153,8 +155,6 @@ class DynamicHold:
             }
         )
         self._suspend_active(connection=connection, names=tuple(self._paused), states=states)
-        self._heartbeat = self._new_heartbeat(self._write_heartbeat)
-        self._heartbeat.start()
 
     def after_create(self, *, connection: Any, name: str) -> None:
         """Suspend a model CREATE OR REPLACE made active; check its new hold as acquire does."""

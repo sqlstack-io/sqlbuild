@@ -28,6 +28,7 @@ from tests.integration.src.sqlbuild.executor.dynamic_pauses._test_types import (
     ClaimRaceTestCase,
     ClaimWaitTestCase,
     DoubleCloseTestCase,
+    LongClaimWaitTestCase,
     QuietTokenTestCase,
     RefusedResumeTestCase,
     StaleSyncResumeTestCase,
@@ -43,8 +44,10 @@ from tests.integration.src.sqlbuild.executor.dynamic_pauses.helpers import (
     RefusingResumeAdapter,
     SyncDuringTakeoverAdapter,
     TokenPausingDuckDbAdapter,
+    age_beat_and_sync,
     build_lease_project,
     claim_events,
+    expired_hold_plan,
     finish_claimed_resume,
     heartbeat_count,
     held_by_dead_run,
@@ -736,30 +739,8 @@ def test_given_two_builds_taking_over_one_expired_hold_when_one_holds_the_model_
     adapter: ClaimHookAdapter = ClaimHookAdapter()
     connection: Any = adapter.connect({"database": str(database_path)})
     connection.execute("CREATE SCHEMA staging")
-    _ = build_lease_project(
-        adapter=adapter,
-        connection=connection,
-        case=lease_project_case(
-            orders_query="SELECT 1 AS order_id", report_locations={}, refresh_on_build=False
-        ),
-        runtime=BuildRuntimeParams(run_id="first_run"),
-        database_path=database_path,
-    )
-    plan: PlanOutput = plan_lease_project(
-        adapter=adapter,
-        connection=connection,
-        case=lease_project_case(
-            orders_query="SELECT 1 AS order_id UNION ALL SELECT 2",
-            report_locations={},
-            refresh_on_build=False,
-        ),
-    )
-    seed_hold(
-        adapter=adapter,
-        connection=connection,
-        run_id="dead_run",
-        name="daily_totals",
-        idle_seconds=3600,
+    plan: PlanOutput = expired_hold_plan(
+        adapter=adapter, connection=connection, database_path=database_path
     )
     holder: DynamicHold | None = hold_dynamic_models(
         plan=plan,
@@ -787,3 +768,62 @@ def test_given_two_builds_taking_over_one_expired_hold_when_one_holds_the_model_
     assert states == test_case.expected_states
     assert tuple(sorted(hold.run_id for hold in holds)) == test_case.expected_open_holds
     assert claims == list(test_case.expected_claims)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LongClaimWaitTestCase(
+            description="a build waiting past its grace on a claim still beats, so it keeps its hold",
+            grace_seconds=61,
+            waited_seconds=62,
+            expected_open_holds=("second_run",),
+            expected_states={"daily_totals": "SUSPENDED"},
+            expected_released_states={"daily_totals": "ACTIVE"},
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_build_waiting_on_a_claim_past_its_grace_when_another_sync_passes_then_its_hold_stays_live(
+    test_case: LongClaimWaitTestCase, database_path: Path
+) -> None:
+    adapter: ClaimHookAdapter = ClaimHookAdapter()
+    connection: Any = adapter.connect({"database": str(database_path)})
+    connection.execute("CREATE SCHEMA staging")
+    plan: PlanOutput = expired_hold_plan(
+        adapter=adapter, connection=connection, database_path=database_path
+    )
+    claim_run: str = f"{_SYNC}/claim/slow"
+    seed_claim(adapter=adapter, connection=connection, claim_run=claim_run, age_seconds=0)
+    adapter.after_claim_read.append(
+        lambda read: age_beat_and_sync(
+            adapter=adapter,
+            connection=read,
+            waiting=("second_run", test_case.waited_seconds),
+            sync=("location-sync:other", float(test_case.grace_seconds), claim_run),
+        )
+    )
+    building: DynamicHold | None = hold_dynamic_models(
+        plan=plan,
+        adapter=adapter,
+        runtime=BuildRuntimeParams(
+            run_id="second_run", dynamic_heartbeat_grace_seconds=test_case.grace_seconds
+        ),
+        connection_config={"database": str(database_path)},
+        heartbeat_seconds=0.05,
+        claim_wait=(60.0, 0.02),
+    )
+    assert building is not None
+
+    building.acquire(connection=connection, on_progress=None)
+
+    holds: tuple[OpenHold, ...] = read_open_holds(
+        adapter=adapter, connection=connection, location=(None, "staging")
+    )
+    states: dict[str, str] = dict(adapter.states)
+    building.release(connection=connection)
+    released: dict[str, str] = dict(adapter.states)
+    adapter.close(connection)
+    assert tuple(sorted(hold.run_id for hold in holds)) == test_case.expected_open_holds
+    assert states == test_case.expected_states
+    assert released == test_case.expected_released_states
