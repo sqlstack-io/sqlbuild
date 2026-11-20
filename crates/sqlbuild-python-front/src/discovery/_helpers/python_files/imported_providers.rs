@@ -14,6 +14,7 @@ use sqlbuild_host::entries::models::UserCodeHost;
 use crate::discovery::_helpers::python_files::imported_modules::{
     ProjectDir, discovered, discovery_error, discovery_error_from, module_functions, shim, tuple_of,
 };
+use crate::discovery::_helpers::sources::provider_secrets::TARGET_ALLOWED_MISSING_SECRETS;
 use crate::discovery::constants::ALLOW_MISSING_SECRETS_FLAG;
 use crate::discovery::models::SecretPolicy;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -135,7 +136,10 @@ fn provider_instance<'py>(
             return Err(discovery_error_from(py, (PROVIDER_ERROR, message), error));
         }
     };
-    if policy == SecretPolicy::Require {
+    let name: String = provider_name.extract()?;
+    let target_allows: bool =
+        TARGET_ALLOWED_MISSING_SECRETS.with_borrow(|(_, providers)| providers.contains(&name));
+    if policy == SecretPolicy::Require && !target_allows {
         let variables: String = missing.join(", ");
         let noun: &str = if missing.len() == 1 {
             "secret"
@@ -259,10 +263,16 @@ pub(crate) fn discover_provider_classes<'py>(
 }
 
 /// Note on stderr which providers run with missing secrets because the command allows them.
+/// Under `Allow`, every provider missing secrets; under `Require`, only those the target's `allow_missing_secrets` lists reach here.
 fn report_allowed(py: Python<'_>, policy: SecretPolicy, allowed: &[String]) -> PyResult<()> {
-    if policy != SecretPolicy::Allow || allowed.is_empty() {
+    if policy == SecretPolicy::Defer || allowed.is_empty() {
         return Ok(());
     }
+    let why: String = match TARGET_ALLOWED_MISSING_SECRETS.with_borrow(|(target, _)| target.clone())
+    {
+        Some(target) if policy == SecretPolicy::Require => format!("allowed on target {target}"),
+        _ => "allowed".to_owned(),
+    };
     let noun: &str = if allowed.len() == 1 {
         "provider has"
     } else {
@@ -272,7 +282,7 @@ fn report_allowed(py: Python<'_>, policy: SecretPolicy, allowed: &[String]) -> P
         py,
         "stderr",
         &format!(
-            "{} {noun} missing secrets (allowed): {}\n",
+            "{} {noun} missing secrets ({why}): {}\n",
             allowed.len(),
             allowed.join(", ")
         ),

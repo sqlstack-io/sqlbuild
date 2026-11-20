@@ -142,6 +142,7 @@ class ProviderSecretE2ETestCase:
     expected_exit_code: int
     expected_output_fragments: tuple[str, ...]
     expected_marker_entries: tuple[str, ...]
+    unexpected_output_fragments: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -455,6 +455,14 @@ fn run_implementation<'py>(
     code.into_bound_py_any(py)
 }
 
+/// The parsed `--target`, `None` when the command has none or it is unset.
+fn selected_target_of(args: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+    match args.getattr_opt("target")? {
+        Some(target) if !target.is_none() => Ok(Some(target.str()?.extract()?)),
+        _ => Ok(None),
+    }
+}
+
 /// Run `body` with the request record a parsed command's route passes, in the scopes `sqb` runs it in.
 pub(crate) fn with_routed_request<'py, T>(
     args: &Bound<'py, PyAny>,
@@ -466,6 +474,7 @@ pub(crate) fn with_routed_request<'py, T>(
         let _secrets = MissingSecretsScope::enter(
             args.getattr_opt(ALLOW_MISSING_SECRETS_DEST)?
                 .is_some_and(|allowed| allowed.is_truthy().unwrap_or(false)),
+            selected_target_of(args)?,
         );
         let route = match command_dispatch(&command_facts(args)?) {
             Dispatch::Run(route, None) => route,
@@ -501,6 +510,7 @@ fn routed_command<'py>(
     let _secrets = MissingSecretsScope::enter(
         args.getattr_opt(ALLOW_MISSING_SECRETS_DEST)?
             .is_some_and(|allowed| allowed.is_truthy().unwrap_or(false)),
+        selected_target_of(args)?,
     );
     match command_dispatch(&command_facts(args)?) {
         Dispatch::Nothing => 0.into_bound_py_any(py),

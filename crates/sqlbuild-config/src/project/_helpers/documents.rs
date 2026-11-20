@@ -200,7 +200,9 @@ fn sections(payload: &Entries) -> Loaded<Fields> {
             ),
         )
         .with_help(format!(
-            "move it to {LOCAL_CONFIG_FILENAME}, or set SQLBUILD_ALLOW_MISSING_SECRETS=1 in CI"
+            "move it to {LOCAL_CONFIG_FILENAME}, set SQLBUILD_ALLOW_MISSING_SECRETS=1 in CI, or list \
+             the providers whose secrets a target may lack in [targets.<name>] \
+             {ALLOW_MISSING_SECRETS_KEY}"
         )));
     }
     Ok(vec![

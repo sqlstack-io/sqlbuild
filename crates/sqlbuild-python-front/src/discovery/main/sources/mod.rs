@@ -1,9 +1,13 @@
 pub mod consumer_uses;
+pub mod env_file_display;
 pub mod invocation_allows_missing_secrets;
+pub mod invocation_target;
 pub mod orchestration_declarations;
 pub mod orchestration_failure;
 pub mod provider_uses;
 pub mod register_declaration_files;
 pub mod register_yaml_entries;
 pub mod require_used_secrets;
+pub mod secret_places;
 pub mod sink_uses;
+pub mod target_allowed_missing_secrets;

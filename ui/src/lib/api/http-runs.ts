@@ -39,6 +39,7 @@ export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
 			synced_copy: document.synced_copy ?? null,
 			changed: document.changed ?? null,
 			...(document.ignore_audit_failures ? { ignore_audit_failures: true } : {}),
+			...(document.cant_run?.length ? { cant_run: document.cant_run } : {}),
 			...(document.pages ? { pages: document.pages } : {}),
 			sections: document.sections,
 			migration_steps: document.migration_steps,

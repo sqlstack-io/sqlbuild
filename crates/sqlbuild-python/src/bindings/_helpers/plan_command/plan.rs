@@ -23,11 +23,16 @@ use sqlbuild_state::warehouse_state::models::WarehouseState;
 use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_connection_context;
 use crate::bindings::_helpers::command_runtime::preview_target::validate_preview_target;
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
-use crate::bindings::_helpers::compile_driver::plan_pipeline::planned_project;
+use crate::bindings::_helpers::compile_driver::plan_pipeline::{
+    SecretCheck, planned_project, selectors,
+};
 use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::plan_command::changed::changed_json;
 use crate::bindings::_helpers::plan_command::changed::changed_text;
+use crate::bindings::_helpers::provider_check::selection::{
+    SecretBlock, cant_run_json, selection_secret_blocks,
+};
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -39,6 +44,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
 use sqlbuild_python_front::compile_attachment::main::build_effective_settings_config::build_effective_settings_config;
+use sqlbuild_python_front::discovery::main::sources::env_file_display::env_file_display;
+use sqlbuild_python_front::discovery::main::sources::secret_places::secret_places;
 use sqlbuild_python_output::build_progress::main::with_verbose_inspection::with_verbose_inspection;
 use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
 use sqlbuild_python_output::build_progress::models::PlanningProgressReporter;
@@ -56,6 +63,8 @@ use sqlbuild_python_planner::planner_warehouse::models::SyncedReads;
 const COMMAND_NAME: &str = "plan";
 /// The plan document's field holding how long each planning step took.
 const TIMINGS_KEY: &str = "timings";
+/// The plan JSON's section of nodes that can't run because a provider is missing secrets.
+const CANT_RUN_KEY: &str = "cant_run";
 /// `timings.planned_from` for a location preview over the synced warehouse state.
 const SYNCED_STATE: &str = "synced_state";
 /// `timings.planned_from` for a plan that read the warehouse.
@@ -363,6 +372,7 @@ fn compile_pipeline<'py>(
             },
             preview.as_ref(),
         ),
+        SecretCheck::Report,
     )
 }
 
@@ -432,7 +442,17 @@ fn write_output(
         if let Some(decision) = changed {
             options.push((CHANGED_KEY, changed_json(py, decision)?.into_any()));
         }
-        let text: String = format_plan_json(py, Some(keywords(py, &options)?))?;
+        let mut text: String = format_plan_json(py, Some(keywords(py, &options)?))?;
+        let blocks: Vec<SecretBlock> = cant_run(request, invocation, pipeline)?;
+        if !blocks.is_empty() {
+            let project_dir: std::path::PathBuf = invocation.project_dir.extract()?;
+            let env_file: Option<String> = env_file_display(&project_dir);
+            text = with_field(
+                text,
+                CANT_RUN_KEY,
+                &cant_run_json(&blocks, env_file.as_deref()),
+            );
+        }
         if captured {
             return Ok(Some(text));
         }
@@ -470,6 +490,12 @@ fn write_output(
     }
     let text: String = format_plan(py, Some(keywords(py, &options)?))?;
     print_line(py, &format!("\n{text}"))?;
+    let blocks: Vec<SecretBlock> = cant_run(request, invocation, pipeline)?;
+    if !blocks.is_empty() {
+        let missing_from: String =
+            secret_places(&invocation.project_dir.extract::<std::path::PathBuf>()?);
+        print_line(py, &cant_run_text(&blocks, &missing_from))?;
+    }
     if let Some(facade) = &invocation.preview {
         print_line(py, &synced_copy_text(&facade.synced))?;
     }
@@ -585,13 +611,57 @@ fn plan<'py>(
 
 /// `document` with its `timings` as the first field; the plan is written before its own timings are known.
 fn with_timings(document: String, timings: &serde_json::Value) -> String {
+    with_field(document, TIMINGS_KEY, timings)
+}
+
+/// `document` with `key` as its first field.
+fn with_field(document: String, key: &str, value: &serde_json::Value) -> String {
     match document.strip_prefix('{') {
         Some(fields) if fields.trim_start().starts_with('}') => {
-            format!("{{\"{TIMINGS_KEY}\": {timings}}}")
+            format!("{{\"{key}\": {value}}}")
         }
-        Some(fields) => format!("{{\"{TIMINGS_KEY}\": {timings}, {fields}"),
+        Some(fields) => format!("{{\"{key}\": {value}, {fields}"),
         None => document,
     }
+}
+
+/// The planned selection's nodes that can't run because a provider they use is missing secrets.
+fn cant_run(
+    request: &Bound<'_, PyAny>,
+    invocation: &PlanInvocation<'_>,
+    pipeline: &Bound<'_, PyAny>,
+) -> PyResult<Vec<SecretBlock>> {
+    selection_secret_blocks(
+        (&invocation.discovered, &native_field(pipeline, "project")?),
+        (
+            &selectors(request, "select")?,
+            &selectors(request, "exclude")?,
+        ),
+    )
+}
+
+/// The text plan's `Can't run` lines: per provider, its variables and the nodes it stops.
+fn cant_run_text(blocks: &[SecretBlock], missing_from: &str) -> String {
+    let short = |key: &String| {
+        key.split_once(':')
+            .map_or(key.clone(), |(_, name)| name.to_owned())
+    };
+    let mut lines: Vec<String> = Vec::new();
+    for block in blocks {
+        lines.push(format!(
+            "Can't run: provider {} needs {} (missing from {missing_from})",
+            block.provider,
+            block.variables.join(", ")
+        ));
+        let users: Vec<String> = block.users.iter().map(short).collect();
+        let mut needs: String = users.join(", ");
+        if !block.readers.is_empty() {
+            let readers: Vec<String> = block.readers.iter().map(short).collect();
+            needs.push_str(&format!(", and {} that read it", readers.join(", ")));
+        }
+        lines.push(format!("  needs  {needs}"));
+    }
+    format!("\n{}", lines.join("\n"))
 }
 
 /// Whether any plan finding has error severity, which `sqb build` refuses.

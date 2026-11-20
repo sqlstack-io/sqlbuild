@@ -2,7 +2,7 @@
 
 use crate::native_commands::models::{LocationMetadataSync, LocationWatch};
 use chrono::{DateTime, Utc};
-use sqlbuild_orchestration::platform::models::LocationRuleFailure;
+use sqlbuild_orchestration::platform::models::{LocationRuleFailure, MissingProviderSecrets};
 use sqlbuild_orchestration::snapshots::models::SnapshotRecord;
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
 
@@ -11,6 +11,7 @@ pub(crate) type LocationPublication = (
     SnapshotRecord,
     Option<DateTime<Utc>>,
     Vec<WarehouseStateLocation>,
+    Vec<MissingProviderSecrets>,
 );
 
 /// A settled publication: the watch without its local databases, its metadata sync, and the sync deferred until the warehouse connects.
@@ -27,9 +28,13 @@ pub(crate) type NextGeneration = (
     Option<Vec<sqlbuild_cache::project_snapshot::models::PathStamp>>,
 );
 
-/// A published generation's refresh deadline and state locations, or the rule findings that failed it.
+/// A published generation's refresh deadline, state locations and providers missing secrets, or the rule findings that failed it.
 pub(crate) type LoadOutcome = Result<
-    (Option<tokio::time::Instant>, Vec<WarehouseStateLocation>),
+    (
+        Option<tokio::time::Instant>,
+        Vec<WarehouseStateLocation>,
+        Vec<MissingProviderSecrets>,
+    ),
     Option<LocationRuleFailure>,
 >;
 

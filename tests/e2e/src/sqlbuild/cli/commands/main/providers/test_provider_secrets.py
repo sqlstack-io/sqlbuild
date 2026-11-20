@@ -136,6 +136,28 @@ API_SINK: dict[str, str] = {
     ).strip()
     + "\n",
 }
+READING_MODEL: dict[str, str] = {
+    "models/api_events.sql": (
+        "MODEL (description 'Test model api_events.', materialized table);\n\n"
+        'SELECT event_id FROM __source("raw_api_events")\n'
+    ),
+}
+TARGET_ALLOWS_API: dict[str, str] = {
+    "sqlbuild_project.toml": (
+        'name = "provider_secret_project"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+        '[connection]\ndatabase = "provider_secret_project.duckdb"\n\n'
+        '[targets.dev]\nschema = "main"\nallow_missing_secrets = ["api_provider"]\n'
+    ),
+}
+REQUIRED_SETTING: dict[str, str] = {
+    "providers/region.py": (
+        "from pydantic import Field\n"
+        "from sqlbuild.providers import Provider\n\n\n"
+        "class RegionProvider(Provider):\n"
+        '    """Test provider RegionProvider."""\n'
+        '    region_code: str = Field(validation_alias="SECRETS_E2E_REGION")\n'
+    ),
+}
 POST_BUILD_CHECK: dict[str, str] = {
     "python/checks/no_api_check.py": dedent(
         """
@@ -162,7 +184,11 @@ MISSING_ERROR: str = (
     f"provider 'api_provider' (providers/api.py) is missing secret {SECRET_VARIABLE}"
 )
 ALLOWED_NOTICE: str = "1 provider has missing secrets (allowed): api_provider"
-SELECTION_ERROR: str = "selected nodes need secrets that are missing:"
+SELECTION_ERROR: str = (
+    "selected nodes need secrets that are missing from the environment and from .env:"
+)
+# Lines a build prints once it starts connecting to the warehouse.
+CONNECTING: tuple[str, ...] = ("Connecting to", "Warehouse connected")
 UNBOUND_NOTICE: str = (
     f"sink 'export_event' is not bound: provider 'api_provider' is missing {SECRET_VARIABLE}"
 )
@@ -225,6 +251,63 @@ BUILD: tuple[str, ...] = ("--no-color", "build", "--no-tests", "--no-audits", "-
             extra_repo_files={},
             expected_exit_code=1,
             expected_output_fragments=(SELECTION_ERROR, SECRET_VARIABLE, "nothing was run"),
+            expected_marker_entries=(),
+            unexpected_output_fragments=CONNECTING,
+        ),
+        ProviderSecretE2ETestCase(
+            description="build stops before the warehouse and names the nodes that read the blocked one",
+            command=(*BUILD, "+api_events"),
+            env={},
+            extra_repo_files=READING_MODEL,
+            expected_exit_code=1,
+            expected_output_fragments=(
+                SELECTION_ERROR,
+                f"api_provider  {SECRET_VARIABLE}  (raw_api_events; read by api_events)",
+                "nothing was run",
+            ),
+            expected_marker_entries=(),
+            unexpected_output_fragments=CONNECTING,
+        ),
+        ProviderSecretE2ETestCase(
+            description="compile passes when the target allows the provider's missing secrets",
+            command=("--no-color", "compile"),
+            env={},
+            extra_repo_files=TARGET_ALLOWS_API,
+            expected_exit_code=0,
+            expected_output_fragments=(
+                "1 provider has missing secrets (allowed on target dev): api_provider",
+            ),
+            expected_marker_entries=(),
+        ),
+        ProviderSecretE2ETestCase(
+            description="build still stops nodes whose provider the target allows to miss secrets",
+            command=(*BUILD, "uses_api"),
+            env={},
+            extra_repo_files=TARGET_ALLOWS_API,
+            expected_exit_code=1,
+            expected_output_fragments=(SELECTION_ERROR, "nothing was run"),
+            expected_marker_entries=(),
+        ),
+        ProviderSecretE2ETestCase(
+            description="a required setting that isn't a secret type is a missing secret",
+            command=("--no-color", "compile"),
+            env={SECRET_VARIABLE: "token"},
+            extra_repo_files=REQUIRED_SETTING,
+            expected_exit_code=1,
+            expected_output_fragments=(
+                "provider 'region_provider' (providers/region.py) is missing secret SECRETS_E2E_REGION",
+            ),
+            expected_marker_entries=(),
+        ),
+        ProviderSecretE2ETestCase(
+            description="a missing required setting is allowed like any secret",
+            command=("--no-color", "compile", "--allow-missing-secrets"),
+            env={SECRET_VARIABLE: "token"},
+            extra_repo_files=REQUIRED_SETTING,
+            expected_exit_code=0,
+            expected_output_fragments=(
+                "1 provider has missing secrets (allowed): region_provider",
+            ),
             expected_marker_entries=(),
         ),
         ProviderSecretE2ETestCase(
@@ -375,6 +458,8 @@ def test_given_provider_secret_unset_when_running_commands_then_only_users_of_it
     assert result.returncode == test_case.expected_exit_code, output
     for fragment in test_case.expected_output_fragments:
         assert fragment in output, output
+    for fragment in test_case.unexpected_output_fragments:
+        assert fragment not in output, output
     marker_entries: tuple[str, ...] = tuple(marker_path.read_text(encoding="utf-8").splitlines())
     assert marker_entries == test_case.expected_marker_entries
 

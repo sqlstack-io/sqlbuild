@@ -203,7 +203,7 @@ pub(crate) const MAX_POOL_LIMIT: i64 = 10_000;
 pub(crate) const PLAN_FROM_KEY: &str = "plan_from";
 /// What `plan_from` may name; `live` is the default.
 pub(crate) const PLAN_FROM_SOURCES: [&str; 2] = ["live", "synced_state"];
-pub(crate) const TARGET_KEYS: [&str; 26] = [
+pub(crate) const TARGET_KEYS: [&str; 27] = [
     "connection",
     "catalog_connection",
     "vars",
@@ -230,6 +230,7 @@ pub(crate) const TARGET_KEYS: [&str; 26] = [
     PLAN_FROM_KEY,
     PAUSE_DYNAMIC_KEY,
     ENV_FILE_KEY,
+    ALLOW_MISSING_SECRETS_KEY,
 ];
 pub(crate) const CONTROL_KEYS: [&str; 3] = ["location", "server", "sync_at_least_every"];
 pub(crate) const CHANGES_KEYS: [&str; 2] = ["counts", "reach"];

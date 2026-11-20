@@ -3,6 +3,9 @@
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PySet, PySetMethods, PyTuple};
 use pyo3::{IntoPyObject, pyfunction};
+use sqlbuild_python_front::discovery::main::sources::invocation_target::invocation_target;
+use sqlbuild_python_front::discovery::main::sources::target_allowed_missing_secrets::target_allowed_missing_secrets;
+use sqlbuild_python_front::discovery::models::TargetAllowedSecretsScope;
 
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
@@ -212,6 +215,23 @@ fn missing_secrets_allowed(local_config: &Bound<'_, PyAny>) -> PyResult<bool> {
     )
 }
 
+/// The command's target as compilation picks it: `--target`, then the local `target`, then `default_target`.
+fn static_target(
+    project_config: &Bound<'_, PyAny>,
+    local_config: &Bound<'_, PyAny>,
+) -> PyResult<Option<String>> {
+    if let Some(target) = invocation_target() {
+        return Ok(Some(target));
+    }
+    for (config, name) in [(local_config, "target"), (project_config, "default_target")] {
+        let value = native_field(config, name)?;
+        if !value.is_none() {
+            return Ok(Some(value.extract()?));
+        }
+    }
+    Ok(None)
+}
+
 /// `_assemble_discovered_project_inputs`: configuration, its checks, discovery and validation.
 pub(crate) fn assembled_inputs<'py>(
     py: Python<'py>,
@@ -259,6 +279,11 @@ pub(crate) fn assembled_inputs<'py>(
     } else {
         request.secret_policy
     };
+    let target: Option<String> = static_target(&project_config, &local_config)?;
+    let _allowed = TargetAllowedSecretsScope::enter(
+        target.clone(),
+        target_allowed_missing_secrets(&project_config, target.as_deref())?,
+    );
     let discovered: Bound<'py, PyAny> = discovered_inputs(
         py,
         (project_dir, &project_config, &local_config),

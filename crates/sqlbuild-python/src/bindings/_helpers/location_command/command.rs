@@ -1,5 +1,8 @@
 //! Compile in the location interpreter and publish data through its scoped HTTP credential.
 
+use sqlbuild_orchestration::platform::main::health::missing_provider_secrets::missing_provider_secrets;
+use sqlbuild_orchestration::platform::models::MissingProviderSecrets;
+use sqlbuild_python_front::discovery::main::sources::target_allowed_missing_secrets::target_allowed_missing_secrets;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -223,6 +226,7 @@ pub(super) type Published = (
     SnapshotRecord,
     Option<DateTime<Utc>>,
     Vec<WarehouseStateLocation>,
+    Vec<MissingProviderSecrets>,
 );
 
 pub(super) fn publish_location<'py>(
@@ -289,6 +293,19 @@ pub(super) fn publish_location<'py>(
             TriggerDeclaration::Schedule(_) | TriggerDeclaration::Sensor(_) => None,
         })
         .min();
+    let allowed: Vec<String> = target_allowed_missing_secrets(
+        &field(&project.discovered, "project_config")?,
+        arguments
+            .value("selected_target")?
+            .extract::<Option<String>>()?
+            .as_deref(),
+    )?;
+    let missing_secrets: Vec<MissingProviderSecrets> = snapshot
+        .input
+        .documents
+        .get("providers")
+        .map(|providers| missing_provider_secrets(providers, &allowed))
+        .unwrap_or_default();
     status(py, "Publishing location snapshot...")?;
     steps(py, &[(DevPhase::Publish, DevStepState::Started)], None)?;
     let record = snapshot.publication(
@@ -307,7 +324,12 @@ pub(super) fn publish_location<'py>(
     status(py, "Location snapshot published.")?;
     steps(py, &[(DevPhase::Publish, DevStepState::Finished)], None)?;
     Ok(Ok((
-        (record, refresh_at, locations.into_iter().collect()),
+        (
+            record,
+            refresh_at,
+            locations.into_iter().collect(),
+            missing_secrets,
+        ),
         (project.discovered, compiled),
     )))
 }
@@ -362,7 +384,7 @@ pub(crate) fn run_location<'py>(
         return run_runtime(py, options.unwrap_or_else(|| PyDict::new(py)));
     }
     let publication = (|| {
-        let ((record, _, _), _) = publish_location(py, &arguments)?.map_err(|failure| {
+        let ((record, _, _, _), _) = publish_location(py, &arguments)?.map_err(|failure| {
             PyValueError::new_err(format!(
                 "Compile failed: {} rule findings",
                 failure.finding_count
