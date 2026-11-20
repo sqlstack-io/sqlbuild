@@ -69,10 +69,13 @@ pub(super) fn orders_publication()
         ),
         resource("loader:stage_shipments", &[], &[], Some("python/loaders")),
     ];
-    let jobs = std::collections::BTreeMap::from([(
-        "carrier_sync".to_owned(),
-        std::collections::BTreeSet::from(["task:request_carrier_collection".to_owned()]),
-    )]);
+    let jobs = sqlbuild_orchestration::runs::models::PublishedJobs {
+        selections: std::collections::BTreeMap::from([(
+            "carrier_sync".to_owned(),
+            std::collections::BTreeSet::from(["task:request_carrier_collection".to_owned()]),
+        )]),
+        ..Default::default()
+    };
     crate::adhoc::main::adhoc_planner::adhoc_planner().prepare(resources, jobs)
 }
 
@@ -101,4 +104,26 @@ pub(super) fn owned_evaluation(
                 refused: None,
             })
         })
+}
+
+/// A pinned `nightly` job holding `selection`, with its settings.
+pub(super) fn nightly_pin(selection: &[&str]) -> serde_json::Value {
+    serde_json::json!({"selection": selection, "settings": {"concurrency": 1, "full_refresh": true, "vars": {"region": "north"}}})
+}
+
+/// A pinned `weekly` job holding `selection`, with its settings.
+pub(super) fn weekly_pin(selection: &[&str]) -> serde_json::Value {
+    serde_json::json!({"selection": selection, "settings": {"vars": {"region": "north"}, "warehouse": "REPORTS_XS"}})
+}
+
+/// A pinning case's expected keys, pinned jobs and build-wide settings, or refusal fragment, owned.
+pub(super) fn expected_pins(
+    expected: Result<(&[&str], serde_json::Value, serde_json::Value), &str>,
+) -> Result<(Vec<String>, serde_json::Value, serde_json::Value), String> {
+    expected
+        .map(|(selection, jobs, build)| {
+            let selection: Vec<String> = selection.iter().map(|key| (*key).to_owned()).collect();
+            (selection, jobs, build)
+        })
+        .map_err(str::to_owned)
 }

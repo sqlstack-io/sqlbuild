@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 
 use serde_json::Value;
+use sqlbuild_orchestration::runs::models::PinnedJob;
 use sqlbuild_orchestration::store::errors::ControlError;
 use tokio::sync::{mpsc, oneshot};
 
@@ -36,9 +37,17 @@ pub(crate) fn plan_arguments(
     Ok(argv)
 }
 
-/// The node names of a frozen selection, each selected as `--select <name>` would.
-pub(crate) fn selected_names(selection: &BTreeSet<String>) -> Result<Vec<String>, String> {
-    selection.iter().map(|key| selected_name(key)).collect()
+/// The node names of a frozen selection, each selected as `--select <name>` would, then `job:<name>` for each pinned job.
+pub(crate) fn selected_names(
+    selection: &BTreeSet<String>,
+    jobs: &BTreeMap<String, PinnedJob>,
+) -> Result<Vec<String>, String> {
+    let mut names: Vec<String> = selection
+        .iter()
+        .map(|key| selected_name(key))
+        .collect::<Result<_, _>>()?;
+    names.extend(jobs.keys().map(|job| format!("job:{job}")));
+    Ok(names)
 }
 
 /// The name of one frozen node key, such as `model:orders`.

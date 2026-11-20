@@ -69,6 +69,7 @@ pub(crate) async fn persist_ticks(
                 window: None,
                 pools: trigger.job_json.pools.clone(),
                 narrowing: None,
+                jobs: Default::default(),
                 retry: None,
                 member_attempt: None,
             };

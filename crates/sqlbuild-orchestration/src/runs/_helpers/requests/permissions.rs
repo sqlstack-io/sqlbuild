@@ -148,9 +148,21 @@ pub(in crate::runs) fn rewrites_history(request: &RunRequest, executions: &[RunR
         let cursor = CURSOR_SETTINGS
             .iter()
             .any(|name| run.settings.contains_key(*name));
-        if enabled || cursor {
+        if enabled || cursor || pinned_full_refresh(run) {
             return true;
         }
     }
     false
+}
+
+/// A job an ad-hoc build pins fully refreshes some of the run's nodes, as running that job would.
+fn pinned_full_refresh(run: &RunRequest) -> bool {
+    run.jobs.values().any(|job| {
+        !job.selection.is_empty()
+            && job
+                .settings
+                .get("full_refresh")
+                .and_then(serde_json::Value::as_bool)
+                == Some(true)
+    })
 }

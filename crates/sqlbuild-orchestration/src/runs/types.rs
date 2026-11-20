@@ -1,13 +1,9 @@
 //! The command planner the server is built with; the CLI owns the grammar and the selector resolver.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use crate::runs::models::{
-    CommandPlan, PlannerResource, PublicationCache, SelectionProblem, SelectionVocabulary,
+    CommandPlan, PlannerResource, PublicationCache, PublishedJobs, SelectionProblem,
+    SelectionVocabulary,
 };
-
-/// Each published job and job group's exact `kind:name` selection, by name.
-pub type PublishedJobs = BTreeMap<String, BTreeSet<String>>;
 
 /// Index a publication once with the CLI's selector graph, then parse and resolve commands against it.
 pub trait CommandPlanner: Send + Sync {

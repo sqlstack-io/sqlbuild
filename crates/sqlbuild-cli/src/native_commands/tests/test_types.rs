@@ -98,6 +98,16 @@ pub(super) struct PlanArgumentsTestCase {
     pub(super) expected_refused: bool,
 }
 
+/// The jobs a kept plan pinned, those a new request pins, and whether the kept plan answers it.
+pub(super) struct PinnedReuseTestCase {
+    pub(super) description: &'static str,
+    pub(super) kept:
+        std::collections::BTreeMap<String, sqlbuild_orchestration::runs::models::PinnedJob>,
+    pub(super) asked:
+        std::collections::BTreeMap<String, sqlbuild_orchestration::runs::models::PinnedJob>,
+    pub(super) expected_reused: bool,
+}
+
 /// One kept plan, then one request for a plan.
 pub(super) struct PlanReuseTestCase {
     pub(super) description: &'static str,

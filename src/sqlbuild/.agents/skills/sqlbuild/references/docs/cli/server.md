@@ -842,8 +842,17 @@ runs. A `build` loads the managed sources its models read, as `sqb build` does, 
 alone; `--no-load` turns that off.
 A `test` or `audit` run reports each selected node with the worst result of its tests or audits.
 
-Selectors use the CLI grammar: names, `seed:`, `source:`, `tag:`, `path:` and `test:`, with `+`
-for upstream or downstream nodes. Positional selectors work as on the command line.
+Selectors use the CLI grammar: names, `seed:`, `source:`, `tag:`, `path:`, `test:` and `job:`,
+with `+` for upstream or downstream nodes. Positional selectors work as on the command line.
+
+A `build` whose selection names a job takes the job's settings, exactly as `sqb build` and the
+job's own runs do; see
+[Settings when a build names a job](../concepts/orchestration.md#settings-when-a-build-names-a-job).
+The server freezes each named job with the run: the nodes that take its settings and the settings
+themselves, as published. A rerun or retry keeps those jobs, narrowed to the nodes it reruns. The
+job's `vars` and `warehouse` need no `run.vars` or `run.warehouse`, which gate only flags a person
+types; publishing the job already decided them. A job's `full_refresh` still needs
+`run.rewrite_history`, as running the job does, unless the build selects none of the job's nodes.
 
 | Flags | Verbs | Needs |
 | --- | --- | --- |
@@ -877,7 +886,7 @@ flag is refused with its reason:
 For an ad-hoc run, the worker checks `--warehouse` against the warehouses the location
 configures for the target before any statement runs. An unconfigured warehouse fails the run with
 the reason `the requested warehouse is not configured for this target on this location; no
-warehouse statement ran`, which the run page shows. A job's own `warehouse` setting is not
+warehouse statement ran`, which the run page shows. A named job's own `warehouse` setting is not
 checked this way.
 
 A run with `--vars` is checked against the publication like any other run. The worker then
@@ -890,6 +899,10 @@ Anyone with `view` on every node of a target can see what a `build` command woul
 runs. The web UI's plan page does this for every Run button: the location serving the target runs
 [`sqb plan --json`](plan.md) on the command's nodes, and the page shows each model's action
 and reason, backfills, migrations and warnings. Running the command still needs `run.adhoc`.
+
+A plan of a command that names a job takes the job's settings as the run would, from the jobs the
+server froze with the request, so the plan shows the job's full refreshes and concurrency, and
+fails as the run would when the job's warehouse can't be selected.
 
 A plan reads the server's synced copy of the target's warehouse metadata, not the warehouse, so
 planning never resumes a suspended warehouse. The page shows when that copy synced, or that it

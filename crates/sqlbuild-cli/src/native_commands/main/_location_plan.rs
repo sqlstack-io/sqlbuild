@@ -1,6 +1,6 @@
 //! A requested plan runs in the location's runtime interpreter on frozen node keys, from the synced copy.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::future::Future;
 
 use chrono::{DateTime, Utc};
@@ -21,16 +21,17 @@ use crate::native_commands::models::{
     HeldCopy, LocationRuntimeRequest, LocationServe, PlanKey, PlanToKeep,
 };
 use crate::native_commands::types::LocationPlan;
+use crate::native_commands::types::PlanSelection;
 
 /// The plan with what to keep once its checks pass, an `{"error": ...}` report, or `None` when stopped first.
 pub(super) async fn plan_location(
     (options, runtime): (&LocationServe, &mpsc::Sender<LocationRuntimeRequest>),
-    (selection, settings, fresh): (&BTreeSet<String>, &BTreeMap<String, Value>, bool),
+    ((selection, jobs), settings, fresh): (PlanSelection<'_>, &BTreeMap<String, Value>, bool),
     (client, session_id, generation): (&LocationWorkClient, Uuid, i64),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<(LocationPlan, Option<PlanToKeep>)>, ControlError> {
     let (argv, select) = match plan_arguments(options, settings)
-        .and_then(|argv| Ok((argv, selected_names(selection)?)))
+        .and_then(|argv| Ok((argv, selected_names(selection, jobs)?)))
     {
         Ok(planned) => planned,
         Err(message) => return Ok(Some((without_diffs(plan_failure(&message)), None))),
@@ -65,6 +66,7 @@ pub(super) async fn plan_location(
         argv: argv.clone(),
         select: select.clone(),
         consumption: planned.consumption,
+        jobs: jobs.clone(),
     };
     let planned_at: DateTime<Utc> = Utc::now();
     if !fresh
@@ -83,6 +85,10 @@ pub(super) async fn plan_location(
         "copy": planned.path.to_string_lossy(),
         "version": planned.version,
         "consumption": planned.consumption,
+        "jobs": jobs,
+        "given": settings.keys().collect::<Vec<_>>(),
+        "project_dir": options.project_dir,
+        "target": options.target,
     }});
     let keep = PlanToKeep {
         generation,

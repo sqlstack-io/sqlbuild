@@ -42,6 +42,8 @@ mod test_node_errors;
 mod test_node_event_resources;
 #[path = "test_permissions.rs"]
 mod test_permissions;
+#[path = "test_pinned_jobs.rs"]
+mod test_pinned_jobs;
 #[path = "test_project_limits.rs"]
 mod test_project_limits;
 #[path = "test_publication_cache.rs"]

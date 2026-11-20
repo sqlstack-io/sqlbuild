@@ -87,7 +87,8 @@ selection.
 ### Settings when a build names a job
 
 A build or plan whose selection names a job, as `job:nightly_orders_job`, the bare name or a
-`job:` pattern such as `job:nightly_*`, takes the job's `[settings]`. Selecting the same nodes some other way, such as by tag, takes none of them.
+`job:` pattern such as `job:nightly_*`, takes the job's `[settings]`. So do ad-hoc builds and plan
+previews through `sqb server`; see [Run ad-hoc commands](/docs/cli/server#run-ad-hoc-commands). Selecting the same nodes some other way, such as by tag, takes none of them.
 Naming a group names each of its jobs. The first value set wins:
 
 1. A flag on the command line, such as `--vars` or `--concurrency`
@@ -131,6 +132,11 @@ that declares them together fails to compile, with the error a build of the grou
 
 Two named jobs that give one node different values of the same setting fail the build with `S027`,
 naming the node, both jobs and the setting. A setting only one of them sets is no conflict.
+
+`sqb plan --json` names what the jobs give the build: `full_refresh_jobs` lists the jobs whose
+models rebuild from scratch, `job_warehouses` maps each job to the warehouse its nodes run on, and
+`job_concurrency` maps each job to how many of its nodes build at once. `job_concurrency` is left
+out when `--concurrency` turns the per-job limits off.
 
 Select a pipeline by its folder or a tag rather than listing its nodes. Rule `SQBRORCHESTRATION101`
 reports a job or sensor `select` that names more than three nodes one by one; see

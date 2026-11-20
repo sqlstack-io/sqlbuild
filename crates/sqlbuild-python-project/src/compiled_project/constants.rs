@@ -38,3 +38,5 @@ pub const JOB_IGNORED_AUDIT_FAILURES_KEY: &str = "job_ignored_audit_failures";
 pub const JOB_FULL_REFRESH_KEY: &str = "job_full_refresh";
 /// Plan metadata mapping each named job whose warehouse its nodes run on to that warehouse.
 pub const JOB_WAREHOUSES_KEY: &str = "job_warehouses";
+/// Plan metadata mapping each named job whose own nodes run at most so many at once to that limit.
+pub const JOB_CONCURRENCY_KEY: &str = "job_concurrency";

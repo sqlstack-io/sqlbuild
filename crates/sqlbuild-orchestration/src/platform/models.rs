@@ -216,6 +216,9 @@ pub enum LocationWork {
         settings: std::collections::BTreeMap<String, serde_json::Value>,
         /// Plan again even when the location kept a plan for the same request.
         fresh: bool,
+        /// The jobs the command names, pinned as an ad-hoc build of it pins them.
+        #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+        jobs: std::collections::BTreeMap<String, crate::runs::models::PinnedJob>,
     },
 }
 

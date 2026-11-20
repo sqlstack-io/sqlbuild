@@ -169,6 +169,9 @@ pub struct RunRequest {
     /// The selectors a person narrowed a job run with; reruns copy it with the rest of the request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub narrowing: Option<RunNarrowing>,
+    /// The jobs an ad-hoc build's selection names, each pinned to its frozen nodes and settings.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub jobs: BTreeMap<String, PinnedJob>,
     /// Set on an automatic retry of a failed run, which is not claimed before `not_before`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry: Option<RunRetry>,
@@ -351,6 +354,22 @@ pub enum QueueWait {
     EarlierRun { run_id: Option<Uuid>, pool: String },
     /// An automatic retry waits out the job's retry delay.
     RetryDelay { attempt: u8, due_at: DateTime<Utc> },
+}
+
+/// A job an ad-hoc selection names: the frozen nodes it gives its settings to, and those settings.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PinnedJob {
+    pub selection: BTreeSet<String>,
+    pub settings: BTreeMap<String, serde_json::Value>,
+}
+
+/// Each published job and group's exact `kind:name` selection, each group's jobs and each job's settings.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PublishedJobs {
+    pub selections: BTreeMap<String, BTreeSet<String>>,
+    pub groups: BTreeMap<String, Vec<String>>,
+    pub settings: BTreeMap<String, BTreeMap<String, serde_json::Value>>,
 }
 
 /// The `sqb build` selectors one run of a job was narrowed with.
@@ -846,6 +865,10 @@ pub struct CommandPlan {
     pub verb: String,
     pub selection: BTreeSet<String>,
     pub settings: BTreeMap<String, serde_json::Value>,
+    /// The jobs a build's selection names, each pinned to the frozen nodes that take its settings.
+    pub jobs: BTreeMap<String, PinnedJob>,
+    /// The build-wide settings those jobs give where the command line is silent; they decide the write set.
+    pub job_settings: BTreeMap<String, serde_json::Value>,
 }
 
 /// One permission the run needs and whether the person holds it on every resolved node.

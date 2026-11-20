@@ -147,6 +147,7 @@ pub(super) fn reuse_key(select: &[&str]) -> PlanKey {
         argv: vec!["plan".into(), "--json".into(), "--changed".into()],
         select: select.iter().map(|name| (*name).to_owned()).collect(),
         consumption: true,
+        jobs: Default::default(),
     }
 }
 

@@ -38,3 +38,9 @@ pub(crate) type LocationPlan = (
     serde_json::Value,
     std::collections::BTreeMap<String, sqlbuild_orchestration::platform::models::PlanModelDiff>,
 );
+
+/// The frozen nodes a plan request selects, and the jobs it pins with their nodes and settings.
+pub(crate) type PlanSelection<'a> = (
+    &'a std::collections::BTreeSet<String>,
+    &'a std::collections::BTreeMap<String, sqlbuild_orchestration::runs::models::PinnedJob>,
+);

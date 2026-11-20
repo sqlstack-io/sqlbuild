@@ -69,7 +69,13 @@ pub(crate) async fn frozen_publication_request(
         let refusal = format!("workers do not run sqb {}", plan.verb);
         return Ok((transaction, Err(refusal)));
     };
-    let writers = held_write_set(&publication.writers, (&plan.selection, &plan.settings));
+    let effective: BTreeMap<String, serde_json::Value> = plan
+        .job_settings
+        .iter()
+        .chain(&plan.settings)
+        .map(|(name, value)| (name.clone(), value.clone()))
+        .collect();
+    let writers = held_write_set(&publication.writers, (&plan.selection, &effective));
     let (transaction, images) = query(
         transaction,
         "SELECT image_id FROM sqb_snapshots WHERE snapshot_id=$1",
@@ -115,6 +121,7 @@ pub(crate) async fn frozen_publication_request(
                 window: None,
                 pools: BTreeMap::new(),
                 narrowing: None,
+                jobs: plan.jobs,
                 retry: None,
                 member_attempt: None,
             },

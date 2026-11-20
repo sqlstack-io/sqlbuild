@@ -15,8 +15,8 @@ use crate::plan_output::_helpers::plan_json::table_type_json;
 use crate::plan_output::_helpers::plan_json::warning_json;
 use crate::plan_output::_helpers::values::mapped;
 use crate::plan_output::constants::{
-    CHANGED_KEY, FULL_REFRESH_JOBS_KEY, IGNORE_AUDIT_FAILURES_JOBS_KEY, RENAMED_REASON,
-    WAREHOUSE_JOBS_KEY,
+    CHANGED_KEY, CONCURRENCY_JOBS_KEY, FULL_REFRESH_JOBS_KEY, IGNORE_AUDIT_FAILURES_JOBS_KEY,
+    RENAMED_REASON, WAREHOUSE_JOBS_KEY,
 };
 use crate::plan_output::main::any::any;
 use crate::plan_output::main::dict::dict;
@@ -32,7 +32,7 @@ use sqlbuild_python_base::compile_outputs::main::indented_json::indented_json;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::main::fields::mapping_get::mapping_get;
 use sqlbuild_python_project::compiled_project::constants::{
-    JOB_FULL_REFRESH_KEY, JOB_IGNORED_AUDIT_FAILURES_KEY, JOB_WAREHOUSES_KEY,
+    JOB_CONCURRENCY_KEY, JOB_FULL_REFRESH_KEY, JOB_IGNORED_AUDIT_FAILURES_KEY, JOB_WAREHOUSES_KEY,
 };
 use std::collections::HashMap;
 
@@ -145,9 +145,14 @@ pub fn format_plan_json(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> P
             )?;
         }
     }
-    let warehouses: Bound<'_, PyAny> = mapping_get(&metadata, JOB_WAREHOUSES_KEY)?;
-    if !warehouses.is_none() {
-        result.set_item(WAREHOUSE_JOBS_KEY, warehouses)?;
+    for (key, label) in [
+        (JOB_WAREHOUSES_KEY, WAREHOUSE_JOBS_KEY),
+        (JOB_CONCURRENCY_KEY, CONCURRENCY_JOBS_KEY),
+    ] {
+        let jobs: Bound<'_, PyAny> = mapping_get(&metadata, key)?;
+        if !jobs.is_none() {
+            result.set_item(label, jobs)?;
+        }
     }
     indented_json(result.as_any())
 }

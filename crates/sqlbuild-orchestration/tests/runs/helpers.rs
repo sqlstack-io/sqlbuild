@@ -110,6 +110,7 @@ pub(crate) fn request(
         window: None,
         pools: BTreeMap::new(),
         narrowing: None,
+        jobs: BTreeMap::new(),
         retry: None,
         member_attempt: None,
     }

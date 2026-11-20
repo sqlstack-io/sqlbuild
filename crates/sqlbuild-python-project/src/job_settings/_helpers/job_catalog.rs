@@ -9,6 +9,7 @@ use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{PyResult, Python};
 use serde_json::Value;
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::graph::main::parse_selector::parse_selector;
 use sqlbuild_analysis::graph::models::{JobSelection, ParsedSelector};
 use sqlbuild_analysis::job_settings::main::declared_runs::declared_runs;
@@ -19,15 +20,17 @@ use sqlbuild_discovery::orchestration_files::models::{OrchestrationInventory, Ru
 use crate::compiled_project::constants::JOB_SELECTOR_KINDS;
 use crate::compiled_project::constants::SELECTOR_INTERSECTION;
 use crate::compiled_project::constants::SENSOR_RUN_ARGUMENT;
+use crate::job_settings::types::PinnedJobs;
 use sqlbuild_python_front::discovery::main::sources::orchestration_declarations::orchestration_declarations;
 
 /// Each job and group's selection, and the names of those a schedule or sensor starts.
 type Catalog = (BTreeMap<String, JobSelection>, BTreeSet<String>);
 
-/// The running command's project directory, its `--target` and, once loaded, its jobs and their settings.
+/// The running command's project directory, its `--target`, the jobs a frozen ad-hoc build pins and, once loaded, its jobs and their settings.
 struct JobScope {
     project_dir: PathBuf,
     selected_target: Option<String>,
+    pinned: Option<PinnedJobs>,
     catalog: Option<(Catalog, BTreeMap<String, DeclaredRun>)>,
 }
 
@@ -69,6 +72,7 @@ pub(crate) fn with_job_scope<T>(
         JobScope {
             project_dir,
             selected_target,
+            pinned: None,
             catalog: None,
         },
         run,
@@ -97,10 +101,48 @@ pub(crate) fn with_frozen_job<T>(
         JobScope {
             project_dir,
             selected_target,
+            pinned: None,
             catalog: Some((catalog, BTreeMap::from([(job.to_owned(), declared)]))),
         },
         run,
     )
+}
+
+/// Run one command with only the `pinned` jobs declared, each selecting exactly its frozen nodes; the project's other jobs stay selectable and still trigger.
+pub(crate) fn with_frozen_jobs<T>(
+    (project_dir, selected_target): (PathBuf, Option<String>),
+    pinned: PinnedJobs,
+    run: impl FnOnce() -> T,
+) -> T {
+    within_job_scope(
+        JobScope {
+            project_dir,
+            selected_target,
+            pinned: Some(pinned),
+            catalog: None,
+        },
+        run,
+    )
+}
+
+/// The project's catalog with each pinned job selecting its frozen nodes, and only the pinned jobs declared.
+fn pinned_catalog(
+    (mut catalog, triggered): Catalog,
+    pinned: &PinnedJobs,
+) -> (Catalog, BTreeMap<String, DeclaredRun>) {
+    let mut declared: BTreeMap<String, DeclaredRun> = BTreeMap::new();
+    for (name, (keys, settings)) in pinned {
+        let keys: Vec<ObjectKey> = keys.iter().cloned().collect();
+        catalog.insert(name.clone(), JobSelection::Resolved { keys });
+        declared.insert(
+            name.clone(),
+            DeclaredRun::Job {
+                settings: settings.clone(),
+                retry: None,
+            },
+        );
+    }
+    ((catalog, triggered), declared)
 }
 
 fn within_job_scope<T>(scope: JobScope, run: impl FnOnce() -> T) -> T {
@@ -162,12 +204,16 @@ fn loaded_jobs(py: Python<'_>) -> PyResult<Option<(Catalog, BTreeMap<String, Dec
     let Some(scope) = JOB_SCOPE.with(|scope| {
         scope.borrow().as_ref().map(|scope| match &scope.catalog {
             Some(loaded) => Ok(loaded.clone()),
-            None => Err((scope.project_dir.clone(), scope.selected_target.clone())),
+            None => Err((
+                scope.project_dir.clone(),
+                scope.selected_target.clone(),
+                scope.pinned.clone(),
+            )),
         })
     }) else {
         return Ok(None);
     };
-    let (project_dir, selected_target): (PathBuf, Option<String>) = match scope {
+    let (project_dir, selected_target, pinned) = match scope {
         Ok(loaded) => return Ok(Some(loaded)),
         Err(scope) => scope,
     };
@@ -175,10 +221,11 @@ fn loaded_jobs(py: Python<'_>) -> PyResult<Option<(Catalog, BTreeMap<String, Dec
         effective_target(&project_dir, selected_target).map_err(PyValueError::new_err)?;
     let inventory: OrchestrationInventory =
         orchestration_declarations(project_dir.clone().into_pyobject(py)?.as_any())?;
-    let loaded = (
-        inventory_catalog(&inventory, target.as_deref()),
-        declared_runs(&inventory, target.as_deref()),
-    );
+    let catalog: Catalog = inventory_catalog(&inventory, target.as_deref());
+    let loaded = match &pinned {
+        Some(pinned) => pinned_catalog(catalog, pinned),
+        None => (catalog, declared_runs(&inventory, target.as_deref())),
+    };
     JOB_SCOPE.with(|scope| {
         if let Some(scope) = scope.borrow_mut().as_mut() {
             scope.catalog = Some(loaded.clone());

@@ -1,5 +1,8 @@
+use std::collections::BTreeMap;
+
 use serde_json::{Value, json};
 use sqlbuild_orchestration::platform::constants::PLAN_DOCUMENT_BYTES;
+use sqlbuild_orchestration::runs::models::PinnedJob;
 
 use std::sync::Mutex;
 
@@ -14,10 +17,12 @@ use crate::native_commands::constants::{REUSED_PLAN_BYTES, REUSED_PLANS};
 use crate::native_commands::models::LocationServe;
 use crate::native_commands::models::LocationWorkTurn;
 use crate::native_commands::models::PlanReuse;
+use crate::native_commands::models::{PlanKey, PlanToKeep};
 use crate::native_commands::tests::helpers::{
     finished_plan, finished_plan_bytes, kept_plans, plan_output, plan_to_keep, reuse_clock,
     reuse_key,
 };
+use crate::native_commands::tests::test_types::PinnedReuseTestCase;
 use crate::native_commands::tests::test_types::{
     PlanArgumentsTestCase, PlanDocumentTestCase, PlanReuseBoundTestCase, PlanReuseTestCase,
     WorkCheckTestCase,
@@ -189,6 +194,59 @@ fn given_a_kept_plan_when_the_same_request_comes_again_then_only_the_same_genera
             test_case.expected_timings,
             "{description}",
             description = test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_kept_plan_when_a_request_pins_other_jobs_then_it_plans_again() {
+    let pinned = |settings: serde_json::Value| -> BTreeMap<String, PinnedJob> {
+        BTreeMap::from([(
+            "nightly".to_owned(),
+            PinnedJob {
+                selection: ["model:orders".to_owned()].into(),
+                settings: serde_json::from_value(settings).expect("settings"),
+            },
+        )])
+    };
+    let test_cases = [
+        PinnedReuseTestCase {
+            description: "the same pinned jobs reuse the plan",
+            kept: pinned(json!({"full_refresh": true})),
+            asked: pinned(json!({"full_refresh": true})),
+            expected_reused: true,
+        },
+        PinnedReuseTestCase {
+            description: "a pinned job with other settings plans again",
+            kept: pinned(json!({"full_refresh": true})),
+            asked: pinned(json!({"full_refresh": false})),
+            expected_reused: false,
+        },
+        PinnedReuseTestCase {
+            description: "a request that pins no job does not reuse one that pinned a job",
+            kept: pinned(json!({"full_refresh": true})),
+            asked: BTreeMap::new(),
+            expected_reused: false,
+        },
+    ];
+    for test_case in test_cases {
+        let reuse: Mutex<Option<PlanReuse>> = Mutex::new(None);
+        let (document, diffs) = finished_plan(false);
+        let mut keep: PlanToKeep = plan_to_keep(3, "copy-1", &["orders"]);
+        keep.key.jobs = test_case.kept;
+        remember_plan(
+            (&reuse, (REUSED_PLANS, REUSED_PLAN_BYTES)),
+            keep,
+            (&document, &diffs),
+        );
+        let mut asked: PlanKey = reuse_key(&["orders"]);
+        asked.jobs = test_case.asked;
+        let reused = reused_plan(&reuse, (3, "copy-1"), &asked, reuse_clock());
+        assert_eq!(
+            reused.is_some(),
+            test_case.expected_reused,
+            "{}",
+            test_case.description
         );
     }
 }

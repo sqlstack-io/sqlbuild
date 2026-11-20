@@ -8,6 +8,7 @@ use uuid::Uuid;
 use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::runs::_helpers::lifecycle::pinned_jobs::narrow_pinned_jobs;
 use crate::runs::_helpers::requests::permissions::authorize_execution;
 use crate::runs::models::{RerunRequest, RunCommand, RunKind, RunOrigin, RunRequest, RunStatus};
 use crate::snapshots::constants::SOURCE_KEY_PREFIX;
@@ -90,6 +91,7 @@ pub(crate) async fn frozen_rerun(
                 .filter(|key| key.starts_with(SOURCE_KEY_PREFIX)),
         );
     }
+    narrow_pinned_jobs(&mut frozen);
     frozen.run_id = request.run_id;
     frozen.origin = RunOrigin::Rerun;
     frozen.parent_run_id = None;

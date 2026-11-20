@@ -2308,6 +2308,10 @@ export interface components {
             command: string[];
             /** @description Plan again even when the location kept a plan for the same request. */
             fresh: boolean;
+            /** @description The jobs the command names, pinned as an ad-hoc build of it pins them. */
+            jobs?: {
+                [key: string]: components["schemas"]["PinnedJob"];
+            };
             /** @enum {string} */
             kind: "plan";
             selection: string[];
@@ -2796,6 +2800,13 @@ export interface components {
             reason: string;
             /** @enum {string} */
             status: "unavailable";
+        };
+        /** @description A job an ad-hoc selection names: the frozen nodes it gives its settings to, and those settings. */
+        PinnedJob: {
+            selection: string[];
+            settings: {
+                [key: string]: unknown;
+            };
         };
         /** @description A planned model's diff text, stored beside its plan document. */
         PlanDiffRead: components["schemas"]["PlanModelDiff"] & {
@@ -3520,6 +3531,10 @@ export interface components {
             command?: components["schemas"]["RunCommand"];
             image_id?: string | null;
             job_key?: string | null;
+            /** @description The jobs an ad-hoc build's selection names, each pinned to its frozen nodes and settings. */
+            jobs?: {
+                [key: string]: components["schemas"]["PinnedJob"];
+            };
             kind: components["schemas"]["RunKind"];
             /** Format: uuid */
             location_id: string;

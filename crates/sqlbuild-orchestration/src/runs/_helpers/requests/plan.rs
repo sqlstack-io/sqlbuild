@@ -123,6 +123,7 @@ pub(in crate::runs) async fn request_plan_in(
                 .filter(|(name, _)| name != PLAN_IGNORED_SETTING)
                 .collect(),
             fresh: request.fresh,
+            jobs: frozen.jobs,
         },
     };
     let transaction = enqueue_location_work(
