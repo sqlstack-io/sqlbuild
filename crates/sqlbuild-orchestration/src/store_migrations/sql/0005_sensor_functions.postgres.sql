@@ -10,11 +10,11 @@ DELETE FROM sqb_location_work WHERE request_json -> 'work' ->> 'kind' = 'evaluat
 
 DELETE FROM sqb_sensor_evaluation_events;
 
-ALTER TABLE sqb_sensor_evaluation_events ADD COLUMN subject_event_id TEXT;
+ALTER TABLE sqb_sensor_evaluation_events ADD COLUMN IF NOT EXISTS subject_event_id TEXT;
 
-CREATE INDEX sqb_sensor_evaluation_subject ON sqb_sensor_evaluation_events(trigger_id, subject_event_id) WHERE subject_event_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS sqb_sensor_evaluation_subject ON sqb_sensor_evaluation_events(trigger_id, subject_event_id) WHERE subject_event_id IS NOT NULL;
 
-CREATE TABLE sqb_sensor_deliveries (
+CREATE TABLE IF NOT EXISTS sqb_sensor_deliveries (
     trigger_id {uuid} NOT NULL REFERENCES sqb_triggers(trigger_id),
     event_id TEXT NOT NULL,
     evaluation_id {uuid} NOT NULL,

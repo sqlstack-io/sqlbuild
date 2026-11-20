@@ -29,13 +29,26 @@ UPDATE sqb_triggers SET job_key = NULL, removed_in_snapshot_id = COALESCE(remove
 
 DELETE FROM sqb_location_work WHERE json_extract(request_json, '$.work.kind') = 'evaluate_sensor';
 
-DELETE FROM sqb_sensor_evaluation_events;
+DROP TABLE sqb_sensor_evaluation_events;
 
-ALTER TABLE sqb_sensor_evaluation_events ADD COLUMN subject_event_id TEXT;
+CREATE TABLE sqb_sensor_evaluation_events (
+    event_id {uuid} PRIMARY KEY,
+    evaluation_id {uuid} NOT NULL,
+    trigger_id {uuid} NOT NULL REFERENCES sqb_triggers(trigger_id),
+    phase TEXT NOT NULL CHECK (phase IN ('requested', 'completed', 'failed', 'timed_out', 'abandoned')),
+    occurred_at {time} NOT NULL,
+    fact_json {json} NOT NULL,
+    subject_event_id TEXT,
+    UNIQUE (evaluation_id, phase)
+);
+
+CREATE INDEX sqb_sensor_evaluation_history ON sqb_sensor_evaluation_events(trigger_id, phase, occurred_at, evaluation_id);
+
+CREATE INDEX sqb_sensor_evaluation_expiry ON sqb_sensor_evaluation_events(occurred_at);
 
 CREATE INDEX sqb_sensor_evaluation_subject ON sqb_sensor_evaluation_events(trigger_id, subject_event_id) WHERE subject_event_id IS NOT NULL;
 
-CREATE TABLE sqb_sensor_deliveries (
+CREATE TABLE IF NOT EXISTS sqb_sensor_deliveries (
     trigger_id {uuid} NOT NULL REFERENCES sqb_triggers(trigger_id),
     event_id TEXT NOT NULL,
     evaluation_id {uuid} NOT NULL,

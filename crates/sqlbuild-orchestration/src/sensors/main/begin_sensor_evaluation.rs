@@ -40,7 +40,7 @@ pub async fn begin_sensor_evaluation(
     let (transaction, cursor) = read_sensor_cursor(transaction, trigger_id).await?;
     let (mut transaction, previous) = last_attempt(transaction, trigger_id).await?;
     if let Some((previous, terminal)) = previous {
-        let Some(phase) = terminal else {
+        if terminal.is_none() {
             if previous.request.epoch == lease.epoch
                 && previous.request.snapshot_id == sensor.snapshot_id
                 && previous.request.cursor == cursor
@@ -48,17 +48,15 @@ pub async fn begin_sensor_evaluation(
                 commit(transaction).await?;
                 return Ok(Some(previous.request));
             }
-            let transaction = append_evaluation(
+            transaction = append_evaluation(
                 transaction,
                 &previous.request,
                 SensorEvaluationOutcome::Abandoned,
             )
             .await?;
-            commit(defer_sensor(transaction, trigger_id, now).await?).await?;
-            return Ok(None);
-        };
-        let delivered =
-            phase == SensorEvaluationOutcome::COMPLETED && previous.request.event.is_some();
+        }
+        let delivered = terminal.as_deref() == Some(SensorEvaluationOutcome::COMPLETED)
+            && previous.request.event.is_some();
         let next = previous.request.requested_at + interval;
         if !delivered && next > now {
             commit(defer_sensor(transaction, trigger_id, next).await?).await?;

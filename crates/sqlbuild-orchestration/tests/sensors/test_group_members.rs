@@ -103,7 +103,7 @@ fn given_a_member_job_watched_by_a_sensor_when_its_group_runs_then_the_member_ou
                 sensors.insert(
                     name.into(),
                     json!({
-                        "description": "Report when a job ends", "job_key": "report_job",
+                        "description": "Report when a job ends", "function": "start_report_job", "code_hash": "v1", "timeout_seconds": 60,
                         "when": {"kind": "run_event", "job_key": job, "kinds": [kind]},
                         "minimum_interval_seconds": 1
                     }),
@@ -279,7 +279,7 @@ fn given_a_member_retried_inside_its_group_when_sensors_watch_it_then_only_its_f
                 sensors.insert(
                     name.into(),
                     json!({
-                        "description": "Report when staging ends", "job_key": "report_job",
+                        "description": "Report when staging ends", "function": "start_report_job", "code_hash": "v1", "timeout_seconds": 60,
                         "when": when, "minimum_interval_seconds": 1
                     }),
                 );
@@ -471,7 +471,7 @@ fn given_a_member_the_group_skips_when_sensors_and_alerts_watch_it_then_it_is_sk
                 sensors.insert(
                     format!("marts_{kind}"),
                     json!({
-                        "description": "Report when marts ends", "job_key": "report_job",
+                        "description": "Report when marts ends", "function": "start_report_job", "code_hash": "v1", "timeout_seconds": 60,
                         "when": {"kind": "run_event", "job_key": "marts_job", "kinds": [kind]},
                         "minimum_interval_seconds": 1
                     }),

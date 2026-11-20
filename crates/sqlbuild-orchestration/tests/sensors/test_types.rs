@@ -1,5 +1,5 @@
 use crate::runs::models::{NodeOutcome, RunOutcome, RunStatus};
-use crate::sensors::models::CustomSensorOutcome;
+use crate::sensors::models::SensorFunctionOutcome;
 use crate::store::tests::store_test_types::Backend;
 
 pub(crate) struct SensorTestCase {
@@ -9,7 +9,7 @@ pub(crate) struct SensorTestCase {
 }
 
 pub(crate) struct CustomSensorResultCase {
-    pub(crate) outcome: CustomSensorOutcome,
+    pub(crate) outcome: SensorFunctionOutcome,
     pub(crate) expected_phase: &'static str,
     pub(crate) expected_cursor: Option<&'static str>,
 }

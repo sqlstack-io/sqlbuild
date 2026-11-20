@@ -1,5 +1,5 @@
 use crate::orchestration_modules::models::{
-    LiteralArgument, PythonDeclaration, PythonDeclarationKind, SourcePosition,
+    LiteralArgument, PythonDeclaration, PythonDeclarationKind, SensorForm, SourcePosition,
 };
 
 /// A 1-based line and column.
@@ -37,5 +37,27 @@ pub(super) fn declaration(
         job_references,
         targets: Some(Vec::new()),
         condition: None,
+        sensor_form: None,
+        positional: None,
+    }
+}
+
+/// A `@sensor(...)` decorating `function`, whose call starts at `position`, with no `targets`.
+pub(super) fn sensor(
+    name: LiteralArgument,
+    position: SourcePosition,
+    function: &str,
+    job_references: Vec<(&'static str, LiteralArgument)>,
+) -> PythonDeclaration {
+    PythonDeclaration {
+        sensor_form: Some(SensorForm::Decorator {
+            function: function.to_owned(),
+        }),
+        ..declaration(
+            PythonDeclarationKind::Sensor,
+            name,
+            position,
+            job_references,
+        )
     }
 }

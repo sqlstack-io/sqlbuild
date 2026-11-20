@@ -6,6 +6,7 @@ use crate::credentials::models::AuditContext;
 use crate::declarations::main::change_trigger::change_trigger;
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
 use crate::platform::models::PlatformEvent;
+use crate::platform::models::{LocationWorkOutcome, LocationWorkResult};
 use crate::runs::main::{
     execution::advance_groups::advance_groups, execution::change_run::change_run,
     execution::claim_next_run::claim_next_run, requests::request_job_run::request_job_run,
@@ -14,13 +15,16 @@ use crate::runs::models::{
     JobRunRequest, NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome,
 };
 use crate::scheduler::models::SchedulerLease;
-use crate::sensors::models::SensorEvaluationFact;
+use crate::sensors::main::complete_sensor::complete_sensor;
+use crate::sensors::models::{
+    RequestedRun, SensorEvaluationFact, SensorEvaluationRequest, SensorFunctionOutcome,
+};
 use crate::snapshots::models::SnapshotInput;
 use crate::store::main::append_control_event::append_control_event;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::query::query;
-use crate::store::models::{ControlEvent, ControlStore, TransactionMode};
+use crate::store::models::{ControlEvent, ControlStore, Parameter, TransactionMode};
 
 use crate::runs::tests::helpers::snapshot as base_snapshot;
 
@@ -36,7 +40,7 @@ pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
         "triggers".into(),
         json!({
             "health_orders": {
-                "description": "Refresh reporting on overdue ticks", "job_key": "orders",
+                "description": "Refresh reporting on overdue ticks", "function": "start_orders", "code_hash": "v1", "timeout_seconds": 60,
                 "when": {"kind": "platform_event", "kinds": ["tick_overdue", "location_broken", "launch_failed"]},
                 "minimum_interval_seconds": 1
             }
@@ -286,19 +290,110 @@ pub(crate) async fn evaluate_sensors(
             crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation(
                 store,
                 lease,
-                trigger.trigger_id,
+                (trigger.trigger_id, None),
             )
             .await
             .expect("begin evaluation")
         else {
             continue;
         };
-        let count = crate::sensors::main::complete_builtin_sensor::complete_builtin_sensor(
-            store, lease, &requested,
-        )
-        .await
-        .expect("complete evaluation");
+        let count = complete_starting_job(store, lease, &requested)
+            .await
+            .expect("complete evaluation");
         *fired.entry(trigger.name.clone()).or_default() += count;
     }
     fired
+}
+
+/// What a test sensor's function does, read from its name: `start_<job>` starts the job for the event.
+fn stand_in_outcome(evaluation: &SensorEvaluationRequest) -> SensorFunctionOutcome {
+    let Some(job) = evaluation.definition.function.strip_prefix("start_") else {
+        return SensorFunctionOutcome::Handled { cursor: None };
+    };
+    let run_key = evaluation.event.as_ref().map_or_else(
+        || evaluation.evaluation_id.to_string(),
+        |event| format!("{}:{job}", event.id()),
+    );
+    SensorFunctionOutcome::Requested {
+        cursor: None,
+        runs: vec![RequestedRun {
+            job: job.into(),
+            run_key,
+        }],
+    }
+}
+
+/// Store `outcome` as the location's answer to the tick, as a location that ran the function would.
+pub(crate) async fn answer_sensor(
+    store: &ControlStore,
+    evaluation: &SensorEvaluationRequest,
+    outcome: SensorFunctionOutcome,
+) {
+    let result = LocationWorkResult {
+        claim_id: Uuid::nil(),
+        session_id: Uuid::nil(),
+        outcome: LocationWorkOutcome::SensorEvaluation { outcome },
+    };
+    let (transaction, _) = query(
+        begin(store, TransactionMode::Write).await.expect("answer"),
+        "UPDATE sqb_location_work SET result_json=$2, completed_at=$3 WHERE request_id=$1 AND completed_at IS NULL",
+        vec![
+            Parameter::Id(evaluation.evaluation_id),
+            Parameter::Json(json!(result)),
+            Parameter::Time(Utc::now()),
+        ],
+    )
+    .await
+    .expect("store the location's answer");
+    commit(transaction).await.expect("commit answer");
+}
+
+/// Answer the tick as the stand-in function named in its definition would, then complete it: the runs it started.
+pub(crate) async fn complete_starting_job(
+    store: &ControlStore,
+    lease: &SchedulerLease,
+    evaluation: &SensorEvaluationRequest,
+) -> Result<usize, crate::store::errors::ControlError> {
+    answer_sensor(store, evaluation, stand_in_outcome(evaluation)).await;
+    complete_sensor(store, lease, evaluation).await
+}
+
+/// Run the sensor's ticks until it has handled every event it can see, each by its stand-in function: the runs they started.
+pub(crate) async fn drain_sensor(
+    store: &ControlStore,
+    lease: &SchedulerLease,
+    trigger_id: Uuid,
+) -> usize {
+    let mut started = 0;
+    let mut seen: Vec<crate::sensors::models::SensorCursor> = Vec::new();
+    loop {
+        match crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation(
+            store,
+            lease,
+            (trigger_id, None),
+        )
+        .await
+        .expect("begin tick")
+        {
+            Some(requested) => {
+                started += complete_starting_job(store, lease, &requested)
+                    .await
+                    .expect("complete tick");
+            }
+            None => {
+                let (transaction, cursor) =
+                    crate::sensors::main::read_sensor_cursor::read_sensor_cursor(
+                        begin(store, TransactionMode::Read).await.expect("read"),
+                        trigger_id,
+                    )
+                    .await
+                    .expect("cursor");
+                commit(transaction).await.expect("commit");
+                if seen.contains(&cursor) {
+                    return started;
+                }
+                seen.push(cursor);
+            }
+        }
+    }
 }
