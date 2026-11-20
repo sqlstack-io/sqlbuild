@@ -10,9 +10,10 @@
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import type { RunEventLevel } from '$lib/api';
 	import { formatStamp } from '$lib/format/time';
-	import { clockTime, nodeLabel, shortRunId } from '$lib/operate/labels';
+	import { nodeLabel, shortRunId } from '$lib/operate/labels';
 	import type { EventCategory } from './types';
 	import { EVENT_CATEGORIES, type LogEntry } from './utils';
+	import { fullStamp } from './utils/proto';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 
 	let {
@@ -21,6 +22,7 @@
 		runId,
 		filteredBy,
 		printed = $bindable(false),
+		onnode,
 		onstatement
 	}: {
 		entries: LogEntry[];
@@ -29,6 +31,8 @@
 		filteredBy: string[];
 		/** Whether what the run printed is shown; a failing run's last printed block always is. */
 		printed?: boolean;
+		/** A node name clicked: the log shows only that node. */
+		onnode?: (nodeKey: string) => void;
 		/** Opens a query's statement, with its SQL. */
 		onstatement?: (nodeKey: string) => void;
 	} = $props();
@@ -84,7 +88,8 @@
 		URL.revokeObjectURL(url);
 	}
 	const logColumns = $derived<TableColumn[]>([
-		{ id: 'time', label: 'Time', width: '110px' },
+		// Full timestamps, never cropped (CHI-1591, change 6).
+		{ id: 'time', label: 'Time', width: '206px' },
 		...(grouped ? [{ id: 'run', label: 'Job run', width: '100px' }] : []),
 		{ id: 'node', label: 'Node', width: '220px' },
 		{ id: 'what', label: 'What happened', minWidth: 300, truncate: false }
@@ -109,9 +114,11 @@
 <DataTable class="static compact log" embedded columns={logColumns} rows={shown} key={(e) => e.id} empty={entries.length ? 'Nothing in the log matches these filters.' : 'Nothing logged yet.'}>
 	{#snippet row(e)}
 			<tr class:error={e.level === 'error'} class:warn={e.level === 'warn'}>
-				<td class="faint nowrap" title={formatStamp(e.at)}>{clockTime(e.at)}</td>
+				<td class="faint nowrap mono stamp" title={formatStamp(e.at)}>{fullStamp(e.at)}</td>
 				{#if grouped}<td class="mono faint"><a href={to(`/runs/${e.runId}`)}>{shortRunId(e.runId)}</a></td>{/if}
-				<td class="mono" class:faint={!e.nodeKey} title={e.nodeKey ?? undefined}>{e.nodeKey ? nodeLabel(e.nodeKey) : (e.stream ?? 'run')}</td>
+				<td class="mono" class:faint={!e.nodeKey} title={e.nodeKey ? `Show only ${e.nodeKey} in the log` : undefined}>
+					{#if e.nodeKey && onnode}<Button variant="link" size="inline" class="font-mono text-[12px]" onclick={() => onnode(e.nodeKey!)}>{nodeLabel(e.nodeKey)}</Button>{:else}{e.nodeKey ? nodeLabel(e.nodeKey) : (e.stream ?? 'run')}{/if}
+				</td>
 				<td class:out={e.stream}>
 					{#if e.stream}
 						{@const lines = e.text.split('\n')}
@@ -131,7 +138,7 @@
 			{#if expanded.has(e.id)}
 				{#each e.queries as x (x.id)}
 					<tr class="query" class:error={x.level === 'error'}>
-						<td class="faint nowrap" title={formatStamp(x.at)}>{clockTime(x.at)}</td>
+						<td class="faint nowrap mono stamp" title={formatStamp(x.at)}>{fullStamp(x.at)}</td>
 						{#if grouped}<td></td>{/if}
 						<td></td>
 						<td>

@@ -19,7 +19,9 @@
 		selected = [],
 		groups = [],
 		active = false,
-		onselect
+		skipText: causeOf = () => null,
+		onselect,
+		onopen
 	}: {
 		nodes: RunNode[];
 		/** Time zero of the axis (ms): the first node's start. */
@@ -30,8 +32,12 @@
 		groups?: GanttGroup[];
 		/** The run is still going, so a node that hasn't started is waiting, not left out. */
 		active?: boolean;
-		/** `add` is true for Ctrl-, Cmd- or Shift-click. */
-		onselect: (nodeKey: string, add: boolean) => void;
+		/** Why a node was skipped, on one line, chain included; null for the plain status. */
+		skipText?: (nodeKey: string) => string | null;
+		/** The tick box: adds the node to the selection, or takes it out. */
+		onselect: (nodeKey: string) => void;
+		/** A click on the row: the node's details, in the drawer. */
+		onopen: (nodeKey: string) => void;
 	} = $props();
 
 	const startOf = (n: RunNode) => (n.startedAt ? (Date.parse(n.startedAt) - origin) / 1000 : null);
@@ -49,7 +55,7 @@
 	let gutterDragging = $state(false);
 	let scrolledX = $state(false);
 	const GUTTER_MIN = 140;
-	const GUTTER_MAX = 560;
+	const GUTTER_MAX = 720;
 
 	const trackBaseW = $derived(Math.max(120, viewportW - gutterW - 24));
 	const trackW = $derived(trackBaseW * zoom);
@@ -76,7 +82,8 @@
 		if (!ctx) return 250;
 		ctx.font = '12px "IBM Plex Mono", ui-monospace, monospace';
 		const widest = Math.max(0, ...nodes.map((n) => ctx.measureText(nodeLabel(n.nodeKey)).width));
-		return Math.min(360, Math.max(GUTTER_MIN, Math.ceil(widest) + 60));
+		// Names are never cut: the column fits the longest, up to the most it may take.
+		return Math.min(GUTTER_MAX, Math.max(GUTTER_MIN, Math.ceil(widest) + 84));
 	}
 
 	onMount(() => {
@@ -119,6 +126,8 @@
 	});
 
 	function skipText(n: RunNode): string {
+		const cause = causeOf(n.nodeKey);
+		if (cause) return cause;
 		if (n.status === 'skipped' && n.skippedBecauseOf) {
 			const across = n.skippedBecauseOf.runId !== n.runId;
 			return `skipped: ${n.skippedBecauseOf.nodeKey} failed${across ? ` in ${n.skippedBecauseOf.jobKey ?? n.skippedBecauseOf.runId}` : ''}`;
@@ -192,8 +201,8 @@
 					{@const n = row.node}
 					{@const s = startOf(n)}
 					{@const e = endOf(n)}
-					<!-- raw-button: a row of the chart, clickable as a whole to select its node -->
-					<button class="row" class:sel={selected.includes(n.nodeKey)} onclick={(ev) => onselect(n.nodeKey, ev.metaKey || ev.ctrlKey || ev.shiftKey)}>
+					<!-- A row of the chart: a click opens its node's details; its tick box selects it. -->
+					<div class="row" class:sel={selected.includes(n.nodeKey)} role="button" tabindex="0" onclick={() => onopen(n.nodeKey)} onkeydown={(ev) => (ev.key === 'Enter' || ev.key === ' ') && onopen(n.nodeKey)} title="Show {n.nodeKey}'s details">
 						<span
 							class="gutter cell"
 							class:shadow={scrolledX}
@@ -202,6 +211,17 @@
 							title={n.nodeKey}
 						>
 							{#if selected.includes(n.nodeKey)}<span class="sel-bar"></span>{/if}
+							<input
+								type="checkbox"
+								class="sb-check tick"
+								checked={selected.includes(n.nodeKey)}
+								onclick={(ev) => {
+									ev.stopPropagation();
+									onselect(n.nodeKey);
+								}}
+								aria-label="Select {n.nodeKey}"
+								title="Add to the selection, or take it out"
+							/>
 							{nodeLabel(n.nodeKey)}{#if n.critical}<em title="Marked critical: if it fails, the whole group stops">critical</em>{/if}
 						</span>
 						<span class="track">
@@ -213,7 +233,7 @@
 								<span class="dur" style:--s={s} style:--e={e} class:flip={durFlips(dur, s, e)}>{dur}</span>
 							{/if}
 						</span>
-					</button>
+					</div>
 				{/if}
 			{/each}
 		</div>
@@ -367,8 +387,11 @@
 		border-bottom: 1px solid var(--border-subtle);
 		text-align: left;
 	}
-	button.row:hover,
-	button.row:hover .gutter,
+	.row[role="button"] {
+		cursor: pointer;
+	}
+	.row[role="button"]:hover,
+	.row[role="button"]:hover .gutter,
 	.row.sel,
 	.row.sel .gutter {
 		background: var(--sb-hover);
@@ -379,7 +402,7 @@
 		align-items: center;
 		gap: 6px;
 		overflow: hidden;
-		padding: 0 12px 0 24px;
+		padding: 0 12px 0 10px;
 		color: var(--muted-foreground);
 		font-family: var(--font-mono);
 		font-size: 12px;
@@ -497,5 +520,9 @@
 	}
 	.note {
 		left: 8px;
+	}
+	.tick {
+		flex: none;
+		margin: 0 2px 0 0;
 	}
 </style>

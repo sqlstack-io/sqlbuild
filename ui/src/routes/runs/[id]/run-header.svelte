@@ -8,7 +8,7 @@
 	import { narrowingText, shortRunId } from '$lib/operate/labels';
 	import { app } from '$lib/state/app.svelte';
 	import { runKindLabel, runOriginLabel, runStatusTone } from '$lib/status';
-	import RerunButton from './rerun-button.svelte';
+	import RunSummary from './run-summary.svelte';
 	import { costSummary, retriedMembers } from './utils';
 	import type { RunDetailState } from './state.svelte';
 
@@ -85,6 +85,7 @@
 					<a class="plan-link" href={to(planHref(run.narrowing?.select ?? [], 'build', { job: run.jobKey, exclude: run.narrowing?.exclude ?? [] }))} title="Plan this build of {run.jobKey} on the current state, section by section; the run's own plan is in its printed output" data-testid="run-plan-link">Plan it now</a>
 				{/if}
 			</div>
+			<RunSummary {view} />
 			{#if view.detail?.provenance?.command}
 				{@const command = view.detail.provenance.command}
 				<div class="command"><span class="faint">$</span> <code>{command}</code> <CopyButton value={command} label="Copy command" /></div>
@@ -110,7 +111,6 @@
 					</Button>
 				</span>
 			{/if}
-			<RerunButton {view} />
 		</div>
 	{/if}
 </div>
