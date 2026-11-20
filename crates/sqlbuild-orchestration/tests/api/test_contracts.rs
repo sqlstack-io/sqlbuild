@@ -2,6 +2,8 @@
 
 #[path = "changes/helpers.rs"]
 mod changes_helpers;
+#[path = "check_lists/helpers.rs"]
+mod check_list_helpers;
 #[path = "denials/helpers.rs"]
 mod denials_helpers;
 #[path = "fingerprint_reads/helpers.rs"]
