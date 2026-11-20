@@ -152,7 +152,9 @@ def test_given_result_in_earlier_location_when_reading_then_store_falls_back_onl
             schema="raw",
             target_config=TargetSettings(schema_preserved=test_case.schema_preserved),
         )
-        found: object = reader.result_of(node_type="asset", node_name="produce_result", default=None)
+        found: object = reader.result_of(
+            node_type="asset", node_name="produce_result", default=None
+        )
     finally:
         adapter.close(connection)
 
