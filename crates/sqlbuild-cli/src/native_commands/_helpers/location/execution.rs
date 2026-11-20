@@ -394,6 +394,8 @@ fn dev_failure(dev_events: bool, generation: i64, message: String) {
                 generation,
                 position: None,
                 message,
+                code: None,
+                help: None,
             }),
         )]));
     }

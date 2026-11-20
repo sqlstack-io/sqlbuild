@@ -1,214 +1,298 @@
 use std::time::Duration;
 
-use crate::screen_text::_helpers::rows::elapsed_text;
-use crate::screen_text::main::format_plain_line::format_plain_line;
 use crate::screen_text::main::redraw_rows::redraw_rows;
 use crate::screen_text::main::render_event_line::render_event_line;
-use crate::screen_text::main::render_phase_lines::render_phase_lines;
-use crate::screen_text::main::render_ready_card::render_ready_card;
-use crate::screen_text::main::render_tree_group::render_tree_group;
-use crate::screen_text::models::{PhaseLayout, PhaseState, ScreenFacts, WarehouseState};
+use crate::screen_text::main::render_problem::render_problem;
+use crate::screen_text::main::render_prompt::render_prompt;
+use crate::screen_text::main::render_ready_box::render_ready_box;
+use crate::screen_text::main::render_result::render_result;
+use crate::screen_text::main::render_step_line::render_step_line;
+use crate::screen_text::main::visible_cells::visible_cells;
+use crate::screen_text::models::{
+    BoxRow, EventLine, EventMark, PhaseState, Problem, ProblemLevel, PromptBlock, ResultLine,
+};
 use crate::screen_text::tests::helpers::{
-    chrome_rows, colour_facts, connected, edited_events, millis, not_connected, phase, plain_facts,
-    ready_card, rows_wider_than_screen, semantic_group, starting_checklist,
+    colour_facts, millis, plain, plain_facts, removed_key, rows_too_wide, run_started, step,
+    ui_row, warehouse_row,
 };
 use crate::screen_text::tests::test_types::{
-    ChromeTestCase, DotTestCase, ElapsedTestCase, EventsTestCase, PhaseLinesTestCase,
-    PlainLineTestCase, ReadyCardTestCase, RedrawTestCase, TreeGroupTestCase, WidthTestCase,
+    ElapsedTestCase, EventTestCase, ProblemTestCase, PromptTestCase, ReadyBoxTestCase,
+    RedrawTestCase, ResultTestCase, StepLineTestCase, VisibleCellsTestCase, WidthTestCase,
 };
+use crate::screen_text::_helpers::rows::elapsed_text;
 
 #[test]
-fn given_phase_lines_when_rendering_then_columns_align_and_rows_fit() {
+fn given_step_lines_when_rendering_then_label_time_and_detail_line_up() {
     let test_cases = [
-        PhaseLinesTestCase {
-            description: "dev checklist at 80 columns cuts the widest detail and keeps the times",
-            lines: starting_checklist(),
-            layout: PhaseLayout::TimeLast,
-            facts: plain_facts(80),
-            expected_rows: vec![
-                "  ✓ Control store        sqlite · target/dev/control.db                     0.1s",
-                "  ✓ API                  127.0.0.1:8000                                     0.2s",
-                "  ✓ Scheduler            41 triggers paused                                 0.1s",
-                "  ⠹ Discover project     Python nodes 287/412 · models/marts/finance/f…    24.6s",
-                "  · Compile snapshot",
-                "  · Publish",
-                "  · Warehouse",
-            ],
+        StepLineTestCase {
+            description: "a finished step has its glyph, label, time and detail in columns",
+            line: step(PhaseState::Ok, "Discovered project", millis(1_800), "118 models \u{b7} 24 seeds"),
+            lasting: true,
+            columns: 80,
+            expected_rows: vec!["\u{2713} Discovered project      1.8s   118 models \u{b7} 24 seeds"],
         },
-        PhaseLinesTestCase {
-            description: "dev checklist at 120 columns shows every detail in full",
-            lines: starting_checklist(),
-            layout: PhaseLayout::TimeLast,
-            facts: plain_facts(120),
-            expected_rows: vec![
-                "  ✓ Control store        sqlite · target/dev/control.db                                            0.1s",
-                "  ✓ API                  127.0.0.1:8000                                                            0.2s",
-                "  ✓ Scheduler            41 triggers paused                                                        0.1s",
-                "  ⠹ Discover project     Python nodes 287/412 · models/marts/finance/fct_revenue_by_region.sql    24.6s",
-                "  · Compile snapshot",
-                "  · Publish",
-                "  · Warehouse",
-            ],
+        StepLineTestCase {
+            description: "a running step shows its spinner frame and live time",
+            line: step(PhaseState::Running { frame: 0 }, "Connecting warehouse", millis(10_300), "snowflake"),
+            lasting: false,
+            columns: 80,
+            expected_rows: vec!["\u{280b} Connecting warehouse   10.3s   snowflake"],
         },
-        PhaseLinesTestCase {
-            description: "compile phases put the time beside the label and the detail after it",
-            lines: vec![
-                phase(PhaseState::Ok, "Discovered project", "", millis(38_800)),
-                phase(
-                    PhaseState::Ok,
-                    "Evaluated rules",
-                    "built-in 3.9s \u{b7} custom 18.1s",
-                    millis(18_600),
-                ),
-                phase(
-                    PhaseState::Warn,
-                    "Inspected cursor bounds",
-                    "5 of 5",
-                    millis(100),
-                ),
-                phase(
-                    PhaseState::Fail,
-                    "Compiled models",
-                    "3 errors",
-                    millis(1_003_400),
-                ),
-            ],
-            layout: PhaseLayout::TimeFirst,
-            facts: ScreenFacts {
-                indent: 0,
-                ..plain_facts(80)
-            },
+        StepLineTestCase {
+            description: "a pending step has no time",
+            line: step(PhaseState::Pending, "Connect warehouse", None, "waiting"),
+            lasting: false,
+            columns: 80,
+            expected_rows: vec!["\u{b7} Connect warehouse              waiting"],
+        },
+        StepLineTestCase {
+            description: "a live row is cut one cell short of the terminal",
+            line: step(PhaseState::Ok, "Compiled project", millis(2_400), "0 errors \u{b7} 1 warning \u{b7} 412 python nodes"),
+            lasting: false,
+            columns: 50,
+            expected_rows: vec!["\u{2713} Compiled project        2.4s   0 errors \u{b7} 1 wa\u{2026}"],
+        },
+        StepLineTestCase {
+            description: "a lasting row wraps its detail under the detail column",
+            line: step(PhaseState::Ok, "Compiled project", millis(2_400), "0 errors \u{b7} 1 warning \u{b7} 412 python nodes"),
+            lasting: true,
+            columns: 60,
             expected_rows: vec![
-                "✓ Discovered project         38.8s",
-                "✓ Evaluated rules            18.6s   built-in 3.9s · custom 18.1s",
-                "⚠ Inspected cursor bounds     0.1s   5 of 5",
-                "✗ Compiled models          16m 43s   3 errors",
+                "\u{2713} Compiled project        2.4s   0 errors \u{b7} 1 warning \u{b7} 412",
+                "                                 python nodes",
             ],
         },
     ];
 
     for test_case in test_cases {
-        let rows: Vec<String> =
-            render_phase_lines(&test_case.lines, test_case.layout, &test_case.facts);
-
-        assert_eq!(rows, test_case.expected_rows, "{}", test_case.description);
+        assert_eq!(
+            render_step_line(&test_case.line, &plain_facts(test_case.columns), test_case.lasting),
+            test_case.expected_rows,
+            "{}",
+            test_case.description
+        );
     }
 }
 
 #[test]
-fn given_ready_card_when_rendering_then_rows_match_the_screen() {
+fn given_a_problem_when_rendering_then_every_word_is_kept_under_its_label() {
     let test_cases = [
-        ReadyCardTestCase {
-            description: "connected warehouse at 80 columns",
-            card: ready_card(connected()),
-            facts: plain_facts(80),
+        ProblemTestCase {
+            description: "a long error wraps with a hanging indent and its code at the right edge",
+            problem: removed_key(),
+            columns: 80,
             expected_rows: vec![
-                "  sqlbuild dev  v0.231.0   ready in 43.1s",
-                "",
-                "  ➜  UI          http://127.0.0.1:8000",
-                "  ➜  Location    dev · gen 1 · 2280 models · 412 python · 85 jobs · 7 groups",
-                "  ➜  Warehouse   ● snowflake · ANALYST · DEVELOPER_ROLE @ DEV_ANALYST_WAREHOUSE…",
-                "  ➜  Triggers    41 paused",
-                "  ➜  Watching    project/",
+                "\u{2717} error  sqlbuild_project.toml                                             D001",
+                "  at     sqlbuild_project.toml:23:1",
+                "  why    dev.auto_build_on_save was removed in sqb 0.250.0. sqb dev no longer",
+                "         builds on every save by default, and this key is no longer read.",
+                "  fix    replace it with dev.on_save = \"build\" to keep building on save, or",
+                "         delete the line to get the new default, dev.on_save = \"compile\"",
             ],
         },
-        ReadyCardTestCase {
-            description: "connected warehouse at 120 columns",
-            card: ready_card(connected()),
-            facts: plain_facts(120),
+        ProblemTestCase {
+            description: "a warning without a place or fix shows only what it has",
+            problem: Problem {
+                level: ProblemLevel::Warning,
+                title: "relation ANALYTICS.LEGACY.V_ORDERS_OLD".to_owned(),
+                code: String::new(),
+                at: Vec::new(),
+                why: "columns are unavailable".to_owned(),
+                fix: String::new(),
+            },
+            columns: 80,
             expected_rows: vec![
-                "  sqlbuild dev  v0.231.0   ready in 43.1s",
-                "",
-                "  ➜  UI          http://127.0.0.1:8000",
-                "  ➜  Location    dev · gen 1 · 2280 models · 412 python · 85 jobs · 7 groups",
-                "  ➜  Warehouse   ● snowflake · ANALYST · DEVELOPER_ROLE @ DEV_ANALYST_WAREHOUSE_LARGE",
-                "  ➜  Triggers    41 paused",
-                "  ➜  Watching    project/",
+                "\u{26a0} warn   relation ANALYTICS.LEGACY.V_ORDERS_OLD",
+                "  why    columns are unavailable",
             ],
         },
-        ReadyCardTestCase {
-            description: "unavailable warehouse says nothing will prompt and how to retry",
-            card: ready_card(not_connected()),
-            facts: plain_facts(80),
+        ProblemTestCase {
+            description: "a word longer than the line is broken, never cut",
+            problem: Problem {
+                why: "x".repeat(50),
+                ..removed_key()
+            },
+            columns: 40,
             expected_rows: vec![
-                "  sqlbuild dev  v0.231.0   ready in 43.1s",
-                "",
-                "  ➜  UI          http://127.0.0.1:8000",
-                "  ➜  Location    dev · gen 1 · 2280 models · 412 python · 85 jobs · 7 groups",
-                "  ➜  Warehouse   ○ not connected · sign-in skipped · press s to retry",
-                "  ➜  Triggers    41 paused",
-                "  ➜  Watching    project/",
-            ],
-        },
-        ReadyCardTestCase {
-            description: "a failed connection shows its error",
-            card: ready_card(WarehouseState::Failed {
-                message: "authentication timed out".to_owned(),
-            }),
-            facts: plain_facts(80),
-            expected_rows: vec![
-                "  sqlbuild dev  v0.231.0   ready in 43.1s",
-                "",
-                "  ➜  UI          http://127.0.0.1:8000",
-                "  ➜  Location    dev · gen 1 · 2280 models · 412 python · 85 jobs · 7 groups",
-                "  ➜  Warehouse   ● snowflake · authentication timed out · press s to retry",
-                "  ➜  Triggers    41 paused",
-                "  ➜  Watching    project/",
+                "\u{2717} error  sqlbuild_project.toml     D001",
+                "  at     sqlbuild_project.toml:23:1",
+                "  why    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                "         xxxxxxxxxxxxxxxxxxxx",
+                "  fix    replace it with dev.on_save =",
+                "         \"build\" to keep building on",
+                "         save, or delete the line to",
+                "         get the new default,",
+                "         dev.on_save = \"compile\"",
             ],
         },
     ];
 
     for test_case in test_cases {
-        let rows: Vec<String> = render_ready_card(&test_case.card, &test_case.facts);
-
-        assert_eq!(rows, test_case.expected_rows, "{}", test_case.description);
+        assert_eq!(
+            render_problem(&test_case.problem, &plain_facts(test_case.columns)),
+            test_case.expected_rows,
+            "{}",
+            test_case.description
+        );
     }
 }
 
 #[test]
-fn given_tree_group_when_rendering_then_rows_are_bounded_with_overflow_line() {
+fn given_ready_rows_when_rendering_the_box_then_parts_wrap_between_labelled_lines() {
     let test_cases = [
-        TreeGroupTestCase {
-            description: "two of five entries shown, overflow names the flag",
-            group: semantic_group(5),
-            facts: ScreenFacts {
-                indent: 0,
-                ..plain_facts(120)
-            },
+        ReadyBoxTestCase {
+            description: "at 80 columns the Warehouse line wraps onto a second line between parts",
+            rows: vec![ui_row(), warehouse_row()],
+            columns: 80,
             expected_rows: vec![
-                "Partial semantic checks (5)",
-                "├── orders__mart_v__fulfilment_monitoring",
-                "│   ├── reason  reads open input orders__mart__fulfilment_monitoring",
-                "│   └── fix     declare the input shape, then sqb compile --no-cache",
-                "├── fct_revenue",
-                "│   ├── at     models/finance/fct_revenue.sql:42:7",
-                "│   └── error  unknown column net_amount_usd",
-                "└── … 3 more (--verbose)",
+                "\u{256d}\u{2500} ready \u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{256e}",
+                "\u{2502} UI         http://127.0.0.1:8640                                           \u{2502}",
+                "\u{2502} Warehouse  snowflake \u{b7} account xy12345 \u{b7} auth browser sign-in (OAuth)      \u{2502}",
+                "\u{2502}            role TRANSFORMER \u{b7} warehouse TRANSFORM_XS                       \u{2502}",
+                "\u{2570}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{256f}",
             ],
         },
-        TreeGroupTestCase {
-            description: "every entry shown ends on the last branch and cuts long rows at 60",
-            group: semantic_group(2),
-            facts: ScreenFacts {
-                indent: 0,
-                ..plain_facts(60)
-            },
+        ReadyBoxTestCase {
+            description: "a part wider than the box starts its own line and wraps by words",
+            rows: vec![BoxRow {
+                label: "Project".to_owned(),
+                parts: vec!["shop".to_owned(), "a b c d e f g h i j".to_owned()],
+                link: None,
+            }],
+            columns: 30,
             expected_rows: vec![
-                "Partial semantic checks (2)",
-                "├── orders__mart_v__fulfilment_monitoring",
-                "│   ├── reason  reads open input orders__mart__fulfilment_m…",
-                "│   └── fix     declare the input shape, then sqb compile -…",
-                "└── fct_revenue",
-                "    ├── at     models/finance/fct_revenue.sql:42:7",
-                "    └── error  unknown column net_amount_usd",
+                "\u{256d}\u{2500} ready \u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{256e}",
+                "\u{2502} Project    shop          \u{2502}",
+                "\u{2502}            a b c d e f g \u{2502}",
+                "\u{2502}            h i j         \u{2502}",
+                "\u{2570}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{256f}",
             ],
         },
     ];
 
     for test_case in test_cases {
-        let rows: Vec<String> = render_tree_group(&test_case.group, &test_case.facts);
+        assert_eq!(
+            render_ready_box(&test_case.rows, &plain_facts(test_case.columns)),
+            test_case.expected_rows,
+            "{}",
+            test_case.description
+        );
+    }
+}
 
-        assert_eq!(rows, test_case.expected_rows, "{}", test_case.description);
+#[test]
+fn given_events_when_rendering_then_run_lines_wrap_instead_of_being_cut() {
+    let test_cases = [
+        EventTestCase {
+            description: "a long run line wraps under its text",
+            event: run_started(),
+            columns: 60,
+            expected_rows: vec![
+                "14:20:31 \u{25b8} run r_8f3a21c0 shop_job  started manually by Sam",
+                "           Lee from the jobs page of the web UI",
+            ],
+        },
+        EventTestCase {
+            description: "a failure shows its time and its notes below it",
+            event: EventLine {
+                clock: "14:24:48".to_owned(),
+                mark: EventMark::Failed,
+                title: "run r_8f3a21c0 shop_job".to_owned(),
+                detail: "failed".to_owned(),
+                elapsed: Some(Duration::from_secs(257)),
+                notes: vec!["1 failed \u{b7} 5 skipped".to_owned()],
+            },
+            columns: 80,
+            expected_rows: vec![
+                "14:24:48 \u{2717} run r_8f3a21c0 shop_job  failed  4m 17s",
+                "           1 failed \u{b7} 5 skipped",
+            ],
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            render_event_line(&test_case.event, &plain_facts(test_case.columns)),
+            test_case.expected_rows,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_session_end_when_rendering_then_one_result_line_and_next_commands() {
+    let test_cases = [
+        ResultTestCase {
+            description: "a start-up failure says why, how long, and what to run next",
+            result: ResultLine {
+                failed: true,
+                title: "sqb dev did not start".to_owned(),
+                detail: "could not connect to the warehouse".to_owned(),
+                elapsed: millis(14_700),
+                next: vec![("sqb debug".to_owned(), "test the connection on its own".to_owned())],
+            },
+            columns: 80,
+            expected_rows: vec![
+                "\u{2717} sqb dev did not start  could not connect to the warehouse   14.7s",
+                "Next",
+                "  sqb debug                     test the connection on its own",
+            ],
+        },
+        ResultTestCase {
+            description: "an interrupted stop is a quiet line",
+            result: ResultLine {
+                failed: false,
+                title: "sqb dev stopped (interrupted)".to_owned(),
+                detail: "ran 42m 10s".to_owned(),
+                elapsed: millis(1_100),
+                next: Vec::new(),
+            },
+            columns: 80,
+            expected_rows: vec!["\u{b7} sqb dev stopped (interrupted)  ran 42m 10s   1.1s"],
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            render_result(&test_case.result, &plain_facts(test_case.columns)),
+            test_case.expected_rows,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_sign_in_prompt_when_rendering_then_its_url_is_broken_across_rows_not_cut() {
+    let test_cases = [PromptTestCase {
+        description: "the client's prompt and a long URL keep every character",
+        text: "Go to https://xy12345.snowflakecomputing.com/oauth/authorize?client_id=SQLBUILD&state=8f3a21c0\nEnter the URL: ",
+        columns: 60,
+        expected_rows: vec![
+            "\u{25cc} sign in  snowflake needs you to sign in",
+            "  Go to https://xy12345.snowflakecomputing.com/oauth/author",
+            "  ize?client_id=SQLBUILD&state=8f3a21c0",
+            "  Enter the URL:",
+            "  wait   0:24 \u{b7} Ctrl+C cancels and stops sqb dev",
+            "\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}",
+        ],
+    }];
+
+    for test_case in test_cases {
+        assert_eq!(
+            render_prompt(
+                &PromptBlock {
+                    title: "snowflake needs you to sign in".to_owned(),
+                    text: test_case.text.to_owned(),
+                    waited: Duration::from_secs(24),
+                },
+                &plain_facts(test_case.columns)
+            ),
+            test_case.expected_rows,
+            "{}",
+            test_case.description
+        );
     }
 }
 
@@ -216,29 +300,19 @@ fn given_tree_group_when_rendering_then_rows_are_bounded_with_overflow_line() {
 fn given_durations_when_formatting_elapsed_then_units_change_at_minute_and_hour() {
     let test_cases = [
         ElapsedTestCase {
-            description: "zero",
-            elapsed: Duration::ZERO,
-            expected_text: "0.0s",
+            description: "under a minute shows tenths, truncated",
+            elapsed: Duration::from_millis(24_690),
+            expected_text: "24.6s",
         },
         ElapsedTestCase {
-            description: "tenths truncate rather than round",
-            elapsed: Duration::from_millis(59_990),
-            expected_text: "59.9s",
+            description: "minutes show two-digit seconds",
+            elapsed: Duration::from_secs(62),
+            expected_text: "1m 02s",
         },
         ElapsedTestCase {
-            description: "a full minute switches to minutes and seconds",
-            elapsed: Duration::from_secs(60),
-            expected_text: "1m 0s",
-        },
-        ElapsedTestCase {
-            description: "just under an hour",
-            elapsed: Duration::from_secs(3599),
-            expected_text: "59m 59s",
-        },
-        ElapsedTestCase {
-            description: "hours drop the seconds",
-            elapsed: Duration::from_secs(7_530),
-            expected_text: "2h 5m",
+            description: "hours show two-digit minutes",
+            elapsed: Duration::from_secs(7_500),
+            expected_text: "2h 05m",
         },
     ];
 
@@ -253,161 +327,31 @@ fn given_durations_when_formatting_elapsed_then_units_change_at_minute_and_hour(
 }
 
 #[test]
-fn given_a_warehouse_state_when_colouring_the_card_then_the_dot_matches_it() {
+fn given_styled_rows_when_measuring_then_escapes_take_no_cells() {
     let test_cases = [
-        DotTestCase {
-            description: "a skipped sign-in is an amber hollow dot, never green",
-            warehouse: not_connected(),
-            expected_dot: "\u{1b}[33m\u{25cb}\u{1b}[0m",
+        VisibleCellsTestCase {
+            description: "plain text counts its cells",
+            row: "\u{2713} ok".to_owned(),
+            expected_cells: 4,
         },
-        DotTestCase {
-            description: "a connected warehouse is a green filled dot",
-            warehouse: connected(),
-            expected_dot: "\u{1b}[32m\u{25cf}\u{1b}[0m",
-        },
-    ];
-
-    for test_case in test_cases {
-        let rows: Vec<String> =
-            render_ready_card(&ready_card(test_case.warehouse), &colour_facts(80));
-
-        assert!(
-            rows[4].contains(test_case.expected_dot),
-            "{}: {:?}",
-            test_case.description,
-            rows[4]
-        );
-    }
-}
-
-#[test]
-fn given_events_when_rendering_then_one_line_each_with_notes_below() {
-    let test_cases = [
-        EventsTestCase {
-            description: "at 80 columns the long Python path is cut with an ellipsis",
-            facts: plain_facts(80),
-            expected_rows: vec![
-                "  09:41:03  ~ models/orders/int_orders.sql",
-                "  09:41:03  ~ python/exports/partner_feed/fulfilment_partner_daily_export_node.…",
-                "  09:41:03  ✓ gen 2 published                 1 model changed      1.4s",
-                "  09:41:03  ↻ location restarted              Python changed       3.9s",
-                "  09:41:03  ✗ gen 4 failed · still serving gen 3",
-                "            models/finance/fct_revenue.sql:42:7  unknown column net_amount_usd",
-                "            r retry · l full log",
-                "  09:41:03  ▶ run nightly_group               started from UI",
-                "  09:41:03  ✓ run nightly_group               212 nodes         16m 43s",
-            ],
-        },
-        EventsTestCase {
-            description: "at 120 columns every path is shown whole and timings stay in their column",
-            facts: plain_facts(120),
-            expected_rows: vec![
-                "  09:41:03  ~ models/orders/int_orders.sql",
-                "  09:41:03  ~ python/exports/partner_feed/fulfilment_partner_daily_export_node.py",
-                "  09:41:03  ✓ gen 2 published                 1 model changed      1.4s",
-                "  09:41:03  ↻ location restarted              Python changed       3.9s",
-                "  09:41:03  ✗ gen 4 failed · still serving gen 3",
-                "            models/finance/fct_revenue.sql:42:7  unknown column net_amount_usd",
-                "            r retry · l full log",
-                "  09:41:03  ▶ run nightly_group               started from UI",
-                "  09:41:03  ✓ run nightly_group               212 nodes         16m 43s",
-            ],
-        },
-        EventsTestCase {
-            description: "with links only the error location is a hyperlink; the visible text is unchanged",
-            facts: ScreenFacts {
-                links: true,
-                ..plain_facts(80)
-            },
-            expected_rows: vec![
-                "  09:41:03  ~ models/orders/int_orders.sql",
-                "  09:41:03  ~ python/exports/partner_feed/fulfilment_partner_daily_export_node.…",
-                "  09:41:03  ✓ gen 2 published                 1 model changed      1.4s",
-                "  09:41:03  ↻ location restarted              Python changed       3.9s",
-                "  09:41:03  ✗ gen 4 failed · still serving gen 3",
-                "            \u{1b}]8;;file:///work/shop/models/finance/fct_revenue.sql\u{1b}\\models/finance/fct_revenue.sql:42:7\u{1b}]8;;\u{1b}\\  unknown column net_amount_usd",
-                "            r retry · l full log",
-                "  09:41:03  ▶ run nightly_group               started from UI",
-                "  09:41:03  ✓ run nightly_group               212 nodes         16m 43s",
-            ],
-        },
-    ];
-
-    for test_case in test_cases {
-        let rows: Vec<String> = edited_events()
-            .iter()
-            .flat_map(|line| render_event_line(line, &test_case.facts))
-            .collect();
-
-        assert_eq!(rows, test_case.expected_rows, "{}", test_case.description);
-    }
-}
-
-#[test]
-fn given_header_rule_and_hotkeys_when_rendering_then_match_the_screen() {
-    let test_cases = [
-        ChromeTestCase {
-            description: "at 80 columns the header, both rules and the hotkey bar are whole",
-            columns: 80,
-            expected_rows: vec![
-                "  sqlbuild dev  v0.231.0 · shop · target dev",
-                "  ── snowflake ─────────────────────────────────────────────────────────────────",
-                "  ──────────────────────────────────────────────────────────────────────────────",
-                "  o open UI · r recompile · s retry warehouse · l logs · q quit",
-            ],
-        },
-        ChromeTestCase {
-            description: "at 40 columns long rows end in an ellipsis and rules shrink to fit",
-            columns: 40,
-            expected_rows: vec![
-                "  sqlbuild dev  v0.231.0 · shop · targe…",
-                "  ── snowflake ─────────────────────────",
-                "  ──────────────────────────────────────",
-                "  o open UI · r recompile · s retry war…",
-            ],
-        },
-    ];
-
-    for test_case in test_cases {
-        let rows: Vec<String> = chrome_rows(&plain_facts(test_case.columns));
-
-        assert_eq!(rows, test_case.expected_rows, "{}", test_case.description);
-    }
-}
-
-#[test]
-fn given_plain_mode_when_formatting_then_lines_are_stable_and_untimed_lines_have_no_suffix() {
-    let test_cases = [
-        PlainLineTestCase {
-            description: "a timed step ends with its time in brackets",
-            message: "control store ready",
-            elapsed: millis(100),
-            expected_line: "sqlbuild dev: control store ready (0.1s)",
-        },
-        PlainLineTestCase {
-            description: "an untimed line has no suffix, even when it ends in brackets itself",
-            message: "location 3f1c9a2e (target dev)",
-            elapsed: None,
-            expected_line: "sqlbuild dev: location 3f1c9a2e (target dev)",
-        },
-        PlainLineTestCase {
-            description: "longer steps keep tenths of a second",
-            message: "discovered 412 python nodes, 2280 models",
-            elapsed: millis(38_200),
-            expected_line: "sqlbuild dev: discovered 412 python nodes, 2280 models (38.2s)",
-        },
-        PlainLineTestCase {
-            description: "the ready line carries the URL and no time",
-            message: "ready http://127.0.0.1:8000",
-            elapsed: None,
-            expected_line: "sqlbuild dev: ready http://127.0.0.1:8000",
+        VisibleCellsTestCase {
+            description: "colour and hyperlink escapes count nothing",
+            row: render_problem(
+                &Problem {
+                    at: vec![plain("a")],
+                    ..removed_key()
+                },
+                &colour_facts(80),
+            )[1]
+                .clone(),
+            expected_cells: 10,
         },
     ];
 
     for test_case in test_cases {
         assert_eq!(
-            format_plain_line(test_case.message, test_case.elapsed),
-            test_case.expected_line,
+            visible_cells(&test_case.row),
+            test_case.expected_cells,
             "{}",
             test_case.description
         );
@@ -451,20 +395,20 @@ fn given_previous_rows_when_redrawing_then_moves_up_clears_and_draws_each_row_on
 fn given_any_width_when_rendering_every_piece_then_no_row_is_wider_than_the_screen() {
     let test_cases = [
         WidthTestCase {
-            description: "uncoloured rows without links fit every width from 8 to 130",
-            colour: false,
+            description: "uncoloured rows fit every width from 8 to 130",
+            facts: plain_facts,
             expected_too_wide: Vec::new(),
         },
         WidthTestCase {
             description: "colour and hyperlink escapes take no visible width",
-            colour: true,
+            facts: colour_facts,
             expected_too_wide: Vec::new(),
         },
     ];
 
     for test_case in test_cases {
         let too_wide: Vec<String> = (8..=130)
-            .flat_map(|columns| rows_wider_than_screen(columns, test_case.colour))
+            .flat_map(|columns| rows_too_wide(columns, test_case.facts))
             .collect();
 
         assert_eq!(

@@ -65,7 +65,15 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                                 py,
                                 &format!("Location compilation/publication failed: {error}\n"),
                             )?;
-                            let failed = generation_failed(generation, error.to_string());
+                            let failed = generation_failed(
+                                generation,
+                                error_text(py, &error, "message")
+                                    .unwrap_or_else(|| error.to_string()),
+                                (
+                                    error_text(py, &error, "code"),
+                                    error_text(py, &error, "help"),
+                                ),
+                            );
                             py.detach(|| emit_dev_event(&failed))?;
                             (None, None)
                         }
@@ -202,4 +210,14 @@ fn failure_reason(error: &PyErr) -> String {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// The error's non-empty `attribute` text, such as a `CliUserError`'s `code`, `help` or `message`.
+fn error_text(py: Python<'_>, error: &PyErr, attribute: &str) -> Option<String> {
+    error
+        .value(py)
+        .getattr(attribute)
+        .ok()
+        .and_then(|value| value.extract::<String>().ok())
+        .filter(|text| !text.trim().is_empty())
 }
