@@ -1644,13 +1644,16 @@ pub(crate) async fn settle_publication(
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Settled>, ControlError> {
     let (mut metadata, deferred) = if connect {
-        let sync: LocationMetadataSync = metadata_sync(
+        let mut sync: LocationMetadataSync = metadata_sync(
             (locations, generation),
             (
                 options.metadata_reconcile_seconds,
                 options.safety_sync_seconds,
             ),
         );
+        sync.dynamic_quiet_tokens = metadata
+            .map(|previous| previous.dynamic_quiet_tokens)
+            .unwrap_or_default();
         (Some(sync), None)
     } else {
         (metadata, Some((locations, generation)))

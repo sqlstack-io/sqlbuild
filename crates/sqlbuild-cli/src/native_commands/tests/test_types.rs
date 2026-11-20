@@ -354,6 +354,13 @@ pub(super) struct FastClockScanTestCase {
     pub(super) expected_described_live: bool,
 }
 
+/// The token a quiet sync left before the location published again, and the token kept.
+pub(super) struct RepublishTokenTestCase {
+    pub(super) description: &'static str,
+    pub(super) previous_token: Option<&'static str>,
+    pub(super) expected_token: Option<&'static str>,
+}
+
 pub(super) struct DynamicResumeTestCase {
     pub(super) description: &'static str,
     /// Whether the synchronization completed, and whether failed reads stopped it.

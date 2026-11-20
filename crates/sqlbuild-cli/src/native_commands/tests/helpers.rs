@@ -108,6 +108,22 @@ pub(super) fn published_location(
     (LocationWorkClient, LocationWorkPoll),
     LocationMetadataSync,
 ) {
+    let (location, work, mut state) = republished_location(directory, wakes_compute, None);
+    state.begin_sync(chrono::Utc::now());
+    state.idle = false;
+    (location, work, state)
+}
+
+/// A location in `directory` published again over the sync `previous` left, and the new sync.
+pub(super) fn republished_location(
+    directory: &Path,
+    wakes_compute: bool,
+    previous: Option<LocationMetadataSync>,
+) -> (
+    (LocationServe, std::path::PathBuf),
+    (LocationWorkClient, LocationWorkPoll),
+    LocationMetadataSync,
+) {
     let script = directory.join(format!("location-{wakes_compute}"));
     std::fs::write(
         &script,
@@ -135,14 +151,12 @@ pub(super) fn published_location(
         .block_on(settle_publication(
             (&options, &script, ("token", Uuid::nil())),
             ((one_location(), 1), true, ConnectionCheckTrigger::Publish),
-            (location_watch(directory), None),
+            (location_watch(directory), previous),
             std::future::pending(),
         ))
         .expect("no control error")
         .expect("not stopped");
-    let mut state = metadata.expect("a connected publication starts a sync");
-    state.begin_sync(chrono::Utc::now());
-    state.idle = false;
+    let state = metadata.expect("a connected publication starts a sync");
     ((options, script), (client, poll), state)
 }
 

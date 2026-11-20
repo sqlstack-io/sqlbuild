@@ -15,10 +15,12 @@ use crate::native_commands::main::_location_metadata::sync_location_metadata;
 use crate::native_commands::models::{LocationMetadataPage, LocationServe, ReadFailure};
 use crate::native_commands::tests::helpers::{
     acknowledge_complete_pages, location_options, one_location, published_location,
+    republished_location,
 };
 use crate::native_commands::tests::test_types::BilledDeferralTestCase;
 use crate::native_commands::tests::test_types::DynamicResumeTestCase;
 use crate::native_commands::tests::test_types::FastClockScanTestCase;
+use crate::native_commands::tests::test_types::RepublishTokenTestCase;
 use crate::native_commands::tests::test_types::{
     FailedReadHealthTestCase, NewestVersionsTestCase, ReadFailureTestCase,
 };
@@ -1401,6 +1403,41 @@ fn given_a_completed_sync_when_finishing_then_its_reader_resumes_expired_holds_o
                 test_case.expected_reader_open,
                 test_case.expected_quiet_token,
             ),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_quiet_pause_table_when_the_location_publishes_again_then_the_new_sync_keeps_its_token() {
+    let test_cases = [
+        RepublishTokenTestCase {
+            description: "a publication after a quiet sync keeps the pause table's token",
+            previous_token: Some("7/12:00"),
+            expected_token: Some("7/12:00"),
+        },
+        RepublishTokenTestCase {
+            description: "the first publication has no token yet",
+            previous_token: None,
+            expected_token: None,
+        },
+    ];
+    for test_case in test_cases {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let mut previous = metadata_sync((one_location(), 1), (3600, 1800));
+        previous.dynamic_quiet_tokens.extend(
+            test_case
+                .previous_token
+                .map(|token| (one_location().remove(0), token.to_owned())),
+        );
+        let (_, _, state) = republished_location(directory.path(), false, Some(previous));
+        assert_eq!(
+            state
+                .dynamic_quiet_tokens
+                .get(&one_location().remove(0))
+                .map(String::as_str),
+            test_case.expected_token,
             "{}",
             test_case.description
         );
