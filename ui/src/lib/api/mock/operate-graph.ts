@@ -63,7 +63,9 @@ export const SNAPSHOT_NODES: SnapshotNode[] = [
 	node('rpt_late_deliveries', 'table', 'fulfillment', ['agg_delivery_times', 'dim_customers']),
 	// Python nodes (CHI-1591): a loader that prints its paging, and a task that warns.
 	node('raw_events', 'loader', 'ingest', [], { cursor: 'timestamp', path: 'models/ingest/raw_events.py' }),
-	node('score_customers', 'task', 'ml', ['dim_customers'], { path: 'models/ml/score_customers.py' })
+	node('score_customers', 'task', 'ml', ['dim_customers'], { path: 'models/ml/score_customers.py' }),
+	// A notebook runner that prints about 2 million lines (CHI-1597).
+	node('notebook_runner', 'task', 'ml', ['fact_orders'], { path: 'models/ml/notebook_runner.py' })
 ];
 
 const BY_KEY = new Map(SNAPSHOT_NODES.map((n) => [n.key, n]));

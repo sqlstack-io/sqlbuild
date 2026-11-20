@@ -89,3 +89,12 @@ export function fullStamp(iso: string): string {
 	const p = (n: number, w = 2) => String(n).padStart(w, '0');
 	return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
 }
+
+/**
+ * A warehouse query's page in its console, or null where the adapter has none (prototype: only
+ * Snowflake's query detail; real per-adapter URLs come later).
+ */
+export function warehouseQueryUrl(adapter: string | null | undefined, queryId: string): string | null {
+	if (adapter === 'snowflake') return `https://app.snowflake.com/#/compute/history/queries/${encodeURIComponent(queryId)}/detail`;
+	return null;
+}

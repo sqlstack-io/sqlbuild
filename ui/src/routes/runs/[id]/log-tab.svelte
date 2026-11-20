@@ -10,8 +10,7 @@
 	import type { RunEventLevel } from '$lib/api';
 	import { formatStamp } from '$lib/format/time';
 	import { nodeLabel, shortRunId } from '$lib/operate/labels';
-	import type { EventCategory } from './types';
-	import { EVENT_CATEGORIES, type LogEntry } from './utils';
+	import type { LogEntry } from './utils';
 	import { fullStamp } from './utils/proto';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -50,8 +49,8 @@
 		{ value: 'info', label: 'Info' },
 		{ value: 'debug', label: 'Debug' }
 	];
-	let level = $state<RunEventLevel | 'all'>('all');
-	let category = $state<EventCategory | 'all'>('all');
+	// One source of truth (CHI-1591): the filter text. The Levels and Kinds menus and the counts only write
+	// `level:` and `kind:` into it.
 	let query = $state('');
 	// Long printed blocks fold to their first lines.
 	const FOLD = 4;
@@ -59,25 +58,24 @@
 	// Nodes whose queries are listed under their outcome row.
 	let expanded = $state<Set<string>>(new Set());
 
-	// Events | Output: the run's events, or what sqb printed (`printed`). A kind shows in the menu only when the log has it.
-	const present = $derived(EVENT_CATEGORIES.filter((c) => c.value !== 'output' && entries.some((e) => e.category === c.value)));
+	// Events | Output: the run's events, or what sqb and the nodes printed (`printed`).
 	const hasOutput = $derived(entries.some((e) => e.category === 'output'));
-	const kindShown = (e: LogEntry) => (printed ? e.category === 'output' : e.category !== 'output' && (category === 'all' || e.category === category));
-	const levelShown = (e: LogEntry) => level === 'all' || e.level === level;
-	// The filter: `prefix:value` terms must all hold, and the other words are a free search (CHI-1591).
+	const inMode = (e: LogEntry) => (printed ? e.category === 'output' : e.category !== 'output');
+	const modeEntries = $derived(entries.filter(inMode));
 	let stream = $state<'all' | 'stdout' | 'stderr'>('all');
 	const kindOf = (e: LogEntry) => e.tag?.text.replace(/ /g, '-') ?? null;
+	type Term = { key: string; value: string };
 	const terms = $derived(
 		query
 			.trim()
 			.split(/\s+/)
 			.filter(Boolean)
-			.map((t) => {
+			.map((t): Term => {
 				const m = t.match(/^(node|kind|level|job|stream):(.*)$/i);
 				return m ? { key: m[1].toLowerCase(), value: m[2].toLowerCase() } : { key: 'text', value: t.toLowerCase() };
 			})
 	);
-	const holds = (e: LogEntry, t: { key: string; value: string }) => {
+	const holds = (e: LogEntry, t: Term) => {
 		if (!t.value) return true;
 		if (t.key === 'node') return !!e.nodeKey && nodeLabel(e.nodeKey).toLowerCase() === t.value;
 		if (t.key === 'kind') return kindOf(e) === t.value;
@@ -86,30 +84,37 @@
 		if (t.key === 'stream') return e.stream === t.value;
 		return [e.nodeKey ?? '', e.text, e.title, ...e.queries.map((x) => x.text)].join(' ').toLowerCase().includes(t.value);
 	};
-	const matches = (e: LogEntry) => terms.every((t) => holds(e, t)) && (!printed || stream === 'all' || e.stream === stream);
+	const matchesExcept = (e: LogEntry, skip: string | null) => terms.every((t) => t.key === skip || holds(e, t)) && (!printed || stream === 'all' || e.stream === stream);
+	const shown = $derived(modeEntries.filter((e) => matchesExcept(e, null)));
+	const termValue = (key: string) => terms.find((t) => t.key === key && t.value)?.value ?? null;
+	const level = $derived((termValue('level') === 'warning' ? 'warn' : termValue('level')) ?? 'all');
+	const kind = $derived(termValue('kind') ?? 'all');
+	/** Writes `key:value` into the filter text, in place of any earlier one; null takes it out. */
+	function setTerm(key: string, value: string | null) {
+		const kept = query.split(/\s+/).filter((t) => t && !t.toLowerCase().startsWith(`${key}:`));
+		query = [...kept, ...(value ? [`${key}:${value}`] : [])].join(' ') + (kept.length || value ? ' ' : '');
+	}
 	const uniq = (xs: (string | null | undefined)[]) => [...new Set(xs.filter((x): x is string => !!x))].sort();
+	const kindValues = $derived(printed ? [] : uniq(modeEntries.map(kindOf)));
 	const filterOptions = $derived<FilterOption[]>([
 		{ prefix: 'node', hint: 'a node', values: uniq(entries.map((e) => (e.nodeKey ? nodeLabel(e.nodeKey) : null))) },
-		{ prefix: 'kind', hint: 'built, merged, failed, check…', values: printed ? [] : uniq(entries.map(kindOf)) },
-		{ prefix: 'level', hint: 'error, warn, info', values: uniq(entries.filter((e) => (printed ? e.category === 'output' : e.category !== 'output')).map((e) => e.level)) },
+		{ prefix: 'kind', hint: 'built, merged, failed, check, log…', values: kindValues },
+		{ prefix: 'level', hint: 'error, warn, info', values: uniq(modeEntries.map((e) => e.level)) },
 		{ prefix: 'job', hint: 'a member job', values: grouped ? uniq(entries.map((e) => memberOf(e.runId))) : [] },
 		{ prefix: 'stream', hint: 'stdout or stderr', values: printed ? uniq(entries.map((e) => e.stream)) : [] }
 	]);
-	const byCategory = $derived(entries.filter(kindShown));
-	const byLevel = $derived(entries.filter((e) => levelShown(e) && (printed ? e.category === 'output' : e.category !== 'output')));
-	const levelText = $derived(LEVELS.find((l) => l.value === level)?.label ?? 'All');
-	const kindText = $derived(category === 'all' ? 'All kinds' : (present.find((c) => c.value === category)?.label ?? 'All kinds'));
-	// Rows whose structured details are open in place; long text stays folded until "show more".
-	let detailOpen = $state<Set<string>>(new Set());
-	let longOpen = $state<Set<string>>(new Set());
-	const shown = $derived(entries.filter((e) => levelShown(e) && kindShown(e) && matches(e)));
-	const levelCounts = $derived(countBy(byCategory, (e) => e.level));
-	const categoryCounts = $derived(countBy(byLevel, (e) => e.category));
+	// Counts for each menu choice: what the rest of the filter leaves, by level or by kind.
+	const levelCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'level')), (e) => e.level));
+	const kindCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'kind')), (e) => kindOf(e) ?? ''));
 	// A count shows only when it matters: errors and warnings in what the switch shows, none when zero.
 	const errors = $derived(levelCounts.get('error') ?? 0);
 	const warnings = $derived(levelCounts.get('warn') ?? 0);
-	const levelOptions = $derived(LEVELS.map((l) => ({ ...l, count: l.value === 'all' ? byCategory.length : (levelCounts.get(l.value) ?? 0) })));
-	const kindOptions = $derived([{ value: 'all' as const, label: 'All kinds', count: byLevel.length }, ...present.map((c) => ({ value: c.value, label: c.label, count: categoryCounts.get(c.value) ?? 0 }))]);
+	const levelText = $derived(LEVELS.find((l) => l.value === level)?.label ?? 'Levels');
+	const levelOptions = $derived(LEVELS.map((l) => ({ ...l, count: l.value === 'all' ? [...levelCounts.values()].reduce((a, b) => a + b, 0) : (levelCounts.get(l.value) ?? 0) })));
+	const kindOptions = $derived([{ value: 'all', label: 'All kinds', count: [...kindCounts.values()].reduce((a, b) => a + b, 0) }, ...kindValues.map((k) => ({ value: k, label: k, count: kindCounts.get(k) ?? 0 }))]);
+	// Rows whose structured details are open in place; long text stays folded until "show more".
+	let detailOpen = $state<Set<string>>(new Set());
+	let longOpen = $state<Set<string>>(new Set());
 
 	function toggle<T>(set: Set<T>, value: T): Set<T> {
 		const next = new Set(set);
@@ -166,23 +171,23 @@
 	<DropdownMenu.Root>
 		<DropdownMenu.Trigger class="menu-trigger" aria-label="Levels">{level === 'all' ? 'Levels' : levelText} <ChevronDownIcon size={13} /></DropdownMenu.Trigger>
 		<DropdownMenu.Content class="w-44">
-			<DropdownMenu.RadioGroup value={level} onValueChange={(v) => (level = v as RunEventLevel | 'all')}>
+			<DropdownMenu.RadioGroup value={level} onValueChange={(v) => setTerm('level', v === 'all' ? null : v)}>
 				{#each levelOptions as l (l.value)}<DropdownMenu.RadioItem value={l.value}>{l.label}<span class="menu-count">{l.count}</span></DropdownMenu.RadioItem>{/each}
 			</DropdownMenu.RadioGroup>
 		</DropdownMenu.Content>
 	</DropdownMenu.Root>
-	{#if !printed && present.length > 1}
+	{#if !printed && kindValues.length > 1}
 		<DropdownMenu.Root>
-			<DropdownMenu.Trigger class="menu-trigger" aria-label="Kinds">{category === 'all' ? 'Kinds' : kindText} <ChevronDownIcon size={13} /></DropdownMenu.Trigger>
+			<DropdownMenu.Trigger class="menu-trigger" aria-label="Kinds">{kind === 'all' ? 'Kinds' : kind} <ChevronDownIcon size={13} /></DropdownMenu.Trigger>
 			<DropdownMenu.Content class="w-44">
-				<DropdownMenu.RadioGroup value={category} onValueChange={(v) => (category = v as EventCategory | 'all')}>
+				<DropdownMenu.RadioGroup value={kind} onValueChange={(v) => setTerm('kind', v === 'all' ? null : v)}>
 					{#each kindOptions as k (k.value)}<DropdownMenu.RadioItem value={k.value}>{k.label}<span class="menu-count">{k.count}</span></DropdownMenu.RadioItem>{/each}
 				</DropdownMenu.RadioGroup>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	{/if}
-	{#if errors}<Button variant="link" size="inline" class="count err" onclick={() => (level = level === 'error' ? 'all' : 'error')} title="Show only errors">Errors {errors}</Button>{/if}
-	{#if warnings}<Button variant="link" size="inline" class="count warn" onclick={() => (level = level === 'warn' ? 'all' : 'warn')} title="Show only warnings">Warnings {warnings}</Button>{/if}
+	{#if errors}<Button variant="link" size="inline" class="count err" onclick={() => setTerm('level', level === 'error' ? null : 'error')} title="Show only errors">Errors {errors}</Button>{/if}
+	{#if warnings}<Button variant="link" size="inline" class="count warn" onclick={() => setTerm('level', level === 'warn' ? null : 'warn')} title="Show only warnings">Warnings {warnings}</Button>{/if}
 	<span class="grow"></span>
 	<Button variant="ghost" size="sm" onclick={download} disabled={!shown.length} title="Download the rows shown as a text file"><DownloadIcon />Download</Button>
 </div>
@@ -192,12 +197,15 @@
 			<tr class:error={e.level === 'error'} class:warn={e.level === 'warn'} class:stderr={e.stream === 'stderr'}>
 				<td class="faint nowrap mono stamp" title={formatStamp(e.at)}>{fullStamp(e.at)}</td>
 				<td class="mono" class:faint={!e.nodeKey} title={e.nodeKey ? `Show only ${e.nodeKey} in the log` : undefined}>
-					{#if e.nodeKey && onnode}<Button variant="link" size="inline" class="font-mono text-[12px]" onclick={() => onnode(e.nodeKey!)}>{nodeLabel(e.nodeKey)}</Button>{:else}{e.nodeKey ? nodeLabel(e.nodeKey) : (e.stream ?? 'run')}{/if}
+					{#if e.nodeKey && onnode}<Button variant="link" size="inline" class="font-mono text-[12px]" onclick={() => onnode(e.nodeKey!)}>{nodeLabel(e.nodeKey)}</Button>{:else}{e.nodeKey ? nodeLabel(e.nodeKey) : 'run'}{/if}
 					{#if grouped && memberOf(e.runId)}<a class="member" href={to(`/runs/${e.runId}`)} title="In member job run {shortRunId(e.runId)}">{memberOf(e.runId)}</a>{/if}
 				</td>
 				{#if !printed}<td class="tagcell">{#if e.tag}<span class="tag" style:--tone={e.tag.tone}>{e.tag.text}</span>{/if}</td>{/if}
 				<td class:out={e.stream} class:opens={!!e.details?.length} onclick={() => e.details?.length && (detailOpen = toggle(detailOpen, e.id))}>
-					{#if e.stream}
+					{#if e.omitted && e.nodeKey}
+						<!-- The live view is capped (CHI-1597): earlier lines are in the paged viewer, not here. -->
+						<a class="omitted" href={to(`/runs/${e.runId}/output/${e.nodeKey}`)}>+{e.omitted.toLocaleString('en-GB')} lines · open in viewer →</a>
+					{:else if e.stream}
 						{@const lines = e.text.split('\n')}
 						<span title={e.title}>{open.has(e.id) || lines.length <= FOLD ? e.text : lines.slice(0, FOLD).join('\n')}</span>
 						{#if lines.length > FOLD}<Button variant="link" size="inline" class="mt-0.5 flex font-sans text-[11.5px]" onclick={() => (open = toggle(open, e.id))}>{open.has(e.id) ? 'Show less' : `Show all ${lines.length} lines`}</Button>{/if}
@@ -386,6 +394,13 @@
 		padding-top: 3px;
 		padding-bottom: 3px;
 		color: var(--muted-foreground);
+	}
+	.omitted {
+		color: var(--primary);
+		font-family: var(--font-sans);
+	}
+	.omitted:hover {
+		text-decoration: underline;
 	}
 	.member {
 		margin-left: 8px;

@@ -28,6 +28,9 @@ import type {
 	RunListQuery,
 	RunNodeError,
 	RunOutputLine,
+	NodeOutputIndex,
+	NodeOutputPage,
+	NodeOutputSearch,
 	RunRowPage,
 	RunRowQuery,
 	RunStatement,
@@ -124,6 +127,11 @@ export interface ApiClient extends PlatformApi {
 	/** One statement's SQL, fetched when its row is expanded. `view.sql` */
 	getStatementSql(scope: Scope, runId: string, statementId: string): Promise<StatementSql>;
 	listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]>;
+	// A node's bulk output, read by range from the output store (prototype, CHI-1597; only the mock has these yet).
+	getNodeOutputIndex?(scope: Scope, runId: string, nodeKey: string): Promise<NodeOutputIndex | null>;
+	getNodeOutputPage?(scope: Scope, runId: string, nodeKey: string, at: { from: number; rows: number; direction: 'forward' | 'backward'; collapse: boolean }): Promise<NodeOutputPage>;
+	searchNodeOutput?(scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward'): Promise<NodeOutputSearch>;
+	downloadNodeOutput?(scope: Scope, runId: string, nodeKey: string, onProgress?: (done: number) => void): Promise<Blob>;
 	/** One failed node's error text, fetched when its row is expanded. `view.evidence` on the node */
 	getRunNodeError(scope: Scope, runId: string, nodeKey: string): Promise<RunNodeError>;
 	/** Queued runs in claim order, with why each one waits. */

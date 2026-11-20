@@ -15,7 +15,7 @@
 	import { nodeLabel, nodeStatusTone, shortRunId } from '$lib/operate/labels';
 	import type { RunDetailState } from './state.svelte';
 	import { formatQueryCost } from './utils';
-	import { fullStamp, skipCause } from './utils/proto';
+	import { fullStamp, skipCause, warehouseQueryUrl } from './utils/proto';
 
 	// A node in this run, in a drawer from the right (CHI-1591), modelled on the Lineage sidebar but
 	// scoped to the run: what it did here, its SQL as it ran, its last builds, what it printed, and where
@@ -51,8 +51,13 @@
 	});
 	let sqlMode = $state<'raw' | 'compiled'>('compiled');
 
-	/** A warehouse query's page in its console, for a running SQL node (prototype: Snowflake's query detail). */
-	const queryHref = (id: string) => `https://app.snowflake.com/#/compute/history/queries/${id}/detail`;
+	// "open in warehouse" only where the adapter has a URL for a query; per-adapter URLs come later.
+	const queryHref = $derived(running?.queryId ? warehouseQueryUrl(app.location?.target.adapter, running.queryId) : null);
+
+	// Resizable from its left edge; the page beside it takes the rest.
+	let width = $state(480);
+	let dragging = $state(false);
+	const clampWidth = (w: number) => Math.round(Math.min(Math.max(340, w), Math.max(360, window.innerWidth * 0.6)));
 
 	function onkey(e: KeyboardEvent) {
 		if (e.key === 'Escape' && key) view.openDrawer(null);
@@ -62,7 +67,26 @@
 <svelte:window onkeydown={onkey} />
 
 {#if n && key}
-	<aside class="drawer" aria-label="{name} in this run" data-testid="node-drawer">
+	<aside class="drawer" style:width="{width}px" aria-label="{name} in this run" data-testid="node-drawer">
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+		<div
+			class="resize"
+			role="separator"
+			aria-orientation="vertical"
+			aria-label="Resize the drawer"
+			aria-valuenow={width}
+			tabindex="0"
+			onpointerdown={(e) => {
+				dragging = true;
+				(e.target as HTMLElement).setPointerCapture(e.pointerId);
+			}}
+			onpointermove={(e) => dragging && (width = clampWidth(window.innerWidth - e.clientX))}
+			onpointerup={() => (dragging = false)}
+			onkeydown={(e) => {
+				if (e.key === 'ArrowLeft') width = clampWidth(width + 24);
+				if (e.key === 'ArrowRight') width = clampWidth(width - 24);
+			}}
+		></div>
 		<header>
 			<div class="title">
 				<span class="name" title={key}>{name}</span>
@@ -98,7 +122,10 @@
 				<dl class="kv">
 					{#if n.startedAt}<div><dt>Started</dt><dd class="mono">{fullStamp(n.startedAt)}</dd></div>{/if}
 					{#if running?.queryId}
-						<div><dt>Query</dt><dd><a class="mono" href={queryHref(running.queryId)} target="_blank" rel="noreferrer" title="Open this query in the warehouse">{running.queryId} ↗</a></dd></div>
+						<div>
+							<dt>Query</dt>
+							<dd><span class="mono">{running.queryId}</span>{#if queryHref} · <a href={queryHref} target="_blank" rel="noreferrer" title="Open this query in the warehouse's console">open in warehouse ↗</a>{/if}</dd>
+						</div>
 					{/if}
 					{#if statements.length}
 						<div><dt>Statements</dt><dd><Button variant="link" size="inline" onclick={() => (view.tab = 'statements')}>{statements.length} in the warehouse →</Button></dd></div>
@@ -121,9 +148,19 @@
 
 			{#if output.length}
 				<InspectorSection title="Output">
-					{#snippet meta()}<span>{output.length} {output.length === 1 ? 'line' : 'lines'}</span>{/snippet}
+					{#snippet meta()}
+						<span>{(output.reduce((sum, l) => sum + (l.omitted ?? 1), 0)).toLocaleString('en-GB')} lines</span>
+						{#if output.some((l) => l.omitted)}<a class="viewer-link" href={to(`/runs/${n.runId}/output/${key}`)}>Open in viewer →</a>{/if}
+					{/snippet}
 					<div class="output">
-						{#each output.slice(-40) as l, i (i)}<div class:err={l.stream === 'stderr'}><span class="stream">{l.stream}</span><pre>{l.text}</pre></div>{/each}
+						{#each output.slice(-60) as l, i (i)}
+							{#if l.omitted}
+								<!-- The live view is capped (CHI-1597): the rest is in the paged viewer. -->
+								<a class="omitted" href={to(`/runs/${n.runId}/output/${key}`)}>+{l.omitted.toLocaleString('en-GB')} lines · open in viewer →</a>
+							{:else}
+								<div class:err={l.stream === 'stderr'}><span class="stream">{l.stream}</span><pre>{l.text}</pre></div>
+							{/if}
+						{/each}
 					</div>
 				</InspectorSection>
 			{/if}
@@ -153,18 +190,27 @@
 
 <style>
 	.drawer {
-		position: fixed;
-		top: 0;
-		right: 0;
-		bottom: 0;
-		z-index: 40;
+		position: relative;
 		display: flex;
-		width: min(500px, 94vw);
+		min-height: 0;
+		flex: none;
 		flex-direction: column;
 		border-left: 1px solid var(--border-subtle);
 		background: var(--card);
-		box-shadow: -8px 0 24px rgb(0 0 0 / 0.18);
 		font-size: 12.5px;
+	}
+	.resize {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: -3px;
+		z-index: 2;
+		width: 6px;
+		cursor: col-resize;
+	}
+	.resize:hover,
+	.resize:focus-visible {
+		background: color-mix(in srgb, var(--primary) 35%, transparent);
 	}
 	header {
 		padding: 14px 16px 12px;
@@ -301,6 +347,17 @@
 		margin: 0;
 		white-space: pre-wrap;
 		word-break: break-word;
+	}
+	.viewer-link {
+		margin-left: auto;
+		color: var(--primary);
+		font-size: 12px;
+	}
+	.omitted {
+		display: block;
+		padding: 2px 4px 4px;
+		color: var(--primary);
+		font-family: var(--font-sans);
 	}
 	.faint {
 		color: var(--sb-text-faint);

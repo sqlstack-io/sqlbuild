@@ -14,7 +14,7 @@ export const EVENT_CATEGORIES: { value: EventCategory; label: string }[] = [
 
 export function eventCategory(e: RunEvent): EventCategory {
 	if (e.type.startsWith('statement_')) return 'queries';
-	if (e.type.startsWith('resource_attempt_')) return 'nodes';
+	if (e.type.startsWith('resource_attempt_') || e.type === 'node_log') return 'nodes';
 	if (e.type === 'audit_completed') return 'checks';
 	return 'run';
 }
@@ -23,6 +23,9 @@ export function eventSummary(e: RunEvent): string {
 	switch (e.type) {
 		case 'requested':
 			return e.message;
+		case 'node_log':
+			// A Python node's `ctx.log` line, as it wrote it (CHI-1597).
+			return e.message.replace(/^\[warning\] /, '');
 		case 'queued':
 			return 'Queued';
 		case 'claimed':
@@ -89,6 +92,8 @@ export type LogEntry = {
 	pinned: boolean;
 	/** A short tag in plain words (built, merged, failed, skipped, check, run) and its colour. */
 	tag?: { text: string; tone: string };
+	/** A capped live view's marker: this many earlier lines of the node's output are in the viewer (CHI-1597). */
+	omitted?: number;
 	/** Structured details the row opens to in place, as key and value; `long` is text behind "show more". */
 	details?: [string, string][];
 	long?: string;
@@ -101,6 +106,7 @@ function eventTag(e: RunEvent): LogEntry['tag'] {
 	if (e.type === 'resource_attempt_failed' || e.type === 'statement_failed' || e.type === 'invocation_failed') return { text: 'failed', tone: TAG_TONE.err };
 	if (e.type === 'resource_attempt_skipped') return { text: 'skipped', tone: TAG_TONE.quiet };
 	if (e.type === 'audit_completed') return { text: 'check', tone: e.level === 'info' ? TAG_TONE.ok : TAG_TONE.warn };
+	if (e.type === 'node_log') return { text: 'log', tone: e.level === 'info' ? TAG_TONE.quiet : TAG_TONE.warn };
 	return { text: 'run', tone: TAG_TONE.quiet };
 }
 
@@ -250,7 +256,8 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 	const byNode = new Map<string, RunEvent[]>();
 	for (const e of events) if (e.nodeKey && known.has(id(e.runId, e.nodeKey))) byNode.set(id(e.runId, e.nodeKey), [...(byNode.get(id(e.runId, e.nodeKey)) ?? []), e]);
 
-	const runLines = events.filter((e) => !(e.nodeKey && known.has(id(e.runId, e.nodeKey))) && !e.type.startsWith('statement_')).map(entryOf);
+	// Run-level events, and a node's `ctx.log` lines, which keep their own rows (CHI-1597).
+	const runLines = events.filter((e) => (e.type === 'node_log' || !(e.nodeKey && known.has(id(e.runId, e.nodeKey)))) && !e.type.startsWith('statement_')).map(entryOf);
 	const failedQueries = events.filter((e) => e.type === 'statement_failed').map(entryOf);
 	const nodeLines = nodes.flatMap((n): LogEntry[] => {
 		const evs = byNode.get(id(n.runId, n.nodeKey)) ?? [];
@@ -299,6 +306,7 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 			runId: l.runId,
 			at: l.at,
 			nodeKey: l.nodeKey ?? null,
+			omitted: l.omitted,
 			level: l.error ? 'error' : 'info',
 			category: 'output',
 			text: l.text,

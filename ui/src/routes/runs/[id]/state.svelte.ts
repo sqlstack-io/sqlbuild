@@ -73,9 +73,17 @@ export function createRunDetailState(runId: string) {
 	const selected = $derived(selection.keys ? nodes.filter((n) => selection.keys!.has(n.nodeKey)).map((n) => n.nodeKey) : []);
 	let tab = $state<BottomTab>('log');
 
-	/** Ticking a node adds its name to the selection, or removes it. */
+	/**
+	 * Ticking a node always toggles whether it is shown (CHI-1591): its plain name comes out of, or goes
+	 * into, the selection; a node selected through a pick such as `fct_order_margin+` is excluded instead,
+	 * and ticking it again takes the exclude back out.
+	 */
 	function selectNode(key: string) {
-		selection.select = withNameToggled(selection.select, nodeLabel(key));
+		const name = nodeLabel(key);
+		const words = (text: string) => text.split(/\s+/).filter(Boolean);
+		if (words(selection.exclude).includes(name)) selection.exclude = withNameToggled(selection.exclude, name);
+		else if (words(selection.select).includes(name) || !selected.includes(key)) selection.select = withNameToggled(selection.select, name);
+		else selection.exclude = withNameToggled(selection.exclude, name);
 	}
 
 	function pick(quick: QuickPick) {

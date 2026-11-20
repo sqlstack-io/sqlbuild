@@ -191,6 +191,20 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
 };
 
 export const PYTHON_SOURCE: Record<string, { file: string; source: string }> = {
+	notebook_runner: {
+		file: 'models/ml/notebook_runner.py',
+		source: `from sqlbuild.tasks import task
+
+from shop.notebooks import run_notebook
+
+
+@task(upstream=["fact_orders"])
+def notebook_runner(ctx):
+    \"\"\"Runs the churn features notebook, cell by cell. It prints every batch.\"\"\"
+    ctx.log.info("Running notebook churn_features.ipynb (48 cells)")
+    result = run_notebook("notebooks/churn_features.ipynb", on_retry=lambda cell: ctx.log.warning(f"cell {cell} retried after worker loss"))
+    ctx.log.info(f"Notebook finished: {result.cells} cells, {result.rows_written:,} rows written")`
+	},
 	raw_events: {
 		file: 'models/ingest/raw_events.py',
 		source: `import logging

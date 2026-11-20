@@ -86,7 +86,9 @@
 
 <AppTopbar title="Runs" />
 
-<div class="flex min-h-0 flex-1 flex-col">
+<!-- The drawer sits beside the page and pushes it aside (CHI-1591), so the toolbar and Plan these stay in view. -->
+<div class="flex min-h-0 min-w-0 flex-1">
+<div class="flex min-h-0 min-w-0 flex-1 flex-col">
 	<RunHeader {view} {runId} />
 
 	{#if detail}
@@ -165,7 +167,7 @@
 			</div>
 			{/if}
 		</div>
-		<NodeDrawer {view} />
+
 	{:else if view.detailRes.loading}
 		<div class="empty"><Loading lines={4} /></div>
 	{:else if view.detailRes.error}
@@ -173,6 +175,8 @@
 	{:else}
 		<div class="empty" title="Only the newest 1,000 runs per location are kept here">Run not found.</div>
 	{/if}
+</div>
+<NodeDrawer {view} />
 </div>
 
 <style>
@@ -186,6 +190,18 @@
 	.pick :global(.selection-bar) {
 		border-bottom: none;
 		background: transparent;
+	}
+	/* With the drawer open the row is narrower: it wraps whole controls, never inside the view switch. */
+	.pick :global(.sb-row) {
+		flex-wrap: wrap;
+	}
+	.pick :global(.segmented-filter) {
+		flex: none;
+		flex-wrap: nowrap;
+	}
+	.pick :global(.sb-row > :nth-child(2)) {
+		min-width: 260px;
+		flex: 1;
 	}
 	.picks {
 		display: inline-flex;

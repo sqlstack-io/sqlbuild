@@ -45,7 +45,7 @@
 	$effect(() => {
 		if (TABS.length && !TABS.some((t) => t.value === view.tab)) view.tab = TABS[0].value;
 	});
-	const count = (t: BottomTab) => (t === 'statements' ? statements.length : t === 'cost' ? (view.cost?.resources.length ?? 0) : logCount);
+	const count = (t: BottomTab) => (t === 'statements' ? statements.length : t === 'cost' ? (view.cost?.resources.filter((r) => !filtering || sel.has(r.nodeKey)).length ?? 0) : logCount);
 	const chipText = $derived(view.focus ? view.focus.label : filterKeys.length === 1 ? filterKeys[0] : `${filterKeys.length} selected nodes`);
 	function showAll() {
 		if (view.focus) view.clearFocus();

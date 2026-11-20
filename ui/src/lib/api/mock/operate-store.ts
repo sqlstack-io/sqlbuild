@@ -2,6 +2,7 @@
 // its claims, jobs, triggers and sensors. A small loop advances live runs so
 // cancels, launches and claims behave like they do on the server.
 
+import { bigAvailable, bigDownload, bigIndex, bigPage, bigSearch } from './big-output';
 import { parseCommand } from '$lib/run/command';
 import { flagSpec, VERBS } from '$lib/run/command-table';
 import { ApiError } from '../client';
@@ -39,6 +40,9 @@ import type {
 	RunListQuery,
 	RunNode,
 	RunOutputLine,
+	NodeOutputIndex,
+	NodeOutputPage,
+	NodeOutputSearch,
 	RunRow,
 	RunRowPage,
 	RunRowQuery,
@@ -489,6 +493,30 @@ export class MockOperate {
 		const statement = execution(rec, this.#nodesOf(rec, now), now).statements.find((st) => st.id === statementId);
 		if (!statement) throw new ApiError(`Unknown statement ${statementId}`, 404);
 		return this.#ctx.reply({ statementId, sql: statement.sqlRecorded ? sqlFor(statement.nodeKey, statement.kind, this.#ctx.target(scope)) : null });
+	}
+
+	/** How much of a node's bulk output exists now (CHI-1597): only the notebook runner prints enough to page. */
+	#bigOutput(runId: string, nodeKey: string): { available: number; live: boolean } | null {
+		const rec = this.#require(runId);
+		const now = Date.now();
+		const n = this.#nodesOf(rec, now).find((x) => x.nodeKey === nodeKey);
+		return n ? bigAvailable(n, now) : null;
+	}
+	getNodeOutputIndex(_scope: Scope, runId: string, nodeKey: string): Promise<NodeOutputIndex | null> {
+		const big = this.#bigOutput(runId, nodeKey);
+		return this.#ctx.reply(big ? bigIndex(big.available, big.live) : null);
+	}
+	getNodeOutputPage(_scope: Scope, runId: string, nodeKey: string, at: { from: number; rows: number; direction: 'forward' | 'backward'; collapse: boolean }): Promise<NodeOutputPage> {
+		const big = this.#bigOutput(runId, nodeKey);
+		return this.#ctx.reply(bigPage(big?.available ?? 0, at));
+	}
+	searchNodeOutput(_scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward'): Promise<NodeOutputSearch> {
+		const big = this.#bigOutput(runId, nodeKey);
+		return this.#ctx.reply(bigSearch(big?.available ?? 0, query, from, direction));
+	}
+	downloadNodeOutput(_scope: Scope, runId: string, nodeKey: string, onProgress?: (done: number) => void): Promise<Blob> {
+		const big = this.#bigOutput(runId, nodeKey);
+		return bigDownload(big?.available ?? 0, onProgress);
 	}
 
 	listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]> {

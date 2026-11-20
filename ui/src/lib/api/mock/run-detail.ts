@@ -20,6 +20,7 @@ import type {
 } from '../types';
 import { ancestors, snapshotNode, sortTopologically } from './operate-graph';
 import { NODE_SPECS } from './build-fixtures';
+import { BIG_NODE, bigAvailable, bigLine } from './big-output';
 
 /** The prototype runs (CHI-1591), run by a local worker process and printing sqb's own lines. */
 const PROTO = /^run-p(f31|r02|s07|g40)/;
@@ -281,6 +282,7 @@ export function statusReason(status: RunStatus, nodes: RunNode[]): string | null
 // ---- Recall events, statements and output ----
 
 const LEVEL: Record<RunEvent['type'], RunEventLevel> = {
+	node_log: 'info',
 	invocation_started: 'info',
 	invocation_completed: 'info',
 	invocation_failed: 'error',
@@ -382,7 +384,8 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 		drafts.push({ producer: 'scheduler', type, occurredAt: typeof at === 'number' ? iso(at) : at, invocationId: null, nodeKey: null, statementId: null, attempt: null, message });
 	const ev = (type: Draft['type'], at: number, nodeKey: string | null, message: string, statementId: string | null = null) =>
 		drafts.push({ type, occurredAt: iso(at), invocationId: inv, nodeKey, statementId, attempt: nodeKey ? 1 : null, message });
-	const out = (stream: RunOutputLine['stream'], at: number, text: string, error = false, nodeKey: string | null = null) => inv && output.push({ invocationId: inv, stream, at: iso(at), text, error, ...(nodeKey ? { nodeKey } : {}) });
+	const out = (stream: RunOutputLine['stream'], at: number, text: string, error = false, nodeKey: string | null = null, omitted?: number) =>
+		inv && output.push({ invocationId: inv, stream, at: iso(at), text, error, ...(nodeKey ? { nodeKey } : {}), ...(omitted ? { omitted } : {}) });
 
 	const queued = Date.parse(run.queuedAt);
 	fact('requested', queued - 200, `Requested by ${run.requestedBy.displayName}${run.triggerName ? ` via ${run.triggerName}` : ''}`);
@@ -486,7 +489,7 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 			producer: d.producer ?? 'sqb',
 			type: d.type,
 			occurredAt: d.occurredAt,
-			level: d.type === 'audit_completed' && /failing rows/.test(d.message) ? 'warn' : LEVEL[d.type],
+			level: (d.type === 'audit_completed' && /failing rows/.test(d.message)) || (d.type === 'node_log' && d.message.startsWith('[warning] ')) ? 'warn' : LEVEL[d.type],
 			invocationId: d.invocationId,
 			nodeKey: d.nodeKey,
 			statementId: d.statementId,
@@ -498,7 +501,7 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 
 type Emit = {
 	ev: (type: RunEvent['type'], at: number, nodeKey: string | null, message: string, statementId?: string | null) => void;
-	out: (stream: RunOutputLine['stream'], at: number, text: string, error?: boolean, nodeKey?: string | null) => void;
+	out: (stream: RunOutputLine['stream'], at: number, text: string, error?: boolean, nodeKey?: string | null, omitted?: number) => void;
 	statements: RunStatement[];
 	inv: string;
 };
@@ -527,6 +530,20 @@ function pythonOutput(key: string, s: number, e: number | null, now: number, out
 					].join('\n')
 				);
 		}
+	}
+	if (key === BIG_NODE) {
+		// The live view is capped (CHI-1597): a marker for what came before, then the latest lines; the rest is in the viewer.
+		const n = { nodeKey: key, startedAt: new Date(s).toISOString(), status: e == null ? 'running' : 'success' } as RunNode;
+		const big = bigAvailable(n, until);
+		if (!big) return;
+		const LIVE = 40;
+		const first = Math.max(1, big.available - LIVE + 1);
+		if (first > 1) out('stdout', until - 1_000, `${(first - 1).toLocaleString('en-GB')} earlier lines`, false, key, first - 1);
+		for (let i = first; i <= big.available; i++) {
+			const l = bigLine(i);
+			out(l.stream, until - 1_000 + (i - first) * 20, l.text, false, key);
+		}
+		return;
 	}
 	if (key === 'score_customers') {
 		line(500, 'stdout', 'Loaded 4,812 customers');
@@ -589,6 +606,12 @@ function protoExecution(record: RunRecord, nodes: RunNode[], now: number, { ev, 
 		ev('resource_attempt_started', s, key, `Started ${k} ${key}`);
 		out('stdout', s, `  ▸ ${key}  ${k}`, false, key);
 		pythonOutput(key, s, e, now, out);
+		if (key === BIG_NODE) {
+			// Its ctx.log lines: few and deliberate, kept as events (CHI-1597).
+			ev('node_log', s + 1_500, key, 'Running notebook churn_features.ipynb (48 cells)');
+			if ((e ?? now) - s > 3_000) ev('node_log', s + ((e ?? now) - s) / 2, key, '[warning] cell 18 retried after worker loss');
+			if (e != null) ev('node_log', e - 200, key, 'Notebook finished: 48 cells, 211,604 rows written');
+		}
 		const kind = STATEMENT_KIND[k];
 		if (kind) {
 			// The node's warehouse statement, with its query ID, for the Statements tab, the cost and the drawer.

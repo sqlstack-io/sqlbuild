@@ -244,6 +244,8 @@ export type RunNodeError = {
 export type RunEdge = { from: string; to: string };
 
 export const RECALL_EVENT_TYPES = [
+	// A Python node's `ctx.log` line (prototype, CHI-1597): few, deliberate, kept as events.
+	'node_log',
 	'invocation_started',
 	'invocation_completed',
 	'invocation_failed',
@@ -416,7 +418,31 @@ export type RunOutputLine = {
 	error: boolean;
 	/** The node the line is about, when sqb printed it for one (prototype, CHI-1591). */
 	nodeKey?: string | null;
+	/** A marker in a capped live view: this many earlier lines of the node's output are in the viewer, not here (CHI-1597). */
+	omitted?: number;
 };
+
+// ---- a node's bulk output, paged from the output store (prototype, CHI-1597) ----
+
+export type NodeOutputLevel = 'info' | 'warn' | 'error';
+/** What the output store's index knows about a node's output, without reading it. */
+export type NodeOutputIndex = {
+	total: number;
+	stdout: number;
+	stderr: number;
+	bytes: number;
+	/** Error and warning lines, by line number, from the index. */
+	marks: { line: number; level: Exclude<NodeOutputLevel, 'info'>; text: string }[];
+	/** Still being written: the node is running. */
+	live: boolean;
+};
+export type NodeOutputLine = { n: number; stream: 'stdout' | 'stderr'; text: string; level: NodeOutputLevel };
+/** A line, or a run of similar lines (the same but for their numbers) folded into one row. */
+export type NodeOutputRow = { kind: 'line'; line: NodeOutputLine } | { kind: 'similar'; from: number; count: number; sample: NodeOutputLine };
+/** Rows covering lines `from` to `to` (exclusive, 1-based). */
+export type NodeOutputPage = { total: number; from: number; to: number; rows: NodeOutputRow[] };
+/** A search over the whole output: how many lines match, and the next match from where the search started. */
+export type NodeOutputSearch = { count: number; line: number | null };
 
 export type RunInvocation = {
 	invocationId: string;
