@@ -15,6 +15,8 @@
 	import { nodeLabel, nodeStatusTone, shortRunId } from '$lib/operate/labels';
 	import type { RunDetailState } from './state.svelte';
 	import CheckList from './check-list.svelte';
+	import QueryPanel from './query-panel.svelte';
+	import TracebackPanel from './traceback-panel.svelte';
 	import { checksOf } from './utils/checks';
 	import { formatQueryCost } from './utils';
 	import { fullStamp, skipCause, warehouseQueryUrl } from './utils/proto';
@@ -31,6 +33,15 @@
 	const checks = $derived(key ? (view.eventsRes.data ?? []).filter((e) => e.type === 'audit_completed' && e.nodeKey === key) : []);
 	const statements = $derived(key ? view.statements.filter((s) => s.nodeKey === key && s.runId === n?.runId) : []);
 	const running = $derived(statements.find((s) => s.status === 'running') ?? null);
+	/** The node's own queries (its build), apart from its checks' queries. */
+	const builds = $derived(statements.filter((s) => s.kind !== 'audit'));
+	let codeEl = $state<HTMLDivElement>();
+	// A traceback frame's line comes into view once the code is there.
+	$effect(() => {
+		const line = view.codeLine;
+		if (line == null || !codeEl) return;
+		codeEl.querySelector('.hit')?.scrollIntoView({ block: 'center' });
+	});
 	const cost = $derived(key ? (view.cost?.resources.find((r) => r.nodeKey === key) ?? null) : null);
 	const output = $derived(key ? (view.outputRes.data ?? []).filter((l) => l.nodeKey === key && l.runId === n?.runId) : []);
 	const STATUS: Record<string, string> = { success: 'Built', warn: 'Built, with warnings', failed: 'Failed', skipped: 'Skipped', running: 'Building', pending: 'Waiting', not_run: 'Not run', cancelled: 'Not run (cancelled)' };
@@ -115,7 +126,10 @@
 					<div><span>Cost</span><b>{cost ? formatQueryCost(cost) : '—'}</b></div>
 				</div>
 				{#if cause}<p class="why">{cause}</p>{/if}
-				{#if n.status === 'failed' && n.errorMessage}
+				{#if n.status === 'failed' && n.errorCode === 'python_exception' && n.errorDetail}
+					<!-- The exception and the last of its traceback; the output viewer has the rest. -->
+					<div class="tb-wrap"><TracebackPanel detail={n.errorDetail} file={n.errorLocation?.file ?? null} runId={n.runId} nodeKey={key} onframe={(line) => view.openCode(key, line)} /></div>
+				{:else if n.status === 'failed' && n.errorMessage}
 					<div class="error">
 						<b>{n.errorMessage}</b>
 						{#if n.errorLocation}<div class="faint mono">{n.errorLocation.file}{n.errorLocation.line != null ? `:${n.errorLocation.line}` : ''}</div>{/if}
@@ -129,14 +143,22 @@
 							<dd><span class="mono">{running.queryId}</span>{#if queryHref} · <a href={queryHref} target="_blank" rel="noreferrer" title="Open this query in the warehouse's console">open in warehouse ↗</a>{/if}</dd>
 						</div>
 					{/if}
-					{#if statements.length}
-						<div><dt>Statements</dt><dd><Button variant="link" size="inline" onclick={() => (view.tab = 'statements')}>{statements.length} in the warehouse →</Button></dd></div>
-					{/if}
+
 				</dl>
 				{#if checks.length}
 					<div class="checks-wrap"><CheckList checks={checksOf(checks)} runId={n.runId} statements={view.statements} onstatement={(id) => view.showStatement(id, key)} /></div>
 				{/if}
 			</InspectorSection>
+
+			{#if builds.length}
+				<!-- The node's queries, in place; a failure's is open, with its error. -->
+				<InspectorSection title={builds.length === 1 ? 'Query' : 'Queries'}>
+					{#snippet meta()}<span>{builds.length}{checks.length ? ` · ${checks.length} check ${checks.length === 1 ? 'query' : 'queries'} under Checks` : ''}</span>{/snippet}
+					{#each builds as q (q.id)}
+						<div class="q"><QueryPanel statement={q} onstatements={() => view.showStatement(q.id, key)} /></div>
+					{/each}
+				</InspectorSection>
+			{/if}
 
 			{#if d?.recentOutcomes.length}
 				<InspectorSection title="Builds">
@@ -169,7 +191,15 @@
 				</InspectorSection>
 			{:else if d?.code}
 				<InspectorSection title="Code">
-					<CodePreview file={d.code.file} code={d.code.source} language="text" maxLines={16} />
+					{#if view.codeLine != null}
+						<!-- Opened from a traceback frame: the whole file, at that line. -->
+						<div class="code" bind:this={codeEl}>
+							<div class="file mono">{d.code.file}</div>
+							{#each d.code.source.split('\n') as l, i (i)}<div class="cl" class:hit={i + 1 === view.codeLine}><span class="no">{i + 1}</span><pre>{l}</pre></div>{/each}
+						</div>
+					{:else}
+						<CodePreview file={d.code.file} code={d.code.source} language="text" maxLines={16} />
+					{/if}
 				</InspectorSection>
 			{/if}
 
@@ -306,6 +336,47 @@
 		padding: 8px 10px;
 		border-left: 2px solid var(--sb-error);
 		background: color-mix(in srgb, var(--sb-error) 6%, transparent);
+	}
+	.tb-wrap {
+		margin-top: 6px;
+	}
+	.q + .q {
+		margin-top: 10px;
+	}
+	.code {
+		overflow: auto;
+		max-height: 360px;
+		border: 1px solid var(--border-subtle);
+		border-radius: 2px;
+		font-size: 12px;
+	}
+	.code .file {
+		position: sticky;
+		top: 0;
+		padding: 6px 10px;
+		border-bottom: 1px solid var(--border-subtle);
+		background: var(--card);
+	}
+	.cl {
+		display: flex;
+		gap: 12px;
+		padding: 0 10px;
+	}
+	.cl .no {
+		flex: none;
+		width: 24px;
+		color: var(--sb-text-faint);
+		font-family: var(--font-mono);
+		text-align: right;
+	}
+	.cl pre {
+		margin: 0;
+		font-family: var(--font-mono);
+		white-space: pre-wrap;
+	}
+	.cl.hit {
+		box-shadow: inset 2px 0 0 var(--sb-error);
+		background: color-mix(in srgb, var(--sb-error) 10%, transparent);
 	}
 	.checks-wrap {
 		margin-top: 10px;

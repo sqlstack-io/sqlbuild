@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Button from '$lib/components/ui/button/button.svelte';
-	import CopyButton from '$lib/components/copy-button.svelte';
+	import QueryPanel from './query-panel.svelte';
 	import type { CheckSample, RunStatement } from '$lib/api';
 	import { app } from '$lib/state/app.svelte';
 	import type { CheckResult } from './utils/checks';
@@ -29,7 +29,6 @@
 	const hidden = $derived(checks.length - shown.length);
 
 	type Loaded<T> = { state: 'loading' } | { state: 'ok'; value: T } | { state: 'error'; message: string };
-	let sql = $state<Record<string, Loaded<string | null>>>({});
 	let sample = $state<Record<string, Loaded<CheckSample | null>>>({});
 	let openSql = $state<Set<string>>(new Set());
 	let openRows = $state<Set<string>>(new Set());
@@ -40,17 +39,8 @@
 		else next.add(id);
 		return next;
 	};
-	async function showSql(c: CheckResult) {
+	function showSql(c: CheckResult) {
 		openSql = toggled(openSql, c.id);
-		const id = c.statementId;
-		if (!id || !app.scope || sql[id]) return;
-		sql = { ...sql, [id]: { state: 'loading' } };
-		try {
-			const res = await app.client.getStatementSql(app.scope, runId, id);
-			sql = { ...sql, [id]: { state: 'ok', value: res.sql } };
-		} catch (e) {
-			sql = { ...sql, [id]: { state: 'error', message: e instanceof Error ? e.message : String(e) } };
-		}
 	}
 	async function showRows(c: CheckResult) {
 		openRows = toggled(openRows, c.id);
@@ -64,7 +54,6 @@
 		}
 	}
 	const statementOf = (c: CheckResult) => statements.find((s) => s.id === c.statementId) ?? null;
-	const took = (s: RunStatement) => (s.endedAt ? `${((Date.parse(s.endedAt) - Date.parse(s.startedAt)) / 1000).toFixed(2)}s` : 'running');
 	const GLYPH = { failed: '✗', warned: '⚠', passed: '✓' } as const;
 	const SEVERITY = { failed: 'error', warned: 'warn', passed: '' } as const;
 </script>
@@ -81,20 +70,9 @@
 				{#if c.outcome !== 'passed' && c.statementId}<Button variant="link" size="inline" class="text-[12px]" onclick={() => showRows(c)} aria-expanded={openRows.has(c.id)}>rows {openRows.has(c.id) ? '▾' : '▸'}</Button>{/if}
 			</span>
 		</div>
-		{#if openSql.has(c.id) && c.statementId}
-			{@const got = sql[c.statementId]}
-			<div class="panel">
-				<div class="meta">
-					{#if st?.queryId}<span>Query <code>{st.queryId}</code></span>{/if}
-					{#if st}<span>{took(st)}</span>{/if}
-					{#if onstatement}<Button variant="link" size="inline" class="text-[12px]" onclick={() => onstatement(c.statementId!)}>In Statements →</Button>{/if}
-				</div>
-				{#if got?.state === 'ok' && got.value}
-					<div class="sql"><pre>{got.value}</pre><CopyButton value={got.value} label="Copy SQL" /></div>
-				{:else if got?.state === 'ok'}<p class="faint">The SQL wasn't recorded.</p>
-				{:else if got?.state === 'error'}<p class="faint">Couldn't load the SQL: {got.message}</p>
-				{:else}<p class="faint">Loading…</p>{/if}
-			</div>
+		{#if openSql.has(c.id) && st}
+			<!-- The check's query, in place: as it ran, with its query ID and duration. -->
+			<div class="panel q"><QueryPanel statement={st} onstatements={onstatement ? () => onstatement(c.statementId!) : undefined} /></div>
 		{/if}
 		{#if openRows.has(c.id) && c.statementId}
 			{@const got = sample[c.statementId]}
@@ -165,6 +143,10 @@
 		display: inline-flex;
 		gap: 12px;
 	}
+	.panel.q {
+		padding: 0;
+		border-left: 0;
+	}
 	.panel {
 		margin: 2px 0 6px 26px;
 		padding: 6px 10px;
@@ -177,23 +159,10 @@
 		gap: 4px 14px;
 		color: var(--sb-text-faint);
 	}
-	code,
-	pre,
 	td,
 	th {
 		font-family: var(--font-mono);
 		font-size: 12px;
-	}
-	.sql {
-		display: flex;
-		align-items: flex-start;
-		gap: 8px;
-		margin-top: 4px;
-	}
-	pre {
-		margin: 0;
-		color: var(--muted-foreground);
-		white-space: pre-wrap;
 	}
 	/* Inside the log's table too: these beat its cell styles. */
 	.checks table {

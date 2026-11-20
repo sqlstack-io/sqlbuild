@@ -195,6 +195,51 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
 };
 
 export const PYTHON_SOURCE: Record<string, { file: string; source: string }> = {
+	score_customers_v2: {
+		file: 'models/ml/score_customers_v2.py',
+		source: `import numpy as np
+import pandas as pd
+from sqlbuild.tasks import task
+
+from shop.models import churn_model
+
+SEGMENT_WEIGHTS = {
+    "loyal": 0.6,
+    "regular": 1.0,
+    "lapsing": 1.4,
+    "new": 1.1,
+}
+
+
+def build_features(customers: pd.DataFrame, segments: pd.DataFrame) -> pd.DataFrame:
+    \"\"\"Joins each customer to their segment and derives the model's features.\"\"\"
+    joined = customers.merge(
+        segments,
+        how="left",
+        left_on="customer_id",
+        right_on="customer_id",
+        suffixes=("", "_seg"),
+    )
+    # The segments table renamed customer_segment to segment in rev 14.
+    joined["orders_per_month"] = joined["orders"] / joined["tenure_months"].clip(lower=1)
+    joined["segment_weight"] = joined["customer_segment"].map(SEGMENT_WEIGHTS)
+    return joined[["customer_id", "orders_per_month", "lifetime_value", "segment_weight"]]
+
+
+@task(upstream=["dim_customers"])
+def score_customers_v2(ctx):
+    \"\"\"Scores churn risk with model churn_v2, weighting by customer segment.\"\"\"
+    customers = ctx.query('SELECT * FROM __ref("dim_customers")').to_pandas()
+    print(f"Loaded {len(customers):,} customers, {len(customers.columns)} columns")
+    segments = ctx.query("SELECT * FROM analytics.customer_segments").to_pandas()
+    model = churn_model("churn_v2")
+    for i, batch in enumerate(batches(customers, size=16)):
+        print(f"  scoring batch {i}")
+        model.score(batch)
+
+    features = build_features(customers, segments)
+    ctx.write("customer_scores_v2", model.predict(features))`
+	},
 	notebook_runner: {
 		file: 'models/ml/notebook_runner.py',
 		source: `from sqlbuild.tasks import task

@@ -93,6 +93,8 @@ export type LogEntry = {
 	pinned: boolean;
 	/** A short tag in plain words (built, merged, failed, skipped, check, run) and its colour. */
 	tag?: { text: string; tone: string };
+	/** A node line's node: its failure, file and statements, for what its details open to. */
+	node?: RunNode;
 	/** A node line's checks, problems first, for the table its details open to (CHI-1591). */
 	checks?: CheckResult[];
 	/** A capped live view's marker: this many earlier lines of the node's output are in the viewer (CHI-1597). */
@@ -261,7 +263,8 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 
 	// Run-level events, and a node's `ctx.log` lines, which keep their own rows (CHI-1597).
 	const runLines = events.filter((e) => (e.type === 'node_log' || !(e.nodeKey && known.has(id(e.runId, e.nodeKey)))) && !e.type.startsWith('statement_')).map(entryOf);
-	const failedQueries = events.filter((e) => e.type === 'statement_failed').map(entryOf);
+	// One failure, one line: a failed query of a node folds into the node's line, with its query in place.
+	const failedQueries = events.filter((e) => e.type === 'statement_failed' && !(e.nodeKey && known.has(id(e.runId, e.nodeKey)))).map(entryOf);
 	const nodeLines = nodes.flatMap((n): LogEntry[] => {
 		const evs = byNode.get(id(n.runId, n.nodeKey)) ?? [];
 		const at = n.startedAt ?? n.endedAt ?? evs[0]?.occurredAt;
@@ -296,6 +299,7 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 				tag: nodeTag(n, checks),
 				details,
 				checks: checksOf(checks),
+				node: n,
 				long: n.errorDetail ?? undefined
 			}
 		];

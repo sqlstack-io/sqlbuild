@@ -56,7 +56,7 @@ function similarRun(n: number, step: 1 | -1, available: number): number {
 	return step > 0 ? Math.min(count, available - n + 1) : Math.min(count, n);
 }
 
-export function bigIndex(available: number, live: boolean): NodeOutputIndex {
+function notebookMarks(available: number): NodeOutputIndex['marks'] {
 	const marks: NodeOutputIndex['marks'] = [];
 	for (let c = 0; c < CELLS; c++) {
 		const base = c * CELL + 1;
@@ -64,8 +64,118 @@ export function bigIndex(available: number, live: boolean): NodeOutputIndex {
 		if (w <= available) marks.push({ line: w, level: 'warn', text: bigLine(w).text });
 		if (ERROR_CELLS.has(c) && base + errorAt(c) <= available) marks.push({ line: base + errorAt(c), level: 'error', text: bigLine(base + errorAt(c)).text });
 	}
-	marks.sort((a, b) => a.line - b.line);
-	const stderr = marks.length;
+	return marks.sort((a, b) => a.line - b.line);
+}
+
+// ---- output sources: a node's printed lines, computed by line number ----
+
+/** A node's whole output, as the output store and its index would serve it. */
+export type OutputSource = {
+	total: number;
+	/** Lines a second while it runs. */
+	rate: number;
+	line(n: number): NodeOutputLine;
+	/** How many similar lines run from `n` in `step`'s direction. */
+	similarRun(n: number, step: 1 | -1, available: number): number;
+	/** Error and warning lines, from the index. */
+	marks(available: number): NodeOutputIndex['marks'];
+	/** Every stderr line's number. */
+	stderrLines(available: number): number[];
+};
+
+const NOTEBOOK: OutputSource = { total: BIG_TOTAL, rate: BIG_RATE, line: bigLine, similarRun, marks: notebookMarks, stderrLines: (available) => notebookMarks(available).map((m) => m.line) };
+
+/** Lines that read the same but for their numbers: one shape. */
+const shapeOf = (l: NodeOutputLine) => `${l.stream}|${l.text.replace(/\d+/g, '#')}`;
+
+/** A small output's own source: similar runs and marks found by reading it, which is cheap at its size. */
+function smallSource(lines: (n: number) => NodeOutputLine, total: number, rate: number): OutputSource {
+	return {
+		total,
+		rate,
+		line: lines,
+		similarRun(n, step, available) {
+			const shape = shapeOf(lines(n));
+			let count = 1;
+			while (n + step * count >= 1 && n + step * count <= available && shapeOf(lines(n + step * count)) === shape) count++;
+			return count;
+		},
+		marks(available) {
+			const out: NodeOutputIndex['marks'] = [];
+			for (let n = 1; n <= available; n++) {
+				const l = lines(n);
+				if (l.level !== 'info') out.push({ line: n, level: l.level, text: l.text });
+			}
+			return out;
+		},
+		stderrLines(available) {
+			const out: number[] = [];
+			for (let n = 1; n <= available; n++) if (lines(n).stream === 'stderr') out.push(n);
+			return out;
+		}
+	};
+}
+
+// A Python task that prints a few thousand lines, then fails with a chained pandas KeyError (CHI-1591).
+export const V2_NODE = 'score_customers_v2';
+const V2_PRINTED = 2_960;
+export const V2_TRACEBACK = [
+	'Traceback (most recent call last):',
+	'  File "/app/.venv/lib/python3.12/site-packages/pandas/core/indexes/base.py", line 3805, in get_loc',
+	'    return self._engine.get_loc(casted_key)',
+	'           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^',
+	'  File "index.pyx", line 167, in pandas._libs.index.IndexEngine.get_loc',
+	'  File "index.pyx", line 196, in pandas._libs.index.IndexEngine.get_loc',
+	'  File "pandas/_libs/hashtable_class_helper.pxi", line 7081, in pandas._libs.hashtable.PyObjectHashTable.get_item',
+	'  File "pandas/_libs/hashtable_class_helper.pxi", line 7089, in pandas._libs.hashtable.PyObjectHashTable.get_item',
+	"KeyError: 'customer_segment'",
+	'',
+	'The above exception was the direct cause of the following exception:',
+	'',
+	'Traceback (most recent call last):',
+	'  File "/app/.venv/lib/python3.12/site-packages/sqlbuild/executor/task.py", line 142, in run_task',
+	'    result = self._call(node, ctx)',
+	'             ^^^^^^^^^^^^^^^^^^^^^',
+	'  File "/app/.venv/lib/python3.12/site-packages/sqlbuild/executor/task.py", line 201, in _call',
+	'    return node.fn(ctx)',
+	'           ^^^^^^^^^^^^',
+	'  File "/app/models/ml/score_customers_v2.py", line 41, in score_customers_v2',
+	'    features = build_features(customers, segments)',
+	'               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^',
+	'  File "/app/models/ml/score_customers_v2.py", line 26, in build_features',
+	'    joined["segment_weight"] = joined["customer_segment"].map(SEGMENT_WEIGHTS)',
+	'                               ~~~~~~^^^^^^^^^^^^^^^^^^^^',
+	'  File "/app/.venv/lib/python3.12/site-packages/pandas/core/frame.py", line 4102, in __getitem__',
+	'    indexer = self.columns.get_loc(key)',
+	'              ^^^^^^^^^^^^^^^^^^^^^^^^^',
+	'  File "/app/.venv/lib/python3.12/site-packages/pandas/core/indexes/base.py", line 3812, in get_loc',
+	'    raise KeyError(key) from err',
+	"KeyError: 'customer_segment'"
+];
+export const V2_TOTAL = V2_PRINTED + V2_TRACEBACK.length;
+function v2Line(n: number): NodeOutputLine {
+	const out = (text: string, stream: 'stdout' | 'stderr' = 'stdout', level: NodeOutputLevel = 'info'): NodeOutputLine => ({ n, stream, text, level });
+	if (n > V2_PRINTED) {
+		const text = V2_TRACEBACK[n - V2_PRINTED - 1] ?? '';
+		return out(text, 'stderr', text.startsWith('KeyError') ? 'error' : 'info');
+	}
+	if (n === 1) return out('Loading customers from analytics.dim_customers');
+	if (n === 2) return out('Loaded 48,120 customers, 31 columns');
+	if (n === 3) return out('Loading segments from analytics.customer_segments');
+	if (n === V2_PRINTED) return out('Building features for 48,120 customers');
+	if (n === V2_PRINTED - 1) return out('Scored 48,120 customers with model churn_v2 (rev 14)');
+	return out(`  scoring batch ${n - 3}/${V2_PRINTED - 5}  customers=${16 + ((n * 7) % 9)}  ${2 + ((n * 13) % 30)}ms`);
+}
+
+export const OUTPUT_SOURCES: Record<string, OutputSource> = {
+	[BIG_NODE]: NOTEBOOK,
+	[V2_NODE]: smallSource(v2Line, V2_TOTAL, 900)
+};
+
+export function bigIndex(nodeKey: string, available: number, live: boolean): NodeOutputIndex {
+	const src = OUTPUT_SOURCES[nodeKey];
+	const marks = src.marks(available);
+	const stderr = src.stderrLines(available).length;
 	return { total: available, stdout: available - stderr, stderr, bytes: Math.round(available * 46.3), marks, live };
 }
 
@@ -76,36 +186,37 @@ export type PageAt = { from: number; rows: number; direction: 'forward' | 'backw
  * folded when `collapse`, except the block holding `around` (a jump's target), which opens around it.
  * `stream` keeps only stdout or stderr lines, keeping their line numbers.
  */
-export function bigPage(available: number, at: PageAt): NodeOutputPage {
+export function bigPage(nodeKey: string, available: number, at: PageAt): NodeOutputPage {
+	const src = OUTPUT_SOURCES[nodeKey];
 	const step = at.direction === 'forward' ? 1 : -1;
 	const rows: NodeOutputRow[] = [];
 	if (at.stream === 'stderr') {
 		// stderr lines are the index's marks: read them from the index, not by walking the output.
-		const lines = bigIndex(available, false).marks.map((m) => m.line);
+		const lines = src.stderrLines(available);
 		const picked = step > 0 ? lines.filter((l) => l >= at.from).slice(0, at.rows) : lines.filter((l) => l < at.from).slice(-at.rows);
-		for (const l of picked) rows.push({ kind: 'line', line: bigLine(l) });
+		for (const l of picked) rows.push({ kind: 'line', line: src.line(l) });
 	} else {
 		let n = step > 0 ? Math.max(1, at.from) : Math.min(available, at.from - 1);
 		while (rows.length < at.rows && n >= 1 && n <= available) {
-			const first = bigLine(n);
+			const first = src.line(n);
 			if (at.stream === 'stdout' && first.stream === 'stderr') {
 				n += step;
 				continue;
 			}
-			let count = at.collapse ? similarRun(n, step, available) : 1;
+			let count = at.collapse ? src.similarRun(n, step, available) : 1;
 			const lo = step > 0 ? n : n - count + 1;
 			if (count >= 4 && at.around != null && at.around >= lo && at.around < lo + count) {
 				// The jump's target is inside this block: fold what comes before it, then show its lines.
 				const before = step > 0 ? at.around - 3 - n : n - (at.around + 3);
 				if (before >= 4) {
-					rows.push({ kind: 'similar', from: step > 0 ? n : at.around + 4, count: before, sample: bigLine(step > 0 ? n : at.around + 4) });
+					rows.push({ kind: 'similar', from: step > 0 ? n : at.around + 4, count: before, sample: src.line(step > 0 ? n : at.around + 4) });
 					n += step * before;
 				}
 				const near = Math.min(7, Math.abs(n - (step > 0 ? at.around + 4 : at.around - 4)));
-				for (let i = 0; i < near && n >= 1 && n <= available; i++, n += step) rows.push({ kind: 'line', line: bigLine(n) });
+				for (let i = 0; i < near && n >= 1 && n <= available; i++, n += step) rows.push({ kind: 'line', line: src.line(n) });
 				continue;
 			}
-			if (count >= 4) rows.push({ kind: 'similar', from: lo, count, sample: bigLine(lo) });
+			if (count >= 4) rows.push({ kind: 'similar', from: lo, count, sample: src.line(lo) });
 			else {
 				count = 1;
 				rows.push({ kind: 'line', line: first });
@@ -122,14 +233,15 @@ export function bigPage(available: number, at: PageAt): NodeOutputPage {
 // A search is a scan over every line; its hits are kept for the next and previous match, as the server
 // would keep a search's result while someone steps through it.
 const searches = new Map<string, number[]>();
-export function bigSearch(available: number, query: string, from: number, direction: 'forward' | 'backward'): NodeOutputSearch {
+export function bigSearch(nodeKey: string, available: number, query: string, from: number, direction: 'forward' | 'backward'): NodeOutputSearch {
+	const src = OUTPUT_SOURCES[nodeKey];
 	const q = query.toLowerCase();
 	if (!q) return { count: 0, line: null, rank: null };
-	const key = `${available}|${q}`;
+	const key = `${nodeKey}|${available}|${q}`;
 	let hits = searches.get(key);
 	if (!hits) {
 		hits = [];
-		for (let n = 1; n <= available; n++) if (bigLine(n).text.toLowerCase().includes(q)) hits.push(n);
+		for (let n = 1; n <= available; n++) if (src.line(n).text.toLowerCase().includes(q)) hits.push(n);
 		searches.clear();
 		searches.set(key, hits);
 	}
@@ -148,7 +260,8 @@ export function bigDownloadUrl(runId: string, nodeKey: string, available: number
 
 /** How many lines the node has printed by `now`: all of them once it finished, else so far. */
 export function bigAvailable(n: RunNode, now: number): { available: number; live: boolean } | null {
-	if (n.nodeKey !== BIG_NODE || !n.startedAt) return null;
-	if (n.status !== 'running') return { available: BIG_TOTAL, live: false };
-	return { available: Math.max(1, Math.min(BIG_TOTAL - 1, Math.floor(((now - Date.parse(n.startedAt)) / 1000) * BIG_RATE))), live: true };
+	const src = OUTPUT_SOURCES[n.nodeKey];
+	if (!src || !n.startedAt) return null;
+	if (n.status !== 'running') return { available: src.total, live: false };
+	return { available: Math.max(1, Math.min(src.total - 1, Math.floor(((now - Date.parse(n.startedAt)) / 1000) * src.rate))), live: true };
 }

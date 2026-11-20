@@ -69,6 +69,8 @@ export const SNAPSHOT_NODES: SnapshotNode[] = [
 	node('fct_payment_daily', 'table', 'finance', ['stg_payments']),
 	node('fct_order_lines', 'table', 'marts', ['stg_orders', 'stg_payments']),
 	node('fct_refunds', 'table', 'finance', ['stg_payments', 'fact_orders']),
+	// A Python task that fails with a pandas KeyError traceback after printing a few thousand lines.
+	node('score_customers_v2', 'task', 'ml', ['dim_customers'], { path: 'models/ml/score_customers_v2.py' }),
 	// A notebook runner that prints about 2 million lines (CHI-1597).
 	node('notebook_runner', 'task', 'ml', ['fact_orders'], { path: 'models/ml/notebook_runner.py' })
 ];

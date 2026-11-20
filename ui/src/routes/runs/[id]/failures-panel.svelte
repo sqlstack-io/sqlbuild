@@ -7,6 +7,8 @@
 	import { shortRunId } from '$lib/operate/labels';
 	import { errorMessage } from '$lib/platform/labels';
 	import type { RunDetailState } from './state.svelte';
+	import QueryPanel from './query-panel.svelte';
+	import TracebackPanel from './traceback-panel.svelte';
 
 	let { view }: { view: RunDetailState } = $props();
 
@@ -62,14 +64,19 @@
 		</button>
 		{#if open.has(key)}
 			{@const got = errors[key]}
+			{@const failedQueries = view.statements.filter((q) => q.nodeKey === n.nodeKey && q.runId === n.runId && q.status === 'failed')}
 			<div class="more">
 				{#if where}
 					<div class="where"><span class="loc mono" title="Where the failure points in the project">{where}</span><CopyButton value={where} label="Copy file" />
-						{#if app.client.supports('listRunStatements')}<Button variant="link" size="inline" class="text-[12px]" onclick={() => view.focusNode(n.nodeKey, 'statements')}>Its queries</Button>{/if}
 						{#if n.runId !== view.run?.id}<a class="faint" href={to(`/runs/${n.runId}`)}>Open its job run</a>{/if}
 					</div>
 				{/if}
-				{#if detail}
+				<!-- The failure in place (CHI-1591): a Python exception's traceback, or the failed query and its error. -->
+				{#if n.errorCode === 'python_exception' && n.errorDetail}
+					<TracebackPanel detail={n.errorDetail} file={n.errorLocation?.file ?? null} runId={n.runId} nodeKey={n.nodeKey} onframe={(line) => view.openCode(n.nodeKey, line)} />
+				{:else if failedQueries.length}
+					{#each failedQueries as q (q.id)}<QueryPanel statement={q} onstatements={() => view.showStatement(q.id, n.nodeKey)} />{/each}
+				{:else if detail}
 					<pre>{detail}</pre>
 				{:else if got && 'failure' in got}
 					<p class="faint">{got.failure}</p>

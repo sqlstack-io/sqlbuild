@@ -29,9 +29,11 @@
 
 	const detail = $derived(view.detail);
 	const nodes = $derived(view.nodes);
-	let topView = $state<'timeline' | 'graph'>('timeline');
+	// Back to the page restores the view and the split as they were (CHI-1591).
+	const mem = view.memory;
+	let topView = $state<'timeline' | 'graph'>((mem.topView as 'timeline' | 'graph') ?? 'timeline');
 	// A group run opens on its Graph: when groups get big, the graph is how you see them (CHI-1591).
-	let viewChosen = false;
+	let viewChosen = 'topView' in mem;
 	$effect(() => {
 		if (viewChosen || !detail) return;
 		viewChosen = true;
@@ -62,11 +64,14 @@
 	const memberOf = (runId: string) => detail?.children.find((c) => c.id === runId)?.jobKey ?? null;
 
 	// ---- resizable split between the timeline and the bottom tabs ----
-	let topFrac = $state(0.5);
+	let topFrac = $state((mem.topFrac as number) ?? 0.5);
+	$effect(() => {
+		Object.assign(mem, { topView, topFrac });
+	});
 	let dragging = $state(false);
 	let splitEl = $state<HTMLDivElement>();
 	// The timeline starts as tall as its rows, so a short run leaves the room to the log below.
-	let sized = false;
+	let sized = 'topFrac' in mem;
 	$effect(() => {
 		if (sized || !splitEl || !nodes.length || !hasBottom || !splitEl.clientHeight) return;
 		sized = true;

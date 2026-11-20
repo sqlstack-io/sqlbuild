@@ -516,15 +516,15 @@ export class MockOperate {
 	}
 	getNodeOutputIndex(_scope: Scope, runId: string, nodeKey: string): Promise<NodeOutputIndex | null> {
 		const big = this.#bigOutput(runId, nodeKey);
-		return this.#ctx.reply(big ? bigIndex(big.available, big.live) : null);
+		return this.#ctx.reply(big ? bigIndex(nodeKey, big.available, big.live) : null);
 	}
 	getNodeOutputPage(_scope: Scope, runId: string, nodeKey: string, at: { from: number; rows: number; direction: 'forward' | 'backward'; collapse: boolean; stream?: 'all' | 'stdout' | 'stderr'; around?: number }): Promise<NodeOutputPage> {
 		const big = this.#bigOutput(runId, nodeKey);
-		return this.#ctx.reply(bigPage(big?.available ?? 0, at));
+		return this.#ctx.reply(big ? bigPage(nodeKey, big.available, at) : { total: 0, from: at.from, to: at.from, rows: [] });
 	}
 	searchNodeOutput(_scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward'): Promise<NodeOutputSearch> {
 		const big = this.#bigOutput(runId, nodeKey);
-		return this.#ctx.reply(bigSearch(big?.available ?? 0, query, from, direction));
+		return this.#ctx.reply(big ? bigSearch(nodeKey, big.available, query, from, direction) : { count: 0, line: null, rank: null });
 	}
 	/** The mock has no file server: the link opens a short note where the server would stream the file. */
 	nodeOutputDownloadUrl(_scope: Scope, runId: string, nodeKey: string): string {

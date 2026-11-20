@@ -59,13 +59,20 @@
 			loading = false;
 		}
 	}
-	// Opens on the tail: the newest lines are usually what someone came for.
+	// Opens on the tail, the newest lines, unless the link names a place: `?at=error` opens at the error
+	// line with the lines before it in view and the error marked; `?line=N` at that line.
 	$effect(() => {
 		void runId;
 		void nodeKey;
+		const at = page.url.searchParams.get('at');
+		const line = Number(page.url.searchParams.get('line') ?? 0);
 		untrack(async () => {
 			const ix = await readIndex();
-			if (ix) await load(ix.total + 1, 'backward');
+			if (!ix) return;
+			const errors = ix.marks.filter((m) => m.level === 'error');
+			const target = at === 'error' && errors.length ? errors[errors.length - 1].line : line > 0 ? Math.min(line, ix.total) : null;
+			if (target != null) await load(Math.max(1, target - 45), 'forward', target);
+			else await load(ix.total + 1, 'backward');
 		});
 	});
 	// While the node still runs, the index grows; refresh it so the counts and Tail stay current.
@@ -105,7 +112,7 @@
 		if (app.scope && app.client.nodeOutputDownloadUrl) downloadUrl = app.client.nodeOutputDownloadUrl(app.scope, runId, nodeKey);
 	});
 	const has = (r: NodeOutputRow, n: number | null) => n != null && (r.kind === 'line' ? r.line.n === n : n >= r.from && n < r.from + r.count);
-	const mb = (bytes: number) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${(bytes / 1e6).toFixed(0)} MB`);
+	const mb = (bytes: number) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : bytes >= 1e6 ? `${(bytes / 1e6).toFixed(0)} MB` : `${Math.max(1, Math.round(bytes / 1e3))} KB`);
 	/** A search word highlighted in a line. */
 	function parts(text: string): { t: string; hit: boolean }[] {
 		const q = hits?.query.trim().toLowerCase();

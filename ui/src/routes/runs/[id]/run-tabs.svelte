@@ -17,14 +17,18 @@
 	let { view }: { view: RunDetailState } = $props();
 
 	// The log follows a summary figure or a node picked in the log, else the selection (until "Show all").
-	let ignoreSelection = $state(false);
-	let lastSelection = '';
+	// Back to the page restores the log as it was (CHI-1591): these too, and where it was scrolled.
+	// svelte-ignore state_referenced_locally
+	const mem = view.memory;
+	let ignoreSelection = $state((mem.ignoreSelection as boolean) ?? false);
+	let lastSelection = (mem.lastSelection as string) ?? '';
 	$effect(() => {
 		const key = view.selected.join(',');
 		if (key !== lastSelection) {
 			lastSelection = key;
 			ignoreSelection = false;
 		}
+		Object.assign(mem, { ignoreSelection, lastSelection });
 	});
 	const filterKeys = $derived(view.focus ? view.focus.keys : ignoreSelection ? [] : view.selected);
 	const sel = $derived(new Set(filterKeys));
@@ -38,7 +42,10 @@
 	const grouped = $derived((view.detail?.children.length ?? 0) > 0);
 	// Kept here so the choice survives switching tabs, and the Log count matches the rows shown.
 	// Events | Output (CHI-1591): the log opens on its events, one line per node; Output is what sqb printed.
-	let printed = $state(false);
+	let printed = $state((mem.printed as boolean) ?? false);
+	$effect(() => {
+		mem.printed = printed;
+	});
 	const logCount = $derived(shownEntries.filter((e) => (printed ? e.category === 'output' : e.category !== 'output')).length);
 
 	const TABS = $derived(bottomTabs(app.client, (c) => app.can(c), !!view.cost && view.cost.status !== 'none'));
@@ -61,8 +68,17 @@
 	}
 	let seen = $state(0);
 	const fresh = $derived(Math.max(0, logCount - seen));
+	// Where the log was scrolled, put back once its rows are in.
+	let restored = !('logScroll' in mem);
+	$effect(() => {
+		if (restored || !scroller || !logCount) return;
+		restored = true;
+		const top = mem.logScroll as number;
+		void tick().then(() => scroller && (scroller.scrollTop = top));
+	});
 	function onscroll() {
 		if (!scroller) return;
+		if (restored) mem.logScroll = scroller.scrollTop;
 		atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 24;
 		if (atBottom) seen = logCount;
 	}
@@ -118,7 +134,7 @@
 			<p class="err">Couldn't load this run's cost: {view.costRes.error}</p>
 		{/if}
 	{:else}
-		<LogTab entries={shownEntries} {grouped} statements={view.statements} onquery={(id, key) => view.showStatement(id, key)} memberOf={(id) => view.detail?.children.find((c) => c.id === id)?.jobKey ?? null} bind:printed runId={view.run?.id ?? ''} filteredBy={filterKeys} onnode={(key) => view.focusNode(key, 'log')} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
+		<LogTab entries={shownEntries} {grouped} memory={mem} statements={view.statements} onquery={(id, key) => view.showStatement(id, key)} onframe={(key, line) => view.openCode(key, line)} memberOf={(id) => view.detail?.children.find((c) => c.id === id)?.jobKey ?? null} bind:printed runId={view.run?.id ?? ''} filteredBy={filterKeys} onnode={(key) => view.focusNode(key, 'log')} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
 	{/if}
 </PageBody>
 {#if view.tab === 'log' && !atBottom && fresh > 0}

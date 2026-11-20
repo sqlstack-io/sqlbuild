@@ -1007,8 +1007,8 @@ export function createOperateFixtures(now: number): OperateFixtures {
 
 	record({
 		id: 'run-pf31', origin: 'manual', job: 'shop_daily', by: DEMO_USER, queuedAgo: 14.2, startedAgo: 14, durationMin: 3.2,
-		fail: ['fct_order_margin', 'fct_refunds'], warn: ['stg_inventory', 'fct_shipments', 'fct_payment_daily', 'fct_order_lines'],
-		errors: { fct_order_margin: 'Division by zero in margin_pct', fct_refunds: 'Check unique(order_id) failed: 14 duplicate rows' }
+		fail: ['fct_order_margin', 'fct_refunds', 'score_customers_v2'], warn: ['stg_inventory', 'fct_shipments', 'fct_payment_daily', 'fct_order_lines'],
+		errors: { fct_order_margin: 'Division by zero in margin_pct', fct_refunds: 'Check unique(order_id) failed: 14 duplicate rows', score_customers_v2: "KeyError: 'customer_segment'" }
 	});
 	record({ id: 'run-pr02', origin: 'manual', job: 'shop_daily', by: DEMO_USER, queuedAgo: 0.6, startedAgo: 0.5, durationMin: 20, running: true, warn: ['stg_inventory'] });
 	record({ id: 'run-ps07', origin: 'schedule', job: 'shop_daily', by: SCHEDULER, queuedAgo: 1442, startedAgo: 1441.8, durationMin: 2.6 });

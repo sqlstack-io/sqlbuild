@@ -59,7 +59,7 @@
 				<RunStatusPill status={run.status} size="md" ignored={run.ignoredAuditFailures} notStarted={notStarted} />
 				<span class="meta">
 					{#each facts as f, i (i)}
-						{#if i}<span class="sep">·</span>{/if}
+						{#if i}<span class="sep">{' · '}</span>{/if}
 						{#if f.href}<a href={to(f.href)} title={f.title}>{f.text}</a>{:else}<span class:live={f.live} title={f.title}>{f.text}</span>{/if}
 					{/each}
 				</span>
@@ -146,7 +146,8 @@
 		display: inline-flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 6px;
+		gap: 0;
+		white-space: pre-wrap;
 		color: var(--muted-foreground);
 		font-size: 12.5px;
 	}

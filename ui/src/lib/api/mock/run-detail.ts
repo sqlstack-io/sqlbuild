@@ -20,7 +20,7 @@ import type {
 } from '../types';
 import { ancestors, snapshotNode, sortTopologically } from './operate-graph';
 import { NODE_SPECS } from './build-fixtures';
-import { BIG_NODE, bigAvailable, bigLine } from './big-output';
+import { BIG_NODE, OUTPUT_SOURCES, V2_NODE, V2_TRACEBACK, bigAvailable } from './big-output';
 
 /** The prototype runs (CHI-1591), run by a local worker process and printing sqb's own lines. */
 const PROTO = /^run-p(f31|r02|s07|g40)/;
@@ -174,14 +174,15 @@ export function computeNodes(record: RunRecord, siblings: RunRecord[], now: numb
 			const status: RunNodeStatus = fails ? 'failed' : script.warn.includes(key) ? 'warn' : 'success';
 			if (fails) failed.set(key, { nodeKey: key, runId: run.id, jobKey: run.jobKey, at: e });
 			const message = fails ? (script.errors[key] ?? 'Statement failed in the warehouse') : null;
+		const python = fails && key === V2_NODE;
 			return {
 				...base(key, status),
 				startedAt: iso(s),
 				endedAt: iso(e),
 				rowsAffected: (fails && !CHECK_FAILS.has(key)) || snapshotNode(key)?.kind === 'view' ? null : PROTO.test(run.id) ? finishedRows(key, e - s) : 120 + (hash(key + run.id) % 48000),
-				errorCode: fails ? (CHECK_FAILS.has(key) ? 'check_failed' : 'E2103') : null,
+				errorCode: fails ? (CHECK_FAILS.has(key) ? 'check_failed' : python ? 'python_exception' : 'E2103') : null,
 				errorMessage: message,
-				...(fails ? (CHECK_FAILS.has(key) ? checkFailureDetail(key) : failureDetail(key, run, message ?? '')) : {})
+				...(fails ? (CHECK_FAILS.has(key) ? checkFailureDetail(key) : python ? pythonFailureDetail() : failureDetail(key, run, message ?? '')) : {})
 			};
 		};
 		if (terminal && script.end === 'complete') return finish();
@@ -246,6 +247,11 @@ export function auditSample(nodeKey: string, statementId: string, count: number)
 	if (name === 'unique') return { columns: [col, 'n'], rows: Array.from({ length: n }, (_, j) => [id(j), 2 + (j % 2)]), total: count };
 	if (name === 'accepted_values') return { columns: [col, 'n'], rows: ['paid ', 'PAID', 'refund', 'unknown', 'n/a'].slice(0, n).map((v, j) => [v, 1 + j]), total: count };
 	return { columns: ['order_id', col, 'created_at'], rows: Array.from({ length: n }, (_, j) => [id(j), null, `2026-11-${String(10 + j).padStart(2, '0')} 0${j}:14:0${j}`]), total: count };
+}
+
+/** A Python node's exception: where it was raised in the node's own code, and the whole traceback. */
+function pythonFailureDetail(): Pick<RunNode, 'errorLocation' | 'errorDetail'> {
+	return { errorLocation: { file: 'models/ml/score_customers_v2.py', line: 26 }, errorDetail: V2_TRACEBACK.join('\n') };
 }
 
 function checkFailureDetail(key: string): Pick<RunNode, 'errorLocation' | 'errorDetail'> {
@@ -587,7 +593,8 @@ function pythonOutput(key: string, s: number, e: number | null, now: number, out
 				);
 		}
 	}
-	if (key === BIG_NODE) {
+	const src = OUTPUT_SOURCES[key];
+	if (src) {
 		// The live view is capped (CHI-1597): a marker for what came before, then the latest lines; the rest is in the viewer.
 		const n = { nodeKey: key, startedAt: new Date(s).toISOString(), status: e == null ? 'running' : 'success' } as RunNode;
 		const big = bigAvailable(n, until);
@@ -597,7 +604,7 @@ function pythonOutput(key: string, s: number, e: number | null, now: number, out
 		const first = Math.max(1, big.available - LIVE + 1);
 		if (first > 1) out('stdout', until - 1_000, `${(first - 1).toLocaleString('en-GB')} earlier lines`, false, key, first - 1);
 		for (let i = first; i <= big.available; i++) {
-			const l = bigLine(i);
+			const l = src.line(i);
 			out(l.stream, until - 1_000 + (i - first) * 20, l.text, false, key);
 		}
 		return;

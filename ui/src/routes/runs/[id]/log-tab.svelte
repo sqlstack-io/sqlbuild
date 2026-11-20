@@ -9,6 +9,8 @@
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import type { RunEventLevel, RunStatement } from '$lib/api';
 	import CheckList from './check-list.svelte';
+	import QueryPanel from './query-panel.svelte';
+	import TracebackPanel from './traceback-panel.svelte';
 	import { formatStamp } from '$lib/format/time';
 	import { nodeLabel, shortRunId } from '$lib/operate/labels';
 	import type { LogEntry } from './utils';
@@ -25,8 +27,10 @@
 		filteredBy,
 		printed = $bindable(false),
 		memberOf = () => null,
+		memory,
 		statements = [],
 		onquery,
+		onframe,
 		onnode,
 		onstatement
 	}: {
@@ -38,6 +42,10 @@
 		printed?: boolean;
 		/** A node name clicked: the log shows only that node. */
 		onnode?: (nodeKey: string) => void;
+		/** The page's memory, so Back restores the log as it was. */
+		memory?: Record<string, unknown>;
+		/** A frame in a node's own code: show that line in the drawer. */
+		onframe?: (nodeKey: string, line: number) => void;
 		/** The run's statements, for a check's query ID and duration. */
 		statements?: readonly RunStatement[];
 		/** Shows a check's query in the Statements tab. */
@@ -58,18 +66,24 @@
 	];
 	// One source of truth (CHI-1591): the filter text. The Levels and Kinds menus and the counts only write
 	// `level:` and `kind:` into it.
-	let query = $state('');
+	// Back to the page restores the log as it was: its filter, stream and open rows (CHI-1591).
+	const mem = <T>(key: string, fallback: T): T => (memory && key in memory ? (memory[key] as T) : fallback);
+	// svelte-ignore state_referenced_locally
+	let query = $state(mem('logQuery', ''));
 	// Long printed blocks fold to their first lines.
 	const FOLD = 4;
-	let open = $state<Set<string>>(new Set());
+	// svelte-ignore state_referenced_locally
+	let open = $state<Set<string>>(new Set(mem<string[]>('logFolded', [])));
 	// Nodes whose queries are listed under their outcome row.
-	let expanded = $state<Set<string>>(new Set());
+	// svelte-ignore state_referenced_locally
+	let expanded = $state<Set<string>>(new Set(mem<string[]>('logQueries', [])));
 
 	// Events | Output: the run's events, or what sqb and the nodes printed (`printed`).
 	const hasOutput = $derived(entries.some((e) => e.category === 'output'));
 	const inMode = (e: LogEntry) => (printed ? e.category === 'output' : e.category !== 'output');
 	const modeEntries = $derived(entries.filter(inMode));
-	let stream = $state<'all' | 'stdout' | 'stderr'>('all');
+	// svelte-ignore state_referenced_locally
+	let stream = $state<'all' | 'stdout' | 'stderr'>(mem('logStream', 'all'));
 	const kindOf = (e: LogEntry) => e.tag?.text.replace(/ /g, '-') ?? null;
 	type Term = { key: string; value: string };
 	const terms = $derived(
@@ -120,8 +134,20 @@
 	const levelOptions = $derived(LEVELS.map((l) => ({ ...l, count: l.value === 'all' ? [...levelCounts.values()].reduce((a, b) => a + b, 0) : (levelCounts.get(l.value) ?? 0) })));
 	const kindOptions = $derived([{ value: 'all', label: 'All kinds', count: [...kindCounts.values()].reduce((a, b) => a + b, 0) }, ...kindValues.map((k) => ({ value: k, label: k, count: kindCounts.get(k) ?? 0 }))]);
 	// Rows whose structured details are open in place; long text stays folded until "show more".
-	let detailOpen = $state<Set<string>>(new Set());
-	let longOpen = $state<Set<string>>(new Set());
+	// svelte-ignore state_referenced_locally
+	let detailOpen = $state<Set<string>>(new Set(mem<string[]>('logDetails', [])));
+	// svelte-ignore state_referenced_locally
+	let longOpen = $state<Set<string>>(new Set(mem<string[]>('logLong', [])));
+	$effect(() => {
+		if (memory) Object.assign(memory, { logQuery: query, logStream: stream, logFolded: [...open], logQueries: [...expanded], logDetails: [...detailOpen], logLong: [...longOpen] });
+	});
+
+	/** A node line's queries (its build statements, not its checks'), or a query row's own statement. */
+	function queriesOf(e: LogEntry): RunStatement[] {
+		if (e.statementId && e.category === 'queries') return statements.filter((q) => q.id === e.statementId);
+		if (!e.node) return [];
+		return statements.filter((q) => q.nodeKey === e.node!.nodeKey && q.runId === e.runId && q.kind !== 'audit');
+	}
 
 	function toggle<T>(set: Set<T>, value: T): Set<T> {
 		const next = new Set(set);
@@ -204,7 +230,15 @@
 			<tr class:error={e.level === 'error'} class:warn={e.level === 'warn'} class:stderr={e.stream === 'stderr'}>
 				<td class="faint nowrap mono stamp" title={formatStamp(e.at)}>{fullStamp(e.at)}</td>
 				<td class="mono" class:faint={!e.nodeKey} title={e.nodeKey ? `Show only ${e.nodeKey} in the log` : undefined}>
-					{#if e.nodeKey && onnode}<Button variant="link" size="inline" class="font-mono text-[12px]" onclick={() => onnode(e.nodeKey!)}>{nodeLabel(e.nodeKey)}</Button>{:else}{e.nodeKey ? nodeLabel(e.nodeKey) : 'run'}{/if}
+					<!-- A real link (CHI-1591): it filters the log to the node, and reads as the node's name anywhere. -->
+					{#if e.nodeKey && onnode}<a
+							class="node-link"
+							href="?node={encodeURIComponent(e.nodeKey)}"
+							onclick={(ev) => {
+								ev.preventDefault();
+								onnode(e.nodeKey!);
+							}}>{nodeLabel(e.nodeKey)}</a
+						>{:else}{e.nodeKey ? nodeLabel(e.nodeKey) : 'run'}{/if}
 					{#if grouped && memberOf(e.runId)}<a class="member" href={to(`/runs/${e.runId}`)} title="In member job run {shortRunId(e.runId)}">{memberOf(e.runId)}</a>{/if}
 				</td>
 				{#if !printed}<td class="tagcell">{#if e.tag}<span class="tag" style:--tone={e.tag.tone}>{e.tag.text}</span>{/if}</td>{/if}
@@ -224,12 +258,29 @@
 							<span>{e.text}</span>
 						{/if}
 						{#if e.details?.length}<span class="caret" class:open={detailOpen.has(e.id)} aria-hidden="true">▸</span>{/if}
-						{#if e.queries.length}
-							<DisclosureButton open={expanded.has(e.id)} onclick={() => (expanded = toggle(expanded, e.id))} class="ml-2 gap-0.5 text-[11.5px]">{plural(e.queries.length, 'query', 'queries')}</DisclosureButton>
+						{#if queriesOf(e).length}
+							<!-- The node's queries open in place, under its line; only "In Statements" changes tab. -->
+							<DisclosureButton
+								open={expanded.has(e.id)}
+								onclick={(ev: MouseEvent) => {
+									ev.stopPropagation();
+									expanded = toggle(expanded, e.id);
+								}}
+								class="ml-2 gap-0.5 text-[11.5px]">{plural(queriesOf(e).length, 'query', 'queries')}</DisclosureButton
+							>
 						{/if}
 					{/if}
-					{#if e.statementId && e.nodeKey && onstatement && e.category === 'queries'}
-						<Button variant="link" size="inline" class="ml-2 font-mono text-[11px]" onclick={() => onstatement(e.nodeKey!)} title="Show this node's queries and their SQL">SQL</Button>
+					{#if e.statementId && e.category === 'queries' && queriesOf(e).length}
+						<Button
+							variant="link"
+							size="inline"
+							class="ml-2 font-mono text-[11px]"
+							onclick={(ev: MouseEvent) => {
+								ev.stopPropagation();
+								expanded = toggle(expanded, e.id);
+							}}
+							title="Show this query here">SQL {expanded.has(e.id) ? '▾' : '▸'}</Button
+						>
 					{/if}
 				</td>
 			</tr>
@@ -244,7 +295,15 @@
 						{#if e.checks?.length}
 							<div class="checks-wrap"><CheckList checks={e.checks} runId={e.runId} {statements} onstatement={onquery && e.nodeKey ? (id) => onquery(id, e.nodeKey!) : undefined} /></div>
 						{/if}
-						{#if e.long}
+						{#if e.node?.errorCode === 'python_exception' && e.long}
+							<!-- A Python failure in place: the exception and the last of its traceback; the output viewer for the rest. -->
+							<div class="inline-wrap"><TracebackPanel detail={e.long} file={e.node.errorLocation?.file ?? null} runId={e.runId} nodeKey={e.node.nodeKey} onframe={onframe ? (line) => onframe(e.node!.nodeKey, line) : undefined} /></div>
+						{:else if e.node?.status === 'failed' && queriesOf(e).some((q) => q.status === 'failed')}
+							<!-- A SQL failure in place: the statement as it ran and its error. -->
+							{#each queriesOf(e).filter((q) => q.status === 'failed') as q (q.id)}
+								<div class="inline-wrap"><QueryPanel statement={q} onstatements={onquery ? () => onquery(q.id, q.nodeKey) : undefined} /></div>
+							{/each}
+						{:else if e.long && e.node?.errorCode !== 'check_failed'}
 							{@const lines = e.long.split('\n')}
 							<pre>{longOpen.has(e.id) ? e.long : lines.slice(0, 3).join('\n')}</pre>
 							{#if lines.length > 3}<Button variant="link" size="inline" class="text-[12px]" onclick={() => (longOpen = toggle(longOpen, e.id))}>{longOpen.has(e.id) ? 'Show less' : `Show more (${lines.length} lines)`}</Button>{/if}
@@ -252,20 +311,15 @@
 					</td>
 				</tr>
 			{/if}
-			{#if expanded.has(e.id)}
-				{#each e.queries as x (x.id)}
-					<tr class="query" class:error={x.level === 'error'}>
-						<td class="faint nowrap mono stamp" title={formatStamp(x.at)}>{fullStamp(x.at)}</td>
-						<td></td>
-						{#if !printed}<td class="tagcell"></td>{/if}
-						<td>
-							<span title={x.title}>{x.text}</span>
-							{#if x.statementId && x.nodeKey && onstatement}
-								<Button variant="link" size="inline" class="ml-2 font-mono text-[11px]" onclick={() => onstatement(x.nodeKey!)} title="Show this node's queries and their SQL">SQL</Button>
-							{/if}
-						</td>
-					</tr>
-				{/each}
+			{#if expanded.has(e.id) && queriesOf(e).length}
+				<tr class="detail">
+					<td></td>
+					<td colspan={printed ? 2 : 3}>
+						{#each queriesOf(e) as q (q.id)}
+							<div class="inline-wrap"><QueryPanel statement={q} onstatements={onquery ? () => onquery(q.id, q.nodeKey) : undefined} /></div>
+						{/each}
+					</td>
+				</tr>
 			{/if}
 	{/snippet}
 </DataTable>
@@ -400,10 +454,17 @@
 		font-size: 12px;
 		white-space: pre-wrap;
 	}
-	tr.query td {
-		padding-top: 3px;
-		padding-bottom: 3px;
-		color: var(--muted-foreground);
+	.node-link {
+		color: var(--primary);
+		font-family: var(--font-mono);
+		font-size: 12px;
+	}
+	.node-link:hover {
+		text-decoration: underline;
+	}
+	.inline-wrap {
+		margin: 8px 0 2px;
+		max-width: 980px;
 	}
 	.checks-wrap {
 		margin: 8px 0 0;
