@@ -1,12 +1,12 @@
 //! Person reads of run nodes and their errors, node run history, catalog nodes, jobs and one job's declaration, triggers, ticks and publications; refusal precedes every lookup, so unknown objects look forbidden.
 
 use axum::extract::{Path, Query, State};
-use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
-use axum::response::{IntoResponse, Response};
+use axum::http::{HeaderMap, StatusCode};
+use axum::response::Response;
 use axum::{Extension, Json};
 use uuid::Uuid;
 
-use crate::api::constants::ANY_ETAG;
+use crate::api::_helpers::resources::cached_json::cached_json;
 use crate::api::errors::ApiError;
 use crate::api::models::{
     CostQuery, PlatformEventsQuery, ReadQuery, RunEventsQuery, RunNodePath, ServerFacts,
@@ -23,7 +23,7 @@ use crate::declarations::models::{
 };
 use crate::node_states::main::list_person_catalog_nodes::list_person_catalog_nodes;
 use crate::node_states::main::read_person_node_states::read_person_node_states;
-use crate::node_states::models::{CachedJson, NodeStateCache, NodeStatesRecord};
+use crate::node_states::models::{NodeStateCache, NodeStatesRecord};
 use crate::platform::main::health::read_person_location_health::read_person_location_health;
 use crate::platform::main::person_reads::list_person_platform_events::list_person_platform_events;
 use crate::platform::main::person_reads::read_person_problems::read_person_problems;
@@ -41,7 +41,6 @@ use crate::sensors::main::read_person_sensor::read_person_sensor;
 use crate::sensors::models::PersonSensorState;
 use crate::snapshots::main::reads::list_person_snapshots::list_person_snapshots;
 use crate::snapshots::models::PublishedSnapshot;
-use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 use crate::warehouse_history::main::read_person_cost_summary::read_person_cost_summary;
 use crate::warehouse_history::main::read_person_node_costs::read_person_node_costs;
@@ -125,48 +124,6 @@ pub(crate) async fn node_states(
     )
     .await?;
     cached_json(states, &HeaderMap::new())
-}
-
-/// A held JSON body, or 304 when the request already names its ETag.
-fn cached_json(json: CachedJson, headers: &HeaderMap) -> Result<Response, ApiError> {
-    let etag: Option<HeaderValue> = json
-        .etag
-        .map(|etag| HeaderValue::from_str(&etag))
-        .transpose()
-        .map_err(|error| ControlError::Invalid(format!("node states ETag: {error}")))?;
-    let unchanged = etag.as_ref().is_some_and(|etag| {
-        headers
-            .get_all(header::IF_NONE_MATCH)
-            .iter()
-            .flat_map(|value| value.as_bytes().split(|byte| *byte == b','))
-            .map(weak_stripped)
-            .any(|tag| tag == ANY_ETAG.as_bytes() || etag.as_bytes() == tag)
-    });
-    let mut response = if unchanged {
-        StatusCode::NOT_MODIFIED.into_response()
-    } else {
-        (
-            [(
-                header::CONTENT_TYPE,
-                HeaderValue::from_static("application/json"),
-            )],
-            json.body,
-        )
-            .into_response()
-    };
-    if let Some(etag) = etag {
-        response.headers_mut().insert(header::ETAG, etag);
-    }
-    Ok(response)
-}
-
-/// One listed entity tag without its surrounding spaces or weak `W/` marks; issued tags are ASCII.
-fn weak_stripped(mut tag: &[u8]) -> &[u8] {
-    tag = tag.trim_ascii();
-    while let Some(rest) = tag.strip_prefix(b"W/") {
-        tag = rest;
-    }
-    tag
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs", operation_id = "listPersonNodeRuns",

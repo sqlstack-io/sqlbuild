@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use axum::body::Bytes;
 use chrono::{DateTime, Utc};
@@ -100,6 +100,22 @@ pub(crate) struct TargetCache {
     pub(crate) announce: AtomicBool,
     /// Open change streams of this target; a signal refreshes a watched target and drops an unwatched one.
     pub(crate) watchers: AtomicUsize,
+    /// The serialized check list, dropped by every signal that names the target.
+    pub(crate) checks: Mutex<HeldChecks>,
+}
+
+/// A target's check list and the signal generation it was read at; a signal bumps the generation and drops the list.
+#[derive(Debug, Default)]
+pub(crate) struct HeldChecks {
+    pub(crate) generation: u64,
+    pub(crate) list: Option<HeldCheckList>,
+}
+
+/// A serialized check list, tagged by its snapshot and content, and the snapshot it was read under.
+#[derive(Clone, Debug)]
+pub(crate) struct HeldCheckList {
+    pub(crate) snapshot_id: Option<Uuid>,
+    pub(crate) json: CachedJson,
 }
 
 /// One change stream's hold on its target, which keeps the target's view refreshed until it drops.

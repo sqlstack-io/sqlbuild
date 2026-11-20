@@ -10,3 +10,5 @@ pub const MAX_PUSHED_NODE_STATES: usize = 2_000;
 pub(crate) const NODE_STATE_UPDATES: usize = 256;
 /// The longest reason a failing changed build reports, in characters.
 pub const MAX_FAILING_REASON_CHARS: usize = 2_000;
+/// Hex characters of the body digest a check list's entity tag carries.
+pub(crate) const CHECKS_TAG_DIGEST_CHARS: usize = 32;

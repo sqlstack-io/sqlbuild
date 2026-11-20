@@ -1,39 +1,45 @@
-//! Check reads use live person grants; SQL and evidence need their own permissions and are audited.
+//! Check reads use live person grants; the list is served from the held copy with its ETag, and SQL and evidence need their own permissions and are audited.
 
 use axum::extract::{Path, Query, State};
+use axum::http::HeaderMap;
+use axum::response::Response;
 use axum::{Extension, Json};
 use uuid::Uuid;
 
+use crate::api::_helpers::resources::cached_json::cached_json;
 use crate::api::errors::ApiError;
 use crate::api::models::{CheckResultPath, ReadQuery};
 use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole};
+use crate::node_states::main::list_person_checks::list_person_checks;
+use crate::node_states::models::NodeStateCache;
 use crate::store::models::ControlStore;
 use crate::warehouse_history::main::read_person_check::read_person_check;
 use crate::warehouse_history::main::read_person_check_evidence::read_person_check_evidence;
 use crate::warehouse_history::main::read_person_check_sql::read_person_check_sql;
-use crate::warehouse_history::main::read_person_checks::read_person_checks;
 use crate::warehouse_history::models::{CheckEvidence, CheckResult, CheckSql};
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/checks", operation_id = "listPersonChecks",
-    params(("location_id" = Uuid, Path), ("target" = String, Path)),
-    responses((status = 200, body = Vec<CheckResult>, description = "The newest result of every check"),
+    params(("location_id" = Uuid, Path), ("target" = String, Path),
+        ("If-None-Match" = Option<String>, Header, description = "An ETag from an earlier response; 304 while every check's newest result is unchanged")),
+    responses((status = 200, body = Vec<CheckResult>, description = "The newest result of every check",
+            headers(("ETag" = String, description = "\"<snapshot_id>:<digest of the body>\", or \"<digest>\" before the first publication"))),
+        (status = 304, description = "Unchanged since the If-None-Match ETag", headers(("ETag" = String))),
         (status = 401, description = "Session rejected"),
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn list(
-    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    (Extension(cache), Extension(context)): (Extension<NodeStateCache>, Extension<AuditContext>),
     Extension(default_role): Extension<DefaultRole>,
-    Path((location_id, target)): Path<(Uuid, String)>,
+    (Path((location_id, target)), headers): (Path<(Uuid, String)>, HeaderMap),
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
-) -> Result<Json<Vec<CheckResult>>, ApiError> {
-    Ok(Json(
-        read_person_checks(
-            &store,
-            (&context, principal),
-            (location_id, &target),
-            default_role,
-        )
-        .await?,
-    ))
+) -> Result<Response, ApiError> {
+    let listing = list_person_checks(
+        &cache,
+        (&context, principal),
+        (location_id, &target),
+        default_role,
+    )
+    .await?;
+    cached_json(listing, &headers)
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}", operation_id = "readPersonCheckHistory",

@@ -46,6 +46,8 @@ mod test_attention_acknowledgements;
 mod test_catalog_reads;
 #[path = "test_changes.rs"]
 mod test_changes;
+#[path = "test_check_list_cache.rs"]
+mod test_check_list_cache;
 #[path = "test_checks.rs"]
 mod test_checks;
 #[path = "test_cli_login.rs"]

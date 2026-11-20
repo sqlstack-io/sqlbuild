@@ -124,6 +124,11 @@ pub(crate) struct WarehouseMetadataTestCase {
     pub(crate) expected_observations: usize,
 }
 
+pub(crate) struct CheckListCacheTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+}
+
 pub(crate) struct MirrorConflictTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
