@@ -576,6 +576,11 @@ pub(crate) struct PlanKey {
     pub(crate) select: Vec<String>,
     /// Whether the plan read the copy's consumption.
     pub(crate) consumption: bool,
+    /// The jobs the request pins, with the nodes and settings each gives.
+    pub(crate) jobs:
+        std::collections::BTreeMap<String, sqlbuild_orchestration::runs::models::PinnedJob>,
+    /// The settings the request's command gives, which replace the pinned jobs' own.
+    pub(crate) given: std::collections::BTreeSet<String>,
 }
 
 /// One finished plan, kept as the JSON text of its document and of the diffs beside it.

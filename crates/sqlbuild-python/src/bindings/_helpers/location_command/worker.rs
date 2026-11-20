@@ -47,10 +47,12 @@ use sqlbuild_python_output::recall::models::InvocationRecall;
 use sqlbuild_python_project::compiled_project::constants::SQL_TEST_KEY_PREFIX;
 use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
 use sqlbuild_python_project::job_settings::constants::SQL_TEST_NODE_KIND;
+use sqlbuild_python_project::job_settings::main::frozen_pins::frozen_pins;
 use sqlbuild_python_project::job_settings::main::frozen_run_flags::frozen_run_flags;
 use sqlbuild_python_project::job_settings::main::frozen_selectors::frozen_selectors;
 use sqlbuild_python_project::job_settings::main::with_frozen_job::with_frozen_job;
-use sqlbuild_python_project::job_settings::models::FrozenRunFlags;
+use sqlbuild_python_project::job_settings::main::within_pinned_build::within_pinned_build;
+use sqlbuild_python_project::job_settings::models::{FrozenRunFlags, PinnedBuild};
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationWorker;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
@@ -127,13 +129,16 @@ fn upstream_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Ve
 /// A job run's job, the selectors of its frozen nodes and its settings, as its build declares it.
 type FrozenJob = (String, Vec<String>, BTreeMap<String, Value>);
 
-/// The frozen command's request, warehouse scope and, for a job's build, the frozen job it names.
+/// The job a job run declares, or the jobs an ad-hoc build pins, for the command to run within.
+type FrozenScope = (Option<FrozenJob>, Option<PinnedBuild>);
+
+/// The frozen command's request, warehouse scope and, for a job's build, the frozen job it names or the jobs an ad-hoc build pins.
 fn command_request<'py>(
     py: Python<'py>,
     discovered: &Bound<'py, PyAny>,
     arguments: &KeywordArguments<'py>,
     (worker, compiled): (&Bound<'py, NativeOrchestrationWorker>, &Bound<'py, PyAny>),
-) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>, Option<FrozenJob>)> {
+) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>, FrozenScope)> {
     let execution = worker.get().execution(py)?;
     let frozen = execution.claim.request;
     let FrozenRunFlags {
@@ -142,8 +147,15 @@ fn command_request<'py>(
         job_build,
     } = frozen_run_flags(&frozen, &arguments.value("project_dir")?)?;
     let command: RunCommand = frozen.command;
+    let skipped = &execution.skipped_nodes;
+    let pinned = frozen_pins(
+        &arguments.value("project_dir")?,
+        &frozen,
+        (&settings, skipped),
+    )?;
     let mut argv: Vec<Bound<'py, PyString>> = std::iter::once(command.as_str().to_owned())
         .chain(flags)
+        .chain(pinned.iter().flat_map(|pinned| pinned.flags.clone()))
         .map(|argument| PyString::new(py, &argument))
         .collect();
     argv.extend([
@@ -156,7 +168,8 @@ fn command_request<'py>(
     ]);
     let selectors: Vec<String> = frozen_selectors(&frozen, &execution.skipped_nodes)?;
     if job_build.is_none() {
-        for selector in &selectors {
+        let tokens = pinned.iter().flat_map(|pinned| pinned.tokens.iter());
+        for selector in selectors.iter().chain(tokens) {
             argv.extend([PyString::new(py, "--select"), PyString::new(py, selector)]);
         }
     }
@@ -186,7 +199,7 @@ fn command_request<'py>(
         )?;
     }
     let frozen_job: Option<FrozenJob> = job_build.map(|job| (job, selectors, settings));
-    Ok((request, warehouse_scope(&args)?, frozen_job))
+    Ok((request, warehouse_scope(&args)?, (frozen_job, pinned)))
 }
 
 /// Run the frozen command from the verified inputs, reporting its progress and outcomes to `worker`.
@@ -352,12 +365,15 @@ pub(super) fn execute_worker<'py>(
             Some(frozen.target.clone()),
         );
         within(&scope, |_| match frozen_job {
-            Some((job, selectors, settings)) => {
+            (Some((job, selectors, settings)), _) => {
                 with_frozen_job(directory, (&job, selectors, settings), || {
                     run_cancellable(py, &worker, (&request, &discovered))
                 })
             }
-            None => run_cancellable(py, &worker, (&request, &discovered)),
+            (None, Some(pinned)) => within_pinned_build(&pinned, || {
+                run_cancellable(py, &worker, (&request, &discovered))
+            }),
+            (None, None) => run_cancellable(py, &worker, (&request, &discovered)),
         })
     })();
     let code = result.as_ref().copied().unwrap_or(1);

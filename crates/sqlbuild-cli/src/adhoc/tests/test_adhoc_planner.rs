@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::json;
 use sqlbuild_orchestration::runs::models::PlannerResource;
-use sqlbuild_orchestration::runs::types::PublishedJobs;
+use sqlbuild_orchestration::runs::models::PublishedJobs;
 
 use crate::adhoc::main::adhoc_planner::adhoc_planner;
 use crate::adhoc::tests::helpers::{owned_plan, resource};
@@ -31,16 +31,19 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
         resource("seed:currencies", &[], &[], None),
         resource("sql_test:orders_keep_amounts", &["model:orders"], &[], None),
     ];
-    let jobs: PublishedJobs = BTreeMap::from([
-        (
-            "nightly".to_owned(),
-            BTreeSet::from(["model:orders".to_owned(), "model:order_totals".to_owned()]),
-        ),
-        (
-            "daily_group".to_owned(),
-            BTreeSet::from(["model:customers".to_owned(), "model:orders".to_owned()]),
-        ),
-    ]);
+    let jobs: PublishedJobs = PublishedJobs {
+        selections: BTreeMap::from([
+            (
+                "nightly".to_owned(),
+                BTreeSet::from(["model:orders".to_owned(), "model:order_totals".to_owned()]),
+            ),
+            (
+                "daily_group".to_owned(),
+                BTreeSet::from(["model:customers".to_owned(), "model:orders".to_owned()]),
+            ),
+        ]),
+        ..Default::default()
+    };
     let test_cases = [
         AdhocPlanTestCase {
             description: "a published job selects its published nodes",
@@ -396,10 +399,13 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
         ),
         resource("loader:stage_shipments", &[], &[], Some("python/loaders")),
     ];
-    let jobs: PublishedJobs = BTreeMap::from([(
-        "carrier_sync".to_owned(),
-        BTreeSet::from(["task:request_carrier_collection".to_owned()]),
-    )]);
+    let jobs: PublishedJobs = PublishedJobs {
+        selections: BTreeMap::from([(
+            "carrier_sync".to_owned(),
+            BTreeSet::from(["task:request_carrier_collection".to_owned()]),
+        )]),
+        ..Default::default()
+    };
     let test_cases = [
         AdhocPlanTestCase {
             description: "a published job selects its Python nodes",

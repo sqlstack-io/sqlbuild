@@ -7,6 +7,20 @@ pub(super) struct AdhocPlanTestCase {
     pub(super) expected_plan: Result<(&'static [&'static str], serde_json::Value), &'static str>,
 }
 
+/// A build command, and the keys it selects, the jobs it pins and their build-wide settings, or how it is refused.
+pub(super) struct JobPinTestCase {
+    pub(super) description: &'static str,
+    pub(super) command: &'static [&'static str],
+    pub(super) expected_plan: Result<
+        (
+            &'static [&'static str],
+            serde_json::Value,
+            serde_json::Value,
+        ),
+        &'static str,
+    >,
+}
+
 /// A selection as typed, and the keys it selects or how `sqb` refuses it.
 pub(super) struct SelectionEvaluationTestCase {
     pub(super) description: &'static str,

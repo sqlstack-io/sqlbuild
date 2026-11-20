@@ -99,6 +99,8 @@ pub(crate) async fn frozen_job_request(
             window: request.window.clone(),
             pools: definition.pools,
             narrowing,
+            jobs: Default::default(),
+            job_settings: Default::default(),
             retry: None,
             member_attempt: None,
         },

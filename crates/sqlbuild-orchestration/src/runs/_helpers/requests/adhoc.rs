@@ -8,9 +8,12 @@ use uuid::Uuid;
 use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::authorization::main::decisions::decide_person_scopes::decide_person_scopes;
 use crate::credentials::main::audit::append_audit::append_audit;
-use crate::credentials::models::{Action, AuditContext, DefaultRole};
+use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::runs::_helpers::lifecycle::pinned_jobs::build_settings;
 use crate::runs::_helpers::lifecycle::publications::{cached_publication, current_publication};
-use crate::runs::_helpers::requests::permissions::{authorize_execution, execution_scopes};
+use crate::runs::_helpers::requests::permissions::{
+    authorize_execution, execution_scopes, job_denial,
+};
 use crate::runs::_helpers::requests::publication::{
     publish_request, record_authored, request_retry,
 };
@@ -69,7 +72,8 @@ pub(crate) async fn frozen_publication_request(
         let refusal = format!("workers do not run sqb {}", plan.verb);
         return Ok((transaction, Err(refusal)));
     };
-    let writers = held_write_set(&publication.writers, (&plan.selection, &plan.settings));
+    let effective = build_settings((&plan.settings, &plan.job_settings));
+    let writers = held_write_set(&publication.writers, (&plan.selection, &effective));
     let (transaction, images) = query(
         transaction,
         "SELECT image_id FROM sqb_snapshots WHERE snapshot_id=$1",
@@ -115,6 +119,8 @@ pub(crate) async fn frozen_publication_request(
                 window: None,
                 pools: BTreeMap::new(),
                 narrowing: None,
+                jobs: plan.jobs,
+                job_settings: plan.job_settings,
                 retry: None,
                 member_attempt: None,
             },
@@ -139,7 +145,10 @@ pub(in crate::runs) async fn permission_decisions(
     principal_id: Uuid,
     frozen: &RunRequest,
 ) -> Result<(ControlTransaction, Vec<AdhocPermission>), ControlError> {
-    let scopes = execution_scopes(frozen, std::slice::from_ref(frozen), Action::RunAdhoc);
+    let (scopes, jobs): (Vec<PermissionScope>, Vec<Option<String>>) =
+        execution_scopes(frozen, std::slice::from_ref(frozen), Action::RunAdhoc)
+            .into_iter()
+            .unzip();
     let (transaction, refusals) =
         decide_person_scopes(transaction, principal_id, (&frozen.target, &scopes)).await?;
     let inactive = Some("authenticated active person required".to_owned());
@@ -148,14 +157,23 @@ pub(in crate::runs) async fn permission_decisions(
         transaction,
         scopes
             .iter()
-            .zip(refusals)
-            .map(|(scope, reason)| AdhocPermission {
+            .zip(refusals.into_iter().zip(jobs))
+            .map(|(scope, (reason, job))| AdhocPermission {
                 action: scope.action,
                 allowed: reason.is_none(),
-                reason,
+                reason: shown_reason(reason, job),
             })
             .collect(),
     ))
+}
+
+/// A refusal as a person sees it, naming the pinned job whose settings need the permission.
+fn shown_reason(reason: Option<String>, job: Option<String>) -> Option<String> {
+    let reason: String = reason?;
+    Some(match job {
+        Some(job) => job_denial(&job, &reason),
+        None => reason,
+    })
 }
 
 /// Resolve, authorise on the exact resolved nodes, publish and audit; workers never re-resolve the caller's selectors.

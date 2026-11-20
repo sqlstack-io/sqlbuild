@@ -195,10 +195,12 @@ async fn perform_work(
             selection,
             settings,
             fresh,
+            jobs,
+            given,
             ..
         } => plan_location(
             (options, runtime),
-            (&selection, &settings, fresh),
+            ((&selection, &jobs), (&settings, &given), fresh),
             copy,
             expires,
         )

@@ -7,6 +7,7 @@ pub(in crate::runs) mod events;
 pub(crate) mod narrowing;
 pub(in crate::runs) mod nodes;
 pub(in crate::runs) mod output;
+pub(crate) mod pinned_jobs;
 pub(in crate::runs) mod projection;
 pub(crate) mod publications;
 pub(in crate::runs) mod publish_change;

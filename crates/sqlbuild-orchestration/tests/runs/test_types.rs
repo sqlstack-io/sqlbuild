@@ -173,7 +173,7 @@ impl crate::runs::types::CommandPlanner for ExactKeyPlanner {
     fn prepare(
         &self,
         resources: Vec<crate::runs::models::PlannerResource>,
-        jobs: crate::runs::types::PublishedJobs,
+        jobs: crate::runs::models::PublishedJobs,
     ) -> std::sync::Arc<dyn crate::runs::types::PreparedPublication> {
         std::sync::Arc::new(ExactKeyPublication { resources, jobs })
     }
@@ -187,7 +187,7 @@ impl crate::runs::types::CommandPlanner for ExactKeyPlanner {
 #[derive(Debug)]
 pub(crate) struct ExactKeyPublication {
     resources: Vec<crate::runs::models::PlannerResource>,
-    jobs: crate::runs::types::PublishedJobs,
+    jobs: crate::runs::models::PublishedJobs,
 }
 
 impl crate::runs::types::PreparedPublication for ExactKeyPublication {
@@ -255,6 +255,8 @@ impl crate::runs::types::PreparedPublication for ExactKeyPublication {
             verb: command.first().cloned().unwrap_or_default(),
             selection: Default::default(),
             settings: Default::default(),
+            jobs: Default::default(),
+            job_settings: Default::default(),
         };
         let mut excluded: std::collections::BTreeSet<String> = Default::default();
         let mut excluding = false;
@@ -298,7 +300,10 @@ impl crate::runs::types::PreparedPublication for ExactKeyPublication {
                     continue;
                 }
                 key if resources.iter().any(|resource| resource.key == key) => vec![key.to_owned()],
-                other => match other.strip_prefix("job:").and_then(|name| jobs.get(name)) {
+                other => match other
+                    .strip_prefix("job:")
+                    .and_then(|name| jobs.selections.get(name))
+                {
                     Some(keys) => keys.iter().cloned().collect(),
                     None => return Err(format!("{other} is not available for ad-hoc runs")),
                 },
@@ -344,6 +349,39 @@ pub(crate) struct JobSubsetTestCase {
     pub(crate) exclude: &'static [&'static str],
     /// The frozen selection, or `None` when the request is refused as invalid.
     pub(crate) expected_selection: Option<&'static [&'static str]>,
+}
+
+/// A rerun of an ad-hoc build that pinned `nightly` to orders and inventory and `weekly` to inventory.
+pub(crate) struct PinnedRerunTestCase {
+    pub(crate) description: &'static str,
+    /// The source run's ID, unique per case.
+    pub(crate) source_id: u128,
+    pub(crate) nodes: &'static [&'static str],
+    /// Each pinned job's nodes in the rerun's frozen request.
+    pub(crate) expected_jobs: &'static [(&'static str, &'static [&'static str])],
+}
+
+/// A member's permissions, the jobs an ad-hoc build pins with the build-wide settings they give, and what launching it needs.
+pub(crate) struct PinnedPermissionTestCase {
+    pub(crate) description: &'static str,
+    /// The roles document generation that grants the member `permissions`.
+    pub(crate) generation: i64,
+    pub(crate) permissions: &'static [&'static str],
+    /// Each pinned job: its name, nodes and settings as JSON.
+    pub(crate) jobs: &'static [(&'static str, &'static [&'static str], &'static str)],
+    pub(crate) job_settings: &'static str,
+    /// The dry run's `[action, allowed, reason]` for each permission, as JSON.
+    pub(crate) expected_permissions: &'static str,
+    /// The launch, or the reason it is refused.
+    pub(crate) expected_launch: Result<(), &'static str>,
+}
+
+/// The build-wide settings a pinned job gave an ad-hoc build of `model:customers`, and what its rerun writes.
+pub(crate) struct PinnedWriteSetTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) source_id: u128,
+    pub(crate) job_settings: &'static str,
+    pub(crate) expected_write_set: &'static [&'static str],
 }
 
 pub(crate) struct NamedRerunTestCase {

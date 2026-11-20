@@ -10,8 +10,8 @@ use sqlbuild_analysis::graph::models::{GraphResource, JobSelection, ProjectGraph
 use sqlbuild_analysis::planner_selection::models::UnitTestSelectorNames;
 use sqlbuild_analysis::python_selection::main::published_python_graph::published_python_graph;
 use sqlbuild_analysis::python_selection::models::{PublishedPythonNode, PythonSelectionGraph};
+use sqlbuild_orchestration::runs::models::PublishedJobs;
 use sqlbuild_orchestration::runs::models::{PlannerResource, SelectionVocabulary};
-use sqlbuild_orchestration::runs::types::PublishedJobs;
 
 use crate::adhoc::constants::SQL_TEST_KIND;
 
@@ -58,7 +58,7 @@ impl IndexedPublication {
             resources: others
                 .iter()
                 .map(|resource| name_of(&resource.key).to_owned())
-                .chain(jobs.keys().cloned())
+                .chain(jobs.selections.keys().cloned())
                 .collect(),
         };
         let (python, sql): (Vec<&PlannerResource>, Vec<&PlannerResource>) = others
@@ -156,7 +156,7 @@ fn published_python_node(resource: &PlannerResource) -> Option<PublishedPythonNo
 /// Published jobs as already-resolved graph selections.
 fn published_jobs(jobs: &PublishedJobs, include_python: bool) -> BTreeMap<String, JobSelection> {
     let mut selections: BTreeMap<String, JobSelection> = BTreeMap::new();
-    for (name, keys) in jobs {
+    for (name, keys) in &jobs.selections {
         let keys: Vec<(String, String)> = keys
             .iter()
             .filter(|key| include_python || python_kind(key).is_none())

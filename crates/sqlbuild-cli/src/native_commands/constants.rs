@@ -233,3 +233,6 @@ pub(crate) const PLAN_NOT_PRODUCED: &str =
 
 /// Return to the start of the line and erase it: a child's spinner may be drawn there.
 pub(crate) const CLEAR_TERMINAL_LINE: &str = "\r\u{1b}[K";
+
+/// The setting of `--changed`, which makes a plan read the synced copy's consumption.
+pub(crate) const CHANGED_SETTING: &str = "changed";

@@ -6,9 +6,13 @@ use uuid::Uuid;
 
 use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::runs::_helpers::lifecycle::pinned_jobs::{
+    applied_settings, applying_jobs, gives_build_settings,
+};
 use crate::runs::_helpers::requests::job::frozen_group_children;
 use crate::runs::constants::VARS_SETTING;
 use crate::runs::models::{RunKind, RunRequest};
+use crate::runs::types::ExecutionScope;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;
 
@@ -43,24 +47,42 @@ pub(crate) async fn authorize_execution(
         (transaction, executions) = frozen_group_children(transaction, request).await?;
     }
     let mut context = context.clone();
-    for scope in execution_scopes(request, &executions, action) {
+    for (scope, job) in execution_scopes(request, &executions, action) {
         (transaction, context) = authorize_person(
             transaction,
             (&context, credentials),
             &scope,
             DefaultRole::None,
         )
-        .await?;
+        .await
+        .map_err(|error| match (error, &job) {
+            (
+                ControlError::Denied {
+                    reason,
+                    decision_id,
+                },
+                Some(job),
+            ) => ControlError::Denied {
+                reason: job_denial(job, &reason),
+                decision_id,
+            },
+            (error, _) => error,
+        })?;
     }
     Ok((transaction, context))
 }
 
-/// Every scope `action` on `request` needs, in check order; pure, so a dry run decides the same scopes without auditing.
+/// Why a person may not apply a pinned job's settings: `reason`, naming the job and the permission.
+pub(in crate::runs) fn job_denial(job: &str, reason: &str) -> String {
+    format!("{reason}: applying job {job}'s settings needs job.run, as running the job does")
+}
+
+/// Every scope `action` on `request` needs, in check order, each with the pinned job it applies for; pure, so a dry run decides the same scopes without auditing.
 pub(crate) fn execution_scopes(
     request: &RunRequest,
     executions: &[RunRequest],
     action: Action,
-) -> Vec<PermissionScope> {
+) -> Vec<ExecutionScope> {
     let nodes: BTreeSet<String> = if request.kind == RunKind::Adhoc {
         request
             .selection
@@ -75,10 +97,26 @@ pub(crate) fn execution_scopes(
     };
     let launches = matches!(action, Action::JobRun | Action::RunRerun | Action::RunAdhoc);
     let adhoc = request.kind == RunKind::Adhoc;
-    let mut actions: Vec<Action> = vec![action];
+    let scope = |action: Action, nodes: BTreeSet<String>| PermissionScope {
+        action,
+        location_id: Some(request.location_id),
+        target: Some(request.target.clone()),
+        nodes,
+    };
+    let mut scopes: Vec<ExecutionScope> = vec![(scope(action, nodes.clone()), None)];
     if action == Action::RunRerun && adhoc {
-        actions.push(Action::RunAdhoc);
+        scopes.push((scope(Action::RunAdhoc, nodes.clone()), None));
     }
+    if launches && adhoc {
+        for (name, job) in applying_jobs(request) {
+            let mut held: BTreeSet<String> = job.selection.clone();
+            if gives_build_settings(request, job) {
+                held.extend(nodes.iter().cloned());
+            }
+            scopes.push((scope(Action::JobRun, held), Some(name.clone())));
+        }
+    }
+    let mut actions: Vec<Action> = Vec::new();
     if launches && rewrites_history(request, executions) {
         actions.push(Action::RunRewriteHistory);
     }
@@ -91,36 +129,24 @@ pub(crate) fn execution_scopes(
     if launches && request.priority > 0 {
         actions.push(Action::RunPrioritise);
     }
-    let mut scopes: Vec<PermissionScope> = actions
-        .into_iter()
-        .map(|action| PermissionScope {
-            action,
-            location_id: Some(request.location_id),
-            target: Some(request.target.clone()),
-            nodes: nodes.clone(),
-        })
-        .collect();
+    scopes.extend(
+        actions
+            .into_iter()
+            .map(|action| (scope(action, nodes.clone()), None)),
+    );
     let loaded = explicitly_loaded(request);
     if launches && adhoc && !loaded.is_empty() {
-        scopes.push(PermissionScope {
-            action: Action::RunLoad,
-            location_id: Some(request.location_id),
-            target: Some(request.target.clone()),
-            nodes: loaded,
-        });
+        scopes.push((scope(Action::RunLoad, loaded), None));
     }
     scopes
 }
 
-/// The sources an ad-hoc `--load`, `--reload` or `load` writes; a plain build's automatic loads need only `run.adhoc`.
+/// The sources an ad-hoc `--load`, `--reload` or `load`, typed or from a pinned job, writes; a plain build's automatic loads need only `run.adhoc`.
 fn explicitly_loaded(request: &RunRequest) -> BTreeSet<String> {
-    let explicit = EXPLICIT_LOAD_SETTINGS.iter().any(|name| {
-        request
-            .settings
-            .get(*name)
-            .and_then(serde_json::Value::as_bool)
-            == Some(true)
-    });
+    let applied = applied_settings(request);
+    let explicit = EXPLICIT_LOAD_SETTINGS
+        .iter()
+        .any(|name| applied.get(*name).and_then(serde_json::Value::as_bool) == Some(true));
     if !explicit {
         return BTreeSet::new();
     }
@@ -132,7 +158,7 @@ fn explicitly_loaded(request: &RunRequest) -> BTreeSet<String> {
         .collect()
 }
 
-/// A window, a full refresh, a cursor setting or an ad-hoc destructive flag on any of `executions`.
+/// A window, a full refresh, a cursor setting or an ad-hoc destructive flag on any of `executions`, typed or from an ad-hoc build's pinned jobs.
 pub(in crate::runs) fn rewrites_history(request: &RunRequest, executions: &[RunRequest]) -> bool {
     if request.window.is_some() {
         return true;
@@ -142,12 +168,13 @@ pub(in crate::runs) fn rewrites_history(request: &RunRequest, executions: &[RunR
         if run.kind == RunKind::Adhoc {
             names.extend(ADHOC_DESTRUCTIVE_SETTINGS);
         }
+        let settings = applied_settings(run);
         let enabled = names
             .iter()
-            .any(|name| run.settings.get(*name).and_then(serde_json::Value::as_bool) == Some(true));
+            .any(|name| settings.get(*name).and_then(serde_json::Value::as_bool) == Some(true));
         let cursor = CURSOR_SETTINGS
             .iter()
-            .any(|name| run.settings.contains_key(*name));
+            .any(|name| settings.contains_key(*name));
         if enabled || cursor {
             return true;
         }

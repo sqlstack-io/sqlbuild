@@ -15,6 +15,8 @@ use sqlbuild_analysis::job_settings::errors::{JobSettingConflict, NodeJobSetting
 use sqlbuild_analysis::job_settings::main::conflict_help::conflict_help;
 use sqlbuild_analysis::job_settings::main::consumed_setting::consumed_setting;
 use sqlbuild_analysis::job_settings::main::resolve_job_settings::resolve_job_settings;
+use sqlbuild_analysis::job_settings::main::setting_scope::setting_scope;
+use sqlbuild_analysis::job_settings::models::SettingScope;
 use sqlbuild_analysis::job_settings::models::{
     DeclaredRun, NodeConsumer, NodeJobSettings, ResolvedJobSettings,
 };
@@ -33,7 +35,7 @@ use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_front::compile_driver::main::session_warehouse_support::session_warehouse_support;
 use sqlbuild_python_front::contracts::main::resolve_effective_adapter_name::resolve_effective_adapter_name;
 use sqlbuild_python_project::compiled_project::constants::{
-    JOB_FULL_REFRESH_KEY, JOB_IGNORED_AUDIT_FAILURES_KEY, JOB_WAREHOUSES_KEY,
+    JOB_CONCURRENCY_KEY, JOB_FULL_REFRESH_KEY, JOB_IGNORED_AUDIT_FAILURES_KEY, JOB_WAREHOUSES_KEY,
 };
 use sqlbuild_python_project::compiled_views::main::project::audits::audits;
 use sqlbuild_python_project::graph::main::nodes::native_key::native_key;
@@ -442,9 +444,14 @@ impl PlannedJobSettings {
         } else {
             &[]
         };
+        let limited: bool = !self.settings.job_limits.is_empty()
+            && !given_settings()
+                .iter()
+                .any(|name| setting_scope(name) == SettingScope::JobLimit);
         if !ignoring.is_empty()
             || !self.refreshing_jobs.is_empty()
             || !self.job_warehouses.is_empty()
+            || limited
         {
             let metadata: Bound<'py, PyDict> = native_field(plan, "metadata")?
                 .cast_into::<PyDict>()?
@@ -464,6 +471,13 @@ impl PlannedJobSettings {
                     warehouses.set_item(job, warehouse)?;
                 }
                 metadata.set_item(JOB_WAREHOUSES_KEY, warehouses)?;
+            }
+            if limited {
+                let limits: Bound<'py, PyDict> = PyDict::new(py);
+                for (job, limit) in &self.settings.job_limits {
+                    limits.set_item(job, limit)?;
+                }
+                metadata.set_item(JOB_CONCURRENCY_KEY, limits)?;
             }
             changes.push(("metadata", metadata.into_any()));
         }
