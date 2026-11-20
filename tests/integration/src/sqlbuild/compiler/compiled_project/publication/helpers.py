@@ -2049,7 +2049,10 @@ def provider_secrets_health(tmp_path: Path, project: Path) -> tuple[dict[str, An
 
 
 def plan_before_sync(
-    tmp_path: Path, project: Path, settings: dict[str, object]
+    tmp_path: Path,
+    project: Path,
+    settings: dict[str, object],
+    selection: tuple[str, ...] = (),
 ) -> tuple[dict[str, Any], str]:
     """Serve `project` until it publishes, then plan from its copy without waiting for a sync."""
     control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
@@ -2076,7 +2079,7 @@ def plan_before_sync(
         ) as location,
     ):
         _ = wait_for_generation(api, "dev", 1, location, log)
-        request_id: str = request_plan(control, [], settings)
+        request_id: str = request_plan(control, list(selection), settings)
         result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
     return result["result_json"]["outcome"], log.read_text()
 

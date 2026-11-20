@@ -1,6 +1,7 @@
 //! `sqb plan`: compile the plan pipeline and print the plan as text or JSON.
 
 use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
+use sqlbuild_python_front::discovery::models::SecretPolicy;
 use sqlbuild_python_planner::planner_phases::constants::{BUILD_HISTORY, DISCOVERING, WRITING};
 use sqlbuild_python_planner::planner_phases::main::timing::timed::timed;
 use sqlbuild_python_planner::planner_phases::models::PlanTimingScope;
@@ -10,7 +11,7 @@ use std::sync::Arc;
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python, pyfunction,
 };
-use pyo3::types::{PyBool, PyCFunction, PyDict, PyDictMethods};
+use pyo3::types::{PyBool, PyCFunction, PyDict, PyDictMethods, PyString};
 use pyo3::wrap_pyfunction;
 use sqlbuild_config::command_connection::errors::CommandConnectionError;
 use sqlbuild_core::plan_display::constants::{
@@ -176,16 +177,17 @@ fn resolve_invocation<'py>(
     let discovered: Bound<'py, PyAny> = match project {
         PlanProject::Held { discovered, .. } => discovered.clone(),
         PlanProject::Compiled => timed(DISCOVERING, || {
-            discover_project_inputs(
-                py,
-                Some(keywords(
-                    py,
-                    &[
-                        ("project_dir", project_dir.clone()),
-                        ("extract_output_column_locations", flag(py, false)),
-                    ],
-                )?),
-            )
+            let mut options: Vec<(&str, Bound<'py, PyAny>)> = vec![
+                ("project_dir", project_dir.clone()),
+                ("extract_output_column_locations", flag(py, false)),
+            ];
+            if state.is_some() {
+                options.push((
+                    "secret_policy",
+                    PyString::new(py, SecretPolicy::Defer.name()).into_any(),
+                ));
+            }
+            discover_project_inputs(py, Some(keywords(py, &options)?))
         })?,
     };
     validate_preview_target(
@@ -547,7 +549,7 @@ pub(crate) fn run_plan_command(request: &Bound<'_, PyAny>) -> PyResult<i32> {
     Ok(plan(request, (PlanProject::Compiled, None))?.0)
 }
 
-/// A location's preview from the synced `state`, without rules, which ran at load; vars or a dbt manifest recompile.
+/// A location's preview from the synced `state`, without rules, which ran at load; vars or a dbt manifest recompile, deferring secrets.
 pub(crate) fn location_plan<'py>(
     request: &Bound<'py, PyAny>,
     (held, state): (PlanProject<'_, 'py>, &Arc<WarehouseState>),

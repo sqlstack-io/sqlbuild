@@ -20,6 +20,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     ChangedPlanPreviewTestCase,
     FailedPlanTestCase,
     HeldPlanTestCase,
+    LocationCantRunTestCase,
     PlanPreviewTestCase,
     SyncedFreshnessTestCase,
     UnknownSourceAccessTestCase,
@@ -30,6 +31,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalo
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     ORDER_SKEW_SECONDS,
+    REGION_PROVIDER_FILES,
     changed_build_and_plan_from_copy,
     changed_build_report,
     changed_runs,
@@ -640,3 +642,61 @@ def test_given_a_plan_that_fails_when_the_location_plans_it_then_its_own_error_i
     assert test_case.expected_reason in plan["error"]["message"], plan
     assert published["changed"] == [] and published["downstream"] == [], published
     assert published["failing"] == plan["error"]["message"], published
+
+
+_CANT_RUN: list[dict[str, object]] = [
+    {
+        "reason": "missing_secret",
+        "provider": "region",
+        "path": "providers/region.py",
+        "variables": ["WORKER_ENV_REGION_CODE", "WORKER_ENV_TOKEN"],
+        "nodes": ["source:raw_regions"],
+        "readers": ["model:orders"],
+        "sinks": [],
+        "env_file": ".env",
+    }
+]
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LocationCantRunTestCase(
+            description="the held project plans what can't run",
+            settings={},
+            expected_cant_run=_CANT_RUN,
+        ),
+        LocationCantRunTestCase(
+            description="variables compile the project again and still plan what can't run",
+            settings={"vars": {"batch": "2"}},
+            expected_cant_run=_CANT_RUN,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_provider_missing_secrets_when_the_location_plans_then_the_plan_says_what_cant_run(
+    test_case: LocationCantRunTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "duckdb"\n'
+                '[connections.local]\ndatabase = "warehouse.db"\n'
+                '[targets.dev]\nschema = "main"\n[vars]\nbatch = "1"\n'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Orders.', materialized table);\n"
+                'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")\n'
+            ),
+        }
+        | REGION_PROVIDER_FILES,
+    )
+
+    outcome, log = plan_before_sync(
+        tmp_path, project, test_case.settings, ("source:raw_regions", "model:orders")
+    )
+
+    assert outcome["kind"] == "plan", log
+    assert outcome["document"].get("cant_run") == test_case.expected_cant_run, (outcome, log)

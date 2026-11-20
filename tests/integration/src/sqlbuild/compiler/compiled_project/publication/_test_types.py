@@ -623,3 +623,11 @@ class DevelopmentSecretReloadTestCase:
     # (node key, status, error code) of the node that uses the provider in the first run.
     expected_first_node: tuple[str, str, str | None]
     expected_second_status: str
+
+
+@dataclass(frozen=True)
+class LocationCantRunTestCase:
+    description: str
+    # The plan request's settings, such as variables that make the location compile again.
+    settings: dict[str, object]
+    expected_cant_run: list[dict[str, object]]
