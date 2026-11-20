@@ -4016,3 +4016,7 @@ reason = "Each reads a two-field key from a different record type (a SqlResource
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-orchestration/src/credentials/main/locations/location_named.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/location_reads/read_development_location.rs"]
 reason = "One reads the active location with a name, the other the development location of a target whose project path matches; each is one control-store read with its own SQL and filter, and only the read-then-decode-the-identity shape is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-compile/src/rules/_helpers/sql/sql_test_objects.rs", "crates/sqlbuild-python-front/src/discovery/_helpers/project/project_facts.rs"]
+reason = "Each parses one closed string set into its own enum: SQL test modes, directly tested resource kinds, and Python node kinds. Only the match-or-ValueError shape is alike."
