@@ -131,6 +131,8 @@ pub struct ReadyCard {
     pub warehouse: WarehouseState,
     pub triggers: String,
     pub watching: String,
+    /// The env file the session loaded and how to reload it, `None` without a project env file.
+    pub env_file: Option<String>,
 }
 
 /// The glyph and colour of one event line.

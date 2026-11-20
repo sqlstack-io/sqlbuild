@@ -56,8 +56,12 @@ pub(crate) fn ready_lines(mut screen: DevScreen, now: Instant) -> (DevScreen, Ve
     };
     screen.ready = true;
     if !screen.live {
-        let line: String = format_plain_line(&format!("ready {}", screen.ui_url), None);
-        return (screen, vec![line]);
+        let mut lines: Vec<String> = Vec::new();
+        if let Some(env_file) = &screen.env_file {
+            lines.push(format_plain_line(&format!("env file {env_file}"), None));
+        }
+        lines.push(format_plain_line(&format!("ready {}", screen.ui_url), None));
+        return (screen, lines);
     }
     let mut location: String = format!("{} \u{b7} gen {generation}", screen.header.target);
     if !screen.compile_detail.is_empty() {
@@ -73,6 +77,7 @@ pub(crate) fn ready_lines(mut screen: DevScreen, now: Instant) -> (DevScreen, Ve
             warehouse,
             triggers: screen.triggers.clone(),
             watching: screen.watching.clone(),
+            env_file: screen.env_file.clone(),
         },
         &screen.facts,
     );

@@ -1,5 +1,6 @@
 //! One privileged owner supervises both launchers; workers receive only claim-scoped HTTP.
 
+use sqlbuild_core::process_environment::main::environment_vars_os::environment_vars_os;
 use std::io::Write;
 use std::process::{ExitStatus, Stdio};
 use std::time::{Duration, Instant};
@@ -367,7 +368,7 @@ fn prepare_spawn(
         .arg(&location.project_dir)
         .current_dir(&location.project_dir)
         .env_clear()
-        .envs(std::env::vars_os().filter(|(key, _)| {
+        .envs(environment_vars_os().into_iter().filter(|(key, _)| {
             key.to_str()
                 .is_none_or(|key| !excluded(key, control_variable))
         }))

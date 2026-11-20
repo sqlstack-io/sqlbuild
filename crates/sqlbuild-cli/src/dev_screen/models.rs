@@ -96,6 +96,8 @@ pub(crate) struct ScreenSetup {
     pub(crate) header: DevHeader,
     pub(crate) watching: String,
     pub(crate) project_root: String,
+    /// The env file row of the ready card, such as `.env · 3 variables · edit it, then press r to reload`.
+    pub(crate) env_file: Option<String>,
 }
 
 /// Everything the screen draws, and how many live rows sit below the last printed line.
@@ -107,6 +109,8 @@ pub(crate) struct DevScreen {
     pub(crate) header: DevHeader,
     pub(crate) ui_url: String,
     pub(crate) watching: String,
+    /// The env file row of the ready card.
+    pub(crate) env_file: Option<String>,
     pub(crate) triggers: String,
     pub(crate) started: Instant,
     pub(crate) steps: Vec<StepRow>,

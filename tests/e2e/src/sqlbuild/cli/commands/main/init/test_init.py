@@ -22,6 +22,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
             expected_exit_code=0,
             expected_paths=(
                 "sqlbuild_project.toml",
+                ".gitignore",
                 "python",
                 "python/.gitkeep",
                 "hooks/sql",
@@ -61,6 +62,7 @@ def test_given_empty_project_directory_when_running_init_then_typed_resource_dir
         assert fragment in result.stdout
     for expected_path in test_case.expected_paths:
         assert (project_dir / expected_path).exists()
+    assert ".env" in (project_dir / ".gitignore").read_text(encoding="utf-8").splitlines()
 
 
 @pytest.mark.parametrize(

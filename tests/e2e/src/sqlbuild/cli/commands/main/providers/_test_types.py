@@ -156,3 +156,21 @@ class SnowflakeKeyWarningE2ETestCase:
     description: str
     command: tuple[str, ...]
     expected_warnings: int = 1
+
+
+@dataclass(frozen=True)
+class EnvFileE2ETestCase:
+    """A project env file, the command run beside it, and what the provider saw."""
+
+    description: str
+    # Written after `name` and `adapter`, before the `[connection]` table.
+    project_toml: str
+    # Files written beside sqlbuild_project.toml, each with its permission bits.
+    files: dict[str, tuple[str, int]]
+    command: tuple[str, ...]
+    env: dict[str, str]
+    expected_exit_code: int
+    expected_output_fragments: tuple[str, ...]
+    # The region the provider read, or None when the task did not run.
+    expected_region: str | None
+    unexpected_output_fragments: tuple[str, ...] = ()

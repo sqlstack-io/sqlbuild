@@ -67,3 +67,19 @@ its last good snapshot until the project passes them.
 
 A `missing_secrets` location publishes and runs jobs whose nodes have their secrets. Set the
 missing variables in its environment and restart it; `sqb debug` in the location lists them.
+
+## Provide settings and secrets
+
+A location reads provider settings from its environment and from the project's
+[env file](/docs/concepts/project-configuration#env-file), which it loads once when it starts.
+For a deployment, point the target at a file outside the project:
+
+```toml
+[targets.production]
+env_file = "/etc/opt/sqlbuild/sqlbuild.env"
+```
+
+The location stops at start-up with an error naming the file when it doesn't exist. Variables
+set in the container or service environment win over the file. After changing the file, restart
+the location so its compiles and plan previews use the new values. Each
+[worker](/docs/cli/server/) reads the file when its run starts.

@@ -6,8 +6,8 @@ use crate::project::_helpers::defaults::{
 };
 use crate::project::_helpers::fields::{
     bool_or_none, coerce_mapping, get, key_name, keyed, object, optional_choice,
-    optional_nullable_bool, optional_str, optional_strict_int, optional_text_field, string_mapping,
-    text_or_none, value_or_none,
+    optional_nullable_bool, optional_str, optional_strict_int, optional_text_allowing_empty,
+    optional_text_field, string_mapping, text_or_none, value_or_none,
 };
 use crate::project::_helpers::keys::{
     Place, reject_removed_virtual_keys, reject_unknown_mapping_keys, validate_allowed_keys,
@@ -15,7 +15,7 @@ use crate::project::_helpers::keys::{
 use crate::project::_helpers::sections::{fixed_duration_seconds, item_timeout};
 use crate::project::_helpers::values::{int_below, is_int};
 use crate::project::constants::{
-    CLONE_KEYS, CONCURRENCY_KEY, CONFIRMATION_POLICIES, EXECUTION_LIMIT_KEYS,
+    CLONE_KEYS, CONCURRENCY_KEY, CONFIRMATION_POLICIES, ENV_FILE_KEY, EXECUTION_LIMIT_KEYS,
     IGNORE_AUDIT_FAILURES_KEY, MAX_FULL_ROWS_KEY, PAUSE_DYNAMIC_KEY, PLAN_FROM_KEY,
     PLAN_FROM_SOURCES, POOLS_KEY, RETENTION_MATERIALIZATIONS, TARGET_KEYS,
     UNLIMITED_DIFF_FULL_ROWS, WAREHOUSE_GROUPS,
@@ -324,6 +324,16 @@ fn validate_target_keys(mapping: &Entries, target: TargetPlace<'_>) -> Result<()
             format!("{label}.{POOLS_KEY} is project policy; set it in sqlbuild_project.toml"),
         ));
     }
+    if matches!(target.file, ConfigFile::Local | ConfigFile::LegacyLocal)
+        && get(mapping, ENV_FILE_KEY).is_some()
+    {
+        return Err(ConfigFailure::at(
+            target.file,
+            format!(
+                "{label}.{ENV_FILE_KEY} is project configuration; set it in sqlbuild_project.toml"
+            ),
+        ));
+    }
     if let Some(recall) = get(mapping, RECALL_SECTION) {
         recall_section(recall, &format!("{label}.{RECALL_SECTION}"))
             .map_err(|message| ConfigFailure::at(target.file, message))?;
@@ -437,6 +447,10 @@ fn local_target(payload: &ConfigValue, target: TargetPlace<'_>) -> Loaded<Fields
     fields.push((
         PAUSE_DYNAMIC_KEY,
         bool_or_none(optional_nullable_bool(mapping, PAUSE_DYNAMIC_KEY)?),
+    ));
+    fields.push((
+        ENV_FILE_KEY,
+        optional_text_allowing_empty(mapping, ENV_FILE_KEY)?,
     ));
     Ok(fields)
 }

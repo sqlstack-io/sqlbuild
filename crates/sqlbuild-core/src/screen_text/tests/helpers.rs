@@ -93,6 +93,7 @@ pub(super) fn ready_card(warehouse: WarehouseState) -> ReadyCard {
         warehouse,
         triggers: "41 paused".to_owned(),
         watching: "project/".to_owned(),
+        env_file: None,
     }
 }
 

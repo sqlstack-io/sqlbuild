@@ -16,6 +16,7 @@ use crate::dev_session::models::{DevProject, LocationPipes};
 use crate::native_commands::_helpers::command::decision::{
     control_address, control_database, control_database_variable, flag, text,
 };
+use crate::native_commands::_helpers::command::environment::with_environment_overlay;
 use crate::native_commands::_helpers::command::init::run_init;
 use crate::native_commands::_helpers::command::package::installed_package;
 use crate::native_commands::_helpers::command::paths::exclude_location_databases;
@@ -31,6 +32,7 @@ use crate::native_commands::_helpers::command::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
 use crate::native_commands::_helpers::command::terminal::{live_screen, stderr_columns};
+use crate::native_commands::_helpers::location::env_reload::env_file_summary;
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_timeout_seconds, rows_text, scan_line,
 };
@@ -250,6 +252,7 @@ fn development_location_role(
     ControlError,
 > {
     let mut command = Command::new(executable);
+    with_environment_overlay(&mut command);
     command
         .args(["--project-dir"])
         .arg(project)
@@ -1053,6 +1056,7 @@ pub(crate) async fn check_location_connection(
 
 pub(crate) fn location_child(options: &LocationServe, script: &Path) -> Command {
     let mut command = Command::new(script);
+    with_environment_overlay(&mut command);
     command.arg("--project-dir").arg(&options.project_dir);
     if terminal_columns().is_err() {
         command.env(COLUMNS_VARIABLE, FALLBACK_COLUMNS.to_string());
@@ -1745,6 +1749,7 @@ pub(crate) fn screen_setup(project: &Path, target: &str) -> ScreenSetup {
         },
         watching: format!("{}/", project_directory_name(project)),
         project_root: project.to_string_lossy().into_owned(),
+        env_file: env_file_summary(project),
     }
 }
 

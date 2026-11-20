@@ -83,6 +83,8 @@ publish = false
 rust-version = "1.88"
 
 [workspace.dependencies]
+# Reads the project env file with dotenv semantics; sqlx-postgres already depends on it.
+dotenvy = "0.15.7"
 argon2 = "0.5.3"
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio"] }
 axum-server = { version = "0.8", default-features = false, features = ["tls-rustls-no-provider"] }

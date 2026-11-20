@@ -2,9 +2,40 @@
 
 use crate::debug_report::constants::{NOT_CONFIGURED, NOT_PRESENT};
 use crate::debug_report::models::{DebugLine, DebugProjectFacts, DebugStatus, WarehouseCheck};
+use crate::process_environment::models::EnvFileMarker;
 
 fn resolved(label: &str, message: &str, status_message: &str) -> DebugLine {
     DebugLine::checked(label, message, (DebugStatus::Ok, Some(status_message)))
+}
+
+/// Which env file loaded, by path and variable count; never a value.
+fn env_file_line(marker: &EnvFileMarker) -> DebugLine {
+    let Some(path) = &marker.path else {
+        return DebugLine::checked(
+            "env file",
+            "off",
+            (DebugStatus::Skip, Some("env_file = \"\"")),
+        );
+    };
+    if !marker.loaded {
+        return DebugLine::checked(
+            "env file",
+            path,
+            (DebugStatus::Ok, Some("not found, optional")),
+        );
+    }
+    let count: usize = marker.names.len();
+    let mut status: String = format!(
+        "loaded, {count} variable{}",
+        if count == 1 { "" } else { "s" }
+    );
+    if !marker.overridden.is_empty() {
+        status.push_str(&format!(
+            ", {} already set in the environment",
+            marker.overridden.len()
+        ));
+    }
+    DebugLine::checked("env file", path, (DebugStatus::Ok, Some(&status)))
 }
 
 fn warehouse_line(check: &WarehouseCheck) -> DebugLine {
@@ -53,6 +84,9 @@ pub fn debug_configuration_lines(
                 NOT_PRESENT
             },
         ),
+    ];
+    lines.extend(facts.env_file.as_ref().map(env_file_line));
+    lines.extend([
         resolved("project", &facts.project_name, "loaded"),
         resolved("adapter", &facts.adapter_name, "found"),
         resolved(
@@ -75,7 +109,7 @@ pub fn debug_configuration_lines(
             facts.schema.as_deref().unwrap_or(NOT_CONFIGURED),
             "resolved",
         ),
-    ];
+    ]);
     lines.extend(warehouses.iter().map(warehouse_line));
     lines
 }

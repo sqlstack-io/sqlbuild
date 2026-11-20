@@ -4305,6 +4305,7 @@ dependencies = [
 name = "sqlbuild-config"
 version = "0.0.0"
 dependencies = [
+ "dotenvy",
  "saphyr-parser",
  "sqlbuild-core",
  "tempfile",

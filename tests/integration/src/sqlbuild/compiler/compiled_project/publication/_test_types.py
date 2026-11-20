@@ -326,6 +326,16 @@ class DevelopmentTerminalTestCase:
 
 
 @dataclass(frozen=True)
+class DevelopmentEnvFileTestCase:
+    description: str
+    first_env_file: str
+    second_env_file: str
+    expected_card_row: str
+    # The parts of the restart event line, in order of appearance.
+    expected_restart: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ComposeDeploymentTestCase:
     description: str
     expected_warehouse_rows: list[list[int]]

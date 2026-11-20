@@ -193,7 +193,11 @@ class SlackNotifier(Provider):
     channel: str = "#builds"  # has a default, environment variable is optional
 ```
 
-See the [pydantic-settings documentation](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) for advanced configuration like custom env prefixes, `.env` file support, and nested settings.
+Put local values in the project's `.env`, which every `sqb` command loads at start-up; variables
+already in the environment win. See [Env file](/docs/concepts/project-configuration#env-file) for
+another file per target or turning it off.
+
+See the [pydantic-settings documentation](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) for advanced configuration like custom env prefixes and nested settings.
 
 ## Secrets
 

@@ -28,7 +28,7 @@ pub fn render_ready_card(card: &ReadyCard, facts: &ScreenFacts) -> Vec<String> {
             span(format!("{SEPARATOR}press s to retry"), Tone::Plain),
         ],
     };
-    let facts_rows: [(&str, Vec<Segment>); 5] = [
+    let mut facts_rows: Vec<(&str, Vec<Segment>)> = vec![
         (
             "UI",
             vec![linked(
@@ -42,6 +42,9 @@ pub fn render_ready_card(card: &ReadyCard, facts: &ScreenFacts) -> Vec<String> {
         ("Triggers", vec![span(card.triggers.as_str(), Tone::Plain)]),
         ("Watching", vec![span(card.watching.as_str(), Tone::Plain)]),
     ];
+    if let Some(env_file) = &card.env_file {
+        facts_rows.push(("Env file", vec![span(env_file.as_str(), Tone::Plain)]));
+    }
     let mut rows: Vec<String> = vec![
         render_row(
             vec![

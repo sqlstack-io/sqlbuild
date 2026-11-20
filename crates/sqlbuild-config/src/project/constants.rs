@@ -57,6 +57,8 @@ pub(crate) const SCENARIO_TIMEOUT_KEY: &str = "scenario_timeout";
 pub(crate) const IGNORE_AUDIT_FAILURES_KEY: &str = "ignore_audit_failures";
 /// A target whose dynamic models stay paused between builds, refreshed only by builds.
 pub(crate) const PAUSE_DYNAMIC_KEY: &str = "pause_dynamic";
+/// The env file a project or target loads into the environment at start-up; `""` turns it off.
+pub(crate) const ENV_FILE_KEY: &str = "env_file";
 /// Whether each run records the machine it ran on in the runs state table.
 pub(crate) const RECORD_RUN_HOST_KEY: &str = "record_run_host";
 pub(crate) const DEFAULT_TEST_TIMEOUT: &str = "30s";
@@ -201,7 +203,7 @@ pub(crate) const MAX_POOL_LIMIT: i64 = 10_000;
 pub(crate) const PLAN_FROM_KEY: &str = "plan_from";
 /// What `plan_from` may name; `live` is the default.
 pub(crate) const PLAN_FROM_SOURCES: [&str; 2] = ["live", "synced_state"];
-pub(crate) const TARGET_KEYS: [&str; 25] = [
+pub(crate) const TARGET_KEYS: [&str; 26] = [
     "connection",
     "catalog_connection",
     "vars",
@@ -227,6 +229,7 @@ pub(crate) const TARGET_KEYS: [&str; 25] = [
     IGNORE_AUDIT_FAILURES_KEY,
     PLAN_FROM_KEY,
     PAUSE_DYNAMIC_KEY,
+    ENV_FILE_KEY,
 ];
 pub(crate) const CONTROL_KEYS: [&str; 3] = ["location", "server", "sync_at_least_every"];
 pub(crate) const CHANGES_KEYS: [&str; 2] = ["counts", "reach"];

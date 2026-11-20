@@ -1,5 +1,6 @@
 pub(crate) mod argv_host;
 pub(crate) mod decision;
+pub(crate) mod environment;
 pub(crate) mod init;
 pub(crate) mod package;
 pub(crate) mod paths;

@@ -4,7 +4,10 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime};
 
+use crate::launcher::_helpers::env_file::load_project_env_file;
 use crate::launcher::_helpers::handoff::{beside, hand_off};
+use sqlbuild_core::process_environment::main::environment_overlay::environment_overlay;
+
 use crate::launcher::_helpers::launch_key::{launch_key, launch_record_path};
 use crate::launcher::_helpers::messages::{
     print_version, report_handoff_failure, report_missing_python_cli,
@@ -34,6 +37,23 @@ fn launch_record(
     launch_record_path(arguments, &cwd, &key).map(|path| (path, key))
 }
 
+/// The variables the Python CLI must have set or unset, from this process's environment overlay.
+fn overlay_changes() -> Vec<(OsString, Option<OsString>)> {
+    let overlay = environment_overlay();
+    let mut changes: Vec<(OsString, Option<OsString>)> = overlay
+        .remove
+        .into_iter()
+        .map(|name| (name, None))
+        .collect();
+    changes.extend(
+        overlay
+            .set
+            .into_iter()
+            .map(|(name, value)| (name, Some(value))),
+    );
+    changes
+}
+
 fn exit_code(code: i64) -> i32 {
     i32::try_from(code).unwrap_or(HANDOFF_FAILURE_EXIT_CODE)
 }
@@ -45,6 +65,9 @@ pub(crate) fn launch(arguments: Vec<OsString>, started: (Instant, SystemTime)) -
     {
         print_version();
         return 0;
+    }
+    if let Err(code) = load_project_env_file(&arguments) {
+        return code;
     }
     let native = parse_native_invocation(&arguments);
     if let Ok(NativeParse::Exit(code)) = &native {
@@ -97,7 +120,7 @@ pub(crate) fn launch(arguments: Vec<OsString>, started: (Instant, SystemTime)) -
         handed.push(option);
     }
     handed.extend(arguments);
-    match hand_off(&script, &handed) {
+    match hand_off(&script, &handed, &overlay_changes()) {
         Ok(Some(code)) => code,
         Ok(None) => HANDOFF_FAILURE_EXIT_CODE,
         Err(error) => {

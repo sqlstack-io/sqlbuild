@@ -54,6 +54,7 @@ materialized = "view"
 | Field | Description |
 |-------|-------------|
 | `default_target` | Name of the target to build against when none is selected (see [Selecting a target](#selecting-a-target)). |
+| `env_file` | File of provider settings and secrets loaded at start-up; default `.env`, `""` turns it off (see [Env file](#env-file)). |
 
 ### Named connections
 
@@ -164,6 +165,7 @@ A target is a named build context - the database and schema you build into, plus
 | `ignore_audit_failures` | Whether builds on this target let audit failures through, replacing `[settings] ignore_audit_failures`; see [Ignoring audit failures](/docs/concepts/audits#ignoring-audit-failures) |
 | `plan_from` | Where `sqb plan` and `sqb build` read warehouse state: `live` (default) or `synced_state`; see [Planning from synced state](#planning-from-synced-state) |
 | `pause_dynamic` | `true` keeps this target's [dynamic models](/docs/concepts/models/dynamic) suspended between builds; each build refreshes the ones it selects. Default `false` |
+| `env_file` | File of provider settings and secrets for this target, replacing the project's `env_file`; see [Env file](#env-file) |
 
 ```toml
 [connections.warehouse]
@@ -371,6 +373,65 @@ that target:
 [targets.dev.diff]
 max_full_rows = 100_000_000
 ```
+
+## Env file
+
+`sqb` loads provider settings and secrets from the project's `.env` when a command starts, so you
+don't have to export them first. Put the file beside `sqlbuild_project.toml` and keep it out of
+git:
+
+```bash
+# .env
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T000/B000/XXXX
+PAYMENTS_API_TOKEN="tok_live_..."
+```
+
+Choose another file for the project, or for one target:
+
+```toml
+env_file = ".env"            # the default; "" turns loading off
+
+[targets.uat]
+env_file = "/etc/opt/sqlbuild/sqlbuild.env"
+```
+
+| Setting | Effect |
+| --- | --- |
+| `env_file` | The file every command loads. Default `.env`; `""` turns loading off |
+| `[targets.<name>] env_file` | The file for that target. It replaces the project's `env_file`; the two don't merge |
+
+Variables already set in the environment win over the file, so CI, deployments and a one-off
+`export` keep working.
+
+A configured file must exist. The default `.env` may be missing:
+
+```text
+$ sqb build --target uat
+error: env file /etc/opt/sqlbuild/sqlbuild.env does not exist (set by [targets.uat] env_file in sqlbuild_project.toml)
+  = help: create /etc/opt/sqlbuild/sqlbuild.env, or change env_file in sqlbuild_project.toml ("" turns it off)
+```
+
+`sqb` warns when the file's group or other users can read it:
+
+```text
+warning: env file .env is readable by group or others (mode 644); restrict it with chmod 600 .env
+```
+
+Details:
+
+- A relative path is relative to the project directory.
+- Every command that reads the project loads the file once, at start-up: CLI commands,
+  [`sqb dev`](/docs/cli/dev/), [`sqb location`](/docs/cli/location/) and the workers they start.
+  The processes they start get the same variables. `sqb dev` reloads it when you press `r`.
+- The format is dotenv: `KEY=value` lines, optional `export`, single or double quotes, and `#`
+  comments. `$NAME` and `${NAME}` expand, except in single quotes. Nothing runs commands. When a
+  name appears twice, the later line wins.
+- No command prints a value from the file. A line that isn't `KEY=value` is reported by its line
+  number only.
+- [`sqb debug`](/docs/cli/debug/) shows the file it loaded and how many variables came from it,
+  and marks the provider secrets the file set.
+- `sqb init` and `sqb playground` add `.env` to `.gitignore`.
+- `sqlbuild_local.toml` can't set `env_file`.
 
 ## Defaults
 
