@@ -15,15 +15,13 @@ use crate::project_snapshot::constants::{
     CONSUMERS, MODEL_NODE_KIND, SNAPSHOT_HIDDEN_SETTING, SOURCE_NODE_KIND,
 };
 use crate::project_snapshot::models::RunsIn;
+use crate::project_snapshot::types::ProviderConsumers;
 
 /// Each provider's consumers, as `{kind, name}`, and the snapshot nodes that run them.
 pub(crate) fn provider_consumers(
     discovered_inputs: &Bound<'_, PyAny>,
     nodes: &BTreeMap<String, SnapshotNode>,
-) -> PyResult<(
-    BTreeMap<String, Vec<Value>>,
-    BTreeMap<String, BTreeSet<String>>,
-)> {
+) -> PyResult<ProviderConsumers> {
     let mut used_by: BTreeMap<String, Vec<Value>> = BTreeMap::new();
     let mut running: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for (kind, collection, runs_in) in CONSUMERS {
