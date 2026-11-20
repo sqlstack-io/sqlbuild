@@ -1199,19 +1199,24 @@ PYTHON_TABLE_FUNCTION_BODY: str = (
                 "\n"
                 "class _SqbHandler:\n"
                 "    @_sqb_vectorized(input=_sqb_pandas.DataFrame)\n"
-                "    def end_partition(self, partition):\n"
-                "        partition.columns = ['ts', 'amount']\n"
-                "        result = main(_sqb_polars.from_pandas(partition))\n"
-                "        returned = list(result.columns)\n"
-                "        expected = ['ts', 'total']\n"
-                "        missing = [name for name in expected if name not in returned]\n"
-                "        extra = [name for name in returned if name not in expected]\n"
-                "        if missing or extra:\n"
+                "    def end_partition(self, _sqb_partition):\n"
+                "        _sqb_partition.columns = ['ts', 'amount']\n"
+                "        _sqb_result = main(_sqb_polars.from_pandas(_sqb_partition))\n"
+                "        _sqb_returned = list(_sqb_result.columns)\n"
+                "        _sqb_expected = ['ts', 'total']\n"
+                "        _sqb_missing = [name for name in _sqb_expected if name not in _sqb_returned]\n"
+                "        _sqb_extra = [name for name in _sqb_returned if name not in _sqb_expected]\n"
+                "        _sqb_repeated = sorted(\n"
+                "            {name for name in _sqb_returned if _sqb_returned.count(name) > 1}\n"
+                "        )\n"
+                "        if _sqb_missing or _sqb_extra or _sqb_repeated:\n"
                 "            raise ValueError(\n"
-                '                f"table function main returned columns {returned}, but its "\n'
-                '                f"returns declare {expected}: missing {missing}, extra {extra}"\n'
+                '                f"table function main returned columns "\n'
+                '                f"{_sqb_returned}, but its "\n'
+                '                f"returns declare {_sqb_expected}: missing {_sqb_missing}, "\n'
+                '                f"extra {_sqb_extra}, repeated {_sqb_repeated}"\n'
                 "            )\n"
-                "        return result.select(expected).to_pandas()\n"
+                "        return _sqb_result.select(_sqb_expected).to_pandas()\n"
                 "$$"
             ),
         ),
@@ -1235,19 +1240,24 @@ PYTHON_TABLE_FUNCTION_BODY: str = (
                 "\n"
                 "class _SqbHandler:\n"
                 "    @_sqb_vectorized(input=_sqb_pandas.DataFrame)\n"
-                "    def end_partition(self, partition):\n"
-                "        partition.columns = ['ts', 'amount']\n"
-                "        result = main(partition)\n"
-                "        returned = list(result.columns)\n"
-                "        expected = ['ts', 'total']\n"
-                "        missing = [name for name in expected if name not in returned]\n"
-                "        extra = [name for name in returned if name not in expected]\n"
-                "        if missing or extra:\n"
+                "    def end_partition(self, _sqb_partition):\n"
+                "        _sqb_partition.columns = ['ts', 'amount']\n"
+                "        _sqb_result = main(_sqb_partition)\n"
+                "        _sqb_returned = list(_sqb_result.columns)\n"
+                "        _sqb_expected = ['ts', 'total']\n"
+                "        _sqb_missing = [name for name in _sqb_expected if name not in _sqb_returned]\n"
+                "        _sqb_extra = [name for name in _sqb_returned if name not in _sqb_expected]\n"
+                "        _sqb_repeated = sorted(\n"
+                "            {name for name in _sqb_returned if _sqb_returned.count(name) > 1}\n"
+                "        )\n"
+                "        if _sqb_missing or _sqb_extra or _sqb_repeated:\n"
                 "            raise ValueError(\n"
-                '                f"table function main returned columns {returned}, but its "\n'
-                '                f"returns declare {expected}: missing {missing}, extra {extra}"\n'
+                '                f"table function main returned columns "\n'
+                '                f"{_sqb_returned}, but its "\n'
+                '                f"returns declare {_sqb_expected}: missing {_sqb_missing}, "\n'
+                '                f"extra {_sqb_extra}, repeated {_sqb_repeated}"\n'
                 "            )\n"
-                "        return result[expected]\n"
+                "        return _sqb_result[_sqb_expected]\n"
                 "$$"
             ),
         ),
@@ -1283,7 +1293,10 @@ def test_given_python_table_function_when_rendering_then_snowflake_wraps_it_in_a
     "test_case",
     [
         SnowflakeTableFunctionRunTestCase(
-            description="arguments are named and the declared columns return in their order",
+            description=(
+                "arguments are named and the declared columns return in their order, even for"
+                " an entry point named like a handler variable"
+            ),
             returned_columns=("total", "ts"),
             expected_rows=((1, 40.0), (2, 20.0)),
         )
@@ -1309,10 +1322,20 @@ def test_given_pandas_table_function_when_a_partition_runs_then_declared_columns
             description="a missing and an extra column are both named",
             returned_columns=("ts", "amount"),
             expected_error=(
-                r"table function main returned columns \['ts', 'amount'\], but its returns "
-                r"declare \['ts', 'total'\]: missing \['total'\], extra \['amount'\]"
+                r"table function result returned columns \['ts', 'amount'\], but its returns "
+                r"declare \['ts', 'total'\]: missing \['total'\], extra \['amount'\], "
+                r"repeated \[\]"
             ),
-        )
+        ),
+        SnowflakeTableFunctionColumnsErrorTestCase(
+            description="a column returned twice is named",
+            returned_columns=("ts", "total", "total"),
+            expected_error=(
+                r"table function result returned columns \['ts', 'total', 'total'\], but its "
+                r"returns declare \['ts', 'total'\]: missing \[\], extra \[\], "
+                r"repeated \['total'\]"
+            ),
+        ),
     ],
     ids=lambda case: case.description,
 )

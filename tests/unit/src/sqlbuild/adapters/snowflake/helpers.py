@@ -733,7 +733,7 @@ def run_python_table_function(
 
 
 def pandas_order_totals_statement() -> str:
-    """The Snowflake DDL of a pandas table function doubling each order amount."""
+    """The Snowflake DDL of a pandas table function `result` doubling each order amount."""
 
     return SnowflakeAdapter().render_create_function(
         destination="analytics.order_totals",
@@ -743,7 +743,7 @@ def pandas_order_totals_statement() -> str:
         ),
         returns="TABLE",
         body_sql=(
-            "def main(readings):\n"
+            "def result(readings):\n"
             "    readings = readings.sort_values('ts')\n"
             "    readings['total'] = readings['amount'] * 2\n"
             "    return readings[RETURNED_COLUMNS]"
@@ -754,6 +754,6 @@ def pandas_order_totals_statement() -> str:
         ),
         language=FunctionLanguage.PYTHON,
         runtime_version="3.12",
-        entry_point="main",
+        entry_point="result",
         dataframe="pandas",
     )[0]

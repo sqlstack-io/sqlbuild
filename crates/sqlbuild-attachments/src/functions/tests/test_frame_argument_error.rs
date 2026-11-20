@@ -27,6 +27,17 @@ fn given_table_function_arguments_when_checking_the_frame_then_fractional_number
             ),
         },
         FrameArgumentTestCase {
+            description: "DEC is a synonym of NUMBER",
+            dataframe: Some("polars"),
+            argument_type: "DEC(10, 2)",
+            expected_error: Some(
+                "Python function functions/python/smooth.py argument 'amount' is \
+                 DEC(10, 2), which Snowflake passes to a polars frame as Python Decimal \
+                 objects, a slow object column; declare it as FLOAT, or as INTEGER when it has \
+                 no fraction",
+            ),
+        },
+        FrameArgumentTestCase {
             description: "a scale of zero is an integer",
             dataframe: Some("polars"),
             argument_type: "NUMBER(38, 0)",

@@ -36,6 +36,15 @@ fn given_sql_when_extracting_references_then_matches_python_scanner() {
             expected_extraction: extracted(vec![partitioned_table_function("smooth", 2)]),
         },
         ExtractSqlReferencesTestCase {
+            description: "comments around the partition clause keep the call partitioned",
+            sql: "SELECT * FROM __table_fn(\"a\")(1) /* c */ OVER (-- key\n PARTITION /* x */ BY k), __table_fn(\"b\")(2) -- c\n OVER (PARTITION BY k)",
+            syntax: generic(),
+            expected_extraction: extracted(vec![
+                partitioned_table_function("a", 1),
+                partitioned_table_function("b", 1),
+            ]),
+        },
+        ExtractSqlReferencesTestCase {
             description: "an empty window or a following OVER word is not a partition clause",
             sql: "SELECT * FROM __table_fn(\"a\")(1) OVER () , __table_fn(\"b\")(2) overflow (partition by x)",
             syntax: generic(),

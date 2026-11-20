@@ -354,6 +354,11 @@ def test_given_table_function_marker_when_resolving_then_returns_expected_sql(
             expected_sql="SELECT * FROM r, TABLE(analytics.customer_orders(r.id)\n  over\n(partition by r.id))",
         ),
         RefResolutionTestCase(
+            description="keeps a comment before the partition clause inside TABLE()",
+            query_sql='SELECT * FROM r, __table_fn("customer_orders")(r.id) /* c */ OVER (PARTITION BY r.id) s',
+            expected_sql="SELECT * FROM r, TABLE(analytics.customer_orders(r.id) /* c */ OVER (PARTITION BY r.id)) s",
+        ),
+        RefResolutionTestCase(
             description="an alias starting with over is not a partition clause",
             query_sql='SELECT * FROM __table_fn("customer_orders")(42) overview',
             expected_sql="SELECT * FROM TABLE(analytics.customer_orders(42)) overview",

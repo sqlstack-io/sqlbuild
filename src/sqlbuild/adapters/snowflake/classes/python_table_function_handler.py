@@ -53,8 +53,12 @@ class PythonTableFunctionHandler:
         if polars:
             imports.append("import polars as _sqb_polars")
         imports.append("from _snowflake import vectorized as _sqb_vectorized")
-        frame: str = "_sqb_polars.from_pandas(partition)" if polars else "partition"
-        output: str = "result.select(expected).to_pandas()" if polars else "result[expected]"
+        frame: str = "_sqb_polars.from_pandas(_sqb_partition)" if polars else "_sqb_partition"
+        output: str = (
+            "_sqb_result.select(_sqb_expected).to_pandas()"
+            if polars
+            else "_sqb_result[_sqb_expected]"
+        )
         lines: list[str] = [
             self.body,
             "",
@@ -63,18 +67,22 @@ class PythonTableFunctionHandler:
             "",
             f"class {PYTHON_TABLE_FUNCTION_HANDLER}:",
             "    @_sqb_vectorized(input=_sqb_pandas.DataFrame)",
-            "    def end_partition(self, partition):",
-            f"        partition.columns = {list(self.argument_names)!r}",
-            f"        result = {self.entry_point}({frame})",
-            "        returned = list(result.columns)",
-            f"        expected = {list(self.column_names)!r}",
-            "        missing = [name for name in expected if name not in returned]",
-            "        extra = [name for name in returned if name not in expected]",
-            "        if missing or extra:",
+            "    def end_partition(self, _sqb_partition):",
+            f"        _sqb_partition.columns = {list(self.argument_names)!r}",
+            f"        _sqb_result = {self.entry_point}({frame})",
+            "        _sqb_returned = list(_sqb_result.columns)",
+            f"        _sqb_expected = {list(self.column_names)!r}",
+            "        _sqb_missing = [name for name in _sqb_expected if name not in _sqb_returned]",
+            "        _sqb_extra = [name for name in _sqb_returned if name not in _sqb_expected]",
+            "        _sqb_repeated = sorted(",
+            "            {name for name in _sqb_returned if _sqb_returned.count(name) > 1}",
+            "        )",
+            "        if _sqb_missing or _sqb_extra or _sqb_repeated:",
             "            raise ValueError(",
-            f'                f"table function {self.entry_point} returned columns {{returned}}, '
-            'but its "',
-            '                f"returns declare {expected}: missing {missing}, extra {extra}"',
+            f'                f"table function {self.entry_point} returned columns "',
+            '                f"{_sqb_returned}, but its "',
+            '                f"returns declare {_sqb_expected}: missing {_sqb_missing}, "',
+            '                f"extra {_sqb_extra}, repeated {_sqb_repeated}"',
             "            )",
             f"        return {output}",
         ]

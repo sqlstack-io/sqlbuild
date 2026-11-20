@@ -24,7 +24,7 @@ pub fn frame_argument_error(
         })
 }
 
-/// Whether `type_text` is `NUMBER(p, s)`, `DECIMAL(p, s)` or `NUMERIC(p, s)` with `s` above zero.
+/// Whether `type_text` is `NUMBER`, `DECIMAL`, `DEC` or `NUMERIC` `(p, s)` with `s` above zero.
 fn fractional_fixed_point(type_text: &str) -> bool {
     let Some((name, parameters)) = type_text.split_once('(') else {
         return false;

@@ -139,15 +139,15 @@ FROM __ref("payments") p,
 ```
 
 - `main` is a plain function: its frame has one column per argument, named after the argument. Test it with pytest like any other Python code.
-- The frame is a polars `DataFrame` by default. Annotate the parameter as a pandas `pd.DataFrame` to receive pandas, or set `function_dataframe = "pandas"` under [`[defaults]`](project-configuration.md#defaults) to make pandas the project default. An annotation wins over the default.
+- The frame is a polars `DataFrame` by default. Annotate the parameter as a pandas `pd.DataFrame` to receive pandas, or set `function_dataframe = "pandas"` under [`[defaults]`](project-configuration.md#defaults) to make pandas the project default. An annotation wins over the default. SQLBuild reads it through the file's top-level `import pandas` or `from pandas import DataFrame`; an annotation in quotes or imported under `if TYPE_CHECKING:` is not read, so the function gets the default.
 - SQLBuild generates the warehouse handler and adds the packages the frame needs: `pandas`, and `polars` and `pyarrow` for polars.
-- The returned frame must have exactly the `returns` columns. Otherwise the call fails with an error naming the missing and extra columns.
+- The returned frame must have exactly the `returns` columns. Otherwise the call fails with an error naming the missing, extra and repeated columns.
 - Rows arrive in no particular order. Sort inside `main` when order matters.
 
 | Problem | Fix |
 |---------|-----|
 | A call without `OVER (PARTITION BY ...)` fails compilation | Add `OVER (PARTITION BY <columns>)` after the call |
-| A polars function's `NUMBER(p, s)` argument with a scale above zero fails compilation | Declare it as `FLOAT`, or as `INTEGER` when it has no fraction |
+| A polars function's `NUMBER(p, s)` argument (or `DECIMAL`, `DEC`, `NUMERIC`) with a scale above zero fails compilation | Declare it as `FLOAT`, or as `INTEGER` when it has no fraction |
 | `returns` is not a column-to-type mapping, so compilation fails | Map each output column to its type |
 
 Python table functions deploy on Snowflake only; other adapters reject them when the function is created (see [Adapter support](#adapter-support)).

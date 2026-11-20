@@ -1,5 +1,6 @@
 //! The general reference scan of Python `extract_sql_references`, reproduced exactly.
 
+use crate::resolution::main::code_start::code_start;
 use crate::resolution::main::over_clause_open::over_clause_open;
 use crate::sql_references::constants::{
     DBT_REFERENCE_KIND, NAME_QUOTE_BYTES, NON_CODE_START_BYTES, PARTITION_CLAUSE_WORDS,
@@ -349,14 +350,17 @@ fn empty_argument() -> String {
     format!("{REFERENCE_CONTEXT} contains an empty argument")
 }
 
-/// Whether `OVER (PARTITION BY` follows `start`, in any case, with whitespace between the words.
+/// Whether `OVER (PARTITION BY` follows `start`, in any case, with whitespace or comments between.
 fn partition_clause_follows(text: &str, start: usize) -> bool {
     let Some(open) = over_clause_open(text, start) else {
         return false;
     };
     let mut position: usize = open + 1;
     for word in PARTITION_CLAUSE_WORDS {
-        position = python_whitespace_end(text, position);
+        let Some(word_start) = code_start(text, position) else {
+            return false;
+        };
+        position = word_start;
         let Some(candidate) = text.get(position..position + word.len()) else {
             return false;
         };
