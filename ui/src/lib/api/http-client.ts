@@ -869,10 +869,10 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				implemented.listPlatformEvents(),
 				acknowledgementsOf(scope),
 				attentionAcknowledgementsOf(scope),
-				// Missing provider secrets come from the target's own health; a refused read leaves the item out.
+				// Missing provider secrets come from the target's own health; a refused or failed read leaves the item out and judges nothing.
 				locationHealth(scope.locationId)
-					.then(([health]) => (health.data ? missingSecretsEventOf(scope.locationId, health.data) : null))
-					.catch(() => null)
+					.then(([health]) => (health.data ? { read: true, event: missingSecretsEventOf(scope.locationId, health.data) } : { read: false, event: null }))
+					.catch(() => ({ read: false, event: null }))
 			]);
 			// Every listing needs view on all of the target, so a partial viewer gets no counts at all.
 			const read = await reads.catch((error: unknown) => {
@@ -881,8 +881,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			});
 			if (!read) return null;
 			const [runs, checks, nodes, changes, listed, acknowledgements, conditions, secrets] = read;
-			const events = secrets ? [...listed, secrets] : listed;
-			return overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now: Date.now(), scopeKey: scope.locationId });
+			const events = secrets.event ? [...listed, secrets.event] : listed;
+			return overviewOf({ healthRead: secrets.read, runs, checks, nodes, changes, events, acknowledgements, conditions, now: Date.now(), scopeKey: scope.locationId });
 		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),

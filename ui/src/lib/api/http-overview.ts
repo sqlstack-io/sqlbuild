@@ -21,6 +21,8 @@ export type OverviewInputs = {
 	acknowledgements: Map<string, Acknowledgement>;
 	/** The location key (`<location>:<target>`) the read was for. */
 	scopeKey: string;
+	/** Whether the target's health read succeeded, so a missing-secrets problem absent from `events` is gone. */
+	healthRead?: boolean;
 	/** Conditions' latest acknowledgements, and the server's snooze (undefined from a server without it). */
 	conditions: { snoozeSeconds: number | null | undefined; acknowledgements: AttentionAcknowledgement[] };
 	now: number;
@@ -70,7 +72,7 @@ export function groupStatusOf(nodes: CatalogNode[]): GroupStatus[] {
  * does not check source freshness, so late sources stay unknown. Groups are top-level folders, and
  * group status is null when the server reports no build state. There is no cost read, so the page hides cost.
  */
-export function overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now, scopeKey }: OverviewInputs): Overview {
+export function overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now, scopeKey, healthRead = false }: OverviewInputs): Overview {
 	const acknowledged = (r: Run) => acknowledgements.get(r.id) ?? null;
 	const topLevel = runs.filter((r) => !r.parentRunId);
 	const recent = topLevel.filter((r) => Date.parse(r.queuedAt) >= now - DAY);
@@ -113,7 +115,7 @@ export function overviewOf({ runs, checks, nodes, changes, events, acknowledgeme
 		// Nodes out of date are seen only with build state; late sources aren't checked here. Every viewer
 		// sees the scheduler, but other problems only for targets they may view, so only this target's count.
 		clearedAcknowledgements: clearedAcknowledgements(attention, conditions.acknowledgements, (key) =>
-			key === 'stale_models' ? nodes.some((n) => n.stale !== null) : visibleEventKey(key, scopeKey)
+			key === 'stale_models' ? nodes.some((n) => n.stale !== null) : visibleEventKey(key, scopeKey, healthRead)
 		),
 		groups: nodes.some((n) => n.stale !== null) ? groupStatusOf(nodes) : null,
 		recentChanges: recentDeploys(changes),

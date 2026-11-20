@@ -137,13 +137,13 @@ export const CLEARED_REASON = 'automatic: the condition cleared';
 /**
  * Whether an event's condition is one every viewer of `scopeKey` (a `<location>:<target>` key) sees in full:
  * the server-wide scheduler, which everyone sees, or this target's own problems. Others' problems are
- * listed only to people who may view their target, so their absence here says nothing.
+ * listed only to people who may view their target, so their absence here says nothing. Missing provider
+ * secrets come from the target's health read, so only a `healthRead` that succeeded can show them gone.
  */
-export function visibleEventKey(key: string, scopeKey: string): boolean {
+export function visibleEventKey(key: string, scopeKey: string, healthRead = false): boolean {
 	if (key === boundedKey('event:scheduler_no_leader::')) return true;
-	// Not missing provider secrets: they come from a health read the Overview skips when it fails, so
-	// their absence says nothing either.
-	return ['location_broken', 'tick_overdue', 'calendar_horizon_low'].some((kind) => key.startsWith(`event:${kind}:${scopeKey}:`));
+	const kinds = ['location_broken', 'tick_overdue', 'calendar_horizon_low', ...(healthRead ? ['location_missing_secrets'] : [])];
+	return kinds.some((kind) => key.startsWith(`event:${kind}:${scopeKey}:`));
 }
 
 /**
