@@ -259,6 +259,17 @@ Without `--debug`, a statement that is still running after 30 seconds prints a `
 30 seconds, with its elapsed time and, when the warehouse reports one, its query ID. A failed
 statement or step still prints its `FAIL` row.
 
+When output isn't a terminal, as in CI logs or a worker's captured output, a node that runs for
+more than 30 seconds also brings one line naming the nodes still running, longest first, with the
+rows a loader or microbatch model has written so far where it reports them:
+
+```
+… still running (3)  stg_inventory 2m10s · stg_shipments 1m50s · raw_events 1m05s (48,210 rows)
+```
+
+It names up to three nodes and counts the rest as `+N more`. While nodes keep running it repeats
+after 1 minute, then 2 minutes, then every 5 minutes. A terminal shows its live view instead.
+
 ## Deferred builds
 
 Use `--defer-to` to resolve unselected model references against another target. This lets you build a subset of models in dev while referencing production tables for everything else:
