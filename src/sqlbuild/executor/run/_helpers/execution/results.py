@@ -65,9 +65,11 @@ def build_failed_result(
     if error_prefix is not None:
         rendered_error = f"{error_prefix}: {rendered_error}"
 
-    statement_recorder.log(f"model {entry.name} failed phase={phase.value} error={rendered_error}")
+    statement_recorder.log(
+        message=f"model {entry.name} failed phase={phase.value} error={rendered_error}"
+    )
     if staging_relation is not None:
-        statement_recorder.log(f"staging relation kept for inspection: {staging_relation}")
+        statement_recorder.log(message=f"staging relation kept for inspection: {staging_relation}")
 
     return ModelExecutionResult(
         model_name=entry.name,
@@ -114,7 +116,7 @@ def build_skipped_result(
     """Build a skipped ModelExecutionResult after a lifecycle skip signal."""
 
     skipped_hook: HookExecutionResult | None = _last_skipped_hook(hook_results)
-    statement_recorder.log(f"model {entry.name} skipped by hook")
+    statement_recorder.log(message=f"model {entry.name} skipped by hook")
     return ModelExecutionResult(
         model_name=entry.name,
         status=ExecutionStatus.SKIPPED,

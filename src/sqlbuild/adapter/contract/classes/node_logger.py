@@ -24,19 +24,19 @@ class NodeLogger:
     def info(self, message: str) -> None:
         """Log `message` at info."""
 
-        self._record(message, LogLevel.INFO)
+        self._record(message=message, level=LogLevel.INFO)
 
     def warning(self, message: str) -> None:
         """Log `message` at warning."""
 
-        self._record(message, LogLevel.WARNING)
+        self._record(message=message, level=LogLevel.WARNING)
 
     def error(self, message: str) -> None:
         """Log `message` at error."""
 
-        self._record(message, LogLevel.ERROR)
+        self._record(message=message, level=LogLevel.ERROR)
 
-    def _record(self, message: str, level: LogLevel) -> None:
-        self._recorder.log(str(message), level)
+    def _record(self, *, message: str, level: LogLevel) -> None:
+        self._recorder.log(message=str(message), level=level)
         if self._logger is not None:
             self._logger.log(_PYTHON_LEVELS[level], "%s", message)

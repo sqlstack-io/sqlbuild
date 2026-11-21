@@ -8,14 +8,13 @@ use crate::compiled_project::constants::SKIP_ACTION;
 use crate::compiled_project::constants::SQL_TEST_KEY_PREFIX;
 use crate::compiled_project::constants::STORE_BUSY_STATUS;
 use crate::compiled_project::constants::UNCHANGED_REASON;
+use crate::native_host::_helpers::synced_catalog::write_stderr;
 use crate::native_host::models::DeferredCost;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::is_function;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::planned_key;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::poisoned;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::severity;
-use crate::project_snapshot::_helpers::snapshot::snapshot_logs::{
-    node_log_changes, upload_loss_change,
-};
+use crate::project_snapshot::_helpers::snapshot::snapshot_logs::{node_log_changes, upload_loss};
 use crate::project_snapshot::_helpers::snapshot::snapshot_worker::WorkerOwner;
 use crate::project_snapshot::_helpers::snapshot::snapshot_worker::unavailable;
 use crate::project_snapshot::types::NodeKeys;
@@ -1025,11 +1024,14 @@ impl WorkerBuild {
             .clone()
             .unwrap_or_else(|| "worker executor completed and closed its connections".into());
         let summary = py.detach(|| finish_output_upload(UPLOAD_CLOSE_BUDGET));
-        if let Some(change) = summary.as_ref().and_then(upload_loss_change) {
-            self.worker
-                .bind(py)
-                .get()
-                .change(py, "worker-output-loss", change)?;
+        if let Some((message, change)) = summary.as_ref().and_then(upload_loss) {
+            write_stderr(py, &format!("Run output: {message}\n"))?;
+            drop(
+                self.worker
+                    .bind(py)
+                    .get()
+                    .change(py, "worker-output-loss", change),
+            );
         }
         let ignored: u32 = self.ignored_audit_failures.load(Ordering::SeqCst);
         if ignored > 0 {

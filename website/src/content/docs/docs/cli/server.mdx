@@ -46,7 +46,8 @@ executable = "/usr/local/bin/sqb"
 | Section | Keys |
 | --- | --- |
 | `[server]` | `host` (default `127.0.0.1`), `port` (`8000`), `database_env` (`SQLBUILD_CONTROL_DATABASE_URL`), `password_origin`, `default_role` (`none`), `scheduler` (`true`), `attention_snooze` (`"24h"`); see [Acknowledge attention items](#acknowledge-attention-items) |
-| `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`, `state_history_versions`; see [Set retention](#set-retention) |
+| `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`, `state_history_versions`, `run_output_days`; see [Set retention](#set-retention) |
+| `[output]` | `store` (an `output` folder beside a SQLite control database), `max_bytes_per_run`; see [Keep run output](#keep-run-output) |
 | `[oidc]` | `origin`, `issuer`, `client_id`, `identities`, and optionally `client_secret_env`, `certificate_authority`, `groups_claim` and `group_roles` |
 | `[trusted_proxy]` | `origin`, and optionally `trusted_peers` (`127.0.0.1` and `::1`), `allowed_hosts`, `username_header` (`X-SQB-User`), `display_name_header`, `email_header`, `unknown_users` (`provision_viewer`), `proxy_logout_url` and `identities`; see [Sign in through a reverse proxy](#sign-in-through-a-reverse-proxy) |
 | `[[launchers.docker]]` | `location`, `target`, `server_url`, `max_workers`, `socket`, `location_container`, `executable`, and optional `run` and `pool_caps` tables; see [Limit worker containers](#limit-worker-containers) |
@@ -365,6 +366,7 @@ snapshot_count = 20
 run_log_days = 7
 run_log_count = 100
 state_history_versions = 10
+run_output_days = 7
 ```
 
 | Data | `[retention]` key | Option | Default | Range |
@@ -375,6 +377,7 @@ state_history_versions = 10
 | Logs of finished runs | `run_log_days` | `--run-log-retention-days` | `14` | `1`–`65535` |
 | Finished runs per location and target that keep their logs | `run_log_count` | `--run-log-retention-count` | `200` | `1`–`65535` |
 | Builds and check results kept for each node | `state_history_versions` | `--state-history-retention-versions` | `5` on SQLite, `20` on PostgreSQL | `1`–`65535` |
+| Output that finished runs printed | `run_output_days` | None | `run_log_days` | `1`–`65535` |
 | Skipped and covered schedule ticks | None | None | 30 days | Fixed |
 
 Statistics samples older than the horizon disappear from statistics reads at once and are then
@@ -430,6 +433,54 @@ on the latest missed time, so deleted ticks never come back.
 An invalid value stops the server before it opens the control database. Servers that share one
 control database delete at the shortest horizon among them and count only their own audit
 webhook, so give them the same values and webhook.
+
+## Keep run output
+
+Everything a run prints goes to the server's output store, filed under the node that printed it.
+Output printed outside any node, such as the worker's own messages, is filed under `run`. The
+store keeps each node's stdout and stderr in zstd-compressed files of a few MB. The control
+database keeps only a small index: where each node's lines are, and which lines look like errors
+or warnings. A run that prints gigabytes does not grow the control database.
+
+Set the store in the `[output]` section of `server.toml`:
+
+```toml
+[output]
+store = "file:///var/lib/sqlbuild/output"
+max_bytes_per_run = "20GB"
+```
+
+- `store` is a local folder, `file:///path`, or an S3 prefix, `s3://bucket/prefix`. By default it
+  is an `output` folder beside a SQLite control database, or in the server's working directory with
+  PostgreSQL. [`sqb dev`](/docs/cli/dev/) keeps its output in `.sqlbuild/output`.
+- A local folder must be on a persistent volume, not inside the server's container, or a restart
+  loses every run's output.
+- Use an S3 prefix when several servers share one control database, or when the server's container
+  is replaced. The server reads AWS credentials from the standard AWS environment variables or from
+  the role it runs under.
+- `max_bytes_per_run` is a number of bytes or text such as `"500MB"` or `"2GiB"`. Past it a run
+  keeps its first half and its newest half, and the lines in between are counted where they were
+  left out. By default a run keeps all of its output.
+
+The server prints `Run output store: ...` when it starts.
+
+Reading a run's output needs `view.evidence` on every node the run selected, and each read is
+recorded in the security audit. People page through one node's stream, read its last lines, search
+it, jump to its error and warning lines, or download it whole; no read loads a whole log at once.
+
+A worker sends what it prints in batches of about 4 MB, or every 2 seconds. When a node prints
+faster than the worker can send, the node waits for the worker. If the server stops accepting
+output for 30 seconds, the worker drops what it cannot send. It prints
+`Run output: N bytes of run output were not stored` to its log, with the reason, and adds the same
+warning to the run.
+
+A finished run's output is deleted `run_output_days` after the run ended; the run, its node results
+and the lines its nodes logged with `ctx.log` stay.
+
+Upgrade the server before its workers. An older server keeps none of a newer worker's output, and
+the worker's log says `the control server is older than this worker and does not accept run output;
+upgrade the server before its workers`. A node that logs with `ctx.log` fails on an older server
+with the same request to upgrade it.
 
 ## Grant roles to OIDC groups (beta)
 

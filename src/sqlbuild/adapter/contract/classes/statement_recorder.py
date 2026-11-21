@@ -22,7 +22,7 @@ class StatementRecorder:
         for statement in statements:
             self.events.append(LifeCycleEvent(kind=LifeCycleEventKind.SQL, content=statement))
 
-    def log(self, message: str, level: LogLevel = LogLevel.INFO) -> None:
+    def log(self, *, message: str, level: LogLevel | None = None) -> None:
         self.events.append(
             LifeCycleEvent(kind=LifeCycleEventKind.LOG, content=message, level=level)
         )

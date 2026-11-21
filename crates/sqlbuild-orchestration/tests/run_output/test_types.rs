@@ -1,10 +1,13 @@
 use crate::store::tests::store_test_types::Backend;
 
+/// One stream as (node key, stream, lines, error lines, warning lines).
+pub(crate) type StreamSummary<N> = (N, &'static str, i64, Vec<i64>, Vec<i64>);
+
 pub(crate) struct OutputReadTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     /// Each stream as (node key, stream, lines, error lines, warning lines).
-    pub(crate) expected_streams: Vec<(&'static str, &'static str, i64, Vec<i64>, Vec<i64>)>,
+    pub(crate) expected_streams: Vec<StreamSummary<&'static str>>,
     pub(crate) expected_page: Vec<(i64, &'static str)>,
     pub(crate) expected_page_links: (Option<i64>, Option<i64>),
     pub(crate) expected_tail: Vec<i64>,

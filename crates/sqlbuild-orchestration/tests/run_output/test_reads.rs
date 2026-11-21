@@ -12,7 +12,7 @@ use crate::run_output::models::{
     OutputDownloadQuery, OutputPageQuery, OutputSearchQuery, OutputStream,
 };
 use crate::run_output::tests::helpers::{batch, claimed_run, output_store, reader, segment};
-use crate::run_output::tests::test_types::OutputReadTestCase;
+use crate::run_output::tests::test_types::{OutputReadTestCase, StreamSummary};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use futures_util::StreamExt;
@@ -113,7 +113,7 @@ fn given_worker_batches_when_a_person_reads_a_node_stream_then_pages_tail_search
                 .await
                 .expect("index")
                 .expect("run");
-            let streams: Vec<(String, &str, i64, Vec<i64>, Vec<i64>)> = index
+            let streams: Vec<StreamSummary<String>> = index
                 .streams
                 .iter()
                 .map(|stream| {
@@ -126,7 +126,7 @@ fn given_worker_batches_when_a_person_reads_a_node_stream_then_pages_tail_search
                     )
                 })
                 .collect();
-            let expected: Vec<(String, &str, i64, Vec<i64>, Vec<i64>)> = test_case
+            let expected: Vec<StreamSummary<String>> = test_case
                 .expected_streams
                 .iter()
                 .map(|(node, stream, lines, errors, warnings)| {

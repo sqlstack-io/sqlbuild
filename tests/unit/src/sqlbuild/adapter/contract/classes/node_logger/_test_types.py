@@ -8,3 +8,10 @@ class NodeLoggerTestCase:
     description: str
     level: LogLevel
     expected_python_level: int
+
+
+@dataclass(frozen=True)
+class NodeLoggerCallTestCase:
+    description: str
+    message: str
+    expected_error: type[Exception]

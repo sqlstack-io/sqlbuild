@@ -47,10 +47,39 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
                 ),
             },
             expected_lines=500_001,
+            expected_error_lines=[500_001],
             expected_logs=[
                 ("model:orders", "info", "loaded orders"),
                 ("model:orders", "warning", "1 order had no customer"),
             ],
+        ),
+        RunOutputTestCase(
+            "a hook logging past the per-node cap",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(17,)],
+            files={
+                "models/orders.sql": (
+                    "MODEL (description 'Orders.', materialized table,\n"
+                    '  post_hooks [python("chatty")]);\n'
+                    "SELECT 17 AS amount\n"
+                ),
+                "hooks/python/chatty.py": (
+                    "from sqlbuild.hooks import hook\n\n\n"
+                    "@hook\n"
+                    "def chatty(ctx):\n"
+                    "    '''Log a long line, then more lines than a node reports.'''\n"
+                    "    ctx.log.error('x' * 5000)\n"
+                    "    for n in range(1, 250):\n"
+                    "        ctx.log.info(f'line {n}')\n"
+                    "    print('done')\n"
+                ),
+            },
+            expected_lines=1,
+            expected_error_lines=[],
+            expected_logs=[("model:orders", "error", "x" * 4093 + "…")]
+            + [("model:orders", "info", f"line {n}") for n in range(1, 200)],
         ),
     ],
     ids=lambda case: case.description,
@@ -82,7 +111,7 @@ def test_given_a_node_printing_a_large_log_when_a_worker_runs_it_then_its_lines_
         assert totals == (0, 0), streams
         assert streams[("model:orders", "stdout")] == (
             test_case.expected_lines,
-            [test_case.expected_lines],
+            test_case.expected_error_lines,
         )
         assert any(node == "run" for node, _ in streams), streams
         assert logs == test_case.expected_logs

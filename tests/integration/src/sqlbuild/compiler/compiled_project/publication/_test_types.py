@@ -176,10 +176,12 @@ class CheckExecutionTestCase(WorkerExecutionTestCase):
     expected_check_outcome: str = "success"
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True)
 class RunOutputTestCase(WorkerExecutionTestCase):
-    expected_lines: int
-    expected_logs: list[tuple[str, str, str]]
+    description: str
+    expected_lines: int = 0
+    expected_error_lines: list[int] = field(default_factory=list)
+    expected_logs: list[tuple[str, str, str]] = field(default_factory=list)
 
 
 @dataclass(frozen=True, kw_only=True)

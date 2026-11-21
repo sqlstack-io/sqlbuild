@@ -9,14 +9,14 @@ use sqlbuild_orchestration::runs::models::{NodeLogLevel, RunChange};
 
 const ELLIPSIS: char = '\u{2026}';
 
-/// Each of the node's first `ctx.log` lines with the event key it reports under.
+/// Each of the node's first `ctx.log` lines with the event key it reports under; lines the executor logs itself carry no level and stay out.
 pub(crate) fn node_log_changes(
     node_key: &str,
     events: &[LifeCycleEvent],
 ) -> Vec<(String, RunChange)> {
     events
         .iter()
-        .filter(|event| matches!(event.kind, LifeCycleEventKind::Log))
+        .filter(|event| matches!(event.kind, LifeCycleEventKind::Log) && event.level.is_some())
         .take(NODE_LOGS_PER_NODE)
         .enumerate()
         .map(|(index, event)| {
@@ -36,19 +36,25 @@ pub(crate) fn node_log_changes(
         .collect()
 }
 
-/// A warning under the run when some of its output could not be sent; `None` when nothing was lost.
-pub(crate) fn upload_loss_change(summary: &UploadSummary) -> Option<RunChange> {
+/// What was lost when some of a run's output could not be sent, and the warning reporting it under the run; `None` when nothing was lost.
+pub(crate) fn upload_loss(summary: &UploadSummary) -> Option<(String, RunChange)> {
     let failure: String = summary
         .failure
         .clone()
         .map_or_else(String::new, |failure| format!(": {failure}"));
-    (summary.dropped_bytes > 0 || summary.failure.is_some()).then(|| RunChange::NodeLog {
-        node_key: RUN_OUTPUT_NODE.to_owned(),
-        level: NodeLogLevel::Warning,
-        message: bounded(&format!(
+    (summary.dropped_bytes > 0 || summary.failure.is_some()).then(|| {
+        let message: String = bounded(&format!(
             "{} bytes of run output were not stored{failure}",
             summary.dropped_bytes
-        )),
+        ));
+        (
+            message.clone(),
+            RunChange::NodeLog {
+                node_key: RUN_OUTPUT_NODE.to_owned(),
+                level: NodeLogLevel::Warning,
+                message,
+            },
+        )
     })
 }
 

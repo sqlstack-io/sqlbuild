@@ -10,6 +10,7 @@ from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecord
 from sqlbuild.adapter.contract.models import LifeCycleEvent
 from sqlbuild.adapter.contract.types import LifeCycleEventKind, LogLevel
 from tests.unit.src.sqlbuild.adapter.contract.classes.node_logger._test_types import (
+    NodeLoggerCallTestCase,
     NodeLoggerTestCase,
 )
 
@@ -42,8 +43,15 @@ def test_given_a_node_logger_when_logging_at_a_level_then_the_line_keeps_its_lev
     ]
 
 
-def test_given_a_node_logger_when_called_directly_then_it_is_not_callable() -> None:
+@pytest.mark.parametrize(
+    "test_case",
+    [NodeLoggerCallTestCase("a message passed to ctx.log itself", "loaded 3 orders", TypeError)],
+    ids=lambda case: case.description,
+)
+def test_given_a_node_logger_when_called_directly_then_it_is_not_callable(
+    test_case: NodeLoggerCallTestCase,
+) -> None:
     logger: NodeLogger = NodeLogger(recorder=StatementRecorder(), logger=None)
 
-    with pytest.raises(TypeError):
-        cast(Any, logger)("loaded 3 orders")
+    with pytest.raises(test_case.expected_error):
+        cast(Any, logger)(test_case.message)
