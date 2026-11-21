@@ -360,6 +360,47 @@ def test_given_one_failed_resource_and_multiple_rules_when_running_cli_then_grou
             ),
         ),
         SnowflakeBodyShapeCase(
+            "partitioned python table function call in a model and its test",
+            (
+                (
+                    "functions/python/smooth_payments.py",
+                    "import polars as pl\nfrom sqlbuild.functions import table_fn\n\n\n"
+                    "@table_fn(\n"
+                    '    arguments={"customer_id": "INTEGER", "amount": "FLOAT"},\n'
+                    '    returns={"customer_id": "INTEGER", "amount_smoothed": "FLOAT"},\n'
+                    '    runtime_version="3.12",\n'
+                    '    database="warehouse",\n'
+                    '    schema="analytics",\n'
+                    ")\n"
+                    "def main(payments: pl.DataFrame) -> pl.DataFrame:\n"
+                    '    """Each customer\'s payment amounts, smoothed."""\n'
+                    '    return payments.rename({"amount": "amount_smoothed"})\n',
+                ),
+                (
+                    "models/payments.sql",
+                    "MODEL (description 'Payments.', database warehouse, schema analytics);\n\n"
+                    "SELECT\n  1 AS customer_id,\n  10.0::FLOAT AS amount\n",
+                ),
+                (
+                    "models/smoothed_payments.sql",
+                    "MODEL (description 'Smoothed payments.', database warehouse, schema analytics);\n\n"
+                    "SELECT\n  s.customer_id,\n  s.amount_smoothed\n"
+                    'FROM __ref("payments") AS p, __table_fn("smooth_payments")(p.customer_id, p.amount)\n'
+                    "    OVER (PARTITION BY p.customer_id) AS s\n",
+                ),
+                (
+                    "tests/unit/test_smooth_payments.sql",
+                    'TEST (name "smooth_payments__identity");\n\n'
+                    "WITH payment AS (\n  SELECT\n    1 AS customer_id,\n    10.0::FLOAT AS amount\n),\n\n"
+                    "__table_fn_actual__ AS (\n  SELECT\n    s.customer_id,\n    s.amount_smoothed\n"
+                    '  FROM payment AS p, __table_fn("smooth_payments")(p.customer_id, p.amount)\n'
+                    "      OVER (PARTITION BY p.customer_id) AS s\n),\n\n"
+                    "__table_fn_expected__ AS (\n  SELECT\n    1 AS customer_id,\n"
+                    "    10.0::FLOAT AS amount_smoothed\n)\n",
+                ),
+            ),
+        ),
+        SnowflakeBodyShapeCase(
             "quoted hook argument where a string is required",
             (
                 (

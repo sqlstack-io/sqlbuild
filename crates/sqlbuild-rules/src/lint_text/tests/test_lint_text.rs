@@ -860,6 +860,18 @@ fn given_snowflake_table_function_calls_when_formatting_then_each_call_is_kept_w
             expected_fault_lines: vec![],
         },
         FormatBodiesTestCase {
+            description: "a partitioned call keeps its OVER clause with it",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: "MODEL ();\nselect s.a from p, __table_fn(\"f\")(p.x) OVER (PARTITION BY p.k) s\n",
+            expected_formatted: vec![(
+                0,
+                "MODEL ();\nSELECT s.a\nFROM p, __table_fn(\"f\")(p.x) OVER (PARTITION BY p.k) s\n"
+                    .to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
             description: "a call the author wrapped in TABLE( ) keeps its arguments",
             dialect: "snowflake",
             relative_parts: None,

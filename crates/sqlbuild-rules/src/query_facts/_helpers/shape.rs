@@ -5,6 +5,7 @@ use crate::query_facts::constants::{
 use crate::query_facts::models::{CallKind, ModelCall, ModelShape};
 use crate::rules::main::compact_sql::compact_sql;
 use sqlbuild_analysis::semantic_validation::main::normalize_mapped::normalize_mapped;
+use sqlbuild_sqltext::resolution::main::over_clause_open::over_clause_open;
 use sqlbuild_sqltext::sql_scan::constants::TABLE_WRAPPER;
 use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use sqlbuild_sqltext::sql_scan::main::dialect_matching_paren::dialect_matching_paren;
@@ -125,7 +126,8 @@ fn quoted_name(sql: &str, open: usize) -> Option<(String, usize)> {
     (valid && sql.as_bytes().get(close) == Some(&b')')).then(|| (name.to_owned(), close))
 }
 
-/// `sql` with calls and placeholders stubbed, table functions optionally wrapped in `TABLE( )`.
+/// `sql` with calls and placeholders stubbed, table functions (with any `OVER (...)` clause)
+/// optionally wrapped in `TABLE( )`.
 fn stub_calls(
     sql: &str,
     policy: QuotePolicy,
@@ -195,7 +197,15 @@ fn stub_calls(
                 let Ok(close) = dialect_matching_paren(bytes, open, syntax) else {
                     continue;
                 };
-                wrap_close = Some(close);
+                wrap_close = Some(
+                    match over_clause_open(sql, close + 1, &syntax.line_comment_prefixes) {
+                        Some(over) => match dialect_matching_paren(bytes, over, syntax) {
+                            Ok(over_close) => over_close,
+                            Err(_) => continue,
+                        },
+                        None => close,
+                    },
+                );
             }
             let wrapper = if wrap_close.is_some() {
                 TABLE_WRAPPER

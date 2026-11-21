@@ -1,5 +1,7 @@
-//! Snowflake table function markers wrapped in `TABLE( )`, as SQLBuild renders them.
+//! Snowflake table function markers wrapped in `TABLE( )` with any `OVER (...)` clause, as
+//! SQLBuild renders them.
 
+use sqlbuild_sqltext::resolution::main::over_clause_open::over_clause_open;
 use sqlbuild_sqltext::sql_scan::constants::TABLE_WRAPPER;
 use sqlbuild_sqltext::sql_scan::main::dialect_matching_paren::dialect_matching_paren;
 use sqlbuild_sqltext::sql_scan::main::follows_table_wrapper::follows_table_wrapper;
@@ -36,6 +38,13 @@ pub(crate) fn table_wrapped(
         }
         let Ok(close) = dialect_matching_paren(bytes, open, syntax) else {
             continue;
+        };
+        let close = match over_clause_open(named, close + 1, &syntax.line_comment_prefixes) {
+            Some(over) => match dialect_matching_paren(bytes, over, syntax) {
+                Ok(over_close) => over_close,
+                Err(_) => continue,
+            },
+            None => close,
         };
         let spaces = bytes[name_end..]
             .iter()
