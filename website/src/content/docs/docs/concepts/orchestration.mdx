@@ -269,7 +269,7 @@ Pass `name="..."` to choose another name, which must also end in `_sensor`.
 | --- | --- |
 | `run_event(job="...", kinds=[...])` | Each run of the job or group that ends with one of `kinds`, optionally only when `executed_successfully` nodes ran and succeeded |
 | `node_event(select="...", kinds=[...])` | Each success, failure or recovery of the selected nodes in any run |
-| `check_event(select="...", kinds=[...])` | Each check, audit or SQL test on the selected nodes that fails or warns inside a run, whatever the run's outcome |
+| `check_event(select="...", kinds=[...])` | Each check, audit or SQL test on the selected nodes that fails or warns inside a job or job group run, whatever the run's outcome; ad-hoc `sqb test` and `sqb audit` runs don't count |
 | `source_new_data(select="...")` | Each new version of the selected sources |
 | `source_stale(select="...", after_seconds=...)` | Each source version older than `after_seconds` |
 | `platform_event(kinds=[...])` | Each server event of `kinds`, such as an overdue tick or a failed run |

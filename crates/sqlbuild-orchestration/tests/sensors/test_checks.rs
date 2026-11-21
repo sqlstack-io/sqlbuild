@@ -28,13 +28,22 @@ fn given_a_successful_run_with_a_failed_check_and_a_warned_audit_when_a_check_se
             description: "SQLite failures and warnings",
             backend: Backend::Sqlite,
             kinds: &["failed", "warn"],
+            run_kind: "job",
             expected_checks: &["audit:orders_amount", "check:orders_valid"],
         },
         CheckEventTestCase {
             description: "PostgreSQL failures only",
             backend: Backend::Postgres,
             kinds: &["failed"],
+            run_kind: "job",
             expected_checks: &["check:orders_valid"],
+        },
+        CheckEventTestCase {
+            description: "SQLite: an ad-hoc test or audit run is a development command, not an event",
+            backend: Backend::Sqlite,
+            kinds: &["failed", "warn"],
+            run_kind: "adhoc",
+            expected_checks: &[],
         },
     ];
     for test_case in test_cases {
@@ -86,6 +95,17 @@ fn given_a_successful_run_with_a_failed_check_and_a_warned_audit_when_a_check_se
                 ],
             )
             .await;
+            let (transaction, _) = query(
+                begin(store, TransactionMode::Write).await.expect("write"),
+                "UPDATE sqb_runs SET kind=$2 WHERE run_id=$1",
+                vec![
+                    Parameter::Id(source),
+                    Parameter::Text(test_case.run_kind.into()),
+                ],
+            )
+            .await
+            .expect("run kind");
+            commit(transaction).await.expect("commit");
             assert_eq!(
                 drain_sensor(store, &lease, trigger.trigger_id).await,
                 test_case.expected_checks.len(),

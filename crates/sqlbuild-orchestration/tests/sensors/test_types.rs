@@ -49,6 +49,8 @@ pub(crate) struct CheckEventTestCase {
     pub(crate) backend: Backend,
     /// The `check_event` kinds the sensor watches.
     pub(crate) kinds: &'static [&'static str],
+    /// The watched run's kind: `job`, or `adhoc` as a worker's `sqb test` or `sqb audit` run is.
+    pub(crate) run_kind: &'static str,
     /// The checks whose outcome starts a run, each once.
     pub(crate) expected_checks: &'static [&'static str],
 }
