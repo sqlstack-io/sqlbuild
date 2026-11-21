@@ -10,15 +10,31 @@ use crate::runs::models::{OutputPublication, RunChange, RunChangeRequest, RunExe
 use crate::worker::errors::WorkerError;
 use crate::worker::models::WorkerClient;
 
+/// Decode a run execution, refusing one with a field at any depth that this release would drop.
+pub(crate) fn read_execution(body: serde_json::Value) -> Result<RunExecution, WorkerError> {
+    let mut unknown: Option<String> = None;
+    let execution: RunExecution = serde_ignored::deserialize(body, |path| {
+        unknown.get_or_insert_with(|| path.to_string());
+    })?;
+    match unknown {
+        Some(field) => Err(WorkerError::NewerServer {
+            version: env!("CARGO_PKG_VERSION"),
+            field,
+        }),
+        None => Ok(execution),
+    }
+}
+
 impl WorkerClient {
-    /// Fetch the launcher's immutable request, not the location's latest deployment.
+    /// Fetch the launcher's immutable request, not the location's latest deployment; a field this release can't read refuses it rather than run part of what was asked.
     pub async fn execution(&self) -> Result<RunExecution, WorkerError> {
-        let execution: RunExecution = client_response(
+        let body: serde_json::Value = client_response(
             self.connection
                 .client
                 .get(format!("{}execution", self.run_url)),
         )
         .await?;
+        let execution: RunExecution = read_execution(body)?;
         if execution.claim.request.run_id != self.run_id
             || execution.claim.claim_id != self.claim_id
         {

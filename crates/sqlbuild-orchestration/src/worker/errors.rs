@@ -19,6 +19,16 @@ pub enum WorkerError {
     Verification(#[from] crate::store::errors::ControlError),
     #[error("run cancellation was requested before execution")]
     Cancelled,
+    /// The run request names a field this worker's release can't read, so it can't run all of what was asked.
+    #[error(
+        "this worker runs SQLBuild {version} and can't read a run request from a newer server (unknown field `{field}`); upgrade the location"
+    )]
+    NewerServer {
+        version: &'static str,
+        field: String,
+    },
+    #[error("worker API response could not be read: {0}")]
+    Response(#[from] serde_json::Error),
 }
 
 impl From<crate::api::errors::ClientError> for WorkerError {

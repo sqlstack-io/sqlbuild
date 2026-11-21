@@ -62,6 +62,24 @@ pub(crate) struct ApiReadTestCase {
     pub(crate) expected_ticks: usize,
 }
 
+/// A newer server that adds a field at `added` to a worker's execution, and whether the worker then starts.
+pub(crate) struct NewerServerTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The path the server adds a field at; empty adds nothing.
+    pub(crate) added: &'static [&'static str],
+    /// The run's status and reason once the worker tried to start.
+    pub(crate) expected_status: RunStatus,
+    pub(crate) expected_reason: Option<String>,
+}
+
+/// Where the real API is and the path a newer server adds a field at.
+#[derive(Clone)]
+pub(crate) struct NewerServer {
+    pub(crate) real: String,
+    pub(crate) added: &'static [&'static str],
+}
+
 pub(crate) struct TestApi {
     pub(crate) url: String,
     pub(crate) shutdown: tokio::sync::oneshot::Sender<()>,

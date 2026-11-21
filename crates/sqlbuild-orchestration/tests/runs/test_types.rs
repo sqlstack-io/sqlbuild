@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use uuid::Uuid;
 
 use crate::credentials::models::BuiltinRole;
-use crate::runs::models::{RerunRequest, RunStatus};
+use crate::runs::models::{RerunRequest, RunOrigin, RunStatus};
 
 pub(crate) use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_test_types::Backend;
@@ -530,4 +530,12 @@ pub(crate) struct NodeOfTestCase {
     /// The node identity columns a run's events read selects from an event's payload.
     pub(crate) fields: &'static [(&'static str, &'static str)],
     pub(crate) expected_node: Option<(&'static str, &'static str)>,
+}
+
+/// A store upgraded from before 0.245, whose stored run requests still carry `concurrency_groups`.
+pub(crate) struct StoredRequestTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The source's claim, its retry's origin, its person rerun's status and the rerun's cancellation.
+    pub(crate) expected_outcomes: (bool, RunOrigin, RunStatus, RunStatus),
 }

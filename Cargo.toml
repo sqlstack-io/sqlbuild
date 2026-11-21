@@ -157,6 +157,8 @@ saphyr-parser = "0.1"
 regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
+# Reports every field a decode ignores; a worker refuses a run request it can only partly read.
+serde_ignored = "0.1"
 # Every crate relies on insertion-ordered JSON objects, which the extension has always built with.
 serde_json = { version = "1", features = ["preserve_order"] }
 sha2 = "0.10"
