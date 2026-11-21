@@ -4,13 +4,11 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::authorization::_helpers::service_accounts::{
-    audit_change, begin_change, require_service_account, service_account_summary,
+    audit_change, begin_account_change, finish_change,
 };
-use crate::credentials::models::{
-    Action, AuditContext, PermissionScope, ServiceAccountAuthority, ServiceAccountSummary,
-};
+use crate::credentials::models::{AuditContext, ServiceAccountAuthority, ServiceAccountSummary};
 use crate::store::errors::ControlError;
-use crate::store::main::{commit::commit, query::query};
+use crate::store::main::query::query;
 use crate::store::models::{Change, ControlStore, Parameter};
 
 /// Stops `key_id` of `principal_id` now; a person needs `user.manage` everywhere.
@@ -19,13 +17,8 @@ pub async fn revoke_service_key(
     (context, authority): (&AuditContext, ServiceAccountAuthority),
     (principal_id, key_id): (Uuid, Uuid),
 ) -> Result<ServiceAccountSummary, ControlError> {
-    let (transaction, authorized) = begin_change(
-        store,
-        (context, authority),
-        &[PermissionScope::action(Action::UserManage, None)],
-    )
-    .await?;
-    let transaction = require_service_account(transaction, principal_id).await?;
+    let (transaction, authorized) =
+        begin_account_change(store, (context, authority), principal_id).await?;
     let now = transaction.now;
     let (mut transaction, stopped) = query(
         transaction,
@@ -55,7 +48,5 @@ pub async fn revoke_service_key(
         ),
     )
     .await?;
-    let (transaction, account) = service_account_summary(transaction, principal_id).await?;
-    commit(transaction).await?;
-    Ok(account)
+    finish_change(transaction, principal_id).await
 }

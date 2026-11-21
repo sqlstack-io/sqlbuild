@@ -170,6 +170,30 @@ pub(crate) async fn require_service_account(
     Ok(transaction)
 }
 
+/// A write changing `principal_id` that needs `user.manage`, refused when it isn't a service account.
+pub(crate) async fn begin_account_change(
+    store: &ControlStore,
+    (context, authority): (&AuditContext, ServiceAccountAuthority),
+    principal_id: Uuid,
+) -> Result<(ControlTransaction, AuditContext), ControlError> {
+    let manage = PermissionScope::action(Action::UserManage, None);
+    let (transaction, authorized) = begin_change(store, (context, authority), &[manage]).await?;
+    Ok((
+        require_service_account(transaction, principal_id).await?,
+        authorized,
+    ))
+}
+
+/// Commits a change to `principal_id` and returns the account as it now reads.
+pub(crate) async fn finish_change(
+    transaction: ControlTransaction,
+    principal_id: Uuid,
+) -> Result<ServiceAccountSummary, ControlError> {
+    let (transaction, account) = service_account_summary(transaction, principal_id).await?;
+    commit(transaction).await?;
+    Ok(account)
+}
+
 /// The service account named `name`, for the CLI, which names accounts rather than numbering them.
 pub(crate) async fn service_account_named(
     store: &ControlStore,

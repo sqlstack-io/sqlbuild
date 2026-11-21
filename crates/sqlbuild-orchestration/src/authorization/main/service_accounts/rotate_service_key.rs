@@ -5,16 +5,15 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::authorization::_helpers::service_accounts::{
-    audit_change, begin_change, require_service_account, service_account_summary,
+    audit_change, begin_account_change, finish_change,
 };
 use crate::credentials::constants::MAX_KEY_OVERLAP_MINUTES;
 use crate::credentials::main::service_keys::issue_service_key::issue_service_key;
 use crate::credentials::models::{
-    Action, AuditContext, IssuedServiceKey, PermissionScope, ServiceAccountAuthority,
-    ServiceKeyRotation,
+    AuditContext, IssuedServiceKey, ServiceAccountAuthority, ServiceKeyRotation,
 };
 use crate::store::errors::ControlError;
-use crate::store::main::{commit::commit, query::query};
+use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter};
 use crate::store::types::Row;
 
@@ -30,13 +29,8 @@ pub async fn rotate_service_key(
             "the overlap is 0 to {MAX_KEY_OVERLAP_MINUTES} minutes"
         )));
     }
-    let (transaction, authorized) = begin_change(
-        store,
-        (context, authority),
-        &[PermissionScope::action(Action::UserManage, None)],
-    )
-    .await?;
-    let transaction = require_service_account(transaction, principal_id).await?;
+    let (transaction, authorized) =
+        begin_account_change(store, (context, authority), principal_id).await?;
     let now = transaction.now;
     let (transaction, replaced) = query(transaction,
         "UPDATE sqb_service_account_keys SET revoked_at=$1 WHERE principal_id=$2 AND revoked_at IS NULL \
@@ -65,10 +59,8 @@ pub async fn rotate_service_key(
         ),
     )
     .await?;
-    let (transaction, account) = service_account_summary(transaction, principal_id).await?;
-    commit(transaction).await?;
     Ok(IssuedServiceKey {
-        account,
+        account: finish_change(transaction, principal_id).await?,
         key: issued.key,
     })
 }
