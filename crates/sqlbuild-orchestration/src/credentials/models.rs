@@ -42,6 +42,17 @@ pub struct SecurityAuditEvent {
     /// The person's name when `actor` is a principal; person reads set it, exports leave it out.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actor_name: Option<String>,
+    /// Whether `actor` is a person or a service account; set with `actor_name`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor_kind: Option<PrincipalKind>,
+}
+
+/// A principal signs in as a person, or calls with an API key as a service account.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PrincipalKind {
+    Person,
+    Service,
 }
 
 /// A person as administrators see them: how they sign in, their SSO groups and live sessions.
@@ -427,4 +438,111 @@ pub(crate) struct StoredToken {
     pub(crate) scope_json: CredentialScope,
     pub(crate) secret_hash: String,
     pub(crate) expires_at: DateTime<Utc>,
+}
+
+/// How a service account key came to be: made by SQLBuild, or chosen with the CLI's `--key-from-env`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ServiceKeyOrigin {
+    Issued,
+    Imported,
+}
+
+/// One working key of a service account; never the key itself.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ServiceKeySummary {
+    pub key_id: Uuid,
+    /// The non-secret start of the key, e.g. `sqbk_Q7m2xT`.
+    pub prefix: String,
+    pub origin: ServiceKeyOrigin,
+    pub created_at: DateTime<Utc>,
+    /// Who made it; none when the control-store owner did, with the CLI.
+    pub created_by: Option<String>,
+    /// The last request this key authenticated that wasn't refused.
+    pub last_used_at: Option<DateTime<Utc>>,
+    /// When a key replaced by a rotation stops working; none for the current key.
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
+/// A service account as administrators see it: its role, state and working keys.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ServiceAccountSummary {
+    pub principal_id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    /// Its built-in role everywhere; none when it holds no installation-wide built-in role.
+    pub role: Option<BuiltinRole>,
+    pub created_at: DateTime<Utc>,
+    pub created_by: Option<String>,
+    /// While set, every key of the account is refused.
+    pub disabled_at: Option<DateTime<Utc>>,
+    /// The newest last use of any of its keys, stopped ones included.
+    pub last_used_at: Option<DateTime<Utc>>,
+    /// Keys that work, or will once the account is enabled: the current key first, then one still in its overlap.
+    pub keys: Vec<ServiceKeySummary>,
+}
+
+/// A service account with a key that is returned only this once; the store keeps only its hash.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct IssuedServiceKey {
+    pub account: ServiceAccountSummary,
+    pub key: String,
+}
+
+/// A service account to add: its name, what uses it, and its built-in role everywhere.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct NewServiceAccount {
+    pub name: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    pub role: BuiltinRole,
+}
+
+/// A rotation: how many minutes the replaced key keeps working, at most a day; none or 0 stops it at once.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ServiceKeyRotation {
+    #[serde(default)]
+    pub overlap_minutes: Option<i64>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ServiceAccountState {
+    pub disabled: bool,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ServiceAccountRole {
+    pub role: BuiltinRole,
+}
+
+/// Who changes a service account: an authenticated person, whose permissions are checked, or the control-store owner.
+#[derive(Clone, Copy, Debug)]
+pub enum ServiceAccountAuthority {
+    Owner,
+    Person(Uuid),
+}
+
+/// The service account a request's key authenticated, and when that key was last recorded as used.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ServiceKeyIdentity {
+    pub(crate) principal_id: Uuid,
+    pub(crate) key_id: Uuid,
+    pub(crate) last_used_at: Option<DateTime<Utc>>,
+}
+
+/// What a presented key turned out to be.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum ServiceKeyCheck {
+    Accepted(ServiceKeyIdentity),
+    /// A key the store knows, refused because its account is disabled or it was stopped or expired.
+    Refused {
+        principal_id: Uuid,
+        key_id: Uuid,
+        reason: &'static str,
+    },
+    Unknown,
 }

@@ -23,7 +23,8 @@ pub(crate) async fn issue_live_session(
     let (transaction, rows) = query(transaction,
         "SELECT p.principal_id FROM sqb_principals p LEFT JOIN sqb_password_credentials c \
          ON c.principal_id=p.principal_id AND c.credential_id=$2 \
-         WHERE p.principal_id=$1 AND p.disabled_at IS NULL AND ($2 IS NULL OR c.credential_id IS NOT NULL)",
+         WHERE p.principal_id=$1 AND p.disabled_at IS NULL AND ($2 IS NULL OR c.credential_id IS NOT NULL) \
+         AND NOT EXISTS (SELECT 1 FROM sqb_service_accounts s WHERE s.principal_id=p.principal_id)",
         vec![Parameter::Id(principal_id), Parameter::OptionalId(credential_id)]).await?;
     if rows.is_empty() {
         return Ok((transaction, None));
@@ -43,6 +44,17 @@ pub(crate) async fn issue_session(
     context: &AuditContext,
     (principal_id, credential_id): (Uuid, Option<Uuid>),
 ) -> Result<(ControlTransaction, IssuedSession), ControlError> {
+    let (transaction, service) = query(
+        transaction,
+        "SELECT principal_id FROM sqb_service_accounts WHERE principal_id=$1",
+        vec![Parameter::Id(principal_id)],
+    )
+    .await?;
+    if !service.is_empty() {
+        return Err(ControlError::Invalid(
+            "a service account has no sessions; it calls with its key".into(),
+        ));
+    }
     let now = transaction.now;
     let session_id = Uuid::now_v7();
     let bearer = new_bearer(session_id)?;

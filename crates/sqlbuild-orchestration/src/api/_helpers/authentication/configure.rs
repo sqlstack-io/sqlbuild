@@ -4,7 +4,9 @@ use std::net::SocketAddr;
 
 use axum::{Extension, Router, middleware};
 
-use crate::api::_helpers::authentication::{development, oidc, password_sessions, trusted_proxy};
+use crate::api::_helpers::authentication::{
+    development, oidc, password_sessions, service_keys, trusted_proxy,
+};
 use crate::api::models::{ApiAuthentication, DevelopmentScope, GroupRole, HumanLogin, LoginMode};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
@@ -35,7 +37,10 @@ pub(crate) async fn configure(
         _ => LoginMode::Password,
     };
     let (development, routes) = match login {
-        HumanLogin::None => (None, Router::new()),
+        HumanLogin::None => (
+            None,
+            service_keys::key_only(store, password_sessions::person_routes()),
+        ),
         HumanLogin::Development(scope) => {
             if !address.ip().is_loopback() {
                 return Err(ControlError::Invalid(

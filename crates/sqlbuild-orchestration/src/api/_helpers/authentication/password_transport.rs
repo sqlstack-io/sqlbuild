@@ -10,6 +10,7 @@ use axum::{Extension, Json};
 use uuid::Uuid;
 
 use crate::api::_helpers::authentication::proxy_settings::ProxySettings;
+use crate::api::_helpers::authentication::service_keys::presented_key;
 use crate::api::constants::{
     EVENT_STREAM_MEDIA_TYPE, PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE, PASSWORD_CSRF_HEADER,
     STREAM_BUFFERING_HEADER, STREAM_CACHE_CONTROL,
@@ -18,7 +19,9 @@ use crate::api::errors::ApiError;
 use crate::api::models::{AuthenticationDenial, BrowserOrigin, ExternalIdentityResponse};
 use crate::credentials::constants::PASSWORD_SESSION_SECONDS;
 use crate::credentials::main::sessions::authenticate_session::authenticate_session;
-use crate::credentials::models::{AuditContext, AuthenticatedPerson, IssuedSession, SessionAccess};
+use crate::credentials::models::{
+    AuditContext, AuthenticatedPerson, IssuedSession, ServiceKeyIdentity, SessionAccess,
+};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
@@ -48,7 +51,10 @@ pub(crate) async fn guard(
         .get::<std::sync::Arc<ProxySettings>>()
         .filter(|settings| settings.trusted_peers.contains(&peer.ip().to_canonical()))
         .cloned();
-    if let Some(settings) = &proxy {
+    // A service key is no browser credential: a page can't send one cross-site without CORS, which the
+    // server never grants, so keyed callers skip the browser's host and origin checks on any address.
+    let keyed = presented_key(request.headers()).is_some();
+    if let Some(settings) = proxy.as_ref().filter(|_| !keyed) {
         let host = single_header(request.headers(), header::HOST.as_str());
         if !settings.host_allowed(host) {
             settings.note_refused_host(host, peer.ip().to_canonical());
@@ -61,7 +67,9 @@ pub(crate) async fn guard(
             });
         }
     }
-    let allowed: bool = if proxy.is_some() {
+    let allowed: bool = if keyed {
+        true
+    } else if proxy.is_some() {
         proxy_request_allowed(&request, &origin)
     } else {
         browser_request_allowed(&request, &origin)
@@ -129,6 +137,9 @@ pub(crate) async fn authenticate(
     mut request: Request,
     next: Next,
 ) -> Result<Response, ApiError> {
+    if request.extensions().get::<ServiceKeyIdentity>().is_some() {
+        return Ok(next.run(request).await);
+    }
     let context = request
         .extensions()
         .get::<AuditContext>()

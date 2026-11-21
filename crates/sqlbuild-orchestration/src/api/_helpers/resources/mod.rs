@@ -23,6 +23,7 @@ pub(crate) mod router;
 pub(crate) mod run_reads;
 pub(crate) mod runs;
 pub(crate) mod server_errors;
+pub(crate) mod service_accounts;
 pub(crate) mod snapshots;
 pub(crate) mod trigger_reads;
 pub(crate) mod ui_assets;

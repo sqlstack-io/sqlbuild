@@ -57,7 +57,7 @@ pub(crate) async fn grant_installation_admin(
     Ok((transaction, applied))
 }
 
-/// Another active installation administrator exists; a lost one is restored with grant-admin.
+/// Another active installation administrator who is a person exists; a lost one is restored with grant-admin.
 pub(crate) async fn remaining_administrator(
     transaction: ControlTransaction,
     principal_id: Uuid,
@@ -65,7 +65,8 @@ pub(crate) async fn remaining_administrator(
     let (transaction, rows) = query(transaction,
         "SELECT COUNT(*) AS administrators FROM sqb_role_assignments a JOIN sqb_principals p USING(principal_id) \
          WHERE a.role_key='admin' AND a.location_id IS NULL AND a.target IS NULL \
-         AND p.disabled_at IS NULL AND p.principal_id<>$1",
+         AND p.disabled_at IS NULL AND p.principal_id<>$1 \
+         AND NOT EXISTS (SELECT 1 FROM sqb_service_accounts s WHERE s.principal_id=p.principal_id)",
         vec![Parameter::Id(principal_id)]).await?;
     Ok((
         transaction,

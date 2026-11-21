@@ -6,4 +6,5 @@ pub(crate) mod password_sessions;
 pub(crate) mod passwords;
 pub(crate) mod scopes;
 pub(crate) mod secrets;
+pub(crate) mod service_keys;
 pub(crate) mod tokens;
