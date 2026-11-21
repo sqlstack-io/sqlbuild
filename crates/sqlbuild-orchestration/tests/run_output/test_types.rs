@@ -39,3 +39,12 @@ pub(crate) struct NodeLogTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_logs: Vec<(&'static str, &'static str, &'static str)>,
 }
+
+pub(crate) struct OutputLargeTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) printed_bytes: usize,
+    /// The control store's files stay below this many bytes.
+    pub(crate) expected_control_bytes_below: u64,
+    pub(crate) expected_tail_lines: usize,
+}

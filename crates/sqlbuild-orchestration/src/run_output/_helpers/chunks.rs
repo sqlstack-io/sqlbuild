@@ -58,3 +58,8 @@ pub(crate) fn decompress(stored: &[u8], capacity: usize) -> Result<String, Contr
     String::from_utf8(bytes)
         .map_err(|error| ControlError::Invalid(format!("run output chunk: {error}")))
 }
+
+/// Whether a count is zero, so a line with nothing left out before it serializes without the field.
+pub(crate) const fn is_zero(value: &i64) -> bool {
+    *value == 0
+}

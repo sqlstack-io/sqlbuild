@@ -5,22 +5,12 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 /// Where a server keeps run output: a local folder or an S3 prefix, and how much of a run it keeps.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct OutputStore {
     pub(crate) objects: Arc<dyn object_store::ObjectStore>,
     pub(crate) prefix: object_store::path::Path,
     pub(crate) location: String,
     pub(crate) max_bytes_per_run: Option<u64>,
-}
-
-impl std::fmt::Debug for OutputStore {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("OutputStore")
-            .field("location", &self.location)
-            .field("max_bytes_per_run", &self.max_bytes_per_run)
-            .finish_non_exhaustive()
-    }
 }
 
 impl OutputStore {
@@ -166,7 +156,10 @@ pub struct OutputPage {
 pub struct OutputLine {
     pub number: i64,
     pub text: String,
-    #[serde(default, skip_serializing_if = "is_zero")]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::run_output::_helpers::chunks::is_zero"
+    )]
     pub omitted_before: i64,
 }
 
@@ -196,10 +189,6 @@ pub struct OutputSearch {
 pub struct OutputDownloadQuery {
     pub node: String,
     pub stream: OutputStream,
-}
-
-const fn is_zero(value: &i64) -> bool {
-    *value == 0
 }
 
 /// A batch ready to index: its chunk's key and sizes, and each segment's place in the chunk.
@@ -265,13 +254,6 @@ pub(crate) struct TailChunk {
     pub(crate) lines: i64,
 }
 
-/// Who reads a run's output: their audit context and person, the run as location, target and ID, and the server's default role.
-pub(crate) type PersonRunRead<'a> = (
-    (&'a crate::credentials::models::AuditContext, uuid::Uuid),
-    (uuid::Uuid, &'a str, uuid::Uuid),
-    crate::credentials::models::DefaultRole,
-);
-
 /// A worker's run output on its way to the server: lines assembled per node and stream, sent in batches by one thread.
 #[derive(Debug)]
 pub struct RunOutputUploader {
@@ -307,4 +289,10 @@ pub struct UploadSummary {
     pub stored_batches: u64,
     pub dropped_bytes: u64,
     pub failure: Option<String>,
+}
+
+/// A finished run whose output is past its retention.
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub(crate) struct ExpiredRun {
+    pub(crate) run_id: uuid::Uuid,
 }

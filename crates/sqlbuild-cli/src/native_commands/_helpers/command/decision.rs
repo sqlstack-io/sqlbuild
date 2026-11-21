@@ -2,7 +2,9 @@
 
 use crate::server_config::constants::BYTE_UNITS;
 use crate::server_config::models::ByteCount;
-use sqlbuild_orchestration::run_output::models::OutputSettings;
+use sqlbuild_orchestration::run_output::main::open_output_store::open_output_store;
+use sqlbuild_orchestration::run_output::models::{OutputSettings, OutputStore};
+use sqlbuild_orchestration::store::models::ControlStore;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 
@@ -23,10 +25,11 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
 use uuid::Uuid;
 
 use crate::argv::constants::{JSON_OPTION, REVIEW_PROG};
-use crate::argv::models::{ArgvOutcome, Namespace, Value};
+use crate::argv::models::{ArgvOutcome, Namespace, Stream, Value};
 use crate::dispatch::main::invocation_policy::invocation_policy;
 use crate::dispatch::models::{CommandFacts, InvocationPolicy};
 use crate::native_commands::_helpers::command::terminal::read_password;
+use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::constants::{
     CLEAN_COMMAND, INIT_COMMAND, RULES_COMMAND, RULES_LIST_ACTION, RULES_SHOW_ACTION,
     SKILLS_COMMAND,
@@ -539,10 +542,26 @@ pub(crate) fn native_invocation(namespace: &Namespace) -> Result<NativeInvocatio
     })
 }
 
-/// `[output]`: the output store's URL and the bytes kept per run.
-pub(crate) fn control_output_settings(
+/// Open the output store `[output]` names into `facts` and report it on stderr; the store and how many days a finished run's output stays in it, for retention.
+pub(crate) fn control_output(
+    namespace: &Namespace,
     config: &ServerConfig,
-) -> Result<OutputSettings, ControlError> {
+    (store, facts): (&ControlStore, &mut ServerFacts),
+) -> Result<Option<(OutputStore, u16)>, ControlError> {
+    let output = open_output_store(&control_output_settings(config)?, store)?;
+    drop(write_output(&[(
+        Stream::Stderr,
+        &format!("Run output store: {}\n", output.location()),
+    )]));
+    facts.output = Some(output.clone());
+    Ok(Some((
+        output,
+        run_output_days(namespace, config, facts.run_logs)?,
+    )))
+}
+
+/// `[output]`: the output store's URL and the bytes kept per run.
+fn control_output_settings(config: &ServerConfig) -> Result<OutputSettings, ControlError> {
     Ok(OutputSettings {
         store: config.output.store.clone(),
         max_bytes_per_run: match &config.output.max_bytes_per_run {
@@ -554,7 +573,7 @@ pub(crate) fn control_output_settings(
 }
 
 /// Days a finished run's output stays, `--run-output-retention-days` over `[retention] run_output_days`, by default `run_log_days`.
-pub(crate) fn run_output_days(
+fn run_output_days(
     namespace: &Namespace,
     config: &ServerConfig,
     run_logs: RunLogRetention,

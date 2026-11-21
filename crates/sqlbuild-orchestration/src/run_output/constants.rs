@@ -64,3 +64,10 @@ pub const UPLOAD_ATTEMPTS: u32 = 3;
 
 /// How long a finishing worker waits for its last batches to send.
 pub const UPLOAD_CLOSE_BUDGET: std::time::Duration = std::time::Duration::from_secs(30);
+
+pub(crate) const FILE_SCHEME: &str = "file://";
+
+pub(crate) const S3_SCHEME: &str = "s3://";
+
+/// Retention removes the output of at most this many runs per pass.
+pub(crate) const PRUNE_RUNS: i64 = 100;

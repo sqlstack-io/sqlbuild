@@ -4052,3 +4052,9 @@ reason = "Each finalizes a successful Python node for its own executor, ingress 
 [[dupes.allowlist]]
 paths = ["scripts/compiler_differential/classes/discovery_features.py"]
 reason = "Each method writes one discovery feature's own fixture files for the compiler differential; only the write-files shape is alike."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS130"
+path = "crates/sqlbuild-orchestration/src/run_output/_helpers/upload.rs"
+symbols = ["attached"]
+reason = "A worker process runs one run, and the bytes it prints reach the uploader through the process-wide output capture, which has no handle to the worker; the uploader is attached once when the run starts and taken once when it finishes."

@@ -6,12 +6,11 @@ use crate::credentials::models::Action;
 use crate::run_output::_helpers::index::{segments_between, stored_stream};
 use crate::run_output::_helpers::pages::{numbered_lines, segment_texts};
 use crate::run_output::constants::{DEFAULT_PAGE_LINES, MAX_PAGE_LINES};
-use crate::run_output::models::{
-    OutputPage, OutputPageQuery, OutputStore, PersonRunRead, StoredSegment,
-};
+use crate::run_output::models::{OutputPage, OutputPageQuery, OutputStore, StoredSegment};
+use crate::run_output::types::PersonRunRead;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
-use crate::warehouse_history::_helpers::run_recall::sensitive_run_read;
+use crate::warehouse_history::main::read_run_evidence::read_run_evidence;
 
 /// `None` when the run is not in this location and target; a stream that printed nothing is an empty page.
 pub async fn read_person_output_page(
@@ -29,7 +28,7 @@ pub async fn read_person_output_page(
     );
     let stream: &str = query.stream.as_str();
     let node: &str = &query.node;
-    let Some((line_count, (from, to), segments)) = sensitive_run_read(
+    let Some((line_count, (from, to), segments)) = read_run_evidence(
         store,
         credentials,
         (run, default_role, Action::ViewEvidence),

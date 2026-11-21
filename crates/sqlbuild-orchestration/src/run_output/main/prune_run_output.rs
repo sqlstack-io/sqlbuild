@@ -3,22 +3,15 @@
 use chrono::TimeDelta;
 use futures_util::StreamExt;
 use object_store::ObjectStoreExt;
-use uuid::Uuid;
 
 use crate::run_output::_helpers::objects::run_prefix;
-use crate::run_output::models::OutputStore;
+use crate::run_output::constants::PRUNE_RUNS;
+use crate::run_output::models::{ExpiredRun, OutputStore};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::main::query_records::query_records;
 use crate::store::main::write::write;
 use crate::store::models::{ControlStore, Parameter};
-
-const PRUNE_RUNS: i64 = 100;
-
-#[derive(serde::Deserialize)]
-struct ExpiredRun {
-    run_id: Uuid,
-}
 
 /// How many runs lost their output; a repeated or interrupted pass finds only output still stored.
 pub async fn prune_run_output(

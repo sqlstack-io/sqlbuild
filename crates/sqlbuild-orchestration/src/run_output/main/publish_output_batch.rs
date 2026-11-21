@@ -6,7 +6,7 @@ use crate::run_output::_helpers::index::{batch_stored, record_chunk};
 use crate::run_output::_helpers::objects::{chunk_key, delete_chunks, put_chunk};
 use crate::run_output::_helpers::prepare::{checked, prepared};
 use crate::run_output::models::{OutputBatch, OutputBatchReceipt, OutputStore};
-use crate::runs::_helpers::lifecycle::output::claim_envelope;
+use crate::runs::main::execution::require_active_claim::require_active_claim;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
@@ -20,7 +20,7 @@ pub async fn publish_output_batch(
 ) -> Result<OutputBatchReceipt, ControlError> {
     checked(&batch)?;
     let transaction = begin(store, TransactionMode::Read).await?;
-    let (transaction, _) = claim_envelope(transaction, (run_id, claim_id)).await?;
+    let transaction = require_active_claim(transaction, (run_id, claim_id)).await?;
     let (transaction, stored) = batch_stored(transaction, (run_id, claim_id), batch.batch).await?;
     commit(transaction).await?;
     if stored {
@@ -36,7 +36,7 @@ pub async fn publish_output_batch(
         .max_bytes_per_run
         .map(|limit| i64::try_from(limit / 2).unwrap_or(i64::MAX));
     let transaction = begin(store, TransactionMode::Write).await?;
-    let (transaction, _) = claim_envelope(transaction, (run_id, claim_id)).await?;
+    let transaction = require_active_claim(transaction, (run_id, claim_id)).await?;
     let (transaction, stored) = batch_stored(transaction, (run_id, claim_id), chunk.batch).await?;
     if stored {
         commit(transaction).await?;

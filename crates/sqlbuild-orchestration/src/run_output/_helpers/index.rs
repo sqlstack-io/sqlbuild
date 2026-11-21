@@ -49,11 +49,11 @@ pub(crate) async fn record_chunk(
         _ => HEAD_PART,
     };
     (transaction, _) = query(transaction,
-        "INSERT INTO sqb_run_output_chunks (run_id, chunk, claim_id, batch, object_key, text_bytes, stored_bytes, part) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+        "INSERT INTO sqb_run_output_chunks (run_id, chunk, claim_id, batch, object_key, text_bytes, part) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7)",
         vec![Parameter::Id(chunk.run_id), Parameter::Integer(number), Parameter::Id(chunk.claim_id),
             Parameter::Integer(integer(chunk.batch)?), Parameter::Text(chunk.object_key.clone()),
-            Parameter::Integer(chunk.text_bytes), Parameter::Integer(chunk.stored_bytes), Parameter::Text(part.into())]).await?;
+            Parameter::Integer(chunk.text_bytes), Parameter::Text(part.into())]).await?;
     (transaction, _) = query(transaction,
         "UPDATE sqb_run_output SET next_chunk=next_chunk+1, head_bytes=head_bytes+$2, tail_bytes=tail_bytes+$3, \
          stored_bytes=stored_bytes+$4, dropped_bytes=dropped_bytes+$5 WHERE run_id=$1",
@@ -61,8 +61,8 @@ pub(crate) async fn record_chunk(
             Parameter::Integer(if part == HEAD_PART { chunk.text_bytes } else { 0 }),
             Parameter::Integer(if part == TAIL_PART { chunk.text_bytes } else { 0 }),
             Parameter::Integer(chunk.stored_bytes), Parameter::Integer(chunk.dropped_bytes)]).await?;
-    for (index, segment) in (0_i64..).zip(&chunk.segments) {
-        transaction = record_segment(transaction, (chunk.run_id, number, index), segment).await?;
+    for segment in &chunk.segments {
+        transaction = record_segment(transaction, (chunk.run_id, number), segment).await?;
     }
     transaction.changes.insert(Change::Run(chunk.run_id));
     match half {
@@ -97,7 +97,7 @@ async fn totals(
 
 async fn record_segment(
     transaction: ControlTransaction,
-    (run_id, chunk, index): (Uuid, i64, i64),
+    (run_id, chunk): (Uuid, i64),
     segment: &PreparedSegment,
 ) -> Result<ControlTransaction, ControlError> {
     let stream: &str = segment.stream.as_str();
@@ -109,9 +109,9 @@ async fn record_segment(
     let before: i64 = existing.as_ref().map_or(0, |found| found.line_count);
     let first_line: i64 = before + 1;
     let (transaction, _) = query(transaction,
-        "INSERT INTO sqb_run_output_segments (run_id, chunk, segment, node_key, stream, first_line, line_count, text_offset, text_bytes) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
-        vec![Parameter::Id(run_id), Parameter::Integer(chunk), Parameter::Integer(index), Parameter::Text(segment.node_key.clone()),
+        "INSERT INTO sqb_run_output_segments (run_id, chunk, node_key, stream, first_line, line_count, text_offset, text_bytes) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+        vec![Parameter::Id(run_id), Parameter::Integer(chunk), Parameter::Text(segment.node_key.clone()),
             Parameter::Text(stream.into()), Parameter::Integer(first_line), Parameter::Integer(segment.line_count),
             Parameter::Integer(segment.text_offset), Parameter::Integer(segment.text_bytes)]).await?;
     let shifted = |offsets: &[i64]| -> Vec<i64> {

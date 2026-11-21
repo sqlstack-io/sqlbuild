@@ -2,7 +2,7 @@
 
 use crate::run_output::_helpers::chunks::lines;
 use crate::run_output::_helpers::objects::read_chunk;
-use crate::run_output::models::{OutputLine, OutputStore, StoredSegment};
+use crate::run_output::models::{OutputLine, OutputSearch, OutputStore, StoredSegment};
 use crate::store::errors::ControlError;
 
 /// The text of one segment within its chunk's text.
@@ -55,4 +55,33 @@ pub(crate) fn numbered_lines(
 
 fn invalid() -> ControlError {
     ControlError::Invalid("run output index points outside its chunk".into())
+}
+
+/// The lines holding `needle`, lowercase, up to `limit`; a search that stops early says after which line to continue.
+pub(crate) fn matching_lines(
+    lines: Vec<OutputLine>,
+    (needle, limit): (&str, usize),
+    (after, more): (i64, bool),
+) -> OutputSearch {
+    let mut matches: Vec<OutputLine> = Vec::new();
+    let mut scanned: i64 = after;
+    for line in lines {
+        scanned = line.number;
+        if line.text.to_lowercase().contains(needle) {
+            matches.push(OutputLine {
+                omitted_before: 0,
+                ..line
+            });
+            if matches.len() == limit {
+                return OutputSearch {
+                    matches,
+                    continue_after: Some(scanned),
+                };
+            }
+        }
+    }
+    OutputSearch {
+        matches,
+        continue_after: more.then_some(scanned),
+    }
 }

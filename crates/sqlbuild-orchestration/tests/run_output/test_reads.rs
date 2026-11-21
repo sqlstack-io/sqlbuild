@@ -20,24 +20,37 @@ use futures_util::StreamExt;
 #[test]
 fn given_worker_batches_when_a_person_reads_a_node_stream_then_pages_tail_search_and_download_agree()
  {
-    let read_case = |description: &'static str, backend: Backend| OutputReadTestCase {
-        description,
-        backend,
-        expected_streams: vec![
-            ("model:orders", "stderr", 2, vec![1, 2], vec![]),
-            ("model:orders", "stdout", 6, vec![], vec![5]),
-            ("run", "stdout", 1, vec![], vec![]),
-        ],
-        expected_page: vec![(2, "line 2"), (3, "line 3"), (4, "line 4")],
-        expected_page_links: (Some(5), Some(1)),
-        expected_tail: vec![5, 6],
-        expected_matches: vec![1, 2, 3, 4, 6],
-        expected_download: "line 1\nline 2\nline 3\nline 4\nwarning: slow load\nline 6\n",
-    };
-    for test_case in [
-        read_case("SQLite", Backend::Sqlite),
-        read_case("PostgreSQL", Backend::Postgres),
-    ] {
+    let test_cases = [
+        OutputReadTestCase {
+            description: "SQLite",
+            backend: Backend::Sqlite,
+            expected_streams: vec![
+                ("model:orders", "stderr", 2, vec![1, 2], vec![]),
+                ("model:orders", "stdout", 6, vec![], vec![5]),
+                ("run", "stdout", 1, vec![], vec![]),
+            ],
+            expected_page: vec![(2, "line 2"), (3, "line 3"), (4, "line 4")],
+            expected_page_links: (Some(5), Some(1)),
+            expected_tail: vec![5, 6],
+            expected_matches: vec![1, 2, 3, 4, 6],
+            expected_download: "line 1\nline 2\nline 3\nline 4\nwarning: slow load\nline 6\n",
+        },
+        OutputReadTestCase {
+            description: "PostgreSQL",
+            backend: Backend::Postgres,
+            expected_streams: vec![
+                ("model:orders", "stderr", 2, vec![1, 2], vec![]),
+                ("model:orders", "stdout", 6, vec![], vec![5]),
+                ("run", "stdout", 1, vec![], vec![]),
+            ],
+            expected_page: vec![(2, "line 2"), (3, "line 3"), (4, "line 4")],
+            expected_page_links: (Some(5), Some(1)),
+            expected_tail: vec![5, 6],
+            expected_matches: vec![1, 2, 3, 4, 6],
+            expected_download: "line 1\nline 2\nline 3\nline 4\nwarning: slow load\nline 6\n",
+        },
+    ];
+    for test_case in test_cases {
         run(async {
             let Some(fixture) = open_test_store(test_case.backend).await else {
                 return;

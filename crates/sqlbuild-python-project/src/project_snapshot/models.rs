@@ -8,7 +8,7 @@ use crate::compiled_project::constants::SKIP_ACTION;
 use crate::compiled_project::constants::SQL_TEST_KEY_PREFIX;
 use crate::compiled_project::constants::STORE_BUSY_STATUS;
 use crate::compiled_project::constants::UNCHANGED_REASON;
-use crate::native_host::_helpers::synced_catalog::write_stderr;
+use crate::native_host::main::write_stderr_line::write_stderr_line;
 use crate::native_host::models::DeferredCost;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::is_function;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::planned_key;
@@ -1025,7 +1025,7 @@ impl WorkerBuild {
             .unwrap_or_else(|| "worker executor completed and closed its connections".into());
         let summary = py.detach(|| finish_output_upload(UPLOAD_CLOSE_BUDGET));
         if let Some((message, change)) = summary.as_ref().and_then(upload_loss) {
-            write_stderr(py, &format!("Run output: {message}\n"))?;
+            write_stderr_line(py, &format!("Run output: {message}\n"))?;
             drop(
                 self.worker
                     .bind(py)

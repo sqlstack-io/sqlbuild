@@ -4,14 +4,13 @@ use serde_json::json;
 
 use crate::credentials::models::Action;
 use crate::run_output::_helpers::index::segments_between;
-use crate::run_output::_helpers::pages::{numbered_lines, segment_texts};
+use crate::run_output::_helpers::pages::{matching_lines, numbered_lines, segment_texts};
 use crate::run_output::constants::{MAX_SEARCH_MATCHES, SEARCH_CHUNKS};
-use crate::run_output::models::{
-    OutputLine, OutputSearch, OutputSearchQuery, OutputStore, PersonRunRead, StoredSegment,
-};
+use crate::run_output::models::{OutputSearch, OutputSearchQuery, OutputStore, StoredSegment};
+use crate::run_output::types::PersonRunRead;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
-use crate::warehouse_history::_helpers::run_recall::sensitive_run_read;
+use crate::warehouse_history::main::read_run_evidence::read_run_evidence;
 
 /// `None` when the run is not in this location and target; a search that stops early says after which line to continue.
 pub async fn search_person_output(
@@ -34,7 +33,7 @@ pub async fn search_person_output(
     )
     .unwrap_or(1);
     let (node, stream): (&str, &str) = (&query.node, query.stream.as_str());
-    let Some(mut segments) = sensitive_run_read(
+    let Some(mut segments) = read_run_evidence(
         store,
         credentials,
         (run, default_role, Action::ViewEvidence),
@@ -53,25 +52,9 @@ pub async fn search_person_output(
     let more: bool = segments.len() > SEARCH_CHUNKS;
     segments.truncate(SEARCH_CHUNKS);
     let texts: Vec<String> = segment_texts(output, &segments).await?;
-    let mut matches: Vec<OutputLine> = Vec::new();
-    let mut scanned: i64 = after;
-    for line in numbered_lines(&segments, &texts, (after + 1, i64::MAX)) {
-        scanned = line.number;
-        if line.text.to_lowercase().contains(&needle) {
-            matches.push(OutputLine {
-                omitted_before: 0,
-                ..line
-            });
-            if matches.len() == limit {
-                return Ok(Some(OutputSearch {
-                    matches,
-                    continue_after: Some(scanned),
-                }));
-            }
-        }
-    }
-    Ok(Some(OutputSearch {
-        matches,
-        continue_after: more.then_some(scanned),
-    }))
+    Ok(Some(matching_lines(
+        numbered_lines(&segments, &texts, (after + 1, i64::MAX)),
+        (&needle, limit),
+        (after, more),
+    )))
 }

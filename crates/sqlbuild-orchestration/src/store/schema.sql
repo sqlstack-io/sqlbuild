@@ -215,7 +215,6 @@ CREATE TABLE sqb_run_output_chunks (
     batch BIGINT NOT NULL,
     object_key TEXT NOT NULL,
     text_bytes BIGINT NOT NULL,
-    stored_bytes BIGINT NOT NULL,
     part TEXT NOT NULL CHECK (part IN ('head', 'tail')),
     PRIMARY KEY (run_id, chunk),
     UNIQUE (run_id, claim_id, batch)
@@ -223,14 +222,13 @@ CREATE TABLE sqb_run_output_chunks (
 CREATE TABLE sqb_run_output_segments (
     run_id {uuid} NOT NULL,
     chunk BIGINT NOT NULL,
-    segment BIGINT NOT NULL,
     node_key TEXT NOT NULL,
     stream TEXT NOT NULL CHECK (stream IN ('stdout', 'stderr')),
     first_line BIGINT NOT NULL,
     line_count BIGINT NOT NULL,
     text_offset BIGINT NOT NULL,
     text_bytes BIGINT NOT NULL,
-    PRIMARY KEY (run_id, chunk, segment),
+    PRIMARY KEY (run_id, node_key, stream, first_line),
     FOREIGN KEY (run_id, chunk) REFERENCES sqb_run_output_chunks(run_id, chunk)
 );
 CREATE INDEX sqb_run_output_segments_lines ON sqb_run_output_segments(run_id, node_key, stream, first_line);

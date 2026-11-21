@@ -8,13 +8,10 @@ use object_store::aws::AmazonS3Builder;
 use object_store::local::LocalFileSystem;
 use object_store::path::Path;
 
-use crate::run_output::constants::DEFAULT_OUTPUT_FOLDER;
+use crate::run_output::constants::{DEFAULT_OUTPUT_FOLDER, FILE_SCHEME, S3_SCHEME};
 use crate::run_output::models::{OutputSettings, OutputStore};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
-
-const FILE_SCHEME: &str = "file://";
-const S3_SCHEME: &str = "s3://";
 
 /// A local folder is created when missing; an S3 store takes its credentials from the standard AWS environment or role.
 pub fn open_output_store(

@@ -6,10 +6,11 @@ use serde_json::json;
 use crate::credentials::models::Action;
 use crate::run_output::_helpers::index::segments_between;
 use crate::run_output::_helpers::pages::segment_texts;
-use crate::run_output::models::{OutputDownloadQuery, OutputStore, PersonRunRead, StoredSegment};
+use crate::run_output::models::{OutputDownloadQuery, OutputStore, StoredSegment};
+use crate::run_output::types::PersonRunRead;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
-use crate::warehouse_history::_helpers::run_recall::sensitive_run_read;
+use crate::warehouse_history::main::read_run_evidence::read_run_evidence;
 
 /// `None` when the run is not in this location and target.
 pub async fn download_person_output(
@@ -21,7 +22,7 @@ pub async fn download_person_output(
 {
     let run_id = run.2;
     let (node, stream): (&str, &str) = (&query.node, query.stream.as_str());
-    let Some(segments) = sensitive_run_read(
+    let Some(segments) = read_run_evidence(
         store,
         credentials,
         (run, default_role, Action::ViewEvidence),

@@ -4,14 +4,13 @@ use serde_json::json;
 
 use crate::credentials::models::Action;
 use crate::run_output::_helpers::index::numbers;
-use crate::run_output::models::{
-    NodeLogLine, OutputStreamSummary, PersonRunRead, RunOutputIndex, StoredStream,
-};
+use crate::run_output::models::{NodeLogLine, OutputStreamSummary, RunOutputIndex, StoredStream};
+use crate::run_output::types::PersonRunRead;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::main::query_records::query_records;
 use crate::store::models::{ControlStore, Parameter};
-use crate::warehouse_history::_helpers::run_recall::sensitive_run_read;
+use crate::warehouse_history::main::read_run_evidence::read_run_evidence;
 
 /// `None` when the run is not in this location and target; each read is audited.
 pub async fn read_person_output_index(
@@ -19,7 +18,7 @@ pub async fn read_person_output_index(
     (credentials, run, default_role): PersonRunRead<'_>,
 ) -> Result<Option<RunOutputIndex>, ControlError> {
     let run_id = run.2;
-    sensitive_run_read(
+    read_run_evidence(
         store,
         credentials,
         (run, default_role, Action::ViewEvidence),
