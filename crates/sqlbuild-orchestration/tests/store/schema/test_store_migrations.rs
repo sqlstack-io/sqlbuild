@@ -46,6 +46,11 @@ const SQLITE_CHECKSUMS: &[(i64, &str)] = &[
         4,
         "734163e22863ff86fbcf1329540736f279806d4ce5ea04f6d6ecb1703b3468c8",
     ),
+    // 0009_service_accounts, the fifth migration on this branch; renumbered with it in the batch.
+    (
+        5,
+        "6e09a2d096c359b3f490cdbe8aea78fbccd094694a37365dd312ed118f691c4a",
+    ),
 ];
 const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
     (
@@ -64,6 +69,11 @@ const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
     (
         4,
         "b1250935a5adf1d4691836a2125bb57360c1ff0a2a296a77e4d11bf6a80a99d9",
+    ),
+    // 0009_service_accounts, the fifth migration on this branch; renumbered with it in the batch.
+    (
+        5,
+        "6a0fa2de8afdd6361281d6094abcc556fd7e79f1ec57b525437e32da49b3828c",
     ),
 ];
 /// A version 1 store mid-run: a child run holding a concurrency slot, a jobs document and an audit result.
