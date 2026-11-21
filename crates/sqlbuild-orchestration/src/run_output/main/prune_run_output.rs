@@ -1,53 +1,24 @@
-//! Finished runs past `run_output_days` lose their output: its objects first, then its index; the run and its node logs stay.
+//! Finished runs past `run_output_days` lose their output; the run and its node logs stay.
 
-use chrono::TimeDelta;
-use futures_util::StreamExt;
-use object_store::ObjectStoreExt;
-
-use crate::run_output::_helpers::objects::run_prefix;
-use crate::run_output::constants::PRUNE_RUNS;
+use crate::run_output::_helpers::prune::{expired_runs, prune_run, report_retention_failure};
 use crate::run_output::models::{ExpiredRun, OutputStore};
-use crate::store::errors::ControlError;
-use crate::store::main::query::query;
-use crate::store::main::query_records::query_records;
-use crate::store::main::write::write;
-use crate::store::models::{ControlStore, Parameter};
+use crate::store::models::ControlStore;
 
-/// How many runs lost their output; a repeated or interrupted pass finds only output still stored.
-pub async fn prune_run_output(
-    store: &ControlStore,
-    output: &OutputStore,
-    days: u16,
-) -> Result<usize, ControlError> {
-    let expired: Vec<ExpiredRun> = write(store, |transaction| async move {
-        let cutoff = transaction.now - TimeDelta::days(i64::from(days));
-        query_records(
-            transaction,
-            "SELECT o.run_id FROM sqb_run_output o JOIN sqb_runs r ON r.run_id=o.run_id \
-             WHERE r.ended_at IS NOT NULL AND r.ended_at<$1 ORDER BY r.ended_at LIMIT $2",
-            vec![Parameter::Time(cutoff), Parameter::Integer(PRUNE_RUNS)],
-        )
-        .await
-    })
-    .await?;
-    for ExpiredRun { run_id } in &expired {
-        let prefix = run_prefix(output, *run_id);
-        let mut listed = output.objects.list(Some(&prefix));
-        while let Some(object) = listed.next().await {
-            output.objects.delete(&object?.location).await?;
+/// How many runs lost their output; a failure is reported on stderr and retried next pass, never stopping other retention.
+pub async fn prune_run_output(store: &ControlStore, output: &OutputStore, days: u16) -> usize {
+    let expired: Vec<ExpiredRun> = match expired_runs(store, days).await {
+        Ok(expired) => expired,
+        Err(error) => {
+            report_retention_failure(None, &error);
+            return 0;
         }
-        write(store, |mut transaction| async move {
-            for sql in [
-                "DELETE FROM sqb_run_output_segments WHERE run_id=$1",
-                "DELETE FROM sqb_run_output_chunks WHERE run_id=$1",
-                "DELETE FROM sqb_run_output_streams WHERE run_id=$1",
-                "DELETE FROM sqb_run_output WHERE run_id=$1",
-            ] {
-                (transaction, _) = query(transaction, sql, vec![Parameter::Id(*run_id)]).await?;
-            }
-            Ok((transaction, ()))
-        })
-        .await?;
+    };
+    let mut pruned: usize = 0;
+    for ExpiredRun { run_id } in &expired {
+        match prune_run(store, output, *run_id).await {
+            Ok(()) => pruned += 1,
+            Err(error) => report_retention_failure(Some(*run_id), &error),
+        }
     }
-    Ok(expired.len())
+    pruned
 }

@@ -77,6 +77,8 @@ pub(crate) struct OutputRetentionTestCase {
     pub(crate) ended_days_ago: Option<i64>,
     pub(crate) expected_pruned: usize,
     pub(crate) expected_objects: usize,
+    /// Error and warning lines still indexed after the pass.
+    pub(crate) expected_marks: usize,
 }
 
 pub(crate) struct NodeLogTestCase {
@@ -92,4 +94,32 @@ pub(crate) struct OutputLargeTestCase {
     /// The control store's files stay below this many bytes.
     pub(crate) expected_control_bytes_below: u64,
     pub(crate) expected_tail_lines: usize,
+}
+
+/// What a pass leaves: runs pruned, objects, chunk rows, marks and the run's output row.
+pub(crate) type RetentionState = (usize, usize, usize, usize, usize);
+
+pub(crate) struct OutputRetentionFailureTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// After a pass that cannot delete the objects, and after the next one that can.
+    pub(crate) expected_states: [RetentionState; 2],
+}
+
+pub(crate) struct OutputUploadTestCase {
+    pub(crate) description: &'static str,
+    /// Each write: the stream and its bytes.
+    pub(crate) writes: Vec<(crate::run_output::models::OutputStream, Vec<u8>)>,
+    /// Whether the sender has already had a batch refused.
+    pub(crate) refused_before: bool,
+    /// Batches queued, the text bytes they hold, and how many replacement characters that text has.
+    pub(crate) expected_queued: (usize, usize, usize),
+}
+
+pub(crate) struct OutputStoreSettingTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) store: Option<String>,
+    /// The error opening it gives, or none when it opens.
+    pub(crate) expected_error: Option<&'static str>,
 }
