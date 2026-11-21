@@ -3597,6 +3597,12 @@ export interface components {
         RunEventRecord: {
             /** Format: int64 */
             affected_rows?: number | null;
+            check_binding_key?: string | null;
+            /** @description For a check's result: its name as declared, its ID and this result's, and the rows it found; never its SQL or rows. */
+            check_name?: string | null;
+            check_result_id?: string | null;
+            /** Format: int64 */
+            check_rows?: number | null;
             /** Format: double */
             duration_ms?: number | null;
             error_code?: string | null;

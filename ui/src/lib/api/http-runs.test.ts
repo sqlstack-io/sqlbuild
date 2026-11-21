@@ -266,6 +266,23 @@ describe('run Recall reads', () => {
 		expect(toRunEvent(event('resource_attempt_started', { resource_id: '3b7370f99e385665996e8f73523b4fd5' }), 'r1')?.nodeKey).toBeNull();
 	});
 
+	it('names a check result, its outcome and the rows it found; other events carry no check', () => {
+		const check = (outcome: string, extra: Partial<W['RunEventRecord']> = {}) => toRunEvent(event('audit_completed', { outcome, ...extra }), 'r1')?.check;
+		expect([
+			check('warn', { check_name: 'unique(order_id)', check_rows: 14, check_binding_key: 'b-1', check_result_id: 'r-1' }),
+			check('error', { check_name: 'not_null(id)', check_rows: 2 }),
+			check('pass', { check_name: 'row_count' }),
+			check('insufficient', { check_name: 'freshness' }),
+			toRunEvent(event('resource_attempt_started'), 'r1')?.check
+		]).toEqual([
+			{ name: 'unique(order_id)', outcome: 'warned', rows: 14, bindingKey: 'b-1', resultId: 'r-1' },
+			{ name: 'not_null(id)', outcome: 'failed', rows: 2, bindingKey: null, resultId: null },
+			{ name: 'row_count', outcome: 'passed', rows: null, bindingKey: null, resultId: null },
+			{ name: 'freshness', outcome: 'skipped', rows: null, bindingKey: null, resultId: null },
+			null
+		]);
+	});
+
 	it('orders statements as sent and tells running from finished by the end time', () => {
 		const statement = (id: string, extra: Partial<W['RunStatementRecord']>): W['RunStatementRecord'] => ({ invocation_id: inv, statement_id: id, sql_available: true, ...extra });
 		const statements = toRunStatements(
