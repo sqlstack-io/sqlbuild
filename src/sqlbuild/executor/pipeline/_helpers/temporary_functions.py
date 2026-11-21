@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import re
 from collections.abc import Iterable
 from dataclasses import replace
@@ -19,7 +18,6 @@ from sqlbuild._native import (
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.models import FunctionDefinition, TemporaryFunction
 from sqlbuild.diagnostics.classes.diagnostic_record_redactor import DiagnosticRecordRedactor
-from sqlbuild.diagnostics.main.log_debug_event import log_debug_event
 from sqlbuild.executor.pipeline.exceptions import TemporaryTestFunctionError
 from sqlbuild.executor.pipeline.models import TemporaryTestFunctions
 from sqlbuild.runtime.execution_limits.exceptions import (
@@ -27,7 +25,6 @@ from sqlbuild.runtime.execution_limits.exceptions import (
     ItemTimeoutError,
 )
 
-_LOGGER: logging.Logger = logging.getLogger("sqlbuild.execution")
 _IDENTIFIER_QUOTES: frozenset[str] = frozenset({'"', "`", "["})
 _SCANNER_CONTEXT: str = "SQL test function call rewriting"
 
@@ -71,6 +68,8 @@ def create_temporary_test_functions(
             name=entry.name,
             definition=FunctionDefinition(
                 destination=deployed_target,
+                database=entry.destination.database,
+                schema=entry.destination.schema,
                 arguments=entry.arguments,
                 returns=entry.returns,
                 body_sql=rewrite_function_calls(
@@ -91,12 +90,12 @@ def create_temporary_test_functions(
                 f"{entry.language} function {entry.name} for the test run"
             )
             continue
-        failure: str | None = _execute_statements(
-            adapter=adapter, connection=connection, statements=temporary.statements
+        _execute_statements(
+            adapter=adapter,
+            connection=connection,
+            function_name=entry.name,
+            statements=temporary.statements,
         )
-        if failure is not None:
-            failures[key] = f"its temporary copy for the test run could not be created: {failure}"
-            continue
         replacements[deployed_target] = temporary.target
         created_keys.add(key)
         statements.extend((entry.name, statement) for statement in temporary.statements)
@@ -186,8 +185,10 @@ def rewrite_function_calls(
 
 
 def _execute_statements(
-    *, adapter: BaseAdapter, connection: Any, statements: tuple[str, ...]
-) -> str | None:
+    *, adapter: BaseAdapter, connection: Any, function_name: str, statements: tuple[str, ...]
+) -> None:
+    """Create one temporary copy on the first test connection, or fail with T006."""
+
     try:
         statement: str
         for statement in statements:
@@ -195,14 +196,11 @@ def _execute_statements(
     except (ItemTimeoutError, ExecutionDurationLimitError):
         raise
     except Exception as error:
-        reason: str = DiagnosticRecordRedactor.text(str(error))
-        log_debug_event(
-            logger=_LOGGER,
-            message="Temporary test function could not be created; using the built function",
-            sqlbuild_error=reason,
-        )
-        return reason
-    return None
+        raise TemporaryTestFunctionError(
+            function_name=function_name,
+            connection="the first test connection",
+            reason=DiagnosticRecordRedactor.text(str(error)) or type(error).__name__,
+        ) from error
 
 
 def _entries_by_key(

@@ -3251,9 +3251,15 @@ class SnowflakeAdapter(
     def render_create_temporary_function(
         self, *, name: str, definition: FunctionDefinition
     ) -> TemporaryFunction | None:
-        """Copy a function into a session TEMPORARY function in the session's current schema."""
+        """Copy a function into a session TEMPORARY function in the built function's schema."""
 
-        target: str = self.render_identifier(f"{TEMPORARY_FUNCTION_PREFIX}{name}")
+        identifier: str = self.render_identifier(f"{TEMPORARY_FUNCTION_PREFIX}{name}")
+        target: str = (
+            self.render_qualified_name(
+                database=definition.database, schema=definition.schema, name=identifier
+            )
+            or identifier
+        )
         statements: tuple[str, ...] = self.render_create_function(
             destination=target,
             arguments=definition.arguments,

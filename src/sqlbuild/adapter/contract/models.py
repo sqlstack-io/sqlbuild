@@ -306,12 +306,17 @@ class SnapshotSqlDialect:
 
 @dataclass(frozen=True)
 class FunctionDefinition:
-    """Warehouse function definition inputs for create/render adapter methods."""
+    """Warehouse function definition inputs for create/render adapter methods.
+
+    `database` and `schema` are the destination's database and schema, rendered as SQL.
+    """
 
     destination: str
     arguments: tuple[Any, ...]
     returns: str
     body_sql: str
+    database: str | None = None
+    schema: str | None = None
     return_columns: tuple[Any, ...] = ()
     language: FunctionLanguage = FunctionLanguage.SQL
     runtime_version: str | None = None
