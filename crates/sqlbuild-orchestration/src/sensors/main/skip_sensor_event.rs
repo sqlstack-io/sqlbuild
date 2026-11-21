@@ -19,10 +19,19 @@ pub(crate) async fn skip_sensor_event(
     event: &str,
 ) -> Result<(ControlTransaction, SensorCursor), ControlError> {
     let (transaction, last) = last_attempt(transaction, request.trigger_id).await?;
-    let Some((stuck, terminal)) = last else {
-        return Err(ControlError::Invalid(
-            "the sensor hasn't been called with an event yet".into(),
-        ));
+    let (stuck, terminal) = match last {
+        None => {
+            return Err(ControlError::Invalid(
+                "the sensor hasn't been called with an event yet".into(),
+            ));
+        }
+        Some(Err(_)) => {
+            return Err(ControlError::Invalid(
+                "the sensor's newest tick can't be read; its next tick checks it again from scratch"
+                    .into(),
+            ));
+        }
+        Some(Ok(last)) => last,
     };
     let stuck_on = stuck
         .request

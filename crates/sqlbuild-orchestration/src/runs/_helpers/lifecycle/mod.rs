@@ -15,4 +15,5 @@ pub(in crate::runs) mod reads;
 pub(in crate::runs) mod recall;
 pub(in crate::runs) mod retries;
 pub(in crate::runs) mod run_failure;
+pub(in crate::runs) mod unreadable;
 pub(in crate::runs) mod waits;

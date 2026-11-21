@@ -455,12 +455,13 @@ pub struct SensorEvaluationFact {
     pub outcome: SensorEvaluationOutcome,
 }
 
-/// What the newest tick leaves for the next: resume it, wait until a time, or go ahead.
+/// What the newest tick leaves for the next: resume it, wait until a time, or go ahead; `Recheck` goes ahead because the newest tick no longer decodes.
 #[derive(Debug)]
 pub(crate) enum PreviousTick {
     Resume(Box<SensorEvaluationRequest>),
     Wait(DateTime<Utc>),
     Proceed,
+    Recheck,
 }
 
 #[derive(Debug, Deserialize)]

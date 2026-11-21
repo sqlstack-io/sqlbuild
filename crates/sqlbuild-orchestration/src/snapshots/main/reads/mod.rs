@@ -1,6 +1,7 @@
 pub mod connection_details;
 pub mod current_snapshot;
 pub mod current_snapshot_record;
+pub(crate) mod decode_published_row;
 pub mod list_person_snapshots;
 pub(crate) mod listing_read;
 pub mod node_hashes;

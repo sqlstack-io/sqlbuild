@@ -1,4 +1,4 @@
-//! When a due sensor's next tick may start: resume the one in flight, wait out a failure, or find its event.
+//! When a due sensor's next tick may start: resume the one in flight, wait out a failure, or find its event; a newest tick that no longer decodes counts as none.
 
 use chrono::{DateTime, TimeDelta, Utc};
 
@@ -21,8 +21,10 @@ pub(crate) async fn previous_tick(
     interval: TimeDelta,
 ) -> Result<(ControlTransaction, PreviousTick), ControlError> {
     let (mut transaction, previous) = last_attempt(transaction, sensor.trigger_id).await?;
-    let Some((previous, terminal)) = previous else {
-        return Ok((transaction, PreviousTick::Proceed));
+    let (previous, terminal) = match previous {
+        None => return Ok((transaction, PreviousTick::Proceed)),
+        Some(Err(_)) => return Ok((transaction, PreviousTick::Recheck)),
+        Some(Ok(previous)) => previous,
     };
     if terminal.is_none() {
         if previous.request.epoch == lease.epoch

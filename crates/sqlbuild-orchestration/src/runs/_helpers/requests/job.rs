@@ -16,6 +16,7 @@ pub(crate) async fn frozen_group_children(
     request: &RunRequest,
 ) -> Result<(ControlTransaction, Vec<RunRequest>), ControlError> {
     let (transaction, definitions) = frozen_definitions(transaction, request.snapshot_id).await?;
+    let definitions = definitions?;
     let group = request
         .job_key
         .as_ref()

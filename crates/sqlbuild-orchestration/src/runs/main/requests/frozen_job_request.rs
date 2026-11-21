@@ -17,7 +17,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// Without a planner, a request that narrows the job is refused.
+/// Without a planner, a request that narrows the job is refused; a stored job that no longer decodes fails only this request, as `ControlError::UnreadableSnapshot`.
 pub(crate) async fn frozen_job_request(
     transaction: ControlTransaction,
     (context, planner): (&AuditContext, Option<&dyn CommandPlanner>),
@@ -36,7 +36,11 @@ pub(crate) async fn frozen_job_request(
     let snapshot_id = serde_json::from_value(row["snapshot_id"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let mut definition: JobDefinition = serde_json::from_value(row["definition_json"].clone())
-        .map_err(|error| ControlError::Invalid(error.to_string()))?;
+        .map_err(|error| ControlError::UnreadableSnapshot {
+            snapshot_id,
+            run_id: None,
+            detail: error.to_string(),
+        })?;
     let image_id = serde_json::from_value(row["image_id"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let kind: RunKind = serde_json::from_value(row["kind"].clone())

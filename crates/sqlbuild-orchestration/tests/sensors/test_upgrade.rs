@@ -86,7 +86,8 @@ fn given_a_snapshot_with_an_old_form_sensor_when_the_store_upgrades_then_its_job
                 snapshot.snapshot_id,
             )
             .await
-            .expect("the snapshot decodes");
+            .expect("read the snapshot");
+            let definitions = definitions.expect("the snapshot decodes");
             let (transaction, hidden) = query(
                 transaction,
                 "SELECT removed_in_snapshot_id FROM sqb_triggers WHERE name='health_orders'",

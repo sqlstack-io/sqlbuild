@@ -7,3 +7,7 @@ pub(crate) type SourcePage = (
     ControlTransaction,
     (Vec<(String, serde_json::Value)>, Option<String>),
 );
+
+/// A sensor's newest requested evaluation and its terminal phase (`None` while in flight), or why it no longer decodes.
+pub(crate) type LastAttempt =
+    Result<(crate::sensors::models::SensorEvaluationFact, Option<String>), String>;

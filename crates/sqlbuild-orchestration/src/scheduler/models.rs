@@ -149,3 +149,20 @@ pub struct TickRecord {
     pub covered_by_run_id: Option<Uuid>,
     pub active_run_id: Option<Uuid>,
 }
+
+/// Which due triggers a scheduler drain evaluates.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DueKind {
+    Schedule,
+    Sensor,
+}
+
+impl DueKind {
+    /// The `sqb_triggers.kind` it reads.
+    pub(crate) fn stored(self) -> &'static str {
+        match self {
+            Self::Schedule => "schedule",
+            Self::Sensor => "sensor",
+        }
+    }
+}

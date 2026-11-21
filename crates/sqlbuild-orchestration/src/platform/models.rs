@@ -327,6 +327,9 @@ pub enum PlatformEventKind {
     LocationBroken,
     LaunchFailed,
     RunFailed,
+    TriggerSkipped,
+    SensorRechecked,
+    CalendarTimesDropped,
 }
 
 impl PlatformEventKind {
@@ -340,6 +343,9 @@ impl PlatformEventKind {
             Self::LocationBroken => "location_broken",
             Self::LaunchFailed => "launch_failed",
             Self::RunFailed => "run_failed",
+            Self::TriggerSkipped => "trigger_skipped",
+            Self::SensorRechecked => "sensor_rechecked",
+            Self::CalendarTimesDropped => "calendar_times_dropped",
         }
     }
 }
@@ -386,6 +392,24 @@ pub enum PlatformEvent {
         failed_nodes: Vec<RunNodeFailure>,
         failed_node_count: i64,
     },
+    /// A trigger was skipped because its stored job or pinned snapshot can't be read; it runs again after its location publishes again.
+    TriggerSkipped {
+        trigger_id: Uuid,
+        snapshot_id: Uuid,
+        reason: String,
+    },
+    /// A sensor's last check was recorded by an earlier release in a form that can't be read, so evaluation `evaluation_id` checked it again from scratch; withdrawn once a check completes.
+    SensorRechecked {
+        trigger_id: Uuid,
+        snapshot_id: Uuid,
+        evaluation_id: Uuid,
+    },
+    /// A republish dropped a calendar's pending past-due `times`, because its previous definition, published by an earlier release, can't be read; withdrawn at the trigger's next successful tick.
+    CalendarTimesDropped {
+        trigger_id: Uuid,
+        snapshot_id: Uuid,
+        times: Vec<DateTime<Utc>>,
+    },
 }
 
 impl PlatformEvent {
@@ -399,6 +423,9 @@ impl PlatformEvent {
             Self::LocationBroken { .. } => PlatformEventKind::LocationBroken,
             Self::LaunchFailed { .. } => PlatformEventKind::LaunchFailed,
             Self::RunFailed { .. } => PlatformEventKind::RunFailed,
+            Self::TriggerSkipped { .. } => PlatformEventKind::TriggerSkipped,
+            Self::SensorRechecked { .. } => PlatformEventKind::SensorRechecked,
+            Self::CalendarTimesDropped { .. } => PlatformEventKind::CalendarTimesDropped,
         }
     }
 
@@ -412,6 +439,9 @@ impl PlatformEvent {
             Self::LocationBroken { .. } => "platform_location_broken",
             Self::LaunchFailed { .. } => "platform_launch_failed",
             Self::RunFailed { .. } => "platform_run_failed",
+            Self::TriggerSkipped { .. } => "platform_trigger_skipped",
+            Self::SensorRechecked { .. } => "platform_sensor_rechecked",
+            Self::CalendarTimesDropped { .. } => "platform_calendar_times_dropped",
         }
     }
 }
@@ -490,6 +520,71 @@ pub struct PlatformProblems {
     /// Running calendar schedules whose dates run out within a day.
     #[serde(default)]
     pub low_calendars: Vec<LowCalendar>,
+    /// Triggers skipped because their stored job or pinned snapshot can't be read, until their location publishes again.
+    #[serde(default)]
+    pub skipped_triggers: Vec<SkippedTrigger>,
+    /// Calendars whose pending times a republish dropped, until their next successful tick.
+    #[serde(default)]
+    pub dropped_calendar_times: Vec<DroppedCalendarTimes>,
+    /// Sensors checked again from scratch because their last check can't be read, until a check completes.
+    #[serde(default)]
+    pub rechecked_sensors: Vec<RecheckedSensor>,
+}
+
+/// A calendar whose pending past-due times a republish dropped, because its previous definition can't be read; it clears at its next successful tick.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct DroppedCalendarTimes {
+    pub trigger_id: Uuid,
+    pub name: String,
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    pub dropped_at: DateTime<Utc>,
+    /// The times that were due by the republish but never ticked, oldest first.
+    pub times: Vec<DateTime<Utc>>,
+}
+
+/// The live trigger problems, each list with its own withdrawal.
+#[derive(Debug, Default)]
+pub(crate) struct TriggerProblems {
+    pub(crate) skipped: Vec<SkippedTrigger>,
+    pub(crate) rechecked: Vec<RecheckedSensor>,
+    pub(crate) dropped: Vec<DroppedCalendarTimes>,
+}
+
+/// A sensor whose last check, recorded by an earlier release, can't be read, so it is checked again from scratch; it clears once a check completes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RecheckedSensor {
+    pub trigger_id: Uuid,
+    pub name: String,
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    pub rechecked_at: DateTime<Utc>,
+}
+
+/// A trigger the scheduler skips because its stored job or pinned snapshot can't be read; it clears once its location publishes again.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SkippedTrigger {
+    pub trigger_id: Uuid,
+    pub name: String,
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    /// When it was first skipped for this snapshot.
+    pub skipped_at: DateTime<Utc>,
+    pub reason: String,
+}
+
+/// A live trigger and the snapshot it was published in.
+#[derive(Debug, Deserialize)]
+pub(crate) struct PublishedTrigger {
+    pub(crate) trigger_id: Uuid,
+    pub(crate) name: String,
+    pub(crate) location_id: Uuid,
+    pub(crate) location_name: String,
+    pub(crate) target: String,
+    pub(crate) snapshot_id: Uuid,
 }
 
 /// A running calendar schedule whose last date is at most a day away, or which has none left.
@@ -556,6 +651,9 @@ pub(crate) struct ProblemScan {
     pub(crate) broken: Vec<BrokenLocation>,
     pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
     pub(crate) low_calendars: Vec<LowCalendar>,
+    pub(crate) skipped_triggers: Vec<SkippedTrigger>,
+    pub(crate) rechecked_sensors: Vec<RecheckedSensor>,
+    pub(crate) dropped_calendar_times: Vec<DroppedCalendarTimes>,
 }
 
 /// Where the control store keeps its data.

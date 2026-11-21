@@ -55,3 +55,6 @@ pub const MAX_REPORTED_RULE_FINDINGS: usize = 50;
 pub const MAX_RULE_FINDING_CHARS: usize = 500;
 /// The most rows one page of a plan section returns.
 pub const PLAN_ROWS_LIMIT: usize = 1000;
+
+/// The newest `trigger_skipped` events the live problems read; each trigger counts once.
+pub(crate) const SKIPPED_TRIGGER_EVENTS: i64 = 200;

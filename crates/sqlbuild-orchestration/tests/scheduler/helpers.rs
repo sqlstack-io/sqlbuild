@@ -237,8 +237,7 @@ pub(crate) async fn report_run(
         crate::runs::models::RunOutcome,
     ),
 ) -> Vec<String> {
-    use crate::runs::main::execution::change_run::change_run;
-    use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest};
+    use crate::runs::models::RunChange;
 
     let mut changes = vec![RunChange::Started];
     changes.extend(
@@ -260,6 +259,18 @@ pub(crate) async fn report_run(
         reason: "the worker finished".into(),
         exit_code: Some(1),
     });
+    report_changes(store, claim, changes).await
+}
+
+/// Report `changes` for a claimed run as its worker does; each report's outcome.
+pub(crate) async fn report_changes(
+    store: &ControlStore,
+    claim: &crate::runs::models::RunClaim,
+    changes: Vec<crate::runs::models::RunChange>,
+) -> Vec<String> {
+    use crate::runs::main::execution::change_run::change_run;
+    use crate::runs::models::{RunAuthority, RunChangeRequest};
+
     let mut outcomes = Vec::new();
     for change in changes {
         let reported = change_run(
@@ -279,4 +290,269 @@ pub(crate) async fn report_run(
         outcomes.push(outcome(reported));
     }
     outcomes
+}
+
+/// A control-store result as a test compares it: `ok`, or the error as people read it.
+pub(crate) fn refusal<T>(result: Result<T, ControlError>) -> String {
+    result.map_or_else(|error| error.to_string(), |_| "ok".to_owned())
+}
+
+/// Every run as `job status: reason`, by job then run.
+pub(crate) async fn run_states(store: &ControlStore) -> Vec<String> {
+    crate::runs::tests::helpers::rows(
+        store,
+        "SELECT job_key, status, status_reason FROM sqb_runs ORDER BY job_key, run_id",
+        vec![],
+    )
+    .await
+    .iter()
+    .map(|row| {
+        format!(
+            "{} {}: {}",
+            row["job_key"].as_str().unwrap_or_default(),
+            row["status"].as_str().unwrap_or_default(),
+            row["status_reason"].as_str().unwrap_or_default()
+        )
+    })
+    .collect()
+}
+
+/// The live problems `principal_id` can see.
+pub(crate) async fn problems(
+    store: &ControlStore,
+    principal_id: uuid::Uuid,
+) -> crate::platform::models::PlatformProblems {
+    crate::platform::main::person_reads::read_person_problems::read_person_problems(
+        store,
+        principal_id,
+        crate::credentials::models::DefaultRole::None,
+    )
+    .await
+    .expect("problems")
+}
+
+/// The triggers the live problems list for `principal_id`: skipped ones as `name: reason`, then sensors checked again from scratch by name.
+pub(crate) async fn trigger_problems(
+    store: &ControlStore,
+    principal_id: uuid::Uuid,
+) -> (Vec<String>, Vec<String>) {
+    let problems = problems(store, principal_id).await;
+    (
+        problems
+            .skipped_triggers
+            .into_iter()
+            .map(|trigger| format!("{}: {}", trigger.name, trigger.reason))
+            .collect(),
+        problems
+            .rechecked_sensors
+            .into_iter()
+            .map(|sensor| sensor.name)
+            .collect(),
+    )
+}
+
+/// The triggers the live problems list as skipped for `principal_id`, as `name: reason`.
+pub(crate) async fn skipped_triggers(
+    store: &ControlStore,
+    principal_id: uuid::Uuid,
+) -> Vec<String> {
+    trigger_problems(store, principal_id).await.0
+}
+
+/// The calendars whose dropped times the live problems list for `principal_id`, as `name: time, time`.
+pub(crate) async fn dropped_calendar_times(
+    store: &ControlStore,
+    principal_id: uuid::Uuid,
+) -> Vec<String> {
+    problems(store, principal_id)
+        .await
+        .dropped_calendar_times
+        .into_iter()
+        .map(|calendar| {
+            let times: Vec<String> = calendar
+                .times
+                .iter()
+                .map(|time| time.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
+                .collect();
+            format!("{}: {}", calendar.name, times.join(", "))
+        })
+        .collect()
+}
+
+/// Publish sensor `health_orders` in `location_id`, let it check once, apply `earlier_form`, then make it due again with a new overdue tick to see; the scheduler's state and the sensor.
+pub(crate) async fn sensor_due_again(
+    store: &ControlStore,
+    location_id: uuid::Uuid,
+    earlier_form: &str,
+) -> (crate::scheduler::models::SchedulerState, uuid::Uuid) {
+    let mut input = upgrade_snapshot(
+        location_id,
+        serde_json::json!({"health_orders": {"description": "Refresh orders on overdue ticks",
+            "function": "start_orders", "code_hash": "v1", "timeout_seconds": 60,
+            "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
+            "minimum_interval_seconds": 1}}),
+    );
+    input.generation = 2;
+    crate::snapshots::main::publication::publish_snapshot::publish_snapshot(store, &input)
+        .await
+        .expect("publish");
+    crate::sensors::tests::helpers::append_events(store, 0..1, chrono::Utc::now()).await;
+    let (state, _) = scheduler_cycle(
+        store,
+        crate::scheduler::models::SchedulerState::new(uuid::Uuid::now_v7()),
+    )
+    .await
+    .expect("the sensor's first check");
+    answer_sensor_work(store).await;
+    make_sensors_due(store).await;
+    let (state, _) = scheduler_cycle(store, state)
+        .await
+        .expect("the sensor's first check completes");
+    execute(store, earlier_form).await;
+    tokio::time::sleep(std::time::Duration::from_millis(1_100)).await;
+    crate::sensors::tests::helpers::append_events(store, 6..7, chrono::Utc::now()).await;
+    make_sensors_due(store).await;
+    let trigger_id = serde_json::from_value(
+        crate::runs::tests::helpers::rows(
+            store,
+            "SELECT trigger_id FROM sqb_triggers WHERE kind='sensor'",
+            vec![],
+        )
+        .await[0]["trigger_id"]
+            .clone(),
+    )
+    .expect("sensor ID");
+    (state, trigger_id)
+}
+
+/// Make every sensor due now.
+pub(crate) async fn make_sensors_due(store: &ControlStore) {
+    execute(
+        store,
+        "UPDATE sqb_trigger_state SET next_due_at='2000-01-01T00:00:00Z' \
+         WHERE trigger_id IN (SELECT trigger_id FROM sqb_triggers WHERE kind='sensor')",
+    )
+    .await;
+}
+
+/// Answer each sensor tick still waiting on its location as the stand-in function named in its definition would.
+pub(crate) async fn answer_sensor_work(store: &ControlStore) {
+    let pending = crate::runs::tests::helpers::rows(
+        store,
+        "SELECT request_json FROM sqb_location_work WHERE completed_at IS NULL",
+        vec![],
+    )
+    .await;
+    for row in pending {
+        let request: crate::platform::models::LocationWorkRequest = serde_json::from_value(
+            crate::runs::tests::helpers::json_column(&row["request_json"]),
+        )
+        .expect("location work request");
+        if let crate::platform::models::LocationWork::EvaluateSensor { evaluation } = request.work {
+            crate::sensors::tests::helpers::answer_sensor(
+                store,
+                &evaluation,
+                crate::sensors::tests::helpers::stand_in_outcome(&evaluation),
+            )
+            .await;
+        }
+    }
+}
+
+/// Give `snapshot_id` a `jobs` document in the form an older release published, which no longer decodes.
+pub(crate) async fn store_unreadable_jobs(store: &ControlStore, snapshot_id: uuid::Uuid) {
+    use crate::store::main::{begin::begin, commit::commit, compress::compress, query::query};
+    use crate::store::models::{Parameter, TransactionMode};
+
+    let body = serde_json::json!({"orders": {"description": "Build orders", "selection": ["orders"],
+        "resolved_concurrency": {"limit": 4, "source": "project"}}});
+    let hash = format!("{snapshot_id}-jobs-published-before-0004");
+    let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    let (transaction, _) = query(
+        transaction,
+        "INSERT INTO sqb_documents (document_hash, body) VALUES ($1, $2)",
+        vec![
+            Parameter::Text(hash.clone()),
+            Parameter::Bytes(compress(&serde_json::to_vec(&body).expect("JSON")).expect("gzip")),
+        ],
+    )
+    .await
+    .expect("store the old document");
+    let (transaction, _) = query(
+        transaction,
+        "DELETE FROM sqb_snapshot_documents WHERE snapshot_id=$1 AND kind='jobs'",
+        vec![Parameter::Id(snapshot_id)],
+    )
+    .await
+    .expect("drop the current jobs document");
+    let (transaction, _) = query(
+        transaction,
+        "INSERT INTO sqb_snapshot_documents (snapshot_id, kind, document_hash) VALUES ($1, 'jobs', $2)",
+        vec![Parameter::Id(snapshot_id), Parameter::Text(hash)],
+    )
+    .await
+    .expect("point the snapshot at it");
+    commit(transaction).await.expect("commit");
+}
+
+/// Two jobs, the second waiting for the first, and the group that runs them.
+pub(crate) fn group_snapshot(location: uuid::Uuid) -> crate::snapshots::models::SnapshotInput {
+    let mut input = crate::runs::tests::helpers::snapshot(location);
+    input.nodes.get_mut("orders").expect("orders").definition["deps"] =
+        serde_json::json!(["customers"]);
+    input.documents.insert(
+        "jobs".into(),
+        serde_json::json!({
+            "staging_job": {"description": "Stage customers", "selection": ["customers"],
+                "resolved_concurrency": {"limit": 4}},
+            "marts_job": {"description": "Build orders", "selection": ["orders"],
+                "resolved_concurrency": {"limit": 4}}
+        }),
+    );
+    input.documents.insert(
+        "groups".into(),
+        serde_json::json!({"nightly_job_group": {
+            "description": "Stage then build orders", "selection": ["customers", "orders"],
+            "jobs": {"staging_job": [], "marts_job": ["staging_job"]}
+        }}),
+    );
+    input
+}
+
+/// Execute `sql` against the store as it stands, such as to put a stored row in the form an earlier release wrote it.
+pub(crate) async fn execute(store: &ControlStore, sql: &str) {
+    use crate::store::main::{begin::begin, commit::commit, query::query};
+    use crate::store::models::TransactionMode;
+
+    let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    let (transaction, _) = query(transaction, sql, vec![]).await.expect(sql);
+    commit(transaction).await.expect("commit");
+}
+
+/// A nightly cron schedule of `orders`.
+pub(crate) fn nightly_cron() -> serde_json::Value {
+    serde_json::json!({"nightly_orders": {"description": "Refresh orders nightly", "job_key": "orders",
+        "schedule": {"kind": "cron", "expression": "0 0 * * *", "timezone": "UTC"}}})
+}
+
+/// A calendar schedule of `orders` at `days`, then far in the future.
+pub(crate) fn nightly_calendar(days: &[i64]) -> serde_json::Value {
+    let times: Vec<String> = days
+        .iter()
+        .map(|day| crate::scheduler::tests::contracts::ticks::helpers::calendar_text(*day))
+        .chain(["2030-01-01T00:00:00Z".to_owned()])
+        .collect();
+    serde_json::json!({"nightly_orders": {"description": "Refresh orders on business days", "job_key": "orders",
+        "starts_at": crate::scheduler::tests::contracts::ticks::helpers::calendar_text(0),
+        "schedule": {"kind": "calendar", "times": times, "refresh_at": "2029-01-01T00:00:00Z"}}})
+}
+
+/// The calendar times days 0 to 2 that the republish drops, as the live problems list them.
+pub(crate) fn dropped_days_problem() -> String {
+    format!(
+        "nightly_orders: {}, {}, {}",
+        crate::scheduler::tests::contracts::ticks::helpers::calendar_text(0),
+        crate::scheduler::tests::contracts::ticks::helpers::calendar_text(1),
+        crate::scheduler::tests::contracts::ticks::helpers::calendar_text(2)
+    )
 }

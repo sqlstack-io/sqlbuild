@@ -48,6 +48,11 @@ impl From<ControlError> for ApiError {
                 message: format!("{reason}; decision {decision_id}"),
                 decision_id: Some(decision_id),
             },
+            ControlError::UnreadableSnapshot { .. } => Self {
+                status: StatusCode::CONFLICT,
+                message: error.to_string(),
+                decision_id: None,
+            },
             ControlError::StaleGeneration | ControlError::Fenced => Self {
                 status: StatusCode::CONFLICT,
                 message: error.to_string(),

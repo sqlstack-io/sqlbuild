@@ -2034,6 +2034,20 @@ export interface components {
             /** @enum {string} */
             status: "unavailable";
         };
+        /** @description A calendar whose pending past-due times a republish dropped, because its previous definition can't be read; it clears at its next successful tick. */
+        DroppedCalendarTimes: {
+            /** Format: date-time */
+            dropped_at: string;
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            name: string;
+            target: string;
+            /** @description The times that were due by the republish but never ticked, oldest first. */
+            times: string[];
+            /** Format: uuid */
+            trigger_id: string;
+        };
         ExternalIdentityResponse: {
             csrf_token: string;
             /** Format: date-time */
@@ -2937,21 +2951,52 @@ export interface components {
             run_id: string;
             run_kind: components["schemas"]["RunKind"];
             target: string;
+        } | {
+            /** @enum {string} */
+            kind: "trigger_skipped";
+            reason: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            /** Format: uuid */
+            trigger_id: string;
+        } | {
+            /** Format: uuid */
+            evaluation_id: string;
+            /** @enum {string} */
+            kind: "sensor_rechecked";
+            /** Format: uuid */
+            snapshot_id: string;
+            /** Format: uuid */
+            trigger_id: string;
+        } | {
+            /** @enum {string} */
+            kind: "calendar_times_dropped";
+            /** Format: uuid */
+            snapshot_id: string;
+            times: string[];
+            /** Format: uuid */
+            trigger_id: string;
         };
         /** @enum {string} */
-        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed" | "run_failed";
+        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed" | "run_failed" | "trigger_skipped" | "sensor_rechecked" | "calendar_times_dropped";
         /** @description Problems derived from live state when read; nothing here is stored. */
         PlatformProblems: {
             broken_locations: components["schemas"]["BrokenLocation"][];
+            /** @description Calendars whose pending times a republish dropped, until their next successful tick. */
+            dropped_calendar_times?: components["schemas"]["DroppedCalendarTimes"][];
             /** @description Running calendar schedules whose dates run out within a day. */
             low_calendars?: components["schemas"]["LowCalendar"][];
             overdue_ticks: components["schemas"]["OverdueTick"][];
+            /** @description Sensors checked again from scratch because their last check can't be read, until a check completes. */
+            rechecked_sensors?: components["schemas"]["RecheckedSensor"][];
             scheduler_leader: boolean;
             /**
              * Format: date-time
              * @description When the last scheduler lease ran out, or will run out; absent until a server first leads.
              */
             scheduler_lease_expires_at?: string | null;
+            /** @description Triggers skipped because their stored job or pinned snapshot can't be read, until their location publishes again. */
+            skipped_triggers?: components["schemas"]["SkippedTrigger"][];
         };
         /** @description A job or group asking for more of a pool than this server's cap, so it runs alone in that pool. */
         PoolCapWarning: {
@@ -3184,6 +3229,18 @@ export interface components {
             /** @enum {string} */
             kind: "blob";
             value: number[];
+        };
+        /** @description A sensor whose last check, recorded by an earlier release, can't be read, so it is checked again from scratch; it clears once a check completes. */
+        RecheckedSensor: {
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            name: string;
+            /** Format: date-time */
+            rechecked_at: string;
+            target: string;
+            /** Format: uuid */
+            trigger_id: string;
         };
         /** @description A run a sensor's function asked for; the key defaults to the event ID and the job. */
         RequestedRun: {
@@ -3975,6 +4032,22 @@ export interface components {
             principal_id: string;
             /** Format: uuid */
             session_id: string;
+        };
+        /** @description A trigger the scheduler skips because its stored job or pinned snapshot can't be read; it clears once its location publishes again. */
+        SkippedTrigger: {
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            name: string;
+            reason: string;
+            /**
+             * Format: date-time
+             * @description When it was first skipped for this snapshot.
+             */
+            skipped_at: string;
+            target: string;
+            /** Format: uuid */
+            trigger_id: string;
         };
         /** @description Node-level changes do not duplicate unchanged definitions or source text. */
         SnapshotChange: {
