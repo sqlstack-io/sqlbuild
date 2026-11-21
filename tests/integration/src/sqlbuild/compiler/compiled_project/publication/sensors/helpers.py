@@ -320,11 +320,13 @@ RECORDING_SENSORS: dict[str, str] = {
         "import json, os\nfrom pathlib import Path\n"
         "from sqlbuild.orchestration import CheckEventKind, check_event, sensor\n\n\n"
         "@sensor(description='Record failed and warned checks.',\n"
-        "        when=check_event(select='{select}', kinds=[CheckEventKind.FAILED, CheckEventKind.WARN]),\n"
+        "        when=check_event(select='{select}',\n"
+        "                         kinds=[CheckEventKind.FAILED, CheckEventKind.WARN]),\n"
         "        minimum_interval_seconds=1)\n"
         "def orders_checks_sensor(ctx):\n"
         "    with Path(os.environ['SQLBUILD_SENSOR_CALLS']).open('a') as out:\n"
-        "        out.write(json.dumps({'sensor': 'orders_checks_sensor', 'check': ctx.event.check,\n"
+        "        out.write(json.dumps({'sensor': 'orders_checks_sensor',\n"
+        "                              'check': ctx.event.check,\n"
         "                              'status': str(ctx.event.status)}) + '\\n')\n"
     ),
     "orchestration/sensors/orders_run_sensor.py": (
@@ -335,7 +337,8 @@ RECORDING_SENSORS: dict[str, str] = {
         "        minimum_interval_seconds=1)\n"
         "def orders_run_sensor(ctx):\n"
         "    with Path(os.environ['SQLBUILD_SENSOR_CALLS']).open('a') as out:\n"
-        "        out.write(json.dumps({'sensor': 'orders_run_sensor', 'status': str(ctx.event.status),\n"
+        "        out.write(json.dumps({'sensor': 'orders_run_sensor',\n"
+        "                              'status': str(ctx.event.status),\n"
         "                              'failed_checks': ctx.event.failed_checks,\n"
         "                              'failed_nodes': ctx.event.failed_nodes}) + '\\n')\n"
     ),
