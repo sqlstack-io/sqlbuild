@@ -202,7 +202,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             target: &evaluation.target,
                             evaluation_id: &evaluation_id,
                             event: evaluation.event.as_ref(),
-                            cursor: evaluation.cursor.custom.as_deref(),
+                            cursor: evaluation.function_cursor(),
                             code_hash: Some(&evaluation.definition.code_hash),
                         },
                     );

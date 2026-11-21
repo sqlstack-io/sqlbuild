@@ -417,6 +417,16 @@ pub struct SensorRequests {
     pub skipped: Vec<SkippedRequest>,
 }
 
+impl SensorEvaluationRequest {
+    /// The value the function sees as `ctx.cursor`: a polling sensor's own value; an event sensor's position belongs to the server.
+    pub fn function_cursor(&self) -> Option<&str> {
+        self.cursor
+            .custom
+            .as_deref()
+            .filter(|_| self.event.is_none())
+    }
+}
+
 impl SensorEvaluationOutcome {
     pub(crate) const COMPLETED: &'static str = "completed";
     pub(crate) const ABANDONED: &'static str = "abandoned";

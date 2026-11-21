@@ -304,10 +304,11 @@ CREATE TABLE sqb_sensor_deliveries (
 );
 CREATE TABLE sqb_run_requests (
     trigger_id {uuid} NOT NULL REFERENCES sqb_triggers(trigger_id),
+    job_key TEXT NOT NULL,
     run_key TEXT NOT NULL,
     evaluation_id {uuid} NOT NULL,
     run_id {uuid} NOT NULL REFERENCES sqb_runs(run_id),
-    PRIMARY KEY (trigger_id, run_key)
+    PRIMARY KEY (trigger_id, job_key, run_key)
 );
 CREATE INDEX sqb_runs_terminal_cursor ON sqb_runs(location_id, target, job_key, last_event_storage_id)
 WHERE status IN ('success', 'warn', 'partial', 'failed', 'cancelled', 'skipped');

@@ -125,7 +125,7 @@
 <section>
 	<h3 title="Run requests by run key">Runs · {trigger.runRequests.length}</h3>
 	{#if trigger.runRequests.length}
-		<DataTable class="static compact" embedded columns={requestColumns} rows={trigger.runRequests} key={(r) => r.runKey} empty="No runs requested yet.">
+		<DataTable class="static compact" embedded columns={requestColumns} rows={trigger.runRequests} key={(r) => r.runId} empty="No runs requested yet.">
 			{#snippet row(r)}
 					<tr>
 						<td class="mono">{r.runKey}</td>

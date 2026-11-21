@@ -140,10 +140,10 @@ async fn apply_result(
     ))
 }
 
-/// `runs` without repeated run keys, in the order the function returned them.
+/// `runs` without repeated `(job, run_key)` requests, in the order the function returned them.
 fn distinct(runs: Vec<RequestedRun>) -> Vec<RequestedRun> {
-    let mut seen: BTreeSet<String> = BTreeSet::new();
+    let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
     runs.into_iter()
-        .filter(|run| seen.insert(run.run_key.clone()))
+        .filter(|run| seen.insert((run.job.clone(), run.run_key.clone())))
         .collect()
 }

@@ -53,3 +53,21 @@ CREATE TABLE IF NOT EXISTS sqb_sensor_deliveries (
     event_id TEXT NOT NULL,
     PRIMARY KEY (trigger_id, event_id)
 );
+
+-- A sensor's run key is unique per job it requests, so two jobs can share one.
+CREATE TABLE sqb_run_requests_v2 (
+    trigger_id {uuid} NOT NULL REFERENCES sqb_triggers(trigger_id),
+    job_key TEXT NOT NULL,
+    run_key TEXT NOT NULL,
+    evaluation_id {uuid} NOT NULL,
+    run_id {uuid} NOT NULL REFERENCES sqb_runs(run_id),
+    PRIMARY KEY (trigger_id, job_key, run_key)
+);
+
+INSERT INTO sqb_run_requests_v2 (trigger_id, job_key, run_key, evaluation_id, run_id) SELECT q.trigger_id, COALESCE(r.job_key, ''), q.run_key, q.evaluation_id, q.run_id FROM sqb_run_requests q JOIN sqb_runs r ON r.run_id = q.run_id;
+
+DROP TABLE sqb_run_requests;
+
+ALTER TABLE sqb_run_requests_v2 RENAME TO sqb_run_requests;
+
+CREATE INDEX IF NOT EXISTS sqb_run_requests_run ON sqb_run_requests(run_id);

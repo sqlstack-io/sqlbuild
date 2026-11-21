@@ -46,9 +46,10 @@ pub(crate) async fn queue_sensor_run(
     let (run_key, job_key) = (run.run_key.as_str(), run.job.as_str());
     let (transaction, rows) = query(
         transaction,
-        "SELECT run_id FROM sqb_run_requests WHERE trigger_id=$1 AND run_key=$2",
+        "SELECT run_id FROM sqb_run_requests WHERE trigger_id=$1 AND job_key=$2 AND run_key=$3",
         vec![
             Parameter::Id(evaluation.trigger_id),
+            Parameter::Text(job_key.into()),
             Parameter::Text(run_key.into()),
         ],
     )
@@ -77,7 +78,10 @@ pub(crate) async fn queue_sensor_run(
         });
         return Ok((transaction, requests));
     }
-    let run_id = Uuid::new_v5(&evaluation.trigger_id, run_key.as_bytes());
+    let run_id = Uuid::new_v5(
+        &evaluation.trigger_id,
+        format!("{job_key}\u{0}{run_key}").as_bytes(),
+    );
     let context = AuditContext {
         actor: "system:sensor".into(),
         granting_role: "system:scheduler".into(),
@@ -105,8 +109,8 @@ pub(crate) async fn queue_sensor_run(
     frozen.trigger_id = Some(evaluation.trigger_id);
     let transaction = queue_run(transaction, &frozen).await?;
     let (transaction, _) = query(transaction,
-        "INSERT INTO sqb_run_requests (trigger_id,run_key,evaluation_id,run_id) VALUES ($1,$2,$3,$4)",
-        vec![Parameter::Id(evaluation.trigger_id), Parameter::Text(run_key.into()), Parameter::Id(evaluation.evaluation_id), Parameter::Id(run_id)]).await?;
+        "INSERT INTO sqb_run_requests (trigger_id,job_key,run_key,evaluation_id,run_id) VALUES ($1,$2,$3,$4,$5)",
+        vec![Parameter::Id(evaluation.trigger_id), Parameter::Text(job_key.into()), Parameter::Text(run_key.into()), Parameter::Id(evaluation.evaluation_id), Parameter::Id(run_id)]).await?;
     requests.run_ids.push(run_id);
     Ok((transaction, requests))
 }

@@ -19,3 +19,14 @@ CREATE TABLE IF NOT EXISTS sqb_sensor_deliveries (
     event_id TEXT NOT NULL,
     PRIMARY KEY (trigger_id, event_id)
 );
+
+-- A sensor's run key is unique per job it requests, so two jobs can share one.
+ALTER TABLE sqb_run_requests ADD COLUMN IF NOT EXISTS job_key TEXT;
+
+UPDATE sqb_run_requests q SET job_key = COALESCE(r.job_key, '') FROM sqb_runs r WHERE r.run_id = q.run_id AND q.job_key IS NULL;
+
+ALTER TABLE sqb_run_requests ALTER COLUMN job_key SET NOT NULL;
+
+ALTER TABLE sqb_run_requests DROP CONSTRAINT IF EXISTS sqb_run_requests_pkey;
+
+ALTER TABLE sqb_run_requests ADD PRIMARY KEY (trigger_id, job_key, run_key);

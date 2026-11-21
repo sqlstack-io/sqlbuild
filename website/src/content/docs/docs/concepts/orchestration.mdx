@@ -295,6 +295,9 @@ from `sqlbuild.orchestration`. `RunEventKind` has `SUCCESS`, `WARN`, `PARTIAL`, 
 | `platform_event` | `PlatformEvent` | `id`, `occurred_at`, `event`, `details` |
 | Not set | `None` | None; keep your place between polls in `ctx.cursor` |
 
+`ctx.cursor` is for polling sensors only. A sensor with a `when` condition always sees `None`,
+and a value it assigns is ignored: the server keeps its place in the events.
+
 `url` links to the run in the UI. It is `None` when the scheduler's configuration sets no sign-in
 origin, such as `[server] password_origin`.
 
@@ -305,8 +308,9 @@ origin, such as `[server] password_origin`.
 | `RunRequest(job="...")`, or a list of them | Started, with links to the runs |
 | Nothing: it raises or runs past `timeout_seconds` | Failed, with the traceback |
 
-A `RunRequest` starts its job once per `run_key`. For an event the key defaults to the event's
-`id` and the job, so a repeated delivery starts nothing new. A polling sensor must pass `run_key`:
+A `RunRequest` starts its job once per `run_key`; different jobs can share a key. For an event
+the key defaults to the event's `id` and the job, so a repeated delivery starts nothing new. A
+polling sensor must pass `run_key`:
 
 ```python
 # orchestration/sensors/orders/partner_files_sensor.py

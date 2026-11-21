@@ -71,3 +71,18 @@ pub(crate) enum FailingTick {
     Completed,
     Abandoned(crate::sensors::models::AbandonReason),
 }
+
+pub(crate) struct FunctionCursorTestCase {
+    pub(crate) description: &'static str,
+    /// Whether the tick is called with an event, as source and run sensors are.
+    pub(crate) with_event: bool,
+    pub(crate) expected_cursor: Option<&'static str>,
+}
+
+pub(crate) struct RunKeyTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The `(job, run_key)` requests each tick returns.
+    pub(crate) requests: &'static [(&'static str, &'static str)],
+    pub(crate) expected_runs: usize,
+}
