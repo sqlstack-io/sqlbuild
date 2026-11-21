@@ -5,7 +5,7 @@ import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, isUnsupported, type ApiClient } from './client';
 import { applyNodeStates } from './node-states';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
-import { outputLive, pageQuery, toNodeOutputIndex, toNodeOutputPage, type NodeOutputAt } from './http-output';
+import { outputLive, pageQuery, toNodeLogEvents, toNodeOutputIndex, toNodeOutputPage, type NodeOutputAt } from './http-output';
 import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage, toNodeStates, toNodeStatusDelta } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
@@ -24,7 +24,7 @@ import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape, AutomaticWithdrawal } from './types/build';
-import type { NodeOutputIndex, NodeOutputPage, NodeOutputSearch, RunNode, AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
+import type { NodeOutputIndex, NodeOutputPage, NodeOutputSearch, RunEvent, RunNode, AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 import { newRequestId } from '$lib/browser/request-id';
 
 type Wire = components['schemas'];
@@ -414,12 +414,14 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		},
 		async listRunEvents(scope: Scope, runId: string, query: { after?: number; limit?: number } = {}): Promise<RunEventPage> {
 			const limit = query.limit ?? 1000;
-			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events', {
-				params: { path: runPath(scope, runId), query: { after: query.after, limit } }
-			});
+			// The first page also carries the lines nodes logged with `ctx.log`, which come with the run's output.
+			const [{ data, error, response }, logs] = await Promise.all([
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events', { params: { path: runPath(scope, runId), query: { after: query.after, limit } } }),
+				query.after == null ? nodeLogEvents(scope, runId) : Promise.resolve([])
+			]);
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
-			return { events: data.flatMap((e) => toRunEvent(e, runId) ?? []), nextCursor: data.length === limit ? (data.at(-1)?.storage_id ?? null) : null };
+			return { events: [...data.flatMap((e) => toRunEvent(e, runId) ?? []), ...logs], nextCursor: data.length === limit ? (data.at(-1)?.storage_id ?? null) : null };
 		},
 		async listRunStatements(scope: Scope, runId: string): Promise<RunStatement[]> {
 			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements', { params: { path: runPath(scope, runId) } });
@@ -1326,6 +1328,14 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		const found = await findRun(scope, runId);
 		if (!found) throw new ApiError('The run is not in the recent runs of this location', 404);
 		return found.run;
+	}
+
+	/** The run's `ctx.log` lines as events; none where its output may not be read or the server keeps none. */
+	async function nodeLogEvents(scope: Scope, runId: string): Promise<RunEvent[]> {
+		if (!evidenceLocations.has(scope.locationId)) return [];
+		const { data, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index', { params: { path: runPath(scope, runId) } });
+		if (response.status === 401) onUnauthorized();
+		return data ? toNodeLogEvents(data, runId) : [];
 	}
 
 	async function runNodes(scope: Scope, runId: string) {

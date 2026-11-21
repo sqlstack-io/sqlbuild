@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { outputLive, pageQuery, toNodeOutputIndex, toNodeOutputPage } from './http-output';
+import { outputLive, pageQuery, toNodeLogEvents, toNodeOutputIndex, toNodeOutputPage } from './http-output';
 
 type W = components['schemas'];
 
@@ -64,5 +64,24 @@ describe('node output mapping', () => {
 			{ nodeKey: 'model:customers', status: 'success' as const }
 		];
 		expect([outputLive(nodes, 'model:orders'), outputLive(nodes, 'model:customers'), outputLive(nodes, 'run'), outputLive(nodes.slice(1), 'run')]).toEqual([true, false, true, false]);
+	});
+
+	it('turns the lines nodes logged with ctx.log into the run’s events, at their level', () => {
+		const index: W['RunOutputIndex'] = {
+			nodes: [],
+			line_count: 0,
+			omitted_bytes: 0,
+			omitted_lines: 0,
+			dropped_bytes: 0,
+			marks: [],
+			logs: [
+				{ node_key: 'asset:score_customers', level: 'info', message: 'scored 120 customers', logged_at: '2026-11-21T09:00:00Z' },
+				{ node_key: 'asset:score_customers', level: 'warning', message: '3 customers had no orders', logged_at: '2026-11-21T09:00:01Z' }
+			]
+		};
+		expect(toNodeLogEvents(index, 'run-1').map((e) => [e.type, e.nodeKey, e.level, e.message, e.occurredAt])).toEqual([
+			['node_log', 'asset:score_customers', 'info', 'scored 120 customers', '2026-11-21T09:00:00Z'],
+			['node_log', 'asset:score_customers', 'warn', '3 customers had no orders', '2026-11-21T09:00:01Z']
+		]);
 	});
 });

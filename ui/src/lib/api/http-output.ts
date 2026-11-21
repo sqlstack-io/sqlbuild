@@ -1,5 +1,5 @@
 import type { components } from '$control/schema.d.ts';
-import type { NodeOutputIndex, NodeOutputLevel, NodeOutputLine, NodeOutputPage, NodeOutputRow, RunNode } from './types/operate';
+import type { NodeOutputIndex, NodeOutputLevel, NodeOutputLine, NodeOutputPage, NodeOutputRow, RunEvent, RunNode } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -52,4 +52,22 @@ export function toNodeOutputIndex(wire: Wire['RunOutputIndex'], nodeKey: string,
 export function outputLive(nodes: readonly Pick<RunNode, 'nodeKey' | 'status'>[], nodeKey: string): boolean {
 	const running = (n: Pick<RunNode, 'status'>) => n.status === 'running' || n.status === 'pending';
 	return nodeKey === 'run' ? nodes.some(running) : nodes.some((n) => n.nodeKey === nodeKey && running(n));
+}
+
+/** The lines a run's nodes logged with `ctx.log`, as events of the run; they come with its output, which needs `view.evidence`. */
+export function toNodeLogEvents(wire: Wire['RunOutputIndex'], runId: string): RunEvent[] {
+	return wire.logs.map((log, i) => ({
+		id: `${runId}-log-${i + 1}`,
+		storageId: 0,
+		runId,
+		producer: 'sqb',
+		type: 'node_log',
+		occurredAt: log.logged_at,
+		level: log.level === 'error' ? 'error' : log.level === 'warning' ? 'warn' : 'info',
+		invocationId: null,
+		nodeKey: log.node_key,
+		statementId: null,
+		attempt: null,
+		message: log.message
+	}));
 }
