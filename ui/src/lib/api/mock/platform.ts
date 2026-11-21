@@ -1011,9 +1011,9 @@ export class MockPlatformApi implements PlatformApi {
 		this.#require('user.manage');
 		const account = this.#serviceAccount(name);
 		const key = account.keys.find((k) => k.id === keyId);
-		if (!key?.expiresAt) throw new ApiError('Only an old key still in its overlap can be stopped; rotate to replace the current key', 409);
+		if (!key) throw new ApiError(`${name} has no working key ${keyId}`, 404);
 		account.keys = account.keys.filter((k) => k.id !== keyId);
-		this.#audit('service_account.key_revoked', { locationId: null, subject: name }, `Stopped ${name}'s old key ${key.prefix}… before its overlap ended`, key.prefix, null);
+		this.#audit('service_account.key_revoked', { locationId: null, subject: name }, `Stopped ${name}'s key ${key.prefix}…`, key.prefix, null);
 		return this.#ctx.reply(structuredClone(account));
 	}
 

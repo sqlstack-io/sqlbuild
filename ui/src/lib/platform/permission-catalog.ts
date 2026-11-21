@@ -99,7 +99,7 @@ const AUDIT_ONLY: Record<string, string> = {
 	'principal.enabled': 'Enabled person',
 	'service_account.created': 'Added service account',
 	'service_account.key_rotated': 'Rotated service account key',
-	'service_account.key_revoked': 'Stopped old service account key',
+	'service_account.key_revoked': 'Stopped service account key',
 	'service_account.disabled': 'Disabled service account',
 	'service_account.enabled': 'Enabled service account',
 	'service_account.role_changed': 'Changed service account role',

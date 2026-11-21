@@ -1,10 +1,9 @@
 import { untrack } from "svelte";
-import type { IssuedToken, ServiceAccount } from "$lib/api";
+import type { ServiceAccount } from "$lib/api";
 import { app } from "$lib/state/app.svelte";
 import { createResource } from "$lib/state/resource.svelte";
-import type { IssuedKey } from "./types";
 
-/** The Service accounts tab: the list, the open panel, and a key just issued. Create during component initialisation. */
+/** The Service accounts tab: the list and the open panel. Create during component initialisation. */
 export function createServiceAccountsState(open: () => string | null) {
   // Only read where the server has them and the person may see them; the page shows why not otherwise.
   const list = createResource((client) =>
@@ -16,8 +15,6 @@ export function createServiceAccountsState(open: () => string | null) {
   /** The service account whose panel is open, first from `&open=<name>`. */
   let selected = $state<string | null>(untrack(open));
   let adding = $state(false);
-  /** Shown once in the panel; gone when the panel closes or another opens. */
-  let issued = $state<IssuedKey | null>(null);
 
   const accounts = $derived(list.data ?? []);
   const selectedAccount = $derived(
@@ -38,40 +35,20 @@ export function createServiceAccountsState(open: () => string | null) {
     get adding() {
       return adding;
     },
-    get issued() {
-      return issued;
+    /** Open a service account's panel, or close it when it is already open, as rows do on People. */
+    toggle(name: string) {
+      selected = selected === name ? null : name;
     },
-    pick(name: string) {
-      adding = false;
-      if (name !== selected) issued = null;
+    open(name: string) {
       selected = name;
-    },
-    startAdding() {
-      selected = null;
-      issued = null;
-      adding = true;
     },
     close() {
       selected = null;
-      adding = false;
-      issued = null;
     },
-    /** After add or rotate: open its panel with the new key showing. */
-    showIssued(
-      result: IssuedToken<ServiceAccount>,
-      reason: IssuedKey["reason"],
-    ) {
-      adding = false;
-      selected = result.token.name;
-      issued = { name: result.token.name, secret: result.secret, reason };
-      list.refresh();
-    },
-    dismissIssued() {
-      issued = null;
+    setAdding(value: boolean) {
+      adding = value;
     },
   };
 }
 
-export type ServiceAccountsState = ReturnType<
-  typeof createServiceAccountsState
->;
+export type ServiceAccountsState = ReturnType<typeof createServiceAccountsState>;

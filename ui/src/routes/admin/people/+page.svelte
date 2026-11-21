@@ -67,7 +67,12 @@
 	function open(e: MouseEvent, a: Account) {
 		if ((e.target as Element).closest('a, button, input, select, label, [data-control]')) return;
 		if (e.metaKey || e.ctrlKey || e.button === 1) openRow(e, personHref(a));
-		else pick(a.name);
+		else toggle(a.name);
+	}
+	/** A click on the open person's row closes their panel, as on Service accounts. */
+	function toggle(name: string) {
+		if (selected === name && !adding) selected = null;
+		else pick(name);
 	}
 	/** Open a person's panel in place of whatever panel is open. */
 	function pick(name: string) {
@@ -136,7 +141,7 @@
 							<div class="cell-name">
 								<UserIcon size={15} strokeWidth={1.75} />
 								<div class="min-w-0">
-									<Button variant="link" size="inline" class="name" onclick={() => pick(a.name)}>{a.displayName}</Button>
+									<Button variant="link" size="inline" class="name" onclick={() => toggle(a.name)}>{a.displayName}</Button>
 									<div class="cell-desc"><code>{a.name}</code> · {a.source === 'oidc' ? 'SSO' : a.source ? accountSourceLabel[a.source] : 'no password'}</div>
 								</div>
 							</div>

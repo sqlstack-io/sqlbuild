@@ -85,7 +85,7 @@ export interface PlatformApi {
 	createServiceAccount(request: NewServiceAccount): Promise<IssuedToken<ServiceAccount>>;
 	/** Issues a new key, returned only this once; the old key works on for the overlap, if any. `user.manage` */
 	rotateServiceAccountKey(name: string, rotation: KeyRotation): Promise<IssuedToken<ServiceAccount>>;
-	/** Stops a key still working in a rotation overlap now. `user.manage` */
+	/** Stops one of the account's keys now, such as an old key before its overlap ends. `user.manage` */
 	revokeServiceAccountKey(name: string, keyId: string): Promise<ServiceAccount>;
 	/** Disabling stops every key of the account at once; enabling lets the same keys work again. `user.manage` */
 	setServiceAccountDisabled(name: string, disabled: boolean): Promise<ServiceAccount>;
