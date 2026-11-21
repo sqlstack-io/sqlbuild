@@ -13,6 +13,7 @@ from sqlbuild.orchestration_declarations.types import (
     NodeEventKind,
     PlatformEventKind,
     RunEventKind,
+    SensorResult,
 )
 
 
@@ -120,7 +121,9 @@ class Sensor:
         object.__setattr__(self, "_declared_at", declaration_site())
 
     def __call__(self, function: Callable[..., SensorResult]) -> Sensor:
-        return replace(self, function=function, name=self.name or function.__name__)
+        return replace(
+            self, function=function, name=self.name or getattr(function, "__name__", None)
+        )
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -136,6 +139,3 @@ class SkipReason:
     """Handle the event, or this poll, without starting a run, and say why."""
 
     reason: str
-
-
-type SensorResult = RunRequest | Iterable[RunRequest] | SkipReason | None

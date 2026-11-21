@@ -17,3 +17,15 @@ pub(crate) const FAILING_TICKS_READ: usize = 200;
 pub(crate) const MAX_TRIAL_EVENTS: usize = 100;
 /// The runtime request key of `sqb sensor try`: `{"try_sensor": SensorTrial}`.
 pub const TRY_SENSOR_REQUEST: &str = "try_sensor";
+/// A tick the location hasn't answered yet, as people see it.
+pub(crate) const TICK_RUNNING: &str = "running";
+/// A tick whose function returned `None`.
+pub(crate) const TICK_HANDLED: &str = "handled";
+/// A tick whose function returned a `SkipReason`.
+pub(crate) const TICK_SKIPPED: &str = "skipped";
+/// A tick whose function asked for runs.
+pub(crate) const TICK_STARTED: &str = "started";
+/// The rows `node_event` reads: started nodes and checks of job runs, not of group runs.
+pub(crate) const NODE_EVENT_ROWS: &str = " AND n.started_at IS NOT NULL AND r.kind<>'group'";
+/// The rows `check_event` reads: checks, audits and SQL tests of any run.
+pub(crate) const CHECK_EVENT_ROWS: &str = " AND n.kind='check'";

@@ -1472,7 +1472,10 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     "timeout_seconds": 15,
                     "minimum_interval_seconds": 30,
                     "default_status": "running",
-                    "declared_at": {"path": "orchestration/sensors/orders_named_sensor.py", "line": 2},
+                    "declared_at": {
+                        "path": "orchestration/sensors/orders_named_sensor.py",
+                        "line": 2,
+                    },
                 }
             },
         ),

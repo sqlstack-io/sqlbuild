@@ -34,7 +34,6 @@ pub(crate) async fn run_control(
     let config = read_server_config(namespace)?;
     let address = control_address(namespace, standalone, &config.server)?;
     let (authentication, mut facts) = control_api_settings(namespace, standalone, &config)?;
-    let origin: Option<String> = authentication.login.origin().map(str::to_owned);
     let store = open_control_store(namespace, Some(&config.server)).await?;
     let (workers, handoff) = open_control_workers(
         (&store, namespace),
@@ -79,7 +78,7 @@ pub(crate) async fn run_control(
         )?;
     }
     if facts.scheduler {
-        start_scheduler(&mut tasks, (store, origin), shutdown, workers);
+        start_scheduler(&mut tasks, (store, facts.origin.clone()), shutdown, workers);
     }
     supervise_control_roles(tasks, stop).await
 }

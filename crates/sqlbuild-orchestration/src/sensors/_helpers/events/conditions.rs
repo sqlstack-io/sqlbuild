@@ -1,9 +1,9 @@
 //! Each condition reads its matching events a bounded page at a time, forward for ticks or back for a person's look.
 
-use crate::sensors::_helpers::nodes::{scan_check_events, scan_node_events};
-use crate::sensors::_helpers::platform::scan_platform_events;
-use crate::sensors::_helpers::runs::scan_run_events;
-use crate::sensors::_helpers::sources::{next_source_event, recent_source_events};
+use crate::sensors::_helpers::events::nodes::{scan_check_events, scan_node_events};
+use crate::sensors::_helpers::events::platform::scan_platform_events;
+use crate::sensors::_helpers::events::runs::scan_run_events;
+use crate::sensors::_helpers::events::sources::{next_source_event, recent_source_events};
 use crate::sensors::constants::RECENT_EVENT_PAGES;
 use crate::sensors::models::{
     Direction, EventScope, NextEvent, Scanned, SensorCondition, SensorCursor, SensorEvent,

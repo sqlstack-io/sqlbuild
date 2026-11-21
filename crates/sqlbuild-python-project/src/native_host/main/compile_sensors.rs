@@ -2,6 +2,7 @@
 
 use crate::graph::models::ProjectSelection;
 use crate::native_host::_helpers::orchestration_triggers::sensor_nodes;
+use crate::native_host::constants::PYTHON_CHECK_KIND;
 use crate::project_snapshot::main::attached_nodes::attached_nodes;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{PyAnyMethods, PyResult, Python};
@@ -20,9 +21,6 @@ use sqlbuild_python_base::orchestration_reads::main::orchestration_code_hash::or
 use sqlbuild_python_base::orchestration_reads::models::{AuthoredSensor, AuthoredSensorCondition};
 use std::collections::BTreeSet;
 use std::path::Path;
-
-/// The snapshot kind of a Python check node.
-const PYTHON_CHECK_KIND: &str = "check";
 
 /// The published definition of each decorated sensor the target publishes, keyed by name.
 pub fn compile_sensors(

@@ -8,22 +8,15 @@ use uuid::Uuid;
 use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::authorization::main::decisions::person_holds_target::person_holds_target;
 use crate::credentials::models::{Action, AuditContext, DefaultRole};
-use crate::sensors::_helpers::facts::definition_fingerprint;
-use crate::sensors::_helpers::failing::sensor_failing;
+use crate::sensors::_helpers::ticks::facts::definition_fingerprint;
+use crate::sensors::main::sensor_failing::sensor_failing;
 use crate::sensors::models::{
     PersonSensorCursor, PersonSensorEvaluation, PersonSensorRunRequest, PersonSensorState,
     SensorCursor, SensorEvaluationOutcome, SensorEvent, StoredEvaluationEvent, StoredRunRequest,
     StoredSensor,
 };
 
-/// A tick the location hasn't answered yet.
-const RUNNING: &str = "running";
-/// A tick whose function returned `None`.
-const HANDLED: &str = "handled";
-/// A tick whose function returned a `SkipReason`.
-const SKIPPED: &str = "skipped";
-/// A tick whose function asked for runs.
-const STARTED: &str = "started";
+use crate::sensors::constants::{TICK_HANDLED, TICK_RUNNING, TICK_SKIPPED, TICK_STARTED};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query_records::query_records};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
@@ -125,7 +118,7 @@ async fn evaluations(
             .or_insert_with(|| PersonSensorEvaluation {
                 evaluation_id: request.evaluation_id,
                 phase: SensorEvaluationOutcome::Requested.phase().into(),
-                outcome: RUNNING.into(),
+                outcome: TICK_RUNNING.into(),
                 requested_at: request.requested_at,
                 finished_at: None,
                 cursor_before: shown_cursor(&request.cursor, evidence),
@@ -155,11 +148,11 @@ async fn evaluations(
             } => {
                 check.cursor_after = Some(shown_cursor(&cursor, evidence));
                 check.outcome = if !run_ids.is_empty() || !skipped.is_empty() {
-                    STARTED
+                    TICK_STARTED
                 } else if skip_reason.is_some() {
-                    SKIPPED
+                    TICK_SKIPPED
                 } else {
-                    HANDLED
+                    TICK_HANDLED
                 }
                 .into();
                 check.run_ids = run_ids;

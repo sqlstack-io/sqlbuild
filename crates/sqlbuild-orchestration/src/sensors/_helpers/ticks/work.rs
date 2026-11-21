@@ -7,7 +7,7 @@ use serde_json::json;
 
 use crate::platform::main::work::read_location_work::read_location_work;
 use crate::platform::models::{LocationWork, LocationWorkOutcome, LocationWorkRequest};
-use crate::sensors::_helpers::requests::{queue_sensor_run, unknown_job};
+use crate::sensors::_helpers::ticks::requests::{queue_sensor_run, unknown_job};
 use crate::sensors::constants::SENSOR_WORK_GRACE_SECONDS;
 use crate::sensors::models::{
     RequestedRun, SensorEvaluationOutcome, SensorEvaluationRequest, SensorFunctionOutcome,

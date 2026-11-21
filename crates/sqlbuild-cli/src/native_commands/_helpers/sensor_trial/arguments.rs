@@ -21,11 +21,10 @@ pub(crate) fn trial_arguments(namespace: &Namespace) -> Result<SensorTrialArgume
     let target = effective_target(&project_dir, text(namespace, "target"))?
         .ok_or("the project names no default target; pass --target")?;
     let limit: u32 = match namespace.get("sensor_limit") {
-        Some(Value::Int(limit)) => limit
-            .parse()
-            .ok()
-            .filter(|limit| *limit > 0)
-            .ok_or("--limit must be a positive whole number")?,
+        Some(Value::Int(limit)) => match limit.parse::<u32>() {
+            Ok(limit) if limit > 0 => limit,
+            _ => return Err("--limit must be a positive whole number".into()),
+        },
         _ => 10,
     };
     let choice = if flag(namespace, "sensor_latest") {

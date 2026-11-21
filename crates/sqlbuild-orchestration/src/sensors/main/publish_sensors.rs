@@ -3,7 +3,7 @@
 use serde_json::json;
 
 use crate::declarations::models::Definitions;
-use crate::sensors::main::read_sensor_events::sensor_trigger_id;
+use crate::sensors::_helpers::events::trial::sensor_trigger_id;
 use crate::snapshots::models::SnapshotRecord;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;

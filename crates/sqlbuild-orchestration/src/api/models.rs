@@ -635,6 +635,8 @@ pub struct ServerFacts {
     pub pool_caps: crate::declarations::models::ServerPoolCaps,
     /// How long an acknowledged attention condition stays hidden while unchanged.
     pub attention_snooze: crate::acknowledgements::models::AttentionSnooze,
+    /// The address people reach the server at, which sensor events link runs under; `None` without a sign-in origin.
+    pub origin: Option<String>,
 }
 
 /// The server's version, storage, sign-in and retention, for administrators.

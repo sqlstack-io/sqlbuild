@@ -325,9 +325,12 @@ pub(crate) fn control_api_settings(
         )?
         .unwrap_or(defaults.count()),
     )?;
+    let authentication = control_authentication(namespace, config)?;
+    let origin = authentication.login.origin().map(str::to_owned);
     Ok((
-        control_authentication(namespace, config)?,
+        authentication,
         ServerFacts {
+            origin,
             version: env!("CARGO_PKG_VERSION").into(),
             scheduler: scheduler_enabled(namespace, standalone, &config.server),
             audit,

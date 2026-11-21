@@ -1,6 +1,6 @@
 //! Source conditions read the latest warehouse observation of each selected source, a page at a time.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU32;
 
 use chrono::{DateTime, NaiveDateTime, TimeDelta, Utc};
@@ -131,24 +131,13 @@ async fn new_data_event(
         other = predicate.replace("record_json", "other.record_json"),
         latest = predicate.replace("record_json", "latest.record_json"),
     ), parameters).await?;
-    let Some(row) = rows.first() else {
+    let Some((record, row)) = latest_record(&rows)? else {
         return Ok((transaction, None));
     };
-    let record: WarehouseFreshnessRecord = serde_json::from_value(row["record_json"].clone())
-        .map_err(|error| ControlError::Invalid(error.to_string()))?;
-    let identity = serde_json::to_vec(&(
-        key,
-        &record.target_database,
-        &record.target_schema,
-        &record.target_name,
-        &record.data_version_hash,
-        &row["streak_start"],
-    ))
-    .map_err(|error| ControlError::Invalid(error.to_string()))?;
     Ok((
         transaction,
         Some(SensorEvent::SourceNewData {
-            id: format!("source:{}", sha256_hex(&identity)),
+            id: version_id(("source", key), &record, &row["streak_start"])?,
             occurred_at: record.observed_at,
             source: key.into(),
             data_version: record.data_version,
@@ -169,27 +158,16 @@ async fn stale_event(
         "SELECT record_json FROM sqb_warehouse_freshness WHERE location_id=$1 AND target=$2 \
          AND record_json ->> 'source_name'=$3{predicate} ORDER BY observed_at DESC,event_id DESC LIMIT 1"
     ), parameters).await?;
-    let Some(row) = rows.first() else {
+    let Some((record, _)) = latest_record(&rows)? else {
         return Ok((transaction, None));
     };
-    let record: WarehouseFreshnessRecord = serde_json::from_value(row["record_json"].clone())
-        .map_err(|error| ControlError::Invalid(error.to_string()))?;
     if !stale_version(&record, transaction.now, after_seconds)? {
         return Ok((transaction, None));
     }
-    let identity = serde_json::to_vec(&(
-        key,
-        &record.target_database,
-        &record.target_schema,
-        &record.target_name,
-        &record.data_version_hash,
-        after_seconds,
-    ))
-    .map_err(|error| ControlError::Invalid(error.to_string()))?;
     Ok((
         transaction,
         Some(SensorEvent::SourceStale {
-            id: format!("stale:{}", sha256_hex(&identity)),
+            id: version_id(("stale", key), &record, after_seconds)?,
             occurred_at: record.observed_at,
             source: key.into(),
             data_version: record.data_version,
@@ -197,6 +175,43 @@ async fn stale_event(
             target: scope.target.into(),
         }),
     ))
+}
+
+/// The newest freshness record among `rows`, with its row.
+fn latest_record(
+    rows: &[BTreeMap<String, serde_json::Value>],
+) -> Result<
+    Option<(
+        WarehouseFreshnessRecord,
+        &BTreeMap<String, serde_json::Value>,
+    )>,
+    ControlError,
+> {
+    rows.first()
+        .map(|row| {
+            serde_json::from_value(row["record_json"].clone())
+                .map(|record| (record, row))
+                .map_err(|error| ControlError::Invalid(error.to_string()))
+        })
+        .transpose()
+}
+
+/// A source event's stable ID: `kind`, then a digest of the source, its relation, its version and `also`.
+fn version_id(
+    (kind, key): (&str, &str),
+    record: &WarehouseFreshnessRecord,
+    also: impl serde::Serialize,
+) -> Result<String, ControlError> {
+    let identity = serde_json::to_vec(&(
+        key,
+        &record.target_database,
+        &record.target_schema,
+        &record.target_name,
+        &record.data_version_hash,
+        also,
+    ))
+    .map_err(|error| ControlError::Invalid(error.to_string()))?;
+    Ok(format!("{kind}:{}", sha256_hex(&identity)))
 }
 
 /// Whether the sensor already handled the source event `id`; source events have no storage order to pass.

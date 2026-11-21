@@ -28,6 +28,9 @@ use crate::store::models::{ControlEvent, ControlStore, Parameter, TransactionMod
 
 use crate::runs::tests::helpers::snapshot as base_snapshot;
 
+/// Ticks a drain runs: more than any test has events, so each is delivered and the cursor reaches the end.
+const DRAIN_TICKS: usize = 160;
+
 pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
     let mut input = base_snapshot(location_id);
     input.documents.insert(
@@ -411,42 +414,29 @@ pub(crate) async fn complete_starting_job(
     complete_sensor(store, lease, evaluation).await
 }
 
-/// Run the sensor's ticks until it has handled every event it can see, each by its stand-in function: the runs they started.
+/// Run `DRAIN_TICKS` of the sensor's ticks, each event by its stand-in function: the runs they started.
 pub(crate) async fn drain_sensor(
     store: &ControlStore,
     lease: &SchedulerLease,
     trigger_id: Uuid,
 ) -> usize {
     let mut started = 0;
-    let mut seen: Vec<crate::sensors::models::SensorCursor> = Vec::new();
-    loop {
-        match crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation(
+    for _ in 0..DRAIN_TICKS {
+        let requested = crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation(
             store,
             lease,
             (trigger_id, None),
         )
         .await
-        .expect("begin tick")
-        {
-            Some(requested) => {
-                started += complete_starting_job(store, lease, &requested)
+        .expect("begin tick");
+        started +=
+            futures_util::future::OptionFuture::from(requested.map(|requested| async move {
+                complete_starting_job(store, lease, &requested)
                     .await
-                    .expect("complete tick");
-            }
-            None => {
-                let (transaction, cursor) =
-                    crate::sensors::main::read_sensor_cursor::read_sensor_cursor(
-                        begin(store, TransactionMode::Read).await.expect("read"),
-                        trigger_id,
-                    )
-                    .await
-                    .expect("cursor");
-                commit(transaction).await.expect("commit");
-                if seen.contains(&cursor) {
-                    return started;
-                }
-                seen.push(cursor);
-            }
-        }
+                    .expect("complete tick")
+            }))
+            .await
+            .unwrap_or_default();
     }
+    started
 }

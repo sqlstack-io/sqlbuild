@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::runs::constants::SUPERSEDED_CHILD;
 use crate::runs::models::RunOutcome;
-use crate::sensors::_helpers::conditions::{page_clause, run_url};
+use crate::sensors::_helpers::events::conditions::{page_clause, run_url};
 use crate::sensors::constants::{EVENT_PAGE_SIZE, EXECUTION_NODE_BATCH_SIZE};
 use crate::sensors::models::{
     Direction, EventScope, RunEventKind, Scanned, SensorEvent, TerminalSensorRun,
@@ -160,9 +160,11 @@ async fn run_event(
         .and_then(|row| row["status_reason"].as_str())
         .filter(|_| run.status != RunOutcome::Success)
         .map(str::to_owned);
-    let occurred_at = reason
-        .and_then(|row| serde_json::from_value(row["occurred_at"].clone()).ok())
-        .unwrap_or(transaction.now);
+    let occurred_at = match reason {
+        Some(row) => serde_json::from_value(row["occurred_at"].clone())
+            .map_err(|error| ControlError::Invalid(format!("run end time: {error}")))?,
+        None => transaction.now,
+    };
     let (transaction, rows) = query(
         transaction,
         "SELECT DISTINCT n.node_key, n.kind FROM sqb_run_nodes n WHERE n.status='failed' \

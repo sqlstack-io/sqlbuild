@@ -2,19 +2,20 @@
 
 use std::collections::BTreeMap;
 
-use ruff_python_ast::{Expr, ExprCall, StmtFunctionDef};
+use ruff_python_ast::{Expr, ExprCall, Stmt, StmtFunctionDef};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::cpython_tree::main::walk_breadth_first::walk_breadth_first;
 use crate::cpython_tree::models::{CpythonNode, ParsedSource, SourceLines};
 use crate::orchestration_modules::_helpers::calls::{
-    authoring_call, literal, literal_strings, module_names, position,
+    authoring_call, authoring_name, literal, literal_strings, module_names, position,
 };
 use crate::orchestration_modules::_helpers::conditions::{
     condition_source, module_assignments, module_imports,
 };
 use crate::orchestration_modules::constants::{
-    JOB_KEYWORD, NAME_KEYWORD, RUN_EVENT_CALL, RUN_REQUEST_CALL, TARGETS_KEYWORD, WHEN_KEYWORD,
+    JOB_KEYWORD, NAME_KEYWORD, RUN_EVENT_CALL, RUN_REQUEST_CALL, SENSOR_CALL, TARGETS_KEYWORD,
+    WHEN_KEYWORD,
 };
 use crate::orchestration_modules::models::{
     ConditionSource, LiteralArgument, ModuleScope, PythonDeclaration, PythonDeclarationKind,
@@ -94,12 +95,40 @@ pub(crate) fn call_declaration<'a>(
     }
 }
 
+/// Each decorator call's function by where the call starts, and the bare `@sensor` decorators, which declare nothing.
+pub(crate) fn decorated_functions<'a>(
+    nodes: &[CpythonNode<'a>],
+    scope: &ModuleScope<'a>,
+) -> (
+    BTreeMap<TextSize, &'a StmtFunctionDef>,
+    Vec<PythonDeclaration>,
+) {
+    let mut decorated: BTreeMap<TextSize, &'a StmtFunctionDef> = BTreeMap::new();
+    let mut bare: Vec<PythonDeclaration> = Vec::new();
+    for node in nodes {
+        let CpythonNode::Stmt(Stmt::FunctionDef(function)) = node else {
+            continue;
+        };
+        for decorator in &function.decorator_list {
+            match &decorator.expression {
+                Expr::Call(call) => {
+                    decorated.insert(call.range().start(), function);
+                }
+                expression
+                    if authoring_name(expression, (&scope.imported, &scope.modules))
+                        == Some(SENSOR_CALL) =>
+                {
+                    bare.push(bare_sensor(expression, function, scope.lines));
+                }
+                _ => {}
+            }
+        }
+    }
+    (decorated, bare)
+}
+
 /// A bare `@sensor` decorator, which declares nothing until it is called with its arguments.
-pub(crate) fn bare_sensor(
-    at: &Expr,
-    function: &StmtFunctionDef,
-    lines: &SourceLines,
-) -> PythonDeclaration {
+fn bare_sensor(at: &Expr, function: &StmtFunctionDef, lines: &SourceLines) -> PythonDeclaration {
     PythonDeclaration {
         kind: PythonDeclarationKind::Sensor,
         name: Some(LiteralArgument {

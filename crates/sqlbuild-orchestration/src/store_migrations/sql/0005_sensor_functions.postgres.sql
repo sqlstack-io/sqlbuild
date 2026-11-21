@@ -17,7 +17,5 @@ CREATE INDEX IF NOT EXISTS sqb_sensor_evaluation_subject ON sqb_sensor_evaluatio
 CREATE TABLE IF NOT EXISTS sqb_sensor_deliveries (
     trigger_id {uuid} NOT NULL REFERENCES sqb_triggers(trigger_id),
     event_id TEXT NOT NULL,
-    evaluation_id {uuid} NOT NULL,
-    delivered_at {time} NOT NULL,
     PRIMARY KEY (trigger_id, event_id)
 );

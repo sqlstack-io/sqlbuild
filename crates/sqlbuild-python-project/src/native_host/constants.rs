@@ -17,3 +17,6 @@ pub(crate) const MAX_RUN_RECORD_CONNECTIONS: usize = 4;
 /// How often a run record's caller checks for Ctrl+C while its writer threads run.
 pub(crate) const RUN_RECORD_SIGNAL_POLL_INTERVAL: std::time::Duration =
     std::time::Duration::from_millis(5);
+
+/// The snapshot kind of a Python check node.
+pub(crate) const PYTHON_CHECK_KIND: &str = "check";

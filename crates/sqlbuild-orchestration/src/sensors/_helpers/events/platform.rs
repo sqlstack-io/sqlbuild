@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 
 use crate::platform::models::{PlatformEventEnvelope, PlatformEventKind};
-use crate::sensors::_helpers::conditions::page_clause;
+use crate::sensors::_helpers::events::conditions::page_clause;
 use crate::sensors::constants::EVENT_PAGE_SIZE;
 use crate::sensors::models::{Direction, Scanned, SensorEvent};
 use crate::store::errors::ControlError;

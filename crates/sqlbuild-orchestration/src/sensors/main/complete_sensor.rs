@@ -4,9 +4,9 @@ use chrono::TimeDelta;
 
 use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::SchedulerLease;
-use crate::sensors::_helpers::attempts::defer_sensor;
-use crate::sensors::_helpers::completion::{finish_evaluation, pending_evaluation};
-use crate::sensors::_helpers::work::read_evaluation_result;
+use crate::sensors::_helpers::ticks::attempts::defer_sensor;
+use crate::sensors::_helpers::ticks::completion::{finish_evaluation, pending_evaluation};
+use crate::sensors::_helpers::ticks::work::read_evaluation_result;
 use crate::sensors::constants::SENSOR_RESULT_RECHECK_SECONDS;
 use crate::sensors::models::{SensorEvaluationOutcome, SensorEvaluationRequest};
 use crate::store::errors::ControlError;

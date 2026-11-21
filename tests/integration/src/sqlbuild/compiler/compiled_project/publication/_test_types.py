@@ -589,3 +589,37 @@ class ChangedBuildReplanTestCase:
     edit: tuple[str, str]
     expected_published: dict[str, list[str]]
     expected_rebuilt: dict[str, list[str]]
+
+
+@dataclass(frozen=True)
+class SensorTrialCase:
+    """One `sqb sensor try`: the function's answer, the event choice and what the command says."""
+
+    description: str
+    mode: str
+    # `{event}` and `{run}` stand for the watched run's event ID and run ID.
+    choice: tuple[str, ...]
+    expected_exit: int
+    expected_stdout: str
+
+
+@dataclass(frozen=True)
+class SensorFunctionsTestCase:
+    description: str
+    worker: WorkerExecutionTestCase
+    expected_failure_code: str
+    expected_failure: str
+    expected_started_job: str
+    expected_trials: tuple[SensorTrialCase, ...]
+
+
+class SensorHarness(NamedTuple):
+    """A sensor test's files, sign-in and CLI environment."""
+
+    root: Path
+    origin: str
+    certificate: Path
+    modes: Path
+    calls: Path
+    binary: str
+    environment: dict[str, str]

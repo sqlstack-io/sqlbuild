@@ -63,6 +63,18 @@ pub enum NodeEventKind {
     Recovered,
 }
 
+impl NodeEventKind {
+    /// The past-tense word for the transition, as an event summary says it.
+    #[must_use]
+    pub const fn word(self) -> &'static str {
+        match self {
+            Self::Success => "succeeded",
+            Self::Failed => "failed",
+            Self::Recovered => "recovered",
+        }
+    }
+}
+
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
 )]
@@ -211,26 +223,36 @@ pub enum SensorEvent {
 
 impl SensorEvent {
     #[must_use]
-    pub const fn occurred_at(&self) -> DateTime<Utc> {
-        match self {
-            Self::Run { occurred_at, .. }
-            | Self::Node { occurred_at, .. }
-            | Self::Check { occurred_at, .. }
-            | Self::SourceNewData { occurred_at, .. }
-            | Self::SourceStale { occurred_at, .. }
-            | Self::Platform { occurred_at, .. } => *occurred_at,
-        }
+    pub fn occurred_at(&self) -> DateTime<Utc> {
+        self.identity().1
     }
 
     #[must_use]
     pub fn id(&self) -> &str {
+        self.identity().0
+    }
+
+    /// The fields every event has: its ID and when it happened.
+    const fn identity(&self) -> (&str, DateTime<Utc>) {
         match self {
-            Self::Run { id, .. }
-            | Self::Node { id, .. }
-            | Self::Check { id, .. }
-            | Self::SourceNewData { id, .. }
-            | Self::SourceStale { id, .. }
-            | Self::Platform { id, .. } => id,
+            Self::Run {
+                id, occurred_at, ..
+            }
+            | Self::Node {
+                id, occurred_at, ..
+            }
+            | Self::Check {
+                id, occurred_at, ..
+            }
+            | Self::SourceNewData {
+                id, occurred_at, ..
+            }
+            | Self::SourceStale {
+                id, occurred_at, ..
+            }
+            | Self::Platform {
+                id, occurred_at, ..
+            } => (id.as_str(), *occurred_at),
         }
     }
 
@@ -249,7 +271,7 @@ impl SensorEvent {
                 run_id,
                 event,
                 ..
-            } => format!("{node} {} in run {run_id}", node_event_word(*event)),
+            } => format!("{node} {} in run {run_id}", event.word()),
             Self::Check {
                 check,
                 run_id,
@@ -270,14 +292,6 @@ impl SensorEvent {
             } => format!("{source} is older than {after_seconds} seconds"),
             Self::Platform { event, .. } => format!("platform event {}", event.as_str()),
         }
-    }
-}
-
-const fn node_event_word(kind: NodeEventKind) -> &'static str {
-    match kind {
-        NodeEventKind::Success => "succeeded",
-        NodeEventKind::Failed => "failed",
-        NodeEventKind::Recovered => "recovered",
     }
 }
 
@@ -403,6 +417,14 @@ impl SensorEvaluationOutcome {
 pub struct SensorEvaluationFact {
     pub request: SensorEvaluationRequest,
     pub outcome: SensorEvaluationOutcome,
+}
+
+/// What the newest tick leaves for the next: resume it, wait until a time, or go ahead.
+#[derive(Debug)]
+pub(crate) enum PreviousTick {
+    Resume(Box<SensorEvaluationRequest>),
+    Wait(DateTime<Utc>),
+    Proceed,
 }
 
 #[derive(Debug, Deserialize)]

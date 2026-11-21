@@ -40,7 +40,7 @@ use crate::runs::models::{
 use crate::scheduler::main::list_person_ticks::list_person_ticks;
 use crate::scheduler::models::TickRecord;
 use crate::sensors::main::read_person_sensor::read_person_sensor;
-use crate::sensors::main::read_sensor_events::read_person_sensor_events;
+use crate::sensors::main::read_person_sensor_events::read_person_sensor_events;
 use crate::sensors::models::{PersonSensorState, SensorEventChoice, SensorTrialEvents};
 use crate::snapshots::main::reads::list_person_snapshots::list_person_snapshots;
 use crate::snapshots::models::PublishedSnapshot;

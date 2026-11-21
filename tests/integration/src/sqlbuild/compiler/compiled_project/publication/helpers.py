@@ -26,6 +26,7 @@ from contextlib import (
 )
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from io import StringIO
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -908,11 +909,9 @@ def scheduled_worker(
     *,
     server_arguments: tuple[str, ...] = (),
     serve_sensors: bool = True,
+    scheduler_settings: dict[str, Any] | None = None,
 ) -> Iterator[ScheduledWorker]:
-    """Declare, publish and schedule isolated DuckDB work without provisioning claims.
-
-    A project with sensors also gets a serving location, which runs their functions.
-    """
+    """Declare, publish and schedule isolated DuckDB work without provisioning claims."""
     project: Path = directory / "project"
     write_files(
         project_dir=project,
@@ -984,16 +983,9 @@ def scheduled_worker(
             | deployment.configuration
             | test_case.launcher_settings
         )
-        # The scheduler shares the server's sign-in origin, which sensor events link runs under.
-        origin: list[str] = [
-            value
-            for flag, value in zip(server_arguments, server_arguments[1:], strict=False)
-            if flag == "--password-origin"
-        ]
         write_server_config(
             configuration,
-            {"launchers": {deployment.kind: [launcher]}}
-            | ({"server": {"password_origin": origin[0]}} if origin else {}),
+            {"launchers": {deployment.kind: [launcher]}} | (scheduler_settings or {}),
         )
         control_store: Path = directory / "control/.sqlbuild/control.sqlite3"
         with sqlite3.connect(control_store) as control:
@@ -1009,30 +1001,34 @@ def scheduled_worker(
             "http://127.0.0.1:1/audit?token=synthetic-audit-credential",
         )
         log: Path = directory / "scheduler.log"
+        serves: bool = serve_sensors and any(
+            path.startswith("orchestration/sensors/") for path in test_case.files
+        )
+        locations: dict[bool, Callable[[], AbstractContextManager[object]]] = {
+            True: partial(
+                location_process,
+                [
+                    executable,
+                    "--project-dir",
+                    str(project),
+                    "location",
+                    "serve",
+                    "--server",
+                    api.url,
+                    "--location-id",
+                    api.location_id,
+                    "--target",
+                    "development",
+                ],
+                directory / "location.log",
+                directory / "location.stdout",
+                env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+            ),
+            False: nullcontext,
+        }
         with ExitStack() as serving:
-            if serve_sensors and any(
-                path.startswith("orchestration/sensors/") for path in test_case.files
-            ):
-                _ = serving.enter_context(
-                    location_process(
-                        [
-                            executable,
-                            "--project-dir",
-                            str(project),
-                            "location",
-                            "serve",
-                            "--server",
-                            api.url,
-                            "--location-id",
-                            api.location_id,
-                            "--target",
-                            "development",
-                        ],
-                        directory / "location.log",
-                        directory / "location.stdout",
-                        env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
-                    )
-                )
+            # A project with sensors gets a serving location, which runs their functions.
+            _ = serving.enter_context(locations[serves]())
             process: subprocess.Popen[bytes] = serving.enter_context(
                 location_process(
                     [

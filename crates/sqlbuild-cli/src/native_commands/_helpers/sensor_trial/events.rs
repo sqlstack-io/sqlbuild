@@ -1,9 +1,9 @@
 //! The published sensor and its chosen events, from a server or the local `sqb dev` store.
 
-use sqlbuild_orchestration::credentials::main::locations::development_location::existing_development_location;
 use sqlbuild_orchestration::sensors::main::read_sensor_events::read_sensor_events as read_store_events;
 use sqlbuild_orchestration::sensors::models::SensorTrialEvents;
 use sqlbuild_orchestration::store::main::open_store::open_store;
+use sqlbuild_orchestration::warehouse_metadata::main::location_reads::read_development_location::read_development_location;
 use uuid::Uuid;
 
 use crate::native_commands::models::{EventSource, SensorTrialArguments};
@@ -40,12 +40,9 @@ async fn development_events(
     let store = open_store(store_url)
         .await
         .map_err(|error| format!("can't open the sqb dev store at {store_url}: {error}"))?;
-    let location_id = existing_development_location(
-        &store,
-        &trial.project_dir.to_string_lossy(),
-        &trial.target,
-    )
-    .await
+    let project = trial.project_dir.to_string_lossy();
+    let location_id = read_development_location(&store, &trial.target, |path| path == project)
+        .await
     .map_err(|error| error.to_string())?
     .ok_or_else(|| {
         format!(

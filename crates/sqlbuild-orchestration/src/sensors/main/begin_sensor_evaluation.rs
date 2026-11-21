@@ -6,13 +6,13 @@ use uuid::Uuid;
 use crate::declarations::models::TriggerStatus;
 use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::SchedulerLease;
-use crate::sensors::_helpers::attempts::{defer_sensor, last_attempt, read_sensor};
-use crate::sensors::_helpers::conditions::next_event;
-use crate::sensors::_helpers::facts::{append_evaluation, commit_cursor, definition_fingerprint};
-use crate::sensors::_helpers::work::request_evaluation_work;
+use crate::sensors::_helpers::ticks::attempts::{defer_sensor, read_sensor};
+use crate::sensors::_helpers::ticks::facts::{append_evaluation, definition_fingerprint};
+use crate::sensors::_helpers::ticks::schedule::{previous_tick, tick_event};
+use crate::sensors::_helpers::ticks::work::request_evaluation_work;
 use crate::sensors::main::read_sensor_cursor::read_sensor_cursor;
 use crate::sensors::models::{
-    EventScope, NextEvent, SensorEvaluationOutcome, SensorEvaluationRequest,
+    EventScope, PreviousTick, SensorEvaluationOutcome, SensorEvaluationRequest,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -33,39 +33,22 @@ pub async fn begin_sensor_evaluation(
     if sensor.status != TriggerStatus::Running {
         return Ok(None);
     }
-    let now = transaction.now;
     let interval = TimeDelta::seconds(i64::from(
         sensor.definition_json.minimum_interval_seconds.get(),
     ));
     let (transaction, cursor) = read_sensor_cursor(transaction, trigger_id).await?;
-    let (mut transaction, previous) = last_attempt(transaction, trigger_id).await?;
-    if let Some((previous, terminal)) = previous {
-        if terminal.is_none() {
-            if previous.request.epoch == lease.epoch
-                && previous.request.snapshot_id == sensor.snapshot_id
-                && previous.request.cursor == cursor
-            {
-                commit(transaction).await?;
-                return Ok(Some(previous.request));
-            }
-            transaction = append_evaluation(
-                transaction,
-                &previous.request,
-                SensorEvaluationOutcome::Abandoned,
-            )
-            .await?;
+    let (transaction, previous) =
+        previous_tick(transaction, lease, (&sensor, &cursor), interval).await?;
+    match previous {
+        PreviousTick::Resume(request) => {
+            commit(transaction).await?;
+            return Ok(Some(*request));
         }
-        let retry_now = match terminal.as_deref() {
-            None => previous.request.epoch == lease.epoch,
-            Some(SensorEvaluationOutcome::ABANDONED) => true,
-            Some(SensorEvaluationOutcome::COMPLETED) => previous.request.event.is_some(),
-            Some(_) => false,
-        };
-        let next = previous.request.requested_at + interval;
-        if !retry_now && next > now {
+        PreviousTick::Wait(next) => {
             commit(defer_sensor(transaction, trigger_id, next).await?).await?;
             return Ok(None);
         }
+        PreviousTick::Proceed => {}
     }
     let scope = EventScope {
         trigger_id,
@@ -74,30 +57,10 @@ pub async fn begin_sensor_evaluation(
         snapshot_id: sensor.snapshot_id,
         origin,
     };
-    let (event, cursor_after) = match &sensor.definition_json.when {
-        None => (None, None),
-        Some(condition) => {
-            let found;
-            (transaction, found) = next_event(transaction, scope, (condition, &cursor)).await?;
-            match found {
-                NextEvent::Found {
-                    event,
-                    cursor_after,
-                } => (Some(event), Some(cursor_after)),
-                NextEvent::Nothing {
-                    cursor: moved,
-                    more,
-                } => {
-                    if moved != cursor {
-                        transaction = commit_cursor(transaction, trigger_id, &moved).await?;
-                    }
-                    let next = if more { now } else { now + interval };
-                    let transaction = defer_sensor(transaction, trigger_id, next).await?;
-                    commit(check_lease(transaction, lease).await?).await?;
-                    return Ok(None);
-                }
-            }
-        }
+    let (transaction, found) = tick_event(transaction, scope, (&sensor, &cursor), interval).await?;
+    let Some((event, cursor_after)) = found else {
+        commit(check_lease(transaction, lease).await?).await?;
+        return Ok(None);
     };
     let definition_fingerprint = definition_fingerprint(&sensor.definition_json)?;
     let request = SensorEvaluationRequest {
@@ -113,7 +76,7 @@ pub async fn begin_sensor_evaluation(
         event,
         cursor_after,
         epoch: lease.epoch,
-        requested_at: now,
+        requested_at: transaction.now,
     };
     let transaction =
         append_evaluation(transaction, &request, SensorEvaluationOutcome::Requested).await?;

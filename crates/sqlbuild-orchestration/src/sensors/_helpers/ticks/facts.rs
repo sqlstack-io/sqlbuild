@@ -77,16 +77,13 @@ pub(crate) async fn record_delivery(
     else {
         return Ok(transaction);
     };
-    let now = transaction.now;
     let (transaction, _) = query(
         transaction,
-        "INSERT INTO sqb_sensor_deliveries (trigger_id,event_id,evaluation_id,delivered_at) \
-         VALUES ($1,$2,$3,$4) ON CONFLICT (trigger_id,event_id) DO NOTHING",
+        "INSERT INTO sqb_sensor_deliveries (trigger_id,event_id) VALUES ($1,$2) \
+         ON CONFLICT (trigger_id,event_id) DO NOTHING",
         vec![
             Parameter::Id(request.trigger_id),
             Parameter::Text(event.id().into()),
-            Parameter::Id(request.evaluation_id),
-            Parameter::Time(now),
         ],
     )
     .await?;

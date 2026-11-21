@@ -1,6 +1,11 @@
-"""Public enum vocabulary only; event processing belongs to Rust."""
+"""Public enum vocabulary and the sensor result alias only; event processing belongs to Rust."""
 
+from collections.abc import Iterable
 from enum import StrEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlbuild.orchestration_declarations.models.authoring import RunRequest, SkipReason
 
 
 class PlatformEventKind(StrEnum):
@@ -40,3 +45,6 @@ class CheckEventKind(StrEnum):
 
     FAILED = "failed"
     WARN = "warn"
+
+
+type SensorResult = RunRequest | Iterable[RunRequest] | SkipReason | None
