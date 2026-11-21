@@ -49,8 +49,7 @@ pub(crate) fn prepared(
     let mut segments: Vec<PreparedSegment> = Vec::with_capacity(batch.segments.len());
     let mut dropped: u64 = 0;
     for segment in &batch.segments {
-        let (error_offsets, warning_offsets) =
-            marked_lines(&segment.text, 0, (MARKED_LINES, MARKED_LINES));
+        let marks = marked_lines(&segment.text, MARKED_LINES);
         segments.push(PreparedSegment {
             node_key: segment
                 .node_key
@@ -60,8 +59,7 @@ pub(crate) fn prepared(
             line_count: line_count(&segment.text),
             text_offset: counter(text.len())?,
             text_bytes: counter(segment.text.len())?,
-            error_offsets,
-            warning_offsets,
+            marks,
         });
         dropped = dropped.saturating_add(segment.dropped_bytes);
         text.push_str(&segment.text);

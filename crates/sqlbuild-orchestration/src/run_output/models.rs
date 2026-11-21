@@ -87,10 +87,12 @@ pub struct OutputBatchReceipt {
     pub stored: bool,
 }
 
-/// What a run printed, per node and stream, without its text; and what a size cap left out.
+/// What a run printed, per node, without its text; one node's error and warning lines; and what a size cap left out.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RunOutputIndex {
-    pub streams: Vec<OutputStreamSummary>,
+    pub nodes: Vec<NodeOutputSummary>,
+    /// Lines the whole run printed, numbered in the order printed.
+    pub line_count: i64,
     /// Bytes and lines past `max_bytes_per_run` that were dropped between the run's first and last parts.
     pub omitted_bytes: i64,
     pub omitted_lines: i64,
@@ -98,20 +100,48 @@ pub struct RunOutputIndex {
     pub dropped_bytes: i64,
     /// Lines the run's nodes logged with `ctx.log`, oldest first.
     pub logs: Vec<NodeLogLine>,
+    /// The named node's lines that look like errors or warnings, by line; empty when no node is named.
+    pub marks: Vec<OutputMark>,
 }
 
-/// One node's stream: how many lines and bytes it printed, and its error and warning lines.
+/// How much one node printed: its lines, numbered across both streams, and its bytes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct OutputStreamSummary {
+pub struct NodeOutputSummary {
     /// The node key, or `run` for lines printed outside any node.
     pub node_key: String,
-    pub stream: OutputStream,
     pub line_count: i64,
+    pub stdout_lines: i64,
+    pub stderr_lines: i64,
     pub text_bytes: i64,
-    /// Numbers of lines that look like errors, such as a traceback, at most 10,000.
-    pub error_lines: Vec<i64>,
-    /// Numbers of lines that look like warnings, at most 10,000.
-    pub warning_lines: Vec<i64>,
+}
+
+/// A line that looks like an error, such as a traceback, or a warning; each stream keeps at most 10,000.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct OutputMark {
+    /// The line in the node's numbering.
+    pub line: i64,
+    pub stream: OutputStream,
+    pub level: OutputLevel,
+    /// The line's text, at most 300 bytes.
+    pub text: String,
+}
+
+/// How a printed line reads: as an error or as a warning.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum OutputLevel {
+    Error,
+    Warning,
+}
+
+impl OutputLevel {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Error => crate::run_output::constants::ERROR_LEVEL,
+            Self::Warning => crate::run_output::constants::WARNING_LEVEL,
+        }
+    }
 }
 
 /// One line a node logged with `ctx.log`.
@@ -123,39 +153,69 @@ pub struct NodeLogLine {
     pub logged_at: chrono::DateTime<chrono::Utc>,
 }
 
-/// A page of one node's stream, read by line number.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::IntoParams)]
+/// A page of a node's output, numbered across its two streams, or of the whole run's output, numbered in the order printed.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct OutputPageQuery {
-    /// The node key, or `run`.
-    pub node: String,
-    pub stream: OutputStream,
-    /// The first line to read, from 1; leave it out with `tail` to read the stream's last lines.
+    /// The node key, or `run`; leave it out to read the whole run's output.
+    pub node: Option<String>,
+    /// Only this stream's lines, keeping their numbers.
+    pub stream: Option<OutputStream>,
+    /// Read forwards from this line, from 1.
     pub from: Option<i64>,
-    /// How many lines to read, at most 2,000.
-    pub limit: Option<u32>,
-    /// Read the stream's last `limit` lines.
+    /// Read the rows that end just before this line.
+    pub before: Option<i64>,
+    /// Read the last rows.
     #[serde(default)]
     pub tail: bool,
+    /// How many rows to read, at most 2,000.
+    pub limit: Option<u32>,
+    /// Fold four or more lines that are the same but for their numbers into one row.
+    #[serde(default)]
+    pub collapse: bool,
+    /// A line to keep open, with three lines either side, when folding.
+    pub around: Option<i64>,
 }
 
-/// Lines of one node's stream, and the pages before and after them.
+/// Rows covering lines `from` up to `to`, and where the pages before and after start.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OutputPage {
-    pub lines: Vec<OutputLine>,
-    /// The stream's line count.
+    pub rows: Vec<OutputRow>,
+    /// The highest line number of the node, or of the run.
     pub line_count: i64,
-    /// The first line of the next page, when there is one.
+    /// The first line the rows cover.
+    pub from: i64,
+    /// The line after the last the rows cover.
+    pub to: i64,
+    /// `from` for the next page, when there are later lines.
     pub next: Option<i64>,
-    /// The first line of the previous page, when there is one.
+    /// `before` for the previous page, when there are earlier lines.
     pub previous: Option<i64>,
+}
+
+/// A line, or a run of lines that are the same but for their numbers, folded into one row.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum OutputRow {
+    Line {
+        line: OutputLine,
+    },
+    Similar {
+        from: i64,
+        count: i64,
+        sample: OutputLine,
+    },
 }
 
 /// One stored line; lines a size cap left out just before it are counted on it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OutputLine {
     pub number: i64,
+    /// The node that printed it, or `run`.
+    pub node_key: String,
+    pub stream: OutputStream,
     pub text: String,
+    pub level: Option<OutputLevel>,
     #[serde(
         default,
         skip_serializing_if = "crate::run_output::_helpers::chunks::is_zero"
@@ -163,32 +223,52 @@ pub struct OutputLine {
     pub omitted_before: i64,
 }
 
-/// A search of one node's stream for text, case-insensitively.
+/// Which way a search looks from its line.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchDirection {
+    #[default]
+    Forward,
+    Backward,
+}
+
+/// A search of a node's output for text, case-insensitively, from a line in one direction.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct OutputSearchQuery {
     pub node: String,
-    pub stream: OutputStream,
+    pub stream: Option<OutputStream>,
     pub text: String,
-    /// Search lines after this one; a search hands back where to continue.
-    pub after: Option<i64>,
-    /// How many matches to return, at most 200.
-    pub limit: Option<u32>,
+    /// Look from this line, which a forward search includes, as a backward one does.
+    pub from: Option<i64>,
+    #[param(inline)]
+    pub direction: Option<SearchDirection>,
 }
 
-/// Matching lines in order, and the line after which to continue when the search stopped early.
+/// The next match; across the whole output, how many match and which this is, when the output was small enough to scan; or where to continue.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OutputSearch {
-    pub matches: Vec<OutputLine>,
-    pub continue_after: Option<i64>,
+    pub line: Option<i64>,
+    pub count: Option<i64>,
+    pub rank: Option<i64>,
+    /// `from` for the next search in the same direction, when this one stopped before finding a match.
+    pub continue_from: Option<i64>,
 }
 
-/// A whole node's stream to download.
+/// A whole node's output to download, both streams or one.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct OutputDownloadQuery {
     pub node: String,
-    pub stream: OutputStream,
+    pub stream: Option<OutputStream>,
+}
+
+/// A node's lines across both streams, or one stream of them, or the whole run's lines.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct OutputView {
+    pub(crate) run_id: uuid::Uuid,
+    pub(crate) node: Option<String>,
+    pub(crate) stream: Option<OutputStream>,
 }
 
 /// A batch ready to index: its chunk's key and sizes, and each segment's place in the chunk.
@@ -212,35 +292,35 @@ pub(crate) struct PreparedSegment {
     pub(crate) line_count: i64,
     pub(crate) text_offset: i64,
     pub(crate) text_bytes: i64,
-    pub(crate) error_offsets: Vec<i64>,
-    pub(crate) warning_offsets: Vec<i64>,
+    /// Each marked line's offset within the segment, level and text.
+    pub(crate) marks: Vec<(i64, OutputLevel, String)>,
 }
 
-/// One stored segment of a stream, with the chunk that holds it.
+/// One stored segment of a view, numbered in the view's numbering, with the chunk that holds it.
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct StoredSegment {
     pub(crate) first_line: i64,
+    pub(crate) line_count: i64,
+    pub(crate) node_key: String,
+    pub(crate) stream: OutputStream,
     pub(crate) text_offset: i64,
     pub(crate) text_bytes: i64,
     pub(crate) object_key: String,
     pub(crate) chunk_text_bytes: i64,
 }
 
-/// A stream's totals and marked lines as the index keeps them.
-#[derive(Clone, Debug, Deserialize)]
-pub(crate) struct StoredStream {
-    pub(crate) node_key: String,
-    pub(crate) stream: OutputStream,
-    pub(crate) line_count: i64,
-    pub(crate) text_bytes: i64,
-    pub(crate) error_lines: serde_json::Value,
-    pub(crate) warning_lines: serde_json::Value,
+/// A node's line count and its marks so far in one stream, before a segment adds to them.
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+pub(crate) struct StoredNodeLines {
+    pub(crate) node_lines: i64,
+    pub(crate) stream_marks: i64,
 }
 
 /// A run's next chunk number and the bytes kept in its first and last parts.
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub(crate) struct StoredTotals {
     pub(crate) next_chunk: i64,
+    pub(crate) line_count: i64,
     pub(crate) head_bytes: i64,
     pub(crate) tail_bytes: i64,
 }
@@ -295,4 +375,81 @@ pub struct UploadSummary {
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub(crate) struct ExpiredRun {
     pub(crate) run_id: uuid::Uuid,
+}
+
+/// One count read from the index.
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub(crate) struct ViewCount {
+    pub(crate) count: i64,
+}
+
+/// Where a view's kept tail starts after a size cap, and where its kept head ends.
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub(crate) struct StoredGap {
+    pub(crate) first_tail: Option<i64>,
+    pub(crate) after_head: Option<i64>,
+    pub(crate) omitted_lines: Option<i64>,
+}
+
+/// Reads a view's lines one at a time in one direction, a batch of segments at a time, each chunk once.
+#[derive(Debug)]
+pub(crate) struct ViewReader<'a> {
+    pub(crate) store: &'a crate::store::models::ControlStore,
+    pub(crate) output: &'a OutputStore,
+    pub(crate) view: &'a OutputView,
+    pub(crate) direction: SearchDirection,
+    /// Forwards, the next line to read; backwards, the line before which to read.
+    pub(crate) bound: i64,
+    /// The view's first line after a size cap's gap, and how many lines the gap left out.
+    pub(crate) gap: Option<(i64, i64)>,
+    pub(crate) pending: std::collections::VecDeque<OutputLine>,
+    pub(crate) exhausted: bool,
+    /// The last chunk read, by object key.
+    pub(crate) cached: Option<(String, Arc<String>)>,
+    pub(crate) chunks_read: usize,
+}
+
+/// A page's rows as they are read, and the lowest and highest lines they cover.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct PageRows {
+    pub(crate) rows: Vec<OutputRow>,
+    pub(crate) low: Option<i64>,
+    pub(crate) high: Option<i64>,
+}
+
+/// Lines read so far that are the same but for their numbers, and what they share.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct SimilarRun {
+    pub(crate) key: Option<String>,
+    pub(crate) lines: Vec<OutputLine>,
+}
+
+/// A run's line count and what a size cap or a slow worker left out.
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+pub(crate) struct StoredOutputTotals {
+    pub(crate) line_count: i64,
+    pub(crate) omitted_bytes: i64,
+    pub(crate) omitted_lines: i64,
+    pub(crate) dropped_bytes: i64,
+}
+
+/// Which node's error and warning lines the index includes.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct OutputIndexQuery {
+    pub node: Option<String>,
+}
+
+/// A whole search's matches: how many, the first and last, and where they sit around the line searched from.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct SearchTally {
+    pub(crate) count: i64,
+    /// Matches before the line searched from, and up to and including it.
+    pub(crate) before: i64,
+    pub(crate) through: i64,
+    pub(crate) first: Option<i64>,
+    pub(crate) last: Option<i64>,
+    /// The first match at or after the line searched from, and the last at or before it.
+    pub(crate) after: Option<i64>,
+    pub(crate) upto: Option<i64>,
 }

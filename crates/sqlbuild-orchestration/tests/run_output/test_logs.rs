@@ -82,6 +82,7 @@ fn given_a_worker_reporting_ctx_log_lines_when_the_output_index_is_read_then_the
                     (location, "development", claim.request.run_id),
                     DefaultRole::None,
                 ),
+                None,
             )
             .await
             .expect("index")

@@ -4058,3 +4058,11 @@ rule = "FPRSS130"
 path = "crates/sqlbuild-orchestration/src/run_output/_helpers/upload.rs"
 symbols = ["attached"]
 reason = "A worker process runs one run, and the bytes it prints reach the uploader through the process-wide output capture, which has no handle to the worker; the uploader is attached once when the run starts and taken once when it finishes."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-analysis/src/sql_tokens/main/normalized_query_text.rs", "crates/sqlbuild-cache/src/digest/_helpers/distributions.rs", "crates/sqlbuild-cli/src/argv/_helpers/text_wrap.rs", "crates/sqlbuild-orchestration/src/run_output/_helpers/chunks.rs"]
+reason = "Each collapses runs of one character class into a single marker for its own purpose: whitespace in query text, distribution keys and wrapped help text, digits in printed lines so similar lines fold. They live in crates that do not depend on each other; only the run-collapsing loop is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-orchestration/src/declarations/_helpers/reads.rs", "crates/sqlbuild-orchestration/src/run_output/_helpers/views.rs", "crates/sqlbuild-orchestration/src/warehouse_history/_helpers/checks.rs"]
+reason = "Each lists its own rows by its own key: triggers, latest ticks, a node's output marks and latest check results. Only the keyed query_records call is alike."

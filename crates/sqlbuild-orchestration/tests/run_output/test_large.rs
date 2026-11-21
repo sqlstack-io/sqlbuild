@@ -6,9 +6,11 @@ use crate::credentials::models::DefaultRole;
 use crate::run_output::constants::BATCH_TEXT_BYTES;
 use crate::run_output::main::publish_output_batch::publish_output_batch;
 use crate::run_output::main::read_person_output_page::read_person_output_page;
-use crate::run_output::models::{OutputPageQuery, OutputStream};
-use crate::run_output::tests::helpers::{batch, claimed_run, output_store, reader, segment};
-use crate::run_output::tests::test_types::OutputLargeTestCase;
+use crate::run_output::models::OutputStream;
+use crate::run_output::tests::helpers::{
+    batch, claimed_run, output_store, page_query, reader, segment,
+};
+use crate::run_output::tests::test_types::{OutputLargeTestCase, PageStart};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
@@ -75,19 +77,20 @@ fn given_a_node_printing_a_gigabyte_when_it_is_stored_then_the_control_store_hol
                     (location, "development", claim.request.run_id),
                     DefaultRole::None,
                 ),
-                &OutputPageQuery {
-                    node: "model:orders".into(),
-                    stream: OutputStream::Stdout,
-                    from: None,
-                    limit: Some(2),
-                    tail: true,
-                },
+                &page_query(
+                    (Some("model:orders"), Some(OutputStream::Stdout)),
+                    PageStart {
+                        tail: true,
+                        ..PageStart::default()
+                    },
+                    (2, false, None),
+                ),
             )
             .await
             .expect("tail")
             .expect("run");
             assert_eq!(
-                (page.line_count, page.lines.len()),
+                (page.line_count, page.rows.len()),
                 (
                     lines_per_batch * batches as i64,
                     test_case.expected_tail_lines

@@ -2609,6 +2609,19 @@ export interface components {
         };
         /** @enum {string} */
         NodeOutcome: "success" | "warn" | "failed" | "skipped" | "cancelled" | "not_run";
+        /** @description How much one node printed: its lines, numbered across both streams, and its bytes. */
+        NodeOutputSummary: {
+            /** Format: int64 */
+            line_count: number;
+            /** @description The node key, or `run` for lines printed outside any node. */
+            node_key: string;
+            /** Format: int64 */
+            stderr_lines: number;
+            /** Format: int64 */
+            stdout_lines: number;
+            /** Format: int64 */
+            text_bytes: number;
+        };
         /** @description One build attempt of a node by a run in this target; the same metadata as the run's node list. */
         NodeRunRecord: {
             /** Format: date-time */
@@ -2717,32 +2730,63 @@ export interface components {
             sequence: number;
             stream: components["schemas"]["OutputStream"];
         };
+        /**
+         * @description How a printed line reads: as an error or as a warning.
+         * @enum {string}
+         */
+        OutputLevel: "error" | "warning";
         /** @description One stored line; lines a size cap left out just before it are counted on it. */
         OutputLine: {
+            level?: null | components["schemas"]["OutputLevel"];
+            /** @description The node that printed it, or `run`. */
+            node_key: string;
             /** Format: int64 */
             number: number;
             /** Format: int64 */
             omitted_before?: number;
+            stream: components["schemas"]["OutputStream"];
             text: string;
         };
-        /** @description Lines of one node's stream, and the pages before and after them. */
+        /** @description A line that looks like an error, such as a traceback, or a warning; each stream keeps at most 10,000. */
+        OutputMark: {
+            level: components["schemas"]["OutputLevel"];
+            /**
+             * Format: int64
+             * @description The line in the node's numbering.
+             */
+            line: number;
+            stream: components["schemas"]["OutputStream"];
+            /** @description The line's text, at most 300 bytes. */
+            text: string;
+        };
+        /** @description Rows covering lines `from` up to `to`, and where the pages before and after start. */
         OutputPage: {
             /**
              * Format: int64
-             * @description The stream's line count.
+             * @description The first line the rows cover.
              */
-            line_count: number;
-            lines: components["schemas"]["OutputLine"][];
+            from: number;
             /**
              * Format: int64
-             * @description The first line of the next page, when there is one.
+             * @description The highest line number of the node, or of the run.
+             */
+            line_count: number;
+            /**
+             * Format: int64
+             * @description `from` for the next page, when there are later lines.
              */
             next?: number | null;
             /**
              * Format: int64
-             * @description The first line of the previous page, when there is one.
+             * @description `before` for the previous page, when there are earlier lines.
              */
             previous?: number | null;
+            rows: components["schemas"]["OutputRow"][];
+            /**
+             * Format: int64
+             * @description The line after the last the rows cover.
+             */
+            to: number;
         };
         /** @description Differing retries retain conflict evidence while preserving the first output bytes. */
         OutputPublication: {
@@ -2753,11 +2797,33 @@ export interface components {
             /** Format: int32 */
             inserted: number;
         };
-        /** @description Matching lines in order, and the line after which to continue when the search stopped early. */
-        OutputSearch: {
+        /** @description A line, or a run of lines that are the same but for their numbers, folded into one row. */
+        OutputRow: {
+            /** @enum {string} */
+            kind: "line";
+            line: components["schemas"]["OutputLine"];
+        } | {
             /** Format: int64 */
-            continue_after?: number | null;
-            matches: components["schemas"]["OutputLine"][];
+            count: number;
+            /** Format: int64 */
+            from: number;
+            /** @enum {string} */
+            kind: "similar";
+            sample: components["schemas"]["OutputLine"];
+        };
+        /** @description The next match; across the whole output, how many match and which this is, when the output was small enough to scan; or where to continue. */
+        OutputSearch: {
+            /**
+             * Format: int64
+             * @description `from` for the next search in the same direction, when this one stopped before finding a match.
+             */
+            continue_from?: number | null;
+            /** Format: int64 */
+            count?: number | null;
+            /** Format: int64 */
+            line?: number | null;
+            /** Format: int64 */
+            rank?: number | null;
         };
         /** @description Complete lines one node printed to one stream, each ending in a newline. */
         OutputSegment: {
@@ -2776,20 +2842,6 @@ export interface components {
          * @enum {string}
          */
         OutputStream: "stdout" | "stderr";
-        /** @description One node's stream: how many lines and bytes it printed, and its error and warning lines. */
-        OutputStreamSummary: {
-            /** @description Numbers of lines that look like errors, such as a traceback, at most 10,000. */
-            error_lines: number[];
-            /** Format: int64 */
-            line_count: number;
-            /** @description The node key, or `run` for lines printed outside any node. */
-            node_key: string;
-            stream: components["schemas"]["OutputStream"];
-            /** Format: int64 */
-            text_bytes: number;
-            /** @description Numbers of lines that look like warnings, at most 10,000. */
-            warning_lines: number[];
-        };
         /** @description A running schedule whose next tick is more than 30 seconds late. */
         OverdueTick: {
             /** Format: uuid */
@@ -3654,15 +3706,23 @@ export interface components {
             /** @description The newest captured lines per invocation, oldest first. */
             lines: components["schemas"]["RunOutputLine"][];
         };
-        /** @description What a run printed, per node and stream, without its text; and what a size cap left out. */
+        /** @description What a run printed, per node, without its text; one node's error and warning lines; and what a size cap left out. */
         RunOutputIndex: {
             /**
              * Format: int64
              * @description Bytes the worker dropped because it could not send them fast enough.
              */
             dropped_bytes: number;
+            /**
+             * Format: int64
+             * @description Lines the whole run printed, numbered in the order printed.
+             */
+            line_count: number;
             /** @description Lines the run's nodes logged with `ctx.log`, oldest first. */
             logs: components["schemas"]["NodeLogLine"][];
+            /** @description The named node's lines that look like errors or warnings, by line; empty when no node is named. */
+            marks: components["schemas"]["OutputMark"][];
+            nodes: components["schemas"]["NodeOutputSummary"][];
             /**
              * Format: int64
              * @description Bytes and lines past `max_bytes_per_run` that were dropped between the run's first and last parts.
@@ -3670,7 +3730,6 @@ export interface components {
             omitted_bytes: number;
             /** Format: int64 */
             omitted_lines: number;
-            streams: components["schemas"]["OutputStreamSummary"][];
         };
         RunOutputLine: {
             invocation_id: string;
@@ -6943,7 +7002,7 @@ export interface operations {
         parameters: {
             query: {
                 node: string;
-                stream: components["schemas"]["OutputStream"];
+                stream?: components["schemas"]["OutputStream"];
             };
             header?: never;
             path: {
@@ -7000,7 +7059,9 @@ export interface operations {
     };
     readPersonRunOutputIndex: {
         parameters: {
-            query?: never;
+            query?: {
+                node?: string;
+            };
             header?: never;
             path: {
                 location_id: string;
@@ -7046,16 +7107,23 @@ export interface operations {
     };
     readPersonRunOutputLines: {
         parameters: {
-            query: {
-                /** @description The node key, or `run`. */
-                node: string;
-                stream: components["schemas"]["OutputStream"];
-                /** @description The first line to read, from 1; leave it out with `tail` to read the stream's last lines. */
+            query?: {
+                /** @description The node key, or `run`; leave it out to read the whole run's output. */
+                node?: string;
+                /** @description Only this stream's lines, keeping their numbers. */
+                stream?: components["schemas"]["OutputStream"];
+                /** @description Read forwards from this line, from 1. */
                 from?: number;
-                /** @description How many lines to read, at most 2,000. */
-                limit?: number;
-                /** @description Read the stream's last `limit` lines. */
+                /** @description Read the rows that end just before this line. */
+                before?: number;
+                /** @description Read the last rows. */
                 tail?: boolean;
+                /** @description How many rows to read, at most 2,000. */
+                limit?: number;
+                /** @description Fold four or more lines that are the same but for their numbers into one row. */
+                collapse?: boolean;
+                /** @description A line to keep open, with three lines either side, when folding. */
+                around?: number;
             };
             header?: never;
             path: {
@@ -7113,12 +7181,11 @@ export interface operations {
         parameters: {
             query: {
                 node: string;
-                stream: components["schemas"]["OutputStream"];
+                stream?: components["schemas"]["OutputStream"];
                 text: string;
-                /** @description Search lines after this one; a search hands back where to continue. */
-                after?: number;
-                /** @description How many matches to return, at most 200. */
-                limit?: number;
+                /** @description Look from this line, which a forward search includes, as a backward one does. */
+                from?: number;
+                direction?: "forward" | "backward";
             };
             header?: never;
             path: {
