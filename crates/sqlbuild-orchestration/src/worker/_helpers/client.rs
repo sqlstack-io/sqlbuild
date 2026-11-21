@@ -17,10 +17,7 @@ pub(crate) fn read_execution(body: serde_json::Value) -> Result<RunExecution, Wo
         unknown.get_or_insert_with(|| path.to_string());
     })?;
     match unknown {
-        Some(field) => Err(WorkerError::NewerServer {
-            version: env!("CARGO_PKG_VERSION"),
-            field,
-        }),
+        Some(field) => Err(WorkerError::UnknownField(field)),
         None => Ok(execution),
     }
 }

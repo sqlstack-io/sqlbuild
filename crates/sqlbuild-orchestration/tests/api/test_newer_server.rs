@@ -32,42 +32,42 @@ fn given_a_newer_server_when_a_worker_fetches_its_execution_then_an_unknown_fiel
             backend: Backend::Sqlite,
             added: &[],
             expected_status: RunStatus::Running,
-            expected_reason: None,
+            expected_unknown_field: None,
         },
         NewerServerTestCase {
             description: "SQLite: an unknown top-level field fails the run",
             backend: Backend::Sqlite,
             added: &["added_by_newer_server"],
             expected_status: RunStatus::Failed,
-            expected_reason: refusal("added_by_newer_server"),
+            expected_unknown_field: Some("added_by_newer_server"),
         },
         NewerServerTestCase {
             description: "SQLite: an unknown field in the request fails the run",
             backend: Backend::Sqlite,
             added: &["claim", "request", "added_by_newer_server"],
             expected_status: RunStatus::Failed,
-            expected_reason: refusal("claim.request.added_by_newer_server"),
+            expected_unknown_field: Some("claim.request.added_by_newer_server"),
         },
         NewerServerTestCase {
             description: "PostgreSQL: an execution of the current shape starts",
             backend: Backend::Postgres,
             added: &[],
             expected_status: RunStatus::Running,
-            expected_reason: None,
+            expected_unknown_field: None,
         },
         NewerServerTestCase {
             description: "PostgreSQL: an unknown top-level field fails the run",
             backend: Backend::Postgres,
             added: &["added_by_newer_server"],
             expected_status: RunStatus::Failed,
-            expected_reason: refusal("added_by_newer_server"),
+            expected_unknown_field: Some("added_by_newer_server"),
         },
         NewerServerTestCase {
             description: "PostgreSQL: an unknown field in the request fails the run",
             backend: Backend::Postgres,
             added: &["claim", "request", "added_by_newer_server"],
             expected_status: RunStatus::Failed,
-            expected_reason: refusal("claim.request.added_by_newer_server"),
+            expected_unknown_field: Some("claim.request.added_by_newer_server"),
         },
     ];
     for test_case in test_cases {
@@ -135,6 +135,9 @@ fn given_a_newer_server_when_a_worker_fetches_its_execution_then_an_unknown_fiel
                 .await
                 .expect("runs");
 
+            let expected_reason: Option<String> = test_case
+                .expected_unknown_field
+                .map(|field| refusal(&baseline.sqb_version, field));
             assert_eq!(
                 (
                     started.as_ref().err().map(ToString::to_string),
@@ -142,9 +145,9 @@ fn given_a_newer_server_when_a_worker_fetches_its_execution_then_an_unknown_fiel
                     runs[0].status_reason.clone()
                 ),
                 (
-                    test_case.expected_reason.clone(),
+                    expected_reason.clone(),
                     test_case.expected_status,
-                    test_case.expected_reason.clone()
+                    expected_reason
                 ),
                 "{}",
                 test_case.description

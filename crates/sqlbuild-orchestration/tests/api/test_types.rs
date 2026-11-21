@@ -68,9 +68,9 @@ pub(crate) struct NewerServerTestCase {
     pub(crate) backend: Backend,
     /// The path the server adds a field at; empty adds nothing.
     pub(crate) added: &'static [&'static str],
-    /// The run's status and reason once the worker tried to start.
+    /// The run's status once the worker tried to start, and the field its refusal names.
     pub(crate) expected_status: RunStatus,
-    pub(crate) expected_reason: Option<String>,
+    pub(crate) expected_unknown_field: Option<&'static str>,
 }
 
 /// Where the real API is and the path a newer server adds a field at.

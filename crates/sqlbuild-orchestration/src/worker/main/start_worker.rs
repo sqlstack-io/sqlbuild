@@ -15,8 +15,11 @@ pub async fn start_worker(
     baseline: &SnapshotInput,
 ) -> Result<WorkerSession, WorkerError> {
     let expected = match client.execution().await {
-        Err(WorkerError::NewerServer { version, field }) => {
-            let error = WorkerError::NewerServer { version, field };
+        Err(WorkerError::UnknownField(field)) => {
+            let error = WorkerError::NewerServer {
+                version: baseline.sqb_version.clone(),
+                field,
+            };
             refuse_unreadable(client, &error).await;
             return Err(error);
         }

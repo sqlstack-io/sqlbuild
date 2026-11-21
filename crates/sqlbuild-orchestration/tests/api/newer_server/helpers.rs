@@ -106,10 +106,9 @@ async fn forward(
     )
 }
 
-/// The reason a worker gives for a request with `field` it can't read.
-pub(crate) fn refusal(field: &str) -> Option<String> {
-    Some(format!(
-        "this worker runs SQLBuild {} and can't read a run request from a newer server (unknown field `{field}`); upgrade the location",
-        env!("CARGO_PKG_VERSION")
-    ))
+/// The reason a worker of release `version` gives for a request with `field` it can't read.
+pub(crate) fn refusal(version: &str, field: &str) -> String {
+    format!(
+        "this worker runs SQLBuild {version} and can't read a run request from a newer server (unknown field `{field}`); upgrade the location"
+    )
 }
