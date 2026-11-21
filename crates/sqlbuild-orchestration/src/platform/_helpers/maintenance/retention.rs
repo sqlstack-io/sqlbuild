@@ -84,7 +84,7 @@ pub(crate) async fn retain(
 ) -> Result<i64, ControlError> {
     prune_run_logs(store, run_logs).await?;
     if let Some((output, days)) = &run_output {
-        while prune_run_output(store, output, *days).await? > 0 {
+        while prune_run_output(store, output, *days).await > 0 {
             tokio::task::yield_now().await;
         }
     }

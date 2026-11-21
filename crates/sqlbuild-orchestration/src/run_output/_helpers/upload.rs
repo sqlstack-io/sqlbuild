@@ -6,7 +6,8 @@ use std::time::Instant;
 
 use crate::api::errors::ClientError;
 use crate::run_output::constants::{
-    BATCH_TEXT_BYTES, BATCH_WINDOW, MAX_PARTIAL_LINE_BYTES, MAX_QUEUED_BATCHES, UPLOAD_ATTEMPTS,
+    BATCH_TEXT_BYTES, BATCH_WINDOW, MAX_BATCH_SEGMENTS, MAX_PARTIAL_LINE_BYTES, MAX_QUEUED_BATCHES,
+    UPLOAD_ATTEMPTS, UTF8_CONTINUATION, UTF8_PREFIX_MASK,
 };
 use crate::run_output::models::{
     OutputBatch, OutputSegment, OutputStream, RunOutputUploader, UploadShared, UploadState,
@@ -32,9 +33,9 @@ impl UploadShared {
 }
 
 impl UploadState {
-    /// Take `data` for `node`'s `stream`, keeping a line until its newline unless it grows past its limit.
+    /// Take `data` for `node`'s `stream`, holding a line until its newline unless it outgrows its limit and is cut between characters.
     pub(crate) fn append(&mut self, (node, stream): (String, OutputStream), data: &[u8]) {
-        if self.summary.failure.is_some() || self.closing.is_some() {
+        if self.closing.is_some() {
             self.summary.dropped_bytes += data.len() as u64;
             return;
         }
@@ -43,13 +44,13 @@ impl UploadState {
         buffer.extend_from_slice(data);
         let complete: usize = match buffer.iter().rposition(|byte| *byte == b'\n') {
             Some(position) => position + 1,
-            None if buffer.len() > MAX_PARTIAL_LINE_BYTES => {
-                buffer.push(b'\n');
-                buffer.len()
-            }
+            None if buffer.len() > MAX_PARTIAL_LINE_BYTES => complete_characters(&buffer),
             None => 0,
         };
         let rest: Vec<u8> = buffer.split_off(complete);
+        if complete > 0 && buffer.last() != Some(&b'\n') {
+            buffer.push(b'\n');
+        }
         if !rest.is_empty() {
             self.partial.insert(key.clone(), rest);
         }
@@ -66,21 +67,41 @@ impl UploadState {
         }
     }
 
+    /// Add complete lines, sealing the batch before a line would overflow its size or a segment its count.
     fn push_lines(&mut self, (node, stream): (String, OutputStream), text: &str) {
         let node_key: Option<String> = Some(node).filter(|node| !node.is_empty());
-        let dropped: u64 = std::mem::take(&mut self.unreported_drops);
-        match self.segments.last_mut() {
-            Some(last) if last.node_key == node_key && last.stream == stream && dropped == 0 => {
-                last.text.push_str(text);
+        for line in text.split_inclusive('\n') {
+            for piece in line_pieces(line) {
+                self.push_piece((&node_key, stream), &piece);
             }
-            _ => self.segments.push(OutputSegment {
-                node_key,
-                stream,
-                text: text.to_owned(),
-                dropped_bytes: dropped,
-            }),
         }
-        self.batch_bytes += text.len();
+    }
+
+    fn push_piece(&mut self, (node_key, stream): (&Option<String>, OutputStream), piece: &str) {
+        if self.batch_bytes + piece.len() > BATCH_TEXT_BYTES {
+            self.seal();
+        }
+        let joins: bool = self.unreported_drops == 0
+            && self
+                .segments
+                .last()
+                .is_some_and(|last| last.node_key == *node_key && last.stream == stream);
+        if joins {
+            if let Some(last) = self.segments.last_mut() {
+                last.text.push_str(piece);
+            }
+        } else {
+            if self.segments.len() >= MAX_BATCH_SEGMENTS {
+                self.seal();
+            }
+            self.segments.push(OutputSegment {
+                node_key: node_key.clone(),
+                stream,
+                text: piece.to_owned(),
+                dropped_bytes: std::mem::take(&mut self.unreported_drops),
+            });
+        }
+        self.batch_bytes += piece.len();
         self.batch_started.get_or_insert_with(Instant::now);
         if self.batch_bytes >= BATCH_TEXT_BYTES {
             self.seal();
@@ -104,7 +125,7 @@ impl UploadState {
 
     /// Whether the printing thread must wait for the sender before printing more.
     pub(crate) fn backlogged(&self) -> bool {
-        self.queued.len() > MAX_QUEUED_BATCHES && self.summary.failure.is_none()
+        self.queued.len() > MAX_QUEUED_BATCHES
     }
 
     /// Drop the newest queued batches past the limit and count their bytes, when the sender has stalled.
@@ -129,6 +150,43 @@ impl UploadState {
         self.batch_started
             .is_some_and(|started| now.duration_since(started) >= BATCH_WINDOW)
     }
+}
+
+/// How many leading bytes end on a character boundary; an incomplete UTF-8 sequence at the end waits for the next write.
+pub(crate) fn complete_characters(bytes: &[u8]) -> usize {
+    let tail: usize = bytes.len().min(3);
+    for back in 1..=tail {
+        let byte: u8 = bytes[bytes.len() - back];
+        if byte & UTF8_PREFIX_MASK == UTF8_CONTINUATION {
+            continue;
+        }
+        let width: usize = (byte.leading_ones() as usize).max(1);
+        return if width > back {
+            bytes.len() - back
+        } else {
+            bytes.len()
+        };
+    }
+    bytes.len()
+}
+
+/// A line cut into pieces of at most a partial line's size at character boundaries, each ending in a newline.
+pub(crate) fn line_pieces(line: &str) -> Vec<std::borrow::Cow<'_, str>> {
+    if line.len() <= MAX_PARTIAL_LINE_BYTES + 1 {
+        return vec![std::borrow::Cow::Borrowed(line)];
+    }
+    let body: &str = line.strip_suffix('\n').unwrap_or(line);
+    let mut pieces: Vec<std::borrow::Cow<'_, str>> = Vec::new();
+    let mut start: usize = 0;
+    while start < body.len() {
+        let mut end: usize = (start + MAX_PARTIAL_LINE_BYTES).min(body.len());
+        while !body.is_char_boundary(end) {
+            end -= 1;
+        }
+        pieces.push(std::borrow::Cow::Owned(format!("{}\n", &body[start..end])));
+        start = end;
+    }
+    pieces
 }
 
 /// Post batches until the uploader closes and nothing is left, or its close budget is spent.
@@ -181,16 +239,10 @@ pub(crate) fn send_batches(
             Ok(()) => state.summary.stored_batches += 1,
             Err(failure) => {
                 state.summary.dropped_bytes += bytes;
+                state.unreported_drops += bytes;
                 if state.summary.failure.is_none() {
                     state.summary.failure = Some(failure);
                 }
-                let dropped: u64 = state
-                    .queued
-                    .drain(..)
-                    .flat_map(|queued| queued.segments)
-                    .map(|segment| segment.text.len() as u64)
-                    .sum();
-                state.summary.dropped_bytes += dropped;
             }
         }
     }

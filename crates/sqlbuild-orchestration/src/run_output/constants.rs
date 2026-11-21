@@ -87,3 +87,9 @@ pub(crate) const S3_SCHEME: &str = "s3://";
 
 /// Retention removes the output of at most this many runs per pass.
 pub(crate) const PRUNE_RUNS: i64 = 100;
+
+/// The top two bits of a UTF-8 byte, which mark a continuation byte when they are `10`.
+pub(crate) const UTF8_PREFIX_MASK: u8 = 0b1100_0000;
+
+/// The top two bits of a UTF-8 continuation byte.
+pub(crate) const UTF8_CONTINUATION: u8 = 0b1000_0000;
