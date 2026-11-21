@@ -18,6 +18,9 @@ class PlatformEventKind(StrEnum):
     LOCATION_BROKEN = "location_broken"
     LAUNCH_FAILED = "launch_failed"
     RUN_FAILED = "run_failed"
+    TRIGGER_SKIPPED = "trigger_skipped"
+    SENSOR_RECHECKED = "sensor_rechecked"
+    CALENDAR_TIMES_DROPPED = "calendar_times_dropped"
 
 
 class RunEventKind(StrEnum):
