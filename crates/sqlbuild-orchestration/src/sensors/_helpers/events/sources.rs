@@ -131,9 +131,10 @@ async fn new_data_event(
         other = predicate.replace("record_json", "other.record_json"),
         latest = predicate.replace("record_json", "latest.record_json"),
     ), parameters).await?;
-    let Some((record, row)) = latest_record(&rows)? else {
+    let Some(row) = rows.first() else {
         return Ok((transaction, None));
     };
+    let record = freshness_record(row)?;
     Ok((
         transaction,
         Some(SensorEvent::SourceNewData {
@@ -158,9 +159,10 @@ async fn stale_event(
         "SELECT record_json FROM sqb_warehouse_freshness WHERE location_id=$1 AND target=$2 \
          AND record_json ->> 'source_name'=$3{predicate} ORDER BY observed_at DESC,event_id DESC LIMIT 1"
     ), parameters).await?;
-    let Some((record, _)) = latest_record(&rows)? else {
+    let Some(row) = rows.first() else {
         return Ok((transaction, None));
     };
+    let record = freshness_record(row)?;
     if !stale_version(&record, transaction.now, after_seconds)? {
         return Ok((transaction, None));
     }
@@ -177,23 +179,12 @@ async fn stale_event(
     ))
 }
 
-/// The newest freshness record among `rows`, with its row.
-fn latest_record(
-    rows: &[BTreeMap<String, serde_json::Value>],
-) -> Result<
-    Option<(
-        WarehouseFreshnessRecord,
-        &BTreeMap<String, serde_json::Value>,
-    )>,
-    ControlError,
-> {
-    rows.first()
-        .map(|row| {
-            serde_json::from_value(row["record_json"].clone())
-                .map(|record| (record, row))
-                .map_err(|error| ControlError::Invalid(error.to_string()))
-        })
-        .transpose()
+/// The freshness record a row holds.
+fn freshness_record(
+    row: &BTreeMap<String, serde_json::Value>,
+) -> Result<WarehouseFreshnessRecord, ControlError> {
+    serde_json::from_value(row["record_json"].clone())
+        .map_err(|error| ControlError::Invalid(error.to_string()))
 }
 
 /// A source event's stable ID: `kind`, then a digest of the source, its relation, its version and `also`.

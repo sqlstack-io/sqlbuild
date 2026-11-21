@@ -1381,7 +1381,7 @@ reason = "Catalog pages read a namespace and statistics pages an exact relation 
 
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-orchestration/src/sensors/_helpers/events/sources.rs"]
-reason = "The new-data sensor keys events on a source's version streak and the stale-source sensor on timestamp age; paging, scoping, decoding and event IDs share source_page, source_scope, latest_record and version_id."
+reason = "The new-data sensor keys events on a source's version streak and the stale-source sensor on timestamp age; paging, scoping, decoding and event IDs share source_page, source_scope, freshness_record and version_id."
 
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-orchestration/src/sensors/_helpers/events/nodes.rs"]
