@@ -7,10 +7,13 @@
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import { app } from '$lib/state/app.svelte';
 	import type { MemberCardData } from './member-graph';
+	import { clickGuard } from './click-guard';
 
 	// A member job opened in place: a box around its nodes, as an open folder on Lineage, whose header closes it.
 	let { data, selected }: NodeProps = $props();
 	const d = $derived(data as MemberCardData);
+	// The header drags the box like a title bar; a click that did not move closes it.
+	const guard = clickGuard();
 </script>
 
 <div class="box" class:selected>
@@ -18,10 +21,10 @@
 	<!-- The whole header row closes the box; its links go where they say. Zoomed out, the target grows upward. -->
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<span class="head-hit nodrag" aria-hidden="true" onclick={() => d.ontoggle?.(d.jobKey)}></span>
+	<span class="head-hit" aria-hidden="true" onpointerdown={guard.down} onclick={(e) => guard.still(e) && d.ontoggle?.(d.jobKey)}></span>
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="head nodrag" onclick={(e) => !(e.target as Element).closest('a, button') && d.ontoggle?.(d.jobKey)}>
+	<div class="head" onpointerdown={guard.down} onclick={(e) => guard.still(e) && !(e.target as Element).closest('a, button') && d.ontoggle?.(d.jobKey)}>
 		<!-- raw-button: the header of a member box on the group graph, clickable as a whole to close it -->
 		<button class="toggle nodrag" title="Close {d.jobKey}" aria-expanded="true" onclick={() => d.ontoggle?.(d.jobKey)}>
 			<ChevronDownIcon size={14} class="chevron" />
