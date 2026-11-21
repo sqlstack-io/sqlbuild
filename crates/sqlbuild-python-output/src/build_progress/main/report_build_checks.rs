@@ -1,4 +1,4 @@
-//! A worker build reports each audit and SQL test it ran as a check result, as `sqb audit` and `sqb test` do.
+//! A worker build reports each audit and SQL test it ran as a check result, as `sqb audit` and `sqb test` do, without checking for a cancel: the build is already finishing.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_host::models::{AuditExecutionResult, AuditOutcome, SqlTestOutcome};
@@ -39,7 +39,7 @@ pub fn report_build_checks(
             AuditOutcome::Skipped => NodeOutcome::Skipped,
             AuditOutcome::Error => NodeOutcome::Failed,
         };
-        worker.finish_attached(py, &audit_check_id(&audit)?, outcome)?;
+        worker.report_attached(py, &audit_check_id(&audit)?, outcome)?;
     }
     for test in field(executor_result, "test_results")?.try_iter()? {
         let test = test?;
@@ -49,7 +49,7 @@ pub fn report_build_checks(
         } else {
             NodeOutcome::Failed
         };
-        worker.finish_attached(py, &sql_test_identity(&test, "test_name")?, outcome)?;
+        worker.report_attached(py, &sql_test_identity(&test, "test_name")?, outcome)?;
     }
     Ok(())
 }
