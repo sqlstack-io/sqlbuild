@@ -20,6 +20,12 @@ describe('a card status line on one line', () => {
 		expect(fitStatus(parts, measure, 150)).toEqual({ label: false, driftWord: false });
 	});
 
+	it('counts the separator and the checks badge as drawn, so a line that measures exactly the room still shortens', () => {
+		// Inter's widths of these parts in a browser: the line draws 219 px, past the card's 214.
+		const inter: Measure = (text) => ({ Success: 44, '13m ago': 44, changed: 44, '✕ 1': 16 })[text] ?? 0;
+		expect(fitStatus({ label: 'Success', when: '13m ago', drift: 'changed', checks: '✕ 1' }, inter)).toEqual({ label: true, driftWord: false });
+	});
+
 	it('has the room of a card', () => {
 		expect(STATUS_ROOM).toBe(214);
 	});
