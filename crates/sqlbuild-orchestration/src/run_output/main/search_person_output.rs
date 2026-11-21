@@ -39,6 +39,7 @@ pub async fn search_person_output(
             async |transaction, _| view_chunk_count(transaction, &view).await,
             |_: &i64| json!({"node": query.node, "stream": query.stream}),
         ),
+        None,
     )
     .await?
     else {

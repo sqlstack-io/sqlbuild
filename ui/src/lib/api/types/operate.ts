@@ -310,6 +310,16 @@ export type RunEventCheck = {
 	resultId: string | null;
 };
 
+/** A read of a run's output that carries on from the last: lines, the run's `ctx.log` lines and the run's last line. */
+export type RunOutputFollow = {
+	lines: RunOutputLine[];
+	logs: RunEvent[];
+	/** The last line read, to carry on from. */
+	last: number;
+	/** Whether `lines` are the newest lines, replacing earlier reads, rather than those after `after`. */
+	replaced: boolean;
+};
+
 export type RunEventPage = {
 	events: RunEvent[];
 	/** Pass back as `after` for the next page; null when there are no more events yet. */
@@ -463,7 +473,13 @@ export type NodeOutputPage = { total: number; from: number; to: number; rows: No
  * A search of a node's output: the next match, and, where the output was small enough to search whole,
  * how many lines match and this one's place among them (1-based); null for a large output.
  */
-export type NodeOutputSearch = { count: number | null; line: number | null; rank: number | null };
+export type NodeOutputSearch = {
+	count: number | null;
+	line: number | null;
+	rank: number | null;
+	/** Where to search on, when this search stopped part-way through a large output without a match. */
+	continueFrom?: number | null;
+};
 /** The rows a failing check found: a sample, and how many there were in all. */
 export type CheckSample = { columns: string[]; rows: (string | number | null)[][]; total: number };
 

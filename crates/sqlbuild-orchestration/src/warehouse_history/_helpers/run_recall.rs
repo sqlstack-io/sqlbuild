@@ -1,11 +1,13 @@
 //! A run's Recall rows: the scheduler invocation and its claimed worker's invocations, with fixed column lists.
 
 use std::collections::BTreeSet;
+use std::time::Duration;
 
 use serde_json::{Value, json};
 use sqlbuild_recall::records::constants::AUDIT_COMPLETED_EVENT;
 use uuid::Uuid;
 
+use crate::warehouse_history::_helpers::audit_repeats::{audit_due, record_audit};
 use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::main::audit::append_audit::append_audit;
@@ -121,6 +123,7 @@ pub(crate) async fn sensitive_run_read<T>(
         ) -> Result<(ControlTransaction, T), ControlError>,
         impl FnOnce(&T) -> Value,
     ),
+    repeat: Option<Duration>,
 ) -> Result<Option<T>, ControlError> {
     let Some((transaction, scope, Some((context, permission)))) =
         begin_run_recall(store, credentials, run, (default_role, Some(action))).await?
@@ -128,18 +131,28 @@ pub(crate) async fn sensitive_run_read<T>(
         return Ok(None);
     };
     let (transaction, result) = read(transaction, &scope).await?;
-    let transaction = append_audit(
-        transaction,
-        &context,
-        (Uuid::now_v7(), audit_action),
-        (
-            json!(permission),
-            json!(null),
-            json!({"run_id": run.2, "read": details(&result)}),
-        ),
-    )
-    .await?;
+    // A read repeated while a page follows the run is authorized each time but audited once per window.
+    let key = (context.actor.as_str(), audit_action, run.2);
+    let audited: bool = repeat.is_none_or(|window| audit_due(key, window));
+    let transaction = if audited {
+        append_audit(
+            transaction,
+            &context,
+            (Uuid::now_v7(), audit_action),
+            (
+                json!(permission),
+                json!(null),
+                json!({"run_id": run.2, "read": details(&result)}),
+            ),
+        )
+        .await?
+    } else {
+        transaction
+    };
     commit(transaction).await?;
+    if audited && repeat.is_some() {
+        record_audit(key);
+    }
     Ok(Some(result))
 }
 

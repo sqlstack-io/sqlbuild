@@ -5,7 +5,7 @@ import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, isUnsupported, type ApiClient } from './client';
 import { applyNodeStates } from './node-states';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
-import { LIVE_OUTPUT_ROWS, outputLive, pageQuery, toNodeLogEvents, toNodeOutputIndex, toNodeOutputPage, toRunOutputLines, type NodeOutputAt } from './http-output';
+import { LIVE_OUTPUT_ROWS, SEARCH_PARTS, followedOutput, outputLive, pageQuery, toNodeOutputIndex, toNodeOutputPage, toRunOutputLines, type NodeOutputAt } from './http-output';
 import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage, toNodeStates, toNodeStatusDelta } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
@@ -24,7 +24,7 @@ import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape, AutomaticWithdrawal } from './types/build';
-import type { NodeOutputIndex, NodeOutputPage, NodeOutputSearch, RunEvent, RunNode, AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
+import type { NodeOutputIndex, NodeOutputPage, NodeOutputSearch, RunNode, RunOutputFollow, AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 import { newRequestId } from '$lib/browser/request-id';
 
 type Wire = components['schemas'];
@@ -414,14 +414,10 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		},
 		async listRunEvents(scope: Scope, runId: string, query: { after?: number; limit?: number } = {}): Promise<RunEventPage> {
 			const limit = query.limit ?? 1000;
-			// The first page also carries the lines nodes logged with `ctx.log`, which come with the run's output.
-			const [{ data, error, response }, logs] = await Promise.all([
-				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events', { params: { path: runPath(scope, runId), query: { after: query.after, limit } } }),
-				query.after == null ? nodeLogEvents(scope, runId) : Promise.resolve([])
-			]);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events', { params: { path: runPath(scope, runId), query: { after: query.after, limit } } });
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
-			return { events: [...data.flatMap((e) => toRunEvent(e, runId) ?? []), ...logs], nextCursor: data.length === limit ? (data.at(-1)?.storage_id ?? null) : null };
+			return { events: data.flatMap((e) => toRunEvent(e, runId) ?? []), nextCursor: data.length === limit ? (data.at(-1)?.storage_id ?? null) : null };
 		},
 		async listRunStatements(scope: Scope, runId: string): Promise<RunStatement[]> {
 			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements', { params: { path: runPath(scope, runId) } });
@@ -486,6 +482,25 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toRunOutput(data);
 		},
+		async followRunOutput(scope: Scope, runId: string, after: number | null): Promise<RunOutputFollow | null> {
+			const refusal = `${scope.locationId}|${runId}`;
+			if (!evidenceLocations.has(scope.locationId) || outputRefused.has(refusal)) return { lines: [], logs: [], last: 0, replaced: true };
+			const lines = (query: { from?: number; tail?: boolean }) =>
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/lines', { params: { path: runPath(scope, runId), query: { ...query, limit: LIVE_OUTPUT_ROWS } } });
+			// The index (each node's totals and its `ctx.log` lines) once, beside the lines since the last read.
+			const [index, page] = await Promise.all([
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index', { params: { path: runPath(scope, runId) } }),
+				lines(after == null ? { tail: true } : { from: after + 1 })
+			]);
+			if (page.response.status === 401) onUnauthorized();
+			if (page.response.status === 403) outputRefused.add(refusal);
+			if (page.response.status === 403) return { lines: [], logs: [], last: 0, replaced: true };
+			// A server that keeps no output store: the caller reads Recall's output instead.
+			if (!page.data || !index.data) return null;
+			// Too many new lines to read on from the last: start again from the newest.
+			const fresh = after != null && page.data.next != null ? (await lines({ tail: true })).data : null;
+			return followedOutput(fresh ?? page.data, index.data, runId, after == null || fresh != null);
+		},
 		async getNodeOutputIndex(scope: Scope, runId: string, nodeKey: string): Promise<NodeOutputIndex | null> {
 			if (!evidenceLocations.has(scope.locationId)) return null;
 			const [{ data, error, response }, nodes] = await Promise.all([
@@ -505,19 +520,21 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toNodeOutputPage(data);
 		},
-		async searchNodeOutput(scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward'): Promise<NodeOutputSearch> {
-			// A large output is searched a bounded part at a time; carry on from where each part stopped.
+		async searchNodeOutput(scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward', signal?: AbortSignal): Promise<NodeOutputSearch> {
+			// A large output is searched a bounded part at a time: carry on from where each part stopped,
+			// for a few parts, then hand back where to search on. A newer search aborts this one.
 			const searchFrom = async (start: number): Promise<Wire['OutputSearch']> => {
 				const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/search', {
-					params: { path: runPath(scope, runId), query: { node: nodeKey, text: query, from: start, direction } }
+					params: { path: runPath(scope, runId), query: { node: nodeKey, text: query, from: start, direction } },
+					signal
 				});
 				if (response.status === 401) onUnauthorized();
 				if (!data) throw new ApiError(errorText(error, response), response.status);
 				return data;
 			};
 			let found: Wire['OutputSearch'] = await searchFrom(from);
-			while (found.line == null && found.continue_from != null) found = await searchFrom(found.continue_from);
-			return { line: found.line ?? null, count: found.count ?? null, rank: found.rank ?? null };
+			for (let part = 1; part < SEARCH_PARTS && found.line == null && found.continue_from != null; part++) found = await searchFrom(found.continue_from);
+			return { line: found.line ?? null, count: found.count ?? null, rank: found.rank ?? null, continueFrom: found.line == null ? (found.continue_from ?? null) : null };
 		},
 		nodeOutputDownloadUrl(scope: Scope, runId: string, nodeKey: string): string {
 			const { location_id, target, run_id } = runPath(scope, runId);
@@ -1336,14 +1353,6 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		const found = await findRun(scope, runId);
 		if (!found) throw new ApiError('The run is not in the recent runs of this location', 404);
 		return found.run;
-	}
-
-	/** The run's `ctx.log` lines as events; none where its output may not be read or the server keeps none. */
-	async function nodeLogEvents(scope: Scope, runId: string): Promise<RunEvent[]> {
-		if (!evidenceLocations.has(scope.locationId)) return [];
-		const { data, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index', { params: { path: runPath(scope, runId) } });
-		if (response.status === 401) onUnauthorized();
-		return data ? toNodeLogEvents(data, runId) : [];
 	}
 
 	async function runNodes(scope: Scope, runId: string) {

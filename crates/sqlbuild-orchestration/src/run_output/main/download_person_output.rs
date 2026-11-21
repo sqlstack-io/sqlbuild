@@ -34,6 +34,7 @@ pub async fn download_person_output(
             async |transaction, _| view_line_count(transaction, &view).await,
             |lines: &i64| json!({"node": query.node, "stream": query.stream, "lines": lines}),
         ),
+        None,
     )
     .await?
     else {

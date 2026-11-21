@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { outputLive, pageQuery, toNodeLogEvents, toNodeOutputIndex, toNodeOutputPage, toRunOutputLines } from './http-output';
+import { followedOutput, outputLive, pageQuery, toNodeLogEvents, toNodeOutputIndex, toNodeOutputPage, toRunOutputLines } from './http-output';
 
 type W = components['schemas'];
 
@@ -117,5 +117,21 @@ describe('node output mapping', () => {
 			['model:orders', 'stdout', 'batch 40 done', 0],
 			['model:customers', 'stdout', 'loaded customers', 0]
 		]);
+	});
+
+	it('reads a follow as the newest lines with markers, or as new lines alone, and carries on from the last line', () => {
+		const index: W['RunOutputIndex'] = {
+			nodes: [{ node_key: 'model:orders', line_count: 50, stdout_lines: 50, stderr_lines: 0, text_bytes: 600 }],
+			line_count: 50,
+			omitted_bytes: 0,
+			omitted_lines: 0,
+			dropped_bytes: 0,
+			marks: [],
+			logs: [{ node_key: 'model:orders', level: 'info', message: 'halfway', logged_at: '2026-11-21T09:00:00Z' }]
+		};
+		const page: W['OutputPage'] = { rows: [{ kind: 'line', line: line(50, 'done') }], line_count: 50, from: 50, to: 51, next: null, previous: 50 };
+		const newest = followedOutput(page, index, 'r1', true);
+		const since = followedOutput(page, index, 'r1', false);
+		expect([newest.lines.map((l) => l.omitted ?? 0), since.lines.map((l) => l.omitted ?? 0), newest.last, newest.logs.length, since.replaced]).toEqual([[49, 0], [0], 50, 1, false]);
 	});
 });

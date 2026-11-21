@@ -35,7 +35,7 @@
 	const filtering = $derived(sel.size > 0);
 	// One line per node outcome, with its checks folded in; `app.now` keeps a building node's line current.
 	const edges = $derived(view.detail?.edges ?? []);
-	const entries = $derived(logEntries(view.eventsRes.data ?? [], view.outputRes.data ?? [], { nodes: view.nodes, skipCause: (n) => skipCause(n, view.nodes, edges), now: app.now }));
+	const entries = $derived(logEntries(view.events, view.outputRes.data ?? [], { nodes: view.nodes, skipCause: (n) => skipCause(n, view.nodes, edges), now: app.now }));
 	const statements = $derived(filtering ? view.statements.filter((s) => sel.has(s.nodeKey)) : view.statements);
 	// Printed lines carry their node when sqb printed them for one; others are kept when they mention it.
 	const shownEntries = $derived(filtering ? entries.filter((e) => (e.nodeKey ? sel.has(e.nodeKey) : filterKeys.some((k) => e.text.includes(k)))) : entries);

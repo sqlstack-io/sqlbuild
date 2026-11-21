@@ -6,6 +6,7 @@ use crate::credentials::models::Action;
 use crate::run_output::_helpers::views::output_index;
 use crate::run_output::models::RunOutputIndex;
 use crate::run_output::types::PersonRunRead;
+use crate::runs::constants::REPEATED_READ_AUDIT;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 use crate::warehouse_history::main::read_run_evidence::read_run_evidence;
@@ -26,6 +27,7 @@ pub async fn read_person_output_index(
             async move |transaction, _| output_index(transaction, (run_id, node)).await,
             |index: &RunOutputIndex| json!({"nodes": index.nodes.len(), "logs": index.logs.len(), "node": node}),
         ),
+        Some(REPEATED_READ_AUDIT),
     )
     .await
 }

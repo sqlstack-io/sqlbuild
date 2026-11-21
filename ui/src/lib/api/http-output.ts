@@ -1,5 +1,5 @@
 import type { components } from '$control/schema.d.ts';
-import type { NodeOutputIndex, NodeOutputLevel, NodeOutputLine, NodeOutputPage, NodeOutputRow, RunEvent, RunNode, RunOutputLine } from './types/operate';
+import type { NodeOutputIndex, NodeOutputLevel, NodeOutputLine, NodeOutputPage, NodeOutputRow, RunEvent, RunNode, RunOutputFollow, RunOutputLine } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -72,6 +72,9 @@ export function toNodeLogEvents(wire: Wire['RunOutputIndex'], runId: string): Ru
 	}));
 }
 
+/** Parts of a large output one search reads before it hands back where to search on. */
+export const SEARCH_PARTS = 8;
+
 /** The run's newest printed lines the log shows; earlier ones are in each node's output viewer. */
 export const LIVE_OUTPUT_ROWS = 2000;
 
@@ -93,4 +96,10 @@ export function toRunOutputLines(page: Wire['OutputPage'], index: Wire['RunOutpu
 		marked.add(line.node_key);
 		return [{ ...printed, text: '', omitted: earlier }, printed];
 	});
+}
+
+/** What one follow read gives: the lines (the newest, or those since the last read), the run's `ctx.log` lines, and its last line. */
+export function followedOutput(page: Wire['OutputPage'], index: Wire['RunOutputIndex'], runId: string, replaced: boolean): RunOutputFollow {
+	const lines = replaced ? toRunOutputLines(page, index) : toRunOutputLines(page, { ...index, nodes: [] });
+	return { lines, logs: toNodeLogEvents(index, runId), last: Math.max(page.to - 1, 0), replaced };
 }

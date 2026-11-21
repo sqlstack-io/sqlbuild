@@ -27,6 +27,7 @@ import type {
 	RunEventPage,
 	RunListQuery,
 	RunNodeError,
+	RunOutputFollow,
 	RunOutputLine,
 	NodeOutputIndex,
 	NodeOutputPage,
@@ -128,10 +129,12 @@ export interface ApiClient extends PlatformApi {
 	/** One statement's SQL, fetched when its row is expanded. `view.sql` */
 	getStatementSql(scope: Scope, runId: string, statementId: string): Promise<StatementSql>;
 	listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]>;
+	/** The run's output from the output store since line `after` (the newest when null), with its `ctx.log` lines; null when the server keeps no output store. `view.evidence` */
+	followRunOutput?(scope: Scope, runId: string, after: number | null): Promise<RunOutputFollow | null>;
 	/** A node's output in the output store: how much there is and its error and warning lines, read by range. `view.evidence` */
 	getNodeOutputIndex?(scope: Scope, runId: string, nodeKey: string): Promise<NodeOutputIndex | null>;
 	getNodeOutputPage?(scope: Scope, runId: string, nodeKey: string, at: { from: number; rows: number; direction: 'forward' | 'backward'; collapse: boolean; stream?: 'all' | 'stdout' | 'stderr'; around?: number }): Promise<NodeOutputPage>;
-	searchNodeOutput?(scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward'): Promise<NodeOutputSearch>;
+	searchNodeOutput?(scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward', signal?: AbortSignal): Promise<NodeOutputSearch>;
 	/** Where the server streams a node's whole output as a file. */
 	nodeOutputDownloadUrl?(scope: Scope, runId: string, nodeKey: string): string;
 	/** A failing check's sample rows, by the check's statement. */
