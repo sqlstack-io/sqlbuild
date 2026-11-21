@@ -49,8 +49,7 @@ pub fn neutralize_interpolation(
     Ok(assemble(body, byte_sites))
 }
 
-/// The end of a `__table_fn(..)` call with its arguments and any `OVER (...)` clause, outside
-/// `TABLE( )` and `LATERAL`.
+/// The end of a `__table_fn(..)` call with its arguments and `OVER`, outside `TABLE( )`/`LATERAL`.
 fn unwrapped_table_call_end(
     body: &str,
     start: usize,
@@ -68,13 +67,17 @@ fn unwrapped_table_call_end(
     if body.as_bytes().get(open) != Some(&b'(') {
         return None;
     }
-    let close: usize = matching_paren(body.as_bytes(), open, policy).ok()?;
+    let close: usize = match matching_paren(body.as_bytes(), open, policy) {
+        Ok(close) => close,
+        Err(_) => return None,
+    };
     let syntax = dialect_lexical_syntax(SNOWFLAKE_DIALECT);
-    match over_clause_open(body, close + 1, &syntax.line_comment_prefixes) {
-        Some(over) => matching_paren(body.as_bytes(), over, policy)
-            .ok()
-            .map(|over_close| over_close + 1),
-        None => Some(close + 1),
+    let Some(over) = over_clause_open(body, close + 1, &syntax.line_comment_prefixes) else {
+        return Some(close + 1);
+    };
+    match matching_paren(body.as_bytes(), over, policy) {
+        Ok(over_close) => Some(over_close + 1),
+        Err(_) => None,
     }
 }
 

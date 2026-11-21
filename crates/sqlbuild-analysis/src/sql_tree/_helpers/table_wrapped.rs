@@ -1,5 +1,4 @@
-//! Snowflake table function markers wrapped in `TABLE( )` with any `OVER (...)` clause, as
-//! SQLBuild renders them.
+//! Snowflake table function markers and their `OVER (...)` wrapped in `TABLE( )`, as rendered.
 
 use sqlbuild_sqltext::resolution::main::over_clause_open::over_clause_open;
 use sqlbuild_sqltext::sql_scan::constants::TABLE_WRAPPER;

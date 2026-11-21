@@ -1,9 +1,4 @@
-//! A partitioned table function call's FROM-clause inputs, read as one row of NULLs.
-//!
-//! A `__table_fn__` fixture stands for the whole output of a call with an `OVER (...)` clause,
-//! emitted once. The rows a partitioned call returns are not tied to an input row, so the
-//! relations before the call in its FROM clause become one row whose columns are NULL:
-//! `FROM p, CALL s` reads as `FROM p RIGHT JOIN (SELECT 1) ON FALSE CROSS JOIN CALL s`.
+//! A partitioned call's FROM-clause inputs read as one row of NULLs, so its fixture is read once.
 
 use std::collections::BTreeMap;
 
@@ -24,7 +19,7 @@ const JOIN_WORDS: [&str; 8] = [
     "join", "cross", "inner", "left", "right", "full", "outer", "natural",
 ];
 
-/// `sql` with the inputs of every partitioned call that `mocked` accepts collapsed to one row.
+/// `sql` with each mocked partitioned call's inputs as `p RIGHT JOIN (SELECT 1) ON FALSE`.
 pub(crate) fn collapse_partition_inputs(
     sql: &str,
     pattern: &Regex,
@@ -151,8 +146,7 @@ fn scan_inputs(
     None
 }
 
-/// The separator right before the call, from the commas and words found scanning back to `FROM`;
-/// `None` when the call follows `FROM` directly.
+/// The separator right before the call, or `None` when the call follows `FROM` directly.
 fn separator(sql: &str, commas: &[usize], words: &[(usize, usize)]) -> Option<Separator> {
     let last_comma = commas.first().copied();
     let mut join_start = None;

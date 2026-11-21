@@ -98,6 +98,22 @@ _SECOND_CONNECTION_FAILS: dict[str, str] = {
     ),
 }
 
+_NO_COPIES: dict[str, str] = {
+    **_PROJECT_FILES,
+    "sqlbuild_project.toml": _PROJECT_FILES["sqlbuild_project.toml"].replace(
+        'adapter = "duckdb"', 'adapter = "duckdb_no_copies"'
+    ),
+    "adapters/duckdb_no_copies.py": (
+        "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
+        "class DuckDbNoCopiesAdapter(DuckDbAdapter):\n"
+        '    adapter_name = "duckdb_no_copies"\n\n'
+        "    def execute(self, *, connection, sql):\n"
+        '        if sql.startswith("CREATE OR REPLACE TEMP MACRO"):\n'
+        '            raise PermissionError("temporary macros are disabled on this session")\n'
+        "        return super().execute(connection=connection, sql=sql)\n"
+    ),
+}
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -242,23 +258,6 @@ def test_given_function_calling_another_when_testing_then_callee_current_definit
         tested.stdout + tested.stderr,
     )
     assert test_case.expected_stdout_fragment in tested.stdout, test_case.description
-
-
-_NO_COPIES: dict[str, str] = {
-    **_PROJECT_FILES,
-    "sqlbuild_project.toml": _PROJECT_FILES["sqlbuild_project.toml"].replace(
-        'adapter = "duckdb"', 'adapter = "duckdb_no_copies"'
-    ),
-    "adapters/duckdb_no_copies.py": (
-        "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
-        "class DuckDbNoCopiesAdapter(DuckDbAdapter):\n"
-        '    adapter_name = "duckdb_no_copies"\n\n'
-        "    def execute(self, *, connection, sql):\n"
-        '        if sql.startswith("CREATE OR REPLACE TEMP MACRO"):\n'
-        '            raise PermissionError("temporary macros are disabled on this session")\n'
-        "        return super().execute(connection=connection, sql=sql)\n"
-    ),
-}
 
 
 @pytest.mark.parametrize(

@@ -10,49 +10,8 @@ import pytest
 from tests.e2e.src.sqlbuild.cli.commands.main.test._test_types import (
     PartitionedCallFixtureE2ETestCase,
 )
+from tests.e2e.src.sqlbuild.cli.commands.main.test.helpers import partitioned_call_fixture_files
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
-
-_FUNCTION: str = (
-    "import polars as pl\n"
-    "from sqlbuild.functions import table_fn\n\n\n"
-    "@table_fn(\n"
-    '    arguments={"customer_id": "INTEGER", "amount": "DOUBLE"},\n'
-    '    returns={"customer_id": "INTEGER", "amount_smoothed": "DOUBLE"},\n'
-    '    runtime_version="3.12",\n'
-    ")\n"
-    "def main(payments: pl.DataFrame) -> pl.DataFrame:\n"
-    '    """Each customer\'s payment amounts, smoothed."""\n'
-    '    return payments.rename({"amount": "amount_smoothed"})\n'
-)
-
-
-def _files(test_case: PartitionedCallFixtureE2ETestCase) -> dict[str, str]:
-    return {
-        "sqlbuild_project.toml": (
-            'name = "payments_fixtures"\nadapter = "duckdb"\n'
-            '[connection]\ndatabase = "payments.duckdb"\n'
-        ),
-        "functions/python/smooth_payments.py": _FUNCTION,
-        "models/payments.sql": (
-            "MODEL (description 'Payments.', materialized table);\n"
-            "SELECT 1 AS customer_id, 10.0::DOUBLE AS amount\n"
-        ),
-        "models/smoothed_payments.sql": (
-            "MODEL (description 'Smoothed payments.', materialized table);\n"
-            "SELECT s.customer_id, s.amount_smoothed\n"
-            f'FROM __ref("payments") AS p, {test_case.call} AS s\n'
-        ),
-        "tests/unit/test_smoothed_payments.sql": (
-            'TEST (name "smoothed_payments__fixture");\nWITH\n'
-            "__ref__payments AS (\n"
-            "  SELECT * FROM (VALUES (1, 10.0::DOUBLE), (1, 20.0::DOUBLE), (1, 30.0::DOUBLE))\n"
-            "    AS v (customer_id, amount)\n),\n"
-            "__table_fn__smooth_payments AS (\n"
-            "  SELECT 1 AS customer_id, 20.0::DOUBLE AS amount_smoothed\n),\n"
-            f"__expected__smoothed_payments AS (\n  {test_case.expected_rows}\n)\n"
-            "SELECT 1\n"
-        ),
-    }
 
 
 @pytest.mark.parametrize(
@@ -89,7 +48,11 @@ def test_given_partitioned_call_fixture_when_testing_then_model_reads_each_fixtu
     tmp_path: Path,
 ) -> None:
     project_dir: Path = prepare_inline_project(
-        tmp_path=tmp_path, project_name="payments_fixtures", repo_files=_files(test_case)
+        tmp_path=tmp_path,
+        project_name="payments_fixtures",
+        repo_files=partitioned_call_fixture_files(
+            call=test_case.call, expected_rows=test_case.expected_rows
+        ),
     )
 
     tested: subprocess.CompletedProcess[str] = run_sqb(command=("test",), project_dir=project_dir)

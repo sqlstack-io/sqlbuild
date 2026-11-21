@@ -126,8 +126,7 @@ fn quoted_name(sql: &str, open: usize) -> Option<(String, usize)> {
     (valid && sql.as_bytes().get(close) == Some(&b')')).then(|| (name.to_owned(), close))
 }
 
-/// `sql` with calls and placeholders stubbed, table functions (with any `OVER (...)` clause)
-/// optionally wrapped in `TABLE( )`.
+/// `sql` with calls and placeholders stubbed, table functions and their `OVER` in `TABLE( )`.
 fn stub_calls(
     sql: &str,
     policy: QuotePolicy,
