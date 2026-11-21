@@ -340,9 +340,13 @@ def partner_files_sensor(ctx: SensorContext[None], partner_files):
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `minimum_interval_seconds` | 30 | How often a polling sensor is called, and how long a failed event waits before its retry |
-| `timeout_seconds` | 60 | How long one call may take |
+| `timeout_seconds` | 60 | How long one call may take, at most 600 |
 | `default_status` | `running` | `paused` publishes the sensor switched off |
 | `targets` | Every target | The targets the sensor runs for |
+
+A location calls one sensor function at a time, and while it runs, the location's other work
+waits: its other sensors, plans and sync. Keep functions short; a call that needs longer belongs
+in a job the sensor starts.
 
 ### When a tick fails
 

@@ -2,6 +2,7 @@
 
 use crate::declarations::models::Definitions;
 use crate::sensors::constants::SOURCE_NODE_KIND;
+use crate::sensors::main::sensor_timeout_error::sensor_timeout_error;
 use crate::sensors::models::{SensorCondition, SensorDefinition};
 use crate::snapshots::models::SnapshotInput;
 use crate::store::errors::ControlError;
@@ -11,6 +12,9 @@ pub(crate) fn validate_sensors(
     input: &SnapshotInput,
 ) -> Result<(), ControlError> {
     for (name, sensor) in &definitions.sensors {
+        if let Some(error) = sensor_timeout_error(name, sensor) {
+            return Err(ControlError::Invalid(error));
+        }
         let valid_condition = sensor
             .when
             .as_ref()

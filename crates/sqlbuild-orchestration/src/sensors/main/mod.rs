@@ -7,5 +7,6 @@ pub(crate) mod read_sensor_cursor;
 pub mod read_sensor_events;
 pub(crate) mod reset_sensor_cursor;
 pub mod sensor_failing;
+pub mod sensor_timeout_error;
 pub(crate) mod skip_sensor_event;
 pub(crate) mod validate_sensors;

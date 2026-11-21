@@ -10,6 +10,7 @@ use serde_json::Value;
 use serde_json::json;
 use sqlbuild_analysis::graph::models::ProjectGraph;
 use sqlbuild_orchestration::declarations::models::Definitions;
+use sqlbuild_orchestration::sensors::main::sensor_timeout_error::sensor_timeout_error;
 use sqlbuild_orchestration::sensors::models::SensorDefinition;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 use sqlbuild_python_base::native_host::constants::CHECK_EVENT_CONDITION;
@@ -61,6 +62,9 @@ pub fn compile_sensors(
             "declared_at": declared_at(project_dir, sensor.declared_at)?,
         }))
         .map_err(|error| PyValueError::new_err(format!("sensor {name}: {error}")))?;
+        if let Some(error) = sensor_timeout_error(&name, &definition) {
+            return Err(PyValueError::new_err(error));
+        }
         definitions.sensors.insert(name, definition);
     }
     Ok(definitions)

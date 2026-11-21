@@ -29,3 +29,5 @@ pub(crate) const NODE_EVENT_ROWS: &str = " AND n.started_at IS NOT NULL AND r.ki
 pub(crate) const CHECK_EVENT_ROWS: &str = " AND n.kind='check'";
 /// The tick phases a failing streak counts: failed, timed out, or abandoned because the location didn't answer.
 pub(crate) const FAILING_TICK_PHASES: &str = "(phase IN ('failed','timed_out') OR (phase='abandoned' AND fact_json -> 'outcome' ->> 'reason'='unanswered'))";
+/// The longest one call of a sensor's function may take: a running sensor holds its location's other sensors, plans and sync until it returns.
+pub const MAX_SENSOR_TIMEOUT_SECONDS: u32 = 600;

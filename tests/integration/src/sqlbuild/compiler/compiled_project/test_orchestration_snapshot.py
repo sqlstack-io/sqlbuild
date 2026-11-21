@@ -1789,6 +1789,25 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             expected_message="sensor\\(\\.\\.\\.\\) must decorate a function",
         ),
         SnapshotDiscoveryRejectionTestCase(
+            description="a sensor timeout past ten minutes cannot publish",
+            files={
+                "orchestration/jobs/refresh_orders_job.toml": (
+                    'name = "refresh_orders_job"\ndescription = "Build orders."\nselect = "orders"\n'
+                ),
+                "orchestration/sensors/slow_sensor.py": (
+                    "from sqlbuild.orchestration import sensor\n"
+                    "@sensor(description='Poll orders slowly.', timeout_seconds=601)\n"
+                    "def slow_sensor(ctx):\n"
+                    "    return None\n"
+                ),
+            },
+            expected_error=ValueError,
+            expected_message=(
+                "sensor slow_sensor: timeout_seconds is 601; the most is 600, because a running "
+                "sensor holds its location's other sensors, plans and sync until it returns"
+            ),
+        ),
+        SnapshotDiscoveryRejectionTestCase(
             description="a job description past max_description_lines cannot publish",
             files={
                 "orchestration/jobs/daily_job.toml": (
