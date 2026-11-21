@@ -63,16 +63,16 @@ export const SNAPSHOT_NODES: SnapshotNode[] = [
 	node('rpt_late_deliveries', 'table', 'fulfillment', ['agg_delivery_times', 'dim_customers']),
 	// Python nodes (CHI-1591): a loader that prints its paging, and a task that warns.
 	node('raw_events', 'loader', 'ingest', [], { cursor: 'timestamp', path: 'models/ingest/raw_events.py' }),
-	node('score_customers', 'task', 'ml', ['dim_customers'], { path: 'models/ml/score_customers.py' }),
+	node('score_customers', 'asset', 'ml', ['dim_customers'], { path: 'models/ml/score_customers.py' }),
 	// Several checks on one node (CHI-1591): all passing, one warning, two warnings, and a failure with warnings.
 	node('stg_sessions', 'view', 'staging', ['raw__customers']),
 	node('fct_payment_daily', 'table', 'finance', ['stg_payments']),
 	node('fct_order_lines', 'table', 'marts', ['stg_orders', 'stg_payments']),
 	node('fct_refunds', 'table', 'finance', ['stg_payments', 'fact_orders']),
 	// A Python task that fails with a pandas KeyError traceback after printing a few thousand lines.
-	node('score_customers_v2', 'task', 'ml', ['dim_customers'], { path: 'models/ml/score_customers_v2.py' }),
+	node('score_customers_v2', 'asset', 'ml', ['dim_customers'], { path: 'models/ml/score_customers_v2.py' }),
 	// A notebook runner that prints about 2 million lines (CHI-1597).
-	node('notebook_runner', 'task', 'ml', ['fact_orders'], { path: 'models/ml/notebook_runner.py' })
+	node('notebook_runner', 'asset', 'ml', ['fact_orders'], { path: 'models/ml/notebook_runner.py' })
 ];
 
 const BY_KEY = new Map(SNAPSHOT_NODES.map((n) => [n.key, n]));

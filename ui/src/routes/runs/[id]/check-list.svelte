@@ -78,6 +78,7 @@
 			{@const got = sample[c.statementId]}
 			<div class="panel">
 				{#if got?.state === 'ok' && got.value}
+					<!-- raw-table: a check's sample of failing rows, whose columns come from the check -->
 					<table>
 						<thead><tr>{#each got.value.columns as col (col)}<th>{col}</th>{/each}</tr></thead>
 						<tbody>

@@ -207,7 +207,7 @@
 							<!-- raw-button: a folded run of similar lines, which opens them unfolded from its first line -->
 							<button class="ln similar" class:target={has(r, target)} onclick={() => ((collapse = false), load(r.from, 'forward', has(r, target) ? target : null))} title="Show these lines unfolded">
 								<span class="no">{fmt(r.from)}</span>
-								<pre><b>×{fmt(r.count)} similar:</b> {r.sample.text}</pre>
+								<pre><b>{fmt(r.count)} similar lines:</b> {r.sample.text}</pre>
 							</button>
 						{/if}
 					{/each}

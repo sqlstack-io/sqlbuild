@@ -34,7 +34,7 @@ const reportsRowsWhileRunning = (key: string) => snapshotNode(key)?.kind === 'lo
 /** Rows a finished node reports: added rows for incrementals and loaders, the table's count from metadata after a rebuild, none for views and tasks. */
 const finishedRows = (key: string, ms: number): number | null => {
 	const kind = snapshotNode(key)?.kind;
-	if (kind === 'view' || kind === 'task') return null;
+	if (kind === 'view' || kind === 'asset') return null;
 	if (kind === 'incremental' || kind === 'loader') return Math.round((ms / 1000) * protoRate(key));
 	return 800 + (hash(`${key}/rows`) % 60_000);
 };

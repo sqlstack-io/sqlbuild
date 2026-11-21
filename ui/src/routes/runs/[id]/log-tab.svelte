@@ -19,6 +19,8 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import LogFilter, { type FilterOption } from './log-filter.svelte';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import { cn } from '$lib/utils';
+	import { buttonVariants } from '$lib/components/ui/button/button.svelte';
 
 	let {
 		entries,
@@ -202,7 +204,7 @@
 	{/if}
 	<LogFilter bind:value={query} options={filterOptions} />
 	<DropdownMenu.Root>
-		<DropdownMenu.Trigger class="menu-trigger" aria-label="Levels">{level === 'all' ? 'Levels' : levelText} <ChevronDownIcon size={13} /></DropdownMenu.Trigger>
+		<DropdownMenu.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'menu-trigger')} aria-label="Levels">{level === 'all' ? 'Levels' : levelText} <ChevronDownIcon size={13} /></DropdownMenu.Trigger>
 		<DropdownMenu.Content class="w-44">
 			<DropdownMenu.RadioGroup value={level} onValueChange={(v) => setTerm('level', v === 'all' ? null : v)}>
 				{#each levelOptions as l (l.value)}<DropdownMenu.RadioItem value={l.value}>{l.label}<span class="menu-count">{l.count}</span></DropdownMenu.RadioItem>{/each}
@@ -211,7 +213,7 @@
 	</DropdownMenu.Root>
 	{#if !printed && kindValues.length > 1}
 		<DropdownMenu.Root>
-			<DropdownMenu.Trigger class="menu-trigger" aria-label="Kinds">{kind === 'all' ? 'Kinds' : kind} <ChevronDownIcon size={13} /></DropdownMenu.Trigger>
+			<DropdownMenu.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'menu-trigger')} aria-label="Kinds">{kind === 'all' ? 'Kinds' : kind} <ChevronDownIcon size={13} /></DropdownMenu.Trigger>
 			<DropdownMenu.Content class="w-44">
 				<DropdownMenu.RadioGroup value={kind} onValueChange={(v) => setTerm('kind', v === 'all' ? null : v)}>
 					{#each kindOptions as k (k.value)}<DropdownMenu.RadioItem value={k.value}>{k.label}<span class="menu-count">{k.count}</span></DropdownMenu.RadioItem>{/each}

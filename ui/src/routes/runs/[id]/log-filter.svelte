@@ -73,8 +73,8 @@
 	{#if open && suggestions.length}
 		<ul class="menu" role="listbox" aria-label="Filter options">
 			{#each suggestions as s, i (s.text)}
-				<!-- raw-button: an option of the filter's dropdown -->
 				<li role="option" aria-selected={i === active}>
+					<!-- raw-button: an option of the filter's dropdown -->
 					<button class:on={i === active} onmousedown={(e) => (e.preventDefault(), choose(s))}><code>{s.text}</code>{#if s.hint}<span>{s.hint}</span>{/if}</button>
 				</li>
 			{/each}

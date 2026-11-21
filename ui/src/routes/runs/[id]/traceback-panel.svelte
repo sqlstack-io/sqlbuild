@@ -40,7 +40,7 @@
 <div class="tb">
 	<div class="exc"><b>{kind}</b>{#if rest.length}: <span class="mono">{rest.join(': ')}</span>{/if}</div>
 	<pre>{#if !all && lines.length > TAIL}<span class="faint">… {lines.length - TAIL} earlier lines</span>
-{/if}{#each shown as l, i (i)}{@const own = ownLine(l)}{#if own != null && onframe}<span>{l.slice(0, l.indexOf('File "'))}File "</span><button class="frame" onclick={() => onframe(own)} title="Show line {own} of {file}">{file}", line {own}</button><span>{l.slice(l.indexOf(`line ${own}`) + `line ${own}`.length)}</span>{:else}<span class:last={l === exception}>{l}</span>{/if}
+{/if}{#each shown as l, i (i)}{@const own = ownLine(l)}{#if own != null && onframe}<span>{l.slice(0, l.indexOf('File "'))}File "</span><Button variant="link" size="inline" class="frame" onclick={() => onframe(own)} title="Show line {own} of {file}">{file}", line {own}</Button><span>{l.slice(l.indexOf(`line ${own}`) + `line ${own}`.length)}</span>{:else}<span class:last={l === exception}>{l}</span>{/if}
 {/each}</pre>
 	<div class="acts">
 		{#if lines.length > TAIL}<Button variant="link" size="inline" class="text-[12px]" onclick={() => (all = !all)}>{all ? 'Show the last lines' : `Show all ${lines.length} lines`}</Button>{/if}
@@ -76,9 +76,8 @@
 	pre .last {
 		color: var(--sb-error);
 	}
-	.frame {
-		color: var(--primary);
-		text-decoration: underline;
+	pre :global(.frame) {
+		font: inherit;
 		text-decoration-color: color-mix(in srgb, var(--primary) 40%, transparent);
 	}
 	.faint {

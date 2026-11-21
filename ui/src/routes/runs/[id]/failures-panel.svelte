@@ -1,4 +1,6 @@
 <script lang="ts">
+	import CircleXIcon from '@lucide/svelte/icons/circle-x';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import { app } from '$lib/state/app.svelte';
@@ -56,11 +58,11 @@
 	<li>
 		<!-- raw-button: the failure's one line, opening its location and text -->
 		<button class="row" onclick={() => toggle(n)} aria-expanded={open.has(key)} title={open.has(key) ? 'Hide the error' : 'Show where it failed and the error'}>
-			<span class="x">✗</span>
+			<CircleXIcon class="x" size={14} aria-hidden="true" />
 			<span class="node mono">{n.nodeKey}</span>
 			{#if n.runId !== view.run?.id}<span class="faint">in {n.jobKey ?? shortRunId(n.runId)}</span>{/if}
 			<span class="msg">{n.errorMessage ?? loaded?.message?.split('\n')[0] ?? (n.errorCode ? `Failed with ${n.errorCode}` : 'Failed')}</span>
-			<span class="caret" class:open={open.has(key)}>▸</span>
+			<ChevronRightIcon class={open.has(key) ? 'caret open' : 'caret'} size={14} aria-hidden="true" />
 		</button>
 		{#if open.has(key)}
 			{@const got = errors[key]}
@@ -97,9 +99,9 @@
 		{:else}
 			<!-- raw-button: the failures' one line, opening the list -->
 			<button class="row head" onclick={() => (listOpen = !listOpen)} aria-expanded={listOpen}>
-				<span class="x">✗</span><b>{failed.length} failed</b>
+				<CircleXIcon class="x" size={14} aria-hidden="true" /><b>{failed.length} failed</b>
 				{#if skipped}<span class="faint">· {skipped} skipped because of them</span>{/if}
-				<span class="caret" class:open={listOpen}>▸</span>
+				<ChevronRightIcon class={listOpen ? 'caret open' : 'caret'} size={14} aria-hidden="true" />
 			</button>
 			{#if listOpen}
 				<ul class="nested">
@@ -142,15 +144,16 @@
 		color: var(--sb-error);
 		font-weight: 600;
 	}
-	.x {
+	.row :global(.x) {
+		flex: none;
 		color: var(--sb-error);
-		font-weight: 600;
 	}
-	.caret {
+	.row :global(.caret) {
+		flex: none;
 		color: var(--sb-text-faint);
 		transition: transform 0.12s;
 	}
-	.caret.open {
+	.row :global(.caret.open) {
 		transform: rotate(90deg);
 	}
 	.more {
