@@ -11,6 +11,8 @@ pub enum ControlError {
     Worker(#[from] tokio::task::JoinError),
     #[error("control-store filesystem: {0}")]
     Io(#[from] std::io::Error),
+    #[error("run output store: {0}")]
+    OutputStore(#[from] object_store::Error),
     #[error("invalid control-plane data: {0}")]
     Invalid(String),
     #[error("control-plane operation denied: {reason}; decision {decision_id}")]

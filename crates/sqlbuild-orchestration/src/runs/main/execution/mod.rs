@@ -6,4 +6,5 @@ pub mod monitor_runs;
 pub mod observe_run;
 pub mod publish_run_output;
 pub mod publish_run_recall;
+pub mod require_active_claim;
 pub mod run_execution;

@@ -15,6 +15,7 @@ from sqlbuild.adapter.contract.types import (
     HistoricalSnapshotCloseStyle,
     HistoricalSnapshotInsertStyle,
     LifeCycleEventKind,
+    LogLevel,
     MigrationTransfer,
     RelationReadStatus,
     RetentionChangePhase,
@@ -462,3 +463,4 @@ class LifeCycleEvent:
 
     kind: LifeCycleEventKind
     content: str
+    level: LogLevel | None = None

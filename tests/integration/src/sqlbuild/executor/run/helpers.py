@@ -49,7 +49,7 @@ def create_python_hook_data(ctx: HookContext, value: int) -> None:
     ctx.execute_sql(
         f"CREATE TABLE {ctx.destination.schema}.python_hook_data AS SELECT {value} AS val"
     )
-    ctx.log(f"python pre-hook created data for {ctx.model_name}")
+    ctx.log.info(f"python pre-hook created data for {ctx.model_name}")
 
 
 def insert_table_hook_log(ctx: HookContext, phase: str) -> None:

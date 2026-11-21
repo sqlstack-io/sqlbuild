@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
 
-from sqlbuild._native import CostContext
+from sqlbuild._native import CostContext, output_node_scope
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.compiler.python_nodes.types import (
     PythonNodeFanInAction,
@@ -113,10 +113,13 @@ def _execute_ready_node(
     on_result: OwnedResultCallback | None,
 ) -> PythonNodeExecutionResult:
     node_kind: PythonNodeKind = PythonNodeKind.ASSET
-    with CostContext.resource_scope(
-        resource_type=node_kind.value,
-        resource_name=node.name,
-        phase="execute",
+    with (
+        output_node_scope(f"{node_kind.value}:{node.name}"),
+        CostContext.resource_scope(
+            resource_type=node_kind.value,
+            resource_name=node.name,
+            phase="execute",
+        ),
     ):
         with ResourceAttemptLifecycle(
             resource_id=f"{node_kind.value}:{node.name}",
@@ -303,11 +306,14 @@ def _call_node_with_retry(
 ) -> PythonNodeExecutionResult:
     node_kind: PythonNodeKind = PythonNodeKind.ASSET
     if retry_policy is None:
-        with CostContext.resource_scope(
-            resource_type=node_kind.value,
-            resource_name=node.name,
-            phase="execute",
-            attempt=1,
+        with (
+            output_node_scope(f"{node_kind.value}:{node.name}"),
+            CostContext.resource_scope(
+                resource_type=node_kind.value,
+                resource_name=node.name,
+                phase="execute",
+                attempt=1,
+            ),
         ):
             with OperationLifecycle(
                 operation_kind="python_node",
@@ -333,11 +339,14 @@ def _call_node_with_retry(
     while True:
         retry_error: BaseException | None = None
         delay_seconds: float | None = None
-        with CostContext.resource_scope(
-            resource_type=node_kind.value,
-            resource_name=node.name,
-            phase="execute",
-            attempt=attempt,
+        with (
+            output_node_scope(f"{node_kind.value}:{node.name}"),
+            CostContext.resource_scope(
+                resource_type=node_kind.value,
+                resource_name=node.name,
+                phase="execute",
+                attempt=attempt,
+            ),
         ):
             with OperationLifecycle(
                 operation_kind="python_node",

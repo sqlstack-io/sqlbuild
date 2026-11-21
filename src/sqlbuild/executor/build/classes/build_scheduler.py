@@ -33,6 +33,7 @@ from sqlbuild._native import (
     SqlTestPlanEntry,
     TableTypePlanEntry,
     audit_resource_id,
+    output_node_scope,
     sql_test_resource_id,
 )
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
@@ -701,12 +702,17 @@ class BuildScheduler:
         self, *, key: CompiledObjectKey, pool: ThreadPoolExecutor, connection: Any
     ) -> ModelExecutionResult:
         try:
-            with CostContext.scope(
-                run_id=self._run_id,
-                resource_type=str(key.resource_type),
-                resource_name=key.name,
-                ledger_path=(self._runtime_dir / "executions" / self._run_id / "statements.jsonl"),
-                on_statement_complete=self._on_statement_complete,
+            with (
+                output_node_scope(f"{key.resource_type}:{key.name}"),
+                CostContext.scope(
+                    run_id=self._run_id,
+                    resource_type=str(key.resource_type),
+                    resource_name=key.name,
+                    ledger_path=(
+                        self._runtime_dir / "executions" / self._run_id / "statements.jsonl"
+                    ),
+                    on_statement_complete=self._on_statement_complete,
+                ),
             ):
                 failure: str | None = self._switch_failure(key=key, connection=connection)
                 if failure is not None:
@@ -1006,12 +1012,17 @@ class BuildScheduler:
             plan_action=None if planned is None else str(planned.action),
             plan_reason_code=None if planned is None else str(planned.reason),
         ) as lifecycle:
-            with CostContext.scope(
-                run_id=self._run_id,
-                resource_type=str(key.resource_type),
-                resource_name=key.name,
-                ledger_path=(self._runtime_dir / "executions" / self._run_id / "statements.jsonl"),
-                on_statement_complete=self._on_statement_complete,
+            with (
+                output_node_scope(f"{key.resource_type}:{key.name}"),
+                CostContext.scope(
+                    run_id=self._run_id,
+                    resource_type=str(key.resource_type),
+                    resource_name=key.name,
+                    ledger_path=(
+                        self._runtime_dir / "executions" / self._run_id / "statements.jsonl"
+                    ),
+                    on_statement_complete=self._on_statement_complete,
+                ),
             ):
                 result: (
                     ModelExecutionResult

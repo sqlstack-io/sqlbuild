@@ -12,6 +12,7 @@ from sqlbuild._native import (
     DiscoveredPythonNode,
     PythonNodeGraph,
     PythonNodeIdentity,
+    output_node_scope,
 )
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
@@ -150,6 +151,7 @@ def _execute_one_python_check(
     adapter: BaseAdapter = runtime.adapter
     providers: ProviderContainer | None = runtime.providers
     with (
+        output_node_scope(f"check:{check_function.name}"),
         CostContext.resource_scope(
             resource_type=PythonNodeKind.CHECK.value,
             resource_name=check_function.name,

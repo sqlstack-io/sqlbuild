@@ -38,9 +38,12 @@ use crate::compute_logs::_helpers::conversion::metadata_model;
 use crate::compute_logs::_helpers::conversion::rejection;
 use crate::compute_logs::_helpers::conversion::storage_error;
 use crate::compute_logs::_helpers::conversion::stream_index;
+use crate::recall::constants::STDOUT_STREAM_INDEX;
 use crate::recall::main::forward_diagnostic::forward_diagnostic;
 use crate::recall::main::forward_output::forward_output;
 use crate::recall::models::RecallLifecycleSink;
+use sqlbuild_orchestration::run_output::main::forward_output::forward_output as forward_run_output;
+use sqlbuild_orchestration::run_output::models::OutputStream;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
@@ -135,6 +138,14 @@ impl LocalFilesystemComputeLogStorage {
         let session = self.recall.get().map(Arc::as_ref);
         if stream != DIAGNOSTICS_STREAM {
             forward_output(session, invocation_id, (stream, data));
+            forward_run_output(
+                if stream == STDOUT_STREAM_INDEX {
+                    OutputStream::Stdout
+                } else {
+                    OutputStream::Stderr
+                },
+                data,
+            );
             return;
         }
         if let Ok(line) = std::str::from_utf8(data) {

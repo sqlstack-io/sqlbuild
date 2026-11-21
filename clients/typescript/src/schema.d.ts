@@ -850,6 +850,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["downloadPersonRunOutput"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonRunOutputIndex"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonRunOutputLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["searchPersonRunOutput"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements": {
         parameters: {
             query?: never;
@@ -1532,6 +1596,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["output"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/output/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["output_batch"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2539,8 +2619,34 @@ export interface components {
         };
         /** @enum {string} */
         NodeEventKind: "success" | "failed" | "recovered";
+        /**
+         * @description The level of a line a node logged with `ctx.log`.
+         * @enum {string}
+         */
+        NodeLogLevel: "info" | "warning" | "error";
+        /** @description One line a node logged with `ctx.log`. */
+        NodeLogLine: {
+            level: string;
+            /** Format: date-time */
+            logged_at: string;
+            message: string;
+            node_key: string;
+        };
         /** @enum {string} */
         NodeOutcome: "success" | "warn" | "failed" | "skipped" | "cancelled" | "not_run";
+        /** @description How much one node printed: its lines, numbered across both streams, and its bytes. */
+        NodeOutputSummary: {
+            /** Format: int64 */
+            line_count: number;
+            /** @description The node key, or `run` for lines printed outside any node. */
+            node_key: string;
+            /** Format: int64 */
+            stderr_lines: number;
+            /** Format: int64 */
+            stdout_lines: number;
+            /** Format: int64 */
+            text_bytes: number;
+        };
         /** @description One build attempt of a node by a run in this target; the same metadata as the run's node list. */
         NodeRunRecord: {
             /** Format: date-time */
@@ -2614,6 +2720,19 @@ export interface components {
             /** Format: int32 */
             retry_delay_seconds: number;
         };
+        /** @description What a worker printed in one batch window, a segment per node and stream in the order printed. */
+        OutputBatch: {
+            /**
+             * Format: int64
+             * @description The worker's batch number within its claim, from 0; a retried batch is stored once.
+             */
+            batch: number;
+            segments: components["schemas"]["OutputSegment"][];
+        };
+        /** @description Whether the server stored a batch; a retry of a stored batch is not stored again. */
+        OutputBatchReceipt: {
+            stored: boolean;
+        };
         /** @description One exact-byte output chunk. */
         OutputChunk: {
             /**
@@ -2636,6 +2755,69 @@ export interface components {
             sequence: number;
             stream: components["schemas"]["OutputStream"];
         };
+        /**
+         * @description How a printed line reads: as an error or as a warning.
+         * @enum {string}
+         */
+        OutputLevel: "error" | "warning";
+        /** @description One stored line; lines a size cap left out just before it are counted on it. */
+        OutputLine: {
+            /**
+             * Format: date-time
+             * @description When the server received the batch holding the line, within a few seconds of its printing.
+             */
+            at: string;
+            level?: null | components["schemas"]["OutputLevel"];
+            /** @description The node that printed it, or `run`. */
+            node_key: string;
+            /** Format: int64 */
+            number: number;
+            /** Format: int64 */
+            omitted_before?: number;
+            stream: components["schemas"]["OutputStream"];
+            text: string;
+        };
+        /** @description A line that looks like an error, such as a traceback, or a warning; each stream keeps at most 10,000. */
+        OutputMark: {
+            level: components["schemas"]["OutputLevel"];
+            /**
+             * Format: int64
+             * @description The line in the node's numbering.
+             */
+            line: number;
+            stream: components["schemas"]["OutputStream"];
+            /** @description The line's text, at most 300 bytes. */
+            text: string;
+        };
+        /** @description Rows covering lines `from` up to `to`, and where the pages before and after start. */
+        OutputPage: {
+            /**
+             * Format: int64
+             * @description The first line the rows cover.
+             */
+            from: number;
+            /**
+             * Format: int64
+             * @description The highest line number of the node, or of the run.
+             */
+            line_count: number;
+            /**
+             * Format: int64
+             * @description `from` for the next page, when there are later lines.
+             */
+            next?: number | null;
+            /**
+             * Format: int64
+             * @description `before` for the previous page, when there are earlier lines.
+             */
+            previous?: number | null;
+            rows: components["schemas"]["OutputRow"][];
+            /**
+             * Format: int64
+             * @description The line after the last the rows cover.
+             */
+            to: number;
+        };
         /** @description Differing retries retain conflict evidence while preserving the first output bytes. */
         OutputPublication: {
             /** Format: int32 */
@@ -2645,8 +2827,48 @@ export interface components {
             /** Format: int32 */
             inserted: number;
         };
+        /** @description A line, or a run of lines that are the same but for their numbers, folded into one row. */
+        OutputRow: {
+            /** @enum {string} */
+            kind: "line";
+            line: components["schemas"]["OutputLine"];
+        } | {
+            /** Format: int64 */
+            count: number;
+            /** Format: int64 */
+            from: number;
+            /** @enum {string} */
+            kind: "similar";
+            sample: components["schemas"]["OutputLine"];
+        };
+        /** @description The next match; across the whole output, how many match and which this is, when the output was small enough to scan; or where to continue. */
+        OutputSearch: {
+            /**
+             * Format: int64
+             * @description `from` for the next search in the same direction, when this one stopped before finding a match.
+             */
+            continue_from?: number | null;
+            /** Format: int64 */
+            count?: number | null;
+            /** Format: int64 */
+            line?: number | null;
+            /** Format: int64 */
+            rank?: number | null;
+        };
+        /** @description Complete lines one node printed to one stream, each ending in a newline. */
+        OutputSegment: {
+            /**
+             * Format: int64
+             * @description Bytes the worker dropped just before these lines because it could not send them fast enough.
+             */
+            dropped_bytes?: number;
+            /** @description The node that printed the lines, keyed `<kind>:<name>`; `None` for lines printed outside a node. */
+            node_key?: string | null;
+            stream: components["schemas"]["OutputStream"];
+            text: string;
+        };
         /**
-         * @description A process output stream.
+         * @description One process stream.
          * @enum {string}
          */
         OutputStream: "stdout" | "stderr";
@@ -3306,6 +3528,12 @@ export interface components {
             /** Format: int64 */
             rows_so_far: number;
         } | {
+            /** @enum {string} */
+            kind: "node_log";
+            level: components["schemas"]["NodeLogLevel"];
+            message: string;
+            node_key: string;
+        } | {
             error_code?: string | null;
             /** @description Redacted and bounded on the way in, whoever sends it; absent from older workers. */
             error_message?: string | null;
@@ -3509,6 +3737,31 @@ export interface components {
             errors: components["schemas"]["RunErrorText"][];
             /** @description The newest captured lines per invocation, oldest first. */
             lines: components["schemas"]["RunOutputLine"][];
+        };
+        /** @description What a run printed, per node, without its text; one node's error and warning lines; and what a size cap left out. */
+        RunOutputIndex: {
+            /**
+             * Format: int64
+             * @description Bytes the worker dropped because it could not send them fast enough.
+             */
+            dropped_bytes: number;
+            /**
+             * Format: int64
+             * @description Lines the whole run printed, numbered in the order printed.
+             */
+            line_count: number;
+            /** @description Lines the run's nodes logged with `ctx.log`, oldest first. */
+            logs: components["schemas"]["NodeLogLine"][];
+            /** @description The named node's lines that look like errors or warnings, by line; empty when no node is named. */
+            marks: components["schemas"]["OutputMark"][];
+            nodes: components["schemas"]["NodeOutputSummary"][];
+            /**
+             * Format: int64
+             * @description Bytes and lines past `max_bytes_per_run` that were dropped between the run's first and last parts.
+             */
+            omitted_bytes: number;
+            /** Format: int64 */
+            omitted_lines: number;
         };
         RunOutputLine: {
             invocation_id: string;
@@ -6783,6 +7036,256 @@ export interface operations {
             };
         };
     };
+    downloadPersonRunOutput: {
+        parameters: {
+            query: {
+                node: string;
+                stream?: components["schemas"]["OutputStream"];
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The node's whole stream */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.evidence on every node the run selected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The server keeps no run output */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonRunOutputIndex: {
+        parameters: {
+            query?: {
+                node?: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOutputIndex"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.evidence on every node the run selected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readPersonRunOutputLines: {
+        parameters: {
+            query?: {
+                /** @description The node key, or `run`; leave it out to read the whole run's output. */
+                node?: string;
+                /** @description Only this stream's lines, keeping their numbers. */
+                stream?: components["schemas"]["OutputStream"];
+                /** @description Read forwards from this line, from 1. */
+                from?: number;
+                /** @description Read the rows that end just before this line. */
+                before?: number;
+                /** @description Read the last rows. */
+                tail?: boolean;
+                /** @description How many rows to read, at most 2,000. */
+                limit?: number;
+                /** @description Fold four or more lines that are the same but for their numbers into one row. */
+                collapse?: boolean;
+                /** @description A line to keep open, with three lines either side, when folding. */
+                around?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutputPage"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.evidence on every node the run selected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The server keeps no run output */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    searchPersonRunOutput: {
+        parameters: {
+            query: {
+                node: string;
+                stream?: components["schemas"]["OutputStream"];
+                text: string;
+                /** @description Look from this line, which a forward search includes, as a backward one does. */
+                from?: number;
+                direction?: "forward" | "backward";
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutputSearch"];
+                };
+            };
+            /** @description Empty search text */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.evidence on every node the run selected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The server keeps no run output */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     listPersonRunStatements: {
         parameters: {
             query?: {
@@ -8901,6 +9404,62 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    output_batch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutputBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutputBatchReceipt"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Run not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The server keeps no run output */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
             };
         };
     };

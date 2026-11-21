@@ -1,5 +1,10 @@
 //! Resolve native invocations and control-service settings from parsed arguments.
 
+use crate::server_config::constants::BYTE_UNITS;
+use crate::server_config::models::ByteCount;
+use sqlbuild_orchestration::run_output::main::open_output_store::open_output_store;
+use sqlbuild_orchestration::run_output::models::{OutputSettings, OutputStore};
+use sqlbuild_orchestration::store::models::ControlStore;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 
@@ -20,10 +25,11 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
 use uuid::Uuid;
 
 use crate::argv::constants::{JSON_OPTION, REVIEW_PROG};
-use crate::argv::models::{ArgvOutcome, Namespace, Value};
+use crate::argv::models::{ArgvOutcome, Namespace, Stream, Value};
 use crate::dispatch::main::invocation_policy::invocation_policy;
 use crate::dispatch::models::{CommandFacts, InvocationPolicy};
 use crate::native_commands::_helpers::command::terminal::read_password;
+use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::constants::{
     CLEAN_COMMAND, INIT_COMMAND, RULES_COMMAND, RULES_LIST_ACTION, RULES_SHOW_ACTION,
     SKILLS_COMMAND,
@@ -342,6 +348,7 @@ pub(crate) fn control_api_settings(
             origin,
             version: env!("CARGO_PKG_VERSION").into(),
             scheduler: scheduler_enabled(namespace, standalone, &config.server),
+            output: None,
             audit,
             statistics,
             snapshots,
@@ -533,4 +540,69 @@ pub(crate) fn native_invocation(namespace: &Namespace) -> Result<NativeInvocatio
         creates_project: policy.creates_project,
         maintains_skills: policy.maintains_skills,
     })
+}
+
+/// Open the output store `[output]` names into `facts` and report it on stderr; the store and how many days a finished run's output stays in it, for retention.
+pub(crate) fn control_output(
+    namespace: &Namespace,
+    config: &ServerConfig,
+    (store, facts): (&ControlStore, &mut ServerFacts),
+) -> Result<Option<(OutputStore, u16)>, ControlError> {
+    let output = open_output_store(&control_output_settings(config)?, store)?;
+    drop(write_output(&[(
+        Stream::Stderr,
+        &format!("Run output store: {}\n", output.location()),
+    )]));
+    facts.output = Some(output.clone());
+    Ok(Some((
+        output,
+        run_output_days(namespace, config, facts.run_logs)?,
+    )))
+}
+
+/// `[output]`: the output store's URL and the bytes kept per run.
+fn control_output_settings(config: &ServerConfig) -> Result<OutputSettings, ControlError> {
+    Ok(OutputSettings {
+        store: config.output.store.clone(),
+        max_bytes_per_run: match &config.output.max_bytes_per_run {
+            Some(ByteCount::Number(bytes)) => Some(*bytes),
+            Some(ByteCount::Text(text)) => Some(byte_count(text)?),
+            None => None,
+        },
+    })
+}
+
+/// Days a finished run's output stays, `--run-output-retention-days` over `[retention] run_output_days`, by default `run_log_days`.
+fn run_output_days(
+    namespace: &Namespace,
+    config: &ServerConfig,
+    run_logs: RunLogRetention,
+) -> Result<u16, ControlError> {
+    Ok(retention_setting(
+        namespace,
+        "run-output-retention-days",
+        ("run_output_days", config.retention.run_output_days),
+    )?
+    .unwrap_or(run_logs.days()))
+}
+
+/// `20GB`, `500 MB` or `2GiB` as bytes; decimal units step by 1000 and binary ones by 1024.
+fn byte_count(text: &str) -> Result<u64, ControlError> {
+    let invalid = || {
+        ControlError::Invalid(format!(
+            "[output] max_bytes_per_run must be a number of bytes or text such as \"20GB\", not {text:?}"
+        ))
+    };
+    let trimmed: &str = text.trim();
+    let split: usize = trimmed
+        .find(|character: char| !character.is_ascii_digit())
+        .unwrap_or(trimmed.len());
+    let (digits, unit) = trimmed.split_at(split);
+    let count: u64 = digits.parse().map_err(|_| invalid())?;
+    let scale: u64 = BYTE_UNITS
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case(unit.trim()))
+        .map(|(_, scale)| *scale)
+        .ok_or_else(invalid)?;
+    count.checked_mul(scale).ok_or_else(invalid)
 }

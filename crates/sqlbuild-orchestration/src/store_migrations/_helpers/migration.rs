@@ -47,6 +47,12 @@ pub(crate) const MIGRATIONS: &[StoreMigration] = &[
         step: None,
     },
     StoreMigration {
+        name: "run_output",
+        sqlite: include_str!("../sql/0007_run_output.sqlite.sql"),
+        postgres: include_str!("../sql/0007_run_output.postgres.sql"),
+        step: None,
+    },
+    StoreMigration {
         name: "discovered_document",
         sqlite: include_str!("../sql/0007_discovered_document.sqlite.sql"),
         postgres: include_str!("../sql/0007_discovered_document.postgres.sql"),

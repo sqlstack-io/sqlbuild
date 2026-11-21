@@ -17,6 +17,8 @@ pub mod discovered_sets;
 
 pub mod platform;
 
+pub mod run_output;
+
 pub mod runs;
 
 pub mod scheduler;

@@ -219,7 +219,7 @@ def test_given_python_hook_when_executing_then_invokes_function_with_context_and
         observed_cost_contexts.append(CostContext.current())
         ctx.execute_sql("CREATE TABLE hook_log AS SELECT 1 AS value")
         rows: list[tuple[object, ...]] = ctx.query("SELECT value FROM hook_log")
-        ctx.log(message)
+        ctx.log.info(message)
         captured.append((ctx, message, rows))
 
     with CostContext.scope(

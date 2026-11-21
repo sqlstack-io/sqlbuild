@@ -365,6 +365,26 @@ pub struct RunNarrowing {
     pub exclude: Vec<String>,
 }
 
+/// The level of a line a node logged with `ctx.log`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NodeLogLevel {
+    Info,
+    Warning,
+    Error,
+}
+
+impl NodeLogLevel {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Info => "info",
+            Self::Warning => "warning",
+            Self::Error => "error",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum NodeOutcome {
@@ -617,6 +637,12 @@ pub enum RunChange {
         node_key: String,
         rows_so_far: i64,
     },
+    /// A line a node logged with `ctx.log`; a worker sends at most a few hundred per node.
+    NodeLog {
+        node_key: String,
+        level: NodeLogLevel,
+        message: String,
+    },
     NodeFinished {
         node_key: String,
         outcome: NodeOutcome,
@@ -675,6 +701,7 @@ impl RunChange {
             Self::Started => "run_started",
             Self::NodeStarted { .. } => "run_node_started",
             Self::NodeProgress { .. } => "run_node_progress",
+            Self::NodeLog { .. } => "run_node_log",
             Self::NodeFinished { .. } => "run_node_finished",
             Self::CheckStarted { .. } => "run_check_started",
             Self::CheckFinished { .. } => "run_check_finished",
@@ -692,6 +719,7 @@ impl RunChange {
         match self {
             Self::NodeStarted { node_key }
             | Self::NodeProgress { node_key, .. }
+            | Self::NodeLog { node_key, .. }
             | Self::NodeFinished { node_key, .. }
             | Self::CheckStarted { node_key }
             | Self::CheckFinished { node_key, .. } => Some(node_key),

@@ -16,6 +16,7 @@ from sqlbuild._native import (
     PythonNodeGraph,
     PythonSqlRunLifecyclePlan,
     SourceEntry,
+    output_node_scope,
 )
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.compiler.python_nodes.types import PythonNodeKind, PythonNodeStatus, SkipMode
@@ -219,10 +220,13 @@ def _finalize_ingress_python_result(
     results.record_python_result(name=discovered_node.name, result=result)
     if result.status != PythonNodeStatus.SUCCESS:
         return
-    with CostContext.resource_scope(
-        resource_type=discovered_node.kind.value,
-        resource_name=discovered_node.name,
-        phase="finalize",
+    with (
+        output_node_scope(f"{discovered_node.kind.value}:{discovered_node.name}"),
+        CostContext.resource_scope(
+            resource_type=discovered_node.kind.value,
+            resource_name=discovered_node.name,
+            phase="finalize",
+        ),
     ):
         if callbacks.identity_recorder is not None:
             callbacks.identity_recorder(identity=discovered_node.identity, _target_name=None)
@@ -270,10 +274,13 @@ def _execute_ingress_loader(
     with lifecycle as attempt:
         if callbacks.on_node_start is not None:
             callbacks.on_node_start(name=source_entry.name, resource_kind=resource_kind)
-        with CostContext.resource_scope(
-            resource_type=PythonNodeKind.LOADER.value,
-            resource_name=loader.name,
-            phase="load",
+        with (
+            output_node_scope(f"source:{loader.name}"),
+            CostContext.resource_scope(
+                resource_type=PythonNodeKind.LOADER.value,
+                resource_name=loader.name,
+                phase="load",
+            ),
         ):
             runtime, warehouse_failure = node_runtime(runtime=runtime, name=node.name)
             result: LoadExecutionResult = (
@@ -381,10 +388,13 @@ def _record_scheduler_skips(
                         mode=skip_mode,
                     )
                     results.record_load_result(name=result.name, result=skipped_result)
-                    with CostContext.resource_scope(
-                        resource_type=PythonNodeKind.LOADER.value,
-                        resource_name=result.name,
-                        phase="finalize",
+                    with (
+                        output_node_scope(f"source:{result.name}"),
+                        CostContext.resource_scope(
+                            resource_type=PythonNodeKind.LOADER.value,
+                            resource_name=result.name,
+                            phase="finalize",
+                        ),
                     ):
                         persist_loader_result(
                             result_store=result_store,

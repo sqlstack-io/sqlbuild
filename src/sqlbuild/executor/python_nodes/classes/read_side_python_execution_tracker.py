@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
-from sqlbuild._native import CostContext, DiscoveredPythonNode, PythonNodeGraph
+from sqlbuild._native import CostContext, DiscoveredPythonNode, PythonNodeGraph, output_node_scope
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.compiler.python_nodes.types import PythonNodeKind, PythonNodeStatus
 from sqlbuild.executor.node_results.main._direct_store import build_direct_node_result_store
@@ -174,10 +174,13 @@ class ReadSidePythonExecutionTracker:
         self._completed_python_names.add(discovered_node.name)
         if result.status != PythonNodeStatus.SUCCESS:
             return
-        with CostContext.resource_scope(
-            resource_type=discovered_node.kind.value,
-            resource_name=discovered_node.name,
-            phase="finalize",
+        with (
+            output_node_scope(f"{discovered_node.kind.value}:{discovered_node.name}"),
+            CostContext.resource_scope(
+                resource_type=discovered_node.kind.value,
+                resource_name=discovered_node.name,
+                phase="finalize",
+            ),
         ):
             if self._identity_recorder is not None:
                 self._identity_recorder(identity=discovered_node.identity, _target_name=None)
