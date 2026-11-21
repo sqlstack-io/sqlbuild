@@ -54,6 +54,8 @@ fn given_each_event_when_encoding_then_one_prefixed_line_reads_back_unchanged() 
                     line: 42,
                     column: 7,
                 }),
+                code: Some("D001".to_owned()),
+                help: Some("rename the column".to_owned()),
             },
             expected_newlines: 1,
         },
@@ -195,11 +197,13 @@ fn given_a_failed_generation_when_reported_then_the_first_source_location_is_its
 
     for test_case in test_cases {
         assert_eq!(
-            generation_failed(4, test_case.message.to_owned()),
+            generation_failed(4, test_case.message.to_owned(), (None, None)),
             DevEvent::Failed {
                 generation: 4,
                 message: test_case.message.to_owned(),
                 position: test_case.expected_position,
+                code: None,
+                help: None,
             },
             "{}",
             test_case.description

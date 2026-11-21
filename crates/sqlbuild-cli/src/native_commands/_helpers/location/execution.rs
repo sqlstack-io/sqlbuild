@@ -8,11 +8,14 @@ use crate::compute_logs::main::finish_capture::finish_capture;
 use crate::compute_logs::main::open_log_root::open_log_root;
 use crate::compute_logs::main::start_capture::start_capture;
 use crate::compute_logs::models::{CaptureEnd, CaptureStart, OpenCapture};
+use crate::dev_screen::main::terminal_size::terminal_size;
 use crate::dev_screen::models::ScreenSetup;
 use crate::dev_screen::models::{DevStep, ScreenMessage};
 use crate::dev_screen::types::DevScreenParts;
 use crate::dev_session::main::run_dev_session::run_dev_session;
 use crate::dev_session::models::{DevProject, LocationPipes};
+use crate::dev_stop::main::stop_switch::stop_switch;
+use crate::dev_stop::models::DevEnd;
 use crate::native_commands::_helpers::command::decision::{
     control_address, control_database, control_database_variable, flag, text,
 };
@@ -22,7 +25,7 @@ use crate::native_commands::_helpers::command::paths::exclude_location_databases
 use crate::native_commands::_helpers::command::paths::{location_database_files, project_location};
 use crate::native_commands::_helpers::command::project_facts::has_no_runtime_extensions;
 use crate::native_commands::_helpers::command::project_facts::{
-    development_project_name, project_directory_name, project_name,
+    development_project_name, project_name,
 };
 use crate::native_commands::_helpers::command::rules::run_rules;
 use crate::native_commands::_helpers::command::skills::{run_skills, skill_freshness_notice};
@@ -30,16 +33,19 @@ use crate::native_commands::_helpers::command::terminal::share_terminal;
 use crate::native_commands::_helpers::command::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
-use crate::native_commands::_helpers::command::terminal::{live_screen, stderr_columns};
+use crate::native_commands::_helpers::command::terminal::{live_screen, screen_colour};
+use crate::native_commands::_helpers::location::dev_cancel::DevRuns;
+use crate::native_commands::_helpers::location::dev_supervision::{
+    DevRoles, supervise_development_roles,
+};
 use crate::native_commands::_helpers::location::dynamic_resume::resume_expired_holds;
 use crate::native_commands::_helpers::location::env_reload::env_file_summary;
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_timeout_seconds, rows_text, scan_line,
 };
 use crate::native_commands::constants::PLAN_NOT_PRODUCED;
-use crate::native_commands::constants::SCREEN_INDENT;
 use crate::native_commands::constants::{
-    ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS,
+    ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS, FALLBACK_ROWS,
     METADATA_OVERLAP_SECONDS, METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS,
     METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS,
     METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS,
@@ -93,7 +99,7 @@ use sqlbuild_orchestration::dev_events::main::dev_events_enabled::dev_events_ena
 use sqlbuild_orchestration::dev_events::main::emit_dev_event::emit_dev_event;
 use sqlbuild_orchestration::dev_events::main::parse_dev_control::parse_dev_control;
 use sqlbuild_orchestration::dev_events::main::parse_dev_event::parse_dev_event;
-use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
+use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent, UnsetProviderSecrets};
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::health::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::health::unallowed_secret_count::unallowed_secret_count;
@@ -141,13 +147,13 @@ use tokio::task::JoinSet;
 use tokio::time::{Instant, Interval, MissedTickBehavior};
 use uuid::Uuid;
 
-/// Own the API, scheduler and outbound location as one development process tree, drawn by `screen`.
+/// Own the API, scheduler and outbound location as one development process tree, drawn by `screen`, until a stop or a role ends it.
 pub(crate) async fn run_development_roles(
     (store, scope): (ControlStore, DevelopmentScope),
     (project, executable): (PathBuf, PathBuf),
     listener: tokio::net::TcpListener,
     (scheduler, (messages, actions, keys)): (bool, DevScreenParts),
-) -> Result<(), ControlError> {
+) -> Result<DevEnd, ControlError> {
     let address = listener.local_addr()?;
     let url = format!("http://{address}");
     let location_id = scope.location_id;
@@ -159,65 +165,76 @@ pub(crate) async fn run_development_roles(
         url.clone(),
     )?;
     let (stop, shutdown) = watch::channel(false);
-    let mut tasks = JoinSet::new();
+    let mut roles: DevRoles = DevRoles::default();
     drop(messages.send(ScreenMessage::Started {
         step: DevStep::Api,
         detail: String::new(),
     }));
     let api_ready = messages.clone();
-    tasks.spawn(serve_api(
-        store.clone(),
-        listener,
-        (
-            ApiAuthentication {
-                login: HumanLogin::Development(scope),
-                ..ApiAuthentication::default()
-            },
-            (Vec::new(), adhoc_planner()),
-            ServerFacts {
-                version: env!("CARGO_PKG_VERSION").into(),
-                scheduler,
-                ..ServerFacts::default()
-            },
+    roles.spawn(
+        Some("UI server"),
+        serve_api(
+            store.clone(),
+            listener,
+            (
+                ApiAuthentication {
+                    login: HumanLogin::Development(scope),
+                    ..ApiAuthentication::default()
+                },
+                (Vec::new(), adhoc_planner()),
+                ServerFacts {
+                    version: env!("CARGO_PKG_VERSION").into(),
+                    scheduler,
+                    ..ServerFacts::default()
+                },
+            ),
+            (
+                move || {
+                    drop(api_ready.send(ScreenMessage::Finished {
+                        step: DevStep::Api,
+                        detail: address.to_string(),
+                    }));
+                },
+                development_stopped(shutdown.clone()),
+            ),
         ),
-        (
-            move || {
-                drop(api_ready.send(ScreenMessage::Finished {
-                    step: DevStep::Api,
-                    detail: address.to_string(),
-                }));
-            },
-            development_stopped(shutdown.clone()),
-        ),
-    ));
-    start_platform_roles(&mut tasks, (&store, &shutdown), Default::default())?;
+    );
+    start_platform_roles(&mut roles.tasks, (&store, &shutdown), Default::default())?;
     let (location, pipes) = development_location_role(
         (&project, &executable),
         (location_id, &target),
         (&url, &store),
         shutdown.clone(),
     )?;
-    tasks.spawn(location);
-    tasks.spawn(run_dev_session(
-        (messages.clone(), actions, keys),
-        (
-            pipes,
-            DevProject {
-                executable: executable.clone(),
-                project: project.clone(),
-                target: target.clone(),
-            },
+    roles.spawn(Some("code location"), location);
+    roles.spawn(
+        None,
+        run_dev_session(
+            (messages.clone(), actions, keys),
+            (
+                pipes,
+                DevProject {
+                    executable: executable.clone(),
+                    project: project.clone(),
+                    target: target.clone(),
+                },
+            ),
+            (store.clone(), location_id, url),
+            shutdown.clone(),
         ),
-        (store.clone(), location_id, url),
-        shutdown.clone(),
-    ));
+    );
     drop(messages.send(ScreenMessage::Started {
         step: DevStep::Scheduler,
         detail: String::new(),
     }));
     if scheduler {
+        roles.runs = Some(DevRuns {
+            store: store.clone(),
+            location_id,
+            target: target.clone(),
+        });
         let scheduler_store = store.clone();
-        tasks.spawn(async move {
+        roles.spawn(Some("scheduler"), async move {
             run_scheduler(
                 &scheduler_store,
                 SchedulerState::new(Uuid::now_v7()),
@@ -227,11 +244,18 @@ pub(crate) async fn run_development_roles(
             .await
         });
     }
-    drop(messages.send(ScreenMessage::Finished {
-        step: DevStep::Scheduler,
-        detail: if scheduler { "started" } else { "off" }.to_owned(),
-    }));
-    supervise_control_roles(tasks, stop).await
+    drop(
+        messages.send(ScreenMessage::Finished {
+            step: DevStep::Scheduler,
+            detail: if scheduler {
+                "triggers start paused"
+            } else {
+                "off (--no-scheduler)"
+            }
+            .to_owned(),
+        }),
+    );
+    Ok(supervise_development_roles(roles, stop, &messages).await)
 }
 
 async fn development_stopped(mut shutdown: watch::Receiver<bool>) {
@@ -281,6 +305,8 @@ fn development_location_role(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
+    #[cfg(unix)]
+    command.process_group(0);
     if let ControlStore::Sqlite(path) = store {
         command.env(
             "SQLBUILD_DEVELOPMENT_CONTROL_FILE",
@@ -288,6 +314,10 @@ fn development_location_role(
         );
     }
     let mut child = command.spawn()?;
+    let group: Option<u32> = child.id();
+    if let Some(group) = group {
+        stop_switch().register_group(group);
+    }
     let (Some(stdin), Some(stdout), Some(stderr)) =
         (child.stdin.take(), child.stdout.take(), child.stderr.take())
     else {
@@ -302,20 +332,25 @@ fn development_location_role(
     };
     Ok((
         async move {
-            tokio::select! {
+            let ended: Result<(), ControlError> = tokio::select! {
                 result = child.wait() => {
-                    result?;
-                    Err(ControlError::Invalid("development code location stopped unexpectedly".into()))
+                    let status = result?;
+                    Err(ControlError::Invalid(format!("the code location stopped unexpectedly ({status})")))
                 },
                 () = development_stopped(shutdown) => {
-                    terminate_child(&mut child)?;
+                    stop_switch().terminate_groups();
+                    terminate_child(&mut child, false)?;
                     match tokio::time::timeout(Duration::from_secs(10), child.wait()).await {
                         Ok(result) => { result?; },
                         Err(_) => child.kill().await?,
                     }
                     Ok(())
                 },
+            };
+            if let Some(group) = group {
+                stop_switch().forget_group(group);
             }
+            ended
         },
         pipes,
     ))
@@ -407,6 +442,8 @@ fn dev_failure(dev_events: bool, generation: i64, message: String) {
                 generation,
                 position: None,
                 message,
+                code: None,
+                help: None,
             }),
         )]));
     }
@@ -799,7 +836,25 @@ pub(crate) fn location_warning(title: &str, detail: String) {
     }));
 }
 
-/// Report the providers a publication shows missing secrets; under `sqb dev`, also warn about them.
+/// The providers whose missing secrets stop runs, by the variables they read: a provider the target allows to miss secrets is left out.
+pub(crate) fn unset_provider_secrets(
+    providers: &[MissingProviderSecrets],
+) -> Vec<UnsetProviderSecrets> {
+    let mut unset: Vec<UnsetProviderSecrets> = Vec::new();
+    for provider in providers.iter().filter(|provider| !provider.allowed) {
+        let mut variables: Vec<String> = Vec::new();
+        for setting in &provider.settings {
+            variables.push(setting.variable.clone());
+        }
+        unset.push(UnsetProviderSecrets {
+            provider: provider.provider.clone(),
+            variables,
+        });
+    }
+    unset
+}
+
+/// Report the providers a publication shows missing secrets; under `sqb dev`, also tell the screen, which warns until a report shows none.
 pub(crate) async fn report_provider_secrets(
     options: &LocationServe,
     (bearer, session_id): (&str, Uuid),
@@ -820,11 +875,10 @@ pub(crate) async fn report_provider_secrets(
                 variables.join(", ")
             ),
         )]));
-        location_warning(
-            "provider secrets unset",
-            format!("{missing} unset; runs that use them fail; sqb debug lists them"),
-        );
     }
+    drop(emit_dev_event(&DevEvent::MissingSecrets {
+        providers: unset_provider_secrets(&providers),
+    }));
     report_location_health(
         options,
         bearer,
@@ -1217,43 +1271,6 @@ pub(crate) async fn open_control_workers(
     Ok((workers, (images, adhoc_planner())))
 }
 
-pub(crate) async fn shutdown_signal() -> Result<(), ControlError> {
-    #[cfg(unix)]
-    {
-        let mut terminate =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
-        tokio::select! {
-            result = tokio::signal::ctrl_c() => result?,
-            _ = terminate.recv() => {},
-        }
-    }
-    #[cfg(not(unix))]
-    tokio::signal::ctrl_c().await?;
-    Ok(())
-}
-
-/// Stop sibling roles on a signal or role failure, then drain their shutdown results.
-pub(crate) async fn supervise_control_roles(
-    mut tasks: JoinSet<Result<(), ControlError>>,
-    stop: watch::Sender<bool>,
-) -> Result<(), ControlError> {
-    let mut result = tokio::select! {
-        result = tasks.join_next() => match result {
-            Some(result) => result.map_err(ControlError::from).and_then(std::convert::identity),
-            None => Ok(()),
-        },
-        result = shutdown_signal() => result,
-    };
-    stop.send_replace(true);
-    while let Some(joined) = tasks.join_next().await {
-        let joined = joined
-            .map_err(ControlError::from)
-            .and_then(std::convert::identity);
-        result = result.and(joined);
-    }
-    result
-}
-
 /// The capture Python's `dispatch_with_compute_logs` opens; a failure only loses the log.
 fn open_capture(
     invocation: &NativeInvocation,
@@ -1584,7 +1601,7 @@ pub(crate) async fn next_turn(
     }
 }
 
-/// `sqb dev`'s control lines from stdin; outside `sqb dev`, a fixed connected state.
+/// `sqb dev`'s control lines from stdin; outside `sqb dev`, a fixed connected state. `sqb dev` holds stdin open while it lives, so its end, even after `sqb dev` was killed, stops the location as SIGTERM does.
 pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevControlState> {
     let (sender, receiver) = watch::channel(DevControlState {
         warehouse: (!options.dev_events).then_some(true),
@@ -1603,6 +1620,11 @@ pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevContro
                     None => {}
                 }
             }
+            #[cfg(unix)]
+            let _ = rustix::process::kill_process(
+                rustix::process::getpid(),
+                rustix::process::Signal::TERM,
+            );
         });
     }
     receiver
@@ -1773,23 +1795,33 @@ pub(crate) async fn announced_store(
     Ok((store, scope))
 }
 
-/// The header, width and paths the screen starts with.
-pub(crate) fn screen_setup(project: &Path, target: &str) -> ScreenSetup {
-    let live: bool = live_screen();
+/// The header, size and paths the screen starts with; `plain` asks for appended lines.
+pub(crate) fn screen_setup(
+    project: &Path,
+    (target, adapter): (&str, &str),
+    plain: bool,
+) -> ScreenSetup {
+    let live: bool = live_screen(plain);
+    let (columns, rows): (usize, usize) = terminal_size(None).unwrap_or((
+        usize::try_from(FALLBACK_COLUMNS).unwrap_or(80),
+        FALLBACK_ROWS,
+    ));
     ScreenSetup {
         live,
         facts: ScreenFacts {
-            columns: stderr_columns(),
-            style: CliStyle { use_color: live },
+            columns,
+            rows,
+            style: CliStyle {
+                use_color: screen_colour(live),
+            },
             links: live,
-            indent: SCREEN_INDENT,
         },
         header: DevHeader {
             version: env!("CARGO_PKG_VERSION").to_owned(),
             project: project_name(project),
             target: target.to_owned(),
         },
-        watching: format!("{}/", project_directory_name(project)),
+        adapter: adapter.to_owned(),
         project_root: project.to_string_lossy().into_owned(),
         env_file: env_file_summary(project),
     }

@@ -9,6 +9,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 ## Contents
 
 - Configure the server
+- Stop the server
 - Serve over HTTPS
 - Sign in through a reverse proxy
 - Receive platform events
@@ -88,6 +89,15 @@ executable = "/usr/local/bin/sqb"
 - An unknown section or key stops the server with the line it is on.
 
 Use `sqb server --help` for the remaining options.
+
+## Stop the server
+
+SIGINT (Ctrl+C), SIGTERM and SIGHUP, which a closed terminal sends, all stop the server the same
+way: it stops scheduling, asks each local worker to stop, waits for the workers to cancel their
+statements and record their runs, and releases their claims. Each local worker runs in its own
+process group, so Ctrl+C in the server's terminal reaches only the server. A second SIGINT or
+SIGTERM while the workers stop kills their process groups at once; the server still records the
+runs and releases their claims before it exits.
 
 ## Serve over HTTPS
 

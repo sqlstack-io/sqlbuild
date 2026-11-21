@@ -12,36 +12,46 @@ Online: https://sqlbuild.com/docs/cli/dev/
 - Set provider secrets
 - Sign in to the warehouse
 - Keys
+- Stop
 - Plain output
 - Run scheduled jobs locally
 - Warehouse cost
 - Details
 
 Run the control API, the scheduler and a code location for the project in the current directory,
-then open the web UI at the address on the ready card:
+then open the web UI at the address in the ready box:
 
 ```bash
 sqb dev
 ```
 
 ```text
-  sqlbuild dev  v0.233.0   ready in 1.0s
-
-  ➜  UI          http://127.0.0.1:8000
-  ➜  Location    dev · gen 1 · 4 python nodes, 38 models
-  ➜  Warehouse   ● duckdb · /work/shop/warehouse.duckdb
-  ➜  Triggers    3 paused
-  ➜  Watching    shop/
-  ➜  Env file    .env · 2 variables · edit it, then press r to reload
-
-  o open UI · r recompile · s retry warehouse · l logs · q quit
+sqb dev  shop · target dev · sqb 0.256.0
+✓ Opened control store    0.0s   sqlite
+✓ Started UI server       0.1s   http://127.0.0.1:8000
+✓ Started scheduler       0.0s   triggers start paused
+✓ Discovered project      0.6s   4 python nodes, 38 models
+✓ Compiled project        0.4s
+✓ Published snapshot      0.1s   snapshot 01a1d7ff
+✓ Connected warehouse     0.3s   duckdb
+╭─ ready ────────────────────────────────────────────────────────────────────╮
+│ UI         http://127.0.0.1:8000                                           │
+│ Project    shop · ~/src/shop · target dev                                  │
+│ Warehouse  duckdb · database /work/shop/warehouse.duckdb                   │
+│ Triggers   3 paused                                                        │
+│ Env file   .env · 2 variables · edit it, then press r to reload            │
+╰────────────────────────────────────────────────────────────────────────────╯
+keys  o open UI · l full log · r recompile · q quit
 ```
 
-The location compiles the project, runs its [Rules](../concepts/rules.md), and publishes it to
-the server. When you save a model, orchestration file or other project input, it compiles and
-publishes again, so the UI and the next run use the new version. Each change, publication, failure
-and run gets one line above the hotkey bar. A compile error or a Rule finding leaves the previous
-version published, and its failure line names the error or the first finding.
+Each step shows a spinner and its elapsed time while it runs, and its finished line stays on
+screen. The live part of the screen, the running steps and the key line, is never taller than the
+terminal. The location compiles the project, runs its [Rules](../concepts/rules.md), and publishes
+it to the server. When you save a model, orchestration file or other project input, it compiles
+and publishes again, so the UI and the next run use the new version. Each change, publication,
+failure and run gets one line above the key line, wrapped rather than cut off. A compile error or
+a Rule finding leaves the previous version published and is shown in full: what failed, where, why
+and how to fix it.
 
 ## Options
 
@@ -52,23 +62,43 @@ version published, and its failure line names the error or the first finding.
 | `--control-store-url` | `.sqlbuild/control.sqlite3` in the project | Control store URL or path |
 | `--no-scheduler` | Off | Serve and reload without running scheduled work |
 | `--triggers` | Off | Keep each trigger's default status and your changes to it, instead of pausing every trigger at start-up |
+| `--plain` | Off, unless stdout or stderr is not a terminal | Print appended lines instead of redrawing the screen; see [Plain output](#plain-output) |
 
 ## Set provider secrets
 
 `sqb dev` loads the project's [env file](../concepts/project-configuration.md#env-file), `.env`
-by default, when it starts, and the **Env file** row on the ready card says how many variables
+by default, when it starts, and the **Env file** row in the ready box says how many variables
 it set. After editing the file, press `r`: the location reads it again and restarts its Python
 interpreter when a value changed, so the next compile and run use the new values. Variables set
 in the shell that started `sqb dev` still win.
 
+While a provider is missing secrets that the target doesn't
+[allow to be missing](../concepts/project-configuration.md#allowed-missing-secrets), a **Secrets missing** warning above the
+keys names the provider and the variables it reads, never their values:
+
+```text
+⚠ Secrets missing                region WORKER_TOKEN, REGION_CODE; set them in .env or
+                                 the environment; press r to reload
+```
+
+Runs that use the provider stop before they reach the warehouse. The warning clears once the next
+publication finds every secret set; with `--plain`, a `Secrets set` line says so.
+
 ## Sign in to the warehouse
 
 Once the first version is published, `sqb dev` connects to the target's warehouse in the
-foreground. A client that asks for a password, a code or a browser sign-in asks once, in a framed
-block on your terminal, and every later connection in the session reuses that sign-in.
+foreground. A client that asks for a password, a code or a browser sign-in asks once, in a
+**sign in** block above the running steps, and every later connection in the session reuses that
+sign-in. What you type goes to the client, which reads it on its own terminal, so prompts that
+read `/dev/tty` work too. A prompt that hides what you type, such as a password prompt, keeps it
+hidden on the screen, in the log and in `--plain` output; other prompts show what you type.
+Ctrl+C still stops `sqb dev`. `sqb dev`
+waits for the sign-in as long as it takes, and the block shows how long it has waited.
 
-If the connection fails, the card shows the error and the UI still works. Press `s` to try again.
-The location reads warehouse history once the connection succeeds.
+If the first connection fails, `sqb dev` shows the error and stops with exit status 2; run
+`sqb debug` to test the connection on its own. The ready box's Warehouse line names the adapter
+and the connection's account or host, authentication, role and warehouse or database. The
+location reads warehouse history once the connection succeeds.
 
 ## Keys
 
@@ -76,26 +106,71 @@ The location reads warehouse history once the connection succeeds.
 | --- | --- |
 | `o` | Open the UI in your browser |
 | `r` | Read the [env file](../concepts/project-configuration.md#env-file) again, then compile and publish |
-| `s` | Retry the warehouse connection in the foreground |
 | `l` | Show or hide the detailed log, the latest 500 lines |
-| `q` | Stop, like Ctrl+C |
+| `q` | Stop |
+| Ctrl+C | Stop; a second Ctrl+C stops at once |
+| Ctrl+\\ | Stop at once, without cancelling runs |
+
+Ctrl+Z is not supported: `sqb dev` does not suspend. Stop it with `q` or Ctrl+C instead.
+
+## Stop
+
+`q`, Ctrl+C, SIGINT, SIGTERM and SIGHUP stop `sqb dev` at any point, including while it reads the
+configuration, opens the control store, compiles, connects or waits for a sign-in. A stop before
+`sqb dev` is ready ends with `sqb dev stopped (interrupted) before it was ready`.
+
+When no run is in flight, each service stops with one line, and anything still running after
+about a second is killed, the code location included. When runs are in flight, `sqb dev` cancels
+them first, also when a service fails after it was ready: each worker cancels its running
+statements, records the run as cancelled and releases its claims, as it does for a cancel from
+the UI. This takes up to 30 seconds, then whatever is left is killed. Ctrl+C again, or Ctrl+\\,
+stops at once:
+
+```text
+· Cancelling run orders_job… 2 running nodes (Ctrl+C again to force)
+· Cancelled run orders_job  2 running nodes cancelled   1.2s
+· Stopped scheduler       0.0s
+· Stopped UI server       0.1s
+· Stopped code location   0.3s
+· sqb dev stopped (interrupted)  ran 42m 10s   1.6s
+```
+
+Each local worker runs in its own process group, which is stopped as a whole, so nothing a worker
+started is left running. The terminal is put back as it was, and the last line says how the
+session ended.
+
+| Exit status | Meaning |
+| --- | --- |
+| `0` | Stopped with `q` |
+| `1` | A service failed after `sqb dev` was ready |
+| `2` | `sqb dev` did not start, for example because the configuration is invalid or the first warehouse connection failed; the screen says why |
+| `129` | SIGHUP, or the terminal closed |
+| `130` | Ctrl+C or SIGINT |
+| `143` | SIGTERM |
 
 ## Plain output
 
-On Windows, when `NO_COLOR`, `CI` or `SQLBUILD_NO_PROGRESS` is set, or when stderr is not a
-terminal, `sqb dev` prints one stable line per step, event and warning, with no redraws or keys:
+With `--plain`, on Windows, with `TERM=dumb`, when `CI` or `SQLBUILD_NO_PROGRESS` is set, or when
+stdout or stderr is not a terminal, `sqb dev` appends lines and never redraws: no spinners, no
+keys and no colour. Only finished steps are printed. `NO_COLOR` turns colour off and nothing else.
 
 ```text
-sqlbuild dev: control store ready (0.1s)
-sqlbuild dev: location 01a1d7ff-0b3a-7631-ba35-e44d44d072f2 · target dev
-sqlbuild dev: discovered 4 python nodes, 38 models (0.6s)
-sqlbuild dev: published gen 1 01a1d7ff (0.1s)
-sqlbuild dev: env file .env · 2 variables · edit it, then press r to reload
-sqlbuild dev: ready http://127.0.0.1:8000
-sqlbuild dev: warehouse read failed: retrying in 30s: CatalogException: Table _sqlbuild_fingerprints does not exist
+sqb dev  shop · target dev · sqb 0.256.0
+✓ Opened control store    0.0s   sqlite
+✓ Started UI server       0.1s   http://127.0.0.1:8000
+✓ Discovered project      0.6s   4 python nodes, 38 models
+✓ Published snapshot      0.1s   snapshot 01a1d7ff
+✓ Connected warehouse     0.3s   duckdb
+✓ ready  http://127.0.0.1:8000
+  warehouse  duckdb · database /work/shop/warehouse.duckdb
+  location   01a1d7ff-0b3a-7631-ba35-e44d44d072f2
+  triggers   3 paused
+  env file   .env · 2 variables · edit it, then press r to reload
+14:20:31 ▸ run orders_daily  started manually
 ```
 
-Warnings cover failed warehouse reads, a stopped warehouse sync and unset provider secrets.
+Warnings, such as a failed warehouse read, a stopped warehouse sync or unset provider secrets, are
+printed as warning blocks.
 
 When stdout is redirected, it receives one JSON record per published version.
 
@@ -142,5 +217,5 @@ timed reads but not the read after each publication or run.
 - The control store keeps the newest 5 builds of each node and results of each check that it copies
   from the warehouse; older ones are deleted and the file shrinks. See
   [retention](server.md#set-retention).
-- When `sqb dev` stops, it prints `Development services stopped successfully`. After a failure it
-  prints the last log lines that explain it.
+- When a service fails without an explanation on screen, `sqb dev` prints the last log lines
+  above its result line.

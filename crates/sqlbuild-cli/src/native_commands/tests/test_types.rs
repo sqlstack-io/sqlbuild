@@ -396,3 +396,11 @@ pub(super) struct DynamicResumeTestCase {
     /// The token the next sync sends for the location.
     pub(super) expected_quiet_token: Option<&'static str>,
 }
+
+/// Providers a health report shows missing secrets, and those `sqb dev` warns about.
+pub(super) struct UnsetProviderSecretsTestCase {
+    pub(super) description: &'static str,
+    /// Each provider, whether the target allows it to miss secrets, and the variables it misses.
+    pub(super) providers: Vec<(&'static str, bool, Vec<&'static str>)>,
+    pub(super) expected_unset: Vec<(&'static str, Vec<&'static str>)>,
+}

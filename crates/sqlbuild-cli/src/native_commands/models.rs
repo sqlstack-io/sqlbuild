@@ -620,3 +620,14 @@ pub(crate) struct HeldCopy {
     pub(crate) consumption: bool,
     pub(crate) path: PathBuf,
 }
+
+/// SIGINT, SIGTERM and SIGHUP, listened for from the first request to stop until the process ends, so a second is never missed.
+#[derive(Debug)]
+pub(crate) struct ShutdownSignals {
+    #[cfg(unix)]
+    pub(crate) interrupt: tokio::signal::unix::Signal,
+    #[cfg(unix)]
+    pub(crate) terminate: tokio::signal::unix::Signal,
+    #[cfg(unix)]
+    pub(crate) hangup: tokio::signal::unix::Signal,
+}

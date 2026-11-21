@@ -1670,8 +1670,8 @@ select = [
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/Cargo.toml"]
-thresholds = { max_crate_code_lines = 51000 }
-reason = "The Python bindings crate is above the code-line limit; this caps it near its current size until it is split into crates by area. The location and plan bindings of the large-project server work and #1560 grew it to 51,122; moving them out would need new cross-crate imports or a policy exception. The dbt event stream moved to sqlbuild-python-output, and the location sync's dynamic-model resume came in (50,945). Lower the cap as code moves out."
+thresholds = { max_crate_code_lines = 51300 }
+reason = "The Python bindings crate is above the code-line limit; this caps it near its current size until it is split into crates by area. The location and plan bindings of the large-project server work and #1560 grew it to 51,122; moving them out would need new cross-crate imports or a policy exception. The dbt event stream moved to sqlbuild-python-output, and the location sync's dynamic-model resume came in (50,945). The CHI-1589 stop handling and dev error fields plus the CHI-1595/CHI-1593 env-file merge took it to 51,210 when combined. The cap stays near its current size; lower it as code moves out."
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/src/bindings/_helpers"]
@@ -2040,6 +2040,16 @@ reason = "The workspace allows unsafe code only in sqlbuild-process-ownership, f
 rule = "FPRSH012"
 path = "crates/sqlbuild-process-ownership/src/lib.rs"
 reason = "The workspace allows unsafe code only in sqlbuild-process-ownership, for the platform calls that prove which process owns a worker claim; each call has an item-level allow and a SAFETY comment."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSH013"
+path = "crates/sqlbuild-process-ownership/src/terminal/_helpers/session.rs"
+reason = "The workspace allows unsafe code only in sqlbuild-process-ownership; giving a prompting child its controlling terminal needs a pre-exec hook, with an item-level allow and a SAFETY comment."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSH002"
+path = "crates/sqlbuild-process-ownership/src/terminal/_helpers/session.rs"
+reason = "The workspace allows unsafe code only in sqlbuild-process-ownership; giving a prompting child its controlling terminal needs a pre-exec hook, with an item-level allow and a SAFETY comment."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSH013"

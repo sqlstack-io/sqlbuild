@@ -17,10 +17,12 @@ use sqlbuild_core::debug_report::main::debug_provider_lines::debug_provider_line
 use sqlbuild_core::debug_report::main::debug_runtime_lines::debug_runtime_lines;
 use sqlbuild_core::debug_report::main::format_debug_json::format_debug_json;
 use sqlbuild_core::debug_report::main::format_debug_text::format_debug_text;
+use sqlbuild_core::debug_report::main::write_report_file::write_report_file;
 use sqlbuild_core::debug_report::models::{
     ConnectionCheck, ConnectionValue, DebugConfigFiles, DebugProjectFacts, DebugProvider,
     DebugReport, DebugRuntime, WarehouseCheck,
 };
+use sqlbuild_orchestration::dev_events::constants::DEBUG_REPORT_VARIABLE;
 
 use crate::bindings::_helpers::cli::failure_cause::FailureCause;
 use crate::bindings::_helpers::cli::failure_cause::report_failure_cause;
@@ -411,9 +413,14 @@ pub(crate) fn run_debug_command(
         let use_color: bool = !arguments.flag("no_color")? && stdout_supports_color(py)?;
         format_debug_text(&report, CliStyle { use_color })
     };
-    let stdout: Bound<'_, PyAny> = py.import("sys")?.getattr("stdout")?;
-    stdout.call_method1("write", (text,))?;
-    stdout.call_method0("flush")?;
+    match std::env::var_os(DEBUG_REPORT_VARIABLE).filter(|_| json_output) {
+        Some(report_file) => write_report_file(report_file.as_ref(), &text)?,
+        None => {
+            let stdout: Bound<'_, PyAny> = py.import("sys")?.getattr("stdout")?;
+            stdout.call_method1("write", (text,))?;
+            stdout.call_method0("flush")?;
+        }
+    }
     if let Some(failure) = debug_failure(&report) {
         report_failure_cause(FailureCause {
             error_type: failure.error_type,

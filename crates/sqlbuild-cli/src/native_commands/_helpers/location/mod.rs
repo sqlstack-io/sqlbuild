@@ -1,4 +1,7 @@
 pub(crate) mod changed_build;
+pub(crate) mod dev_cancel;
+pub(crate) mod dev_start;
+pub(crate) mod dev_supervision;
 pub(crate) mod dynamic_resume;
 pub(crate) mod env_reload;
 pub(crate) mod execution;
@@ -6,6 +9,7 @@ pub(crate) mod held_copy;
 pub(crate) mod plan_document;
 pub(crate) mod plan_request;
 pub(crate) mod plan_reuse;
+pub(crate) mod shutdown;
 pub(crate) mod sync_outcomes;
 pub(crate) mod sync_report;
 pub(crate) mod work;

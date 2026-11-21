@@ -1,14 +1,13 @@
-//! One dim line of the detailed log shown under the `sqb dev` events.
+//! One dim line of the detailed log, shown with `l`.
 
-use crate::screen_text::_helpers::rows::{render_row, span};
+use crate::screen_text::_helpers::rows::{break_cells, paint, row_width, span};
 use crate::screen_text::models::{ScreenFacts, Tone};
 
-/// `line` dimmed and cut to the screen width; control characters are dropped.
+/// `line` dimmed and broken to the terminal width, never cut; control characters are dropped.
 #[must_use]
-pub fn render_log_line(line: &str, facts: &ScreenFacts) -> String {
-    let text: String = line
-        .chars()
-        .filter(|character| !character.is_control())
-        .collect();
-    render_row(vec![span(text, Tone::Muted)], facts)
+pub fn render_log_line(line: &str, facts: &ScreenFacts) -> Vec<String> {
+    break_cells(line, row_width(facts))
+        .into_iter()
+        .map(|row| paint(&[span(row, Tone::Muted)], facts))
+        .collect()
 }

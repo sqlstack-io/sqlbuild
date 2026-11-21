@@ -33,11 +33,13 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     CheckExecutionTestCase,
     ClaimedLoadTestCase,
     ClaimedWorker,
+    ForcedWorkerStopTestCase,
     GroupExecutionTestCase,
     ProviderSecretsHealthTestCase,
     SnapshotWorkerTestCase,
     UnclaimedLoadTestCase,
     WorkerExecutionTestCase,
+    WorkerHangUpTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     INTERMEDIATE_LOADER_FILES,
@@ -45,11 +47,13 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     REGION_PROVIDER_FILES,
     cancel_running_statement,
     claimed_worker,
+    processes_naming,
     provider_secrets_health,
     run_write_set,
     running_statement,
     scheduled_worker,
     snapshot_api,
+    uncooperative_worker_pid,
     wait_for_log,
     wait_for_run,
     without_loads,
@@ -1870,13 +1874,7 @@ def test_given_an_uncooperative_worker_when_scheduler_stops_then_the_fence_and_c
     test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
-        pidfile: Path = worker.project / "worker.pid"
-        deadline: float = time.monotonic() + 15
-        while not pidfile.exists():
-            assert worker.process.poll() is None, worker.log.read_text()
-            assert time.monotonic() < deadline, worker.log.read_text()
-            time.sleep(0.02)
-        pid: int = int(pidfile.read_text())
+        pid: int = uncooperative_worker_pid(worker)
         worker.process.send_signal(signal.SIGTERM)
         time.sleep(32)
         assert worker.process.poll() is None, worker.log.read_text()
@@ -1906,6 +1904,103 @@ def test_given_an_uncooperative_worker_when_scheduler_stops_then_the_fence_and_c
                 "SELECT json_extract(payload, '$.change.change.exit_code') FROM recall_events "
                 "WHERE event_type='run_terminated'"
             ).fetchone() == (137,)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX signals and process groups")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ForcedWorkerStopTestCase(
+            "SIGINT during the shutdown SIGTERM began kills the worker's group at once",
+            signal.SIGTERM,
+            signal.SIGINT,
+            0,
+            137,
+        ),
+        ForcedWorkerStopTestCase(
+            "Ctrl+C twice does the same",
+            signal.SIGINT,
+            signal.SIGINT,
+            0,
+            137,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_uncooperative_worker_when_the_scheduler_is_signalled_twice_then_it_is_killed_at_once(
+    test_case: ForcedWorkerStopTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    execution: WorkerExecutionTestCase = WorkerExecutionTestCase(
+        "a worker that ignores SIGTERM",
+        "SELECT 23 AS amount",
+        "",
+        "failed",
+        [],
+        launcher="uncooperative",
+    )
+    with scheduled_worker(tmp_path, monkeypatch, execution) as worker:
+        pid: int = uncooperative_worker_pid(worker)
+        worker.process.send_signal(test_case.first)
+        time.sleep(1)
+        assert worker.process.poll() is None, worker.log.read_text()
+        forced_at: float = time.monotonic()
+        worker.process.send_signal(test_case.second)
+        exit_code: int = worker.process.wait(timeout=20)
+        stopped_in: float = time.monotonic() - forced_at
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+        with sqlite3.connect(worker.control_store) as control:
+            claims: tuple[int] = control.execute("SELECT count(*) FROM sqb_write_claims").fetchone()
+            worker_exit: tuple[int] = control.execute(
+                "SELECT json_extract(payload, '$.change.change.exit_code') FROM recall_events "
+                "WHERE event_type='run_terminated'"
+            ).fetchone()
+        log: str = worker.log.read_text()
+
+    assert exit_code == test_case.expected_exit_code, log
+    assert stopped_in < 10, f"{stopped_in:.2f}s\n{log}"
+    assert claims == (0,), log
+    assert worker_exit == (test_case.expected_worker_exit_code,), log
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX signals and process groups")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerHangUpTestCase(
+            "the hang-up a closed terminal sends stops the scheduler and its worker as SIGTERM does",
+            0,
+            "failed",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_running_build_when_the_scheduler_hangs_up_then_its_worker_is_stopped_and_released(
+    test_case: WorkerHangUpTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    execution: WorkerExecutionTestCase = WorkerExecutionTestCase(
+        "an endless build",
+        Path("benchmarks/duckshop/edge_cases/orchestration/local_worker_recovery.sql").read_text(),
+        "",
+        "failed",
+        [],
+    )
+    with scheduled_worker(tmp_path, monkeypatch, execution) as worker:
+        active: dict[str, Any] = running_statement(worker)
+        worker.process.send_signal(signal.SIGHUP)
+        exit_code: int = worker.process.wait(timeout=60)
+        left: list[str] = processes_naming(worker.project)
+        with sqlite3.connect(worker.control_store) as control:
+            status: tuple[str] = control.execute(
+                "SELECT status FROM sqb_runs WHERE run_id=?", (active["run_id"],)
+            ).fetchone()
+            claims: tuple[int] = control.execute("SELECT count(*) FROM sqb_write_claims").fetchone()
+        log: str = worker.log.read_text()
+
+    assert exit_code == test_case.expected_exit_code, log
+    assert left == [], log
+    assert status == (test_case.expected_status,), log
+    assert claims == (0,), log
 
 
 @pytest.mark.parametrize(

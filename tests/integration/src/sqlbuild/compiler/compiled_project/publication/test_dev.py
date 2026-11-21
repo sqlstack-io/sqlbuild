@@ -39,7 +39,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     REGION_PROVIDER_FILES,
     current_snapshot,
     location_process,
-    request_development_run,
+    request_identified_run,
     stop_location,
     wait_for_connection_health,
     wait_for_development_ready,
@@ -281,7 +281,7 @@ def test_given_development_start_when_location_is_ready_then_project_python_is_d
     [
         DevelopmentWarningTestCase(
             "a failed warehouse read is a plain line, without the detailed log",
-            "sqlbuild dev: warehouse read failed: retrying in 30s: ",
+            "  why    retrying in 30s: ",
             "Warehouse history read failed; retaining mirror",
         )
     ],
@@ -322,7 +322,7 @@ def test_given_plain_development_when_a_warehouse_read_fails_then_a_warning_line
         record_finished_run(project / ".sqlbuild/control.sqlite3")
         wait_for_log(process, log, test_case.expected_line, timeout=45)
         process.send_signal(signal.SIGTERM)
-        assert process.wait(timeout=15) == 0, log.read_text()
+        assert process.wait(timeout=15) == 128 + signal.SIGTERM, log.read_text()
 
     assert test_case.hidden_line not in log.read_text()
 
@@ -378,7 +378,7 @@ def test_given_a_missing_secret_when_it_is_added_to_the_env_file_then_the_next_r
         url, identity = wait_for_development_ready(process, log)
         api: SnapshotApi = SnapshotApi(url, identity, "local-development")
         _ = wait_for_generation(api, "development", 1, process, log)
-        first_id: str = request_development_run(executable, project, identity, admin)
+        first_id: str = request_identified_run(executable, project, identity, admin)
         first: dict[str, Any] = wait_for_run(api, process, log, run_id=first_id)
         with sqlite3.connect(project / ".sqlbuild/control.sqlite3") as control:
             node: tuple[str, str, str | None] = control.execute(
@@ -388,7 +388,7 @@ def test_given_a_missing_secret_when_it_is_added_to_the_env_file_then_the_next_r
             ).fetchone()
         _ = (project / ".env").write_text(test_case.second_env_file)
         _ = wait_for_generation(api, "development", 2, process, log)
-        second_id: str = request_development_run(executable, project, identity, admin)
+        second_id: str = request_identified_run(executable, project, identity, admin)
         second: dict[str, Any] = wait_for_run(api, process, log, run_id=second_id)
 
     assert first["status"] == test_case.expected_first_status, log.read_text()
@@ -451,7 +451,7 @@ def test_given_an_unparsable_env_file_when_a_run_starts_then_its_reason_names_th
         _ = (project / ".env").write_text(test_case.invalid_env_file)
         wait_for_log(process, log, "env file not reloaded")
         # Queued from outside the project, as the UI does, so the request itself reads no .env.
-        run_id: str = request_development_run(executable, tmp_path, identity, admin)
+        run_id: str = request_identified_run(executable, tmp_path, identity, admin)
         run: dict[str, Any] = wait_for_run(api, process, log, run_id=run_id)
 
     assert run["status"] == test_case.expected_status, log.read_text()

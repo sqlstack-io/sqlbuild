@@ -1,7 +1,6 @@
 //! Run the `sqb dev` screen as the only writer to the terminal.
 
 use std::fs::File;
-use std::time::Instant;
 
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
@@ -11,21 +10,22 @@ use crate::dev_screen::_helpers::drawing::draw_screen;
 use crate::dev_screen::_helpers::keys::KeyReader;
 use crate::dev_screen::_helpers::new_dev_screen::new_dev_screen;
 use crate::dev_screen::models::{
-    DevScreen, DevScreenHandle, ScreenAction, ScreenMessage, ScreenSetup,
+    DevScreen, DevScreenHandle, ScreenAction, ScreenEnd, ScreenMessage, ScreenSetup,
 };
+use crate::dev_stop::main::stop_switch::stop_switch;
 
-/// Draw `setup`'s screen from the messages sent to the handle; a live screen also reads hotkeys.
+/// Draw `setup`'s screen from the messages sent to the handle; a live screen also reads keys.
 pub(crate) fn start_dev_screen(setup: ScreenSetup) -> DevScreenHandle {
     let live: bool = setup.live;
     let (messages, inbox) = mpsc::unbounded_channel::<ScreenMessage>();
     let (actions, asked) = mpsc::unbounded_channel::<ScreenAction>();
-    let (finish, finished) = oneshot::channel::<bool>();
+    let (finish, finished) = oneshot::channel::<ScreenEnd>();
     let keys: Option<KeyReader> = if live {
         KeyReader::start(messages.clone())
     } else {
         None
     };
-    let gate = keys.as_ref().map(KeyReader::gate);
+    let input = keys.as_ref().map(KeyReader::input);
     let terminal: Option<File> = match capture_stderr(messages.clone()) {
         Ok(terminal) => terminal,
         Err(error) => {
@@ -35,7 +35,11 @@ pub(crate) fn start_dev_screen(setup: ScreenSetup) -> DevScreenHandle {
             None
         }
     };
-    let screen: DevScreen = new_dev_screen(setup, Instant::now());
+    stop_switch().save_output(match terminal.as_ref().map(File::try_clone) {
+        Some(Ok(copy)) => Some(copy),
+        Some(Err(_)) | None => None,
+    });
+    let screen: DevScreen = new_dev_screen(setup);
     let task = tokio::spawn(draw_screen(
         screen,
         (inbox, actions),
@@ -45,7 +49,7 @@ pub(crate) fn start_dev_screen(setup: ScreenSetup) -> DevScreenHandle {
     DevScreenHandle {
         messages,
         actions: asked,
-        keys: gate,
+        keys: input,
         finish,
         task,
     }

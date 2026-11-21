@@ -145,7 +145,17 @@ pub(crate) fn read_catalog(
     let mut records: Vec<WarehouseHistoryRecord> = Vec::new();
     for (name, relation_type, key) in selected {
         let relation_columns = columns.get_item(key)?.ok_or_else(|| {
-            PyValueError::new_err("catalog relation columns are unavailable; scan incomplete")
+            PyValueError::new_err(format!(
+                "catalog relation {}{}.{name} has no readable columns (a view whose query \
+                 fails, or no privilege on a table it reads); scan incomplete",
+                request
+                    .location
+                    .database
+                    .as_ref()
+                    .map(|database| format!("{database}."))
+                    .unwrap_or_default(),
+                request.location.schema
+            ))
         })?;
         let mut decoded: Vec<WarehouseCatalogColumn> = Vec::new();
         for column in relation_columns.try_iter()? {

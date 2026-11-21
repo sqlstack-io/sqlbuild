@@ -1,5 +1,6 @@
 """Publication cases and isolated server credentials."""
 
+import signal
 import sqlite3
 from collections.abc import Callable
 from contextlib import AbstractContextManager
@@ -319,10 +320,78 @@ class DevelopmentWarningTestCase:
 @dataclass(frozen=True)
 class DevelopmentTerminalTestCase:
     description: str
-    environment: dict[str, str]
+    arguments: list[str]
     unset: frozenset[str]
+    # How the client reads the code: `sys.stdin.readline()` or `getpass.getpass(...)` on /dev/tty.
+    read_code: str
     expected_ready: str
     expected_sign_ins: list[str]
+    # Whether the typed code is visible: a plain prompt echoes it, a getpass prompt never does.
+    expected_code_shown: bool
+
+
+@dataclass(frozen=True)
+class DevelopmentStartupStopTestCase:
+    description: str
+    keys: bytes
+    expected_exit_code: int
+    expected_result: str
+
+
+@dataclass(frozen=True)
+class DevelopmentHangUpTestCase:
+    description: str
+    expected_exit_code: int
+    expected_status: str
+
+
+@dataclass(frozen=True)
+class ForcedWorkerStopTestCase:
+    description: str
+    first: signal.Signals
+    second: signal.Signals
+    expected_exit_code: int
+    expected_worker_exit_code: int
+
+
+@dataclass(frozen=True)
+class WorkerHangUpTestCase:
+    description: str
+    expected_exit_code: int
+    expected_status: str
+
+
+@dataclass(frozen=True)
+class DevelopmentActiveRunStopTestCase:
+    description: str
+    keys: bytes
+    expected_exit_code: int
+    expected_lines: list[str]
+    expected_status: str
+
+
+@dataclass(frozen=True)
+class DevelopmentKeyStopTestCase:
+    description: str
+    keys: bytes
+    expected_exit_code: int
+    expected_result: str
+
+
+@dataclass(frozen=True)
+class DevelopmentSignalStopTestCase:
+    description: str
+    stop: signal.Signals
+    expected_exit_code: int
+    expected_result: str
+
+
+@dataclass(frozen=True)
+class DevelopmentStartFailureTestCase:
+    description: str
+    configuration: str
+    expected_exit_code: int
+    expected_lines: list[str]
 
 
 @dataclass(frozen=True)
@@ -335,6 +404,15 @@ class DevelopmentEnvFileTestCase:
     expected_restart: tuple[str, ...]
     # The `--project-dir` argument for the project, such as a symlink to it.
     project_argument: Callable[[Path], Path] = lambda project: project
+
+
+@dataclass(frozen=True)
+class DevelopmentMissingSecretsTestCase:
+    description: str
+    first_env_file: str
+    second_env_file: str
+    # What the warning row shows while the secrets are missing.
+    expected_warning: tuple[str, ...]
 
 
 @dataclass(frozen=True)

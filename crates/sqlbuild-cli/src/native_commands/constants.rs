@@ -16,11 +16,19 @@ pub(crate) const CI_VARIABLE: &str = "CI";
 
 /// Turns live progress off; `sqb dev` then prints plain lines.
 pub(crate) const NO_PROGRESS_VARIABLE: &str = "SQLBUILD_NO_PROGRESS";
+/// Names the terminal type; `dumb` cannot move the cursor.
+pub(crate) const TERM_VARIABLE: &str = "TERM";
+/// The `TERM` of a terminal without cursor movement.
+pub(crate) const DUMB_TERMINAL: &str = "dumb";
 
 pub(crate) const COLUMNS_VARIABLE: &str = "COLUMNS";
 
 /// `shutil.get_terminal_size`'s fallback width.
 pub(crate) const FALLBACK_COLUMNS: i64 = 80;
+/// The height a screen assumes when the terminal does not say.
+pub(crate) const FALLBACK_ROWS: usize = 24;
+/// The code of a rejected project configuration, as `ProjectConfigError` reports it.
+pub(crate) const CONFIG_ERROR_CODE: &str = "D001";
 
 /// Variables that change where Python imports `sqlbuild` from.
 pub(crate) const PYTHON_PATH_VARIABLES: [&str; 2] = ["PYTHONPATH", "PYTHONHOME"];
@@ -203,9 +211,6 @@ pub(crate) const PLAN_OUTPUT_BYTES: usize =
 /// `sqb dev` names at most this many changed inputs per change event.
 pub(crate) const CHANGED_PATHS_SHOWN: usize = 3;
 
-/// The spaces every `sqb dev` screen row starts with.
-pub(crate) const SCREEN_INDENT: usize = 2;
-
 /// Seconds a state-table or catalog page may take; its byte budget bounds the transfer.
 pub(crate) const METADATA_PAGE_SECONDS: u64 = 120;
 
@@ -236,3 +241,7 @@ pub(crate) const CLEAR_TERMINAL_LINE: &str = "\r\u{1b}[K";
 
 /// The setting of `--changed`, which makes a plan read the synced copy's consumption.
 pub(crate) const CHANGED_SETTING: &str = "changed";
+
+/// What a second signal during worker shutdown prints before it kills the workers.
+pub(crate) const FORCED_WORKER_STOP: &str =
+    "Stopping now: killing the workers' process groups instead of waiting for them\n";

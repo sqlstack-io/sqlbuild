@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use sqlbuild_orchestration::runs::models::{RunRecord, RunStatus};
+use sqlbuild_orchestration::runs::models::{RunOrigin, RunRecord, RunStatus};
 use uuid::Uuid;
 
 use crate::dev_screen::models::ScreenMessage;
@@ -26,14 +26,18 @@ pub(crate) fn run_messages(
         if before.is_none() {
             messages.push(ScreenMessage::Run {
                 name: run_name(run),
-                detail: format!("started from {}", run.origin.as_str()),
+                detail: started_by(run),
                 finished: None,
             });
         }
         if run.status.is_terminal() && before.is_none_or(|status| !status.is_terminal()) {
             messages.push(ScreenMessage::Run {
                 name: run_name(run),
-                detail: format!("{} nodes", run.node_counts_json.values().sum::<i64>()),
+                detail: format!(
+                    "{} \u{b7} {} nodes",
+                    outcome(run.status),
+                    run.node_counts_json.values().sum::<i64>()
+                ),
                 finished: Some((
                     matches!(run.status, RunStatus::Success | RunStatus::Warn),
                     run_elapsed(run),
@@ -42,6 +46,36 @@ pub(crate) fn run_messages(
         }
     }
     (messages, now)
+}
+
+/// How a finished run ended, in words.
+fn outcome(status: RunStatus) -> &'static str {
+    match status {
+        RunStatus::Success => "succeeded",
+        RunStatus::Warn => "succeeded with warnings",
+        RunStatus::Partial => "partly succeeded",
+        RunStatus::Failed => "failed",
+        RunStatus::Cancelled => "cancelled",
+        RunStatus::Skipped => "skipped",
+        RunStatus::Queued | RunStatus::Launched | RunStatus::Running | RunStatus::Unresponsive => {
+            "ended"
+        }
+    }
+}
+
+/// `started manually`, `started by schedule nightly` or `started as a rerun`; the trigger is named unless it already names the run.
+fn started_by(run: &RunRecord) -> String {
+    let trigger: String = match (&run.job_key, &run.trigger_name) {
+        (Some(_), Some(name)) => format!(" {name}"),
+        _ => String::new(),
+    };
+    match run.origin {
+        RunOrigin::Manual => "started manually".to_owned(),
+        RunOrigin::Schedule => format!("started by schedule{trigger}"),
+        RunOrigin::Sensor => format!("started by sensor{trigger}"),
+        RunOrigin::Rerun => "started as a rerun".to_owned(),
+        RunOrigin::Backfill => "started by a backfill".to_owned(),
+    }
 }
 
 fn run_name(run: &RunRecord) -> String {
