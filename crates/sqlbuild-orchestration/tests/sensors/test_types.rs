@@ -53,14 +53,17 @@ pub(crate) struct CheckEventTestCase {
     pub(crate) expected_checks: &'static [&'static str],
 }
 
+/// How many ticks in a row end the same way, and how they end.
+pub(crate) type FailingTicks = (
+    usize,
+    fn() -> crate::sensors::models::SensorEvaluationOutcome,
+);
+
 pub(crate) struct SensorFailingTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     /// How the ticks after one good tick end, oldest first: how many in a row end each way.
-    pub(crate) ticks: &'static [(
-        usize,
-        fn() -> crate::sensors::models::SensorEvaluationOutcome,
-    )],
+    pub(crate) ticks: &'static [FailingTicks],
     pub(crate) expected_failed_ticks: Option<usize>,
     pub(crate) expected_reason: Option<&'static str>,
     /// Why the newest tick was abandoned, as people see it.
