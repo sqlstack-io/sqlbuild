@@ -7,7 +7,9 @@ use uuid::Uuid;
 use crate::runs::constants::SUPERSEDED_CHILD;
 use crate::runs::models::RunOutcome;
 use crate::sensors::_helpers::events::conditions::{page_clause, run_url};
-use crate::sensors::constants::{EVENT_PAGE_SIZE, EXECUTION_NODE_BATCH_SIZE};
+use crate::sensors::constants::{
+    CHECK_KEY_PREFIXES, CHECK_ROW_KIND, EVENT_PAGE_SIZE, EXECUTION_NODE_BATCH_SIZE,
+};
 use crate::sensors::models::{
     Direction, EventScope, RunEventKind, Scanned, SensorEvent, TerminalSensorRun,
 };
@@ -173,11 +175,21 @@ async fn run_event(
         vec![Parameter::Id(run.run_id)],
     )
     .await?;
-    let failed = |kind: &str| -> Vec<String> {
-        rows.iter()
-            .filter(|row| row["kind"] == kind)
+    let failed = |checks: bool| -> Vec<String> {
+        let mut keys: Vec<String> = rows
+            .iter()
+            .filter(|row| {
+                let key = row["node_key"].as_str().unwrap_or_default();
+                let check = row["kind"] == CHECK_ROW_KIND
+                    || CHECK_KEY_PREFIXES
+                        .iter()
+                        .any(|prefix| key.starts_with(prefix));
+                check == checks
+            })
             .filter_map(|row| row["node_key"].as_str().map(str::to_owned))
-            .collect()
+            .collect();
+        keys.dedup();
+        keys
     };
     Ok((
         transaction,
@@ -188,8 +200,8 @@ async fn run_event(
             run_id: run.run_id,
             status: run.status,
             error,
-            failed_nodes: failed("node"),
-            failed_checks: failed("check"),
+            failed_nodes: failed(false),
+            failed_checks: failed(true),
             target: scope.target.into(),
             url: run_url(scope.origin, run.run_id),
         },

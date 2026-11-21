@@ -625,3 +625,14 @@ class SensorHarness(NamedTuple):
     calls: Path
     binary: str
     environment: dict[str, str]
+
+
+@dataclass(frozen=True)
+class CheckSensorsTestCase:
+    description: str
+    worker: WorkerExecutionTestCase
+    # Each failed or warned check the check sensor is called with, as (check, status).
+    expected_check_events: list[tuple[str, str]]
+    # The run event's failed checks and failed nodes.
+    expected_failed_checks: list[str]
+    expected_failed_nodes: list[str]

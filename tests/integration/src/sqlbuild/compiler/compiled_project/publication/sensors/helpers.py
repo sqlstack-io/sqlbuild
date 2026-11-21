@@ -304,3 +304,35 @@ def assert_trials(
     assert sensor_calls(harness.calls, {"sensor": "orders_poll_sensor"})[-1]["event_type"] == (
         "NoneType"
     )
+
+
+RECORDING_SENSORS: dict[str, str] = {
+    "orchestration/sensors/orders_checks_sensor.py": (
+        "import json, os\nfrom pathlib import Path\n"
+        "from sqlbuild.orchestration import CheckEventKind, check_event, sensor\n\n\n"
+        "@sensor(description='Record failed and warned checks.',\n"
+        "        when=check_event(select='{select}', kinds=[CheckEventKind.FAILED, CheckEventKind.WARN]),\n"
+        "        minimum_interval_seconds=1)\n"
+        "def orders_checks_sensor(ctx):\n"
+        "    with Path(os.environ['SQLBUILD_SENSOR_CALLS']).open('a') as out:\n"
+        "        out.write(json.dumps({'sensor': 'orders_checks_sensor', 'check': ctx.event.check,\n"
+        "                              'status': str(ctx.event.status)}) + '\\n')\n"
+    ),
+    "orchestration/sensors/orders_run_sensor.py": (
+        "import json, os\nfrom pathlib import Path\n"
+        "from sqlbuild.orchestration import RunEventKind, run_event, sensor\n\n\n"
+        "@sensor(description='Record the finished run.',\n"
+        "        when=run_event(job='annual_orders_job', kinds=[RunEventKind.COMPLETED]),\n"
+        "        minimum_interval_seconds=1)\n"
+        "def orders_run_sensor(ctx):\n"
+        "    with Path(os.environ['SQLBUILD_SENSOR_CALLS']).open('a') as out:\n"
+        "        out.write(json.dumps({'sensor': 'orders_run_sensor', 'status': str(ctx.event.status),\n"
+        "                              'failed_checks': ctx.event.failed_checks,\n"
+        "                              'failed_nodes': ctx.event.failed_nodes}) + '\\n')\n"
+    ),
+}
+
+
+def recording_sensors(select: str) -> dict[str, str]:
+    """Both recording sensors, the check sensor watching the checks on `select`."""
+    return {path: text.replace("{select}", select) for path, text in RECORDING_SENSORS.items()}
