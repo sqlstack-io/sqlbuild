@@ -1,0 +1,69 @@
+---
+title: "sqb sensor try"
+description: "Call a sensor's function from your local code with a real event, without starting runs."
+sidebar:
+  label: "sensor try"
+---
+
+Try a [sensor](/docs/concepts/orchestration#react-with-a-sensor) while you write it: list the
+events it reacts to, then call its function from your local code with one of them.
+
+```bash
+sqb sensor try orders_failed_sensor --server https://control.example.com --location-id <uuid>
+```
+
+```text
+run:0193b2c4-5e1f-7a20-9c3d-4b8e2f6a1d07  2026-11-20 06:12:09 UTC  run 0193b2c4-5e1f-7a20-9c3d-4b8e2f6a1d07 of nightly_orders_job ended failed
+run:0193b1a0-8c42-7d11-a6e5-0f9b3c7d2e18  2026-11-19 06:11:47 UTC  run 0193b1a0-8c42-7d11-a6e5-0f9b3c7d2e18 of nightly_orders_job ended failed
+
+Call orders_failed_sensor with one: sqb sensor try orders_failed_sensor --event <id> (or --latest, --run <run-id>)
+```
+
+With no event chosen, the command lists recent matching events and exits without calling the
+function. Choose one to call it:
+
+```bash
+sqb sensor try orders_failed_sensor --latest --server https://control.example.com --location-id <uuid>
+```
+
+```text
+Calling orders_failed_sensor() for sensor orders_failed_sensor with run:0193b2c4-5e1f-7a20-9c3d-4b8e2f6a1d07 (run 0193b2c4-5e1f-7a20-9c3d-4b8e2f6a1d07 of nightly_orders_job ended failed), using target production's providers.
+What they do, such as sending a message, really happens; no run starts and no tick is recorded.
+The function asked for 1 run; try starts none:
+  orders_export_job  (run key run:0193b2c4-5e1f-7a20-9c3d-4b8e2f6a1d07:orders_export_job)
+```
+
+The function runs with the target's real providers, so a message it sends is really sent. No run
+starts and no tick is recorded.
+
+## Options
+
+| Option | Meaning |
+| --- | --- |
+| `NAME` | The sensor's name |
+| `--event <id>` | Call the function with this event, as the listing or a tick shows its ID |
+| `--latest` | Call the function with the newest matching event; a polling sensor is called once |
+| `--run <run-id>` | For a `run_event` sensor, call the function with this run's outcome |
+| `--limit N` | Events to list when none is chosen (default 10) |
+| `--target` | The project target whose providers and events to use (default: the project's default target) |
+| `--server`, `--location-id`, `--ca-cert` | Read events from this server with your [`sqb login`](/docs/cli/login) session |
+| `--control-store-url` | Without `--server`, read events from this [`sqb dev`](/docs/cli/dev) store (default `.sqlbuild/control.sqlite3`) |
+| `--project-dir` | The project directory (default: the current directory) |
+
+`--event`, `--latest` and `--run` are mutually exclusive.
+
+## Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| 0 | The events were listed, or the function returned `None`, a `SkipReason` or run requests |
+| 1 | The function raised or timed out, no event matches, or the events couldn't be read |
+| 2 | A usage error, such as two of `--event`, `--latest` and `--run` |
+
+Details:
+
+- The function is the one in your local project, not the published code, so you can try a change
+  before you publish it.
+- `--run` fails when the run hasn't finished, or when its outcome isn't one of the sensor's `kinds`,
+  and says which.
+- Reading events needs `view` on every node of the target, as the sensor's page does.
