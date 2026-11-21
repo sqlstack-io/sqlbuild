@@ -110,7 +110,7 @@ pub(crate) async fn run_read<T>(
     Ok(Some(result))
 }
 
-/// A sensitive run read, authorized for `action` and audited as `audit_action` in the same transaction.
+/// A sensitive run read, authorized for `action` each time and audited as `audit_action` in the same transaction, once per `repeat` window when given.
 pub(crate) async fn sensitive_run_read<T>(
     store: &ControlStore,
     credentials: (&AuditContext, Uuid),
@@ -131,7 +131,6 @@ pub(crate) async fn sensitive_run_read<T>(
         return Ok(None);
     };
     let (transaction, result) = read(transaction, &scope).await?;
-    // A read repeated while a page follows the run is authorized each time but audited once per window.
     let key = (context.actor.as_str(), audit_action, run.2);
     let audited: bool = repeat.is_none_or(|window| audit_due(key, window));
     let transaction = if audited {

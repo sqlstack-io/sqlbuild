@@ -1,5 +1,4 @@
-//! A run read that needs an evidence permission, authorized and audited in one transaction, for other domains' run reads.
-//! A read a page repeats while following a run passes `repeat`, and is audited once per that window.
+//! A run read that needs an evidence permission, authorized and audited in one transaction (once per `repeat` window when given), for other domains.
 
 use std::time::Duration;
 

@@ -831,8 +831,6 @@ impl WorkerBuild {
                 Some(value) => value.extract()?,
                 None => None,
             };
-            // A Python failure's traceback, when it has one, is the run's error text; its summary
-            // line stays the node's own message.
             let detail: Option<String> = match result.getattr_opt("error_detail")? {
                 Some(value) => value.extract()?,
                 None => None,
