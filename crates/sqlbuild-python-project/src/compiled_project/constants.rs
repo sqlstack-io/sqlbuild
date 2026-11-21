@@ -4,6 +4,9 @@ pub const SKIP_ACTION: &str = "skip";
 
 pub const NO_CHANGE_REASON: &str = "no_change";
 
+/// Why an up-to-date node succeeded without building, as a run's node list shows it.
+pub const UNCHANGED_REASON: &str = "unchanged since its last build";
+
 pub const REPORT_ATTEMPTS: usize = 3;
 
 /// The HTTP status a control server answers while its store is busy; reports retry it.

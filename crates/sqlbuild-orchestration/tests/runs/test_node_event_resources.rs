@@ -116,6 +116,8 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
                     node_key: "model:payments".into(),
                     outcome: NodeOutcome::Success,
                     rows_affected: Some(3),
+                    table_rows: None,
+                    no_change_reason: None,
                     error_code: None,
                     skipped_because_of: None,
                     error_message: None,

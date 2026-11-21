@@ -531,3 +531,20 @@ pub(crate) struct NodeOfTestCase {
     pub(crate) fields: &'static [(&'static str, &'static str)],
     pub(crate) expected_node: Option<(&'static str, &'static str)>,
 }
+
+/// One run node as the run's node list reads it back.
+pub(crate) type NodeResultRow = (
+    &'static str,
+    &'static str,
+    Option<&'static str>,
+    (Option<i64>, Option<i64>, Option<i64>),
+    Option<&'static str>,
+);
+
+pub(crate) struct NodeResultsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Each node's key, status, materialization, (rows affected, table rows, rows so far) and why it changed nothing.
+    pub(crate) expected_nodes: &'static [NodeResultRow],
+    pub(crate) expected_not_run: i64,
+}

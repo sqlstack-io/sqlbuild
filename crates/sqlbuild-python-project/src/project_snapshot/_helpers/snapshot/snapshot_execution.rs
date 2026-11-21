@@ -4,13 +4,10 @@ use pyo3::exceptions::PyRuntimeError;
 use sqlbuild_core::models::CompiledResourceType;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 
-/// A finished node's outcome, rows affected, error code and error message.
-pub(crate) type Completion = (NodeOutcome, Option<i64>, (Option<String>, Option<String>));
-
 /// Failure outranks cancellation, then warnings, then success.
 pub(crate) fn severity(outcome: NodeOutcome) -> u8 {
     match outcome {
-        NodeOutcome::Skipped => 0,
+        NodeOutcome::Skipped | NodeOutcome::NotRun => 0,
         NodeOutcome::Success => 1,
         NodeOutcome::Warn => 2,
         NodeOutcome::Cancelled => 3,

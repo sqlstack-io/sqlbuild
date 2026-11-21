@@ -5,8 +5,8 @@ use crate::compiled_project::constants::REPORT_ATTEMPTS;
 use crate::compiled_project::constants::SKIP_ACTION;
 use crate::compiled_project::constants::SQL_TEST_KEY_PREFIX;
 use crate::compiled_project::constants::STORE_BUSY_STATUS;
+use crate::compiled_project::constants::UNCHANGED_REASON;
 use crate::native_host::models::DeferredCost;
-use crate::project_snapshot::_helpers::snapshot::snapshot_execution::Completion;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::is_function;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::poisoned;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::severity;
@@ -122,6 +122,39 @@ impl NativeOrchestrationSnapshot {
     }
 }
 
+/// A finished node's result as the worker reports it.
+#[derive(Clone, Debug)]
+pub(crate) struct Completion {
+    pub(crate) outcome: NodeOutcome,
+    pub(crate) rows_affected: Option<i64>,
+    /// The rows a fully rebuilt table holds, where the warehouse's metadata count is exact.
+    pub(crate) table_rows: Option<i64>,
+    pub(crate) no_change_reason: Option<String>,
+    pub(crate) error_code: Option<String>,
+    pub(crate) error_message: Option<String>,
+}
+
+impl Completion {
+    pub(crate) const fn of(outcome: NodeOutcome) -> Self {
+        Self {
+            outcome,
+            rows_affected: None,
+            table_rows: None,
+            no_change_reason: None,
+            error_code: None,
+            error_message: None,
+        }
+    }
+
+    /// A node that is up to date succeeds without building, saying why.
+    pub(crate) fn unchanged() -> Self {
+        Self {
+            no_change_reason: Some(UNCHANGED_REASON.into()),
+            ..Self::of(NodeOutcome::Success)
+        }
+    }
+}
+
 /// This transient owner records only acknowledged outcomes; durable lifecycle remains on the API.
 #[derive(Debug)]
 pub struct WorkerBuild {
@@ -176,7 +209,7 @@ impl WorkerBuild {
             deferred_cost: DeferredCost::default(),
         });
         for key in state.execution.skipped_nodes.keys() {
-            state.complete(worker.py(), key, (NodeOutcome::Skipped, None, (None, None)))?;
+            state.complete(worker.py(), key, Completion::of(NodeOutcome::Skipped))?;
         }
         Ok(state)
     }
@@ -304,12 +337,13 @@ impl WorkerBuild {
                 if kind == ResourceKind::Model.as_str()
                     && field(&entry, "action")?.str()?.to_str()? == SKIP_ACTION
                 {
-                    let outcome = if field(&entry, "reason")?.str()?.to_str()? == NO_CHANGE_REASON {
-                        NodeOutcome::Success
-                    } else {
-                        NodeOutcome::Skipped
-                    };
-                    self.complete(pipeline.py(), &key, (outcome, None, (None, None)))?;
+                    let completion =
+                        if field(&entry, "reason")?.str()?.to_str()? == NO_CHANGE_REASON {
+                            Completion::unchanged()
+                        } else {
+                            Completion::of(NodeOutcome::Skipped)
+                        };
+                    self.complete(pipeline.py(), &key, completion)?;
                 }
             }
         }
@@ -333,7 +367,7 @@ impl WorkerBuild {
     /// Nodes `build --changed` leaves unbuilt are up to date, as a planner `no_change` skip is.
     pub fn unchanged(&self, py: Python<'_>, keys: &[String]) -> PyResult<()> {
         for key in keys {
-            self.complete(py, key, (NodeOutcome::Success, None, (None, None)))?;
+            self.complete(py, key, Completion::unchanged())?;
         }
         Ok(())
     }
@@ -344,27 +378,17 @@ impl WorkerBuild {
             self.complete(
                 py,
                 key,
-                (
-                    NodeOutcome::Skipped,
-                    None,
-                    (None, Some(format!("held back: {why}"))),
-                ),
+                Completion {
+                    error_message: Some(format!("held back: {why}")),
+                    ..Completion::of(NodeOutcome::Skipped)
+                },
             )?;
         }
         Ok(())
     }
 
     /// A skip in a build names the failed node upstream of it; a test or audit run that raised skips what it never checked, with no cause.
-    fn complete(
-        &self,
-        py: Python<'_>,
-        key: &str,
-        (outcome, rows_affected, (error_code, error_message)): (
-            NodeOutcome,
-            Option<i64>,
-            (Option<String>, Option<String>),
-        ),
-    ) -> PyResult<()> {
+    fn complete(&self, py: Python<'_>, key: &str, completion: Completion) -> PyResult<()> {
         if !self.execution.claim.request.selection.contains(key) {
             return Ok(());
         }
@@ -376,24 +400,33 @@ impl WorkerBuild {
         {
             return Ok(());
         }
-        let skipped_because_of = match outcome {
-            NodeOutcome::Skipped => match self.execution.skipped_nodes.get(key) {
-                Some(cause) => Some(cause.clone()),
-                None if !self.checks_only() => self.failed_upstream(key)?,
-                None => None,
-            },
+        let upstream = match completion.outcome {
+            NodeOutcome::Skipped | NodeOutcome::NotRun => {
+                match self.execution.skipped_nodes.get(key) {
+                    Some(cause) => Some(cause.clone()),
+                    None if !self.checks_only() => self.failed_upstream(key)?,
+                    None => None,
+                }
+            }
             _ => None,
         };
+        let outcome = match (completion.outcome, &upstream) {
+            (NodeOutcome::NotRun, Some(_)) => NodeOutcome::Skipped,
+            (outcome, _) => outcome,
+        };
+        let skipped_because_of = upstream.filter(|_| outcome == NodeOutcome::Skipped);
         self.worker.bind(py).get().change(
             py,
             &format!("node-finished/{key}"),
             RunChange::NodeFinished {
                 node_key: key.into(),
                 outcome,
-                rows_affected,
-                error_code,
+                rows_affected: completion.rows_affected,
+                table_rows: completion.table_rows,
+                no_change_reason: completion.no_change_reason,
+                error_code: completion.error_code,
                 skipped_because_of: skipped_because_of.clone(),
-                error_message: error_message.as_deref().map(redact_error_text),
+                error_message: completion.error_message.as_deref().map(redact_error_text),
             },
         )?;
         let cause = match outcome {
@@ -456,7 +489,7 @@ impl WorkerBuild {
 
     /// Report a selected node's outcome when the command reports no executor result for it.
     pub fn finish_key(&self, py: Python<'_>, key: &str, outcome: NodeOutcome) -> PyResult<()> {
-        self.complete(py, key, (outcome, None, (None, None)))
+        self.complete(py, key, Completion::of(outcome))
     }
 
     /// A test or audit the snapshot records has started; a selected SQL test reports as a node.
@@ -524,7 +557,7 @@ impl WorkerBuild {
             outcome
         };
         if self.execution.claim.request.selection.contains(key) {
-            self.complete(py, key, (outcome, None, (None, None)))?;
+            self.complete(py, key, Completion::of(outcome))?;
         } else {
             self.finish_check(py, key, outcome)?;
         }
@@ -584,14 +617,15 @@ impl WorkerBuild {
             (false, true) => NodeOutcome::Cancelled,
             (false, false) => NodeOutcome::Failed,
         };
-        self.complete(py, &key, (node, None, (error.clone(), message.clone())))?;
+        let failure = |outcome| Completion {
+            error_code: error.clone(),
+            error_message: message.clone(),
+            ..Completion::of(outcome)
+        };
+        self.complete(py, &key, failure(node))?;
         if !passed && !cancelled {
             for model in self.blocked.get(&key).into_iter().flatten() {
-                self.complete(
-                    py,
-                    model,
-                    (NodeOutcome::Failed, None, (error.clone(), message.clone())),
-                )?;
+                self.complete(py, model, failure(NodeOutcome::Failed))?;
             }
         }
         self.release_tested(py, &key)
@@ -624,7 +658,7 @@ impl WorkerBuild {
     /// Publish a node's result, or hold a built function's while its tests have still to report.
     fn complete_or_hold(&self, py: Python<'_>, key: &str, completion: Completion) -> PyResult<()> {
         let waiting = !self.checks_only()
-            && matches!(completion.0, NodeOutcome::Success | NodeOutcome::Warn)
+            && matches!(completion.outcome, NodeOutcome::Success | NodeOutcome::Warn)
             && self
                 .untested
                 .lock()
@@ -677,7 +711,11 @@ impl WorkerBuild {
                     )));
                 }
             };
-            let rows = match result.getattr_opt("rows_affected")? {
+            let rows_affected = match result.getattr_opt("rows_affected")? {
+                Some(value) => value.extract()?,
+                None => None,
+            };
+            let table_rows = match result.getattr_opt("table_rows")? {
                 Some(value) => value.extract()?,
                 None => None,
             };
@@ -689,7 +727,17 @@ impl WorkerBuild {
                 Some(value) => value.extract()?,
                 None => None,
             };
-            self.complete_or_hold(result.py(), key, (outcome, rows, (error, message)))?;
+            self.complete_or_hold(
+                result.py(),
+                key,
+                Completion {
+                    rows_affected,
+                    table_rows,
+                    error_code: error,
+                    error_message: message,
+                    ..Completion::of(outcome)
+                },
+            )?;
         }
         Ok(())
     }
@@ -772,7 +820,7 @@ impl WorkerBuild {
                     })
                 };
                 if let Some(outcome) = outcome {
-                    self.complete(py, key, (outcome, None, (None, None)))?;
+                    self.complete(py, key, Completion::of(outcome))?;
                 }
             }
         }
@@ -792,9 +840,9 @@ impl WorkerBuild {
             } else if returned && source_needs_no_run(key) {
                 NodeOutcome::Success
             } else {
-                NodeOutcome::Skipped
+                NodeOutcome::NotRun
             };
-            self.complete(py, key, (outcome, None, (None, None)))?;
+            self.complete(py, key, Completion::of(outcome))?;
         }
         let outcome = {
             let completed = self.completed.lock().map_err(|_| poisoned())?;
@@ -806,7 +854,10 @@ impl WorkerBuild {
             let bad = outcomes.iter().any(|value| {
                 matches!(
                     value,
-                    NodeOutcome::Failed | NodeOutcome::Skipped | NodeOutcome::Cancelled
+                    NodeOutcome::Failed
+                        | NodeOutcome::Skipped
+                        | NodeOutcome::Cancelled
+                        | NodeOutcome::NotRun
                 )
             });
             if cancelled {

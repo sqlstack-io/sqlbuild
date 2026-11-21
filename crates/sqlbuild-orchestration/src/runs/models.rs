@@ -368,6 +368,8 @@ pub enum NodeOutcome {
     Failed,
     Skipped,
     Cancelled,
+    /// The run stopped before it reached the node: nothing upstream failed or skipped it.
+    NotRun,
 }
 
 impl NodeOutcome {
@@ -379,6 +381,7 @@ impl NodeOutcome {
             Self::Failed => "failed",
             Self::Skipped => "skipped",
             Self::Cancelled => "cancelled",
+            Self::NotRun => "not_run",
         }
     }
 }
@@ -389,7 +392,20 @@ pub struct RunNodeRecord {
     pub status: String,
     pub started_at: Option<DateTime<Utc>>,
     pub ended_at: Option<DateTime<Utc>>,
+    /// Rows a statement inserted, merged or deleted, as the warehouse reported them.
     pub rows_affected: Option<i64>,
+    /// The rows a fully rebuilt table holds, read from the warehouse's metadata where that count is exact.
+    #[serde(default)]
+    pub table_rows: Option<i64>,
+    /// Rows written so far while the node runs, from microbatch batches or a loader's progress.
+    #[serde(default)]
+    pub rows_so_far: Option<i64>,
+    /// Why a node that ran changed nothing, such as `unchanged since its last build`.
+    #[serde(default)]
+    pub no_change_reason: Option<String>,
+    /// The node's materialization in the run's snapshot, such as `table`, `incremental` or `view`.
+    #[serde(default)]
+    pub materialization: Option<String>,
     pub error_code: Option<String>,
     pub skipped_because_of: Option<String>,
 }
@@ -587,10 +603,21 @@ pub enum RunChange {
     NodeStarted {
         node_key: String,
     },
+    /// Rows a running node has written so far; a worker sends at most one every few seconds per node.
+    NodeProgress {
+        node_key: String,
+        rows_so_far: i64,
+    },
     NodeFinished {
         node_key: String,
         outcome: NodeOutcome,
         rows_affected: Option<i64>,
+        /// The rows a fully rebuilt table holds, where the warehouse's metadata count is exact.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        table_rows: Option<i64>,
+        /// Why a node that ran changed nothing.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        no_change_reason: Option<String>,
         error_code: Option<String>,
         skipped_because_of: Option<String>,
         /// Redacted and bounded on the way in, whoever sends it; absent from older workers.
@@ -638,6 +665,7 @@ impl RunChange {
             Self::LaunchFailed { .. } => "run_launch_failed",
             Self::Started => "run_started",
             Self::NodeStarted { .. } => "run_node_started",
+            Self::NodeProgress { .. } => "run_node_progress",
             Self::NodeFinished { .. } => "run_node_finished",
             Self::CheckStarted { .. } => "run_check_started",
             Self::CheckFinished { .. } => "run_check_finished",
@@ -654,6 +682,7 @@ impl RunChange {
     pub(crate) fn node_key(&self) -> Option<&str> {
         match self {
             Self::NodeStarted { node_key }
+            | Self::NodeProgress { node_key, .. }
             | Self::NodeFinished { node_key, .. }
             | Self::CheckStarted { node_key }
             | Self::CheckFinished { node_key, .. } => Some(node_key),

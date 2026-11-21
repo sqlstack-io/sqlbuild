@@ -164,6 +164,8 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                         node_key: node.clone(),
                         outcome,
                         rows_affected: None,
+                        table_rows: None,
+                        no_change_reason: None,
                         error_code: None,
                         skipped_because_of: (outcome == NodeOutcome::Skipped)
                             .then(|| "orders".into()),

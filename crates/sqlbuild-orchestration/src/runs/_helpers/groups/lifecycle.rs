@@ -159,7 +159,7 @@ async fn skip_blocked_members(
         let rows;
         (transaction, rows) = query(transaction,
             "SELECT n.node_key, n.skipped_because_of FROM sqb_run_nodes n WHERE n.run_id=$1 AND n.kind='node' \
-             AND n.status IN ('failed','skipped','cancelled') ORDER BY CASE n.status WHEN 'failed' THEN 0 ELSE 1 END, n.node_key LIMIT 1",
+             AND n.status IN ('failed','skipped','cancelled','not_run') ORDER BY CASE n.status WHEN 'failed' THEN 0 ELSE 1 END, n.node_key LIMIT 1",
             vec![Parameter::Id(failed.request_json.run_id)]).await?;
         let cause: Option<String> = rows.first().and_then(|row| {
             row["skipped_because_of"]
@@ -175,6 +175,8 @@ async fn skip_blocked_members(
                     node_key: node_key.clone(),
                     outcome: NodeOutcome::Skipped,
                     rows_affected: None,
+                    table_rows: None,
+                    no_change_reason: None,
                     error_code: None,
                     skipped_because_of: cause.clone(),
                     error_message: None,
@@ -237,7 +239,7 @@ async fn finish_group(
     let rank = |status: &str| match status {
         "failed" => 5,
         "cancelled" => 4,
-        "skipped" => 3,
+        "skipped" | "not_run" => 3,
         "warn" => 2,
         "success" => 1,
         _ => 0,
@@ -269,6 +271,8 @@ async fn finish_group(
                 node_key: key.clone(),
                 outcome,
                 rows_affected: node.rows_affected,
+                table_rows: None,
+                no_change_reason: None,
                 error_code: node.error_code.clone(),
                 skipped_because_of: node.skipped_because_of.clone(),
                 error_message: None,

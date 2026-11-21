@@ -40,6 +40,8 @@ mod test_monitor;
 mod test_node_errors;
 #[path = "test_node_event_resources.rs"]
 mod test_node_event_resources;
+#[path = "test_node_results.rs"]
+mod test_node_results;
 #[path = "test_permissions.rs"]
 mod test_permissions;
 #[path = "test_project_limits.rs"]

@@ -65,7 +65,7 @@ pub(crate) async fn frozen_rerun(
         let rows;
         (transaction, rows) = query(
             transaction,
-            "SELECT node_key FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' AND status IN ('failed','skipped')",
+            "SELECT node_key FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' AND status IN ('failed','skipped','not_run')",
             vec![Parameter::Id(request.source_run_id)],
         )
         .await?;
