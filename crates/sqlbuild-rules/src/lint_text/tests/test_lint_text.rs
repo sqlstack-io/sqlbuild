@@ -1069,3 +1069,110 @@ fn given_expression_macro_bodies_when_formatting_twice_then_every_dialect_lays_t
     }
     Ok(())
 }
+
+#[test]
+fn given_a_model_body_that_is_one_macro_call_when_formatting_then_every_dialect_leaves_it_as_written()
+-> Result<(), LintTextError> {
+    macro_rules! model_header {
+        () => {
+            "MODEL (description \"Completed orders\", materialized table,);\n"
+        };
+    }
+    macro_rules! macro_call {
+        () => {
+            "@py.orders_for(__ref(\"stg_orders\"), status=\"completed\")"
+        };
+    }
+    let test_cases = [
+        FormatBodiesTestCase {
+            description: "the call alone on snowflake",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: concat!(model_header!(), macro_call!(), "\n"),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "the call ending its statement on snowflake",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: concat!(model_header!(), macro_call!(), ";\n"),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "the call followed by a comment on snowflake",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: concat!(
+                model_header!(),
+                macro_call!(),
+                "\n-- Completed orders only\n"
+            ),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "the call followed by a block comment on snowflake",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: concat!(model_header!(), macro_call!(), " /* completed */;\n"),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "the call alone on duckdb",
+            dialect: "duckdb",
+            relative_parts: None,
+            contents: concat!(model_header!(), macro_call!(), "\n"),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "the call ending its statement on duckdb",
+            dialect: "duckdb",
+            relative_parts: None,
+            contents: concat!(model_header!(), macro_call!(), ";\n"),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "the call followed by a comment on duckdb",
+            dialect: "duckdb",
+            relative_parts: None,
+            contents: concat!(
+                model_header!(),
+                macro_call!(),
+                "\n-- Completed orders only\n"
+            ),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "the call followed by a block comment on duckdb",
+            dialect: "duckdb",
+            relative_parts: None,
+            contents: concat!(model_header!(), macro_call!(), " /* completed */;\n"),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+    ];
+
+    for test_case in test_cases {
+        let files = [FormatFile {
+            relative_parts: test_case.relative_parts.clone(),
+            contents: test_case.contents.to_string(),
+        }];
+
+        let result = format_sql_bodies(&files, test_case.dialect, 100)?;
+        let fault_lines: Vec<usize> = result.faults.iter().map(|fault| fault.line).collect();
+
+        assert_eq!(
+            (result.formatted, fault_lines),
+            (test_case.expected_formatted, test_case.expected_fault_lines),
+            "{}",
+            test_case.description
+        );
+    }
+    Ok(())
+}
