@@ -280,7 +280,8 @@ kept under `target/run/`, which can hold sensitive data; the cost records under
 ## Functions in unit tests
 
 `sqb test` creates each UDF and table function the selected tests call, SQL or Python, as a
-`TEMPORARY FUNCTION __SQB_TEST__<NAME>` in the built function's database and schema, so the session
-needs no current database or schema. The role needs permission to create functions there, and the
-schema must exist; otherwise `sqb test` stops with `T006`. See
+`TEMPORARY FUNCTION __SQB_TEST__<NAME>` in the session's current database and schema, so a fresh
+development environment needs no build first. A session without a current database or schema puts
+the copy in the function's own database and schema, which must then exist. The role needs
+permission to create functions there; otherwise `sqb test` stops with `T006`. See
 [Functions in `sqb test`](/docs/concepts/testing-reference#functions-in-sqb-test).

@@ -45,6 +45,7 @@ def create_temporary_test_functions(
     created_keys: set[CompiledObjectKey] = set()
     statements: list[tuple[str, str]] = []
     failures: dict[CompiledObjectKey, str] = {}
+    session: tuple[str, str] | None = adapter.session_schema(connection=connection)
     key: CompiledObjectKey
     for key in _dependency_order(
         required_keys=required_keys, entries_by_key=entries_by_key, syntax=syntax
@@ -68,8 +69,8 @@ def create_temporary_test_functions(
             name=entry.name,
             definition=FunctionDefinition(
                 destination=deployed_target,
-                database=entry.destination.database,
-                schema=entry.destination.schema,
+                database=session[0] if session is not None else entry.destination.database,
+                schema=session[1] if session is not None else entry.destination.schema,
                 arguments=entry.arguments,
                 returns=entry.returns,
                 body_sql=rewrite_function_calls(

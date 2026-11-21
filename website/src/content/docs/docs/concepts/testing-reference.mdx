@@ -142,7 +142,7 @@ copies disappear when the test connections close.
 |---|---|
 | DuckDB, MotherDuck | `CREATE TEMP MACRO`, called as `temp.main.<name>`. Python UDFs are registered on each test connection |
 | PostgreSQL | SQL function in the session's `pg_temp` schema, called as `pg_temp.<name>` |
-| Snowflake | `CREATE TEMPORARY FUNCTION <database>.<schema>.__sqb_test__<name>` in the built function's database and schema, for SQL and Python UDFs and table functions |
+| Snowflake | `CREATE TEMPORARY FUNCTION <database>.<schema>.__sqb_test__<name>` in the session's current database and schema, or the function's own when the session has none, for SQL and Python UDFs and table functions |
 | Databricks | `CREATE TEMPORARY FUNCTION __sqb_test__<name>` for SQL functions |
 | BigQuery, SQL Server, ClickHouse | No copy; tests call the built function (ClickHouse functions are server-wide) |
 | SQLite | Not applicable; SQLite has no SQL functions |

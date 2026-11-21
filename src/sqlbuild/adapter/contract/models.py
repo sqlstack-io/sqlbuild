@@ -306,14 +306,12 @@ class SnapshotSqlDialect:
 
 @dataclass(frozen=True)
 class FunctionDefinition:
-    """Warehouse function definition inputs, with the destination's database and schema."""
+    """Warehouse function definition inputs; `database` and `schema` place a temporary copy."""
 
     destination: str
     arguments: tuple[Any, ...]
     returns: str
     body_sql: str
-    database: str | None = None
-    schema: str | None = None
     return_columns: tuple[Any, ...] = ()
     language: FunctionLanguage = FunctionLanguage.SQL
     runtime_version: str | None = None
@@ -321,6 +319,8 @@ class FunctionDefinition:
     packages: tuple[str, ...] = ()
     dataframe: str | None = None
     source_file_path: Path | None = None
+    database: str | None = None
+    schema: str | None = None
 
 
 @dataclass(frozen=True)
