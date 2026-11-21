@@ -85,8 +85,9 @@ test('a read taken during a sync is never judged, even once the sync has settled
 	const settledFrom = server.reads.shop.started;
 	server.notify('all');
 	await expect.poll(() => server.reads.shop.started, { timeout: 15_000 }).toBeGreaterThan(settledFrom);
-	// Back, and smaller than when acknowledged, so it shows as acknowledged still.
-	await expect(health(page).getByRole('button', { name: /^Acknowledged \(1\)$/ })).toBeVisible({ timeout: 20_000 });
+	// Back, and smaller than when acknowledged, so it shows as acknowledged still: nothing else is open,
+	// so it is on the Overview's slim line rather than in the panel.
+	await expect(page.getByTestId('attention-quiet').getByRole('button', { name: /^Acknowledged \(1\)$/ })).toBeVisible({ timeout: 20_000 });
 	await afterReads(page, server, server.reads.shop.started);
 	expect(server.withdrawals()).toEqual([]);
 });
