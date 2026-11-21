@@ -3857,8 +3857,7 @@ export interface components {
         RunRequest: {
             /**
              * Format: uuid
-             * @description The first run of this run's rerun chain, which a node reads as `ctx.root_run_id`; unset when
-             *     this run is the first. Reruns and retries keep it, and a job's member runs derive theirs.
+             * @description The first run of this run's rerun chain, read as `ctx.root_run_id`; unset for the first run.
              */
             chain_run_id?: string | null;
             command?: components["schemas"]["RunCommand"];
