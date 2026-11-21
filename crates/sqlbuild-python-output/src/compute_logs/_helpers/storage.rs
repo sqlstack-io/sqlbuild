@@ -132,8 +132,6 @@ impl LocalFilesystemComputeLogStorage {
         writers[stream].write_all(data)?;
         self.forward_to_recall(invocation_id, stream, data);
         drop(state);
-        // A slow output server holds this thread only, outside the lock and with the GIL released,
-        // so other threads (and cancelling) go on.
         if stream != DIAGNOSTICS_STREAM {
             py.detach(wait_for_output_room);
         }

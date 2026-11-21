@@ -93,7 +93,7 @@ fn given_finished_runs_when_retention_runs_then_only_output_past_its_days_is_rem
             })
             .await
             .expect("end the run");
-            let pruned = prune_run_output(store, &output, 7).await.expect("prune");
+            let pruned = prune_run_output(store, &output, 7).await;
             assert_eq!(
                 pruned, test_case.expected_pruned,
                 "{}",
@@ -130,7 +130,7 @@ fn given_finished_runs_when_retention_runs_then_only_output_past_its_days_is_rem
                 test_case.description
             );
             assert_eq!(
-                prune_run_output(store, &output, 7).await.expect("repeat"),
+                prune_run_output(store, &output, 7).await,
                 0,
                 "{}: a repeated pass finds nothing",
                 test_case.description
@@ -196,8 +196,9 @@ fn given_objects_that_cannot_be_deleted_when_retention_runs_then_the_index_point
             let mut states: Vec<RetentionState> = Vec::new();
             for writable in [false, true] {
                 set_chunks_writable(&output, folder.path(), writable).await;
-                let pruned = prune_run_output(store, &output, 7).await.expect("a pass never fails for one run");
-                let count = async |sql: &str| rows(store, sql, vec![Parameter::Id(run_id)]).await.len();
+                let pruned = prune_run_output(store, &output, 7).await;
+                let count =
+                    async |sql: &str| rows(store, sql, vec![Parameter::Id(run_id)]).await.len();
                 states.push((
                     pruned,
                     object_count(&output).await,

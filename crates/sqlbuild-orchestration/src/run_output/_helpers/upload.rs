@@ -7,7 +7,7 @@ use std::time::Instant;
 use crate::api::errors::ClientError;
 use crate::run_output::constants::{
     BATCH_TEXT_BYTES, BATCH_WINDOW, MAX_BATCH_SEGMENTS, MAX_PARTIAL_LINE_BYTES, MAX_QUEUED_BATCHES,
-    UPLOAD_ATTEMPTS,
+    UPLOAD_ATTEMPTS, UTF8_CONTINUATION, UTF8_PREFIX_MASK,
 };
 use crate::run_output::models::{
     OutputBatch, OutputSegment, OutputStream, RunOutputUploader, UploadShared, UploadState,
@@ -33,8 +33,7 @@ impl UploadShared {
 }
 
 impl UploadState {
-    /// Take `data` for `node`'s `stream`, keeping a line until its newline unless it grows past its
-    /// limit, when it is cut at a character boundary.
+    /// Take `data` for `node`'s `stream`, holding a line until its newline unless it outgrows its limit and is cut between characters.
     pub(crate) fn append(&mut self, (node, stream): (String, OutputStream), data: &[u8]) {
         if self.closing.is_some() {
             self.summary.dropped_bytes += data.len() as u64;
@@ -68,8 +67,7 @@ impl UploadState {
         }
     }
 
-    /// Add complete lines; a batch is sealed before a line would take it past its size or a new
-    /// segment past its count, and a line longer than a partial line may be is cut into pieces.
+    /// Add complete lines, sealing the batch before a line would overflow its size or a segment its count.
     fn push_lines(&mut self, (node, stream): (String, OutputStream), text: &str) {
         let node_key: Option<String> = Some(node).filter(|node| !node.is_empty());
         for line in text.split_inclusive('\n') {
@@ -154,22 +152,20 @@ impl UploadState {
     }
 }
 
-/// How many of `bytes`' leading bytes end on a character boundary: an incomplete UTF-8 sequence at
-/// the end stays for the next write.
+/// How many leading bytes end on a character boundary; an incomplete UTF-8 sequence at the end waits for the next write.
 pub(crate) fn complete_characters(bytes: &[u8]) -> usize {
     let tail: usize = bytes.len().min(3);
     for back in 1..=tail {
         let byte: u8 = bytes[bytes.len() - back];
-        if byte & 0b1100_0000 == 0b1000_0000 {
+        if byte & UTF8_PREFIX_MASK == UTF8_CONTINUATION {
             continue;
         }
-        let width: usize = match byte {
-            0xF0..=0xF7 => 4,
-            0xE0..=0xEF => 3,
-            0xC0..=0xDF => 2,
-            _ => 1,
+        let width: usize = (byte.leading_ones() as usize).max(1);
+        return if width > back {
+            bytes.len() - back
+        } else {
+            bytes.len()
         };
-        return if width > back { bytes.len() - back } else { bytes.len() };
     }
     bytes.len()
 }
@@ -241,8 +237,6 @@ pub(crate) fn send_batches(
         shared.wake.notify_all();
         match sent {
             Ok(()) => state.summary.stored_batches += 1,
-            // A refused batch is lost on its own: later output still goes, and its first segment
-            // reports the loss.
             Err(failure) => {
                 state.summary.dropped_bytes += bytes;
                 state.unreported_drops += bytes;

@@ -6,8 +6,7 @@ use std::time::Instant;
 use crate::run_output::_helpers::upload::attached;
 use crate::run_output::constants::UPLOAD_STALL;
 
-/// Waits while too many batches are queued; only a sender stalled past `UPLOAD_STALL` loses output.
-/// Call it holding no other lock and, from Python, with the GIL released.
+/// Waits while too many batches are queued (only a sender stalled past `UPLOAD_STALL` loses output); call it holding no lock and no GIL.
 pub fn wait_for_output_room() {
     let Some(uploader) = attached().clone() else {
         return;

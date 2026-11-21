@@ -1,5 +1,4 @@
-//! Open the output store `server.toml` names, or a folder beside a SQLite control store.
-//! A PostgreSQL control store serves several replicas, so it needs a named store.
+//! Open the output store `server.toml` names, or a folder beside a SQLite control store; PostgreSQL needs a named store.
 
 use std::path::PathBuf;
 use std::sync::Arc;

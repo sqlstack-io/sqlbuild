@@ -12,9 +12,9 @@ mod test_logs;
 mod test_reads;
 #[path = "test_retention.rs"]
 mod test_retention;
-#[path = "test_upload.rs"]
-mod test_upload;
 #[path = "test_store.rs"]
 mod test_store;
 #[path = "test_types.rs"]
 pub(crate) mod test_types;
+#[path = "test_upload.rs"]
+mod test_upload;

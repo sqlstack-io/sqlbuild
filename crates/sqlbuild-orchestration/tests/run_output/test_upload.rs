@@ -1,5 +1,4 @@
-//! A worker's output goes into batches the server accepts: never past its size or segment count,
-//! long lines cut at character boundaries, and a refused batch never stops later output.
+//! A worker's output fits the server's batches, long lines are cut between characters, and a refusal never stops later output.
 
 use crate::run_output::constants::{MAX_BATCH_SEGMENTS, MAX_BATCH_TEXT_BYTES};
 use crate::run_output::models::{OutputStream, UploadState};
@@ -62,20 +61,35 @@ fn given_large_or_mixed_output_when_batched_then_every_batch_fits_the_server_and
             .iter()
             .map(|batch| {
                 (
-                    batch.segments.iter().map(|segment| segment.text.len()).sum(),
+                    batch
+                        .segments
+                        .iter()
+                        .map(|segment| segment.text.len())
+                        .sum(),
                     batch.segments.len(),
                 )
             })
-            .filter(|(bytes, segments)| *bytes > MAX_BATCH_TEXT_BYTES || *segments > MAX_BATCH_SEGMENTS)
+            .filter(|(bytes, segments)| {
+                *bytes > MAX_BATCH_TEXT_BYTES || *segments > MAX_BATCH_SEGMENTS
+            })
             .collect();
-        assert_eq!(too_big, Vec::new(), "{}: batches past the server's limits", test_case.description);
+        assert_eq!(
+            too_big,
+            Vec::new(),
+            "{}: batches past the server's limits",
+            test_case.description
+        );
         let text: String = state
             .queued
             .iter()
             .flat_map(|batch| batch.segments.iter().map(|segment| segment.text.as_str()))
             .collect();
         assert_eq!(
-            (state.queued.len(), text.len(), text.matches('\u{FFFD}').count()),
+            (
+                state.queued.len(),
+                text.len(),
+                text.matches('\u{FFFD}').count()
+            ),
             test_case.expected_queued,
             "{}: (batches, text bytes, replacement characters)",
             test_case.description

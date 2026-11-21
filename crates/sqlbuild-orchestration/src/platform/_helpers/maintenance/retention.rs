@@ -83,17 +83,9 @@ pub(crate) async fn retain(
     sinks: &[String],
 ) -> Result<i64, ControlError> {
     prune_run_logs(store, run_logs).await?;
-    // Output retention reports its own failures and never stops the policies after it.
     if let Some((output, days)) = &run_output {
-        loop {
-            match prune_run_output(store, output, *days).await {
-                Ok(0) => break,
-                Ok(_) => tokio::task::yield_now().await,
-                Err(error) => {
-                    eprintln!("Run output retention failed; retrying next pass: {error}");
-                    break;
-                }
-            }
+        while prune_run_output(store, output, *days).await > 0 {
+            tokio::task::yield_now().await;
         }
     }
     prune_snapshots(store, snapshots).await?;

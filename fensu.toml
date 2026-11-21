@@ -1944,6 +1944,12 @@ reason = "Locations, workers and remote publication share this client; it warns 
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSH011"
+path = "crates/sqlbuild-orchestration/src/run_output/_helpers/prune.rs"
+symbols = ["report_retention_failure"]
+reason = "Output retention runs in the server's maintenance role, which has no caller to return a failure to without stopping the other retention policies; the operator reads on stderr which run's output could not be removed, and it is retried on the next pass."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSH011"
 path = "crates/sqlbuild-orchestration/src/api/_helpers/authentication/proxy_warnings.rs"
 symbols = ["warn_plain_http_origin", "warn_untrusted_source", "warn_untrusted_overflow", "warn_taken_username", "warn_refused_host"]
 reason = "The server's operator reads trusted-proxy misconfiguration on stderr: a plain-HTTP origin at start-up, and once each the untrusted peers that send the username header, the usernames refused because another principal holds the name, and the escaped Host values a trusted peer was refused under, so they can be added to allowed_hosts. Untrusted peers' header values are never printed."

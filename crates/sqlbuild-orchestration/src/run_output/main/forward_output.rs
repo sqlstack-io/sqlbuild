@@ -3,8 +3,7 @@
 use crate::run_output::_helpers::upload::{OUTPUT_NODE, attached};
 use crate::run_output::models::OutputStream;
 
-/// Nothing happens outside a worker. Never waits: call it under the lock that orders the output,
-/// then `wait_for_output_room` once that lock and the GIL are released.
+/// Never waits: call it under the lock that orders output, then `wait_for_output_room` outside it; a no-op outside a worker.
 pub fn forward_output(stream: OutputStream, data: &[u8]) {
     let Some(uploader) = attached().clone() else {
         return;
