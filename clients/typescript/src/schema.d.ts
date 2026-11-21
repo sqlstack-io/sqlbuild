@@ -2026,6 +2026,20 @@ export interface components {
             /** @enum {string} */
             status: "unavailable";
         };
+        /** @description A calendar whose pending past-due times a republish dropped, because its previous definition can't be read; it clears at its next successful tick. */
+        DroppedCalendarTimes: {
+            /** Format: date-time */
+            dropped_at: string;
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            name: string;
+            target: string;
+            /** @description The times that were due by the republish but never ticked, oldest first. */
+            times: string[];
+            /** Format: uuid */
+            trigger_id: string;
+        };
         ExternalIdentityResponse: {
             csrf_token: string;
             /** Format: date-time */
@@ -2967,12 +2981,22 @@ export interface components {
             snapshot_id: string;
             /** Format: uuid */
             trigger_id: string;
+        } | {
+            /** @enum {string} */
+            kind: "calendar_times_dropped";
+            /** Format: uuid */
+            snapshot_id: string;
+            times: string[];
+            /** Format: uuid */
+            trigger_id: string;
         };
         /** @enum {string} */
-        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed" | "run_failed" | "trigger_skipped" | "sensor_rechecked";
+        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed" | "run_failed" | "trigger_skipped" | "sensor_rechecked" | "calendar_times_dropped";
         /** @description Problems derived from live state when read; nothing here is stored. */
         PlatformProblems: {
             broken_locations: components["schemas"]["BrokenLocation"][];
+            /** @description Calendars whose pending times a republish dropped, until their next successful tick. */
+            dropped_calendar_times?: components["schemas"]["DroppedCalendarTimes"][];
             /** @description Running calendar schedules whose dates run out within a day. */
             low_calendars?: components["schemas"]["LowCalendar"][];
             overdue_ticks: components["schemas"]["OverdueTick"][];

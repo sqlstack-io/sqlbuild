@@ -96,6 +96,23 @@ describe('toPlatformEvents', () => {
 		]);
 	});
 
+	it('names the calendar times a republish dropped, under their own kind', () => {
+		const times = Array.from({ length: 12 }, (_, i) => `2026-11-${String(i + 1).padStart(2, '0')}T00:00:00Z`);
+		const [event] = toPlatformEvents(
+			{
+				scheduler_leader: true,
+				broken_locations: [],
+				overdue_ticks: [],
+				dropped_calendar_times: [{ trigger_id: 'c-month', name: 'month_end', location_id: 'l1', location_name: 'orders', target: 'development', dropped_at: '2026-11-08T11:30:00Z', times }]
+			},
+			NOW
+		);
+		expect([event.kind, event.locationId, event.members]).toEqual(['calendar_times_dropped', 'l1:development', ['c-month']]);
+		expect(event.message).toBe(
+			`month_end in orders · development won’t tick ${times.slice(0, 10).join(', ')} and 2 more: its previous definition was published by an earlier SQLBuild release and can’t be read.`
+		);
+	});
+
 	it('groups late ticks per location, dated and named by the oldest', () => {
 		const events = toPlatformEvents(
 			{

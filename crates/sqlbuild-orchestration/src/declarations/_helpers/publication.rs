@@ -3,7 +3,7 @@
 use uuid::Uuid;
 
 use crate::declarations::_helpers::trigger_state::{
-    dropped_times_reason, previous_state, retain_calendar_ticks, trigger_timing,
+    previous_state, retain_calendar_ticks, trigger_timing,
 };
 use crate::declarations::models::{Definitions, StoredTriggerState};
 use crate::platform::main::health::record_trigger_problem::record_trigger_problem;
@@ -72,10 +72,10 @@ pub(crate) async fn publish_projections(
         if !dropped.is_empty() {
             transaction = record_trigger_problem(
                 transaction,
-                PlatformEvent::TriggerSkipped {
+                PlatformEvent::CalendarTimesDropped {
                     trigger_id: id,
                     snapshot_id: snapshot.snapshot_id,
-                    reason: dropped_times_reason(&dropped),
+                    times: dropped,
                 },
             )
             .await?;

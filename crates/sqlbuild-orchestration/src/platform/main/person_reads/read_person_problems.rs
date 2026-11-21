@@ -39,6 +39,11 @@ pub async fn read_person_problems(
                 .iter()
                 .map(|sensor| (sensor.location_id, sensor.target.clone())),
         )
+        .chain(
+            scan.dropped_calendar_times
+                .iter()
+                .map(|calendar| (calendar.location_id, calendar.target.clone())),
+        )
         .collect::<BTreeSet<_>>()
     {
         if person_holds_target(
@@ -78,6 +83,11 @@ pub async fn read_person_problems(
             .rechecked_sensors
             .into_iter()
             .filter(|sensor| listed.contains(&(sensor.location_id, sensor.target.clone())))
+            .collect(),
+        dropped_calendar_times: scan
+            .dropped_calendar_times
+            .into_iter()
+            .filter(|calendar| listed.contains(&(calendar.location_id, calendar.target.clone())))
             .collect(),
     })
 }

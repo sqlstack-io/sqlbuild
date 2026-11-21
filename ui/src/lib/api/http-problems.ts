@@ -6,8 +6,10 @@ import type { PlatformEventRecord, PlatformHealth } from './types/platform';
 type Wire = components['schemas'];
 
 const placeOf = (name: string, target: string) => `${name} · ${target}`;
+/** Dropped calendar times a message names before `and N more`. */
+const DROPPED_TIMES_NAMED = 10;
 
-/** Live problems as active banner events: a stopped scheduler, each broken location, and late schedules, low calendars, skipped triggers and sensors checked again from scratch per location. */
+/** Live problems as active banner events: a stopped scheduler, each broken location, and late schedules, low calendars, skipped triggers, sensors checked again from scratch and calendars' dropped times per location. */
 export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number): PlatformEvent[] {
 	const events: PlatformEvent[] = [];
 	if (!problems.scheduler_leader) {
@@ -129,7 +131,36 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 					: `${sensors.length} sensors in ${place} are being checked again from scratch, starting with ${first.name}: their last checks were recorded by an earlier SQLBuild release and can’t be read.`
 		});
 	}
+	const dropped = new Map<string, Wire['DroppedCalendarTimes'][]>();
+	for (const calendar of problems.dropped_calendar_times ?? []) {
+		const key = keyOf(calendar.location_id, calendar.target);
+		dropped.set(key, [...(dropped.get(key) ?? []), calendar]);
+	}
+	for (const [key, calendars] of dropped) {
+		const first = calendars.reduce((a, b) => (a.dropped_at <= b.dropped_at ? a : b));
+		const place = placeOf(first.location_name, first.target);
+		events.push({
+			id: `dropped:${key}`,
+			kind: 'calendar_times_dropped',
+			severity: 'warning',
+			occurredAt: first.dropped_at,
+			members: [...new Set(calendars.map((c) => c.trigger_id))].sort(),
+			active: true,
+			locationId: key,
+			subject: place,
+			message:
+				calendars.length === 1
+					? `${first.name} in ${place} won’t tick ${droppedTimes(first.times)}: its previous definition was published by an earlier SQLBuild release and can’t be read.`
+					: `${calendars.length} calendars in ${place} dropped pending times, starting with ${first.name}, which won’t tick ${droppedTimes(first.times)}.`
+		});
+	}
 	return events;
+}
+
+/** The first few dropped calendar times, then how many more. */
+function droppedTimes(times: string[]): string {
+	const named = times.slice(0, DROPPED_TIMES_NAMED).join(', ');
+	return times.length > DROPPED_TIMES_NAMED ? `${named} and ${times.length - DROPPED_TIMES_NAMED} more` : named;
 }
 
 /** The scheduler from the problems read: whether a lease is live and when it runs out. Replicas, heartbeat and forwarding aren't reported. */
@@ -170,6 +201,8 @@ function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, stri
 			return { ...base, kind: event.kind, severity: 'warning', message: `A calendar in ${place ?? 'a location'} was running out of dates.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'calendar', locationId: key }] : [], payload: { refresh_at: event.refresh_at, ...(event.horizon_end ? { horizon_end: event.horizon_end } : {}) } };
 		case 'trigger_skipped':
 			return { ...base, kind: event.kind, severity: 'warning', message: `A trigger in ${place ?? 'a location'} was skipped: ${event.reason}.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'trigger', locationId: key }] : [], payload: { snapshot_id: event.snapshot_id } };
+		case 'calendar_times_dropped':
+			return { ...base, kind: event.kind, severity: 'warning', message: `A calendar in ${place ?? 'a location'} dropped pending times ${droppedTimes(event.times)}: its previous definition couldn’t be read.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'calendar', locationId: key }] : [], payload: { snapshot_id: event.snapshot_id, times: event.times.join(', ') } };
 		case 'sensor_rechecked':
 			return { ...base, kind: event.kind, severity: 'info', message: `A sensor in ${place ?? 'a location'} was checked again from scratch: its last check was recorded by an earlier SQLBuild release and couldn’t be read.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'sensor', locationId: key }] : [], payload: { snapshot_id: event.snapshot_id, evaluation_id: event.evaluation_id } };
 		case 'launch_failed':

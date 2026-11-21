@@ -33,7 +33,8 @@ pub(crate) async fn event_history(
             PlatformEvent::TickOverdue { trigger_id, .. }
             | PlatformEvent::CalendarHorizonLow { trigger_id, .. }
             | PlatformEvent::TriggerSkipped { trigger_id, .. }
-            | PlatformEvent::SensorRechecked { trigger_id, .. } => triggers.push(trigger_id),
+            | PlatformEvent::SensorRechecked { trigger_id, .. }
+            | PlatformEvent::CalendarTimesDropped { trigger_id, .. } => triggers.push(trigger_id),
             PlatformEvent::LaunchFailed { run_id, .. } => runs.push(run_id),
             _ => {}
         }
@@ -65,7 +66,8 @@ fn person_event(
         PlatformEvent::TickOverdue { trigger_id, .. }
         | PlatformEvent::CalendarHorizonLow { trigger_id, .. }
         | PlatformEvent::TriggerSkipped { trigger_id, .. }
-        | PlatformEvent::SensorRechecked { trigger_id, .. } => {
+        | PlatformEvent::SensorRechecked { trigger_id, .. }
+        | PlatformEvent::CalendarTimesDropped { trigger_id, .. } => {
             Some(scopes.get(trigger_id).cloned()?)
         }
         PlatformEvent::LaunchFailed { run_id, .. } => Some(scopes.get(run_id).cloned()?),
