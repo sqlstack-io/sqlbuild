@@ -459,7 +459,7 @@ def test_given_implicit_reference_when_running_command_then_it_fails_with_guidan
             enforce_explicit=True,
             expected_exit_code=0,
             expected_warning_fragments=(
-                "[P008] task 'export_orders' named model:stg_customers as 'stg_customers'",
+                "[P008] asset 'export_orders' named model:stg_customers as 'stg_customers'",
             ),
             expected_final_line_prefix="\u2713 Completed with warnings",
         ),

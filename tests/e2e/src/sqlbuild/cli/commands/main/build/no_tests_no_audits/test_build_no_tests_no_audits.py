@@ -443,7 +443,7 @@ def test_given_task_selector_when_running_run_then_task_executes(
     )
 
     assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
-    assert "python    task      prepare_orders" in result.stdout
+    assert "python    asset     prepare_orders" in result.stdout
     assert "OK" in result.stdout
     assert (project_dir / "task_marker.txt").read_text(encoding="utf-8") == "ran"
 
@@ -626,7 +626,7 @@ def test_given_failing_task_selector_when_running_run_then_command_fails(
 
     assert result.returncode == test_case.expected_exit_code
     combined_output: str = result.stdout + result.stderr
-    assert "python    task      fail_orders" in combined_output
+    assert "python    asset     fail_orders" in combined_output
     assert "FAIL" in combined_output
     assert "\u2717 Completed with errors" in combined_output
     assert "Python node failures:" in combined_output
@@ -713,7 +713,7 @@ def test_given_task_loader_source_model_chain_when_running_model_then_task_runs_
     )
 
     assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
-    assert "python    task      prepare_orders" in result.stdout
+    assert "python    asset     prepare_orders" in result.stdout
     execution_output: str = result.stdout[result.stdout.index("Execution  sqb build") :]
     assert execution_output.index("prepare_orders") < execution_output.index("fact_orders")
     db_path: Path = project_dir / "python_loader_run_project.duckdb"
@@ -1388,7 +1388,7 @@ def test_given_sql_ready_task_fails_when_running_run_then_footer_json_and_exit_f
 
     assert result.returncode == test_case.expected_exit_code
     combined_output: str = result.stdout + result.stderr
-    assert "python    task      fail_after_stg_orders" in combined_output
+    assert "python    asset     fail_after_stg_orders" in combined_output
     assert "FAIL" in combined_output
     assert "Python node failures:" in combined_output
     payload: dict[str, object] = json.loads(json_output_path.read_text(encoding="utf-8"))

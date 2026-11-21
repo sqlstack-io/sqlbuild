@@ -379,7 +379,7 @@ def published_keys(control: Path) -> list[str]:
             for row in database.execute(
                 "SELECT n.node_key FROM sqb_snapshot_nodes n JOIN sqb_current_snapshots c "
                 "ON c.snapshot_id=n.snapshot_id WHERE n.node_kind IN "
-                "('model','source','seed','udf','table_fn','task','asset','loader')"
+                "('model','source','seed','udf','table_fn','asset','loader')"
             )
         ]
 

@@ -553,7 +553,7 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
             },
             command=_TEST_COMMAND,
             expected_exit_code=0,
-            expected_fragments=("Changed since main: 1 task changed\n",),
+            expected_fragments=("Changed since main: 1 asset changed\n",),
         ),
     ),
     ids=lambda case: case.description,

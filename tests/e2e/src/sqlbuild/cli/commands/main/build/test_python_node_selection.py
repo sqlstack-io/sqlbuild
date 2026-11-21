@@ -209,7 +209,7 @@ def test_given_python_node_selection_when_building_then_it_gates_only_on_schedul
             select="asset:report_order_count",
             upstream_select="asset:count_orders",
             expected_error=(
-                "Upstream task 'count_orders' has no successful result to read. Build it first "
+                "Upstream asset 'count_orders' has no successful result to read. Build it first "
                 "with 'sqb build --select asset:count_orders', or build both with "
                 "'sqb build --select +asset:report_order_count'."
             ),

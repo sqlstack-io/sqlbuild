@@ -704,7 +704,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
             expected_exit_code=1,
             expected_output_fragments=(
                 "Python ingress (1)",
-                "python    task      prepare_orders",
+                "python    asset     prepare_orders",
                 "FAIL",
                 "Python node failures:",
             ),
@@ -751,7 +751,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
             expected_exit_code=0,
             expected_output_fragments=(
                 "Python ingress (1)",
-                "python    task      prepare_orders",
+                "python    asset     prepare_orders",
                 "SKIP",
                 "no input",
             ),
@@ -838,7 +838,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
             expected_exit_code=1,
             expected_output_fragments=(
                 "fact_orders",
-                "python    task      fail_after_fact",
+                "python    asset     fail_after_fact",
                 "FAIL",
                 "Python node failures:",
             ),
@@ -878,7 +878,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
             expected_exit_code=0,
             expected_output_fragments=(
                 "fact_orders",
-                "python    task      skip_after_fact",
+                "python    asset     skip_after_fact",
                 "SKIP",
                 "no profile needed",
             ),
@@ -918,7 +918,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
             expected_exit_code=0,
             expected_output_fragments=(
                 "fact_orders",
-                "python    task      soft_skip_after_fact",
+                "python    asset     soft_skip_after_fact",
                 "SKIP",
                 "optional profile skipped",
             ),
@@ -976,7 +976,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
             },
             expected_exit_code=0,
             expected_output_fragments=(
-                "python    task      prepare_orders",
+                "python    asset     prepare_orders",
                 "OK",
             ),
             expected_present_tables=("raw_orders", "fact_orders"),
@@ -1024,7 +1024,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
             },
             expected_exit_code=0,
             expected_output_fragments=(
-                "python    task      profile_raw_orders",
+                "python    asset     profile_raw_orders",
                 "OK",
             ),
             expected_present_tables=("raw_orders",),
@@ -1138,7 +1138,7 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                 ),
             },
             expected_exit_code=0,
-            expected_output_fragments=("source    raw_events", "unselected upstream task"),
+            expected_output_fragments=("source    raw_events", "unselected upstream asset"),
             expected_present_tables=("raw_events",),
             expected_absent_paths=("prepared.txt",),
         ),
@@ -1331,11 +1331,11 @@ def test_given_python_asset_with_json_output_when_building_then_json_includes_py
             expected_execution_fragments=(
                 "Python ingress (2)",
                 "Python read-side (3)",
-                "python    task      prepare_orders",
+                "python    asset     prepare_orders",
                 "python    asset     publish_prepared_orders",
-                "python    task      profile_fact_orders",
+                "python    asset     profile_fact_orders",
                 "python    asset     export_fact_orders",
-                "python    task      notify_fact_orders",
+                "python    asset     notify_fact_orders",
             ),
             expected_table_names=("window_orders", "raw_orders", "fact_orders"),
             expected_notify_text="7",

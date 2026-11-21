@@ -80,17 +80,17 @@ PROVIDER_MARKER_FILE: str = (
             expected_text_fragments=(
                 "Providers",
                 "\u2514\u2500\u2500 marker_provider",
+                "    ├── asset publish_orders (MarkerProvider)",
                 "    ├── custom materialization copy_table (MarkerProvider)",
                 "    ├── hook mark_pre (MarkerProvider)",
-                "    ├── loader raw_orders (MarkerProvider)",
-                "    └── task publish_orders (MarkerProvider)",
+                "    └── loader raw_orders (MarkerProvider)",
             ),
             expected_provider_name="marker_provider",
             expected_used_by=(
+                ("asset", "publish_orders", "marker_provider"),
                 ("custom materialization", "copy_table", "marker_provider"),
                 ("hook", "mark_pre", "marker_provider"),
                 ("loader", "raw_orders", "marker_provider"),
-                ("asset", "publish_orders", "marker_provider"),
             ),
         )
     ],

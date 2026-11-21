@@ -157,8 +157,8 @@ def test_given_snowflake_dbt_profile_when_running_dbt_init_then_builds_profile_l
         SnowflakeNodeResultE2ETestCase(
             description="direct node results persist and read on snowflake",
             expected_rows=(
-                ("check", "check_produce_result", "success"),
                 ("asset", "produce_result", "success"),
+                ("check", "check_produce_result", "success"),
             ),
         )
     ],

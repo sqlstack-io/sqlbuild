@@ -237,7 +237,7 @@ def test_given_helper_package_with_relative_imports_when_editing_helper_then_tas
         db_path=project_dir / "warehouse.duckdb",
         sql=(
             "SELECT COUNT(DISTINCT version_hash) FROM main._sqlbuild_fingerprints "
-            "WHERE node_type = 'task' AND node_name = 'orders'"
+            "WHERE node_type = 'asset' AND node_name = 'orders'"
         ),
     ) == [(test_case.expected_version_count,)]
 

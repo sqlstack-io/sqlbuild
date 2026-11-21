@@ -35,7 +35,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
             ),
             expected_output_fragments=(
                 "SQLBuild project created",
-                "Add Python loaders, tasks, assets, checks, and factories to python/",
+                "Add Python loaders, assets, checks, and factories to python/",
                 "Add SQL hooks to hooks/sql/, Python hooks to hooks/python/",
                 "reusable audits to audits/generic/",
                 "standalone audits to audits/singular/",

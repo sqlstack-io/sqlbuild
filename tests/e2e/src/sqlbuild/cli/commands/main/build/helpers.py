@@ -867,10 +867,10 @@ def _counting_python_node(*, decorator: str, name: str, ref: str, returned: str)
 
 
 def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
-    """Return a DuckDB project whose tasks and assets count managed, unmanaged, and model rows."""
+    """Return a DuckDB project whose assets count managed, unmanaged, and model rows."""
 
     task_nodes: str = "".join(
-        _counting_python_node(decorator="task", name=name, ref=ref, returned="None")
+        _counting_python_node(decorator="asset", name=name, ref=ref, returned="None")
         for name, ref in (
             ("count_customers", 'source("raw_customers")'),
             ("count_raw_orders", 'source("raw_orders")'),

@@ -16,6 +16,6 @@ class RuntimeRelationGuardTestCase:
     expected_warning_count: int
     resolved_refs: tuple[SqlResourceRef, ...] = field(default_factory=tuple)
     own_refs: frozenset[SqlResourceRef] = frozenset()
-    owner_label: str = "task 'export_orders'"
+    owner_label: str = "asset 'export_orders'"
     owner_kind: HardCodedRelationOwnerKind = HardCodedRelationOwnerKind.NODE
     upstream_loader_by_source: dict[str, str] = field(default_factory=dict)
