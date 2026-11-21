@@ -15,13 +15,15 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Every retention horizon one server's maintenance role enforces.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RetentionPolicies {
     pub audit: AuditRetention,
     pub statistics: StatisticsRetention,
     pub snapshots: SnapshotRetention,
     pub run_logs: RunLogRetention,
     pub state_history: StateHistoryRetention,
+    /// The output store and how many days a finished run's output stays in it; `None` keeps no output.
+    pub run_output: Option<(crate::run_output::models::OutputStore, u16)>,
 }
 
 /// One pooled outbound connection; the location never receives a store handle.

@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use serde_json::json;
 
+use crate::run_output::constants::NODE_LOG_MESSAGE_BYTES;
 use crate::runs::_helpers::lifecycle::checks::check_execution_history;
 use crate::runs::_helpers::lifecycle::nodes::project_node;
 use crate::runs::models::{ChangingRun, RunChange, RunChangeRequest, RunOutcome};
@@ -62,6 +63,31 @@ pub(crate) async fn project_run_state(
         | RunChange::Compiled { .. } => {}
         RunChange::NodeStarted { .. } | RunChange::NodeFinished { .. } => {
             return project_node(transaction, request, &state.node_counts_json).await;
+        }
+        RunChange::NodeLog {
+            node_key,
+            level,
+            message,
+        } => {
+            if message.len() > NODE_LOG_MESSAGE_BYTES {
+                return Err(ControlError::Invalid(
+                    "a ctx.log message is longer than its limit".into(),
+                ));
+            }
+            (transaction, _) = query(
+                transaction,
+                "INSERT INTO sqb_run_node_logs (run_id, event_id, node_key, level, message, logged_at) \
+                 VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (run_id, event_id) DO NOTHING",
+                vec![
+                    Parameter::Id(request.run_id),
+                    Parameter::Id(request.event_id),
+                    Parameter::Text(node_key.clone()),
+                    Parameter::Text(level.as_str().into()),
+                    Parameter::Text(message.clone()),
+                    Parameter::Time(now),
+                ],
+            )
+            .await?;
         }
         RunChange::NodeProgress {
             node_key,

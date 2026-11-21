@@ -99,6 +99,8 @@ use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
     WarehouseSyncFailure,
 };
+use sqlbuild_orchestration::run_output::main::open_output_store::open_output_store;
+use sqlbuild_orchestration::run_output::models::OutputSettings;
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
@@ -171,6 +173,7 @@ pub(crate) async fn run_development_roles(
             ServerFacts {
                 version: env!("CARGO_PKG_VERSION").into(),
                 scheduler,
+                output: Some(open_output_store(&OutputSettings::default(), &store)?),
                 ..ServerFacts::default()
             },
         ),

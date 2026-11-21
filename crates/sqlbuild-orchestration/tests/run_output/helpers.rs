@@ -1,0 +1,98 @@
+//! A claimed run, an output store in a temporary folder, a person who may read evidence, and batches.
+
+use std::collections::BTreeMap;
+use std::path::Path;
+
+use futures_util::StreamExt;
+use uuid::Uuid;
+
+use crate::authorization::main::people::bootstrap_user::bootstrap_user;
+use crate::credentials::models::AuditContext;
+use crate::credentials::tests::location_helpers::create_location;
+use crate::run_output::main::open_output_store::open_output_store;
+use crate::run_output::models::{
+    OutputBatch, OutputSegment, OutputSettings, OutputStore, OutputStream,
+};
+use crate::runs::main::execution::claim_next_run::claim_next_run;
+use crate::runs::models::RunClaim;
+use crate::runs::tests::helpers::{queue, request, snapshot};
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
+use crate::store::main::migrate_store::migrate_store;
+use crate::store::models::ControlStore;
+
+/// A migrated store's location and a claimed run that selects `orders`.
+pub(crate) async fn claimed_run(store: &ControlStore) -> (Uuid, RunClaim) {
+    migrate_store(store).await.expect("migrate");
+    let location = create_location(store, "orders", "test-admin")
+        .await
+        .expect("location");
+    let published = publish_snapshot(store, &snapshot(location))
+        .await
+        .expect("publish");
+    queue(
+        store,
+        &request((location, published.snapshot_id), 61, 0, &["orders"]),
+    )
+    .await;
+    let lease = acquire_lease(store, Uuid::now_v7())
+        .await
+        .expect("elect")
+        .expect("leader");
+    let claim = claim_next_run(store, &lease, &BTreeMap::new(), None)
+        .await
+        .expect("claim")
+        .expect("claimable");
+    (location, claim)
+}
+
+/// An output store in `folder`, keeping at most `max_bytes_per_run` of a run.
+pub(crate) fn output_store(
+    store: &ControlStore,
+    folder: &Path,
+    max_bytes_per_run: Option<u64>,
+) -> OutputStore {
+    open_output_store(
+        &OutputSettings {
+            store: Some(format!("file://{}", folder.display())),
+            max_bytes_per_run,
+        },
+        store,
+    )
+    .expect("output store")
+}
+
+/// An administrator who may read every run's evidence, and the audit context they read with.
+pub(crate) async fn reader(store: &ControlStore) -> (AuditContext, Uuid) {
+    let context = AuditContext {
+        actor: "test-operator".into(),
+        granting_role: "control-store-owner".into(),
+        request_id: Uuid::now_v7(),
+        ip_address: None,
+    };
+    let admin = bootstrap_user(store, &context, "orders-admin")
+        .await
+        .expect("administrator");
+    (context, admin)
+}
+
+pub(crate) fn segment(node_key: Option<&str>, stream: OutputStream, text: &str) -> OutputSegment {
+    OutputSegment {
+        node_key: node_key.map(str::to_owned),
+        stream,
+        text: text.into(),
+        dropped_bytes: 0,
+    }
+}
+
+pub(crate) fn batch(number: u64, segments: Vec<OutputSegment>) -> OutputBatch {
+    OutputBatch {
+        batch: number,
+        segments,
+    }
+}
+
+/// How many objects the output store holds.
+pub(crate) async fn object_count(output: &OutputStore) -> usize {
+    output.objects.list(None).count().await
+}

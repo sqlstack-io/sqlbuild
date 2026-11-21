@@ -14,6 +14,7 @@ use crate::platform::constants::{
     PLATFORM_ALERT_RETENTION_DAYS, SENSOR_EVALUATION_RETENTION_DAYS,
 };
 use crate::platform::models::RetentionPolicies;
+use crate::run_output::main::prune_run_output::prune_run_output;
 use crate::runs::constants::{RUN_LOG_DIGEST_CHUNK, RUN_LOG_RETENTION_BATCH};
 use crate::runs::models::RunLogRetention;
 use crate::snapshots::main::publication::prune_snapshots::prune_snapshots;
@@ -77,10 +78,16 @@ pub(crate) async fn retain(
         snapshots,
         run_logs,
         state_history,
+        run_output,
     }: RetentionPolicies,
     sinks: &[String],
 ) -> Result<i64, ControlError> {
     prune_run_logs(store, run_logs).await?;
+    if let Some((output, days)) = &run_output {
+        while prune_run_output(store, output, *days).await? > 0 {
+            tokio::task::yield_now().await;
+        }
+    }
     prune_snapshots(store, snapshots).await?;
     while prune_statistics(store, statistics).await? == MAX_HISTORY_RECORDS {
         tokio::task::yield_now().await;

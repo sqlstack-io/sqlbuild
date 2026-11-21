@@ -46,6 +46,12 @@ pub(crate) const MIGRATIONS: &[StoreMigration] = &[
         postgres: include_str!("../sql/0006_node_results.postgres.sql"),
         step: None,
     },
+    StoreMigration {
+        name: "run_output",
+        sqlite: include_str!("../sql/0007_run_output.sqlite.sql"),
+        postgres: include_str!("../sql/0007_run_output.postgres.sql"),
+        step: None,
+    },
 ];
 
 /// The schema version a store created by this build has.

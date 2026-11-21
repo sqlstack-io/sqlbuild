@@ -2,6 +2,7 @@
 
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
 use sqlbuild_orchestration::platform::models::RetentionPolicies;
+use sqlbuild_orchestration::run_output::main::open_output_store::open_output_store;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::store::errors::ControlError;
@@ -11,7 +12,9 @@ use tokio::task::JoinSet;
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream};
-use crate::native_commands::_helpers::command::decision::{control_address, control_api_settings};
+use crate::native_commands::_helpers::command::decision::{
+    control_address, control_api_settings, control_output_settings, run_output_days,
+};
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::{
     open_control_store, open_control_workers, start_platform_roles, supervise_control_roles,
@@ -35,6 +38,13 @@ pub(crate) async fn run_control(
     let address = control_address(namespace, standalone, &config.server)?;
     let (authentication, mut facts) = control_api_settings(namespace, standalone, &config)?;
     let store = open_control_store(namespace, Some(&config.server)).await?;
+    let output = open_output_store(&control_output_settings(&config)?, &store)?;
+    let output_days = run_output_days(namespace, &config, facts.run_logs)?;
+    drop(write_output(&[(
+        Stream::Stderr,
+        &format!("Run output store: {}\n", output.location()),
+    )]));
+    facts.output = Some(output.clone());
     let (workers, handoff) = open_control_workers(
         (&store, namespace),
         (&config.server, config.launchers),
@@ -74,6 +84,7 @@ pub(crate) async fn run_control(
                 snapshots: facts.snapshots,
                 run_logs: facts.run_logs,
                 state_history: facts.state_history,
+                run_output: Some((output, output_days)),
             },
         )?;
     }

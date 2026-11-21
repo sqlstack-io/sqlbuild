@@ -34,7 +34,7 @@ pub async fn run_maintenance(
             Err(error) => return Err(error),
         }
         if retained_at.is_none_or(|at| at.elapsed() >= Duration::from_secs(60)) {
-            match retain(store, retention, &sinks).await {
+            match retain(store, retention.clone(), &sinks).await {
                 Ok(retained) => {
                     if retained != reported {
                         report(retained);
