@@ -487,8 +487,11 @@ max_bytes_per_run = "20GB"
 The server prints `Run output store: ...` when it starts.
 
 Reading a run's output needs `view.evidence` on every node the run selected, and each read is
-recorded in the security audit. People page through one node's stream, read its last lines, search
-it, jump to its error and warning lines, or download it whole; no read loads a whole log at once.
+recorded in the security audit. People read a node's output with its stdout and stderr lines in the
+order printed, or one stream of it, or the whole run's output with each line's node. They page
+forwards and backwards, read the last lines, fold runs of similar lines, search in either direction,
+jump to error and warning lines, or download a node's output whole. No read loads a whole log at
+once.
 
 A worker sends what it prints in batches of about 4 MB, or every 2 seconds. When a node prints
 faster than the worker can send, the node waits for the worker. If the server stops accepting

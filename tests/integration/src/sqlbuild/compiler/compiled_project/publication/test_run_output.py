@@ -1,6 +1,5 @@
 """A worker files what each node prints under that node in the output store, with its ctx.log lines."""
 
-import json
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -91,14 +90,22 @@ def test_given_a_node_printing_a_large_log_when_a_worker_runs_it_then_its_lines_
         run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
         assert run["status"] == test_case.expected_status, worker.log.read_text()[-4000:]
         with sqlite3.connect(worker.control_store) as control:
-            streams: dict[tuple[str, str], tuple[int, list[int]]] = {
-                (node, stream): (lines, json.loads(errors))
-                for node, stream, lines, errors in control.execute(
-                    "SELECT node_key, stream, line_count, error_lines FROM sqb_run_output_streams "
+            streams: dict[tuple[str, str], int] = {
+                (node, stream): lines
+                for node, stream, lines in control.execute(
+                    "SELECT node_key, stream, line_count FROM sqb_run_output_streams "
                     "WHERE run_id=?",
                     (run["run_id"],),
                 ).fetchall()
             }
+            error_lines: list[int] = [
+                line
+                for (line,) in control.execute(
+                    "SELECT node_line FROM sqb_run_output_marks WHERE run_id=? "
+                    "AND node_key='model:orders' AND level='error' ORDER BY node_line",
+                    (run["run_id"],),
+                ).fetchall()
+            ]
             totals: tuple[int, int] = control.execute(
                 "SELECT dropped_bytes, omitted_bytes FROM sqb_run_output WHERE run_id=?",
                 (run["run_id"],),
@@ -109,7 +116,7 @@ def test_given_a_node_printing_a_large_log_when_a_worker_runs_it_then_its_lines_
                 (run["run_id"],),
             ).fetchall()
         assert totals == (0, 0), streams
-        assert streams[("model:orders", "stdout")] == (
+        assert (streams[("model:orders", "stdout")], error_lines) == (
             test_case.expected_lines,
             test_case.expected_error_lines,
         )

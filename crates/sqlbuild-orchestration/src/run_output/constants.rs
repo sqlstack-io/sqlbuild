@@ -19,19 +19,35 @@ pub const MAX_BATCH_TEXT_BYTES: usize = 8 * 1024 * 1024;
 /// A batch the server accepts carries at most this many segments.
 pub const MAX_BATCH_SEGMENTS: usize = 4096;
 
-/// The most lines one page of output returns.
-pub const MAX_PAGE_LINES: u32 = 2000;
+/// The most rows one page of output returns.
+pub const MAX_PAGE_ROWS: u32 = 2000;
 
-/// Lines one page returns when the reader names no limit.
-pub const DEFAULT_PAGE_LINES: u32 = 500;
+/// Rows one page returns when the reader names no limit.
+pub const DEFAULT_PAGE_ROWS: u32 = 500;
 
-/// The most matches one search returns.
-pub const MAX_SEARCH_MATCHES: u32 = 200;
+/// A folding page reads at most this many lines past its last row to finish a run of similar lines.
+pub const COLLAPSE_SCAN_LINES: i64 = 100_000;
 
-/// The most chunks one search reads before it hands back where to continue.
+/// Four or more lines that are the same but for their numbers fold into one row.
+pub const MIN_SIMILAR_LINES: usize = 4;
+
+/// Lines this close to the line a reader jumped to never fold.
+pub const AROUND_OPEN_LINES: i64 = 3;
+
+/// A mark keeps at most this many bytes of its line.
+pub const MARK_TEXT_BYTES: usize = 300;
+
+/// A page or search reads a view's segments this many at a time.
+pub(crate) const SEGMENT_BATCH: i64 = 64;
+
+pub(crate) const ERROR_LEVEL: &str = "error";
+
+pub(crate) const WARNING_LEVEL: &str = "warning";
+
+/// The most chunks one search reads before it hands back where to continue; a view this small is searched whole, with a count.
 pub const SEARCH_CHUNKS: usize = 64;
 
-/// Each stream keeps at most this many error and this many warning line numbers.
+/// Each node's stream keeps at most this many marked lines.
 pub const MARKED_LINES: usize = 10_000;
 
 /// The zstd level each chunk is written at.

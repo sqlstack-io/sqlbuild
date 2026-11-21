@@ -1,12 +1,10 @@
 //! The control store's index of a run's output: chunks, segments, stream totals and what a cap dropped.
 
-use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::run_output::_helpers::chunks::appended;
-use crate::run_output::constants::{HEAD_PART, TAIL_PART};
+use crate::run_output::constants::{HEAD_PART, MARKED_LINES, TAIL_PART};
 use crate::run_output::models::{
-    PreparedChunk, PreparedSegment, StoredSegment, StoredStream, StoredTotals, TailChunk,
+    PreparedChunk, PreparedSegment, StoredNodeLines, StoredTotals, TailChunk,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -32,7 +30,7 @@ pub(crate) async fn batch_stored(
     Ok((transaction, !rows.is_empty()))
 }
 
-/// Index one chunk, numbering each segment's lines after its stream's last; past `half` of a capped run's bytes the oldest later chunks go, and their object keys come back for deletion.
+/// Index one chunk, numbering each segment's lines after the run's last and after its node's last; past `half` of a capped run's bytes the oldest later chunks go, and their object keys come back for deletion.
 pub(crate) async fn record_chunk(
     transaction: ControlTransaction,
     chunk: &PreparedChunk,
@@ -41,6 +39,7 @@ pub(crate) async fn record_chunk(
     let (mut transaction, totals) = totals(transaction, chunk.run_id).await?;
     let StoredTotals {
         next_chunk: number,
+        line_count: mut run_lines,
         head_bytes: head,
         tail_bytes: tail,
     } = totals;
@@ -62,8 +61,16 @@ pub(crate) async fn record_chunk(
             Parameter::Integer(if part == TAIL_PART { chunk.text_bytes } else { 0 }),
             Parameter::Integer(chunk.stored_bytes), Parameter::Integer(chunk.dropped_bytes)]).await?;
     for segment in &chunk.segments {
-        transaction = record_segment(transaction, (chunk.run_id, number), segment).await?;
+        transaction =
+            record_segment(transaction, (chunk.run_id, number, run_lines + 1), segment).await?;
+        run_lines += segment.line_count;
     }
+    (transaction, _) = query(
+        transaction,
+        "UPDATE sqb_run_output SET line_count=$2 WHERE run_id=$1",
+        vec![Parameter::Id(chunk.run_id), Parameter::Integer(run_lines)],
+    )
+    .await?;
     transaction.changes.insert(Change::Run(chunk.run_id));
     match half {
         Some(half) if part == TAIL_PART => {
@@ -79,12 +86,12 @@ async fn totals(
     run_id: Uuid,
 ) -> Result<(ControlTransaction, StoredTotals), ControlError> {
     let (transaction, _) = query(transaction,
-        "INSERT INTO sqb_run_output (run_id, next_chunk, head_bytes, tail_bytes, stored_bytes, omitted_bytes, omitted_lines, dropped_bytes) \
-         VALUES ($1,0,0,0,0,0,0,0) ON CONFLICT (run_id) DO NOTHING",
+        "INSERT INTO sqb_run_output (run_id, next_chunk, line_count, head_bytes, tail_bytes, stored_bytes, omitted_bytes, omitted_lines, dropped_bytes) \
+         VALUES ($1,0,0,0,0,0,0,0,0) ON CONFLICT (run_id) DO NOTHING",
         vec![Parameter::Id(run_id)]).await?;
     let (transaction, rows): (ControlTransaction, Vec<StoredTotals>) = query_records(
         transaction,
-        "SELECT next_chunk, head_bytes, tail_bytes FROM sqb_run_output WHERE run_id=$1",
+        "SELECT next_chunk, line_count, head_bytes, tail_bytes FROM sqb_run_output WHERE run_id=$1",
         vec![Parameter::Id(run_id)],
     )
     .await?;
@@ -97,49 +104,41 @@ async fn totals(
 
 async fn record_segment(
     transaction: ControlTransaction,
-    (run_id, chunk): (Uuid, i64),
+    (run_id, chunk, run_line): (Uuid, i64, i64),
     segment: &PreparedSegment,
 ) -> Result<ControlTransaction, ControlError> {
     let stream: &str = segment.stream.as_str();
-    let (transaction, rows): (ControlTransaction, Vec<StoredStream>) = query_records(transaction,
-        "SELECT node_key, stream, line_count, text_bytes, error_lines, warning_lines FROM sqb_run_output_streams \
-         WHERE run_id=$1 AND node_key=$2 AND stream=$3",
-        vec![Parameter::Id(run_id), Parameter::Text(segment.node_key.clone()), Parameter::Text(stream.into())]).await?;
-    let existing: Option<StoredStream> = rows.into_iter().next();
-    let before: i64 = existing.as_ref().map_or(0, |found| found.line_count);
-    let first_line: i64 = before + 1;
-    let (transaction, _) = query(transaction,
-        "INSERT INTO sqb_run_output_segments (run_id, chunk, node_key, stream, first_line, line_count, text_offset, text_bytes) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
-        vec![Parameter::Id(run_id), Parameter::Integer(chunk), Parameter::Text(segment.node_key.clone()),
-            Parameter::Text(stream.into()), Parameter::Integer(first_line), Parameter::Integer(segment.line_count),
+    let node: Parameter = Parameter::Text(segment.node_key.clone());
+    let (transaction, rows): (ControlTransaction, Vec<StoredNodeLines>) = query_records(transaction,
+        "SELECT CAST(COALESCE(SUM(line_count), 0) AS BIGINT) AS node_lines, \
+         CAST(COALESCE(SUM(CASE WHEN stream=$3 THEN mark_count ELSE 0 END), 0) AS BIGINT) AS stream_marks \
+         FROM sqb_run_output_streams WHERE run_id=$1 AND node_key=$2",
+        vec![Parameter::Id(run_id), node.clone(), Parameter::Text(stream.into())]).await?;
+    let before: StoredNodeLines = rows.into_iter().next().unwrap_or_default();
+    let node_line: i64 = before.node_lines + 1;
+    let (mut transaction, _) = query(transaction,
+        "INSERT INTO sqb_run_output_segments (run_id, chunk, node_key, stream, run_line, node_line, line_count, text_offset, text_bytes) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+        vec![Parameter::Id(run_id), Parameter::Integer(chunk), node.clone(), Parameter::Text(stream.into()),
+            Parameter::Integer(run_line), Parameter::Integer(node_line), Parameter::Integer(segment.line_count),
             Parameter::Integer(segment.text_offset), Parameter::Integer(segment.text_bytes)]).await?;
-    let shifted = |offsets: &[i64]| -> Vec<i64> {
-        offsets.iter().map(|offset| offset + first_line).collect()
-    };
-    let (errors, warnings): (Vec<i64>, Vec<i64>) = match &existing {
-        Some(found) => (
-            appended(
-                numbers(&found.error_lines)?,
-                shifted(&segment.error_offsets),
-            ),
-            appended(
-                numbers(&found.warning_lines)?,
-                shifted(&segment.warning_offsets),
-            ),
-        ),
-        None => (
-            appended(Vec::new(), shifted(&segment.error_offsets)),
-            appended(Vec::new(), shifted(&segment.warning_offsets)),
-        ),
-    };
+    let room: usize =
+        MARKED_LINES.saturating_sub(usize::try_from(before.stream_marks).unwrap_or(MARKED_LINES));
+    let marks = &segment.marks[..segment.marks.len().min(room)];
+    for (offset, level, text) in marks {
+        (transaction, _) = query(transaction,
+            "INSERT INTO sqb_run_output_marks (run_id, node_key, node_line, stream, level, text) VALUES ($1,$2,$3,$4,$5,$6)",
+            vec![Parameter::Id(run_id), node.clone(), Parameter::Integer(node_line + offset),
+                Parameter::Text(stream.into()), Parameter::Text(level.as_str().into()), Parameter::Text(text.clone())]).await?;
+    }
     let (transaction, _) = query(transaction,
-        "INSERT INTO sqb_run_output_streams (run_id, node_key, stream, line_count, text_bytes, error_lines, warning_lines) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (run_id, node_key, stream) DO UPDATE SET line_count=excluded.line_count, \
-         text_bytes=sqb_run_output_streams.text_bytes+$8, error_lines=excluded.error_lines, warning_lines=excluded.warning_lines",
-        vec![Parameter::Id(run_id), Parameter::Text(segment.node_key.clone()), Parameter::Text(stream.into()),
-            Parameter::Integer(before + segment.line_count), Parameter::Integer(segment.text_bytes),
-            Parameter::Json(json!(errors)), Parameter::Json(json!(warnings)), Parameter::Integer(segment.text_bytes)]).await?;
+        "INSERT INTO sqb_run_output_streams (run_id, node_key, stream, line_count, text_bytes, mark_count) \
+         VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (run_id, node_key, stream) DO UPDATE SET \
+         line_count=sqb_run_output_streams.line_count+$4, text_bytes=sqb_run_output_streams.text_bytes+$5, \
+         mark_count=sqb_run_output_streams.mark_count+$6",
+        vec![Parameter::Id(run_id), node, Parameter::Text(stream.into()),
+            Parameter::Integer(segment.line_count), Parameter::Integer(segment.text_bytes),
+            Parameter::Integer(i64::try_from(marks.len()).unwrap_or(i64::MAX))]).await?;
     Ok(transaction)
 }
 
@@ -167,6 +166,9 @@ async fn drop_oldest_tail(
             return Ok((transaction, dropped));
         };
         for sql in [
+            "DELETE FROM sqb_run_output_marks WHERE run_id=$1 AND EXISTS (SELECT 1 FROM sqb_run_output_segments s \
+             WHERE s.run_id=$1 AND s.chunk=$2 AND s.node_key=sqb_run_output_marks.node_key \
+             AND sqb_run_output_marks.node_line>=s.node_line AND sqb_run_output_marks.node_line<s.node_line+s.line_count)",
             "DELETE FROM sqb_run_output_segments WHERE run_id=$1 AND chunk=$2",
             "DELETE FROM sqb_run_output_chunks WHERE run_id=$1 AND chunk=$2",
         ] {
@@ -182,44 +184,6 @@ async fn drop_oldest_tail(
             vec![Parameter::Id(run_id), Parameter::Integer(bytes), Parameter::Integer(lines)]).await?;
         dropped.push(key);
     }
-}
-
-/// The stored segments of one stream that hold lines `from` to `to`, in order.
-pub(crate) async fn segments_between(
-    transaction: ControlTransaction,
-    (run_id, node_key, stream): (Uuid, &str, &str),
-    (from, to): (i64, i64),
-) -> Result<(ControlTransaction, Vec<StoredSegment>), ControlError> {
-    query_records(transaction,
-        "SELECT s.first_line, s.text_offset, s.text_bytes, c.object_key, c.text_bytes AS chunk_text_bytes \
-         FROM sqb_run_output_segments s JOIN sqb_run_output_chunks c ON c.run_id=s.run_id AND c.chunk=s.chunk \
-         WHERE s.run_id=$1 AND s.node_key=$2 AND s.stream=$3 AND s.first_line<=$5 AND s.first_line+s.line_count>$4 \
-         ORDER BY s.first_line",
-        vec![Parameter::Id(run_id), Parameter::Text(node_key.into()), Parameter::Text(stream.into()),
-            Parameter::Integer(from), Parameter::Integer(to)]).await
-}
-
-/// One stream's totals, if it printed anything.
-pub(crate) async fn stored_stream(
-    transaction: ControlTransaction,
-    (run_id, node_key, stream): (Uuid, &str, &str),
-) -> Result<(ControlTransaction, Option<StoredStream>), ControlError> {
-    let (transaction, rows): (ControlTransaction, Vec<StoredStream>) = query_records(transaction,
-        "SELECT node_key, stream, line_count, text_bytes, error_lines, warning_lines FROM sqb_run_output_streams \
-         WHERE run_id=$1 AND node_key=$2 AND stream=$3",
-        vec![Parameter::Id(run_id), Parameter::Text(node_key.into()), Parameter::Text(stream.into())]).await?;
-    Ok((transaction, rows.into_iter().next()))
-}
-
-/// Line numbers kept as a JSON array, which SQLite returns as text.
-pub(crate) fn numbers(value: &Value) -> Result<Vec<i64>, ControlError> {
-    let parsed: Value = match value {
-        Value::String(text) => {
-            serde_json::from_str(text).map_err(|error| ControlError::Invalid(error.to_string()))?
-        }
-        other => other.clone(),
-    };
-    serde_json::from_value(parsed).map_err(|error| ControlError::Invalid(error.to_string()))
 }
 
 fn integer(value: u64) -> Result<i64, ControlError> {

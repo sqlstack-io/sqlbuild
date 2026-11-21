@@ -1,64 +1,64 @@
-//! One page of a node's stream by line number, or its last lines; each read needs view.evidence and is audited.
+//! A page of a node's output, or of the whole run's, forwards, backwards or from the end, with similar lines folded on request; each read needs view.evidence and is audited.
 
 use serde_json::json;
 
 use crate::credentials::models::Action;
-use crate::run_output::_helpers::index::{segments_between, stored_stream};
-use crate::run_output::_helpers::pages::{numbered_lines, segment_texts};
-use crate::run_output::constants::{DEFAULT_PAGE_LINES, MAX_PAGE_LINES};
-use crate::run_output::models::{OutputPage, OutputPageQuery, OutputStore, StoredSegment};
+use crate::run_output::_helpers::pages::{page_neighbours, page_rows, page_start};
+use crate::run_output::_helpers::views::view_line_count;
+use crate::run_output::constants::{DEFAULT_PAGE_ROWS, MAX_PAGE_ROWS};
+use crate::run_output::models::{OutputPage, OutputPageQuery, OutputStore, OutputView, ViewReader};
 use crate::run_output::types::PersonRunRead;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 use crate::warehouse_history::main::read_run_evidence::read_run_evidence;
 
-/// `None` when the run is not in this location and target; a stream that printed nothing is an empty page.
+/// `None` when the run is not in this location and target; output nobody printed is an empty page.
 pub async fn read_person_output_page(
     store: &ControlStore,
     output: &OutputStore,
     (credentials, run, default_role): PersonRunRead<'_>,
     query: &OutputPageQuery,
 ) -> Result<Option<OutputPage>, ControlError> {
-    let run_id = run.2;
-    let limit: i64 = i64::from(
+    let view = OutputView {
+        run_id: run.2,
+        node: query.node.clone(),
+        stream: query.stream,
+    };
+    let limit: usize = usize::try_from(
         query
             .limit
-            .unwrap_or(DEFAULT_PAGE_LINES)
-            .clamp(1, MAX_PAGE_LINES),
-    );
-    let stream: &str = query.stream.as_str();
-    let node: &str = &query.node;
-    let Some((line_count, (from, to), segments)) = read_run_evidence(
+            .unwrap_or(DEFAULT_PAGE_ROWS)
+            .clamp(1, MAX_PAGE_ROWS),
+    )
+    .unwrap_or(1);
+    let Some(line_count) = read_run_evidence(
         store,
         credentials,
         (run, default_role, Action::ViewEvidence),
         (
             "output.page",
-            async move |transaction, _| {
-                let (transaction, found) = stored_stream(transaction, (run_id, node, stream)).await?;
-                let line_count: i64 = found.map_or(0, |found| found.line_count);
-                let from: i64 = if query.tail {
-                    (line_count - limit + 1).max(1)
-                } else {
-                    query.from.unwrap_or(1).max(1)
-                };
-                let to: i64 = from + limit - 1;
-                let (transaction, segments): (_, Vec<StoredSegment>) =
-                    segments_between(transaction, (run_id, node, stream), (from, to)).await?;
-                Ok((transaction, (line_count, (from, to), segments)))
-            },
-            |(_, (from, to), _): &(i64, (i64, i64), Vec<StoredSegment>)| json!({"node": node, "stream": stream, "from": from, "to": to}),
+            async |transaction, _| view_line_count(transaction, &view).await,
+            |_: &i64| json!({"node": query.node, "stream": query.stream, "from": query.from, "before": query.before, "tail": query.tail}),
         ),
     )
     .await?
     else {
         return Ok(None);
     };
-    let texts: Vec<String> = segment_texts(output, &segments).await?;
+    let start = page_start(query, line_count)?;
+    let mut reader = ViewReader::open((store, output), &view, start).await?;
+    let page = page_rows(&mut reader, limit, (query.collapse, query.around)).await?;
+    let (from, to) = (
+        page.low.unwrap_or(start.1),
+        page.high.map_or(start.1, |high| high + 1),
+    );
+    let (next, previous) = page_neighbours(store, &view, (from, to)).await?;
     Ok(Some(OutputPage {
-        lines: numbered_lines(&segments, &texts, (from, to)),
+        rows: page.rows,
         line_count,
-        next: (to < line_count).then_some(to + 1),
-        previous: (from > 1).then_some((from - limit).max(1)),
+        from,
+        to,
+        next,
+        previous,
     }))
 }

@@ -9,10 +9,13 @@ use uuid::Uuid;
 use crate::authorization::main::people::bootstrap_user::bootstrap_user;
 use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
+use crate::run_output::_helpers::chunks::level_of;
 use crate::run_output::main::open_output_store::open_output_store;
 use crate::run_output::models::{
-    OutputBatch, OutputSegment, OutputSettings, OutputStore, OutputStream,
+    OutputBatch, OutputLine, OutputPageQuery, OutputRow, OutputSegment, OutputSettings,
+    OutputStore, OutputStream,
 };
+use crate::run_output::tests::test_types::PageStart;
 use crate::runs::main::execution::claim_next_run::claim_next_run;
 use crate::runs::models::RunClaim;
 use crate::runs::tests::helpers::{queue, request, snapshot};
@@ -95,4 +98,50 @@ pub(crate) fn batch(number: u64, segments: Vec<OutputSegment>) -> OutputBatch {
 /// How many objects the output store holds.
 pub(crate) async fn object_count(output: &OutputStore) -> usize {
     output.objects.list(None).count().await
+}
+
+/// A stored line as a page returns it, its level read the way the server reads it.
+pub(crate) fn line(number: i64, node_key: &str, stream: OutputStream, text: &str) -> OutputLine {
+    OutputLine {
+        number,
+        node_key: node_key.into(),
+        stream,
+        text: text.into(),
+        level: level_of(text),
+        omitted_before: 0,
+    }
+}
+
+/// A page row of one line.
+pub(crate) fn line_row(number: i64, node_key: &str, stream: OutputStream, text: &str) -> OutputRow {
+    OutputRow::Line {
+        line: line(number, node_key, stream, text),
+    }
+}
+
+/// A page row folding `count` similar lines from `sample`'s.
+pub(crate) fn similar_row(count: i64, sample: OutputLine) -> OutputRow {
+    OutputRow::Similar {
+        from: sample.number,
+        count,
+        sample,
+    }
+}
+
+/// A page query for one node's view, or the run's, from `start`.
+pub(crate) fn page_query(
+    (node, stream): (Option<&str>, Option<OutputStream>),
+    start: PageStart,
+    (limit, collapse, around): (u32, bool, Option<i64>),
+) -> OutputPageQuery {
+    OutputPageQuery {
+        node: node.map(str::to_owned),
+        stream,
+        from: start.from,
+        before: start.before,
+        tail: start.tail,
+        limit: Some(limit),
+        collapse,
+        around,
+    }
 }
