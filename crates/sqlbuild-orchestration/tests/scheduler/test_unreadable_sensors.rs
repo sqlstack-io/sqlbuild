@@ -5,15 +5,18 @@ use crate::credentials::tests::role_helpers::{credentials, role_fixture};
 use crate::declarations::main::change_trigger::change_trigger;
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
 use crate::runs::tests::helpers::rows;
+use crate::scheduler::_helpers::unreadable_trigger::skip_failed_sensor;
 use crate::scheduler::tests::contracts::helpers::{
     answer_sensor_work, execute_with, make_sensors_due, outcome, scheduler_cycle, sensor_due_again,
     trigger_problems,
 };
 use crate::scheduler::tests::contracts::test_types::{
-    FailedSensorTestCase, SensorRecheckTestCase, UnreadableSensorTestCase, UnreadableSkipTestCase,
+    FailedAttemptsTestCase, FailedSensorTestCase, SensorRecheckTestCase, UnreadableSensorTestCase,
+    UnreadableSkipTestCase,
 };
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
 use crate::sensors::tests::helpers::complete_starting_job;
+use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::Parameter;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
@@ -33,7 +36,12 @@ const EARLIER_JOB: &str =
 const HEALTHY_CHECKS: &str = "SELECT COUNT(*) AS count FROM sqb_sensor_evaluation_events e \
      JOIN sqb_triggers t ON t.trigger_id=e.trigger_id WHERE t.name='watch_overdue' AND e.phase='completed'";
 /// The health problem a sensor shows when its location work is gone.
-const FAILED: &str = "health_orders: this sensor's check failed and was skipped; it is checked again in a minute: invalid control-plane data: sensor has no location work";
+const FAILED: &str = "health_orders: this sensor's check failed and was skipped; it is checked again in a minute: control-plane data this release can't read or accept";
+/// A denied check's problem, which names no decision.
+const DENIED: &str = "health_orders: this sensor's check failed and was skipped; it is checked again in a minute: a control-plane operation was denied";
+/// The `trigger_skipped` events recorded so far.
+const SKIPPED_EVENTS: &str =
+    "SELECT COUNT(*) AS count FROM recall_events WHERE event_type='platform_trigger_skipped'";
 /// The skip refusal while the sensor runs: its next tick checks it again.
 const RUNNING_REFUSAL: &str = "invalid control-plane data: the sensor's newest tick can't be read; its next tick checks it again from scratch";
 /// The skip refusal while the sensor is paused: no next tick comes.
@@ -396,6 +404,68 @@ fn given_a_sensor_whose_newest_tick_is_unreadable_when_an_operator_skips_its_eve
                 refused.map(|_| ()).map_err(|error| error.to_string()),
                 Err(test_case.expected_refusal.to_owned()),
                 "{}: the refusal says what unsticks the sensor",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_sensor_failing_with_a_different_id_each_attempt_when_it_is_skipped_then_one_problem_names_the_kind()
+ {
+    let test_cases = [
+        FailedAttemptsTestCase {
+            description: "SQLite store",
+            backend: Backend::Sqlite,
+            expected_events: 1,
+            expected_skipped: &[DENIED],
+        },
+        FailedAttemptsTestCase {
+            description: "PostgreSQL store",
+            backend: Backend::Postgres,
+            expected_events: 1,
+            expected_skipped: &[DENIED],
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let fixture = open_test_store(test_case.backend)
+                .await
+                .expect("required backend");
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let roles = role_fixture(store).await;
+            let (state, trigger_id) = sensor_due_again(store, roles.location_id, NOTHING).await;
+            let lease = state.lease.clone().expect("leader");
+            let denied = || ControlError::Denied {
+                reason: "the sensor's role can't queue job orders".into(),
+                decision_id: uuid::Uuid::now_v7(),
+            };
+
+            skip_failed_sensor(store, &lease, trigger_id, &denied())
+                .await
+                .expect("first skip");
+            skip_failed_sensor(store, &lease, trigger_id, &denied())
+                .await
+                .expect("second skip");
+
+            assert_eq!(
+                (
+                    rows(store, SKIPPED_EVENTS, vec![]).await[0]["count"].as_i64(),
+                    trigger_problems(store, credentials(&roles.administrator))
+                        .await
+                        .0,
+                ),
+                (
+                    Some(test_case.expected_events),
+                    test_case
+                        .expected_skipped
+                        .iter()
+                        .map(|line| (*line).to_owned())
+                        .collect::<Vec<_>>(),
+                ),
+                "{}: attempts that differ only in their IDs are one problem, which names the error's kind",
                 test_case.description
             );
             close_test_store(fixture).await;

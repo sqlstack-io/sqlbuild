@@ -30,7 +30,7 @@ pub(crate) async fn skip_unreadable_trigger(
     .await
 }
 
-/// Skip sensor `trigger_id`, whose check failed with `error`, with a `trigger_skipped` health problem naming the error.
+/// Skip sensor `trigger_id`, whose check failed with `error`, with a `trigger_skipped` health problem naming the error's kind, the same for every attempt.
 pub(crate) async fn skip_failed_sensor(
     store: &ControlStore,
     lease: &SchedulerLease,
@@ -41,7 +41,7 @@ pub(crate) async fn skip_failed_sensor(
         store,
         lease,
         (trigger_id, FAILED_SENSOR_RETRY_SECONDS),
-        format!("{FAILED_SENSOR}: {error}"),
+        format!("{FAILED_SENSOR}: {}", error.kind_description()),
     )
     .await
 }

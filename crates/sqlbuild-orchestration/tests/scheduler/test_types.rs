@@ -167,3 +167,13 @@ pub(crate) struct UnreadableSkipTestCase {
     /// The refusal, as the operator reads it.
     pub(crate) expected_refusal: &'static str,
 }
+
+/// A sensor whose check fails twice, with a different ID each time.
+pub(crate) struct FailedAttemptsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// `trigger_skipped` events recorded for the two attempts.
+    pub(crate) expected_events: i64,
+    /// The triggers the live problems list as skipped, as `name: reason`.
+    pub(crate) expected_skipped: &'static [&'static str],
+}
