@@ -63,10 +63,10 @@ PROJECT_FILES: dict[str, str] = {
     ).strip()
     + "\n",
     "python/tasks/uses_api.py": MARKING_NODE.format(
-        decorator="task", arguments="", name="uses_api", parameter=USES_API, body=""
+        decorator="asset", arguments="", name="uses_api", parameter=USES_API, body=""
     ),
     "python/tasks/no_api.py": MARKING_NODE.format(
-        decorator="task", arguments="", name="no_api", parameter="", body=""
+        decorator="asset", arguments="", name="no_api", parameter="", body=""
     ),
     "python/checks/api_check.py": MARKING_NODE.format(
         decorator="check",

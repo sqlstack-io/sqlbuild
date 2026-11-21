@@ -4,7 +4,7 @@ use serde_json::json;
 use crate::python_rules::tests::helpers::{owned_faults, python_rule_faults};
 use crate::python_rules::tests::test_types::{PythonRunFailureTestCase, PythonRunTestCase};
 
-const PURE_FACTORY: &str = r#"from sqlbuild.tasks import factory, task
+const PURE_FACTORY: &str = r#"from sqlbuild.assets import factory, asset
 
 from python.inventory.snapshots.constants import WAREHOUSE_SPECS
 
@@ -14,7 +14,7 @@ def warehouse_snapshots():
     nodes = []
     for spec in WAREHOUSE_SPECS:
 
-        @task(name=spec)
+        @asset(name=spec)
         def snapshot(ctx):
             return requests.get(spec)
 
@@ -24,14 +24,14 @@ def warehouse_snapshots():
 const RUNTIME_ONLY: &str = r#"import psycopg
 import requests
 
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
 def main(ctx):
     return psycopg.connect("dsn").execute("SELECT 1")
 
 
-@task
+@asset
 def export(ctx):
     return requests.post("https://example.com/orders")
 
@@ -42,7 +42,7 @@ class CarrierApi:
 "#;
 const QUERYING_FACTORY: &str = r#"import psycopg
 
-from sqlbuild.tasks import factory
+from sqlbuild.assets import factory
 
 from ._helpers.spec_loading import load_specs
 

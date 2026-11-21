@@ -7,7 +7,6 @@ from typing import Any, ClassVar
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.assets import asset
 from sqlbuild.observability import LifecycleEvent
-from sqlbuild.tasks import task
 
 
 def operation_events(events: list[LifecycleEvent]) -> tuple[LifecycleEvent, ...]:
@@ -79,7 +78,7 @@ class CountingLoaderContextTestAdapter(LoaderContextTestAdapter):
         return super().connect(config)
 
 
-@task
+@asset
 def score_orders(ctx: object) -> object:
     """A task a loader may read through `ctx.result_of`, never `ctx.loader`."""
 

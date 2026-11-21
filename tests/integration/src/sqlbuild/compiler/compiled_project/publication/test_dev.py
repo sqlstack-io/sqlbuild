@@ -236,10 +236,10 @@ def test_given_development_start_when_location_is_ready_then_project_python_is_d
     project: Path = tmp_path / "project"
     imports: Path = tmp_path / "python_imports.txt"
     probe: str = (
-        "import os\nfrom pathlib import Path\nfrom sqlbuild.tasks import task\n"
+        "import os\nfrom pathlib import Path\nfrom sqlbuild.assets import asset\n"
         f"with Path({str(imports)!r}).open('a') as imported:\n"
         "    imported.write(f'{os.getpid()}\\n')\n"
-        "@task(description='Probe.')\n"
+        "@asset(description='Probe.')\n"
         "def import_probe(ctx):\n    return None\n"
     )
     write_files(

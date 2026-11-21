@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D007",
-     "message": "Check 'orders_checked' depends on another check; checks may depend on loaders, tasks, assets, models, sources, and seeds only"
+     "message": "Check 'orders_checked' depends on another check; checks may depend on loaders, assets, models, sources, and seeds only"
     }
    ]
   }

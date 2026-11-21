@@ -52,13 +52,11 @@ class DependencyResultReader:
 
         identity: tuple[str, str] | None = self.result_node_identity(node_function)
         if identity is None:
-            raise ExecutorInputError(
-                "Python node result dependency must be a task, asset, or loader"
-            )
+            raise ExecutorInputError("Python node result dependency must be an asset or loader")
         return identity
 
     def result_node_identity(self, node_function: Callable[..., object]) -> tuple[str, str] | None:
-        """Return the `(kind, name)` of a decorated task, asset or loader, else None."""
+        """Return the `(kind, name)` of a decorated asset or loader, else None."""
 
         for attribute, kind in RESULT_DEPENDENCY_ATTRIBUTES:
             definition: object = getattr(node_function, attribute, None)

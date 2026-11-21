@@ -1,4 +1,4 @@
-//! A group orders a warehouse round trip by its nearest lineage, SQL to task to loader to models, on both stores.
+//! A group orders a warehouse round trip by its nearest lineage, SQL to asset to loader to models, on both stores.
 
 use std::collections::BTreeMap;
 
@@ -25,7 +25,7 @@ use crate::store::tests::store_test_types::Backend;
 fn given_a_round_trip_split_across_jobs_when_the_group_runs_then_members_follow_the_loader_edge() {
     let test_cases = [
         RoundTripGroupTestCase {
-            description: "SQLite: the task waits for SQL, the loader for the task, the model for the loader",
+            description: "SQLite: the asset waits for SQL, the loader for the asset, the model for the loader",
             backend: Backend::Sqlite,
             expected_waits: json!({
                 "orders_job": [],
@@ -36,7 +36,7 @@ fn given_a_round_trip_split_across_jobs_when_the_group_runs_then_members_follow_
             expected_order: &["orders_job", "score_job", "ingest_job", "report_job"],
         },
         RoundTripGroupTestCase {
-            description: "PostgreSQL: the task waits for SQL, the loader for the task, the model for the loader",
+            description: "PostgreSQL: the asset waits for SQL, the loader for the asset, the model for the loader",
             backend: Backend::Postgres,
             expected_waits: json!({
                 "orders_job": [],
@@ -64,12 +64,12 @@ fn given_a_round_trip_split_across_jobs_when_the_group_runs_then_members_follow_
                     snapshot_node("model", json!({"deps": []})),
                 ),
                 (
-                    "task:score_orders".into(),
-                    snapshot_node("task", json!({"deps": ["model:orders"]})),
+                    "asset:score_orders".into(),
+                    snapshot_node("asset", json!({"deps": ["model:orders"]})),
                 ),
                 (
                     "loader:partner_scores".into(),
-                    snapshot_node("loader", json!({"deps": ["task:score_orders"]})),
+                    snapshot_node("loader", json!({"deps": ["asset:score_orders"]})),
                 ),
                 (
                     "source:partner_scores".into(),
@@ -90,7 +90,7 @@ fn given_a_round_trip_split_across_jobs_when_the_group_runs_then_members_follow_
                 "jobs".into(),
                 json!({
                     "orders_job": {"description": "Build orders", "selection": ["model:orders"]},
-                    "score_job": {"description": "Score orders", "selection": ["task:score_orders"]},
+                    "score_job": {"description": "Score orders", "selection": ["asset:score_orders"]},
                     "ingest_job": {
                         "description": "Load partner scores",
                         "selection": ["loader:partner_scores", "source:partner_scores"]
@@ -107,7 +107,7 @@ fn given_a_round_trip_split_across_jobs_when_the_group_runs_then_members_follow_
                     "description": "Score orders through the partner and report on them",
                     "selection": [
                         "loader:partner_scores", "model:orders", "model:scored_orders",
-                        "source:partner_scores", "task:score_orders"
+                        "source:partner_scores", "asset:score_orders"
                     ],
                     "jobs": test_case.expected_waits,
                 }}),

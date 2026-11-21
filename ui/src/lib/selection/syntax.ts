@@ -4,7 +4,7 @@
 // the paths from `a` to `b`. Pure: it splits text and never decides what exists.
 
 /** Selector types `sqb` accepts before a colon. */
-export const SELECTOR_TYPES = ['tag', 'path', 'job', 'kind', 'source', 'seed', 'test', 'task', 'asset', 'loader', 'check'] as const;
+export const SELECTOR_TYPES = ['tag', 'path', 'job', 'kind', 'source', 'seed', 'test', 'asset', 'loader', 'check'] as const;
 export type SelectorType = (typeof SELECTOR_TYPES)[number];
 
 /** One comma part of a token, such as `+tag:finance`. */

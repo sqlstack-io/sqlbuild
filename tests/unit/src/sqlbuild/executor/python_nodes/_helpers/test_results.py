@@ -33,7 +33,6 @@ from tests.unit.src.sqlbuild.executor.python_nodes._helpers._test_types import (
     PythonCheckReturnNormalizationTestCase,
     PythonNodeFailureResultTestCase,
     PythonNodeFanInPolicyTestCase,
-    PythonNodeReturnNormalizationErrorTestCase,
     PythonNodeReturnNormalizationTestCase,
 )
 from tests.unit.src.sqlbuild.executor.python_nodes._helpers.helpers import (
@@ -179,7 +178,7 @@ def test_given_check_context_when_building_results_then_returns_check_results(
     [
         PythonNodeReturnNormalizationTestCase(
             description="normalizes plain return as successful payload",
-            kind=PythonNodeKind.TASK,
+            kind=PythonNodeKind.ASSET,
             returned={"rows": 3},
             expected_status=PythonNodeStatus.SUCCESS,
             expected_payload={"rows": 3},
@@ -190,7 +189,7 @@ def test_given_check_context_when_building_results_then_returns_check_results(
         ),
         PythonNodeReturnNormalizationTestCase(
             description="normalizes none return as empty success",
-            kind=PythonNodeKind.TASK,
+            kind=PythonNodeKind.ASSET,
             returned=None,
             expected_status=PythonNodeStatus.SUCCESS,
             expected_payload=None,
@@ -216,7 +215,7 @@ def test_given_check_context_when_building_results_then_returns_check_results(
         ),
         PythonNodeReturnNormalizationTestCase(
             description="normalizes downstream skip signal",
-            kind=PythonNodeKind.TASK,
+            kind=PythonNodeKind.ASSET,
             returned=PythonNodeSkipResult(
                 reason="No new source rows",
                 mode=SkipMode.HARD,
@@ -254,29 +253,6 @@ def test_given_python_node_return_when_normalizing_then_returns_execution_result
 @pytest.mark.parametrize(
     "test_case",
     [
-        PythonNodeReturnNormalizationErrorTestCase(
-            description="rejects materialized flag on task result",
-            kind=PythonNodeKind.TASK,
-            returned=PythonNodeResult(materialized=False),
-            expected_error_fragment="Only asset Python nodes",
-        )
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_non_asset_materialized_result_when_normalizing_then_raises(
-    test_case: PythonNodeReturnNormalizationErrorTestCase,
-) -> None:
-    with pytest.raises(ValueError, match=test_case.expected_error_fragment):
-        normalize_python_node_return(
-            node_name="fetch_orders",
-            kind=test_case.kind,
-            returned=test_case.returned,
-        )
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
         PythonNodeFailureResultTestCase(
             description="records failed status and error message",
             error=RuntimeError("API unavailable"),
@@ -291,7 +267,7 @@ def test_given_python_node_exception_when_building_failure_result_then_records_m
 ) -> None:
     result: PythonNodeExecutionResult = build_python_node_failure_result(
         node_name="fetch_orders",
-        kind=PythonNodeKind.TASK,
+        kind=PythonNodeKind.ASSET,
         error=test_case.error,
     )
 
@@ -346,7 +322,7 @@ def test_given_upstream_python_node_results_when_evaluating_fan_in_then_returns_
     upstream_results: tuple[PythonNodeExecutionResult, ...] = tuple(
         PythonNodeExecutionResult(
             node_name=f"upstream_{index}",
-            kind=PythonNodeKind.TASK,
+            kind=PythonNodeKind.ASSET,
             status=status,
             skip_mode=test_case.upstream_skip_modes[index],
         )

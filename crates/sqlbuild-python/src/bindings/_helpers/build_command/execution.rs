@@ -138,7 +138,6 @@ fn run_context_facts(
         + count(&project, "seeds")?
         + count(&project, "functions")?
         + loaded_sources
-        + count(&discovered, "task_functions")?
         + count(&discovered, "asset_functions")?;
     let resolved: Bound<'_, PyAny> = describe_connection_warehouse(
         py,

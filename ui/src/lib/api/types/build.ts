@@ -56,7 +56,7 @@ export type CatalogNode = {
 	liveStatus?: 'run' | 'ok' | 'warn' | 'fail';
 	key: string;
 	kind: NodeKind;
-	/** e.g. `table`, `view`, `incremental · merge`, `incremental · microbatch`; null for sources and tasks. */
+	/** e.g. `table`, `view`, `incremental · merge`, `incremental · microbatch`; null for sources and Python nodes. */
 	materialization: string | null;
 	/** Null when the server does not report groups. */
 	group: string | null;

@@ -263,8 +263,8 @@ class DiscoveryFeatureWriter:
             "    batch_size: int = 50\n"
         )
         self._files["python/tasks/provided.py"] = (
-            "from sqlbuild.tasks import task\n\n\n"
-            "@task\n"
+            "from sqlbuild.assets import asset\n\n\n"
+            "@asset\n"
             "def provided_export(ctx, export_settings):\n"
             '    """Export with provider settings."""\n'
             '    return ctx.result(payload={"region": export_settings.region})\n'

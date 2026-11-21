@@ -35,12 +35,7 @@ pub(crate) const PYTHON_TESTS_INPUT_CODE: &str = "S000";
 /// The project folder whose `python/`, `providers/` and `orchestration/` folders mirror the project's.
 const TESTS_FOLDER: &str = "tests";
 /// The discovered Python node collections whose folders a selection's tests mirror.
-const NODE_COLLECTIONS: [&str; 4] = [
-    "loader_functions",
-    "task_functions",
-    "asset_functions",
-    "check_functions",
-];
+const NODE_COLLECTIONS: [&str; 3] = ["loader_functions", "asset_functions", "check_functions"];
 /// Lets tests import project and `tests.*` modules, and mirrored folders reuse module names.
 const IMPORT_MODE: &str = "--import-mode=importlib";
 /// The JSON section reporting the Python tests a `sqb test` ran.

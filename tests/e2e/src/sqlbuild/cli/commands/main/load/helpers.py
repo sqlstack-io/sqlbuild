@@ -55,8 +55,8 @@ def assert_source_only_ingress_dependency_case(
             ),
             "python/tasks/prepare.py": (
                 "from pathlib import Path\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def prepare_events(ctx):\n"
                 "    '''Test task prepare_events.'''\n"
                 "    Path(__file__).parents[2].joinpath('prepared.txt').write_text('prepared')\n"

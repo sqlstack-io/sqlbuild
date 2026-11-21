@@ -255,9 +255,9 @@ Every loader function receives a `LoaderContext` as its first argument. It provi
 | `qualify_name(name)` | Return a fully-qualified relation name in the destination database/schema |
 | `skip(reason, mode=...)` | Skip this loader. `mode` is `"soft"` (default, skip only this loader) or `"hard"` (also block dependents) |
 | `result(payload=, metadata=, materialized=)` | Return a structured result for a self-managed loader |
-| `result_of(node_fn)` | Read the result of an upstream task, asset or loader: its result from this run, else its latest successful one; raises naming the upstream if it never succeeded |
+| `result_of(node_fn)` | Read the result of an upstream asset or loader: its result from this run, else its latest successful one; raises naming the upstream if it never succeeded |
 | `results_of(node_fn, limit=N)` | Read the last N successful results of an upstream node, newest first |
-| `loader(loader_fn)` | Return a `LoaderRelationRef` for an upstream loader dependency; a task or asset is refused with a pointer to `result_of` |
+| `loader(loader_fn)` | Return a `LoaderRelationRef` for an upstream loader dependency; an asset is refused with a pointer to `result_of` |
 | `source(source_name)` | Return a `LoaderRelationRef` for a project source by YAML name |
 
 ### LoaderRelationRef
@@ -272,7 +272,7 @@ Returned by `ctx.loader()` and `ctx.source()`. Provides access to an upstream re
 
 ## Loader dependencies
 
-Loaders can depend on other loaders, tasks and assets using `depends_on`. Dependencies are executed first. An upstream loader's destination relation is available via `ctx.loader()`:
+Loaders can depend on other loaders and assets using `depends_on`. Dependencies are executed first. An upstream loader's destination relation is available via `ctx.loader()`:
 
 ```python
 from sqlbuild.loaders import loader
@@ -297,25 +297,25 @@ def raw_account_metrics(ctx: LoaderContext) -> list[dict[str, object]]:
     ]
 ```
 
-Read upstream relations through `ctx.loader(...)` and `ctx.source(...)`, not by writing their table names in SQL. SQLBuild rejects literal SQL that names a project source, model, or seed with `P008`, and warns at run time when dynamic SQL does; loaders cannot read models and seeds. To use model data in a loader, read it in an upstream task and pass it on through the task's result. See [Hard-coded relation names](/docs/concepts/python-nodes/sql-references#hard-coded-relation-names).
+Read upstream relations through `ctx.loader(...)` and `ctx.source(...)`, not by writing their table names in SQL. SQLBuild rejects literal SQL that names a project source, model, or seed with `P008`, and warns at run time when dynamic SQL does; loaders cannot read models and seeds. To use model data in a loader, read it in an upstream asset and pass it on through the asset's result. See [Hard-coded relation names](/docs/concepts/python-nodes/sql-references#hard-coded-relation-names).
 
 Dependencies form a DAG. SQLBuild schedules loaders in topological order and executes independent loaders concurrently when `--concurrency` is set.
 
-### Depending on tasks and assets
+### Depending on assets
 
-A loader reads an upstream task's or asset's result with `ctx.result_of(...)`; `ctx.loader(...)`
-takes loaders only. A failed or hard-skipped upstream task or asset skips the loader and everything
-downstream of the source it fills. Otherwise the loader runs when a task or asset it depends on,
+A loader reads an upstream asset's result with `ctx.result_of(...)`; `ctx.loader(...)`
+takes loaders only. A failed or hard-skipped upstream asset skips the loader and everything
+downstream of the source it fills. Otherwise the loader runs when an asset it depends on,
 directly or through other loaders, succeeded; when all of them skip softly or did not run, only the
 load is skipped, so the source keeps its last loaded data and its readers still build when another
-of their inputs ran. A loader selected without its upstream task or asset reads that upstream's
+of their inputs ran. A loader selected without its upstream asset reads that upstream's
 latest successful result, and fails naming the upstream if it never succeeded.
 
 ```python
 from sqlbuild.loaders import loader
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
-@task
+@asset
 def fetch_partner_scores(ctx):
     """Download the scores a partner published."""
     return ctx.result(payload={"scores": [[1, 10], [2, 20]]})
@@ -327,9 +327,9 @@ def partner_scores(ctx):
     return [{"order_id": order_id, "score": score} for order_id, score in scores]
 ```
 
-When the task or asset reads SQL, directly or through other Python nodes, the loader makes a
+When the asset reads SQL, directly or through other Python nodes, the loader makes a
 [warehouse round trip](/docs/concepts/python-nodes/overview#warehouse-round-trips), which the project
-must allow with `allow_warehouse_round_trips`. The loader then loads after the SQL the task reads
+must allow with `allow_warehouse_round_trips`. The loader then loads after the SQL the asset reads
 and before the models that read its source, in the same `sqb build`.
 
 Intermediate loaders (those referenced only via `depends_on`, with no managed source of the same name) are given synthetic source entries and write to `__loader__<name>` tables by default. Only the terminal loader - the one whose name matches a managed source - populates that source; intermediate loaders feed it. Use the `destination` parameter on the decorator to override the intermediate relation:
@@ -352,7 +352,7 @@ The `@loader` decorator accepts optional parameters that can also be set in the 
 
 | Parameter | Description |
 |-----------|-------------|
-| `depends_on` | List of loader, task and asset functions this loader depends on. Depending on one that reads SQL is a [warehouse round trip](/docs/concepts/python-nodes/overview#warehouse-round-trips) |
+| `depends_on` | List of loader and asset functions this loader depends on. Depending on one that reads SQL is a [warehouse round trip](/docs/concepts/python-nodes/overview#warehouse-round-trips) |
 | `destination` | Override the destination relation name (can include schema or database) |
 | `write_strategy` | `table`, `append`, `delete_insert`, or `merge` |
 | `cursor_column` | Column used for incremental cursor tracking |

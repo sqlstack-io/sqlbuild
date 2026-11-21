@@ -39,7 +39,6 @@ DESCRIPTION_REQUIRED_INPUT_KINDS: dict[str, str] = {
     "sql_hook_files": "hook",
     "hook_functions": "hook",
     "loader_functions": "loader",
-    "task_functions": "task",
     "asset_functions": "asset",
     "check_functions": "check",
     "providers": "provider",

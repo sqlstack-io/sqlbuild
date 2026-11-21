@@ -40,7 +40,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
             expected_output_fragments=(
                 "S000",
                 "loader 'partner_scores' is in a dependency cycle: loader 'partner_scores' -> "
-                "task 'score_orders' -> model 'scored_orders' -> source 'partner_scores' -> "
+                "asset 'score_orders' -> model 'scored_orders' -> source 'partner_scores' -> "
                 "loader 'partner_scores'",
             ),
         ),
@@ -63,7 +63,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
             edited_files={},
             expected_exit_code=1,
             expected_output_fragments=(
-                "loader 'partner_scores' depends on task 'score_orders', which reads SQL",
+                "loader 'partner_scores' depends on asset 'score_orders', which reads SQL",
                 "set `allow_warehouse_round_trips = true` under [settings]",
             ),
         ),

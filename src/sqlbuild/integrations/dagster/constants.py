@@ -19,7 +19,6 @@ DAGSTER_ASSET_NODE_KIND_MEMBERS: frozenset[NodeKind] = frozenset(
         NodeKind.MODEL,
         NodeKind.UDF,
         NodeKind.TABLE_FN,
-        NodeKind.TASK,
         NodeKind.ASSET,
     }
 )
@@ -61,7 +60,6 @@ LOAD_SELECTABLE_NODE_KIND_EXCLUSIONS: frozenset[NodeKind] = frozenset(
         NodeKind.UDF,
         NodeKind.TABLE_FN,
         NodeKind.MODEL,
-        NodeKind.TASK,
         NodeKind.ASSET,
         NodeKind.CHECK,
         NodeKind.SQL_TEST,
@@ -79,7 +77,6 @@ DEFAULT_SELECTABLE_NODE_KIND_MEMBERS: frozenset[NodeKind] = frozenset(
 DEFAULT_SELECTABLE_NODE_KIND_EXCLUSIONS: frozenset[NodeKind] = frozenset(
     {
         NodeKind.LOADER,
-        NodeKind.TASK,
         NodeKind.ASSET,
         NodeKind.CHECK,
         NodeKind.SQL_TEST,
@@ -103,7 +100,6 @@ MATERIALIZABLE_NODE_KIND_MEMBERS: frozenset[NodeKind] = frozenset(
 )
 MATERIALIZABLE_NODE_KIND_EXCLUSIONS: frozenset[NodeKind] = frozenset(
     {
-        NodeKind.TASK,
         NodeKind.ASSET,
         NodeKind.CHECK,
         NodeKind.SQL_TEST,

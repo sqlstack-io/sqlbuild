@@ -2,11 +2,11 @@
 
 # sqb check
 
-> Run Python checks against tasks, assets, and loaders.
+> Run Python checks against assets and loaders.
 
 Online: https://sqlbuild.com/docs/cli/check/
 
-Runs Python [checks](../concepts/python-nodes/checks.md) in isolation. Checks validate the output of tasks, assets, and loaders. For SQL relation validation, use [`sqb audit`](audit.md) instead.
+Runs Python [checks](../concepts/python-nodes/checks.md) in isolation. Checks validate the output of assets and loaders. For SQL relation validation, use [`sqb audit`](audit.md) instead.
 
 ## Usage
 
@@ -29,7 +29,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--vars` | Override project variables |
 | `--warehouse <name>` | Snowflake warehouse for this invocation; overrides the target's `build` [warehouse group](../concepts/adapters/snowflake.md#command-group-warehouses) and the connection warehouse |
 
-Selecting a non-check node is rejected; use [`sqb build`](build.md) to run tasks and assets.
+Selecting a non-check node is rejected; use [`sqb build`](build.md) to run assets.
 
 ## Examples
 
@@ -55,4 +55,4 @@ Results are written to `target/run/checks/python_checks.json`.
 
 ## Relationship to build
 
-`sqb build` runs relevant Python checks by default after the tasks, assets, loaders, models, sources, and seeds they depend on have run. `sqb build --no-audits` skips checks alongside audits. `sqb check` runs only checks, on demand.
+`sqb build` runs relevant Python checks by default after the assets, loaders, models, sources, and seeds they depend on have run. `sqb build --no-audits` skips checks alongside audits. `sqb check` runs only checks, on demand.

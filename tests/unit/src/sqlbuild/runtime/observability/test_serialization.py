@@ -162,6 +162,9 @@ def test_given_known_event_when_serializing_and_decoding_then_round_trips(
         RetiredOperationCase(
             "a stored ingestr subprocess", "subprocess", "ingestr_command", "ingestr_command"
         ),
+        RetiredOperationCase(
+            "a stored Python task attempt", "python_node", "python_task", "python_task"
+        ),
     ],
     ids=lambda case: case.description,
 )

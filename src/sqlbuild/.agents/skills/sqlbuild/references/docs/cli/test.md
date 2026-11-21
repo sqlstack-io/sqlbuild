@@ -161,7 +161,7 @@ arguments, result type or body change, or a project variable it reads; formattin
 description do not count. A node that calls a SQL macro also uses every SQL macro that macro calls. An enum, constant or audit counts as changed when its declaration file
 changes other than in formatting and comments. A seed counts as changed with its data or column
 types, a source with its declaration or inline expression, and a function with its definition.
-Loaders, tasks, assets and checks are compared by their Python modules and the project modules
+Loaders, assets and checks are compared by their Python modules and the project modules
 they import; they appear in the change summary but no unit test runs them.
 
 ### Project-wide inputs

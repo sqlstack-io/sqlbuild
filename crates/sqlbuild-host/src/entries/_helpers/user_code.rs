@@ -215,11 +215,6 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::UserCode,
     },
     HostEntry {
-        name: "read_task_definition",
-        kind: HostKind::Function,
-        edge: HostEdge::UserCode,
-    },
-    HostEntry {
         name: "AuditCase",
         kind: HostKind::Class,
         edge: HostEdge::UserCode,

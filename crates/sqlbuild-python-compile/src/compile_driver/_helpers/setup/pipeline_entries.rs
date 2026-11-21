@@ -10,12 +10,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 
 /// Discovered Python node functions whose selectors need the Python graph.
-const PYTHON_NODE_FUNCTIONS: [&str; 4] = [
-    "loader_functions",
-    "task_functions",
-    "asset_functions",
-    "check_functions",
-];
+const PYTHON_NODE_FUNCTIONS: [&str; 3] = ["loader_functions", "asset_functions", "check_functions"];
 /// Plan entry lists that are runtime work.
 pub(crate) const PLAN_WORK_ENTRIES: [&str; 6] = [
     "model_entries",

@@ -51,8 +51,8 @@ _PROJECT_FILES: dict[str, str] = {
         'MODEL (description "Test model order_marker.", materialized table, post_hooks [python("count_raw")]);\nSELECT 1 AS n\n'
     ),
     "python/tasks/count.py": (
-        "from sqlbuild.refs import source\nfrom sqlbuild.tasks import task\n\n\n"
-        '@task(depends_on=source("raw_orders"))\n'
+        "from sqlbuild.refs import source\nfrom sqlbuild.assets import asset\n\n\n"
+        '@asset(depends_on=source("raw_orders"))\n'
         "def count_task(ctx):\n"
         '    """Test task count_task."""\n    raw = ctx.relation(source("raw_orders"))\n'
         '    ctx.execute_sql(f"CREATE OR REPLACE TABLE main.task_counts AS '
@@ -82,7 +82,7 @@ _TASK_RAN: str = r"count_task\s+OK"
     [
         PythonSourceDeferralE2ETestCase(
             description="hook and task read the deferred source a model reads",
-            select=("order_count", "task:count_task"),
+            select=("order_count", "asset:count_task"),
             expected_counts={"dev.order_count": 2, "main.hook_counts": 2, "main.task_counts": 2},
             expected_check_pattern=_CHECK_PASSED,
         ),
@@ -152,7 +152,7 @@ def test_given_only_a_task_selected_when_building_then_it_reads_its_source_like_
     execute_duckdb(db_path=database, sql=_ENVIRONMENT_ROWS)
 
     build: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "build", "--select", "task:count_task"), project_dir=project_dir
+        command=("--no-color", "build", "--select", "asset:count_task"), project_dir=project_dir
     )
 
     output: str = build.stdout + build.stderr

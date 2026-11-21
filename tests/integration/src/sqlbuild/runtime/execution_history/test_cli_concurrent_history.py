@@ -58,8 +58,8 @@ def test_given_explicit_cli_history_when_two_workers_publish_then_events_and_pro
 
     def execute_attempt(resource_name: str) -> None:
         with ResourceAttemptLifecycle(
-            resource_id=f"task:{resource_name}",
-            resource_kind="task",
+            resource_id=f"asset:{resource_name}",
+            resource_kind="asset",
             resource_name=resource_name,
             run_id="concurrent-run",
         ):

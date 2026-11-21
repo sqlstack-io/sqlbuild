@@ -18,8 +18,8 @@ from scripts.compiler_differential.constants import (
 from scripts.compiler_differential.models import FailureCase
 
 _TASK_MODULE: str = (
-    "from sqlbuild.tasks import task\n\n\n"
-    "@task\ndef export_orders(ctx):\n"
+    "from sqlbuild.assets import asset\n\n\n"
+    "@asset\ndef export_orders(ctx):\n"
     '    """Export orders."""\n'
     "    return None\n"
 )

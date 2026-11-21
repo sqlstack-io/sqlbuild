@@ -9,26 +9,26 @@ Python nodes can **read** SQL models, sources, and seeds at runtime, but SQL can
 
 ## Declaring a reference
 
-Use `model()`, `source()`, and `seed()` from `sqlbuild.refs` in the `depends_on` of a task, asset, or check:
+Use `model()`, `source()`, and `seed()` from `sqlbuild.refs` in the `depends_on` of an asset or check:
 
 ```python
 from sqlbuild.refs import model, seed, source
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task(depends_on=model("fact_orders"))
+@asset(depends_on=model("fact_orders"))
 def export_orders(ctx):
     """Export orders."""
     ...
 
 
-@task(depends_on=source("raw_orders"))
+@asset(depends_on=source("raw_orders"))
 def inspect_raw(ctx):
     """Inspect raw."""
     ...
 
 
-@task(depends_on=seed("country_codes"))
+@asset(depends_on=seed("country_codes"))
 def export_countries(ctx):
     """Export countries."""
     ...
@@ -41,14 +41,14 @@ Declaring the reference does two things:
 
 It does **not** make the SQL resource depend on the Python node. The dependency is one-way: Python reads SQL, never the reverse.
 
-The reference is a graph edge. It appears in `sqb dag --json`, and selector expansion follows it: `+task:export_countries` also selects the `country_codes` seed and its upstream, and `country_codes+` also selects the tasks and assets that read it. Checks are never added by expansion; they run when their dependencies run.
+The reference is a graph edge. It appears in `sqb dag --json`, and selector expansion follows it: `+asset:export_countries` also selects the `country_codes` seed and its upstream, and `country_codes+` also selects the assets that read it. Checks are never added by expansion; they run when their dependencies run.
 
 ## Resolving with ctx.relation
 
 Always resolve a reference to its concrete relation with `ctx.relation(...)` instead of hardcoding the table name:
 
 ```python
-@task(depends_on=model("fact_orders"))
+@asset(depends_on=model("fact_orders"))
 def export_orders(ctx):
     """Export orders."""
     relation = ctx.relation(model("fact_orders"))
@@ -64,7 +64,7 @@ Do not hardcode model or source names in raw SQL. A model's relation depends on 
 
 ## Hard-coded relation names
 
-SQLBuild checks SQL passed to `ctx.query()` and `ctx.execute_sql()` in tasks, assets, checks,
+SQLBuild checks SQL passed to `ctx.query()` and `ctx.execute_sql()` in assets, checks,
 loaders, and [Python hooks](/docs/concepts/models/hooks/python) for names of project relations:
 models, sources, and seeds.
 
@@ -73,8 +73,8 @@ literal text, is parsed with the project's SQL dialect. Naming a project relatio
 with `P008`:
 
 ```
-error[P008]: task:export_orders names model:fact_orders as 'fact_orders' in SQL passed to ctx.query()
-  --> python/tasks/export.py:9
+error[P008]: asset:export_orders names model:fact_orders as 'fact_orders' in SQL passed to ctx.query()
+  --> python/exports/export.py:9
   = help: declare it with depends_on=model("fact_orders") and use ctx.relation(model("fact_orders")) instead of the relation name
   = help: if 'fact_orders' is an external table that shares the name, qualify it with its schema
   = help: while migrating a project, allow hard-coded relation names with [references] enforce_explicit = false in sqlbuild_project.toml
@@ -122,16 +122,16 @@ Naming every upstream model ties a node to model names that change with each ren
 
 ```python
 from sqlbuild.refs import job, tag
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task(depends_on=(job("orders_job", exclude="tag:experimental"), tag("finance_inputs")))
+@asset(depends_on=(job("orders_job", exclude="tag:experimental"), tag("finance_inputs")))
 def publish_revenue(ctx):
     """Publish revenue."""
     ...
 ```
 
-- `job(name)` depends on the job's **end nodes**: the models, seeds, sources, loaders, tasks and
+- `job(name)` depends on the job's **end nodes**: the models, seeds, sources, loaders and
   assets of its selection that nothing else in the selection reads. Everything else in the job is
   upstream of an end node, so this waits for the whole job without listing every edge. A job group
   name depends on the union of its jobs.
@@ -140,7 +140,7 @@ def publish_revenue(ctx):
   `kind:`) and removes those nodes before the set is reduced to its end nodes.
 
 Compile resolves each into ordinary edges to the end nodes, so planning, `--changed`, selector
-expansion (`+task:publish_revenue`), `sqb dag` and job group waits treat them like named
+expansion (`+asset:publish_revenue`), `sqb dag` and job group waits treat them like named
 dependencies. A model named directly and also reached through a job is one edge. Jobs resolve
 whatever targets they are declared for.
 
@@ -152,7 +152,7 @@ it was last built with:
 
 ```text
 Python read-side (1)
-└── publish_revenue      task (unchanged)
+└── publish_revenue      asset (unchanged)
     └── publish_revenue now also waits on model 'refund_totals' through job 'orders_job'
 ```
 
@@ -167,7 +167,7 @@ Compile fails when:
   by job, so if the dependant's job waits for the job it depends on while that job reads a node of
   the dependant's job, neither can start. The error names the nodes that close the loop; move
   them to another job;
-- a loader declares one: loaders depend on loaders, tasks and assets named one by one;
+- a loader declares one: loaders depend on loaders and assets named one by one;
 - the name has a code location prefix such as `job("billing:nightly_job")`, which is reserved for
   depending on other locations' jobs.
 
@@ -183,7 +183,7 @@ Compile fails when:
 
 ## Where references are allowed
 
-- **Tasks**, **assets**, and **checks** may declare `model()`, `source()`, and `seed()` references and read them with `ctx.relation(...)`, and depend on a `job()` or `tag()`.
+- **Assets** and **checks** may declare `model()`, `source()`, and `seed()` references and read them with `ctx.relation(...)`, and depend on a `job()` or `tag()`.
 - **Python hooks** declare the models, sources, and seeds they read with `@hook(reads=...)`; see [Python Hooks](/docs/concepts/models/hooks/python#declared-reads).
 - **Loaders** may not reference SQL resources; they read sources with `ctx.source(...)` and upstream loaders with `ctx.loader(...)`.
 - A Python node referencing a SQL resource never turns into a SQL dependency; selector expansion will not pull Python outputs into SQL model dependencies.

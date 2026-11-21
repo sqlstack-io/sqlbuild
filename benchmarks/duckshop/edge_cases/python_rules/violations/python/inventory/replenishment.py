@@ -1,8 +1,8 @@
 """Replenishment declared in a flat module."""
 
-from sqlbuild.tasks import TaskContext, task
+from sqlbuild.assets import AssetContext, asset
 
 
-@task(description="Reorder products that ran out.")
-def replenish(ctx: TaskContext) -> None:
+@asset(description="Reorder products that ran out.")
+def replenish(ctx: AssetContext) -> None:
     return None

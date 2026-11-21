@@ -42,7 +42,7 @@ _GROUP_FILES: tuple[tuple[str, str], ...] = (
     ),
     (
         "orchestration/jobs/reporting_job.toml",
-        'name = "reporting_job"\ndescription = "Reporting."\nselect = "task:report customers"\n',
+        'name = "reporting_job"\ndescription = "Reporting."\nselect = "asset:report customers"\n',
     ),
     (
         "orchestration/job_groups/daily_job_group.toml",
@@ -81,7 +81,7 @@ _GROUP_FILES: tuple[tuple[str, str], ...] = (
     ],
     ids=lambda case: case.description,
 )
-def test_given_set_dependency_when_planning_the_tasks_upstream_then_selects_the_set(
+def test_given_set_dependency_when_planning_the_assets_upstream_then_selects_the_set(
     test_case: SetDependencyPlanTestCase,
     tmp_path: Path,
     write_repo_files: Callable[[Path, dict[str, str]], None],
@@ -93,7 +93,7 @@ def test_given_set_dependency_when_planning_the_tasks_upstream_then_selects_the_
         discovered_inputs=discovered,
         adapter=DuckDbAdapter(),
         options=CompilePipelineOptions(
-            no_sql_validation=True, select=("+task:report",), resolve_python_run_selectors=True
+            no_sql_validation=True, select=("+asset:report",), resolve_python_run_selectors=True
         ),
         hooks=ConnectionHooks(),
     )
@@ -113,20 +113,22 @@ def test_given_set_dependency_when_planning_the_tasks_upstream_then_selects_the_
             depends_on='job("weekly_job")',
             job_files=(),
             expected_fragments=(
-                "task 'report' depends on job 'weekly_job', which the project does not declare",
+                "asset 'report' depends on job 'weekly_job', which the project does not declare",
             ),
         ),
         SetDependencyErrorTestCase(
             description="an unknown tag",
             depends_on='tag("marketing")',
             job_files=(),
-            expected_fragments=("task 'report' depends on tag 'marketing', which no node carries",),
+            expected_fragments=(
+                "asset 'report' depends on tag 'marketing', which no node carries",
+            ),
         ),
         SetDependencyErrorTestCase(
             description="a job its exclude empties",
             depends_on='job("nightly_job", exclude="stg_orders orders order_items")',
             job_files=(),
-            expected_fragments=("which leaves no model, seed, source, loader, task or asset",),
+            expected_fragments=("which leaves no model, seed, source, loader or asset",),
         ),
         SetDependencyErrorTestCase(
             description="job group members that would wait for each other",

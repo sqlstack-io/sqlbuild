@@ -28,11 +28,10 @@ from sqlbuild.assets import asset
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
-from sqlbuild.tasks import task
 
 
 def make_task(name):
-    @task(name=name)
+    @asset(name=name)
     def generated_task(ctx):
         return {"name": name}
     return generated_task
@@ -69,12 +68,10 @@ def regional_pipeline():
 """,
             },
             expected_loader_names=("raw_orders",),
-            expected_task_names=("fetch_orders",),
-            expected_asset_names=("orders_export",),
+            expected_asset_names=("fetch_orders", "orders_export"),
             expected_check_names=("orders_export_exists",),
             expected_loader_dependency_counts=(1,),
-            expected_task_dependency_counts=(0,),
-            expected_asset_dependency_counts=(1,),
+            expected_asset_dependency_counts=(0, 1),
             expected_check_dependency_counts=(1,),
         ),
         DiscoverPythonNodeFactoriesTestCase(
@@ -98,7 +95,6 @@ def generated_loaders():
 """,
             },
             expected_loader_names=("raw_orders", "raw_customers"),
-            expected_task_names=(),
             expected_asset_names=(),
             expected_check_names=(),
             expected_loader_dependency_counts=(0, 0),
@@ -120,7 +116,6 @@ def generated_checks():
 """,
             },
             expected_loader_names=(),
-            expected_task_names=(),
             expected_asset_names=(),
             expected_check_names=("orders_export_exists",),
             expected_check_dependency_counts=(0,),
@@ -142,7 +137,6 @@ def generated_asset():
 """,
             },
             expected_loader_names=(),
-            expected_task_names=(),
             expected_asset_names=("orders_export",),
             expected_check_names=(),
             expected_asset_dependency_counts=(0,),
@@ -164,7 +158,6 @@ def generated_loader():
 """,
             },
             expected_loader_names=("raw_orders",),
-            expected_task_names=(),
             expected_asset_names=(),
             expected_check_names=(),
             expected_loader_dependency_counts=(0,),
@@ -182,7 +175,6 @@ def export(ctx):
 """,
             },
             expected_loader_names=(),
-            expected_task_names=(),
             expected_asset_names=("orders_export",),
             expected_check_names=(),
             expected_asset_dependency_counts=(0,),
@@ -197,10 +189,10 @@ REGION = "emea"
 from python._helpers import REGION
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task(name="prepare_orders")
+@asset(name="prepare_orders")
 def prepare_orders(ctx):
     return {"region": REGION}
 
@@ -214,10 +206,9 @@ def regional_checks():
 """,
             },
             expected_loader_names=(),
-            expected_task_names=("prepare_orders",),
-            expected_asset_names=(),
+            expected_asset_names=("prepare_orders",),
             expected_check_names=("orders_emea_exists",),
-            expected_task_dependency_counts=(0,),
+            expected_asset_dependency_counts=(0,),
             expected_check_dependency_counts=(1,),
         ),
     ),
@@ -233,14 +224,10 @@ def test_given_factory_nodes_when_discovering_python_nodes_then_returns_generate
     result: DiscoveredPythonNodeFunctions = discover_python_node_functions(project_dir=tmp_path)
 
     assert tuple(node.name for node in result.loaders) == test_case.expected_loader_names
-    assert tuple(node.name for node in result.tasks) == test_case.expected_task_names
     assert tuple(node.name for node in result.assets) == test_case.expected_asset_names
     assert tuple(node.name for node in result.checks) == test_case.expected_check_names
     assert tuple(len(node.depends_on) for node in result.loaders) == (
         test_case.expected_loader_dependency_counts
-    )
-    assert tuple(len(node.depends_on) for node in result.tasks) == (
-        test_case.expected_task_dependency_counts
     )
     assert tuple(len(node.depends_on) for node in result.assets) == (
         test_case.expected_asset_dependency_counts
@@ -266,7 +253,6 @@ def broken_factory():
 """,
             },
             expected_loader_names=(),
-            expected_task_names=(),
             expected_asset_names=(),
             expected_check_names=(),
             expected_error_fragment="must return a SQLBuild node function",
@@ -284,7 +270,6 @@ def broken_factory():
 """,
             },
             expected_loader_names=(),
-            expected_task_names=(),
             expected_asset_names=(),
             expected_check_names=(),
             expected_error_fragment="must return a SQLBuild node function",
@@ -302,7 +287,6 @@ def broken_factory():
 """,
             },
             expected_loader_names=(),
-            expected_task_names=(),
             expected_asset_names=(),
             expected_check_names=(),
             expected_error_fragment="must return a SQLBuild node function",
@@ -320,7 +304,6 @@ def broken_factory():
 """,
             },
             expected_loader_names=(),
-            expected_task_names=(),
             expected_asset_names=(),
             expected_check_names=(),
             expected_error_fragment="must return a SQLBuild node function",
@@ -338,7 +321,6 @@ def broken_factory():
 """,
             },
             expected_loader_names=(),
-            expected_task_names=(),
             expected_asset_names=(),
             expected_check_names=(),
             expected_error_fragment="must return a SQLBuild node function",
@@ -360,20 +342,19 @@ def broken_factory():
 """,
             },
             expected_loader_names=(),
-            expected_task_names=(),
             expected_asset_names=(),
             expected_check_names=(),
-            expected_error_fragment="returned item 0 that is not a SQLBuild task",
+            expected_error_fragment="returned item 0 that is not a SQLBuild asset",
         ),
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns nested structures",
             files={
                 "python/tasks/generated.py": """
 from sqlbuild.factories import factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task(name="generated_task")
+@asset(name="generated_task")
 def generated_task(ctx):
     return None
 
@@ -384,10 +365,9 @@ def broken_factory():
 """,
             },
             expected_loader_names=(),
-            expected_task_names=(),
             expected_asset_names=(),
             expected_check_names=(),
-            expected_error_fragment="returned item 0 that is not a SQLBuild task",
+            expected_error_fragment="returned item 0 that is not a SQLBuild asset",
         ),
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returned item is not decorated",
@@ -406,10 +386,9 @@ def broken_factory():
 """,
             },
             expected_loader_names=(),
-            expected_task_names=(),
             expected_asset_names=(),
             expected_check_names=(),
-            expected_error_fragment="returned item 0 that is not a SQLBuild task",
+            expected_error_fragment="returned item 0 that is not a SQLBuild asset",
         ),
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory requires arguments",
@@ -424,7 +403,6 @@ def broken_factory(region):
 """,
             },
             expected_loader_names=(),
-            expected_task_names=(),
             expected_asset_names=(),
             expected_check_names=(),
             expected_error_fragment="must not require arguments",
@@ -442,7 +420,6 @@ def broken_factory():
 """,
             },
             expected_loader_names=(),
-            expected_task_names=(),
             expected_asset_names=(),
             expected_check_names=(),
             expected_error_fragment="failed during discovery: boom",

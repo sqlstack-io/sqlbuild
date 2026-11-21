@@ -64,7 +64,7 @@ function generated(spec: NodeSpec, sn: SnapshotNode, columns = spec.columns): st
 
 /** Current raw SQL in the snapshot; null for sources, seeds and Python nodes. */
 export function rawSql(sn: SnapshotNode): string | null {
-	if (sn.kind === 'source' || sn.kind === 'seed' || sn.kind === 'loader' || sn.kind === 'task') return null;
+	if (sn.kind === 'source' || sn.kind === 'seed' || sn.kind === 'loader' || sn.kind === 'asset') return null;
 	if (sn.key === 'fact_orders') return FACT_ORDERS_SQL;
 	const spec = NODE_SPECS[sn.key];
 	return spec ? generated(spec, sn) : null;

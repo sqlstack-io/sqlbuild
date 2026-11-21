@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::node_set_dependencies::constants::NAMED_NODES;
 use crate::node_set_dependencies::models::{GraphNode, NodeSetDependency};
 
-/// `model 'orders'` or `task 'export_orders'`.
+/// `model 'orders'` or `asset 'export_orders'`.
 pub(crate) fn node_label(node: &GraphNode, kinds: &HashMap<String, String>) -> String {
     match node {
         GraphNode::Sql((kind, name)) => format!("{kind} '{name}'"),

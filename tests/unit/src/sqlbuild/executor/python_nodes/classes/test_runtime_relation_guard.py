@@ -26,7 +26,7 @@ _PROJECT_RELATIONS: dict[SqlResourceRef, str] = {
             description="unqualified model name resolved against the current schema warns once",
             statements=("SELECT * FROM customers", "SELECT count(*) FROM main.customers"),
             expected_warning_fragments=(
-                "[P008] task 'export_orders' named model:customers as 'customers' in SQL; "
+                "[P008] asset 'export_orders' named model:customers as 'customers' in SQL; "
                 'declare it with depends_on=model("customers") and use '
                 'ctx.relation(model("customers")) instead of the relation name',
             ),

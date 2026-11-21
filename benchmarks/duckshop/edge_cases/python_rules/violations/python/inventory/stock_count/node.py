@@ -2,12 +2,12 @@
 
 from orchestration.sensors.fulfillment._helpers.hours import CUTOFF_HOURS
 
-from sqlbuild.tasks import TaskContext, task
+from sqlbuild.assets import AssetContext, asset
 
 WAREHOUSES: tuple[str, ...] = ("north", "south")
 
 
-@task
-def stock_count(context: TaskContext) -> int:
+@asset
+def stock_count(context: AssetContext) -> int:
     """Count stock in every warehouse."""
     return len(WAREHOUSES) + CUTOFF_HOURS

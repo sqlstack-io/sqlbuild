@@ -57,11 +57,6 @@ fn given_raw_selector_when_parsing_then_returns_kind_value_and_expansion() {
             expected_selector: kind("seed", "country_codes", true, false),
         },
         ParseSelectorTestCase {
-            description: "task typed selector",
-            raw: "task:prepare_orders",
-            expected_selector: kind("task", "prepare_orders", false, false),
-        },
-        ParseSelectorTestCase {
             description: "asset typed selector",
             raw: "asset:export_orders",
             expected_selector: kind("asset", "export_orders", false, false),
@@ -553,10 +548,10 @@ fn given_unresolvable_selectors_when_resolving_then_fails_with_message() {
         ProjectSelectorErrorTestCase {
             description: "a Python node kind needs the Python node graph",
             project: DIAMOND_PROJECT,
-            select: &["kind:task"],
+            select: &["kind:asset"],
             expected_error: (
                 "S010",
-                "selector 'kind:task' selects Python nodes; they cannot be selected here",
+                "selector 'kind:asset' selects Python nodes; they cannot be selected here",
                 None,
             ),
         },

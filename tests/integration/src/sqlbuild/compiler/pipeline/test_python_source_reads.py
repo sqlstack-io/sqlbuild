@@ -33,8 +33,8 @@ _PROJECT_FILES: dict[str, str] = {
     ),
     "models/order_marker.sql": "MODEL (description 'Test model order_marker.', materialized table);\nSELECT 1 AS n\n",
     "python/tasks/count.py": (
-        "from sqlbuild.refs import source\nfrom sqlbuild.tasks import task\n\n\n"
-        '@task(depends_on=source("raw_orders"))\n'
+        "from sqlbuild.refs import source\nfrom sqlbuild.assets import asset\n\n\n"
+        '@asset(depends_on=source("raw_orders"))\n'
         "def count_task(ctx):\n"
         "    '''Test task count_task.'''\n    ctx.query(f\"SELECT count(*) FROM {ctx.relation(source('raw_orders'))}\")\n"
     ),
@@ -73,7 +73,7 @@ def test_given_only_a_task_selected_when_planning_then_its_source_resolves_like_
     result: CompilePipelineResult = run_compile_pipeline_for_project(
         project_dir=tmp_path,
         adapter=DuckDbAdapter(),
-        select=("task:count_task",),
+        select=("asset:count_task",),
         resolve_python_run_selectors=True,
     )
 

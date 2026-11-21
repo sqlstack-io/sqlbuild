@@ -11,12 +11,10 @@ from sqlbuild.compiler.python_nodes._helpers.identity import build_python_identi
 from sqlbuild.python_nodes.main.read_asset_definition import read_asset_definition
 from sqlbuild.python_nodes.main.read_check_definition import read_check_definition
 from sqlbuild.python_nodes.main.read_loader_definition import read_loader_definition
-from sqlbuild.python_nodes.main.read_task_definition import read_task_definition
 from sqlbuild.python_nodes.models import (
     AssetDefinition,
     CheckDefinition,
     LoaderDefinition,
-    TaskDefinition,
 )
 
 
@@ -53,11 +51,6 @@ def python_node_dependency_key(dependency: object) -> object | tuple[str, str]:
     )
     if loader_definition is not None:
         return ("name", loader_definition.name)
-    task_definition: TaskDefinition | None = (
-        read_task_definition(dependency) if callable(dependency) else None
-    )
-    if task_definition is not None:
-        return ("name", task_definition.name)
     asset_definition: AssetDefinition | None = (
         read_asset_definition(dependency) if callable(dependency) else None
     )

@@ -26,9 +26,8 @@ use sqlbuild_python_front::discovery::main::python_files::provider_usages::provi
 const NAME_KEY: &str = "name";
 
 /// One discovered function collection, its node kind and whether it carries documentation.
-pub(crate) const KINDS: [(&str, &str, bool); 4] = [
+pub(crate) const KINDS: [(&str, &str, bool); 3] = [
     ("loader_functions", "LOADER", false),
-    ("task_functions", "TASK", true),
     ("asset_functions", "ASSET", true),
     ("check_functions", "CHECK", true),
 ];
@@ -41,7 +40,7 @@ pub(crate) struct Vocabulary<'py> {
     pub(crate) providers: Bound<'py, PyDict>,
     /// Each node's resolved `job(...)` and `tag(...)` dependencies; empty for the explicit graph.
     pub(crate) sets: Vec<ResolvedNode>,
-    /// Each discovered node's kind, such as `task`, by name.
+    /// Each discovered node's kind, such as `asset`, by name.
     pub(crate) node_kinds: HashMap<String, String>,
 }
 
@@ -65,7 +64,7 @@ impl Vocabulary<'_> {
         )
     }
 
-    /// `model 'orders'` or `task 'export_orders'`.
+    /// `model 'orders'` or `asset 'export_orders'`.
     fn end_label(&self, end: &GraphNode) -> String {
         match end {
             GraphNode::Sql((kind, name)) => format!("{kind} '{name}'"),
@@ -173,10 +172,6 @@ fn kind_metadata<'py>(
                     "contract",
                 ],
             )?,
-        ),
-        "TASK" => (
-            "task",
-            metadata(RecordId::DiscoveredPythonTaskMetadata, &["retry"])?,
         ),
         "ASSET" => (
             "asset",

@@ -17,7 +17,6 @@ RIVERS_ASSET_NODE_KIND_MEMBERS: frozenset[NodeKind] = frozenset(
         NodeKind.MODEL,
         NodeKind.UDF,
         NodeKind.TABLE_FN,
-        NodeKind.TASK,
         NodeKind.ASSET,
     }
 )

@@ -121,7 +121,7 @@ class ReadSidePythonExecutionTracker:
                 if node_name in self._completed_python_names:
                     continue
                 node: DiscoveredPythonNode = self._python_graph.nodes_by_name[node_name]
-                if node.kind not in {PythonNodeKind.TASK, PythonNodeKind.ASSET}:
+                if node.kind != PythonNodeKind.ASSET:
                     continue
                 if not self._sql_dependencies_satisfied(node):
                     continue

@@ -9,7 +9,7 @@ use crate::graph::models::ProjectGraph;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PythonSelectionNode {
     pub name: String,
-    /// `task`, `asset`, `loader` or `check`.
+    /// `asset`, `loader` or `check`.
     pub kind: String,
     /// The SQL resource keys the node declares, in authored order.
     pub sql_deps: Vec<ObjectKey>,
@@ -58,7 +58,7 @@ pub struct InventoryNode {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PublishedPythonNode {
     pub name: String,
-    /// `task`, `asset`, `loader` or `check`.
+    /// `asset`, `loader` or `check`.
     pub kind: String,
     pub tags: Vec<String>,
     /// The folder of the node's file relative to the project, in POSIX form.

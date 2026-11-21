@@ -79,12 +79,8 @@ const RUNTIME_SETTINGS: [&str; 12] = [
 ];
 const PYTHON_SUFFIX: &str = ".py";
 /// Discovered Python node collections, in `PYTHON_NODE_KINDS` order.
-const PYTHON_NODE_COLLECTIONS: [&str; 4] = [
-    "loader_functions",
-    "task_functions",
-    "asset_functions",
-    "check_functions",
-];
+const PYTHON_NODE_COLLECTIONS: [&str; 3] =
+    ["loader_functions", "asset_functions", "check_functions"];
 
 fn node(kind: &str, name: &str, aspects: Vec<(&str, String)>) -> NodeDefinition {
     NodeDefinition {
@@ -433,7 +429,7 @@ fn python_files(directory: &Path) -> PyResult<Vec<PathBuf>> {
     Ok(files)
 }
 
-/// Loaders, tasks, assets, checks and materializations by their Python modules and imports.
+/// Loaders, assets, checks and materializations by their Python modules and imports.
 fn python_nodes(
     discovered: &Bound<'_, PyAny>,
     fingerprints: &Fingerprinting,

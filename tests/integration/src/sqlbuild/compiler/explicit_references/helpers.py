@@ -57,8 +57,8 @@ def _hook(
 
 def _task(body: str, depends_on: str = 'model("orders")') -> str:
     return (
-        "from sqlbuild.refs import model, source\nfrom sqlbuild.tasks import task\n\n\n"
-        f"@task(depends_on={depends_on})\ndef export_orders(ctx):\n{body}"
+        "from sqlbuild.refs import model, source\nfrom sqlbuild.assets import asset\n\n\n"
+        f"@asset(depends_on={depends_on})\ndef export_orders(ctx):\n{body}"
     )
 
 

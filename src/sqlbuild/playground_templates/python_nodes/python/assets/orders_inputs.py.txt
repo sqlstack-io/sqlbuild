@@ -1,9 +1,9 @@
-"""Task examples for the Python nodes playground."""
+"""Upstream asset examples for the Python nodes playground."""
 
-from sqlbuild.tasks import SkipMode, task
+from sqlbuild.assets import SkipMode, asset
 
 
-@task(tags=["python", "ingress"], group="ingress")
+@asset(tags=["python", "ingress"], group="ingress")
 def prepare_raw_orders(ctx):
     """Prepare a tiny in-memory order extract before the loader runs."""
 
@@ -14,14 +14,14 @@ def prepare_raw_orders(ctx):
     return ctx.result(payload={"rows": rows}, metadata={"row_count": len(rows)})
 
 
-@task(tags=["python", "optional"], group="exports")
+@asset(tags=["python", "optional"], group="exports")
 def optional_partner_feed(ctx):
     """Soft-skip an optional upstream without blocking sibling fan-in."""
 
     return ctx.skip(reason="partner feed is not configured", mode=SkipMode.SOFT)
 
 
-@task(tags=["python", "optional"], group="exports")
+@asset(tags=["python", "optional"], group="exports")
 def export_window(ctx):
     """Successful sibling that lets downstream fan-in continue."""
 

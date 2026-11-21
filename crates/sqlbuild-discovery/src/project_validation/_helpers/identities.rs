@@ -131,12 +131,7 @@ fn candidates(facts: &ProjectFacts) -> Vec<Candidate<'_>> {
     }
     candidates.push_named(&facts.model_schemas, "model schema");
     candidates.push_named(&facts.materializations, "materialization");
-    for kind in [
-        NodeKind::Loader,
-        NodeKind::Task,
-        NodeKind::Asset,
-        NodeKind::Check,
-    ] {
+    for kind in [NodeKind::Loader, NodeKind::Asset, NodeKind::Check] {
         for node in facts.nodes.iter().filter(|node| node.kind == kind) {
             candidates.push(&node.name, kind.label(), &node.path);
         }

@@ -26,7 +26,7 @@ fn dependency_key(dependency: &DependencyFact) -> Option<DependencyKey<'_>> {
     }
 }
 
-/// The loaders, tasks and assets a dependency key names, as `node_by_dependency_key` maps them.
+/// The loaders and assets a dependency key names, as `node_by_dependency_key` maps them.
 struct ExecutableNodes<'a> {
     nodes: &'a [NodeFact],
     by_name: HashMap<&'a str, usize>,
@@ -74,7 +74,7 @@ pub(crate) fn validate_loader_dependencies(nodes: &[NodeFact]) -> Result<(), Val
     find_cycle(nodes, &roots, next, "Loader dependency cycle detected")
 }
 
-/// `_validate_python_node_dependencies` over loaders, tasks and assets.
+/// `_validate_python_node_dependencies` over loaders and assets.
 pub(crate) fn validate_python_node_dependencies(
     nodes: &[NodeFact],
 ) -> Result<(), ValidationFailure> {
@@ -90,7 +90,7 @@ pub(crate) fn validate_python_node_dependencies(
                     if node.kind == NodeKind::Loader {
                         return Err(conflict(format!(
                             "Loader '{}' depends on SQL resource '{name}'; loaders may depend on \
-                             Python loader/task/asset functions only",
+                             Python loader/asset functions only",
                             node.name
                         )));
                     }
@@ -110,7 +110,7 @@ pub(crate) fn validate_python_node_dependencies(
                     }
                     return Err(conflict(format!(
                         "Python node '{}' depends on an unknown Python node; use function \
-                         references to decorated loaders, tasks, or assets",
+                         references to decorated loaders or assets",
                         node.name
                     )));
                 }
@@ -128,7 +128,7 @@ pub(crate) fn validate_python_node_dependencies(
     find_cycle(nodes, &roots, next, "Python node dependency cycle detected")
 }
 
-/// `_validate_check_dependencies`: checks depend on loaders, tasks and assets, never checks.
+/// `_validate_check_dependencies`: checks depend on loaders and assets, never checks.
 pub(crate) fn validate_check_dependencies(nodes: &[NodeFact]) -> Result<(), ValidationFailure> {
     let allowed: HashSet<&str> = nodes
         .iter()
@@ -151,7 +151,7 @@ pub(crate) fn validate_check_dependencies(nodes: &[NodeFact]) -> Result<(), Vali
             };
             if name.is_some_and(|name| checks.contains(name)) {
                 return Err(conflict(format!(
-                    "Check '{}' depends on another check; checks may depend on loaders, tasks, \
+                    "Check '{}' depends on another check; checks may depend on loaders, \
                      assets, models, sources, and seeds only",
                     check.name
                 )));
@@ -159,7 +159,7 @@ pub(crate) fn validate_check_dependencies(nodes: &[NodeFact]) -> Result<(), Vali
             if !name.is_some_and(|name| allowed.contains(name)) {
                 return Err(conflict(format!(
                     "Check '{}' depends on an unknown Python node; use function references to \
-                     decorated loaders, tasks, or assets",
+                     decorated loaders or assets",
                     check.name
                 )));
             }

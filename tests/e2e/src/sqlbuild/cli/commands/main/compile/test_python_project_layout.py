@@ -141,7 +141,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             description="removed tasks Python root",
             repo_files={
                 "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
-                "tasks/orders.py": "from sqlbuild.tasks import task\n",
+                "tasks/orders.py": "from sqlbuild.assets import asset\n",
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
@@ -153,7 +153,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             description="removed assets Python root",
             repo_files={
                 "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
-                "assets/orders.py": "from sqlbuild.tasks import task\n",
+                "assets/orders.py": "from sqlbuild.assets import asset\n",
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
@@ -165,7 +165,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             description="removed checks Python root",
             repo_files={
                 "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
-                "checks/orders.py": "from sqlbuild.tasks import task\n",
+                "checks/orders.py": "from sqlbuild.assets import asset\n",
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
@@ -177,7 +177,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             description="removed loaders Python root",
             repo_files={
                 "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
-                "loaders/orders.py": "from sqlbuild.tasks import task\n",
+                "loaders/orders.py": "from sqlbuild.assets import asset\n",
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
@@ -189,7 +189,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             description="removed factories Python root",
             repo_files={
                 "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
-                "factories/orders.py": "from sqlbuild.tasks import task\n",
+                "factories/orders.py": "from sqlbuild.assets import asset\n",
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
@@ -201,7 +201,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             description="removed libs Python root",
             repo_files={
                 "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
-                "libs/cleaning.py": "from sqlbuild.tasks import task\n",
+                "libs/cleaning.py": "from sqlbuild.assets import asset\n",
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
@@ -213,7 +213,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             description="removed dagster Python root",
             repo_files={
                 "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
-                "dagster/definitions.py": "from sqlbuild.tasks import task\n",
+                "dagster/definitions.py": "from sqlbuild.assets import asset\n",
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
@@ -225,7 +225,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             description="removed rivers_pipeline Python root",
             repo_files={
                 "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
-                "rivers_pipeline/definitions.py": "from sqlbuild.tasks import task\n",
+                "rivers_pipeline/definitions.py": "from sqlbuild.assets import asset\n",
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
@@ -237,7 +237,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             description="removed root definitions.py Python root",
             repo_files={
                 "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
-                "definitions.py": "from sqlbuild.tasks import task\n",
+                "definitions.py": "from sqlbuild.assets import asset\n",
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
@@ -426,8 +426,8 @@ def test_given_python_root_project_when_compiling_and_building_then_nodes_run_wi
                 ),
                 "python/factories/orders.py": (
                     "from sqlbuild.factories import factory\n"
-                    "from sqlbuild.tasks import task\n\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n\n"
+                    "@asset\n"
                     "def orders(ctx):\n"
                     "    '''Test task orders.'''\n    return None\n\n\n"
                     "@factory\n"
@@ -445,11 +445,11 @@ def test_given_python_root_project_when_compiling_and_building_then_nodes_run_wi
                 ),
                 "python/factories/orders.py": (
                     "from sqlbuild.factories import factory\n"
-                    "from sqlbuild.tasks import task\n\n\n"
+                    "from sqlbuild.assets import asset\n\n\n"
                     "@factory\n"
                     "def order_nodes():\n"
                     "    global orders\n\n"
-                    "    @task\n"
+                    "    @asset\n"
                     "    def orders(ctx):\n"
                     "        '''Test task orders.'''\n        return None\n\n"
                     "    return orders\n"
@@ -494,13 +494,13 @@ def test_given_factory_returning_module_node_when_planning_then_node_registers_o
                 ),
                 "python/factories/orders.py": (
                     "from sqlbuild.factories import factory\n"
-                    "from sqlbuild.tasks import task\n\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n\n"
+                    "@asset\n"
                     "def orders(ctx):\n"
                     "    '''Test task orders.'''\n    return None\n\n\n"
                     "@factory\n"
                     "def order_nodes():\n"
-                    "    @task(name='orders')\n"
+                    "    @asset(name='orders')\n"
                     "    def generated_orders(ctx):\n"
                     "        '''Test task generated_orders.'''\n        return None\n"
                     "    return generated_orders\n"
@@ -551,8 +551,8 @@ def test_given_factory_returning_distinct_same_name_node_when_planning_then_conf
                 ),
                 "python/orders.py": (
                     "import python.helpers.clean\n"
-                    "from sqlbuild.tasks import task\n\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n\n"
+                    "@asset\n"
                     "def orders(ctx):\n"
                     "    '''Test task orders.'''\n    return ctx.result(payload={'status': python.helpers.clean.label()})\n"
                 ),
@@ -586,6 +586,69 @@ def test_given_unrelated_python_package_on_path_when_building_then_project_pytho
     output: str = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert all(fragment in output for fragment in test_case.expected_build_fragments)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        PythonProjectLayoutCompileTestCase(
+            description="a node module importing the removed task decorator",
+            repo_files={
+                "sqlbuild_project.toml": 'name = "task_layout"\nadapter = "duckdb"\n',
+                "python/fulfillment/refresh_carriers/node.py": (
+                    "from sqlbuild.tasks import task\n\n\n"
+                    "@task\n"
+                    "def refresh_carriers() -> None:\n"
+                    '    """Refresh carrier rates."""\n'
+                ),
+            },
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "python/fulfillment/refresh_carriers/node.py",
+                "`sqlbuild.tasks` was removed",
+                "use `@asset` from `sqlbuild.assets`",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="a node module importing the removed task context",
+            repo_files={
+                "sqlbuild_project.toml": 'name = "task_layout"\nadapter = "duckdb"\n',
+                "python/fulfillment/refresh_carriers/node.py": (
+                    "from sqlbuild import tasks\n\n\n"
+                    "@tasks.task\n"
+                    "def refresh_carriers(context: tasks.TaskContext) -> None:\n"
+                    '    """Refresh carrier rates."""\n'
+                ),
+            },
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "python/fulfillment/refresh_carriers/node.py",
+                "`sqlbuild.tasks` was removed",
+                "use `@asset` from `sqlbuild.assets`",
+            ),
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_a_node_using_the_removed_task_decorator_when_compiling_then_command_says_to_use_asset(
+    test_case: PythonProjectLayoutCompileTestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="task_layout",
+        repo_files=test_case.repo_files,
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "compile"),
+        project_dir=project_dir,
+    )
+
+    assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
+    assert all(fragment in result.stderr for fragment in test_case.expected_stderr_fragments), (
+        result.stderr
+    )
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ use crate::graph::models::EdgeDirection;
 use crate::python_selection::_helpers::nodes::error;
 use crate::python_selection::constants::{
     ASSET_KIND, CHECK_KIND, LOADER_KIND, MODEL_RESOURCE, PLANNER_DEFAULT_CODE, SOURCE_RESOURCE,
-    SQL_MODEL_DEPENDENCY_TYPES, TASK_KIND,
+    SQL_MODEL_DEPENDENCY_TYPES,
 };
 use crate::python_selection::models::{Atom, SelectionContext, SqlSelectionGraph};
 
@@ -68,7 +68,7 @@ pub(crate) fn validate_boundaries(context: &SelectionContext<'_>) -> Result<(), 
                     node.name
                 )));
             }
-            if node.kind == TASK_KIND || node.kind == ASSET_KIND {
+            if node.kind == ASSET_KIND {
                 return Err(failure(format!(
                     "Python node '{}' depends on terminal loader '{dependency}'; \
                      depend on source '{source}' instead",
@@ -142,7 +142,7 @@ fn dependency_cycle(context: &SelectionContext<'_>) -> Option<SelectorError> {
             cycle.join(" -> ")
         ),
         help: Some(
-            "each arrow points to what a node depends on; a task or asset upstream of a \
+            "each arrow points to what a node depends on; an asset upstream of a \
              loader cannot read anything built from the source that loader fills"
                 .to_owned(),
         ),
@@ -177,7 +177,7 @@ fn validate_loader_upstreams(context: &SelectionContext<'_>) -> Result<(), Selec
         let kind: &str = context
             .nodes
             .node(reader)
-            .map_or(TASK_KIND, |node| &node.kind);
+            .map_or(ASSET_KIND, |node| &node.kind);
         let through: String = if path.len() > 1 {
             let names: Vec<String> = path[..path.len() - 1]
                 .iter()
@@ -212,7 +212,7 @@ fn python_label(context: &SelectionContext<'_>, name: &str) -> String {
     format!("{kind} '{name}'")
 }
 
-/// The nearest task or asset upstream of `loader` that reads SQL, with the Python nodes between.
+/// The nearest asset upstream of `loader` that reads SQL, with the Python nodes between.
 fn sql_reading_upstream<'graph>(
     context: &SelectionContext<'graph>,
     loader: &str,
@@ -227,7 +227,7 @@ fn sql_reading_upstream<'graph>(
     }
     while let Some(name) = queue.pop_front() {
         if let Some(node) = context.nodes.node(name)
-            && (node.kind == TASK_KIND || node.kind == ASSET_KIND)
+            && node.kind == ASSET_KIND
             && !node.sql_deps.is_empty()
         {
             let mut path: Vec<&'graph str> = vec![name];

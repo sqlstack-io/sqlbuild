@@ -37,7 +37,6 @@ pub struct SourceFileFact {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NodeKind {
     Loader,
-    Task,
     Asset,
     Check,
 }
@@ -47,7 +46,6 @@ impl NodeKind {
     pub fn label(self) -> &'static str {
         match self {
             Self::Loader => "loader",
-            Self::Task => "task",
             Self::Asset => "asset",
             Self::Check => "check",
         }
@@ -63,12 +61,12 @@ pub enum DependencyFact {
     Object {
         /// The index of the discovered node whose function this object is.
         owner: Option<usize>,
-        /// The name a loader, task, asset or check decorator records on the object.
+        /// The name a loader, asset or check decorator records on the object.
         decorated_name: Option<String>,
     },
 }
 
-/// A decorated Python loader, task, asset or check function.
+/// A decorated Python loader, asset or check function.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NodeFact {
     pub kind: NodeKind,
@@ -161,7 +159,7 @@ pub struct ProjectFacts {
     /// Every model schema declaration across the model schema files.
     pub model_schemas: Vec<NamedPath>,
     pub materializations: Vec<NamedPath>,
-    /// Loaders, tasks, assets, then checks.
+    /// Loaders, assets, then checks.
     pub nodes: Vec<NodeFact>,
     pub hook_functions: Vec<NamedPath>,
     pub event_exporters: Vec<NamedPath>,

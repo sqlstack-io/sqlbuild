@@ -16,7 +16,7 @@ pub struct NodeSetDependency {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DependantNode {
     pub name: String,
-    /// The node's kind, such as `task`.
+    /// The node's kind, such as `asset`.
     pub kind: String,
     pub sets: Vec<NodeSetDependency>,
 }

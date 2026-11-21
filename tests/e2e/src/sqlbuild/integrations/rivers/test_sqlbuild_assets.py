@@ -44,13 +44,13 @@ rs: Any = pytest.importorskip("rivers")
             expected_asset_names=frozenset(
                 {
                     "main__orders",
-                    "task__prepare_orders",
+                    "asset__prepare_orders",
                     "warehouse_export",
                     "asset__orders_export",
                 }
             ),
             expected_task_deps=("main__orders",),
-            expected_asset_deps=("warehouse_export", "task__prepare_orders"),
+            expected_asset_deps=("asset__prepare_orders", "warehouse_export"),
             expected_task_group="python",
             expected_asset_group="exports",
         )
@@ -84,7 +84,7 @@ def test_given_python_nodes_project_when_loading_rivers_assets_then_maps_real_ar
         asset.name: (asset,) for asset in output_defs
     }
     assert len(output_defs_by_name) == len(output_defs)
-    task_def: Any = next(iter(output_defs_by_name.get("task__prepare_orders", ())))
+    task_def: Any = next(iter(output_defs_by_name.get("asset__prepare_orders", ())))
     asset_def: Any = next(iter(output_defs_by_name.get("asset__orders_export", ())))
 
     assert sqlbuild_project.dag_path.exists()

@@ -150,7 +150,6 @@ def test_given_project_graph_when_building_dag_artifact_then_includes_assets_edg
                     "udf",
                     "table_fn",
                     "model",
-                    "task",
                     "asset",
                     "check",
                     "sql_test",

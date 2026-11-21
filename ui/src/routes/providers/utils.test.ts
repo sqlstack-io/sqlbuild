@@ -37,8 +37,8 @@ describe('usedByGraph', () => {
 	});
 
 	it('falls back to the consumer of the same name for keys without a kind', () => {
-		const graph = usedByGraph({ usedBy: [{ kind: 'task', name: 'export_orders' }], nodes: [], jobs: ['exports'], jobNodes: { exports: ['export_orders'] } });
-		expect(graph.groups.map((g) => [g.kind, g.nodes, g.jobs])).toEqual([['task', ['export_orders'], ['exports']]]);
+		const graph = usedByGraph({ usedBy: [{ kind: 'asset', name: 'export_orders' }], nodes: [], jobs: ['exports'], jobNodes: { exports: ['export_orders'] } });
+		expect(graph.groups.map((g) => [g.kind, g.nodes, g.jobs])).toEqual([['asset', ['export_orders'], ['exports']]]);
 	});
 
 	it('is empty for an unused provider', () => {

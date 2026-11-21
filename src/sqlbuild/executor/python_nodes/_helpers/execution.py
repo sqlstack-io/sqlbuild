@@ -1,4 +1,4 @@
-"""Serial executor helpers for Python task and asset nodes."""
+"""Serial executor helpers for Python asset nodes."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
 
-from sqlbuild._native import CostContext, DiscoveredAssetFunction
+from sqlbuild._native import CostContext
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.compiler.python_nodes.types import (
     PythonNodeFanInAction,
@@ -32,7 +32,6 @@ from sqlbuild.executor.python_nodes.models import (
     PythonNodeFanInDecision,
     PythonNodeRunState,
     PythonNodeRuntime,
-    TaskContext,
 )
 from sqlbuild.executor.python_nodes.types import ExecutablePythonNode, OwnedResultCallback
 from sqlbuild.provider.main.runtime import (
@@ -67,7 +66,7 @@ def execute_ready_python_node(
     monotonic: Callable[[], float] = time.monotonic,
     on_result: OwnedResultCallback | None = None,
 ) -> PythonNodeExecutionResult:
-    """Execute one scheduler-ready task/asset node."""
+    """Execute one scheduler-ready asset node."""
 
     return _execute_ready_node(
         node=node,
@@ -108,7 +107,7 @@ def _execute_ready_node(
     monotonic: Callable[[], float],
     on_result: OwnedResultCallback | None,
 ) -> PythonNodeExecutionResult:
-    node_kind: PythonNodeKind = _node_kind(node)
+    node_kind: PythonNodeKind = PythonNodeKind.ASSET
     with CostContext.resource_scope(
         resource_type=node_kind.value,
         resource_name=node.name,
@@ -192,7 +191,7 @@ def _execute_ready_node_in_cost_scope(
         _persist_python_node_result(result_store=result_store, result=result, run_id=run_id)
         return result, None
     warnings: list[str] = []
-    context: TaskContext | AssetContext = _build_context(
+    context: AssetContext = _build_context(
         node=node,
         node_kind=node_kind,
         runtime=runtime,
@@ -281,13 +280,13 @@ def _persist_python_node_result(
 def _call_node_with_retry(
     *,
     node: ExecutablePythonNode,
-    context: TaskContext | AssetContext,
+    context: AssetContext,
     providers: ProviderContainer | None,
     retry_policy: RetryPolicy | None,
     sleep: Callable[[float], None],
     monotonic: Callable[[], float],
 ) -> PythonNodeExecutionResult:
-    node_kind: PythonNodeKind = _node_kind(node)
+    node_kind: PythonNodeKind = PythonNodeKind.ASSET
     if retry_policy is None:
         with CostContext.resource_scope(
             resource_type=node_kind.value,
@@ -373,7 +372,7 @@ def _missing_upstream_result(
     *,
     node: ExecutablePythonNode,
     node_kind: PythonNodeKind,
-    context: TaskContext | AssetContext,
+    context: AssetContext,
     upstream_results: tuple[PythonNodeExecutionResult, ...],
 ) -> str | None:
     """Why the node cannot run: a Python upstream outside this run that has never succeeded."""
@@ -412,7 +411,7 @@ def _build_context(
     run_state: PythonNodeRunState,
     result_store: Any | None,
     warnings: list[str],
-) -> TaskContext | AssetContext:
+) -> AssetContext:
     context_logger: logging.Logger = logger or logging.getLogger(
         f"sqlbuild.{node_kind.value}.{node.name}"
     )
@@ -422,10 +421,7 @@ def _build_context(
     providers: ProviderContainer = (
         runtime.providers if runtime.providers is not None else _empty_provider_container()
     )
-    context_class: type[AssetContext] | type[TaskContext] = (
-        AssetContext if node_kind == PythonNodeKind.ASSET else TaskContext
-    )
-    return context_class(
+    return AssetContext(
         adapter=runtime.adapter,
         connection_config=runtime.connection_config,
         connection=runtime.connection,
@@ -451,9 +447,3 @@ def _build_context(
         start_cursor_int=runtime.start_cursor_int,
         end_cursor_int=runtime.end_cursor_int,
     )
-
-
-def _node_kind(node: ExecutablePythonNode) -> PythonNodeKind:
-    if isinstance(node, DiscoveredAssetFunction):
-        return PythonNodeKind.ASSET
-    return PythonNodeKind.TASK

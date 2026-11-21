@@ -23,7 +23,7 @@ The positional argument is the directory to create (default `sqlbuild-playground
 | `waffle_shop` | Default. DuckDB-backed project with models, tests, scenarios, and macros. |
 | `dagster` | A Dagster code location: a ready-to-run `definitions.py` next to the waffle shop SQLBuild project in `waffle_shop/`. |
 | `rivers` | A Rivers code repository: a `definitions.py` repository definition next to the waffle shop SQLBuild project in `waffle_shop/`. |
-| `python_nodes` | A small DuckDB project demonstrating [Python nodes](../concepts/python-nodes/overview.md): a task feeding a loader, a model read by a Python asset through `ctx.relation(model(...))`, a soft-skip fan-in, `materialized=False`, and a Python check. |
+| `python_nodes` | A small DuckDB project demonstrating [Python nodes](../concepts/python-nodes/overview.md): an asset feeding a loader, a model read by a Python asset through `ctx.relation(model(...))`, a soft-skip fan-in, `materialized=False`, and a Python check. |
 
 ## What it creates
 
@@ -52,7 +52,7 @@ The Dagster `definitions.py` uses `sqlbuild_assets`, `sqlbuild_scenario_checks`,
 
 The `python_nodes` template instead creates a focused Python-nodes project:
 
-- `python/tasks/orders.py`, `python/loaders/orders.py`, `python/assets/orders_export.py`, `python/checks/orders_export.py`
+- `python/assets/orders_inputs.py`, `python/loaders/orders.py`, `python/assets/orders_export.py`, `python/checks/orders_export.py`
 - A `fact_orders` SQL model over a managed `raw_orders` source
 - Examples of the SQL boundary, `ctx.relation(model(...))`, soft-skip fan-in, and a Python check
 

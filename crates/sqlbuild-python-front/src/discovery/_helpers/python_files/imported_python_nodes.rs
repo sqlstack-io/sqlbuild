@@ -4,7 +4,8 @@ use crate::discovery::main::python_files::provider_by_name::provider_by_name;
 use crate::discovery::main::python_files::provider_usages::provider_usages;
 use std::collections::HashMap;
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::exceptions::PyImportError;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBytes, PyDict, PyDictMethods, PyList, PyString, PyTuple};
 use pyo3::{IntoPyObjectExt, pyfunction};
 use sqlbuild_core::constants::PYTHON_NODE_ROOT;
@@ -26,7 +27,9 @@ const AUDIT_CASE: UserCodeHost = UserCodeHost::AuditCase;
 const READ_FACTORY: UserCodeHost = UserCodeHost::ReadFactoryDefinition;
 const READ_AUDIT_FACTORY: UserCodeHost = UserCodeHost::ReadAuditFactoryDefinition;
 const READ_HOOK: UserCodeHost = UserCodeHost::ReadHookDefinition;
-const NOT_A_NODE: &str = "that is not a SQLBuild task, asset, loader, or check";
+const NOT_A_NODE: &str = "that is not a SQLBuild asset, loader, or check";
+/// The package and name of the removed task module, as `from sqlbuild import tasks` names it.
+const REMOVED_TASKS: (&str, &str) = ("sqlbuild", "tasks");
 
 /// One Python-node kind: its reader, record class, bucket and copied definition fields.
 struct NodeKind {
@@ -39,7 +42,7 @@ struct NodeKind {
 }
 
 /// Readers in precedence order; the first matching definition decides the kind.
-const NODE_KINDS: [NodeKind; 4] = [
+const NODE_KINDS: [NodeKind; 3] = [
     NodeKind {
         reader: UserCodeHost::ReadLoaderDefinition,
         record: RecordId::DiscoveredLoaderFunction,
@@ -57,23 +60,9 @@ const NODE_KINDS: [NodeKind; 4] = [
         ],
     },
     NodeKind {
-        reader: UserCodeHost::ReadTaskDefinition,
-        record: RecordId::DiscoveredTaskFunction,
-        bucket: 1,
-        identity: ("TASK", true),
-        fields: &[
-            "depends_on",
-            "tags",
-            "group",
-            "description",
-            "meta",
-            "retry",
-        ],
-    },
-    NodeKind {
         reader: UserCodeHost::ReadAssetDefinition,
         record: RecordId::DiscoveredAssetFunction,
-        bucket: 2,
+        bucket: 1,
         identity: ("ASSET", true),
         fields: &[
             "depends_on",
@@ -89,7 +78,7 @@ const NODE_KINDS: [NodeKind; 4] = [
     NodeKind {
         reader: UserCodeHost::ReadCheckDefinition,
         record: RecordId::DiscoveredCheckFunction,
-        bucket: 3,
+        bucket: 2,
         identity: ("CHECK", true),
         fields: &[
             "depends_on",
@@ -102,9 +91,9 @@ const NODE_KINDS: [NodeKind; 4] = [
     },
 ];
 
-/// Discovered loaders, tasks, assets, checks and audit factories, in discovery order.
+/// Discovered loaders, assets, checks and audit factories, in discovery order.
 pub(crate) struct Buckets<'py> {
-    pub(crate) nodes: [Vec<Bound<'py, PyAny>>; 4],
+    pub(crate) nodes: [Vec<Bound<'py, PyAny>>; 3],
     pub(crate) audit_factories: Vec<(String, String, Bound<'py, PyAny>)>,
 }
 
@@ -258,8 +247,9 @@ impl<'py> Buckets<'py> {
     ) -> PyResult<()> {
         let mut modules: Vec<ImportedModule<'py>> = Vec::new();
         for file_path in project.module_files(PYTHON_NODE_ROOT, false)? {
-            let module: Bound<'py, PyAny> =
-                project.load(UserCodeHost::ImportPythonRootModule, &file_path)?;
+            let module: Bound<'py, PyAny> = project
+                .load(UserCodeHost::ImportPythonRootModule, &file_path)
+                .map_err(|error| removed_tasks_guidance(project, &file_path, error))?;
             modules.push(ImportedModule { file_path, module });
         }
         let mut direct: HashMap<usize, Bound<'py, PyAny>> = HashMap::new();
@@ -284,7 +274,7 @@ fn node_definition_names(function: &Bound<'_, PyAny>) -> PyResult<Vec<&'static s
     if definition(function, READ_FACTORY)?.is_some() {
         names.push("factory");
     }
-    for (kind, name) in NODE_KINDS.iter().zip(["loader", "task", "asset", "check"]) {
+    for (kind, name) in NODE_KINDS.iter().zip(["loader", "asset", "check"]) {
         if definition(function, kind.reader)?.is_some() {
             names.push(name);
         }
@@ -321,6 +311,52 @@ fn call_factory<'py>(
         );
         discovery_error_from(py, (NODE_ERROR, message), error)
     })
+}
+
+/// `error` pointing to `@asset` when importing `file_path` failed on the removed `sqlbuild.tasks`.
+fn removed_tasks_guidance(
+    project: &ProjectDir<'_>,
+    file_path: &Bound<'_, PyAny>,
+    error: PyErr,
+) -> PyErr {
+    let py: Python<'_> = project.py();
+    let Some(cause) = error.cause(py) else {
+        return error;
+    };
+    if !cause.is_instance_of::<PyImportError>(py) {
+        return error;
+    }
+    match imports_removed_tasks(cause.value(py).as_any()) {
+        Ok(true) => {}
+        Ok(false) => return error,
+        Err(unexpected) => return unexpected,
+    }
+    let Ok(path) = project.relative_to(file_path) else {
+        return error;
+    };
+    let message: String = format!(
+        "Failed to import Python node file {path}: `sqlbuild.tasks` was removed; \
+         use `@asset` from `sqlbuild.assets` instead, with `AssetContext` in place of `TaskContext`"
+    );
+    discovery_error_from(py, (NODE_ERROR, message), error)
+}
+
+/// Whether an `ImportError` names `sqlbuild.tasks`, or `tasks` imported from `sqlbuild`.
+fn imports_removed_tasks(error: &Bound<'_, PyAny>) -> PyResult<bool> {
+    let text = |attribute: &str| -> PyResult<Option<String>> {
+        Ok(error
+            .getattr_opt(attribute)?
+            .map(|value| value.extract())
+            .transpose()?
+            .flatten())
+    };
+    let (package, name) = REMOVED_TASKS;
+    let imported: Option<String> = text("name")?;
+    Ok(
+        imported.as_deref() == Some(format!("{package}.{name}").as_str())
+            || (imported.as_deref() == Some(package)
+                && text("name_from")?.as_deref() == Some(name)),
+    )
 }
 
 fn audit_cases<'py>(

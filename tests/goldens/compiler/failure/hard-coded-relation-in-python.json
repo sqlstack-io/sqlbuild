@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P008",
-     "message": "task:export_orders names model:stg_orders as 'stg_orders' in SQL passed to ctx.query()",
+     "message": "asset:export_orders names model:stg_orders as 'stg_orders' in SQL passed to ctx.query()",
      "path": "python/tasks/exports.py",
      "line": 7,
      "column": 1,

@@ -25,7 +25,7 @@ from tests.unit.src.sqlbuild.executor.python_nodes._helpers.helpers import (
             python_graph_case="orders",
             selected_names=frozenset({"prepare_orders", "load_events"}),
             expected_names=("load_events", "prepare_orders"),
-            expected_kinds=("loader", "task"),
+            expected_kinds=("loader", "asset"),
             expected_upstream_names=(("prepare_orders",), ()),
             expected_payload_names=("load_events", "prepare_orders"),
         ),

@@ -549,7 +549,7 @@ def test_given_direct_diagnostics_policy_when_formatting_plan_json_then_evidence
             python_plan_entries=(
                 PythonPlanEntry(
                     name="prepare_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.PRE_SQL_INGRESS,
                 ),
                 PythonPlanEntry(
@@ -562,7 +562,7 @@ def test_given_direct_diagnostics_policy_when_formatting_plan_json_then_evidence
             expected_fragments=(
                 '"python_node_count": 2',
                 '"name": "prepare_orders"',
-                '"kind": "task"',
+                '"kind": "asset"',
                 '"phase": "pre_sql_ingress"',
                 '"name": "export_orders"',
                 '"kind": "asset"',
@@ -575,7 +575,7 @@ def test_given_direct_diagnostics_policy_when_formatting_plan_json_then_evidence
             python_plan_entries=(
                 PythonPlanEntry(
                     name="prepare_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.PRE_SQL_INGRESS,
                     identity_status=PythonIdentityStatus.CHANGED,
                     previous_definition_json=json.dumps(
@@ -640,7 +640,7 @@ def test_given_direct_diagnostics_policy_when_formatting_plan_json_then_evidence
             python_plan_entries=(
                 PythonPlanEntry(
                     name="publish_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.READ_SIDE,
                     provider_usages=(build_discovered_provider_usage(),),
                 ),
@@ -652,7 +652,7 @@ def test_given_direct_diagnostics_policy_when_formatting_plan_json_then_evidence
                 '"used_by"',
                 '"kind": "loader"',
                 '"name": "raw_orders"',
-                '"kind": "task"',
+                '"kind": "asset"',
                 '"name": "publish_orders"',
                 '"parameter": "marker_provider"',
                 '"class_name": "MarkerProvider"',

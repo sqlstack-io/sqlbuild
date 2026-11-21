@@ -63,7 +63,7 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal, use
                 "Next steps:",
                 "1. Add sources to sources/",
                 "2. Add seeds to seeds/",
-                "3. Add Python loaders, tasks, assets, checks, and factories to python/",
+                "3. Add Python loaders, assets, checks, and factories to python/",
                 "4. Add SQL hooks to hooks/sql/, Python hooks to hooks/python/",
                 "reusable audits to audits/generic/",
                 "standalone audits to audits/singular/",

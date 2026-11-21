@@ -1,15 +1,15 @@
 """Loader examples for the Python nodes playground."""
 
 from sqlbuild.loaders import loader
-from python.tasks.orders import prepare_raw_orders
+from python.assets.orders_inputs import prepare_raw_orders
 
 
 @loader(depends_on=(prepare_raw_orders,))
 def raw_orders(ctx):
-    """Load source rows after the preparation task has completed."""
+    """Load source rows after the preparation asset has completed."""
 
     # Loader contexts intentionally keep the SQL ingress API narrow; the dependency makes
-    # the task part of the same DAG even though this example returns static rows.
+    # the asset part of the same DAG even though this example returns static rows.
     return [
         {"order_id": 1, "customer_id": 10, "amount_cents": 1200, "load_batch": 1},
         {"order_id": 2, "customer_id": 20, "amount_cents": 800, "load_batch": 1},

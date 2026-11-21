@@ -19,7 +19,7 @@ from sqlbuild.compiler.compile.types import PythonResourceRow, SourceInput
 def python_resource_rows(
     *, discovered_inputs: DiscoveredProjectInputs, source_inputs: tuple[SourceInput, ...]
 ) -> list[PythonResourceRow]:
-    """User Python loaders, tasks, assets, checks and hooks, then providers, in report order."""
+    """User Python loaders, assets, checks and hooks, then providers, in report order."""
 
     return [
         *_python_nodes(discovered_inputs=discovered_inputs, source_inputs=source_inputs),
@@ -49,7 +49,6 @@ def _python_nodes(
             function=loader.function,
         )
     for kind, functions in (
-        ("task", discovered_inputs.task_functions),
         ("asset", discovered_inputs.asset_functions),
         ("check", discovered_inputs.check_functions),
         ("hook", discovered_inputs.hook_functions),

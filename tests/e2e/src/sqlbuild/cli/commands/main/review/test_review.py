@@ -131,8 +131,8 @@ _OWN_DATABASE_ORDERS: str = "models/own_database_orders.sql"
             expected_exit_code=0,
             expected_status="passed",
             expected_validated=("stg_orders", "order_totals"),
-            expected_not_validated=("open_orders", "order_ledger", "task:export_totals"),
-            expected_node_statuses={"task:export_totals": "not_validated"},
+            expected_not_validated=("open_orders", "order_ledger", "asset:export_totals"),
+            expected_node_statuses={"asset:export_totals": "not_validated"},
         ),
         ReviewOutcomeE2ETestCase(
             description="a changed seed is built but never passes uncompared",

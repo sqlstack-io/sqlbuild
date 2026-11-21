@@ -236,8 +236,8 @@ def test_given_postgres_dbt_profile_when_running_dbt_init_then_plain_build_uses_
         PostgresNodeResultE2ETestCase(
             description="direct node results persist and read on postgres",
             expected_rows=(
+                ("asset", "produce_result", "success"),
                 ("check", "check_produce_result", "success"),
-                ("task", "produce_result", "success"),
             ),
         )
     ],
@@ -259,8 +259,8 @@ def test_given_python_result_when_running_check_on_postgres_then_persists_node_r
                 config=postgres_e2e_config,
             ),
             "python/tasks/results.py": (
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def produce_result(ctx):\n"
                 "    '''Test task produce_result.'''\n    return ctx.result(payload={'value': 42}, metadata={'source': 'postgres'})\n"
             ),

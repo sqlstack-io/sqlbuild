@@ -14,7 +14,6 @@ const KIND_PLURAL: Record<string, string> = {
 	udf: 'UDFs',
 	table_fn: 'table functions',
 	function: 'functions',
-	task: 'tasks',
 	asset: 'assets',
 	loader: 'loaders',
 	check: 'checks'
