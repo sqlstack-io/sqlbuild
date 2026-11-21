@@ -123,6 +123,7 @@ export type PlatformEventKind =
 	| 'calendar_horizon_low'
 	| 'scheduler_no_leader'
 	| 'location_broken'
+	| 'location_missing_secrets'
 	| 'launch_failed'
 	| 'connection_test_failed'
 	| 'warehouse_sync_failed'

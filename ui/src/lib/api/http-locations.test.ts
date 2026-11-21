@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectionDetailsOf, connectionTestOf, firstSyncPending, healthOf, instancesOf, poolCapWarningsOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
+import { connectionDetailsOf, connectionTestOf, firstSyncPending, healthOf, instancesOf, missingSecretsEventOf, missingSecretsOf, poolCapWarningsOf, toLocationDetail, toWarehouseConnection, warehouseSyncOf } from './http-locations';
 
 const now = Date.parse('2026-11-08T12:00:00Z');
 const at = (secondsAgo: number) => new Date(now - secondsAgo * 1000).toISOString();
@@ -38,10 +38,33 @@ describe('location health', () => {
 	});
 
 	it('reports missing provider secrets ahead of a failed connection until a newer report finds none', () => {
-		const missing = seen(10, { kind: 'provider_secrets', generation: 2, missing: 1 });
+		const missing = seen(10, { kind: 'provider_secrets', generation: 2, missing: 1, providers: [] });
 		const unhealthy = seen(10, { kind: 'connection', generation: 2, healthy: false });
 		expect(healthOf([missing, unhealthy], now).health).toBe('missing_secrets');
-		expect(healthOf([seen(5, { kind: 'provider_secrets', generation: 3, missing: 0 }), missing], now).health).toBe('healthy');
+		expect(healthOf([seen(5, { kind: 'provider_secrets', generation: 3, missing: 0, providers: [] }), missing], now).health).toBe('healthy');
+	});
+
+	it('lists the newest check\'s providers missing secrets, the target\'s allowed ones last, and raises only the others', () => {
+		const orders = { provider: 'orders_api', path: 'providers/orders_api.py', settings: [{ field: 'api_key', variable: 'ORDERS_API_KEY', line: 18 }], nodes: ['source:raw_orders'], allowed: false };
+		const bucket = { provider: 'export_bucket', path: 'providers/storage.py', settings: [{ field: 'secret', variable: 'BUCKET_SECRET' }], nodes: ['task:export'], allowed: true };
+		const older = seen(30, { kind: 'provider_secrets', generation: 1, missing: 2, providers: [orders, { ...orders, provider: 'gone' }] });
+		const newest = seen(10, { kind: 'provider_secrets', generation: 2, missing: 1, providers: [bucket, orders] });
+		expect(missingSecretsOf([newest, older]).map((p) => [p.provider, p.allowed, p.settings[0].line])).toEqual([
+			['orders_api', false, 18],
+			['export_bucket', true, null]
+		]);
+		expect(missingSecretsEventOf('loc-1:prod', [newest])).toMatchObject({
+			id: 'secrets:loc-1:prod',
+			kind: 'location_missing_secrets',
+			severity: 'warning',
+			occurredAt: at(10),
+			members: ['ORDERS_API_KEY'],
+			locationId: 'loc-1:prod',
+			message: "orders_api is missing ORDERS_API_KEY in the location's environment, so runs of the node that uses it stop before the warehouse."
+		});
+		const allowedOnly = seen(5, { kind: 'provider_secrets', generation: 3, missing: 0, providers: [bucket] });
+		expect(missingSecretsEventOf('loc-1:prod', [allowedOnly, newest])).toBeNull();
+		expect(healthOf([allowedOnly], now).health).toBe('healthy');
 	});
 
 	it('needs attention when the latest connection check failed', () => {

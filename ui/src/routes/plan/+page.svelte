@@ -30,6 +30,7 @@
 	import { applySuggestion, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow, type Suggestion } from '$lib/run/command';
 	import DataRange from '$lib/run/data-range.svelte';
 	import PlanBrowser from '$lib/run/plan-browser.svelte';
+	import { cantRunKeys, cantRunReason, sinkBlocks, withoutNodes } from '$lib/run/cant-run';
 	import PlanTimings from '$lib/run/plan-timings.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
@@ -329,7 +330,10 @@
 	let launchError = $state<string | null>(null);
 	const planned = $derived(check?.verb !== 'build' || planCurrent);
 	const allowed = $derived(job ? jobPermissions.every((p) => p.allowed) : !!check?.launchable);
-	const canLaunch = $derived(fresh && !check?.error && !jobProblem && !settled.typing && allowed && planned);
+	/** Nodes the current plan can't run because a provider is missing secrets; Run waits until none are left. */
+	const cantRun = $derived(planCurrent && check?.verb === 'build' ? (plan?.cant_run ?? []) : []);
+	const blockedNodes = $derived(cantRunKeys(cantRun));
+	const canLaunch = $derived(fresh && !check?.error && !jobProblem && !settled.typing && allowed && planned && !cantRun.length);
 	const problem = $derived(jobProblem ?? checkError ?? (fresh ? check?.error : null) ?? (planError?.key === requestKey ? planError.message : null));
 	/** One loading state over the whole result, from the first check until the plan arrives, so the page doesn't rebuild itself in steps. */
 	const waiting = $derived<'check' | 'plan' | null>(
@@ -346,7 +350,15 @@
 					(job
 						? jobPermissions.find((p) => !p.allowed) && "You don't have permission to rebuild or reprocess data (run.rewrite_history)"
 						: check?.permissions.find((p) => !p.allowed)?.reason) ??
-					(planned ? (settled.typing ? 'Finish the option you are typing' : undefined) : (planError?.key === requestKey ? planError.message : 'Waiting for the plan')))
+					(planned
+						? settled.typing
+							? 'Finish the option you are typing'
+							: cantRun.length
+								? cantRunReason(cantRun)
+								: undefined
+						: planError?.key === requestKey
+							? planError.message
+							: 'Waiting for the plan'))
 	);
 
 	/** The banner shows only problems that stop this run or touch what it builds; the rest stay on the Overview. */
@@ -487,7 +499,20 @@
 				</DataTable>
 				</div>
 			{:else if shown?.verb === 'build' && plan}
-				<PlanBrowser {plan} {refresh} {section} onselect={(key) => (section = key)} more={planRequestId ? morePlan : undefined} load={planRequestId ? findPlanRows : undefined} diff={planRequestId ? planDiff : undefined} />
+				<PlanBrowser
+					{plan}
+					{refresh}
+					{section}
+					onselect={(key) => (section = key)}
+					more={planRequestId ? morePlan : undefined}
+					load={planRequestId ? findPlanRows : undefined}
+					diff={planRequestId ? planDiff : undefined}
+					kindOf={(key) => {
+						const node = byKey.get(key);
+						return node ? kindLine(node) : '';
+					}}
+					upstreamOf={(key) => byKey.get(key)?.upstream ?? []}
+				/>
 			{:else if shown?.verb && shown.verb !== 'build'}
 				<DataTable class="static compact" embedded columns={nodeColumns} rows={picked} key={(key) => key} rowHeight={32} empty="No nodes selected.">
 					{#snippet row(key)}
@@ -520,6 +545,9 @@
 		<div class="why">
 			{#if launchError}<span class="problem">{launchError}</span>{:else if !canLaunch && blockedReason && blockedReason !== problem}<span class="faint">{blockedReason}</span>{/if}
 		</div>
+		{#if blockedNodes.length && !sinkBlocks(cantRun)}
+			<Button variant="outline" size="sm" data-testid="plan-without-blocked" onclick={() => (cmd = withoutNodes(cmd, blockedNodes))}>Plan without {blockedNodes.length === 1 ? 'this node' : `these ${blockedNodes.length} nodes`}</Button>
+		{/if}
 		<GatedButton requires={job ? 'job.run' : 'run.adhoc'} variant={canLaunch ? 'default' : 'outline'} disabled={!canLaunch} reason={blockedReason} busy={launching} onclick={launch}><PlayIcon class="size-3.5 fill-current stroke-none" />Run</GatedButton>
 	</div>
 </div>

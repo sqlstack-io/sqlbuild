@@ -1,6 +1,7 @@
-"""`sqb dev` on a real terminal: sign-in in the foreground, prompt stops from keys and signals, a stop that cancels runs in flight, and start-up stops and failures."""
+"""`sqb dev` on a real terminal: sign-in in the foreground, prompt stops from keys and signals, a stop that cancels runs in flight, start-up stops and failures, and `r` reloading the env file."""
 
 import os
+import re
 import signal
 import sqlite3
 import subprocess
@@ -16,6 +17,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     DevelopmentActiveRunStopTestCase,
+    DevelopmentEnvFileTestCase,
     DevelopmentHangUpTestCase,
     DevelopmentKeyStopTestCase,
     DevelopmentSignalStopTestCase,
@@ -28,6 +30,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     development_run_state,
     drain_terminal,
     endless_build_files,
+    linked_project,
     processes_naming,
     read_terminal_until,
     reap_development,
@@ -466,4 +469,82 @@ def test_given_a_running_build_when_the_terminal_closes_then_its_worker_still_ca
     assert exit_code == test_case.expected_exit_code, shown
     assert development_run_state(control, run_id) == (test_case.expected_status, []), shown
     assert cancels.read_text().split() != [], shown
+    assert left == [], shown
+
+
+ENV_PROBE: str = (
+    "import os\nfrom pathlib import Path\n\n"
+    "with Path(os.environ['ORDERS_ENV_PROBES']).open('a') as probes:\n"
+    "    probes.write(os.environ.get('ORDERS_ENV_PROBE', 'unset') + '\\n')\n"
+)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX pseudo-terminal contract")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DevelopmentEnvFileTestCase(
+            "an edited env file reaches the interpreter after r",
+            "ORDERS_ENV_PROBE=first\n",
+            "ORDERS_ENV_PROBE=second\n",
+            ".env \u00b7 1 variable \u00b7 edit it, then press r to reload",
+            ("location restarted", "env file changed"),
+        ),
+        DevelopmentEnvFileTestCase(
+            "a symlinked project names its env file relative to the project",
+            "ORDERS_ENV_PROBE=first\n",
+            "ORDERS_ENV_PROBE=second\n",
+            ".env \u00b7 1 variable \u00b7 edit it, then press r to reload",
+            ("location restarted", "env file changed"),
+            project_argument=linked_project,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_env_file_when_developing_then_start_up_names_it_and_r_reloads_it(
+    test_case: DevelopmentEnvFileTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    probes: Path = tmp_path / "probes.txt"
+    write_files(
+        project_dir=project,
+        files=PUBLISHABLE_FILES
+        | {
+            "sqlbuild_project.toml": 'default_target = "development"\n'
+            + PUBLISHABLE_FILES["sqlbuild_project.toml"]
+            + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
+            + '[targets.development]\nschema = "main"\n',
+            "python/env_probe.py": ENV_PROBE,
+        },
+    )
+    env_file: Path = project / ".env"
+    _ = env_file.write_text(test_case.first_env_file)
+    env_file.chmod(0o600)
+    environment: dict[str, str] = development_environment(
+        {"ORDERS_ENV_PROBES": str(probes)}, NO_PLAIN
+    )
+    served: Path = test_case.project_argument(project)
+    terminal, process = start_development_on_terminal(served, [], environment)
+    try:
+        shown: str = read_terminal_until(terminal, process, lambda shown: "\u2500 ready " in shown)
+        _ = env_file.write_text(test_case.second_env_file)
+        _ = os.write(terminal, b"r")
+        shown += read_terminal_until(
+            terminal,
+            process,
+            lambda _: probes.exists() and "second" in probes.read_text().split(),
+        )
+        process.send_signal(signal.SIGTERM)
+        exit_code: int = process.wait(timeout=15)
+        shown += drain_terminal(terminal)
+    finally:
+        left: list[str] = reap_development(process, served)
+        os.close(terminal)
+
+    plain: str = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", shown)
+    assert test_case.expected_card_row in plain, plain
+    restart_line: str = next(filter(lambda line: "location restarted" in line, plain.splitlines()))
+    assert all(part in restart_line for part in test_case.expected_restart), plain
+    assert probes.read_text().split()[0] == "first", probes.read_text()
+    assert exit_code == 128 + signal.SIGTERM, shown
     assert left == [], shown

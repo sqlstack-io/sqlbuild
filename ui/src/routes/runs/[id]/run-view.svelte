@@ -7,6 +7,8 @@
 	import { runStatusTone } from '$lib/status';
 	import { shortRunId } from '$lib/operate/labels';
 	import FailuresPanel from './failures-panel.svelte';
+	import CantRunProblem from '$lib/run/cant-run-problem.svelte';
+	import { runCantRun } from '$lib/run/cant-run';
 	import IgnoredAuditsPanel from './ignored-audits-panel.svelte';
 	import LiveStatements from './live-statements.svelte';
 	import NodePanel from './node-panel.svelte';
@@ -72,6 +74,12 @@
 
 	{#if detail}
 		<RunBanners banners={view.banners} />
+		{@const cantRun = runCantRun(view.nodes)}
+		{#if cantRun.length}
+			<div class="cant-run" data-testid="run-cant-run">
+				{#each cantRun as entry (entry.provider)}<CantRunProblem {entry} title="Couldn't run:" then="the next run works" />{/each}
+			</div>
+		{/if}
 		<FailuresPanel {view} />
 		<IgnoredAuditsPanel {view} />
 		<RelatedRuns {view} />
@@ -139,6 +147,13 @@
 </div>
 
 <style>
+	.cant-run {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 10px 24px;
+		border-bottom: 1px solid var(--border);
+	}
 	.exec-head {
 		display: flex;
 		align-items: center;

@@ -17,7 +17,7 @@ use crate::bindings::_helpers::build_command::invocation::BuildContext;
 use crate::bindings::_helpers::build_command::policies::enforce_plan_policies;
 use crate::bindings::_helpers::build_command::policies::model_limit;
 use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
-use crate::bindings::_helpers::compile_driver::plan_pipeline::planned_project;
+use crate::bindings::_helpers::compile_driver::plan_pipeline::{SecretCheck, planned_project};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::keywords::keywords;
@@ -143,6 +143,7 @@ pub(crate) fn compile_build_plan<'py>(context: &BuildContext<'py>) -> PyResult<B
             (&context.get("discovered_inputs")?, &context.get("adapter")?),
             (&options, hooks),
             (held.as_ref(), None),
+            SecretCheck::FailBeforeConnecting,
         )
     })
 }

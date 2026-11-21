@@ -123,6 +123,8 @@ pub(crate) struct ScreenSetup {
     /// The configured adapter, such as `snowflake`, for the sign-in prompt; empty when unknown.
     pub(crate) adapter: String,
     pub(crate) project_root: String,
+    /// The env file row of the ready box, such as `.env · 3 variables · edit it, then press r to reload`.
+    pub(crate) env_file: Option<String>,
 }
 
 /// Everything the screen draws, and the live rows it last drew below the printed lines.
@@ -135,6 +137,8 @@ pub(crate) struct DevScreen {
     pub(crate) header_printed: bool,
     pub(crate) ui_url: String,
     pub(crate) location: String,
+    /// The env file row of the ready box.
+    pub(crate) env_file: Option<String>,
     pub(crate) triggers: String,
     pub(crate) steps: Vec<StepRow>,
     pub(crate) ready: bool,

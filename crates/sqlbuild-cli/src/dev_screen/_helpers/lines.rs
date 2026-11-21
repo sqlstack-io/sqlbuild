@@ -64,6 +64,13 @@ pub(crate) fn ready_lines(mut screen: DevScreen) -> (DevScreen, Vec<String>) {
                 screen.facts.columns,
             ));
         }
+        if let Some(env_file) = &screen.env_file {
+            lines.extend(render_labelled_parts(
+                "env file ",
+                std::slice::from_ref(env_file),
+                screen.facts.columns,
+            ));
+        }
         return (screen, lines);
     }
     let mut project: Vec<String> = vec![
@@ -94,6 +101,13 @@ pub(crate) fn ready_lines(mut screen: DevScreen) -> (DevScreen, Vec<String>) {
         rows.push(BoxRow {
             label: "Triggers".to_owned(),
             parts: vec![screen.triggers.clone()],
+            link: None,
+        });
+    }
+    if let Some(env_file) = &screen.env_file {
+        rows.push(BoxRow {
+            label: "Env file".to_owned(),
+            parts: vec![env_file.clone()],
             link: None,
         });
     }

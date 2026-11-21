@@ -54,5 +54,6 @@ pub(super) fn provider(name: &str, secrets: &[(&str, bool)]) -> DebugProvider {
             .iter()
             .map(|(variable, set)| ((*variable).to_owned(), *set))
             .collect(),
+        from_env_file: Vec::new(),
     }
 }

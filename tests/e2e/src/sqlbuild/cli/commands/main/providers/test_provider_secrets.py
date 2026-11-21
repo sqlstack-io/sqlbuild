@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from textwrap import dedent
@@ -9,8 +10,14 @@ from textwrap import dedent
 import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.providers._test_types import (
+    ChangedCantRunTestCase,
+    ProjectDirSpellingTestCase,
     ProviderCommandDiagnosticE2ETestCase,
     ProviderSecretE2ETestCase,
+)
+from tests.e2e.src.sqlbuild.cli.commands.main.providers.helpers import (
+    linked_project,
+    relative_project,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
@@ -136,6 +143,28 @@ API_SINK: dict[str, str] = {
     ).strip()
     + "\n",
 }
+READING_MODEL: dict[str, str] = {
+    "models/api_events.sql": (
+        "MODEL (description 'Test model api_events.', materialized table);\n\n"
+        'SELECT event_id FROM __source("raw_api_events")\n'
+    ),
+}
+TARGET_ALLOWS_API: dict[str, str] = {
+    "sqlbuild_project.toml": (
+        'name = "provider_secret_project"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+        '[connection]\ndatabase = "provider_secret_project.duckdb"\n\n'
+        '[targets.dev]\nschema = "main"\nallow_missing_secrets = ["api_provider"]\n'
+    ),
+}
+REQUIRED_SETTING: dict[str, str] = {
+    "providers/region.py": (
+        "from pydantic import Field\n"
+        "from sqlbuild.providers import Provider\n\n\n"
+        "class RegionProvider(Provider):\n"
+        '    """Test provider RegionProvider."""\n'
+        '    region_code: str = Field(validation_alias="SECRETS_E2E_REGION")\n'
+    ),
+}
 POST_BUILD_CHECK: dict[str, str] = {
     "python/checks/no_api_check.py": dedent(
         """
@@ -162,7 +191,11 @@ MISSING_ERROR: str = (
     f"provider 'api_provider' (providers/api.py) is missing secret {SECRET_VARIABLE}"
 )
 ALLOWED_NOTICE: str = "1 provider has missing secrets (allowed): api_provider"
-SELECTION_ERROR: str = "selected nodes need secrets that are missing:"
+SELECTION_ERROR: str = (
+    "selected nodes need secrets that are missing from the environment and from .env:"
+)
+# Lines a build prints once it starts connecting to the warehouse.
+CONNECTING: tuple[str, ...] = ("Connecting to", "Warehouse connected")
 UNBOUND_NOTICE: str = (
     f"sink 'export_event' is not bound: provider 'api_provider' is missing {SECRET_VARIABLE}"
 )
@@ -225,6 +258,63 @@ BUILD: tuple[str, ...] = ("--no-color", "build", "--no-tests", "--no-audits", "-
             extra_repo_files={},
             expected_exit_code=1,
             expected_output_fragments=(SELECTION_ERROR, SECRET_VARIABLE, "nothing was run"),
+            expected_marker_entries=(),
+            unexpected_output_fragments=CONNECTING,
+        ),
+        ProviderSecretE2ETestCase(
+            description="build stops before the warehouse and names the nodes that read the blocked one",
+            command=(*BUILD, "+api_events"),
+            env={},
+            extra_repo_files=READING_MODEL,
+            expected_exit_code=1,
+            expected_output_fragments=(
+                SELECTION_ERROR,
+                f"api_provider  {SECRET_VARIABLE}  (raw_api_events; read by api_events)",
+                "nothing was run",
+            ),
+            expected_marker_entries=(),
+            unexpected_output_fragments=CONNECTING,
+        ),
+        ProviderSecretE2ETestCase(
+            description="compile passes when the target allows the provider's missing secrets",
+            command=("--no-color", "compile"),
+            env={},
+            extra_repo_files=TARGET_ALLOWS_API,
+            expected_exit_code=0,
+            expected_output_fragments=(
+                "1 provider has missing secrets (allowed on target dev): api_provider",
+            ),
+            expected_marker_entries=(),
+        ),
+        ProviderSecretE2ETestCase(
+            description="build still stops nodes whose provider the target allows to miss secrets",
+            command=(*BUILD, "uses_api"),
+            env={},
+            extra_repo_files=TARGET_ALLOWS_API,
+            expected_exit_code=1,
+            expected_output_fragments=(SELECTION_ERROR, "nothing was run"),
+            expected_marker_entries=(),
+        ),
+        ProviderSecretE2ETestCase(
+            description="a required setting that isn't a secret type is a missing secret",
+            command=("--no-color", "compile"),
+            env={SECRET_VARIABLE: "token"},
+            extra_repo_files=REQUIRED_SETTING,
+            expected_exit_code=1,
+            expected_output_fragments=(
+                "provider 'region_provider' (providers/region.py) is missing secret SECRETS_E2E_REGION",
+            ),
+            expected_marker_entries=(),
+        ),
+        ProviderSecretE2ETestCase(
+            description="a missing required setting is allowed like any secret",
+            command=("--no-color", "compile", "--allow-missing-secrets"),
+            env={SECRET_VARIABLE: "token"},
+            extra_repo_files=REQUIRED_SETTING,
+            expected_exit_code=0,
+            expected_output_fragments=(
+                "1 provider has missing secrets (allowed): region_provider",
+            ),
             expected_marker_entries=(),
         ),
         ProviderSecretE2ETestCase(
@@ -314,8 +404,25 @@ BUILD: tuple[str, ...] = ("--no-color", "build", "--no-tests", "--no-audits", "-
             env={},
             extra_repo_files=API_SINK,
             expected_exit_code=1,
-            expected_output_fragments=(SELECTION_ERROR, "export_event", "nothing was run"),
+            expected_output_fragments=(
+                SELECTION_ERROR,
+                f"sink export_event needs {SECRET_VARIABLE}; every run uses sinks",
+                "nothing was run",
+            ),
             expected_marker_entries=(),
+            unexpected_output_fragments=("(sink:export_event", "(export_event)"),
+        ),
+        ProviderSecretE2ETestCase(
+            description="plan whose sink's provider is missing the secret can't run at all",
+            command=("--no-color", "plan", "--select", "no_api"),
+            env={},
+            extra_repo_files=API_SINK | TARGET_ALLOWS_API,
+            expected_exit_code=0,
+            expected_output_fragments=(
+                f"Can't run: sink export_event needs {SECRET_VARIABLE}; every run uses sinks",
+            ),
+            expected_marker_entries=(),
+            unexpected_output_fragments=("needs  export_event",),
         ),
         ProviderSecretE2ETestCase(
             description="debug with a sink lists the missing secret",
@@ -375,6 +482,8 @@ def test_given_provider_secret_unset_when_running_commands_then_only_users_of_it
     assert result.returncode == test_case.expected_exit_code, output
     for fragment in test_case.expected_output_fragments:
         assert fragment in output, output
+    for fragment in test_case.unexpected_output_fragments:
+        assert fragment not in output, output
     marker_entries: tuple[str, ...] = tuple(marker_path.read_text(encoding="utf-8").splitlines())
     assert marker_entries == test_case.expected_marker_entries
 
@@ -409,3 +518,86 @@ def test_given_project_file_allows_missing_secrets_when_compiling_then_fails(
 
     assert result.returncode != 0
     assert test_case.expected_error_fragment in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ProjectDirSpellingTestCase(
+            description="a symlinked project names its env file relative to the project",
+            project_argument=linked_project,
+            expected_output_fragment=SELECTION_ERROR,
+        ),
+        ProjectDirSpellingTestCase(
+            description="a relative project directory names its env file relative to the project",
+            project_argument=relative_project,
+            expected_output_fragment=SELECTION_ERROR,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_project_dir_spelling_when_a_secret_is_missing_then_the_env_file_shows_as_dot_env(
+    test_case: ProjectDirSpellingTestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="provider_secret_project",
+        repo_files={**PROJECT_FILES, ".env": "UNRELATED_SETTING=1\n"},
+    )
+    (project_dir / ".env").chmod(0o600)
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=(*BUILD, "uses_api"),
+        project_dir=test_case.project_argument(project_dir),
+        env={"MARKER_PATH": str(tmp_path / "marker.log")},
+    )
+
+    output: str = result.stdout + result.stderr
+    assert result.returncode == 1, output
+    assert test_case.expected_output_fragment in output, output
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ChangedCantRunTestCase(
+            description="an unchanged reader that --changed skips is not counted as can't run",
+            select="+api_events",
+            expected_cant_run_nodes=["source:raw_api_events"],
+            expected_cant_run_readers=[],
+            expected_unchanged=["model:api_events"],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_changed_plan_when_a_secret_is_missing_then_only_nodes_it_runs_cant_run(
+    test_case: ChangedCantRunTestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="provider_secret_project",
+        repo_files={**PROJECT_FILES, **READING_MODEL, **TARGET_ALLOWS_API},
+    )
+    marker: dict[str, str] = {"MARKER_PATH": str(tmp_path / "marker.log")}
+    built: subprocess.CompletedProcess[str] = run_sqb(
+        command=(*BUILD, test_case.select),
+        project_dir=project_dir,
+        env=marker | {SECRET_VARIABLE: "token"},
+    )
+    assert built.returncode == 0, built.stdout + built.stderr
+
+    planned: subprocess.CompletedProcess[str] = run_sqb(
+        command=("plan", "--json", "--changed", "--select", test_case.select),
+        project_dir=project_dir,
+        env=marker,
+    )
+
+    assert planned.returncode == 0, planned.stderr
+    document: dict[str, object] = json.loads(planned.stdout)
+    changed: dict[str, list[str]] = document["changed"]  # type: ignore[assignment]
+    cant_run: list[dict[str, list[str]]] = document["cant_run"]  # type: ignore[assignment]
+    assert changed["unchanged"] == test_case.expected_unchanged, planned.stdout
+    assert [entry["nodes"] for entry in cant_run] == [test_case.expected_cant_run_nodes]
+    assert [entry["readers"] for entry in cant_run] == [test_case.expected_cant_run_readers]

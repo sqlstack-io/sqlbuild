@@ -1,5 +1,6 @@
 //! Python-free commands, the invocation facts they run with and what they print.
 
+use sqlbuild_orchestration::platform::models::PublishedGeneration;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -18,7 +19,6 @@ use uuid::{NoContext, Timestamp, Uuid};
 
 use crate::argv::models::Namespace;
 use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_POLL_SECONDS};
-use crate::native_commands::types::LocationPublication;
 
 /// Privileged local operations require direct ownership of the control database.
 pub(crate) enum ControlAdmin {
@@ -200,7 +200,7 @@ pub(crate) struct LocationCompileRequest {
 /// The runtime's reply to a generation: its publication, or the rule findings that failed its compile.
 #[derive(Debug, serde::Deserialize)]
 pub(crate) struct LocationLoad {
-    pub(crate) published: Option<LocationPublication>,
+    pub(crate) published: Option<PublishedGeneration>,
     pub(crate) rules: Option<sqlbuild_orchestration::platform::models::LocationRuleFailure>,
 }
 

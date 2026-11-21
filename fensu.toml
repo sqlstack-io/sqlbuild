@@ -1971,6 +1971,12 @@ reason = "Every native entry point installs the build identity before anything r
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS130"
+path = "crates/sqlbuild-core/src/process_environment/_helpers/overlay.rs"
+symbols = ["replace"]
+reason = "The environment overlay stands in for the process environment, which is process-wide by definition: the launcher installs the project's env file once before anything reads the environment, and sqb dev replaces it on reload. It replaces an unsafe std::env::set_var, so every reader and every child sees one environment."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS130"
 path = "crates/sqlbuild-python/src/bindings/_helpers/command_runtime/connection.rs"
 symbols = ["connection_config"]
 reason = "A once-per-process warning is process state by definition: a command resolves its connection at startup for provider setup and again for its own work, and threading a flag through every caller would not guarantee once. Approved 17 Nov for this module only."

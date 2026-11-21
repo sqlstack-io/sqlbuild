@@ -1,6 +1,7 @@
 //! Both launchers hand off the same scoped invocation and exclude privileged credentials.
 
 use sqlbuild_core::command_output::constants::INVOCATION_CONTEXT_ENV;
+use sqlbuild_core::process_environment::constants::RUN_TOKEN_VARIABLE;
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::runs::models::RunClaim;
 use sqlbuild_orchestration::webhooks::constants::SECURITY_AUDIT_WEBHOOK_VARIABLE;
@@ -42,7 +43,7 @@ pub(in crate::workers) fn environment(
     bearer: &str,
 ) -> [(&'static str, String); 2] {
     [
-        ("SQLBUILD_RUN_TOKEN", bearer.into()),
+        (RUN_TOKEN_VARIABLE, bearer.into()),
         (INVOCATION_CONTEXT_ENV, serde_json::json!({
             "run_id": claim.request.run_id,
             "integration": {"name": "sqlbuild", "run_id": claim.request.run_id, "job_name": claim.request.job_key},

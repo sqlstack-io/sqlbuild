@@ -70,3 +70,10 @@ pub(crate) struct DynamicConfigErrorTestCase {
     pub(crate) project: &'static str,
     pub(crate) expected_fragment: &'static str,
 }
+
+pub(crate) struct EnvFileConfigErrorTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) project: &'static str,
+    pub(crate) local: &'static str,
+    pub(crate) expected_fragment: &'static str,
+}

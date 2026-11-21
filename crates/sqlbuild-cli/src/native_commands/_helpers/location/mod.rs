@@ -2,6 +2,7 @@ pub(crate) mod changed_build;
 pub(crate) mod dev_cancel;
 pub(crate) mod dev_start;
 pub(crate) mod dev_supervision;
+pub(crate) mod env_reload;
 pub(crate) mod execution;
 pub(crate) mod held_copy;
 pub(crate) mod plan_document;

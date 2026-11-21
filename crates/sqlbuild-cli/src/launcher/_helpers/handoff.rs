@@ -16,18 +16,42 @@ pub(crate) fn beside(program: &Path, name: &str) -> Option<PathBuf> {
 
 /// Replace this process with `target`; returns only the error that kept it from starting.
 #[cfg(unix)]
-pub(crate) fn hand_off(target: &Path, arguments: &[OsString]) -> std::io::Result<Option<i32>> {
+pub(crate) fn hand_off(
+    target: &Path,
+    arguments: &[OsString],
+    environment: &[(OsString, Option<OsString>)],
+) -> std::io::Result<Option<i32>> {
     use std::os::unix::process::CommandExt;
 
-    Err(Command::new(target).args(arguments).exec())
+    Err(command_for(target, arguments, environment).exec())
+}
+
+/// `target` with `arguments`, each variable of `environment` set, or unset where its value is `None`.
+fn command_for(
+    target: &Path,
+    arguments: &[OsString],
+    environment: &[(OsString, Option<OsString>)],
+) -> Command {
+    let mut command = Command::new(target);
+    for (name, value) in environment {
+        match value {
+            Some(value) => command.env(name, value),
+            None => command.env_remove(name),
+        };
+    }
+    command.args(arguments);
+    command
 }
 
 /// Run `target` as a child that alone handles Ctrl+C and Ctrl+Break, and return its exit code.
 #[cfg(not(unix))]
-pub(crate) fn hand_off(target: &Path, arguments: &[OsString]) -> std::io::Result<Option<i32>> {
+pub(crate) fn hand_off(
+    target: &Path,
+    arguments: &[OsString],
+    environment: &[(OsString, Option<OsString>)],
+) -> std::io::Result<Option<i32>> {
     let _ = ctrlc::set_handler(|| {});
-    Command::new(target)
-        .args(arguments)
+    command_for(target, arguments, environment)
         .status()
         .map(|status| status.code())
 }

@@ -15,6 +15,7 @@ pub(crate) fn new_dev_screen(setup: ScreenSetup) -> DevScreen {
         header_printed: false,
         ui_url: String::new(),
         location: String::new(),
+        env_file: setup.env_file,
         triggers: String::new(),
         steps: STEPS.into_iter().map(pending).collect(),
         ready: false,

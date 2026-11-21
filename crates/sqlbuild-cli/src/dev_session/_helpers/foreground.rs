@@ -15,6 +15,7 @@ use crate::dev_session::_helpers::connection::{connection_outcome, split_debug_o
 use crate::dev_session::constants::{CONNECTING, DEBUG_DRAIN, NO_REPORT};
 use crate::dev_session::models::DevProject;
 use crate::dev_stop::main::stop_switch::stop_switch;
+use sqlbuild_core::process_environment::main::apply_environment_overlay::apply_environment_overlay;
 
 /// Run `sqb debug --json`, showing the client's own text as a prompt above the live steps; the connection's state.
 pub(crate) async fn connect_in_foreground(
@@ -71,6 +72,7 @@ async fn run_debug(
         std::env::temp_dir().join(format!("sqb-dev-debug-{}.json", uuid::Uuid::now_v7())),
     );
     let mut command = Command::new(&dev.executable);
+    apply_environment_overlay(command.as_std_mut());
     command
         .arg("--project-dir")
         .arg(&dev.project)

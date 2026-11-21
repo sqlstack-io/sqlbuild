@@ -37,6 +37,7 @@ pub(super) fn screen(size: Option<(usize, usize)>) -> DevScreen {
         },
         adapter: "snowflake".to_owned(),
         project_root: "/home/analyst/projects/shop".to_owned(),
+        env_file: None,
     })
 }
 

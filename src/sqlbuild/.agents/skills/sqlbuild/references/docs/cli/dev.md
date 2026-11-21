@@ -9,6 +9,7 @@ Online: https://sqlbuild.com/docs/cli/dev/
 ## Contents
 
 - Options
+- Set provider secrets
 - Sign in to the warehouse
 - Keys
 - Stop
@@ -38,6 +39,7 @@ sqb dev  shop · target dev · sqb 0.256.0
 │ Project    shop · ~/src/shop · target dev                                  │
 │ Warehouse  duckdb · database /work/shop/warehouse.duckdb                   │
 │ Triggers   3 paused                                                        │
+│ Env file   .env · 2 variables · edit it, then press r to reload            │
 ╰────────────────────────────────────────────────────────────────────────────╯
 keys  o open UI · l full log · r recompile · q quit
 ```
@@ -62,6 +64,14 @@ and how to fix it.
 | `--triggers` | Off | Keep each trigger's default status and your changes to it, instead of pausing every trigger at start-up |
 | `--plain` | Off, unless stdout or stderr is not a terminal | Print appended lines instead of redrawing the screen; see [Plain output](#plain-output) |
 
+## Set provider secrets
+
+`sqb dev` loads the project's [env file](../concepts/project-configuration.md#env-file), `.env`
+by default, when it starts, and the **Env file** row in the ready box says how many variables
+it set. After editing the file, press `r`: the location reads it again and restarts its Python
+interpreter when a value changed, so the next compile and run use the new values. Variables set
+in the shell that started `sqb dev` still win.
+
 ## Sign in to the warehouse
 
 Once the first version is published, `sqb dev` connects to the target's warehouse in the
@@ -83,7 +93,7 @@ location reads warehouse history once the connection succeeds.
 | Key | Effect |
 | --- | --- |
 | `o` | Open the UI in your browser |
-| `r` | Compile and publish again |
+| `r` | Read the [env file](../concepts/project-configuration.md#env-file) again, then compile and publish |
 | `l` | Show or hide the detailed log, the latest 500 lines |
 | `q` | Stop |
 | Ctrl+C | Stop; a second Ctrl+C stops at once |
@@ -143,6 +153,7 @@ sqb dev  shop · target dev · sqb 0.256.0
   warehouse  duckdb · database /work/shop/warehouse.duckdb
   location   01a1d7ff-0b3a-7631-ba35-e44d44d072f2
   triggers   3 paused
+  env file   .env · 2 variables · edit it, then press r to reload
 14:20:31 ▸ run orders_daily  started manually
 ```
 

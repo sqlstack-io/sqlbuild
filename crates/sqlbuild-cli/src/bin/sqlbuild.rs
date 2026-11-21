@@ -22,7 +22,7 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     };
     let arguments: Vec<OsString> = std::env::args_os().skip(1).collect();
-    match hand_off(&sqb, &arguments) {
+    match hand_off(&sqb, &arguments, &[]) {
         Ok(Some(code)) => process_exit(code),
         Ok(None) => ExitCode::FAILURE,
         Err(error) => {

@@ -11,6 +11,7 @@ use crate::compile_command::models::RecordedCompileOutput;
 use crate::compile_delta::constants::DELTA_VERIFY_ENV_VAR;
 use crate::frontier::constants::CAPTURE_DIR_ENV_VAR;
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
+use sqlbuild_core::process_environment::constants::ENV_FILE_MARKER_VARIABLE;
 use sqlbuild_python_base::records::main::registry::class_of::class_of;
 use sqlbuild_python_base::records::models::GetterEntry;
 
@@ -34,10 +35,11 @@ pub(crate) const REUSE_LOGGER_NAME: &str = "sqlbuild.compile.reuse";
 pub const TRACKED_ENVIRONMENT_PREFIXES: [&str; 2] = ["SQLBUILD_", "SQB_"];
 
 /// Sorted; tracked-prefix variables that never invalidate a stored compile.
-pub const UNTRACKED_ENVIRONMENT_NAMES: [&str; 3] = [
+pub const UNTRACKED_ENVIRONMENT_NAMES: [&str; 4] = [
     CAPTURE_DIR_ENV_VAR,
     REUSE_DISABLE_ENV_VAR,
     DELTA_VERIFY_ENV_VAR,
+    ENV_FILE_MARKER_VARIABLE,
 ];
 
 pub(crate) const MISSING_ENVIRONMENT_VALUE: &str = "\0missing";
