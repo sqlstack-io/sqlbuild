@@ -424,6 +424,15 @@ pub(crate) async fn exchange_location_generation(
     compiler: &mut LocationCompiler,
     request: &DiscoveryPublishRequest,
 ) -> Result<LocationLoad, ControlError> {
+    exchange_reply(compiler, request, "publication record").await
+}
+
+/// Write `request` as one JSON line and read the reply line as a `what`, passing `sqb dev` event lines on.
+async fn exchange_reply<T: serde::de::DeserializeOwned>(
+    compiler: &mut LocationCompiler,
+    request: &impl serde::Serialize,
+    what: &str,
+) -> Result<T, ControlError> {
     let mut line: Vec<u8> = serde_json::to_vec(request).map_err(std::io::Error::other)?;
     line.push(b'\n');
     compiler.stdin.write_all(&line).await?;
@@ -437,13 +446,12 @@ pub(crate) async fn exchange_location_generation(
             ));
         }
         if parse_dev_event(&line).is_none() {
-            break;
+            return serde_json::from_str(&line).map_err(|_| {
+                ControlError::Invalid(format!("location interpreter returned an invalid {what}"))
+            });
         }
         drop(write_output(&[(Stream::Stdout, &line)]));
     }
-    serde_json::from_str(&line).map_err(|_| {
-        ControlError::Invalid("location interpreter returned an invalid publication record".into())
-    })
 }
 
 /// The caller retains and reaps the child while a cancellable bounded exchange owns its pipes.
@@ -1945,18 +1953,7 @@ pub(crate) async fn exchange_location_plan(
     compiler: &mut LocationCompiler,
     request: &serde_json::Value,
 ) -> Result<serde_json::Value, ControlError> {
-    let mut line: Vec<u8> = serde_json::to_vec(request).map_err(std::io::Error::other)?;
-    line.push(b'\n');
-    compiler.stdin.write_all(&line).await?;
-    compiler.stdin.flush().await?;
-    let mut reply = String::new();
-    if compiler.stdout.read_line(&mut reply).await? == 0 {
-        return Err(ControlError::Invalid(
-            "location interpreter exited before replying".into(),
-        ));
-    }
-    serde_json::from_str(&reply)
-        .map_err(|_| ControlError::Invalid("location interpreter returned an invalid plan".into()))
+    exchange_reply(compiler, request, "plan").await
 }
 
 /// The safety sync interval from the flag, then the environment, then the project; `None` when unset.
