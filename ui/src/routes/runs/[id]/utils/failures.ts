@@ -17,3 +17,11 @@ export function tracebackOf(text: string | null | undefined): string | null {
 export function errorTextOf(n: RunNode, loaded: RunNodeError | null): string | null {
 	return n.errorDetail ?? loaded?.message ?? n.errorMessage ?? null;
 }
+
+/** An error's one line: a traceback's exception, such as `KeyError: 'segment'`, else its first line. */
+export function errorHeadline(text: string | null | undefined): string | null {
+	if (!text) return null;
+	const lines = text.split('\n').filter((l) => l.trim());
+	if (!tracebackOf(text)) return lines[0] ?? null;
+	return [...lines].reverse().find((l) => /^[A-Za-z_][\w.]*(Error|Exception|Warning|Interrupt|Exit)\b/.test(l)) ?? lines.at(-1) ?? null;
+}

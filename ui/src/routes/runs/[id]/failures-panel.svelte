@@ -6,7 +6,7 @@
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import type { RunNode } from '$lib/api';
 	import { shortRunId } from '$lib/operate/labels';
-	import { errorTextOf, tracebackOf } from './utils';
+	import { errorHeadline, errorTextOf, tracebackOf } from './utils';
 	import type { RunDetailState } from './state.svelte';
 	import QueryPanel from './query-panel.svelte';
 	import TracebackPanel from './traceback-panel.svelte';
@@ -48,7 +48,7 @@
 			<CircleXIcon class="x" size={14} aria-hidden="true" />
 			<span class="node mono">{n.nodeKey}</span>
 			{#if n.runId !== view.run?.id}<span class="faint">in {n.jobKey ?? shortRunId(n.runId)}</span>{/if}
-			<span class="msg">{n.errorMessage ?? loaded?.message?.split('\n')[0] ?? (n.errorCode ? `Failed with ${n.errorCode}` : 'Failed')}</span>
+			<span class="msg">{n.errorMessage ?? errorHeadline(loaded?.message) ?? (n.errorCode ? `Failed with ${n.errorCode}` : 'Failed')}</span>
 			<ChevronRightIcon class={open.has(key) ? 'caret open' : 'caret'} size={14} aria-hidden="true" />
 		</button>
 		{#if open.has(key)}

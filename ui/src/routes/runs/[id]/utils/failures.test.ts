@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RunNode } from '$lib/api';
-import { errorTextOf, tracebackOf } from './failures';
+import { errorHeadline, errorTextOf, tracebackOf } from './failures';
 
 describe('a failed node’s error', () => {
 	it('finds a Python traceback in its text, from its first line, and none in a warehouse error', () => {
@@ -21,5 +21,10 @@ describe('a failed node’s error', () => {
 			'first line',
 			null
 		]);
+	});
+
+	it('reads a traceback by its exception and any other error by its first line', () => {
+		const traceback = 'Traceback (most recent call last):\n  ... 12 earlier lines\n  File "models/ml/score.py", line 9, in score\n    row["segment"]\nKeyError: \'segment\'\n';
+		expect([errorHeadline(traceback), errorHeadline('Division by zero\nin margin_pct'), errorHeadline(null)]).toEqual(["KeyError: 'segment'", 'Division by zero', null]);
 	});
 });

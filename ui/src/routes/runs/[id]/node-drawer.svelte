@@ -19,7 +19,7 @@
 	import TracebackPanel from './traceback-panel.svelte';
 	import { checksOf } from './utils/checks';
 	import { formatQueryCost } from './utils';
-	import { errorTextOf, fullStamp, rowsText, skipCause, tracebackOf, warehouseQueryUrl } from './utils';
+	import { errorHeadline, errorTextOf, fullStamp, rowsText, skipCause, tracebackOf, warehouseQueryUrl } from './utils';
 
 	// A node in this run, in a drawer from the right, modelled on the Lineage sidebar but
 	// scoped to the run: what it did here, its SQL as it ran, its last builds, what it printed, and where
@@ -30,7 +30,7 @@
 	const n = $derived(key ? (view.nodes.find((x) => x.nodeKey === key) ?? null) : null);
 	const name = $derived(key ? nodeLabel(key) : '');
 	const cause = $derived(n ? skipCause(n, view.nodes, view.detail?.edges ?? []) : null);
-	const checks = $derived(key ? (view.eventsRes.data ?? []).filter((e) => e.type === 'audit_completed' && e.nodeKey === key) : []);
+	const checks = $derived(key ? view.events.filter((e) => e.type === 'audit_completed' && e.nodeKey === key) : []);
 	const statements = $derived(key ? view.statements.filter((s) => s.nodeKey === key && s.runId === n?.runId) : []);
 	const running = $derived(statements.find((s) => s.status === 'running') ?? null);
 	/** The node's own queries (its build), apart from its checks' queries. */
@@ -53,7 +53,7 @@
 	});
 	const errorText = $derived(n?.status === 'failed' ? errorTextOf(n, view.nodeError(n)) : null);
 	const traceback = $derived(tracebackOf(errorText));
-	const errorLine = $derived(n?.errorMessage ?? errorText?.split('\n')[0] ?? null);
+	const errorLine = $derived(n?.errorMessage ?? errorHeadline(errorText));
 
 	// The node's catalog facts: SQL or code, relation, description, and its last builds.
 	const catalog = useCatalogNodes();

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import traceback
+
 from sqlbuild.compiler.python_nodes.types import (
     PythonNodeFanInAction,
     PythonNodeKind,
@@ -9,6 +11,11 @@ from sqlbuild.compiler.python_nodes.types import (
     SkipMode,
 )
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
+from sqlbuild.executor.python_nodes.constants import (
+    ERROR_DETAIL_CHARS,
+    TRACEBACK_ELIDED,
+    TRACEBACK_HEADER,
+)
 from sqlbuild.executor.python_nodes.models import (
     PythonCheckResult,
     PythonNodeExecutionResult,
@@ -83,7 +90,28 @@ def build_python_node_failure_result(
         kind=kind,
         status=PythonNodeStatus.FAILED,
         error_message=str(error),
+        error_detail=traceback_tail(error=error),
     )
+
+
+def traceback_tail(*, error: BaseException) -> str:
+    """Return the error's formatted traceback, keeping its end when it is too long to keep whole."""
+
+    text: str = "".join(traceback.format_exception(error))
+    if len(text) <= ERROR_DETAIL_CHARS:
+        return text
+    lines: list[str] = text.splitlines(keepends=True)
+    kept: list[str] = []
+    room: int = ERROR_DETAIL_CHARS - len(TRACEBACK_HEADER) - len(TRACEBACK_ELIDED.format(count=len(lines)))
+    for line in reversed(lines):
+        if len(line) > room:
+            break
+        kept.append(line)
+        room -= len(line)
+    if not kept:
+        return TRACEBACK_HEADER + lines[-1][-room:]
+    kept.reverse()
+    return TRACEBACK_HEADER + TRACEBACK_ELIDED.format(count=len(lines) - len(kept)) + "".join(kept)
 
 
 def evaluate_python_node_fan_in(
