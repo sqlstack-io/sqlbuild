@@ -24,6 +24,7 @@ reqwest.workspace = true
 rusqlite.workspace = true
 serde.workspace = true
 serde_ignored.workspace = true
+serde_path_to_error.workspace = true
 serde_json.workspace = true
 sqlbuild-core.workspace = true
 sqlbuild-cursor.workspace = true

@@ -1,4 +1,4 @@
-//! A worker refuses a run request with a field its release can't read, failing the run with why, rather than run part of what was asked.
+//! A worker refuses a run request with any part its release can't read, an unknown field or variant at any depth, failing the run with why, rather than run part of what was asked.
 
 use std::collections::BTreeMap;
 
@@ -25,49 +25,98 @@ use crate::worker::main::connect_worker::connect_worker;
 use crate::worker::main::start_worker::start_worker;
 
 #[test]
-fn given_a_newer_server_when_a_worker_fetches_its_execution_then_an_unknown_field_fails_the_run() {
+fn given_a_newer_server_when_a_worker_fetches_its_execution_then_an_unreadable_part_fails_the_run()
+{
     let test_cases = [
         NewerServerTestCase {
             description: "SQLite: an execution of the current shape starts",
             backend: Backend::Sqlite,
-            added: &[],
+            edit: None,
             expected_status: RunStatus::Running,
-            expected_unknown_field: None,
+            expected_unreadable: None,
         },
         NewerServerTestCase {
             description: "SQLite: an unknown top-level field fails the run",
             backend: Backend::Sqlite,
-            added: &["added_by_newer_server"],
+            edit: Some((&["added_by_newer_server"], "true")),
             expected_status: RunStatus::Failed,
-            expected_unknown_field: Some("added_by_newer_server"),
+            expected_unreadable: Some("unknown field `added_by_newer_server`"),
         },
         NewerServerTestCase {
             description: "SQLite: an unknown field in the request fails the run",
             backend: Backend::Sqlite,
-            added: &["claim", "request", "added_by_newer_server"],
+            edit: Some((&["claim", "request", "added_by_newer_server"], "true")),
             expected_status: RunStatus::Failed,
-            expected_unknown_field: Some("claim.request.added_by_newer_server"),
+            expected_unreadable: Some("unknown field `claim.request.added_by_newer_server`"),
+        },
+        NewerServerTestCase {
+            description: "SQLite: an unknown command fails the run",
+            backend: Backend::Sqlite,
+            edit: Some((
+                &["claim", "request", "command"],
+                r#""added_by_newer_server""#,
+            )),
+            expected_status: RunStatus::Failed,
+            expected_unreadable: Some(
+                "unknown variant `added_by_newer_server` in `claim.request.command`",
+            ),
+        },
+        NewerServerTestCase {
+            description: "SQLite: an unknown field in the window fails the run",
+            backend: Backend::Sqlite,
+            edit: Some((
+                &["claim", "request", "window"],
+                r#"{"kind": "integer", "start": 1, "end": 2, "added_by_newer_server": true}"#,
+            )),
+            expected_status: RunStatus::Failed,
+            expected_unreadable: Some(
+                "unknown field `added_by_newer_server` in `claim.request.window`",
+            ),
         },
         NewerServerTestCase {
             description: "PostgreSQL: an execution of the current shape starts",
             backend: Backend::Postgres,
-            added: &[],
+            edit: None,
             expected_status: RunStatus::Running,
-            expected_unknown_field: None,
+            expected_unreadable: None,
         },
         NewerServerTestCase {
             description: "PostgreSQL: an unknown top-level field fails the run",
             backend: Backend::Postgres,
-            added: &["added_by_newer_server"],
+            edit: Some((&["added_by_newer_server"], "true")),
             expected_status: RunStatus::Failed,
-            expected_unknown_field: Some("added_by_newer_server"),
+            expected_unreadable: Some("unknown field `added_by_newer_server`"),
         },
         NewerServerTestCase {
             description: "PostgreSQL: an unknown field in the request fails the run",
             backend: Backend::Postgres,
-            added: &["claim", "request", "added_by_newer_server"],
+            edit: Some((&["claim", "request", "added_by_newer_server"], "true")),
             expected_status: RunStatus::Failed,
-            expected_unknown_field: Some("claim.request.added_by_newer_server"),
+            expected_unreadable: Some("unknown field `claim.request.added_by_newer_server`"),
+        },
+        NewerServerTestCase {
+            description: "PostgreSQL: an unknown command fails the run",
+            backend: Backend::Postgres,
+            edit: Some((
+                &["claim", "request", "command"],
+                r#""added_by_newer_server""#,
+            )),
+            expected_status: RunStatus::Failed,
+            expected_unreadable: Some(
+                "unknown variant `added_by_newer_server` in `claim.request.command`",
+            ),
+        },
+        NewerServerTestCase {
+            description: "PostgreSQL: an unknown field in the window fails the run",
+            backend: Backend::Postgres,
+            edit: Some((
+                &["claim", "request", "window"],
+                r#"{"kind": "integer", "start": 1, "end": 2, "added_by_newer_server": true}"#,
+            )),
+            expected_status: RunStatus::Failed,
+            expected_unreadable: Some(
+                "unknown field `added_by_newer_server` in `claim.request.window`",
+            ),
         },
     ];
     for test_case in test_cases {
@@ -126,7 +175,7 @@ fn given_a_newer_server_when_a_worker_fetches_its_execution_then_an_unknown_fiel
             .await
             .expect("worker token");
             let api = start_api(store).await;
-            let newer = newer_server(&api.url, test_case.added).await;
+            let newer = newer_server(&api.url, test_case.edit).await;
             let worker =
                 connect_worker(&newer.url, &token.bearer, identity).expect("worker client");
 
@@ -136,8 +185,8 @@ fn given_a_newer_server_when_a_worker_fetches_its_execution_then_an_unknown_fiel
                 .expect("runs");
 
             let expected_reason: Option<String> = test_case
-                .expected_unknown_field
-                .map(|field| refusal(&baseline.sqb_version, field));
+                .expected_unreadable
+                .map(|unreadable| refusal(&baseline.sqb_version, unreadable));
             assert_eq!(
                 (
                     started.as_ref().err().map(ToString::to_string),

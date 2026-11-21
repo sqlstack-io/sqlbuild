@@ -8,11 +8,11 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::routing::{any, get};
 use serde_json::Value;
 
-use crate::api::tests::test_types::{NewerServer as Newer, TestApi};
+use crate::api::tests::test_types::{NewerEdit, NewerServer as Newer, TestApi};
 use crate::store::errors::ControlError;
 
-/// Serve a newer server over `real` that adds `added_by_newer_server` at `added`.
-pub(crate) async fn newer_server(real: &str, added: &'static [&'static str]) -> TestApi {
+/// Serve a newer server over `real` that makes `edit` to a worker's execution.
+pub(crate) async fn newer_server(real: &str, edit: NewerEdit) -> TestApi {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("newer server socket");
@@ -25,7 +25,7 @@ pub(crate) async fn newer_server(real: &str, added: &'static [&'static str]) -> 
         .route("/api/runs/{run_id}/{endpoint}", any(passthrough))
         .with_state(Newer {
             real: real.trim_end_matches('/').to_owned(),
-            added,
+            edit,
         });
     let (shutdown, signal) = tokio::sync::oneshot::channel();
     let task = tokio::spawn(async move {
@@ -43,7 +43,7 @@ pub(crate) async fn newer_server(real: &str, added: &'static [&'static str]) -> 
     }
 }
 
-/// The real execution, with a field added at the newer server's path.
+/// The real execution, with the newer server's edit made.
 async fn execution(
     State(newer): State<Newer>,
     Path(run_id): Path<String>,
@@ -60,13 +60,15 @@ async fn execution(
     .json()
     .await
     .expect("execution JSON");
-    let added: Option<Value> = newer.added.split_last().and_then(|(field, parents)| {
+    let replaced: Option<Value> = newer.edit.and_then(|(path, value)| {
+        let (field, parents) = path.split_last()?;
         let parent: String = parents.iter().map(|part| format!("/{part}")).collect();
-        body.pointer_mut(&parent)?
-            .as_object_mut()?
-            .insert((*field).to_owned(), Value::Bool(true))
+        body.pointer_mut(&parent)?.as_object_mut()?.insert(
+            (*field).to_owned(),
+            serde_json::from_str(value).expect("the edit's JSON"),
+        )
     });
-    drop(added);
+    drop(replaced);
     axum::Json(body)
 }
 
@@ -106,9 +108,9 @@ async fn forward(
     )
 }
 
-/// The reason a worker of release `version` gives for a request with `field` it can't read.
-pub(crate) fn refusal(version: &str, field: &str) -> String {
+/// The reason a worker of release `version` gives for a request with a part it can't read.
+pub(crate) fn refusal(version: &str, unreadable: &str) -> String {
     format!(
-        "this worker runs SQLBuild {version} and can't read a run request from a newer server (unknown field `{field}`); upgrade the location"
+        "this worker runs SQLBuild {version} and can't read a run request from a newer server ({unreadable}); upgrade the location"
     )
 }

@@ -62,22 +62,25 @@ pub(crate) struct ApiReadTestCase {
     pub(crate) expected_ticks: usize,
 }
 
-/// A newer server that adds a field at `added` to a worker's execution, and whether the worker then starts.
+/// What a newer server sets in a worker's execution: the path, then the JSON it sets there.
+pub(crate) type NewerEdit = Option<(&'static [&'static str], &'static str)>;
+
+/// A newer server that edits a worker's execution, and whether the worker then starts.
 pub(crate) struct NewerServerTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
-    /// The path the server adds a field at; empty adds nothing.
-    pub(crate) added: &'static [&'static str],
-    /// The run's status once the worker tried to start, and the field its refusal names.
+    /// What the server sets; `None` serves the execution as it is.
+    pub(crate) edit: NewerEdit,
+    /// The run's status once the worker tried to start, and the part its refusal names.
     pub(crate) expected_status: RunStatus,
-    pub(crate) expected_unknown_field: Option<&'static str>,
+    pub(crate) expected_unreadable: Option<&'static str>,
 }
 
-/// Where the real API is and the path a newer server adds a field at.
+/// Where the real API is and what a newer server sets in a worker's execution.
 #[derive(Clone)]
 pub(crate) struct NewerServer {
     pub(crate) real: String,
-    pub(crate) added: &'static [&'static str],
+    pub(crate) edit: NewerEdit,
 }
 
 pub(crate) struct TestApi {

@@ -341,9 +341,10 @@ server can't read what they wrote.
 the control server is older than this worker and refused its run report; upgrade the server before its workers
 ```
 
-A server newer than a worker can send it a run request with a field the worker's release can't
-read. The worker doesn't run part of what was asked: it fails the run with a reason naming the
-field, before any warehouse work, and the run can be rerun once the location is upgraded:
+A server newer than a worker can send it a run request with a field or a value, such as a new
+command, that the worker's release can't read. The worker doesn't run part of what was asked: it
+fails the run with a reason naming what it can't read and where, before any warehouse work, and
+the run can be rerun once the location is upgraded:
 
 ```text
 this worker runs SQLBuild 0.256.0 and can't read a run request from a newer server (unknown field `claim.request.<field>`); upgrade the location

@@ -6,6 +6,7 @@ use crate::runs::models::{RunChange, RunOutcome};
 use crate::snapshots::main::publication::verify_execution::verify_execution;
 use crate::snapshots::models::SnapshotInput;
 use crate::worker::_helpers::heartbeat::start_session;
+use crate::worker::constants::{REFUSAL_ATTEMPTS, REFUSAL_RETRY_DELAY, STORE_BUSY_STATUS};
 use crate::worker::errors::WorkerError;
 use crate::worker::models::{WorkerClient, WorkerSession};
 
@@ -15,10 +16,10 @@ pub async fn start_worker(
     baseline: &SnapshotInput,
 ) -> Result<WorkerSession, WorkerError> {
     let expected = match client.execution().await {
-        Err(WorkerError::UnknownField(field)) => {
+        Err(WorkerError::UnreadableExecution(detail)) => {
             let error = WorkerError::NewerServer {
                 version: baseline.sqb_version.clone(),
-                field,
+                detail,
             };
             refuse_unreadable(client, &error).await;
             return Err(error);
@@ -35,7 +36,7 @@ pub async fn start_worker(
     Ok(session)
 }
 
-/// Fail the run with why its request can't be read; the supervisor's own exit reason only applies if this report doesn't land.
+/// Fail the run with why its request can't be read, retrying a busy store or a lost response with the same event; the supervisor's own exit reason only applies if this report doesn't land.
 async fn refuse_unreadable(client: &WorkerClient, error: &WorkerError) {
     let event_id = Uuid::new_v5(&client.claim_id, b"worker-unreadable-request");
     let change = RunChange::Finished {
@@ -43,5 +44,13 @@ async fn refuse_unreadable(client: &WorkerClient, error: &WorkerError) {
         reason: error.to_string(),
         exit_code: None,
     };
-    drop(client.report(event_id, change).await);
+    for attempt in 1..=REFUSAL_ATTEMPTS {
+        match client.report(event_id, change.clone()).await {
+            Err(WorkerError::Transport(_)) if attempt < REFUSAL_ATTEMPTS => {}
+            Err(WorkerError::Rejected(status))
+                if attempt < REFUSAL_ATTEMPTS && status.as_u16() == STORE_BUSY_STATUS => {}
+            _ => return,
+        }
+        tokio::time::sleep(REFUSAL_RETRY_DELAY).await;
+    }
 }
