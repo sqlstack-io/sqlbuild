@@ -43,6 +43,7 @@ use crate::recall::main::forward_diagnostic::forward_diagnostic;
 use crate::recall::main::forward_output::forward_output;
 use crate::recall::models::RecallLifecycleSink;
 use sqlbuild_orchestration::run_output::main::forward_output::forward_output as forward_run_output;
+use sqlbuild_orchestration::run_output::main::wait_for_output_room::wait_for_output_room;
 use sqlbuild_orchestration::run_output::models::OutputStream;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -130,10 +131,16 @@ impl LocalFilesystemComputeLogStorage {
         };
         writers[stream].write_all(data)?;
         self.forward_to_recall(invocation_id, stream, data);
+        drop(state);
+        // A slow output server holds this thread only, outside the lock and with the GIL released,
+        // so other threads (and cancelling) go on.
+        if stream != DIAGNOSTICS_STREAM {
+            py.detach(wait_for_output_room);
+        }
         Ok(())
     }
 
-    /// Hand bytes the capture just accepted to Recall while its lock is held, so both keep one order.
+    /// Hand bytes the capture just accepted to Recall and the run output while its lock is held, so all keep one order.
     fn forward_to_recall(&self, invocation_id: &str, stream: usize, data: &[u8]) {
         let session = self.recall.get().map(Arc::as_ref);
         if stream != DIAGNOSTICS_STREAM {

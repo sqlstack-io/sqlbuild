@@ -9,3 +9,4 @@ pub mod read_person_output_index;
 pub mod read_person_output_page;
 pub mod search_person_output;
 pub mod start_output_upload;
+pub mod wait_for_output_room;

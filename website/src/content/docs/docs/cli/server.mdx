@@ -451,8 +451,8 @@ max_bytes_per_run = "20GB"
 ```
 
 - `store` is a local folder, `file:///path`, or an S3 prefix, `s3://bucket/prefix`. By default it
-  is an `output` folder beside a SQLite control database, or in the server's working directory with
-  PostgreSQL. [`sqb dev`](/docs/cli/dev/) keeps its output in `.sqlbuild/output`.
+  is an `output` folder beside a SQLite control database. A PostgreSQL control store requires it,
+  since its replicas must share one store. [`sqb dev`](/docs/cli/dev/) keeps its output in `.sqlbuild/output`.
 - A local folder must be on a persistent volume, not inside the server's container, or a restart
   loses every run's output.
 - Use an S3 prefix when several servers share one control database, or when the server's container

@@ -1,4 +1,5 @@
 //! Open the output store `server.toml` names, or a folder beside a SQLite control store.
+//! A PostgreSQL control store serves several replicas, so it needs a named store.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -20,7 +21,7 @@ pub fn open_output_store(
 ) -> Result<OutputStore, ControlError> {
     let location: String = match &settings.store {
         Some(location) => location.clone(),
-        None => format!("{FILE_SCHEME}{}", default_folder(control).display()),
+        None => format!("{FILE_SCHEME}{}", default_folder(control)?.display()),
     };
     let (objects, prefix): (Arc<dyn ObjectStore>, Path) =
         if let Some(folder) = location.strip_prefix(FILE_SCHEME) {
@@ -57,13 +58,15 @@ pub fn open_output_store(
     })
 }
 
-/// `output` beside a SQLite control store; in the working directory for PostgreSQL.
-fn default_folder(control: &ControlStore) -> PathBuf {
+/// `output` beside a SQLite control store; a PostgreSQL one has no folder of its own.
+fn default_folder(control: &ControlStore) -> Result<PathBuf, ControlError> {
     match control {
-        ControlStore::Sqlite(sqlite) => sqlite.path.parent().map_or_else(
+        ControlStore::Sqlite(sqlite) => Ok(sqlite.path.parent().map_or_else(
             || PathBuf::from(DEFAULT_OUTPUT_FOLDER),
             |folder| folder.join(DEFAULT_OUTPUT_FOLDER),
-        ),
-        ControlStore::Postgres(_) => PathBuf::from(DEFAULT_OUTPUT_FOLDER),
+        )),
+        ControlStore::Postgres(_) => Err(ControlError::Invalid(
+            "a PostgreSQL control store needs [output] store in server.toml: an s3:// bucket, or a file:// folder every server replica shares".into(),
+        )),
     }
 }
