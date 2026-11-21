@@ -4,7 +4,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyBytes, PyBytesMethods, PyString};
 
 /// Each nonempty value of a secret setting (one with `get_secret_value()`) of `instances`.
-pub fn instance_secret_values(instances: &[Bound<'_, PyAny>]) -> PyResult<Vec<String>> {
+pub(crate) fn instance_secret_values(instances: &[Bound<'_, PyAny>]) -> PyResult<Vec<String>> {
     let mut values: Vec<String> = Vec::new();
     for instance in instances {
         for name in instance.get_type().getattr("model_fields")?.try_iter()? {

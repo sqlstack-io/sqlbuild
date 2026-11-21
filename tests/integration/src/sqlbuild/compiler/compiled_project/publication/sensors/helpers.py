@@ -5,6 +5,7 @@ import sqlite3
 import subprocess
 import time
 from collections.abc import Callable
+from itertools import chain
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -349,6 +350,9 @@ def recording_sensors(select: str) -> dict[str, str]:
 def masked_forms(test_case: SensorFunctionsTestCase) -> list[str]:
     """Every secret value the case sets, raw, percent-encoded and JSON-escaped."""
     values: list[str] = [*test_case.expected_masked.values(), *test_case.dotenv_secrets.values()]
-    return [
-        form for value in values for form in (value, quote(value, safe=""), json.dumps(value)[1:-1])
-    ]
+    return list(chain.from_iterable(map(secret_forms, values)))
+
+
+def secret_forms(value: str) -> tuple[str, str, str]:
+    """`value` as it is, percent-encoded and JSON-escaped."""
+    return (value, quote(value, safe=""), json.dumps(value)[1:-1])

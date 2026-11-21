@@ -15,7 +15,6 @@ use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::constants::SENSOR_CONTEXT_PARAMETER;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry as entry;
 use sqlbuild_python_base::orchestration_reads::main::callback_code_hash::callback_code_hash;
-use sqlbuild_python_base::orchestration_reads::main::instance_secret_values::instance_secret_values;
 use sqlbuild_python_base::orchestration_reads::main::mask_sensor_outcome::mask_sensor_outcome;
 use sqlbuild_python_base::orchestration_reads::main::orchestration_code_hash::orchestration_code_hash;
 use sqlbuild_python_base::orchestration_reads::main::provider_secret_values::provider_secret_values;
@@ -46,15 +45,12 @@ pub(crate) fn evaluate_sensor(
     project_dir: &Path,
     call: SensorCall<'_>,
 ) -> SensorFunctionOutcome {
-    match called(py, project_dir, call) {
-        Ok(outcome) => outcome,
-        Err(error) => mask_sensor_outcome(
-            SensorFunctionOutcome::Failed {
-                error: sensor_traceback(py, &error),
-            },
-            &[],
-        ),
-    }
+    called(py, project_dir, call).unwrap_or_else(|error| {
+        let failed = SensorFunctionOutcome::Failed {
+            error: sensor_traceback(py, &error),
+        };
+        mask_sensor_outcome(failed.clone(), (&[], &[])).unwrap_or(failed)
+    })
 }
 
 fn called(
@@ -90,12 +86,12 @@ fn called(
         (&project_path, providers, &secrets),
     ) {
         Ok(outcome) => Ok(outcome),
-        Err(error) => Ok(mask_sensor_outcome(
+        Err(error) => mask_sensor_outcome(
             SensorFunctionOutcome::Failed {
                 error: sensor_traceback(py, &error),
             },
-            &secrets,
-        )),
+            (&secrets, &[]),
+        ),
     }
 }
 
@@ -131,8 +127,6 @@ fn with_providers<'py>(
                 instances.push(instance);
             }
         }
-        let mut masked: Vec<String> = instance_secret_values(&instances)?;
-        masked.extend_from_slice(secrets);
         let called = function.call((), Some(&arguments)).and_then(|result| {
             let cursor: Option<String> = context.getattr("cursor")?.extract()?;
             sensor_outcome(
@@ -144,6 +138,6 @@ fn with_providers<'py>(
         let outcome = called.unwrap_or_else(|error| SensorFunctionOutcome::Failed {
             error: sensor_traceback(py, &error),
         });
-        Ok(mask_sensor_outcome(outcome, &masked))
+        mask_sensor_outcome(outcome, (secrets, &instances))
     })
 }

@@ -46,7 +46,6 @@ pub(crate) async fn skip_sensor_event(
             "the sensor has moved past {event} since its last tick"
         )));
     }
-    // A tick still out on the event, as a timing-out or paused sensor's usually is, ends here: its late answer starts nothing.
     let transaction = if terminal.is_none() {
         append_evaluation(
             transaction,
