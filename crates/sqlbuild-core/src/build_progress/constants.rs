@@ -37,3 +37,9 @@ pub(crate) const INSUFFICIENT: &str = "insufficient";
 pub(crate) const DELTA_AND_FINAL: &str = "delta_and_final";
 pub(crate) const TIMEOUT_OUTCOME: &str = "timeout";
 pub(crate) const TIMEOUT_CODE: &str = "C417";
+
+/// Seconds before each heartbeat of captured build output; the last repeats.
+pub(crate) const HEARTBEAT_INTERVALS: [u64; 4] = [30, 60, 120, 300];
+
+/// How many running nodes a heartbeat names before `+N more`.
+pub(crate) const HEARTBEAT_NAMES: usize = 3;

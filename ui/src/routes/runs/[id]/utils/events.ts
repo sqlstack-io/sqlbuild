@@ -28,7 +28,7 @@ export function eventSummary(e: RunEvent): string {
 		case 'claimed':
 			return 'Claimed write lock';
 		case 'launched':
-			return 'Container started';
+			return e.message || 'Worker started';
 		case 'cancel_requested':
 			return e.message;
 		case 'presumed_failed':

@@ -548,3 +548,10 @@ pub(crate) struct NodeResultsTestCase {
     pub(crate) expected_nodes: &'static [NodeResultRow],
     pub(crate) expected_not_run: i64,
 }
+
+pub(crate) struct LaunchEventTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) container_id: Option<&'static str>,
+    pub(crate) expected_message: &'static str,
+}

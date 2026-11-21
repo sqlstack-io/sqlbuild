@@ -28,6 +28,8 @@ use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
 use pyo3::pyclass;
 use pyo3::pymethods;
+use pyo3::types::PyDict;
+use pyo3::types::PyDictMethods;
 use pyo3::types::PyStringMethods;
 use sqlbuild_core::models::ResourceKind;
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
@@ -374,11 +376,8 @@ impl WorkerBuild {
     /// Keep the plan's upstream edges, keyed `<kind>:<name>`, so a skip names a blocker the snapshot does not link.
     fn record_planned_upstream(&self, plan: &Bound<'_, PyAny>) -> PyResult<()> {
         let mut planned = self.planned_upstream.lock().map_err(|_| poisoned())?;
-        for item in field(plan, "upstream_deps")?
-            .call_method0("items")?
-            .try_iter()?
-        {
-            let (node, deps): (Bound<'_, PyAny>, Bound<'_, PyAny>) = item?.extract()?;
+        let edges = field(plan, "upstream_deps")?;
+        for (node, deps) in edges.cast::<PyDict>()?.iter() {
             let mut keys: Vec<String> = Vec::new();
             for dep in deps.try_iter()? {
                 keys.push(planned_key(&dep?)?);

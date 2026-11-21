@@ -1,5 +1,6 @@
 //! Frozen run requests and the run, node and claim records the control store keeps.
 
+use crate::runs::constants::RUN_LAUNCHED_EVENT;
 use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Utc};
@@ -661,7 +662,7 @@ pub enum RunChange {
 impl RunChange {
     pub(crate) const fn event_type(&self) -> &'static str {
         match self {
-            Self::Launched { .. } => "run_launched",
+            Self::Launched { .. } => RUN_LAUNCHED_EVENT,
             Self::LaunchFailed { .. } => "run_launch_failed",
             Self::Started => "run_started",
             Self::NodeStarted { .. } => "run_node_started",

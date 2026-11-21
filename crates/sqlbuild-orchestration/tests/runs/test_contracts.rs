@@ -32,6 +32,8 @@ mod test_groups;
 mod test_job_detail;
 #[path = "test_job_subsets.rs"]
 mod test_job_subsets;
+#[path = "test_launch_events.rs"]
+mod test_launch_events;
 #[path = "test_lifecycle.rs"]
 mod test_lifecycle;
 #[path = "test_monitor.rs"]

@@ -197,7 +197,7 @@ describe('runs past the newest window', () => {
 });
 
 describe('run detail', () => {
-	it('links parent, children and reruns, and reruns from failed and skipped nodes but not cancelled ones', () => {
+	it('links parent, children and reruns, and reruns from failed, skipped and unreached nodes but not cancelled ones', () => {
 		const wires = [
 			wire('parent', { kind: 'group' }),
 			wire('run', { parent_run_id: 'parent', root_run_id: 'parent', status: 'failed' }),
@@ -207,14 +207,14 @@ describe('run detail', () => {
 		];
 		const runs = toRuns(wires, LOCATION);
 		const run = runs[1];
-		const nodes = (['success', 'failed', 'skipped', 'cancelled', 'bogus'] as const).map((status, i) =>
+		const nodes = (['success', 'failed', 'skipped', 'cancelled', 'bogus', 'not_run'] as const).map((status, i) =>
 			toRunNode({ node_key: `model.n${i}`, status, skipped_because_of: status === 'skipped' ? 'model.n1' : null } as components['schemas']['RunNodeRecord'], run)
 		);
 		const detail = runDetailOf(run, wires[1], runs, nodes);
 		expect(detail.parent?.id).toBe('parent');
 		expect(detail.children.map((r) => r.id)).toEqual(['child-early', 'child-late']);
 		expect(detail.reruns.map((r) => r.id)).toEqual(['retry']);
-		expect(detail.rerunFromFailureNodes).toEqual(['model.n1', 'model.n2']);
+		expect(detail.rerunFromFailureNodes).toEqual(['model.n1', 'model.n2', 'model.n4', 'model.n5']);
 		expect(nodes[4].status).toBe('not_run');
 		expect(nodes[2].skippedBecauseOf).toEqual({ nodeKey: 'model.n1', runId: 'run', jobKey: 'orders_daily' });
 	});

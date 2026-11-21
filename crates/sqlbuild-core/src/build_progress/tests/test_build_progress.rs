@@ -1,5 +1,7 @@
 use crate::build_progress::main::batch_progress_message::batch_progress_message;
 use crate::build_progress::main::format_build_footer::format_build_footer;
+use crate::build_progress::main::heartbeat_interval::heartbeat_interval;
+use crate::build_progress::main::heartbeat_message::heartbeat_message;
 use crate::build_progress::main::progress_name_width::progress_name_width;
 use crate::build_progress::main::render_build_spinner_line::render_build_spinner_line;
 use crate::build_progress::main::render_failed_test_result::render_failed_test_result;
@@ -7,12 +9,14 @@ use crate::build_progress::main::render_model_result::render_model_result;
 use crate::build_progress::main::scheduler_diagnostic_message::scheduler_diagnostic_message;
 use crate::build_progress::models::{
     BatchProgressText, BuildResultText, ErrorText, LifecycleEventText, ModelResultText,
-    ModelRowFacts, NameWidthInputs, ProgressLayout, PythonNodeText, SchedulerStateText, SpinnerRow,
+    ModelRowFacts, NameWidthInputs, ProgressLayout, PythonNodeText, RunningNodeText,
+    SchedulerStateText, SpinnerRow,
 };
 use crate::build_progress::tests::helpers::{audit, failed_model, layout, model, test};
 use crate::build_progress::tests::test_types::{
-    BatchProgressTestCase, FailedTestTestCase, FooterTestCase, InlineErrorTestCase,
-    ModelRowTestCase, NameWidthTestCase, SchedulerTestCase, SpinnerTestCase,
+    BatchProgressTestCase, FailedTestTestCase, FooterTestCase, HeartbeatIntervalTestCase,
+    HeartbeatTestCase, InlineErrorTestCase, ModelRowTestCase, NameWidthTestCase, SchedulerTestCase,
+    SpinnerTestCase,
 };
 use crate::cli_text::main::format_inline_error_lines::format_inline_error_lines;
 use crate::cli_text::models::CliStyle;
@@ -322,6 +326,80 @@ fn given_completed_batch_when_describing_then_names_model_window_rows_and_time()
         assert_eq!(
             batch_progress_message(&test_case.batch),
             test_case.expected_text,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_long_running_nodes_when_a_heartbeat_is_due_then_one_line_names_the_longest_with_known_rows()
+ {
+    let node = |name: &str, elapsed_seconds: u64, rows_so_far: Option<i64>| RunningNodeText {
+        name: name.to_owned(),
+        elapsed_seconds,
+        rows_so_far,
+    };
+    let test_cases = [
+        HeartbeatTestCase {
+            description: "longest first, rows only where known",
+            running: vec![
+                node("raw_events", 65, Some(48_210)),
+                node("stg_inventory", 130, None),
+                node("stg_shipments", 110, None),
+            ],
+            expected_text: "… still running (3)  stg_inventory 2m10s · stg_shipments 1m50s · raw_events 1m05s (48,210 rows)",
+        },
+        HeartbeatTestCase {
+            description: "more than three names collapse into a count",
+            running: vec![
+                node("a", 40, None),
+                node("b", 3_725, Some(1)),
+                node("c", 31, None),
+                node("d", 600, None),
+                node("e", 5, None),
+            ],
+            expected_text: "… still running (5)  b 1h02m05s (1 row) · d 10m00s · a 40s · +2 more",
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            heartbeat_message(&test_case.running, PLAIN),
+            test_case.expected_text,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_long_running_build_when_heartbeats_repeat_then_they_back_off_to_every_five_minutes() {
+    let test_cases = [
+        HeartbeatIntervalTestCase {
+            description: "the first line waits for a node to pass 30 seconds",
+            beats: 0,
+            expected_seconds: 30,
+        },
+        HeartbeatIntervalTestCase {
+            description: "the second comes a minute later",
+            beats: 1,
+            expected_seconds: 60,
+        },
+        HeartbeatIntervalTestCase {
+            description: "the third two minutes later",
+            beats: 2,
+            expected_seconds: 120,
+        },
+        HeartbeatIntervalTestCase {
+            description: "then every five minutes",
+            beats: 7,
+            expected_seconds: 300,
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            heartbeat_interval(test_case.beats).as_secs(),
+            test_case.expected_seconds,
             "{}",
             test_case.description
         );

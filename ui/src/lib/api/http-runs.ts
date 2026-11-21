@@ -136,7 +136,7 @@ function countsOf(wire: Wire['RunRecord']): NodeCounts {
 		success: n('success'),
 		warn: n('warn'),
 		failed: n('failed') + n('cancelled'),
-		skipped: n('skipped'),
+		skipped: n('skipped') + n('not_run'),
 		running: n('running'),
 		pending: n('pending')
 	};
@@ -376,7 +376,7 @@ export function runDetailOf(run: Run, wire: Wire['RunRecord'], listed: Run[], no
 				: null,
 		selection: wire.selection_json,
 		waits: [],
-		rerunFromFailureNodes: nodes.filter((n) => n.status === 'failed' || n.status === 'skipped').map((n) => n.nodeKey),
+		rerunFromFailureNodes: nodes.filter((n) => n.status === 'failed' || n.status === 'skipped' || n.status === 'not_run').map((n) => n.nodeKey),
 		rerunOf: run.rerunOfRunId ? (byId.get(run.rerunOfRunId) ?? null) : null,
 		reruns: listed.filter((r) => r.rerunOfRunId === run.id)
 	};
