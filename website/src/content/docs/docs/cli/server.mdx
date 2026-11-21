@@ -86,12 +86,72 @@ adds a person from **People → Add person** with their sign-in name, a first pa
 them; they can change it after they sign in. Behind OIDC or a trusted proxy, people appear the
 first time they sign in instead, and the button isn't shown.
 
+## Call the server from scripts with service accounts
+
+A service account lets a script, such as a deploy that republishes a project, call the server
+with an API key under its own name. Add one in **People → Service accounts**, or on the server's
+host:
+
+```bash
+sqb admin create-service-account orders-deploy --role developer --description "Release pipeline"
+```
+
+The key is in the JSON result, as `key`, and in the UI's dialog once. Store it now, for example in
+your deploy's secret store: it isn't shown again, and the server keeps only a hash of it. The script
+sends it in an `Authorization` header:
+
+```bash
+curl -H "Authorization: Bearer $SQB_SERVICE_KEY" https://control.example.com/api/control/bootstrap
+```
+
+| Command | Does |
+| --- | --- |
+| `sqb admin create-service-account NAME --role ROLE` | Adds the account with a built-in role everywhere (`viewer`, `operator`, `developer` or `admin`) and prints its key. `--description` says what uses it. |
+| `sqb admin rotate-service-account NAME` | Prints a new key. The replaced key stops now, or keeps working for `--overlap-minutes` (at most 1440) while you update the script. |
+| `sqb admin disable-service-account NAME` | Refuses every key of the account at once. |
+| `sqb admin enable-service-account NAME` | Accepts the same keys again. Rotate as well if a key may have leaked. |
+| `sqb admin list-service-accounts` | Lists the accounts, their roles and the prefixes of their working keys, never the keys. |
+
+- **Keys.** A key starts with `sqbk_`, so you can recognise one in a script or a secret scanner.
+  The UI and the list show only its first characters, such as `sqbk_Q7m2xT`.
+- **Rotating.** One old key works at a time: rotating again stops a key that is still in its
+  overlap. **Stop now** in a key's menu stops any key at once, the current one included; the
+  account then has no working key until you rotate.
+- **Importing a key.** To recreate a control store with the same key, pass
+  `--key-from-env VAR` to `create-service-account`, with the key in the environment variable `VAR`.
+  It must start with `sqbk_` and have at least 32 more characters, without spaces. The result then
+  leaves the key out. Only the CLI imports keys; the UI always makes a new one.
+- **Any address.** A keyed request is accepted on whatever address the server listens on, with any
+  `Host`, so a server behind a sign-in proxy can also listen on the network, such as
+  `host = "0.0.0.0"`, for scripts. The proxy's username header is still trusted only from
+  `trusted_peers`, so a direct request can't sign in as a person.
+- **Without people's sign-in.** On a server with no `password_origin`, `[oidc]` or
+  `[trusted_proxy]`, service keys are the only way to call its person API.
+- **Roles.** A service account holds its built-in role everywhere and doesn't get `default_role`.
+  In the UI, changing it needs `role.assign`.
+- **No sign-in.** A service account has no password, browser session or `sqb login`, and a
+  `[trusted_proxy.identities]` binding to one is refused.
+- **Audit.** Its actions appear in the audit log under its name. A request with a key that the
+  account no longer accepts, because the account is disabled or the key was stopped or rotated
+  away, is refused and recorded as `service_account.key_refused`, at most once a minute per key.
+- **Last used.** The Service accounts tab shows when each key last made a request that wasn't
+  refused.
+
+| Action in the UI | Needs |
+| --- | --- |
+| See service accounts | `user.manage` or `role.assign` |
+| Add a service account | `user.manage` and `role.assign` |
+| Rotate, stop a key, disable or enable | `user.manage` |
+| Change the role | `role.assign` |
+
 ## Sign in through a reverse proxy
 
 A reverse proxy such as Apache or nginx can sign people in and tell the server who they are in a
 request header. The server trusts that header only on requests whose socket peer is listed in
 `trusted_peers`, so it never trusts a header that a browser sends straight to the server. With the
-proxy on the same host, bind the server to loopback so that only local processes reach it:
+proxy on the same host, bind the server to loopback so that only local processes reach it, or
+listen on the network as well when [service accounts](#call-the-server-from-scripts-with-service-accounts)
+call it from other hosts:
 
 ```toml
 [server]
@@ -169,7 +229,8 @@ ProxyPassReverse "/" "http://127.0.0.1:8000/"
 - **The CLI.** `sqb login` still needs an `https://` server URL, so that its session token never
   crosses the network unencrypted.
 - **Locations and workers.** They use bearer tokens, not the proxy. On the server's own host, give
-  them `http://127.0.0.1:8000` so their tokens stay on loopback.
+  them `http://127.0.0.1:8000` so their tokens stay on loopback. Service accounts call with their
+  keys too, directly or through the proxy.
 - **Streaming.** The live-update feed sends `Cache-Control: no-cache, no-transform`, which stops
   `mod_deflate` from compressing it, and `X-Accel-Buffering: no`. It sends a keep-alive comment
   every 15 seconds, well within Apache's default 60-second `Timeout`. Long work, such as planning a
