@@ -5,9 +5,7 @@ use crate::scheduler::main::_evaluate_trigger::evaluate_trigger;
 use crate::scheduler::main::renew_lease::renew_lease;
 use crate::scheduler::models::{DueKind, SchedulerLease};
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
-use crate::sensors::main::complete_builtin_sensor::complete_builtin_sensor;
-use crate::sensors::main::complete_custom_sensor::complete_custom_sensor;
-use crate::sensors::models::SensorCondition;
+use crate::sensors::main::complete_sensor::complete_sensor;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -17,7 +15,7 @@ use crate::store::models::{ControlStore, Parameter, TransactionMode};
 /// Evaluate up to 100 due triggers of `kind`, oldest due first; how many were evaluated and the ticks they took.
 pub(crate) async fn drain_due(
     store: &ControlStore,
-    mut lease: SchedulerLease,
+    (mut lease, origin): (SchedulerLease, Option<&str>),
     kind: DueKind,
 ) -> Result<(SchedulerLease, usize, usize), ControlError> {
     let transaction = begin(store, TransactionMode::Read).await?;
@@ -33,7 +31,7 @@ pub(crate) async fn drain_due(
     for row in rows {
         let trigger_id: uuid::Uuid = serde_json::from_value(row["trigger_id"].clone())
             .map_err(|error| ControlError::Invalid(error.to_string()))?;
-        match evaluate_due(store, &lease, trigger_id, kind).await {
+        match evaluate_due(store, &lease, (trigger_id, origin), kind).await {
             Ok(Some(taken)) => {
                 evaluated += 1;
                 ticks += taken;
@@ -53,7 +51,7 @@ pub(crate) async fn drain_due(
 async fn evaluate_due(
     store: &ControlStore,
     lease: &SchedulerLease,
-    trigger_id: uuid::Uuid,
+    (trigger_id, origin): (uuid::Uuid, Option<&str>),
     kind: DueKind,
 ) -> Result<Option<usize>, ControlError> {
     if kind == DueKind::Schedule {
@@ -61,13 +59,9 @@ async fn evaluate_due(
             .await?
             .map(|plan| plan.actions.len()));
     }
-    let Some(request) = begin_sensor_evaluation(store, lease, trigger_id).await? else {
+    let Some(request) = begin_sensor_evaluation(store, lease, (trigger_id, origin)).await? else {
         return Ok(None);
     };
-    if matches!(request.definition.when, SensorCondition::Custom { .. }) {
-        complete_custom_sensor(store, lease, &request).await?;
-    } else {
-        complete_builtin_sensor(store, lease, &request).await?;
-    }
+    complete_sensor(store, lease, &request).await?;
     Ok(Some(0))
 }

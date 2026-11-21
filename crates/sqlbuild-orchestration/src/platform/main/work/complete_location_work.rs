@@ -12,7 +12,7 @@ use crate::platform::main::installation::require_instance::require_instance;
 use crate::platform::main::work::read_location_work::read_location_work;
 use crate::platform::models::{LocationWork, LocationWorkOutcome, LocationWorkResult};
 use crate::sensors::constants::MAX_SENSOR_RUN_REQUESTS;
-use crate::sensors::models::CustomSensorOutcome;
+use crate::sensors::models::SensorFunctionOutcome;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -78,9 +78,15 @@ pub async fn complete_location_work(
     Ok(true)
 }
 
-/// Warehouse text in a plan's error and warnings is redacted before it is compared or stored.
+/// Warehouse text in a plan's error and warnings, and a sensor's traceback, is redacted before it is compared or stored.
 fn redacted(result: &LocationWorkResult) -> LocationWorkResult {
     let mut result = result.clone();
+    if let LocationWorkOutcome::SensorEvaluation {
+        outcome: SensorFunctionOutcome::Failed { error },
+    } = &mut result.outcome
+    {
+        *error = redact_error_text(error);
+    }
     if let LocationWorkOutcome::Plan { document, .. } = &mut result.outcome {
         let texts = ["/error/message", "/error/help"]
             .into_iter()
@@ -116,12 +122,16 @@ fn valid_outcome(work: &LocationWork, outcome: &LocationWorkOutcome) -> bool {
             LocationWork::EvaluateSensor { .. },
             LocationWorkOutcome::SensorEvaluation { outcome },
         ) => match outcome {
-            CustomSensorOutcome::Completed { run_keys, .. } => {
-                run_keys.len() <= MAX_SENSOR_RUN_REQUESTS
-                    && run_keys.iter().all(|key| !key.trim().is_empty())
+            SensorFunctionOutcome::Requested { runs, .. } => {
+                runs.len() <= MAX_SENSOR_RUN_REQUESTS
+                    && runs
+                        .iter()
+                        .all(|run| !run.run_key.trim().is_empty() && !run.job.trim().is_empty())
             }
-            CustomSensorOutcome::Skipped { reason, .. } => !reason.trim().is_empty(),
-            CustomSensorOutcome::Failed | CustomSensorOutcome::TimedOut => true,
+            SensorFunctionOutcome::Skipped { reason, .. } => !reason.trim().is_empty(),
+            SensorFunctionOutcome::Handled { .. }
+            | SensorFunctionOutcome::Failed { .. }
+            | SensorFunctionOutcome::TimedOut => true,
         },
         _ => false,
     }

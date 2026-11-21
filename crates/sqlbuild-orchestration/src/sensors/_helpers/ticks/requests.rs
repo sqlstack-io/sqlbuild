@@ -9,23 +9,47 @@ use crate::runs::main::requests::frozen_job_request::frozen_job_request;
 use crate::runs::main::requests::queue_run::queue_run;
 use crate::runs::models::{JobRunRequest, RunOrigin};
 use crate::scheduler::main::active_job_run::active_job_run;
-use crate::sensors::models::{SensorEvaluationRequest, SensorRequests, SkippedRequest};
+use crate::sensors::models::{
+    RequestedRun, SensorEvaluationRequest, SensorRequests, SkippedRequest,
+};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// Queue the run for `run_key` once, or record it skipped while a run of a `skip` job is active.
+/// The first requested job or group the evaluated snapshot doesn't publish, so the tick queues nothing.
+pub(crate) async fn unknown_job(
+    mut transaction: ControlTransaction,
+    evaluation: &SensorEvaluationRequest,
+    runs: &[RequestedRun],
+) -> Result<(ControlTransaction, Option<String>), ControlError> {
+    for run in runs {
+        let job;
+        (transaction, job) = published_job(
+            transaction,
+            (evaluation.location_id, &evaluation.target, &run.job),
+        )
+        .await?;
+        if job.is_none_or(|job| job.snapshot_id != evaluation.snapshot_id) {
+            return Ok((transaction, Some(run.job.clone())));
+        }
+    }
+    Ok((transaction, None))
+}
+
+/// Queue the run for its key once, or record it skipped while a run of a `skip` job is active.
 pub(crate) async fn queue_sensor_run(
     transaction: ControlTransaction,
     evaluation: &SensorEvaluationRequest,
-    run_key: &str,
+    run: &RequestedRun,
     mut requests: SensorRequests,
 ) -> Result<(ControlTransaction, SensorRequests), ControlError> {
+    let (run_key, job_key) = (run.run_key.as_str(), run.job.as_str());
     let (transaction, rows) = query(
         transaction,
-        "SELECT run_id FROM sqb_run_requests WHERE trigger_id=$1 AND run_key=$2",
+        "SELECT run_id FROM sqb_run_requests WHERE trigger_id=$1 AND job_key=$2 AND run_key=$3",
         vec![
             Parameter::Id(evaluation.trigger_id),
+            Parameter::Text(job_key.into()),
             Parameter::Text(run_key.into()),
         ],
     )
@@ -37,8 +61,7 @@ pub(crate) async fn queue_sensor_run(
         );
         return Ok((transaction, requests));
     }
-    let job_key = &evaluation.definition.job_key;
-    let (transaction, overlap) = job_overlap(transaction, evaluation).await?;
+    let (transaction, overlap) = job_overlap(transaction, evaluation, job_key).await?;
     let (transaction, active) = if overlap.is_queue() {
         (transaction, None)
     } else {
@@ -55,7 +78,10 @@ pub(crate) async fn queue_sensor_run(
         });
         return Ok((transaction, requests));
     }
-    let run_id = Uuid::new_v5(&evaluation.trigger_id, run_key.as_bytes());
+    let run_id = Uuid::new_v5(
+        &evaluation.trigger_id,
+        format!("{job_key}\u{0}{run_key}").as_bytes(),
+    );
     let context = AuditContext {
         actor: "system:sensor".into(),
         granting_role: "system:scheduler".into(),
@@ -66,8 +92,8 @@ pub(crate) async fn queue_sensor_run(
         run_id,
         location_id: evaluation.location_id,
         target: evaluation.target.clone(),
-        job_key: evaluation.definition.job_key.clone(),
-        reason: "Sensor condition matched".into(),
+        job_key: job_key.into(),
+        reason: format!("Requested by sensor {}", evaluation.sensor),
         priority: 0,
         window: None,
         full_refresh: false,
@@ -83,24 +109,21 @@ pub(crate) async fn queue_sensor_run(
     frozen.trigger_id = Some(evaluation.trigger_id);
     let transaction = queue_run(transaction, &frozen).await?;
     let (transaction, _) = query(transaction,
-        "INSERT INTO sqb_run_requests (trigger_id,run_key,evaluation_id,run_id) VALUES ($1,$2,$3,$4)",
-        vec![Parameter::Id(evaluation.trigger_id), Parameter::Text(run_key.into()), Parameter::Id(evaluation.evaluation_id), Parameter::Id(run_id)]).await?;
+        "INSERT INTO sqb_run_requests (trigger_id,job_key,run_key,evaluation_id,run_id) VALUES ($1,$2,$3,$4,$5)",
+        vec![Parameter::Id(evaluation.trigger_id), Parameter::Text(job_key.into()), Parameter::Text(run_key.into()), Parameter::Id(evaluation.evaluation_id), Parameter::Id(run_id)]).await?;
     requests.run_ids.push(run_id);
     Ok((transaction, requests))
 }
 
-/// The overlap the sensor's job declares in the evaluated snapshot, which the target currently publishes.
+/// The overlap the requested job declares in the evaluated snapshot, which the target currently publishes.
 async fn job_overlap(
     transaction: ControlTransaction,
     evaluation: &SensorEvaluationRequest,
+    job_key: &str,
 ) -> Result<(ControlTransaction, Overlap), ControlError> {
     let (transaction, job) = published_job(
         transaction,
-        (
-            evaluation.location_id,
-            &evaluation.target,
-            &evaluation.definition.job_key,
-        ),
+        (evaluation.location_id, &evaluation.target, job_key),
     )
     .await?;
     Ok((

@@ -175,6 +175,8 @@ export interface ApiClient extends PlatformApi {
 	setTriggerStates(scope: Scope, ids: string[], state: TriggerState, reason?: string | null): Promise<Trigger[]>;
 	resetTriggerToDefault(scope: Scope, id: string): Promise<Trigger>;
 	resetSensorCursor(scope: Scope, id: string, reason?: string | null): Promise<TriggerDetail>;
+	/** Mark the event a sensor is stuck on delivered without calling its function; the reason is required. */
+	skipSensorEvent(scope: Scope, id: string, eventId: string, reason: string): Promise<TriggerDetail>;
 	// ---- end OPERATE ----
 
 	listPlatformEvents(query: { activeOnly: boolean }): Promise<PlatformEvent[]>;

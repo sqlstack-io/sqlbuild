@@ -4,7 +4,7 @@ use crate::api::models::ControlClient;
 use crate::credentials::models::AuditRetention;
 use crate::declarations::models::TriggerDefinition;
 use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
-use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
+use crate::sensors::models::{SensorEvaluationRequest, SensorFunctionOutcome};
 use crate::snapshots::models::{SnapshotRecord, SnapshotRetention};
 use crate::warehouse_metadata::models::StateHistoryRetention;
 use crate::warehouse_metadata::models::{
@@ -315,7 +315,7 @@ pub enum LocationWorkOutcome {
         healthy: bool,
     },
     SensorEvaluation {
-        outcome: CustomSensorOutcome,
+        outcome: SensorFunctionOutcome,
     },
     /// The plan document `sqb plan --json` printed, or its `{"error": ...}` report.
     Plan {
@@ -374,6 +374,24 @@ pub enum PlatformEventKind {
     TriggerSkipped,
     SensorRechecked,
     CalendarTimesDropped,
+}
+
+impl PlatformEventKind {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Heartbeat => "heartbeat",
+            Self::SchedulerNoLeader => "scheduler_no_leader",
+            Self::TickOverdue => "tick_overdue",
+            Self::CalendarHorizonLow => "calendar_horizon_low",
+            Self::LocationBroken => "location_broken",
+            Self::LaunchFailed => "launch_failed",
+            Self::RunFailed => "run_failed",
+            Self::TriggerSkipped => "trigger_skipped",
+            Self::SensorRechecked => "sensor_rechecked",
+            Self::CalendarTimesDropped => "calendar_times_dropped",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

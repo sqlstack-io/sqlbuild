@@ -388,7 +388,7 @@ pub(crate) async fn sensor_due_again(
     let mut input = upgrade_snapshot(
         location_id,
         serde_json::json!({"health_orders": {"description": "Refresh orders on overdue ticks",
-            "job_key": "orders",
+            "function": "start_orders", "code_hash": "v1", "timeout_seconds": 60,
             "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
             "minimum_interval_seconds": 1}}),
     );
@@ -403,15 +403,15 @@ pub(crate) async fn sensor_due_again(
     )
     .await
     .expect("the sensor's first check");
+    answer_sensor_work(store).await;
+    make_sensors_due(store).await;
+    let (state, _) = scheduler_cycle(store, state)
+        .await
+        .expect("the sensor's first check completes");
     execute(store, earlier_form).await;
     tokio::time::sleep(std::time::Duration::from_millis(1_100)).await;
     crate::sensors::tests::helpers::append_events(store, 6..7, chrono::Utc::now()).await;
-    execute(
-        store,
-        "UPDATE sqb_trigger_state SET next_due_at='2000-01-01T00:00:00Z' \
-         WHERE trigger_id IN (SELECT trigger_id FROM sqb_triggers WHERE kind='sensor')",
-    )
-    .await;
+    make_sensors_due(store).await;
     let trigger_id = serde_json::from_value(
         crate::runs::tests::helpers::rows(
             store,
@@ -423,6 +423,40 @@ pub(crate) async fn sensor_due_again(
     )
     .expect("sensor ID");
     (state, trigger_id)
+}
+
+/// Make every sensor due now.
+pub(crate) async fn make_sensors_due(store: &ControlStore) {
+    execute(
+        store,
+        "UPDATE sqb_trigger_state SET next_due_at='2000-01-01T00:00:00Z' \
+         WHERE trigger_id IN (SELECT trigger_id FROM sqb_triggers WHERE kind='sensor')",
+    )
+    .await;
+}
+
+/// Answer each sensor tick still waiting on its location as the stand-in function named in its definition would.
+pub(crate) async fn answer_sensor_work(store: &ControlStore) {
+    let pending = crate::runs::tests::helpers::rows(
+        store,
+        "SELECT request_json FROM sqb_location_work WHERE completed_at IS NULL",
+        vec![],
+    )
+    .await;
+    for row in pending {
+        let request: crate::platform::models::LocationWorkRequest = serde_json::from_value(
+            crate::runs::tests::helpers::json_column(&row["request_json"]),
+        )
+        .expect("location work request");
+        if let crate::platform::models::LocationWork::EvaluateSensor { evaluation } = request.work {
+            crate::sensors::tests::helpers::answer_sensor(
+                store,
+                &evaluation,
+                crate::sensors::tests::helpers::stand_in_outcome(&evaluation),
+            )
+            .await;
+        }
+    }
 }
 
 /// Give `snapshot_id` a `jobs` document in the form an older release published, which no longer decodes.

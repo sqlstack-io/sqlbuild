@@ -25,12 +25,17 @@ note = "Public calendar and sensor authoring records only; jobs, job groups and 
 [[stays]]
 path = "orchestration_declarations/models/sensor_context.py"
 rule = 3
-note = "Only the mutable SensorContext authoring declaration required by ctx.cursor assignment; no Python runtime allowance. Native fenced completion validates and commits proposed progress."
+note = "Only the mutable SensorContext authoring declaration: ctx.event and ctx.cursor assignment; no Python runtime allowance. Native fenced completion validates and commits proposed progress."
+
+[[stays]]
+path = "orchestration_declarations/models/sensor_events.py"
+rule = 3
+note = "Public event records a sensor's function receives as ctx.event, one per condition; native code finds, builds and delivers the events, and this file holds fields only."
 
 [[stays]]
 path = "orchestration_declarations/types.py"
 rule = 3
-note = "Public PlatformEventKind, RunEventKind and NodeEventKind enums only, placed in types.py to satisfy enum ownership while retaining a zero implementation budget; no Python event processing allowance."
+note = "Public PlatformEventKind, RunEventKind, NodeEventKind and CheckEventKind enums only, placed in types.py to satisfy enum ownership while retaining a zero implementation budget; no Python event processing allowance."
 
 [[stays]]
 path = "orchestration_declarations/main/compile_snapshot.py"

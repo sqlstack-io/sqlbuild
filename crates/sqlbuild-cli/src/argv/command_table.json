@@ -96,6 +96,30 @@
      }
     },
     {
+     "name": "sensor",
+     "parser": {
+      "prog": "sqb sensor",
+      "description": "Try a published sensor's function from this project's code: with no event chosen, list the recent events its condition matches; with --event, --latest or --run, call the function once with that event, using the target's real providers. No run starts and no tick is recorded. Events come from the server through your sqb login session with --server, or from the local sqb dev store.",
+      "groups": [{"title": "positional arguments"}, {"title": "options"}],
+      "mutex_groups": [false],
+      "actions": [
+       {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
+       {"kind": "store", "options": [], "dest": "sensor_action", "required": true, "choices": ["try"], "help": "try: list the sensor's recent events, or call its function with one", "group": 0},
+       {"kind": "store", "options": [], "dest": "sensor_name", "required": true, "help": "the sensor's name, such as orders_failed_sensor", "group": 0},
+       {"kind": "store", "options": ["--event"], "dest": "sensor_event", "help": "call the function with this event ID, as a tick or the listing shows it", "group": 1, "mutex_group": 0},
+       {"kind": "store_true", "options": ["--latest"], "dest": "sensor_latest", "nargs": 0, "const": true, "default": false, "help": "call the function with the newest matching event; a polling sensor is called once", "group": 1, "mutex_group": 0},
+       {"kind": "store", "options": ["--run"], "dest": "sensor_run", "help": "for a run_event sensor, call the function with this run's terminal event", "group": 1, "mutex_group": 0},
+       {"kind": "store", "options": ["--limit"], "dest": "sensor_limit", "type": "int", "default": 10, "help": "events to list when none is chosen (default: 10)", "group": 1},
+       {"kind": "store", "options": ["--target"], "dest": "target", "help": "configured project target (default: the project's default target)", "group": 1},
+       {"kind": "store", "options": ["--server"], "dest": "login_server", "help": "HTTPS SQLBuild server origin used by sqb login; without it, the local sqb dev store", "group": 1},
+       {"kind": "store", "options": ["--ca-cert"], "dest": "login_ca", "help": "additional trusted PEM CA certificate", "group": 1},
+       {"kind": "store", "options": ["--location-id"], "dest": "person_location", "help": "published location UUID; required with --server", "group": 1},
+       {"kind": "store", "options": ["--control-store-url"], "dest": "development_store_url", "help": "sqb dev control store URL or path (default: .sqlbuild/control.sqlite3 in the project)", "group": 1},
+       {"kind": "store", "options": ["--project-dir", "--sqb-project-dir"], "dest": "project_dir", "default": {"suppress": true}, "help": "SQLBuild project directory (default: the current directory)", "group": 1}
+      ]
+     }
+    },
+    {
      "name": "login",
      "parser": {
       "prog": "sqb login",
@@ -900,10 +924,11 @@
               "pause",
               "reset-default",
               "set-cursor",
-              "reset-cursor"
+              "reset-cursor",
+              "skip-event"
              ],
              "required": true,
-             "help": "runtime change; reset-default restores the published status default",
+             "help": "runtime change; reset-default restores the published status default, reset-cursor re-delivers every retained event to a sensor, skip-event marks one sensor event delivered",
              "group": 0
             },
             {
@@ -933,6 +958,15 @@
              ],
              "dest": "admin_cursor",
              "help": "RFC3339 timestamp with offset; required only for set-cursor",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--event"
+             ],
+             "dest": "admin_sensor_event",
+             "help": "the sensor event ID to mark delivered without calling the function; required only for skip-event",
              "group": 1
             }
            ]
@@ -9119,7 +9153,7 @@
     }
    ],
    "choices_help": [
-    {"dest": "control", "metavar": "control", "help": "inspect published SQL with your saved person session"},
+    {"dest": "control", "metavar": "control", "help": "inspect published SQL with your saved person session"}, {"dest": "sensor", "metavar": "sensor", "help": "try a sensor's function with a recent event, using this project's code"},
     {"dest": "login", "metavar": "login", "help": "sign in through a browser or verify a saved CLI session"},
     {"dest": "logout", "metavar": "logout", "help": "revoke the CLI session and remove local credentials"},
     {

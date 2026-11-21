@@ -69,7 +69,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
                     "        ctx.target = 'not-an-authority-input'\n"
                     "        ctx.evaluation_id = 'not-an-authority-input'\n"
                     "        ctx.cursor = 'orders/page-1'\n"
-                    "        return [RunRequest(run_key='orders-1'), RunRequest(run_key='orders-1')]\n"
+                    "        return [RunRequest(job='annual_orders_job', run_key='orders-1'), RunRequest(job='annual_orders_job', run_key='orders-1')]\n"
                 ),
             },
             default_job_files={},
@@ -95,6 +95,7 @@ def test_given_a_custom_polling_sensor_when_a_callback_fails_or_times_out_then_a
         "AnnAssign",
         "AnnAssign",
         "AnnAssign",
+        "AnnAssign",
     ]
     data: Path = tmp_path / "fulfillment.json"
     calls: Path = tmp_path / "sensor-calls.jsonl"
@@ -106,6 +107,7 @@ def test_given_a_custom_polling_sensor_when_a_callback_fails_or_times_out_then_a
         monkeypatch,
         test_case,
         server_arguments=("--password-origin", "https://control.example.com"),
+        serve_sensors=False,
     ) as worker:
         administrator: dict[str, Any] = provision_person(
             tmp_path / "control", "create-user", "orders-admin"

@@ -730,3 +730,53 @@ class DevelopmentInvalidEnvFileTestCase:
     expected_reason: str
     # A value in the invalid line, which no output may show.
     secret_text: str
+
+
+@dataclass(frozen=True)
+class SensorTrialCase:
+    """One `sqb sensor try`: the function's answer, the event choice and what the command says."""
+
+    description: str
+    mode: str
+    # `{event}` and `{run}` stand for the watched run's event ID and run ID.
+    choice: tuple[str, ...]
+    expected_exit: int
+    expected_stdout: str
+
+
+@dataclass(frozen=True)
+class SensorFunctionsTestCase:
+    description: str
+    worker: WorkerExecutionTestCase
+    expected_failure_code: str
+    expected_failure: str
+    expected_started_job: str
+    expected_trials: tuple[SensorTrialCase, ...]
+    # Provider secret values the location's environment sets; no stored tick or trial output
+    # may show them.
+    expected_masked: dict[str, str]
+    # Provider secret values only a `.env` file sets, masked the same way.
+    dotenv_secrets: dict[str, str]
+
+
+class SensorHarness(NamedTuple):
+    """A sensor test's files, sign-in and CLI environment."""
+
+    root: Path
+    origin: str
+    certificate: Path
+    modes: Path
+    calls: Path
+    binary: str
+    environment: dict[str, str]
+
+
+@dataclass(frozen=True)
+class CheckSensorsTestCase:
+    description: str
+    worker: WorkerExecutionTestCase
+    # Each failed or warned check the check sensor is called with, as (check, status).
+    expected_check_events: list[tuple[str, str]]
+    # The run event's failed checks and failed nodes.
+    expected_failed_checks: list[str]
+    expected_failed_nodes: list[str]

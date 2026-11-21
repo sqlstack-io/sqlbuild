@@ -160,9 +160,7 @@ pub(crate) const EXIT_FLUSH_FAILURE_STATUS: i32 = 120;
 
 pub(crate) const UNCAUGHT_EXCEPTION_STATUS: i32 = 1;
 
-/// Reserve half the location work claim for acknowledgement retries after killing a callback.
-pub(crate) const SENSOR_EVALUATION_SECONDS: u64 = 30;
-
+/// The largest answer a sensor's interpreter may send back.
 pub(crate) const SENSOR_RESULT_BYTES: u64 = 1_048_576;
 
 /// Read timeout, and the delay before retrying a failed page of an unfinished synchronization.
@@ -245,3 +243,10 @@ pub(crate) const CHANGED_SETTING: &str = "changed";
 /// What a second signal during worker shutdown prints before it kills the workers.
 pub(crate) const FORCED_WORKER_STOP: &str =
     "Stopping now: killing the workers' process groups instead of waiting for them\n";
+
+/// The command `sqb sensor` answers.
+pub(crate) const SENSOR_COMMAND: &str = "sensor";
+/// Exit status of a misused command, as for other usage errors.
+pub(crate) const SENSOR_USAGE_EXIT: i32 = 2;
+/// Exit status when the function failed, timed out, or there was nothing to call it with.
+pub(crate) const SENSOR_FAILED_EXIT: i32 = 1;

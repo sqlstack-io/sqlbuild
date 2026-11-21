@@ -79,14 +79,15 @@ pub(crate) async fn run_control(
         )?;
     }
     if facts.scheduler {
-        start_scheduler(&mut tasks, store, shutdown, workers);
+        start_scheduler(&mut tasks, (store, facts.origin.clone()), shutdown, workers);
     }
     supervise_control_roles(tasks, stop).await
 }
 
+/// Start the scheduler, whose sensor events link runs under `origin`.
 fn start_scheduler(
     tasks: &mut JoinSet<Result<(), ControlError>>,
-    store: ControlStore,
+    (store, origin): (ControlStore, Option<String>),
     shutdown: watch::Receiver<bool>,
     workers: Workers,
 ) {
@@ -94,7 +95,7 @@ fn start_scheduler(
     tasks.spawn(async move {
         run_scheduler(
             &store,
-            SchedulerState::new(Uuid::now_v7()),
+            SchedulerState::new(Uuid::now_v7()).with_origin(origin),
             shutdown,
             workers,
         )

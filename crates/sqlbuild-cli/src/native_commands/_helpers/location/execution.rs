@@ -219,7 +219,7 @@ pub(crate) async fn run_development_roles(
                     target: target.clone(),
                 },
             ),
-            (store.clone(), location_id, url),
+            (store.clone(), location_id, url.clone()),
             shutdown.clone(),
         ),
     );
@@ -234,10 +234,11 @@ pub(crate) async fn run_development_roles(
             target: target.clone(),
         });
         let scheduler_store = store.clone();
+        let origin = Some(url.clone());
         roles.spawn(Some("scheduler"), async move {
             run_scheduler(
                 &scheduler_store,
-                SchedulerState::new(Uuid::now_v7()),
+                SchedulerState::new(Uuid::now_v7()).with_origin(origin),
                 shutdown,
                 workers,
             )

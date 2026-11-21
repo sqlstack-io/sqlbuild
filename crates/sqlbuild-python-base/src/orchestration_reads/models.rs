@@ -25,15 +25,17 @@ pub struct AuthoredSensorCondition {
     pub after_seconds: Value,
 }
 
+/// A `@sensor(...)` declaration; `name` and `function` are `None` until it decorates a function.
 #[derive(Debug, FromPyObject)]
 pub struct AuthoredSensor {
-    pub name: String,
+    pub name: Option<String>,
     pub description: String,
     pub when: Option<AuthoredSensorCondition>,
     pub function: Option<pyo3::Py<PyAny>>,
-    pub run: String,
     #[pyo3(from_py_with = authored_setting)]
     pub minimum_interval_seconds: Value,
+    #[pyo3(from_py_with = authored_setting)]
+    pub timeout_seconds: Value,
     pub default_status: String,
     pub targets: Vec<String>,
     #[pyo3(attribute("_declared_at"))]

@@ -194,7 +194,7 @@ pub(crate) fn compile_declarations(
         ("sensor", &inventory.sensors),
         authored_sensors
             .iter()
-            .map(|sensor| sensor.name.as_str())
+            .filter_map(|sensor| sensor.name.as_deref())
             .collect(),
     )?;
     let format: FormatSettings =
@@ -209,9 +209,9 @@ pub(crate) fn compile_declarations(
         ("job group", run.name.value.clone(), run.description.clone())
     }));
     described.extend(
-        authored_sensors
-            .iter()
-            .map(|sensor| ("sensor", sensor.name.clone(), sensor.description.clone())),
+        authored_sensors.iter().filter_map(|sensor| {
+            Some(("sensor", sensor.name.clone()?, sensor.description.clone()))
+        }),
     );
     described.extend(
         calendar_descriptions

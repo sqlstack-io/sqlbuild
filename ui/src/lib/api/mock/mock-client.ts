@@ -441,6 +441,11 @@ export class MockApiClient implements ApiClient {
 		return this.#operate.resetSensorCursor(scope, id, reason ?? null);
 	}
 
+	async skipSensorEvent(scope: Scope, id: string, eventId: string, reason: string): Promise<TriggerDetail> {
+		this.#location(scope);
+		return this.#operate.skipSensorEvent(scope, id, eventId, reason);
+	}
+
 	// ---- end OPERATE ----
 
 	async listPlatformEvents(query: { activeOnly: boolean }): Promise<PlatformEvent[]> {

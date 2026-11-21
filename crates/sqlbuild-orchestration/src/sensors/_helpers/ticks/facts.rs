@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::sensors::models::{
     SensorCursor, SensorDefinition, SensorEvaluationFact, SensorEvaluationOutcome,
-    SensorEvaluationRequest,
+    SensorEvaluationRequest, SensorEvent,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -40,11 +40,13 @@ pub(crate) async fn append_evaluation(
         request: request.clone(),
         outcome,
     };
+    let subject = request.event.as_ref().map(|event| event.id().to_owned());
     let (mut transaction, _) = query(transaction,
-        "INSERT INTO sqb_sensor_evaluation_events (event_id,evaluation_id,trigger_id,phase,occurred_at,fact_json) \
-         VALUES ($1,$2,$3,$4,$5,$6)",
+        "INSERT INTO sqb_sensor_evaluation_events (event_id,evaluation_id,trigger_id,phase,occurred_at,fact_json,subject_event_id) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7)",
         vec![Parameter::Id(event_id), Parameter::Id(request.evaluation_id), Parameter::Id(request.trigger_id),
-            Parameter::Text(phase.into()), Parameter::Time(occurred_at), Parameter::Json(json!(fact))]).await?;
+            Parameter::Text(phase.into()), Parameter::Time(occurred_at), Parameter::Json(json!(fact)),
+            Parameter::OptionalText(subject)]).await?;
     transaction
         .changes
         .insert(Change::Trigger(request.trigger_id));
@@ -60,6 +62,29 @@ pub(crate) async fn commit_cursor(
         transaction,
         "UPDATE sqb_trigger_state SET cursor_json=$1 WHERE trigger_id=$2",
         vec![Parameter::Json(json!(cursor)), Parameter::Id(trigger_id)],
+    )
+    .await?;
+    Ok(transaction)
+}
+
+/// Record that the sensor handled a source event, which has no storage order for its cursor to pass.
+pub(crate) async fn record_delivery(
+    transaction: ControlTransaction,
+    request: &SensorEvaluationRequest,
+) -> Result<ControlTransaction, ControlError> {
+    let Some(event @ (SensorEvent::SourceNewData { .. } | SensorEvent::SourceStale { .. })) =
+        &request.event
+    else {
+        return Ok(transaction);
+    };
+    let (transaction, _) = query(
+        transaction,
+        "INSERT INTO sqb_sensor_deliveries (trigger_id,event_id) VALUES ($1,$2) \
+         ON CONFLICT (trigger_id,event_id) DO NOTHING",
+        vec![
+            Parameter::Id(request.trigger_id),
+            Parameter::Text(event.id().into()),
+        ],
     )
     .await?;
     Ok(transaction)

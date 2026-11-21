@@ -57,8 +57,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                 "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
                 "orchestration/sensors/orders_sensor.py": (
                     "from sqlbuild.orchestration import job, sensor\n"
-                    "orders = sensor('orders_sensor', description='Orders.', "
-                    "run=job('nightly', description='Orders.', select='orders'))\n"
+                    "@sensor(description='Orders.', when=job('nightly', description='Orders.', select='orders'))\n"
+                    "def orders_sensor(ctx):\n    return None\n"
                 ),
             },
             expected_exit_code=1,

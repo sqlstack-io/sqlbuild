@@ -11,7 +11,7 @@ pub(super) fn job(name: &str, select: &str) -> String {
 /// A sensor module whose `when` is `condition`.
 pub(super) fn sensor(name: &str, condition: &str) -> String {
     format!(
-        "from sqlbuild.orchestration import node_event, sensor, source_new_data\n\nSELECTION = \"a\"\n{name} = sensor(name=\"{name}_sensor\", description=\"d\", when={condition}, run=\"orders_export_job\")\n"
+        "from sqlbuild.orchestration import node_event, sensor, source_new_data\n\nSELECTION = \"a\"\n@sensor(description=\"d\", when={condition})\ndef {name}_sensor(ctx):\n    return None\n"
     )
 }
 

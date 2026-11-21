@@ -4,6 +4,8 @@
 pub const CALENDAR_WINDOW_PARAMETER: &str = "window";
 
 pub const SOURCE_NEW_DATA_CONDITION: &str = "source_new_data";
+/// The sensor condition on checks, audits and SQL tests that fail or warn inside runs.
+pub const CHECK_EVENT_CONDITION: &str = "check_event";
 
 pub const SOURCE_STALE_CONDITION: &str = "source_stale";
 

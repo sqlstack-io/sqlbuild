@@ -11,6 +11,7 @@ pub mod register_footer;
 pub mod register_nested_progress;
 pub mod register_progress_reporters;
 pub mod register_progress_text;
+pub mod report_build_checks;
 pub mod test_label;
 pub mod test_result_label;
 pub mod with_verbose_inspection;

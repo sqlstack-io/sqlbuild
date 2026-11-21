@@ -1,10 +1,8 @@
 //! Discovered collections, key kinds and variables the provider check reads.
 
 /// Discovered Python nodes that run as their own node, with the key kind each publishes.
-pub(crate) const OWN_NODES: [(&str, &str); 2] = [
-    ("asset_functions", "asset"),
-    ("check_functions", "check"),
-];
+pub(crate) const OWN_NODES: [(&str, &str); 2] =
+    [("asset_functions", "asset"), ("check_functions", "check")];
 
 /// Model settings whose hooks may call a provider's hook.
 pub(crate) const HOOK_SETTINGS: [&str; 2] = ["pre_hooks", "post_hooks"];

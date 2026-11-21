@@ -15,11 +15,11 @@ use crate::store::models::{ControlStore, TransactionMode};
 /// Schedules first, then sensors, each a bounded page.
 pub(crate) async fn drain_due_triggers(
     store: &ControlStore,
-    lease: SchedulerLease,
+    (lease, origin): (SchedulerLease, Option<&str>),
     mut cycle: SchedulerCycle,
 ) -> Result<(SchedulerLease, SchedulerCycle), ControlError> {
-    let (lease, schedules, ticks) = drain_due(store, lease, DueKind::Schedule).await?;
-    let (lease, sensors, _) = drain_due(store, lease, DueKind::Sensor).await?;
+    let (lease, schedules, ticks) = drain_due(store, (lease, origin), DueKind::Schedule).await?;
+    let (lease, sensors, _) = drain_due(store, (lease, origin), DueKind::Sensor).await?;
     cycle.evaluated += schedules + sensors;
     cycle.ticks += ticks;
     Ok((lease, cycle))

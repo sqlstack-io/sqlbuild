@@ -3,13 +3,14 @@
 use crate::credentials::tests::role_helpers::{credentials, role_fixture};
 use crate::runs::tests::helpers::rows;
 use crate::scheduler::tests::contracts::helpers::{
-    outcome, scheduler_cycle, sensor_due_again, trigger_problems,
+    answer_sensor_work, make_sensors_due, outcome, scheduler_cycle, sensor_due_again,
+    trigger_problems,
 };
 use crate::scheduler::tests::contracts::test_types::{
     SensorRecheckTestCase, UnreadableSensorTestCase,
 };
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
-use crate::sensors::main::complete_builtin_sensor::complete_builtin_sensor;
+use crate::sensors::tests::helpers::complete_starting_job;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
@@ -98,7 +99,14 @@ fn given_a_sensor_an_earlier_release_left_unreadable_when_the_scheduler_cycles_t
             let (state, _) =
                 sensor_due_again(store, roles.location_id, test_case.earlier_form).await;
 
-            let cycled = scheduler_cycle(store, state).await;
+            let cycled = match scheduler_cycle(store, state).await {
+                Ok((state, _)) => {
+                    answer_sensor_work(store).await;
+                    make_sensors_due(store).await;
+                    scheduler_cycle(store, state).await
+                }
+                failed => failed,
+            };
 
             let count = |sql: &'static str| async move {
                 rows(store, sql, vec![]).await[0]["count"].as_i64()
@@ -159,12 +167,12 @@ fn given_a_sensor_whose_last_check_is_unreadable_when_it_is_checked_again_then_i
             let (state, trigger_id) =
                 sensor_due_again(store, roles.location_id, EARLIER_CHECK).await;
             let lease = state.lease.clone().expect("leader");
-            let request = begin_sensor_evaluation(store, &lease, trigger_id)
+            let request = begin_sensor_evaluation(store, &lease, (trigger_id, None))
                 .await
                 .expect("begin the re-check")
                 .expect("the sensor is due");
             let while_checking = trigger_problems(store, credentials(&roles.administrator)).await;
-            complete_builtin_sensor(store, &lease, &request)
+            complete_starting_job(store, &lease, &request)
                 .await
                 .expect("complete the re-check");
             let names = |lines: &[&str]| {

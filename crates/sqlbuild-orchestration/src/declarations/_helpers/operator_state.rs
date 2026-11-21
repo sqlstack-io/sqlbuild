@@ -8,6 +8,8 @@ use crate::declarations::models::{
 };
 use crate::sensors::main::read_sensor_cursor::read_sensor_cursor;
 use crate::sensors::main::reset_sensor_cursor::reset_sensor_cursor;
+use crate::sensors::main::skip_sensor_event::skip_sensor_event;
+use crate::sensors::models::SensorCursor;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{Change, ControlTransaction, Parameter};
@@ -28,7 +30,14 @@ pub(crate) async fn apply_operator_change(
             let (transaction, cursor) = read_sensor_cursor(transaction, request.trigger_id).await?;
             (transaction, Some(cursor))
         }
-        TriggerDeclaration::Schedule(_) => (transaction, None),
+        TriggerDeclaration::Schedule(_) => {
+            if matches!(request.change, TriggerChange::SkipEvent { .. }) {
+                return Err(ControlError::Invalid(
+                    "skip-event is for sensors; a schedule has no events".into(),
+                ));
+            }
+            (transaction, None)
+        }
     };
     let mut before =
         json!({"status_override": state.status_override, "last_tick_for": state.last_tick_for});
@@ -41,7 +50,9 @@ pub(crate) async fn apply_operator_change(
         TriggerChange::ResetDefault => state.status_override = None,
         TriggerChange::SetCursor { time } => state.last_tick_for = Some(time),
         TriggerChange::ResetCursor => state.last_tick_for = None,
+        TriggerChange::SkipEvent { .. } => {}
     }
+    let mut moved: Option<SensorCursor> = None;
     let (status, next) = match &state.definition_json {
         TriggerDeclaration::Schedule(definition) => trigger_timing(
             definition,
@@ -50,8 +61,17 @@ pub(crate) async fn apply_operator_change(
             state.status_override,
         )?,
         TriggerDeclaration::Sensor(definition) => {
-            if matches!(request.change, TriggerChange::ResetCursor) {
-                transaction = reset_sensor_cursor(transaction, request.trigger_id).await?;
+            match &request.change {
+                TriggerChange::ResetCursor => {
+                    transaction = reset_sensor_cursor(transaction, request.trigger_id).await?;
+                    moved = Some(SensorCursor::default());
+                }
+                TriggerChange::SkipEvent { event } => {
+                    let after;
+                    (transaction, after) = skip_sensor_event(transaction, request, event).await?;
+                    moved = Some(after);
+                }
+                _ => {}
             }
             let status = state.status_override.unwrap_or(definition.default_status);
             (
@@ -62,11 +82,7 @@ pub(crate) async fn apply_operator_change(
     };
     let mut after = json!({"status_override": state.status_override, "last_tick_for": state.last_tick_for, "reason": request.reason});
     if let Some(cursor) = cursor {
-        after["cursor"] = json!(if matches!(request.change, TriggerChange::ResetCursor) {
-            Default::default()
-        } else {
-            cursor
-        });
+        after["cursor"] = json!(moved.unwrap_or(cursor));
     }
     let (mut transaction, _) = query(transaction,
         "UPDATE sqb_trigger_state SET status=$1, status_override=$2, last_tick_for=$3, next_due_at=$4 WHERE trigger_id=$5 \

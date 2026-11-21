@@ -8,7 +8,7 @@
     ["SQBRPYTHON016", "orchestration/sensors/stock_feed.py", 1, 1],
     ["SQBRPYTHON019", "orchestration/sensors/stock_feed.py", 3, 8],
     ["SQBRPYTHON018", "orchestration/sensors/stock_feed.py", 7, 1],
-    ["SQBRPYTHON020", "orchestration/sensors/stock_feed.py", 16, 5],
+    ["SQBRPYTHON020", "orchestration/sensors/stock_feed.py", 14, 5],
     ["SQBRPYTHON015", "providers/carrier_api/provider.py", 3, 8],
     ["SQBRPYTHON014", "providers/carrier_api/provider.py", 8, 5],
     ["SQBRPYTHON013", "providers/stock_feed.py", 1, 1],

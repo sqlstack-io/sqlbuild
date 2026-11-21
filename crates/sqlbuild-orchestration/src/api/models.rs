@@ -51,6 +51,7 @@ use crate::api::_helpers::resources::{
     person_reads::ticks,
     person_reads::trigger_changes,
     person_reads::sensor_state,
+    person_reads::sensor_events,
     person_reads::snapshots,
     person_reads::health,
     person_reads::problems,
@@ -291,6 +292,19 @@ pub enum HumanLogin {
     Password(String),
     TrustedProxy(TrustedProxyAuthentication),
     Oidc(OidcAuthentication),
+}
+
+impl HumanLogin {
+    /// The address people reach the server at, when a sign-in method names it.
+    #[must_use]
+    pub fn origin(&self) -> Option<&str> {
+        match self {
+            Self::Password(origin) => Some(origin),
+            Self::TrustedProxy(proxy) => Some(&proxy.origin),
+            Self::Oidc(oidc) => Some(&oidc.origin),
+            Self::None | Self::Development(_) => None,
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -621,6 +635,8 @@ pub struct ServerFacts {
     pub pool_caps: crate::declarations::models::ServerPoolCaps,
     /// How long an acknowledged attention condition stays hidden while unchanged.
     pub attention_snooze: crate::acknowledgements::models::AttentionSnooze,
+    /// The address people reach the server at, which sensor events link runs under; `None` without a sign-in origin.
+    pub origin: Option<String>,
 }
 
 /// The server's version, storage, sign-in and retention, for administrators.

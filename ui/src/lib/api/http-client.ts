@@ -66,6 +66,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'setTriggerStates',
 	'resetTriggerToDefault',
 	'resetSensorCursor',
+	'skipSensorEvent',
 	'listChecks',
 	'getCheck',
 	'getCheckSql',
@@ -874,7 +875,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				// Missing provider secrets come from the target's own health; a refused or failed read leaves the item out and judges nothing.
 				locationHealth(scope.locationId)
 					.then(([health]) => (health.data ? { read: true, event: missingSecretsEventOf(scope.locationId, health.data) } : { read: false, event: null }))
-					.catch(() => ({ read: false, event: null }))
+					.catch(() => ({ read: false, event: null })),
+				listedTriggers(scope)
 			]);
 			// Every listing needs view on all of the target, so a partial viewer gets no counts at all.
 			const read = await reads.catch((error: unknown) => {
@@ -882,9 +884,9 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				throw error;
 			});
 			if (!read) return null;
-			const [runs, checks, nodes, changes, listed, acknowledgements, conditions, secrets] = read;
+			const [runs, checks, nodes, changes, listed, acknowledgements, conditions, secrets, triggers] = read;
 			const events = secrets.event ? [...listed, secrets.event] : listed;
-			return overviewOf({ healthRead: secrets.read, runs, checks, nodes, changes, events, acknowledgements, conditions, now: Date.now(), scopeKey: scope.locationId });
+			return overviewOf({ healthRead: secrets.read, runs, checks, nodes, changes, events, triggers, acknowledgements, conditions, now: Date.now(), scopeKey: scope.locationId });
 		},
 		listChecks: (scope: Scope, notBefore?: number): Promise<Check[]> => shared(`checks ${scope.locationId}`, () => checkListing(scope), notBefore),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
@@ -937,6 +939,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		},
 		async resetSensorCursor(scope: Scope, id: string, reason?: string | null): Promise<TriggerDetail> {
 			await changeTrigger(id, { kind: 'reset_cursor' }, reason);
+			const detail = await implemented.getTrigger(scope, id);
+			if (!detail) throw new ApiError('The trigger is no longer published', 404);
+			return detail;
+		},
+		async skipSensorEvent(scope: Scope, id: string, eventId: string, reason: string): Promise<TriggerDetail> {
+			await changeTrigger(id, { kind: 'skip_event', event: eventId }, reason);
 			const detail = await implemented.getTrigger(scope, id);
 			if (!detail) throw new ApiError('The trigger is no longer published', 404);
 			return detail;

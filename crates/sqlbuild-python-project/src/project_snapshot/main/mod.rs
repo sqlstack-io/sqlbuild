@@ -1,3 +1,4 @@
+pub mod attached_nodes;
 pub mod compile_declarations;
 pub mod compile_project_roles;
 pub mod job_group_cycles;

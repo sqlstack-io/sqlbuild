@@ -46,7 +46,7 @@ describe('location health', () => {
 
 	it('lists the newest check\'s providers missing secrets, the target\'s allowed ones last, and raises only the others', () => {
 		const orders = { provider: 'orders_api', path: 'providers/orders_api.py', settings: [{ field: 'api_key', variable: 'ORDERS_API_KEY', line: 18 }], nodes: ['source:raw_orders'], allowed: false };
-		const bucket = { provider: 'export_bucket', path: 'providers/storage.py', settings: [{ field: 'secret', variable: 'BUCKET_SECRET' }], nodes: ['task:export'], allowed: true };
+		const bucket = { provider: 'export_bucket', path: 'providers/storage.py', settings: [{ field: 'secret', variable: 'BUCKET_SECRET' }], nodes: ['asset:export'], allowed: true };
 		const older = seen(30, { kind: 'provider_secrets', generation: 1, missing: 2, providers: [orders, { ...orders, provider: 'gone' }] });
 		const newest = seen(10, { kind: 'provider_secrets', generation: 2, missing: 1, providers: [bucket, orders] });
 		expect(missingSecretsOf([newest, older]).map((p) => [p.provider, p.allowed, p.settings[0].line])).toEqual([

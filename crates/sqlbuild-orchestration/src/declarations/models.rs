@@ -378,7 +378,8 @@ pub struct JobMember {
 pub struct TriggerRecord {
     pub trigger_id: uuid::Uuid,
     pub name: String,
-    pub job_key: String,
+    /// The job or group a schedule starts; `None` for a sensor, whose function chooses.
+    pub job_key: Option<String>,
     pub definition_json: TriggerDeclaration,
     pub status: TriggerStatus,
     pub last_tick_for: Option<DateTime<Utc>>,
@@ -393,6 +394,9 @@ pub struct PersonTriggerRecord {
     pub latest_tick: Option<crate::scheduler::models::TickRecord>,
     /// A running schedule's next due times from `next_due_at` on, at most five; empty otherwise.
     pub upcoming: Vec<DateTime<Utc>>,
+    /// A sensor whose latest ticks failed: since when and the event it is stuck on.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sensor_failing: Option<crate::sensors::models::SensorFailing>,
 }
 
 /// One operator change of a trigger, as a person reads it: what changed, who changed it, when and why.
@@ -419,8 +423,15 @@ pub enum TriggerChange {
     Enable,
     Pause,
     ResetDefault,
-    SetCursor { time: DateTime<Utc> },
+    SetCursor {
+        time: DateTime<Utc>,
+    },
+    /// A sensor reads every retained event again from the start.
     ResetCursor,
+    /// A sensor's stuck `event` counts as delivered without calling the function again.
+    SkipEvent {
+        event: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

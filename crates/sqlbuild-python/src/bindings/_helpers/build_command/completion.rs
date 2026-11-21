@@ -1,5 +1,6 @@
 //! Cost finalization, runtime targets, the footer, execution JSON and phase timings.
 
+use sqlbuild_python_output::build_progress::main::report_build_checks::report_build_checks;
 use std::time::Instant;
 
 use pyo3::exceptions::PyKeyboardInterrupt;
@@ -472,6 +473,7 @@ pub(crate) fn complete_direct_build<'py>(
     let exit_code: i32 = build_exit_code(succeeded, (python_failed, checks_failed));
     if let Some(worker) = &context.worker {
         worker.ignored_audit_failures(result.ignored_audit_failure_count);
+        report_build_checks(py, worker, &outcome.executor_result)?;
     }
     let target_dir: Bound<'py, PyAny> =
         joined(&context.get("effective_project_dir")?, &["target"])?;

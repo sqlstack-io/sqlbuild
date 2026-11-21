@@ -21,6 +21,7 @@ use crate::native_commands::main::run_location_invocation::run_location_invocati
 use crate::native_commands::main::run_login_invocation::run_login_invocation;
 use crate::native_commands::main::run_native_invocation::run_native_invocation;
 use crate::native_commands::main::run_person_invocation::run_person_invocation;
+use crate::native_commands::main::run_sensor_invocation::run_sensor_invocation;
 use crate::native_commands::models::NativeParse;
 use crate::replay::main::serve_reused_compile::serve_reused_compile;
 
@@ -92,6 +93,11 @@ pub(crate) fn launch(arguments: Vec<OsString>, started: (Instant, SystemTime)) -
     let script = beside(&program, PYTHON_CLI_SCRIPT);
     if let Ok(NativeParse::Invocation { namespace, .. }) = &native
         && let Some(code) = run_location_invocation(namespace, script.as_deref())
+    {
+        return code;
+    }
+    if let Ok(NativeParse::Invocation { namespace, .. }) = &native
+        && let Some(code) = run_sensor_invocation(namespace, script.as_deref())
     {
         return code;
     }

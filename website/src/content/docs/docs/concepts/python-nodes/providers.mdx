@@ -171,14 +171,14 @@ Which target `ctx.target_config` describes depends on what uses the provider:
 | --- | --- |
 | Python nodes in `sqb build`, `sqb check` and `sqb load` | The command's target |
 | Event exporters and command output sinks | The command's target: `--target`, or the project's default target |
-| Orchestration sensors | The target the sensor evaluates for |
+| Orchestration sensors | The target the sensor's tick is for |
 | Orchestration calendars | `None` |
 
 Details:
 
 - When the project can't resolve the target's settings, for example because the target names a connection that isn't defined, every command that uses the target, such as `sqb build`, `sqb compile` or `sqb query`, fails before any exporter or sink provider is set up.
 - Commands that don't use the target, such as `sqb format`, still run, and their exporter and sink providers get `ctx` set to `None`.
-- In a project that defines providers, a sensor evaluation whose target's settings can't be resolved fails, and the sensor's cursor doesn't advance.
+- In a project that defines providers, a sensor tick whose target's settings can't be resolved fails, and its event is retried.
 - Check for `None` in a provider that calendars, exporters or sinks use.
 
 ## Configuration from environment variables

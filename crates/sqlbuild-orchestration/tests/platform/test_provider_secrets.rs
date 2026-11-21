@@ -18,7 +18,7 @@ fn given_providers_missing_secrets_when_a_location_reports_them_then_only_unallo
          "settings": [
             {"name": "base_url", "env": "ORDERS_API_BASE_URL", "missing": false, "line": 9},
             {"name": "api_key", "env": "ORDERS_API_KEY", "missing": true, "line": 12}]},
-        {"name": "export_bucket", "path": "providers/storage.py", "nodes": ["task:export"],
+        {"name": "export_bucket", "path": "providers/storage.py", "nodes": ["asset:export"],
          "settings": [
             {"name": "region", "env": "BUCKET_REGION", "missing": true},
             {"name": "secret", "env": "BUCKET_SECRET", "missing": true, "line": 14}]},

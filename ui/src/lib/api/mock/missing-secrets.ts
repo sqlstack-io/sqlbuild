@@ -115,8 +115,8 @@ export function missingSecrets(client: ApiClient, { sink = false }: { sink?: boo
 				const python_nodes = [
 					...result.plan.python_nodes,
 					...check.selection
-						.filter((key) => SNAPSHOT_NODES.find((node) => node.key === key)?.kind === 'task')
-						.map((name) => ({ name, kind: 'task', phase: 'after_models', identity_status: 'unchanged' }))
+						.filter((key) => SNAPSHOT_NODES.find((node) => node.key === key)?.kind === 'asset')
+						.map((name) => ({ name, kind: 'asset', phase: 'after_models', identity_status: 'unchanged' }))
 				];
 				return { ...result, plan: { ...result.plan, source_loads, python_nodes, cant_run } };
 			};

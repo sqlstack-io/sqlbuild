@@ -13,6 +13,7 @@ import type {
 	RunEvent,
 	RunNodeStatus,
 	SensorEvaluationOutcome,
+	AbandonReason,
 	TickOutcome,
 	TriggerKind,
 	TriggerStateEventKind
@@ -227,11 +228,43 @@ export const tickOutcomeHelp: Record<TickOutcome, string> = {
 };
 
 export const evaluationTone: Record<SensorEvaluationOutcome, string> = {
-	requested: 'var(--sb-running)',
-	completed: 'var(--sb-success)',
+	running: 'var(--sb-running)',
+	handled: 'var(--sb-success)',
+	skipped: 'var(--muted-foreground)',
+	started: 'var(--sb-success)',
 	failed: 'var(--sb-error)',
 	timed_out: 'var(--sb-error)',
 	abandoned: 'var(--sb-warning)'
+};
+
+export const evaluationLabel: Record<SensorEvaluationOutcome, string> = {
+	running: 'Running',
+	handled: 'Handled',
+	skipped: 'Skipped',
+	started: 'Started',
+	failed: 'Failed',
+	timed_out: 'Timed out',
+	abandoned: 'Abandoned'
+};
+
+export const evaluationHelp: Record<SensorEvaluationOutcome, string> = {
+	running: 'The function is being called (running)',
+	handled: 'The function returned None (handled)',
+	skipped: 'The function returned a SkipReason (skipped)',
+	started: 'The function returned run requests, which started runs (started)',
+	failed: 'The function raised, or returned something it may not; the event is retried after the minimum interval (failed)',
+	timed_out: 'The function took longer than its timeout; the event is retried after the minimum interval (timed_out)',
+	abandoned: 'Ended before it finished; only a location that did not answer counts as failing (abandoned)'
+};
+
+export const abandonReasonLabel: Record<AbandonReason, string> = {
+	unanswered: "The location didn't answer in time",
+	superseded: 'The location replaced it, as when it restarted',
+	republished: 'The location published again',
+	paused: 'The sensor was paused',
+	cursor_reset: 'The cursor was reset or moved',
+	leader_changed: 'Another server took over scheduling',
+	skipped: 'An operator skipped its event'
 };
 
 export const triggerKindLabel: Record<TriggerKind, string> = {
@@ -239,17 +272,19 @@ export const triggerKindLabel: Record<TriggerKind, string> = {
 	calendar_schedule: 'Calendar schedule',
 	job_sensor: 'Job sensor',
 	node_sensor: 'Data sensor',
+	check_sensor: 'Check sensor',
 	platform_sensor: 'Problem sensor',
-	custom_sensor: 'Custom sensor'
+	polling_sensor: 'Polling sensor'
 };
 
 export const triggerKindHelp: Record<TriggerKind, string> = {
 	cron_schedule: 'Runs at times set by a cron expression (cron_schedule)',
 	calendar_schedule: 'Runs at times listed by a calendar, computed ahead of time (calendar_schedule)',
-	job_sensor: 'Starts a run when another job or group finishes (job_sensor)',
-	node_sensor: 'Starts a run when a model or source is rebuilt, fails or gets new data (node_sensor)',
-	platform_sensor: 'Runs code when a problem is recorded, e.g. to post a message (platform_sensor)',
-	custom_sensor: 'Your own @sensor function decides when to start runs (custom_sensor)'
+	job_sensor: 'Calls its function when another job or group finishes (job_sensor)',
+	node_sensor: 'Calls its function when a model or source is rebuilt, fails or gets new data (node_sensor)',
+	check_sensor: 'Calls its function when a check, audit or SQL test fails or warns in a run (check_sensor)',
+	platform_sensor: 'Calls its function when a problem is recorded, e.g. to post a message (platform_sensor)',
+	polling_sensor: 'Calls its function every interval, which decides whether to start runs (polling_sensor)'
 };
 
 export const stateEventLabel: Record<TriggerStateEventKind, string> = {
@@ -257,7 +292,8 @@ export const stateEventLabel: Record<TriggerStateEventKind, string> = {
 	paused: 'Paused',
 	reset_to_default: 'Reset to code',
 	cursor_set: 'Position set',
-	cursor_reset: 'Started over'
+	cursor_reset: 'Started over',
+	event_skipped: 'Event skipped'
 };
 
 export const eventTone = (event: RunEvent): string =>
