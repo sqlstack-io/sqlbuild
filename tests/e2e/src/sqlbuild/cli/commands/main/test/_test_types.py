@@ -658,3 +658,14 @@ class ScenarioStatementSummaryE2ETestCase:
     description: str
     expected_exit_code: int
     expected_kinds: frozenset[str]
+
+
+@dataclass(frozen=True)
+class PartitionedCallFixtureE2ETestCase:
+    """A model test whose `__table_fn__` fixture replaces a call, with the rows it should read."""
+
+    description: str
+    call: str
+    expected_rows: str
+    expected_exit_code: int
+    expected_stdout_fragment: str

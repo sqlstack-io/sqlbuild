@@ -28,6 +28,7 @@ use crate::compiler::_helpers::sql_tests::markers::{
     ProtectedRanges, marker_names, marker_names_in, replace_callable_markers,
     replace_dbt_ref_markers, replace_named_markers,
 };
+use crate::compiler::_helpers::sql_tests::partition_inputs::collapse_partition_inputs;
 use crate::compiler::_helpers::sql_tests::reader_references::{
     CompilerReads, assertion_ref_targets, calls_reference, unresolvable_call,
     unresolved_reference_error,
@@ -1707,8 +1708,12 @@ fn resolve_table_function_fixtures<'a>(
     if fixtures.mock_table_functions.is_empty() {
         return Ok(resolved);
     }
+    let collapsed =
+        collapse_partition_inputs(sql, &patterns.table_function, &patterns.lexical, |name| {
+            fixtures.mock_table_functions.contains_key(name)
+        })?;
     let (replaced, reached) = replace_callable_markers(
-        sql,
+        &collapsed,
         (&patterns.table_function, true, true),
         &patterns.lexical,
         |name, _call_suffix| {

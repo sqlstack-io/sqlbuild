@@ -401,6 +401,39 @@ The fixture name must match a declared table function. Fixtures can read helper 
 assertion can read a table-function fixture directly. To test the table function itself, use a
 [table function test](testing-reference.md#table-function-tests).
 
+How often the fixture's rows appear depends on the call:
+
+- A call without an `OVER` clause runs once per input row, so the fixture is joined to each row
+  before it in the `FROM` clause, as the function's result for that row.
+- A call with `OVER (PARTITION BY ...)`, such as a [Python table
+  function](functions.md#python-table-functions), stands for its whole output: write
+  exactly the rows the call returns, and the model reads each fixture row once, however many input
+  rows there are. Those rows don't belong to an input row, so the columns of the relations before
+  the call in its `FROM` clause are NULL in them, the `PARTITION BY` columns included. Read the
+  function's output columns.
+
+```sql
+-- models/smoothed_payments.sql reads:
+-- FROM __ref("payments") p,
+--   __table_fn("smooth_payments")(p.customer_id, p.paid_at, p.amount)
+--     OVER (PARTITION BY p.customer_id) s
+TEST();
+
+WITH
+__ref__payments AS (
+  SELECT * FROM VALUES (1, 1.0, 10.0), (1, 2.0, 20.0), (1, 3.0, 30.0)
+    AS v (customer_id, paid_at, amount)
+),
+__table_fn__smooth_payments AS (
+  SELECT 1 AS customer_id, 3.0 AS paid_at, 20.0 AS amount_smoothed
+),
+__expected__smoothed_payments AS (
+  SELECT 1 AS customer_id, 3.0 AS paid_at, 20.0 AS amount_smoothed
+)
+```
+
+The three payments return the fixture's one row once.
+
 ## Multiple expected models
 
 One test can check several models. Each is compared on its own:
