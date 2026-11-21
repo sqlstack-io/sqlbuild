@@ -1,4 +1,4 @@
-//! A group orders a warehouse round trip by its nearest lineage, SQL to task to loader to models, on both stores.
+//! A group orders a warehouse round trip by its nearest lineage, SQL to asset to loader to models, on both stores.
 
 use std::collections::BTreeMap;
 
@@ -25,7 +25,7 @@ use crate::store::tests::store_test_types::Backend;
 fn given_a_round_trip_split_across_jobs_when_the_group_runs_then_members_follow_the_loader_edge() {
     let test_cases = [
         RoundTripGroupTestCase {
-            description: "SQLite: the task waits for SQL, the loader for the task, the model for the loader",
+            description: "SQLite: the asset waits for SQL, the loader for the asset, the model for the loader",
             backend: Backend::Sqlite,
             expected_waits: json!({
                 "orders_job": [],
@@ -36,7 +36,7 @@ fn given_a_round_trip_split_across_jobs_when_the_group_runs_then_members_follow_
             expected_order: &["orders_job", "score_job", "ingest_job", "report_job"],
         },
         RoundTripGroupTestCase {
-            description: "PostgreSQL: the task waits for SQL, the loader for the task, the model for the loader",
+            description: "PostgreSQL: the asset waits for SQL, the loader for the asset, the model for the loader",
             backend: Backend::Postgres,
             expected_waits: json!({
                 "orders_job": [],

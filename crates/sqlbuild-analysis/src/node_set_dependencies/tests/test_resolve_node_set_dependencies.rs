@@ -28,7 +28,7 @@ fn given_job_and_tag_dependencies_when_resolving_then_each_reduces_to_its_end_no
         EndNodesTestCase {
             description: "a Python node reading the job's model is its end",
             groups: &[],
-            sets: &[("job", "with_task", None)],
+            sets: &[("job", "with_asset", None)],
             expected_ends: &[&["asset 'export_orders'"]],
         },
         EndNodesTestCase {

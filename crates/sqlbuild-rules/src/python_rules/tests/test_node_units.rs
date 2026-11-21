@@ -17,7 +17,7 @@ const UNIT_RULES: [&str; 10] = [
     "SQBRPYTHON012",
 ];
 
-const DAILY_TASK: &str = r#"from .main import main
+const DAILY_ASSET: &str = r#"from .main import main
 
 
 @asset(description="Daily.")
@@ -25,7 +25,7 @@ def daily(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#;
 
-const TASK_MAIN: &str = r#"from sqlbuild import PythonNodeResult
+const ASSET_MAIN: &str = r#"from sqlbuild import PythonNodeResult
 
 
 def main(ctx: AssetContext) -> PythonNodeResult:
@@ -155,7 +155,7 @@ def region_exports():
         PythonRunTestCase {
             description: "unit layout: a missing main.py, a stray module and a folder that is not _helpers/",
             files: &[
-                ("python/orders/daily/node.py", DAILY_TASK),
+                ("python/orders/daily/node.py", DAILY_ASSET),
                 ("python/orders/weekly/node.py", ""),
                 ("python/orders/weekly/main.py", ""),
                 ("python/orders/weekly/report.py", ""),
@@ -234,7 +234,7 @@ def unpacked(ctx: AssetContext) -> None:
     return main(**ctx)
 "#,
                 ),
-                ("python/orders/daily/main.py", TASK_MAIN),
+                ("python/orders/daily/main.py", ASSET_MAIN),
                 (
                     "python/orders/weekly/node.py",
                     r#"from python.orders.daily.main import main
@@ -245,7 +245,7 @@ def weekly(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#,
                 ),
-                ("python/orders/weekly/main.py", TASK_MAIN),
+                ("python/orders/weekly/main.py", ASSET_MAIN),
             ],
             config: json!({ "select": ["SQBRPYTHON005"] }),
             expected_faults: vec![
@@ -258,7 +258,7 @@ def weekly(ctx: AssetContext) -> None:
         PythonRunTestCase {
             description: "main.py: other statements, a result that does not fit the node kind, and no main()",
             files: &[
-                ("python/orders/daily/node.py", DAILY_TASK),
+                ("python/orders/daily/node.py", DAILY_ASSET),
                 (
                     "python/orders/daily/main.py",
                     r#"from sqlbuild import PythonNodeResult
@@ -315,7 +315,7 @@ def no_ctx(context: AssetContext) -> None:
 
 
 @asset(description="B.")
-def wrong_type(ctx: AssetContext, *, store: Store) -> None:
+def wrong_type(ctx: LoaderContext, *, store: Store) -> None:
     return main(ctx=ctx, store=store)
 
 
@@ -361,7 +361,7 @@ def quality(ctx: AssetContext) -> bool:
                     "from python.orders.weekly.main import main\n",
                 ),
                 ("python/orders/_helpers/dates.py", ""),
-                ("python/orders/daily/node.py", DAILY_TASK),
+                ("python/orders/daily/node.py", DAILY_ASSET),
                 ("python/orders/daily/_helpers/rows.py", ""),
                 (
                     "python/orders/daily/main.py",
@@ -395,7 +395,7 @@ def weekly(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#,
                 ),
-                ("python/orders/weekly/main.py", TASK_MAIN),
+                ("python/orders/weekly/main.py", ASSET_MAIN),
                 ("python/orders/weekly/constants.py", ""),
                 ("python/orders/weekly/_helpers/x.py", ""),
                 ("python/billing/invoices/node.py", ""),
@@ -414,7 +414,7 @@ def weekly(ctx: AssetContext) -> None:
         PythonRunTestCase {
             description: "checks.py: statements, a check of another unit's node, a check that computes, and a plain function report",
             files: &[
-                ("python/orders/daily/node.py", DAILY_TASK),
+                ("python/orders/daily/node.py", DAILY_ASSET),
                 (
                     "python/orders/weekly/node.py",
                     "@asset\ndef weekly(ctx):\n    pass\n",
@@ -591,7 +591,7 @@ def tables():
                 ),
                 (
                     "python/utils/flat.py",
-                    "@asset\ndef util_task(ctx):\n    return 1\n",
+                    "@asset\ndef util_asset(ctx):\n    return 1\n",
                 ),
             ],
             config: json!({ "select": ["SQBRPYTHON012"] }),
@@ -625,8 +625,8 @@ fn given_valid_shapes_and_hidden_mistakes_when_evaluating_unit_rules_then_report
             files: &[
                 ("python/utils/graph/node.py", "class Node:\n    pass\n"),
                 ("python/orders/models/node.py", "class Node:\n    pass\n"),
-                ("python/orders/daily/node.py", DAILY_TASK),
-                ("python/orders/daily/main.py", TASK_MAIN),
+                ("python/orders/daily/node.py", DAILY_ASSET),
+                ("python/orders/daily/main.py", ASSET_MAIN),
                 (
                     "python/orders/daily/_helpers/node.py",
                     "class Node:\n    pass\n",
@@ -669,7 +669,7 @@ def region_exports():
             return main(ctx=ctx)
 "#,
                 ),
-                ("python/orders/regions/main.py", TASK_MAIN),
+                ("python/orders/regions/main.py", ASSET_MAIN),
                 ("python/orders/ranked/constants.py", "SPECS: dict = {}\n"),
                 (
                     "python/orders/ranked/node.py",
@@ -686,7 +686,7 @@ def ranked_exports():
             return main(ctx=ctx, region=region)
 "#,
                 ),
-                ("python/orders/ranked/main.py", TASK_MAIN),
+                ("python/orders/ranked/main.py", ASSET_MAIN),
             ],
             config: json!({ "select": ["SQBRPYTHON010"] }),
             expected_faults: vec![],
@@ -711,9 +711,9 @@ def daily(ctx: AssetContext, *, store: "Store") -> None:
     return main(ctx=ctx, store=store)
 "#,
                 ),
-                ("python/orders/daily/main.py", TASK_MAIN),
-                ("python/orders/weekly/node.py", DAILY_TASK),
-                ("python/orders/weekly/main.py", TASK_MAIN),
+                ("python/orders/daily/main.py", ASSET_MAIN),
+                ("python/orders/weekly/node.py", DAILY_ASSET),
+                ("python/orders/weekly/main.py", ASSET_MAIN),
             ],
             config: json!({ "select": ["SQBRPYTHON004", "SQBRPYTHON007", "SQBRPYTHON008"] }),
             expected_faults: vec![("SQBRPYTHON008", "python/orders/daily/node.py", 7, 43)],
@@ -721,8 +721,8 @@ def daily(ctx: AssetContext, *, store: "Store") -> None:
         PythonRunTestCase {
             description: "a node named through import a.b in depends_on passes; an unused import of a node does not",
             files: &[
-                ("python/orders/daily/node.py", DAILY_TASK),
-                ("python/orders/daily/main.py", TASK_MAIN),
+                ("python/orders/daily/node.py", DAILY_ASSET),
+                ("python/orders/daily/main.py", ASSET_MAIN),
                 (
                     "python/orders/weekly/node.py",
                     r#"import python.orders.daily.node
@@ -735,7 +735,7 @@ def weekly(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#,
                 ),
-                ("python/orders/weekly/main.py", TASK_MAIN),
+                ("python/orders/weekly/main.py", ASSET_MAIN),
                 (
                     "python/orders/weekly/_helpers/rows.py",
                     "from python.orders.daily.node import daily\n",
@@ -752,7 +752,7 @@ def weekly(ctx: AssetContext) -> None:
         PythonRunTestCase {
             description: "a quoted union result and a loader's tuple of rows fit their node",
             files: &[
-                ("python/orders/daily/node.py", DAILY_TASK),
+                ("python/orders/daily/node.py", DAILY_ASSET),
                 (
                     "python/orders/daily/main.py",
                     "def main(ctx: AssetContext) -> \"PythonNodeResult | PythonNodeSkipResult\":\n    return ctx.result()\n",
@@ -776,7 +776,7 @@ def weekly(ctx: AssetContext) -> None:
                     "python/orders/daily/node.py",
                     "from . import main\n\n\n@asset(description=\"D.\")\ndef daily(ctx: AssetContext) -> None:\n    return main(ctx=ctx)\n",
                 ),
-                ("python/orders/daily/main.py", TASK_MAIN),
+                ("python/orders/daily/main.py", ASSET_MAIN),
             ],
             config: json!({ "select": ["SQBRPYTHON005"] }),
             expected_faults: vec![("SQBRPYTHON005", "python/orders/daily/node.py", 5, 5)],
