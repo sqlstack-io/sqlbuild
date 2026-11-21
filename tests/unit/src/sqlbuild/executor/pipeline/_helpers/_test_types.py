@@ -220,6 +220,13 @@ class TemporaryTestFunctionTestCase:
 
 
 @dataclass(frozen=True)
+class TemporaryCopyPlacementTestCase:
+    description: str
+    session_schema: tuple[str, str] | None
+    expected_target: str
+
+
+@dataclass(frozen=True)
 class FunctionCallRewriteTestCase:
     description: str
     sql: str

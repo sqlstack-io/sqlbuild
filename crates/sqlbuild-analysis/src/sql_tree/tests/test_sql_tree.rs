@@ -117,6 +117,17 @@ fn given_sql_when_building_a_rule_tree_then_clauses_own_their_queries_at_their_s
             ],
         },
         TreeShapeTestCase {
+            description: "a partitioned Snowflake table function marker reads with its OVER clause inside TABLE( )",
+            dialect: "snowflake",
+            sql: "SELECT s.a\nFROM p, __table_fn(\"f\")(p.x) OVER (PARTITION BY p.k) s JOIN (SELECT 2 AS k) q ON 1=1",
+            expected_nodes: vec![
+                ("select", 1, 1, None),
+                ("join", 2, 56, Some("select")),
+                ("select", 2, 61, Some("subquery")),
+                ("subquery", 2, 61, Some("join")),
+            ],
+        },
+        TreeShapeTestCase {
             description: "a Snowflake table function marker already inside TABLE( ) is not wrapped twice",
             dialect: "snowflake",
             sql: "SELECT 1\nFROM TABLE(__table_fn(\"f\")(1)) t JOIN (SELECT 2 AS k) s ON s.k = t.k",
