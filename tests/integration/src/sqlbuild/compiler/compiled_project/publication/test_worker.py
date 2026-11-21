@@ -40,6 +40,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     UnclaimedLoadTestCase,
     WorkerExecutionTestCase,
     WorkerHangUpTestCase,
+    WorkerReportTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     INTERMEDIATE_LOADER_FILES,
@@ -57,6 +58,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_log,
     wait_for_run,
     without_loads,
+    worker_printed,
     worker_result,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
@@ -2068,3 +2070,52 @@ def test_given_a_provider_missing_secrets_when_a_location_publishes_then_its_hea
         assert fragment in log, log
     for fragment in test_case.unexpected_output_fragments:
         assert fragment not in log, log
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerReportTestCase(
+            "a build prints its human output and no JSON report",
+            WorkerExecutionTestCase(
+                "a scheduled build",
+                "SELECT 23 AS amount",
+                "SELECT amount FROM orders",
+                "success",
+                [(23,)],
+            ),
+            [("model:orders", "success", None)],
+            frozenset(
+                {
+                    "invocation_started",
+                    "invocation_completed",
+                    "run_started",
+                    "run_completed",
+                    "operation_started",
+                    "operation_completed",
+                    "resource_attempt_started",
+                    "resource_attempt_completed",
+                    "statement_completed",
+                }
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_worker_run_when_its_output_is_captured_then_it_holds_no_json_report(
+    test_case: WorkerReportTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case.execution) as worker:
+        run: dict[str, Any] = worker_result(worker, test_case.execution)
+        printed, events = worker_printed(worker.control_store)
+        with sqlite3.connect(worker.control_store) as control:
+            nodes: list[tuple[str, str, int | None]] = control.execute(
+                "SELECT node_key, status, rows_affected FROM sqb_run_nodes WHERE run_id=? "
+                "ORDER BY node_key",
+                (run["run_id"],),
+            ).fetchall()
+    assert run["status"] == test_case.execution.expected_status, printed
+    assert nodes == test_case.expected_nodes, nodes
+    assert test_case.expected_recall_events <= events, sorted(events)
+    assert "{" not in [line.strip() for line in printed.splitlines()], printed
+    assert "Completed successfully" in printed.splitlines()[-1], printed

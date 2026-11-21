@@ -50,6 +50,7 @@ use sqlbuild_python_base::records::main::fields::replaced::replaced;
 use sqlbuild_python_front::compile_attachment::main::build_effective_connection_config::build_effective_connection_config;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 use sqlbuild_python_output::recall::models::InvocationRecall;
+use sqlbuild_python_output::result_output::main::results::discard_reports::discard_reports;
 use sqlbuild_python_project::compiled_project::constants::SQL_TEST_KEY_PREFIX;
 use sqlbuild_python_project::compiled_views::main::project::sql_tests::sql_tests;
 use sqlbuild_python_project::job_settings::constants::SQL_TEST_NODE_KIND;
@@ -371,6 +372,7 @@ pub(super) fn execute_worker<'py>(
             command_request(py, &discovered, arguments, (&owner, compiled))?;
         write_stderr(py, "Run inputs verified. Executing frozen selection...\n")?;
         let _rules = RulesAtLoadScope::enter();
+        let _reports = discard_reports();
         let directory: (PathBuf, Option<String>) = (
             arguments.value("project_dir")?.extract()?,
             Some(frozen.target.clone()),

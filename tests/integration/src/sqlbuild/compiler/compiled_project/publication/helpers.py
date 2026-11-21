@@ -2312,3 +2312,22 @@ def linked_project(project: Path) -> Path:
 def latest_redraw(shown: str) -> str:
     """The rows the live screen drew last, uncoloured: everything after its last clear."""
     return re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", shown.rsplit("\x1b[J", 1)[-1])
+
+
+def worker_printed(control_store: Path) -> tuple[str, frozenset[str]]:
+    """What the run's worker printed, both streams in order, and its Recall event types."""
+    with sqlite3.connect(control_store) as control:
+        printed: str = "".join(
+            data
+            for (data,) in control.execute(
+                "SELECT CAST(data AS TEXT) FROM recall_output WHERE invocation_id LIKE 'worker/%' "
+                "ORDER BY occurred_at, sequence"
+            ).fetchall()
+        )
+        events: frozenset[str] = frozenset(
+            event_type
+            for (event_type,) in control.execute(
+                "SELECT DISTINCT event_type FROM recall_events WHERE invocation_id LIKE 'worker/%'"
+            ).fetchall()
+        )
+    return printed, events

@@ -407,6 +407,16 @@ class DevelopmentEnvFileTestCase:
 
 
 @dataclass(frozen=True)
+class WorkerReportTestCase:
+    description: str
+    execution: WorkerExecutionTestCase
+    # The run's node statuses and the Recall event types the worker always records;
+    # the report never fed them.
+    expected_nodes: list[tuple[str, str, int | None]]
+    expected_recall_events: frozenset[str]
+
+
+@dataclass(frozen=True)
 class DevelopmentMissingSecretsTestCase:
     description: str
     first_env_file: str
