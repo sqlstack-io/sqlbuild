@@ -119,6 +119,7 @@ from sqlbuild.adapters.clickhouse.classes.relation_write_locks import RelationWr
 from sqlbuild.adapters.clickhouse.constants import (
     DEFAULT_COLUMN_DEFAULT_KIND,
     DEFAULT_DATABASE,
+    EXACT_ROW_COUNT_ENGINES,
     EXCHANGE_UNSUPPORTED_CODES,
     EXPECTED_OUTPUT_COLUMNS_CONFIG_KEY,
     FRESH_GENERATION_CLAUSE,
@@ -479,7 +480,7 @@ class ClickHouseAdapter(
     def rebuilt_table_row_count(
         self, *, connection: Any, database: str | None, schema: str | None, name: str
     ) -> int | None:
-        """``total_rows`` of a MergeTree-family table; other engines may not count exactly."""
+        """``total_rows`` of plain MergeTree tables; merging engines count rows before merges."""
 
         del database
         row: Any = self.execute(
@@ -488,7 +489,7 @@ class ClickHouseAdapter(
             + _database_filter(schema)
             + f" AND name = {quote_string(name)}",
         ).fetchone()
-        if row is None or row[1] is None or not str(row[0]).endswith("MergeTree"):
+        if row is None or row[1] is None or str(row[0]) not in EXACT_ROW_COUNT_ENGINES:
             return None
         return int(row[1])
 

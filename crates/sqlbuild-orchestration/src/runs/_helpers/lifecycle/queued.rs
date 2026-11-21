@@ -5,6 +5,7 @@ use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 
 use crate::runs::_helpers::requests::permissions::rewrites_history;
 use crate::runs::models::RunRequest;
+use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -38,10 +39,19 @@ pub(crate) async fn project_queued_run(
             Parameter::Text(request.requested_by.clone()), Parameter::Integer(request.priority), Parameter::Json(selection), Parameter::Text(digest),
             Parameter::Time(now), Parameter::Json(json!({"pending": request.selection.len()})), Parameter::Integer(cursor), Parameter::Json(json!(request)),
             Parameter::Boolean(rewrites_history(request, std::slice::from_ref(request)))]).await?;
+    let definitions;
+    (transaction, definitions) =
+        read_snapshot_nodes(transaction, request.snapshot_id, Some(&request.selection)).await?;
     for node in &request.selection {
+        let materialization: Option<String> = definitions
+            .get(node)
+            .and_then(|definition| definition.definition.get("materialization"))
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned);
         (transaction, _) = query(transaction,
-            "INSERT INTO sqb_run_nodes (run_id, node_key, status, writes) VALUES ($1,$2,'pending',$3)",
-            vec![Parameter::Id(request.run_id), Parameter::Text(node.clone()), Parameter::Boolean(request.write_set.contains(node))]).await?;
+            "INSERT INTO sqb_run_nodes (run_id, node_key, status, writes, materialization) VALUES ($1,$2,'pending',$3,$4)",
+            vec![Parameter::Id(request.run_id), Parameter::Text(node.clone()), Parameter::Boolean(request.write_set.contains(node)),
+                Parameter::OptionalText(materialization)]).await?;
     }
     Ok(transaction)
 }

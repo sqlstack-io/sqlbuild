@@ -1,14 +1,11 @@
 //! Bounded metadata projection; it never includes SQL, sampled rows or captured output.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use uuid::Uuid;
 
 use crate::runs::_helpers::lifecycle::waits::queue_states;
 
 use crate::runs::models::{RunNodeRecord, RunRecord};
 use crate::runs::types::RunsListing;
-use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::query_records::query_records;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -56,33 +53,13 @@ pub(crate) async fn list_runs_in(
     Ok((transaction, runs))
 }
 
-/// The run's nodes, each with its materialization in the snapshot the run was pinned to.
+/// The run's nodes, each with the materialization its snapshot gave it when the run was queued.
 pub(crate) async fn run_nodes_in(
     transaction: ControlTransaction,
     run_id: Uuid,
 ) -> Result<(ControlTransaction, Vec<RunNodeRecord>), ControlError> {
-    let (transaction, mut nodes): (_, Vec<RunNodeRecord>) = query_records(transaction,
+    query_records(transaction,
         "SELECT node_key, status, started_at, ended_at, rows_affected, table_rows, rows_so_far, no_change_reason, \
-         error_code, skipped_because_of FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' ORDER BY node_key",
-        vec![Parameter::Id(run_id)]).await?;
-    let (transaction, runs): (_, Vec<BTreeMap<String, Uuid>>) = query_records(
-        transaction,
-        "SELECT snapshot_id FROM sqb_runs WHERE run_id=$1",
-        vec![Parameter::Id(run_id)],
-    )
-    .await?;
-    let Some(snapshot_id) = runs.first().and_then(|row| row.get("snapshot_id")).copied() else {
-        return Ok((transaction, nodes));
-    };
-    let selection: BTreeSet<String> = nodes.iter().map(|node| node.node_key.clone()).collect();
-    let (transaction, definitions) =
-        read_snapshot_nodes(transaction, snapshot_id, Some(&selection)).await?;
-    for node in &mut nodes {
-        node.materialization = definitions
-            .get(&node.node_key)
-            .and_then(|definition| definition.definition.get("materialization"))
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_owned);
-    }
-    Ok((transaction, nodes))
+         materialization, error_code, skipped_because_of FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' ORDER BY node_key",
+        vec![Parameter::Id(run_id)]).await
 }

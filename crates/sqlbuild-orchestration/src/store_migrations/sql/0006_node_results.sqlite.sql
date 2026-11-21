@@ -1,6 +1,7 @@
 -- A run's nodes say what each one did: the rows a rebuilt table holds, rows written so far while
 -- it runs, and why a node that ran changed nothing. A node the run never reached is `not_run`,
--- apart from a node something upstream skipped.
+-- apart from a node something upstream skipped. Each node also keeps the materialization its
+-- snapshot gave it, so listing a run's nodes reads no snapshot.
 CREATE TABLE sqb_run_nodes_v2 (
     run_id {uuid} NOT NULL REFERENCES sqb_runs(run_id),
     node_key TEXT NOT NULL,
@@ -16,6 +17,7 @@ CREATE TABLE sqb_run_nodes_v2 (
     table_rows BIGINT,
     rows_so_far BIGINT,
     no_change_reason TEXT,
+    materialization TEXT,
     PRIMARY KEY (run_id, node_key)
 );
 
