@@ -11,10 +11,7 @@ use crate::declarations::models::TriggerChange;
 use crate::runs::main::listings::list_runs::list_runs;
 use crate::runs::models::{NodeOutcome, RunOutcome};
 use crate::scheduler::tests::contracts::helpers::{acquire_lease, hold_lease};
-use crate::sensors::main::{
-    begin_sensor_evaluation::begin_sensor_evaluation,
-    complete_builtin_sensor::complete_builtin_sensor,
-};
+use crate::sensors::tests::helpers::drain_sensor;
 use crate::sensors::tests::helpers::{change, finish_run, snapshot};
 use crate::sensors::tests::test_types::SensorTestCase;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
@@ -64,9 +61,9 @@ fn given_independent_check_failures_when_nondecisive_results_arrive_then_only_ex
                 "inventory": {"description": "React to a transition", "selection": ["inventory"]}
             }));
             input.documents.insert("triggers".into(), json!({
-                "failed_checks": {"description": "Actual failures", "job_key": "inventory",
+                "failed_checks": {"description": "Actual failures", "function": "start_inventory", "code_hash": "v1", "timeout_seconds": 60,
                     "when": {"kind": "node_event", "selection": ["orders", "customers"], "kinds": ["failed"]}, "minimum_interval_seconds": 1},
-                "recovered_checks": {"description": "Actual recoveries", "job_key": "inventory",
+                "recovered_checks": {"description": "Actual recoveries", "function": "start_inventory", "code_hash": "v1", "timeout_seconds": 60,
                     "when": {"kind": "node_event", "selection": ["orders", "customers"], "kinds": ["recovered"]}, "minimum_interval_seconds": 1}
             }));
             publish_snapshot(store, &input).await.expect("publish");
@@ -128,17 +125,12 @@ fn given_independent_check_failures_when_nondecisive_results_arrive_then_only_ex
                 .expect("triggers");
             let mut queued = 0;
             for trigger in &triggers {
-                let pending = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                    .await
-                    .expect("evaluate")
-                    .expect("due");
                 let count = tokio::time::timeout(
                     Duration::from_secs(5),
-                    complete_builtin_sensor(store, &lease, &pending),
+                    drain_sensor(store, &lease, trigger.trigger_id),
                 )
                 .await
-                .expect("bounded transition page")
-                .expect("complete");
+                .expect("bounded ticks");
                 assert_eq!(
                     count,
                     if trigger.name == "failed_checks" {
@@ -155,19 +147,14 @@ fn given_independent_check_failures_when_nondecisive_results_arrive_then_only_ex
             assert_eq!(queued, test_case.expected_runs);
             tokio::time::sleep(Duration::from_secs(1)).await;
             for trigger in triggers {
-                let replay = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                    .await
-                    .expect("replay")
-                    .expect("due");
                 assert_eq!(
-                    complete_builtin_sensor(store, &lease, &replay)
-                        .await
-                        .expect("deduplicated replay"),
+                    drain_sensor(store, &lease, trigger.trigger_id).await,
                     if trigger.name == "failed_checks" {
                         3
                     } else {
                         2
-                    }
+                    },
+                    "a reset replays each event to a run its key already queued"
                 );
             }
             assert_eq!(

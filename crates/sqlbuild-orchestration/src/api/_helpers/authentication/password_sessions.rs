@@ -193,6 +193,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_reads::sensor_state),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/sensors/{name}/events",
+            get(crate::api::_helpers::resources::person_reads::sensor_events),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/snapshots",
             get(crate::api::_helpers::resources::person_reads::snapshots),
         )

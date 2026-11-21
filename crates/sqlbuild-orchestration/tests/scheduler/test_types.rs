@@ -18,7 +18,7 @@ pub(crate) struct MigratedConcurrencySourceTestCase {
     pub(crate) expected_refused_before: bool,
     pub(crate) expected_resolved_concurrency: serde_json::Value,
     pub(crate) expected_ticks: usize,
-    /// Runs queued after 0004, as `origin count`.
+    /// Runs queued after the migrations, as `origin count`; sensors published before 0005 wait for a republish.
     pub(crate) expected_runs: &'static [&'static str],
     /// A job page read and a group run request after 0004, before the location publishes again.
     pub(crate) expected_until_republished: [&'static str; 2],

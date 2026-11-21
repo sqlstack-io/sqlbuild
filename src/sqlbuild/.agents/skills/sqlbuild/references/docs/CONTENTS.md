@@ -168,3 +168,4 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [sqb location](cli/location.md) (`cli/location`) - Run a code location that publishes a project to the server, and check its health.
 - [sqb dev](cli/dev.md) (`cli/dev`) - Run the server, scheduler and a reloading code location for one project on your machine.
 - [sqb login and logout](cli/login.md) (`cli/login`) - Authorize a bounded CLI session through your server's browser sign-in.
+- [sqb sensor try](cli/sensor.md) (`cli/sensor`) - Call a sensor's function from your local code with a real event, without starting runs.

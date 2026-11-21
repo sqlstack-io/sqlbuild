@@ -57,7 +57,9 @@ import type {
 	Trigger,
 	TriggerDetail,
 	TriggerState,
-	TriggerStateEvent
+	TriggerStateEvent,
+	SensorEvaluation,
+	SensorFailing,
 } from '../types';
 import { newRequestId } from '$lib/browser/request-id';
 import {
@@ -1437,7 +1439,8 @@ export class MockOperate {
 						cursorUpdatedAt: rt.cursorUpdatedAt ? new Date(rt.cursorUpdatedAt).toISOString() : null,
 						cursorKnown: true,
 						currentFingerprint: currentFp,
-						lastEvaluatedFingerprint: sensorFp
+						lastEvaluatedFingerprint: sensorFp,
+						failing: failingOf(evaluations ?? [])
 					}
 				: null,
 			ticks: this.#ticksOf(def.name).map(plainTick),
@@ -1495,4 +1498,13 @@ function changedDecision(selection: string[], changed: Map<string, string>): Pla
 		}
 	}
 	return decision;
+}
+
+/** The run of failed ticks at the head of `evaluations` (newest first), as the server reports it. */
+function failingOf(evaluations: SensorEvaluation[]): SensorFailing | null {
+	const done = evaluations.filter((e) => e.outcome !== 'running');
+	const end = done.findIndex((e) => e.outcome !== 'failed' && e.outcome !== 'timed_out');
+	const failed = end === -1 ? done : done.slice(0, end);
+	const first = failed.at(-1);
+	return first ? { since: first.requestedAt, failedTicks: failed.length, eventId: first.eventId, eventSummary: first.eventSummary } : null;
 }

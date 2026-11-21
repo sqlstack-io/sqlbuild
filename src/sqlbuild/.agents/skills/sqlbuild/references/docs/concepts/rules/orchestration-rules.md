@@ -31,8 +31,8 @@ The Rule is selected with `SQBR` or `SQBRORCHESTRATION`, and with its exact code
 ## What counts as a named node
 
 The Rule reads the `select` of every [job](../orchestration.md#declare-a-job) and the
-`select` of each `node_event`, `source_new_data` and `source_stale` condition of a
-[sensor](../orchestration.md#start-a-job-from-a-sensor). It counts the distinct
+`select` of each `node_event`, `check_event`, `source_new_data` and `source_stale` condition of a
+[sensor](../orchestration.md#react-with-a-sensor). It counts the distinct
 [selector](../selectors.md) atoms that each name one node.
 
 | Atom | Counts |

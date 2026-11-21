@@ -8,20 +8,22 @@ use ruff_text_size::{Ranged, TextSize};
 use crate::cpython_tree::main::source_position::source_position;
 use crate::cpython_tree::models::SourceLines;
 use crate::orchestration_modules::constants::{
-    CALENDAR_CALL, ORCHESTRATION_MODULE, PLATFORM_EVENT_CALL, RUN_EVENT_CALL,
+    CALENDAR_CALL, ORCHESTRATION_MODULE, PLATFORM_EVENT_CALL, RUN_EVENT_CALL, RUN_REQUEST_CALL,
     SELECTING_CONDITION_CALLS, SENSOR_CALL,
 };
 use crate::orchestration_modules::models::{LiteralArgument, SourcePosition};
 
-/// The calls a module's `calendar`, `sensor` and condition names can make.
-const AUTHORING_CALLS: [&str; 7] = [
+/// The calls a module's `calendar`, `sensor`, condition and `RunRequest` names can make.
+const AUTHORING_CALLS: [&str; 9] = [
     CALENDAR_CALL,
     SENSOR_CALL,
     RUN_EVENT_CALL,
     PLATFORM_EVENT_CALL,
+    RUN_REQUEST_CALL,
     SELECTING_CONDITION_CALLS[0],
     SELECTING_CONDITION_CALLS[1],
     SELECTING_CONDITION_CALLS[2],
+    SELECTING_CONDITION_CALLS[3],
 ];
 
 /// The 1-based line and column of `offset`.
@@ -108,9 +110,17 @@ fn dotted(expression: &Expr) -> Option<String> {
 /// Which authoring call `call` is: an imported `calendar`, `sensor` or condition, or one reached as an attribute of the orchestration module.
 pub(crate) fn authoring_call(
     call: &ExprCall,
+    scope: (&BTreeMap<&str, &str>, &BTreeSet<String>),
+) -> Option<&'static str> {
+    authoring_name(call.func.as_ref(), scope)
+}
+
+/// Which authoring name `expression` is, as `authoring_call` reads a call's function.
+pub(crate) fn authoring_name(
+    expression: &Expr,
     (imported, modules): (&BTreeMap<&str, &str>, &BTreeSet<String>),
 ) -> Option<&'static str> {
-    let name: &str = match call.func.as_ref() {
+    let name: &str = match expression {
         Expr::Name(name) => imported.get(name.id.as_str())?,
         Expr::Attribute(attribute) if modules.contains(&dotted(&attribute.value)?) => {
             attribute.attr.as_str()

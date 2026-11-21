@@ -9,7 +9,10 @@ use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use sqlbuild_orchestration::dev_events::main::emit_dev_event::emit_dev_event;
 use sqlbuild_orchestration::dev_events::main::generation_failed::generation_failed;
-use sqlbuild_orchestration::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
+use sqlbuild_orchestration::sensors::constants::TRY_SENSOR_REQUEST;
+use sqlbuild_orchestration::sensors::models::{
+    SensorEvaluationRequest, SensorFunctionOutcome, SensorTrial,
+};
 use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryFailure, WarehouseHistoryKind, WarehouseHistoryRead,
 };
@@ -20,7 +23,7 @@ use crate::bindings::_helpers::location_command::constants::DUCKDB_LOCK_CONFLICT
 use crate::bindings::_helpers::location_command::constants::PLAN_REQUEST;
 use crate::bindings::_helpers::location_command::runtime_plan::runtime_plan;
 use crate::bindings::_helpers::location_command::types::HeldProject;
-use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
+use crate::bindings::_helpers::native_host::orchestration_sensors::{SensorCall, evaluate_sensor};
 use crate::bindings::_helpers::native_host::warehouse_metadata::close_history_session;
 use crate::bindings::_helpers::native_host::warehouse_metadata::open_history_session;
 use crate::bindings::_helpers::native_host::warehouse_metadata::read_history;
@@ -47,7 +50,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                 };
                 let request: serde_json::Value = serde_json::from_str(&line).map_err(|_| {
                     PyValueError::new_err(
-                        "runtime expects a JSON generation or sensor evaluation per line",
+                        "runtime expects a JSON generation, plan, metadata read, sensor evaluation or sensor trial per line",
                     )
                 })?;
                 let output = if let Some(generation) = request.as_i64() {
@@ -150,6 +153,28 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             }
                         }
                     }
+                } else if let Some(trial) = request.get(TRY_SENSOR_REQUEST) {
+                    let trial: SensorTrial =
+                        serde_json::from_value(trial.clone()).map_err(|_| {
+                            PyValueError::new_err("runtime received an invalid sensor trial")
+                        })?;
+                    let arguments = location_arguments(py, Some(options.clone()))?;
+                    let directory = arguments
+                        .value("project_dir")?
+                        .extract::<std::path::PathBuf>()?;
+                    let outcome = evaluate_sensor(
+                        py,
+                        &directory,
+                        SensorCall {
+                            sensor: &trial.sensor,
+                            target: &trial.target,
+                            evaluation_id: "trial",
+                            event: trial.event.as_ref(),
+                            cursor: None,
+                            code_hash: None,
+                        },
+                    );
+                    serde_json::to_string(&outcome)
                 } else {
                     let evaluation: SensorEvaluationRequest = serde_json::from_value(request)
                         .map_err(|_| {
@@ -168,16 +193,28 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     let directory = arguments
                         .value("project_dir")?
                         .extract::<std::path::PathBuf>()?;
-                    let outcome = match evaluate_sensor(py, &directory, &evaluation) {
-                        Ok(outcome) => outcome,
-                        Err(_) => {
-                            write_stderr(
-                                py,
-                                "Custom sensor evaluation failed. No cursor or run requests committed.\n",
-                            )?;
-                            CustomSensorOutcome::Failed
-                        }
-                    };
+                    let evaluation_id = evaluation.evaluation_id.to_string();
+                    let outcome = evaluate_sensor(
+                        py,
+                        &directory,
+                        SensorCall {
+                            sensor: &evaluation.sensor,
+                            target: &evaluation.target,
+                            evaluation_id: &evaluation_id,
+                            event: evaluation.event.as_ref(),
+                            cursor: evaluation.cursor.custom.as_deref(),
+                            code_hash: Some(&evaluation.definition.code_hash),
+                        },
+                    );
+                    if let SensorFunctionOutcome::Failed { .. } = outcome {
+                        write_stderr(
+                            py,
+                            &format!(
+                                "Sensor {} failed. No cursor or run requests committed.\n",
+                                evaluation.sensor
+                            ),
+                        )?;
+                    }
                     serde_json::to_string(&outcome)
                 };
                 let output = output.map_err(|error| PyValueError::new_err(error.to_string()))?;

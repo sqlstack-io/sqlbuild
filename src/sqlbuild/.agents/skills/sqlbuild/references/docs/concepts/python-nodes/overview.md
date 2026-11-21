@@ -133,6 +133,7 @@ Every decorator accepts the same organizational metadata:
 
 | Argument | Description |
 |----------|-------------|
+| `name` | The node's name; defaults to the function's name |
 | `depends_on` | A single function, tuple, or list of upstream nodes (and, where allowed, `model()`/`source()`/`seed()` references or a `job()`/`tag()`; see [SQL References](sql-references.md#depending-on-a-job-or-a-tag)) |
 | `tags` | Labels for selection, filtering, and catalog grouping |
 | `group` | A display/catalog grouping string |

@@ -30,6 +30,11 @@ pub(crate) const MIGRATIONS: &[StoreMigration] = &[
         sqlite: include_str!("../sql/0004_drop_concurrency_source.sqlite.sql"),
         postgres: include_str!("../sql/0004_drop_concurrency_source.postgres.sql"),
     },
+    StoreMigration {
+        name: "sensor_functions",
+        sqlite: include_str!("../sql/0005_sensor_functions.sqlite.sql"),
+        postgres: include_str!("../sql/0005_sensor_functions.postgres.sql"),
+    },
 ];
 
 /// The schema version a store created by this build has.

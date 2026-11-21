@@ -299,7 +299,8 @@
 					"docs/cli/server",
 					"docs/cli/location",
 					"docs/cli/dev",
-					"docs/cli/login"
+					"docs/cli/login",
+					"docs/cli/sensor"
 				]
 			}
 		]

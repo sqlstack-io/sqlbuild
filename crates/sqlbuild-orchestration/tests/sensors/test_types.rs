@@ -1,5 +1,5 @@
 use crate::runs::models::{NodeOutcome, RunOutcome, RunStatus};
-use crate::sensors::models::CustomSensorOutcome;
+use crate::sensors::models::SensorFunctionOutcome;
 use crate::store::tests::store_test_types::Backend;
 
 pub(crate) struct SensorTestCase {
@@ -9,7 +9,7 @@ pub(crate) struct SensorTestCase {
 }
 
 pub(crate) struct CustomSensorResultCase {
-    pub(crate) outcome: CustomSensorOutcome,
+    pub(crate) outcome: SensorFunctionOutcome,
     pub(crate) expected_phase: &'static str,
     pub(crate) expected_cursor: Option<&'static str>,
 }
@@ -42,4 +42,13 @@ pub(crate) struct SkippedMemberSensorTestCase {
     pub(crate) expected_marts_status: RunStatus,
     /// Sensors that fire, with how many runs each requested.
     pub(crate) expected_fired: &'static [(&'static str, usize)],
+}
+
+pub(crate) struct CheckEventTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The `check_event` kinds the sensor watches.
+    pub(crate) kinds: &'static [&'static str],
+    /// The checks whose outcome starts a run, each once.
+    pub(crate) expected_checks: &'static [&'static str],
 }

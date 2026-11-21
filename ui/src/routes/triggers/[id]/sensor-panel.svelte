@@ -9,9 +9,8 @@
 	import { app } from '$lib/state/app.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { runStatusLabel, runStatusTone } from '$lib/status';
-	import { evaluationTone, shortRunId } from '$lib/operate/labels';
-
-	const outcomeText: Record<string, string> = { requested: 'Checking…', completed: 'Done', failed: 'Failed', timed_out: 'Timed out', abandoned: 'Abandoned' };
+	import { evaluationHelp, evaluationLabel, evaluationTone, shortRunId } from '$lib/operate/labels';
+	import { plural } from '$lib/format/plural';
 
 	let { trigger }: { trigger: TriggerDetail } = $props();
 	const sensor = $derived(trigger.sensor!);
@@ -40,9 +39,8 @@
 	const changed = $derived(sensor.lastEvaluatedFingerprint !== null && sensor.lastEvaluatedFingerprint !== sensor.currentFingerprint);
 	const evaluationColumns: TableColumn[] = [
 		{ id: 'when', label: 'When', width: '120px' },
-		{ id: 'result', label: 'Result', width: '160px' },
-		{ id: 'position', label: 'Position', width: '24%', title: 'Cursor before → after' },
-		{ id: 'runs', label: 'Runs started', width: '110px', align: 'right' },
+		{ id: 'event', label: 'Event', width: '30%', title: 'The event the function was called with' },
+		{ id: 'result', label: 'Outcome', width: '130px' },
 		{ id: 'detail', label: 'Detail', minWidth: 220, truncate: false }
 	];
 	const requestColumns: TableColumn[] = [
@@ -56,12 +54,19 @@
 <section>
 	<h3>Condition</h3>
 	<p><code>{sensor.condition}</code></p>
+	<p title="Each tick calls this function in the code location, once per event">Runs <code>{sensor.action}</code></p>
 	{#each sensor.nodeConditions as c (c)}<p class="faint">and {c}</p>{/each}
 	<p class="faint" title={[sensor.minimumIntervalSeconds ? `Checks at most every ${sensor.minimumIntervalSeconds}s` : 'Checks each time something relevant happens', sensor.timeoutSeconds ? `a check is stopped if it takes over ${sensor.timeoutSeconds}s` : ''].filter(Boolean).join('; ')}>
 		{sensor.minimumIntervalSeconds ? `Min interval ${sensor.minimumIntervalSeconds}s` : 'On every event'}{sensor.timeoutSeconds ? ` · timeout ${sensor.timeoutSeconds}s` : ''}
 	</p>
 	{#if trigger.kind === 'platform_sensor'}
 		<p class="faint"><a href={to(`/locations/${app.locationId}#problems`)}>Problems it handled ↗</a></p>
+	{/if}
+	{#if sensor.failing}
+		<p class="warn" title="A failed tick leaves its event undelivered; it is retried after the minimum interval and later events wait">
+			<!-- copy-allow: consequence of a failing sensor -->
+			Stuck{#if sensor.failing.eventId} on <code>{sensor.failing.eventId}</code>{/if} since {formatAgo(sensor.failing.since, app.now)} · {plural(sensor.failing.failedTicks, 'failed tick')}
+		</p>
 	{/if}
 	{#if changed}
 		<p class="warn" title="The next check uses the new code. Fingerprint {sensor.lastEvaluatedFingerprint} → {sensor.currentFingerprint}">Code changed since last check</p>
@@ -93,16 +98,19 @@
 
 {#if trigger.evaluations}
 <section>
-	<h3 title="Each time the sensor ran its check (an evaluation), newest first">Recent checks</h3>
-	<DataTable class="static compact" embedded columns={evaluationColumns} rows={trigger.evaluations} key={(e) => e.id} empty="It hasn't checked yet.">
+	<h3 title="Each tick is one call of the function, newest first">Recent ticks</h3>
+	<DataTable class="static compact" embedded columns={evaluationColumns} rows={trigger.evaluations} key={(e) => e.id} empty="No ticks yet.">
 		{#snippet row(e)}
 				<tr>
 					<td class="nowrap" title={formatStamp(e.requestedAt)}>{formatAgo(e.requestedAt, app.now)}</td>
-					<td title="{e.outcome} · {e.id}"><StatusLabel tone={evaluationTone[e.outcome]} label={outcomeText[e.outcome] ?? e.outcome} /></td>
-					<td class="mono faint">{e.cursorBefore ?? '∅'}{#if e.cursorAfter && e.cursorAfter !== e.cursorBefore} → {e.cursorAfter}{/if}</td>
-					<td class="num">{e.runRequests}</td>
-					<td class:err={!!e.error} class:faint={!e.error}>
-						{e.error ?? e.skipReason ?? ''}
+					<td title={e.eventSummary ?? undefined}>{#if e.eventId}<code>{e.eventId}</code>{:else}<span class="faint" title="A polling sensor's tick has no event">Poll</span>{/if}</td>
+					<td title="{evaluationHelp[e.outcome]} · {e.id}"><StatusLabel tone={evaluationTone[e.outcome]} label={evaluationLabel[e.outcome]} /></td>
+					<td class:faint={!e.error}>
+						{#if e.outcome === 'skipped'}{e.skipReason ?? ''}{/if}
+						{#if e.runIds.length}→ {#each e.runIds as id, i (id)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${id}`)} title={id}>{shortRunId(id)}</a>{/each}{/if}
+						{#if e.outcome === 'failed' || e.outcome === 'timed_out'}
+							{#if e.error}<details class="trace"><summary class="err">{e.error.split('\n').at(-1)}</summary><pre>{e.error}</pre></details>{:else}<span class="err" title="The traceback needs view.evidence">{e.failureCode ?? e.outcome}</span>{/if}
+						{/if}
 						{#if e.skippedFor.length}<span title="The job's overlap is skip, so matching requests that arrived while a run was active were dropped">{e.skippedFor.length} skipped · {#each [...new Set(e.skippedFor)] as id, i (id)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${id}`)} title={id}>{shortRunId(id)}</a>{/each}</span>{/if}
 						{#if e.definitionFingerprint !== sensor.currentFingerprint}<span class="sb-tag ml-1.5" title="Checked with code fingerprint {e.definitionFingerprint}">older code</span>{/if}
 					</td>
@@ -127,7 +135,7 @@
 			{/snippet}
 		</DataTable>
 	{:else}
-		<p class="faint">{trigger.jobKey ? 'It hasn’t started any runs yet.' : 'No job'}</p>
+		<p class="faint">No runs yet.</p>
 	{/if}
 </section>
 {/if}
@@ -194,8 +202,20 @@
 		display: flex;
 		gap: 8px;
 	}
-	.num {
-		text-align: right;
+	.trace summary {
+		cursor: pointer;
+	}
+	.trace pre {
+		max-height: 320px;
+		margin-top: 4px;
+		padding: 6px 8px;
+		overflow: auto;
+		border: 1px solid var(--border);
+		border-radius: 2px;
+		background: var(--secondary);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		white-space: pre-wrap;
 	}
 	.nowrap {
 		white-space: nowrap;

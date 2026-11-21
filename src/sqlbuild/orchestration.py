@@ -7,6 +7,7 @@ from sqlbuild.orchestration_declarations.models.authoring import (
     RunRequest,
     SkipReason,
 )
+from sqlbuild.orchestration_declarations.models.authoring import CheckEventCondition as check_event
 from sqlbuild.orchestration_declarations.models.authoring import NodeEventCondition as node_event
 from sqlbuild.orchestration_declarations.models.authoring import (
     PlatformEventCondition as platform_event,
@@ -20,17 +21,38 @@ from sqlbuild.orchestration_declarations.models.authoring import (
     SourceStaleCondition as source_stale,
 )
 from sqlbuild.orchestration_declarations.models.sensor_context import SensorContext
-from sqlbuild.orchestration_declarations.types import NodeEventKind, PlatformEventKind, RunEventKind
+from sqlbuild.orchestration_declarations.models.sensor_events import (
+    CheckEvent,
+    NodeEvent,
+    PlatformEvent,
+    RunEvent,
+    SourceNewDataEvent,
+    SourceStaleEvent,
+)
+from sqlbuild.orchestration_declarations.types import (
+    CheckEventKind,
+    NodeEventKind,
+    PlatformEventKind,
+    RunEventKind,
+)
 
 __all__ = (
     "CalendarWindow",
+    "CheckEvent",
+    "CheckEventKind",
+    "NodeEvent",
     "NodeEventKind",
+    "PlatformEvent",
     "PlatformEventKind",
+    "RunEvent",
     "RunEventKind",
     "RunRequest",
     "SensorContext",
     "SkipReason",
+    "SourceNewDataEvent",
+    "SourceStaleEvent",
     "calendar",
+    "check_event",
     "compile_snapshot",
     "node_event",
     "platform_event",

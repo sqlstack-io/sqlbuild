@@ -149,6 +149,17 @@ export function attentionView(item: AttentionItem, now: number, changedBuild: Ch
 				action: 'View queue',
 				consequences: []
 			};
+		case 'sensor_failing':
+			return {
+				key: `sensor:${item.triggerId}`,
+				tone: 'error',
+				title: `Sensor ${item.triggerName} is failing`,
+				detail: [item.failing.eventId ? `Stuck on ${item.failing.eventId}` : null, plural(item.failing.failedTicks, 'failed tick')].filter(Boolean).join(' · '),
+				since: formatAgo(item.failing.since, now),
+				href: `/triggers/${item.triggerId}`,
+				action: 'View sensor',
+				consequences: []
+			};
 		case 'calendar_low':
 			return {
 				key: `calendar:${item.triggerId}`,

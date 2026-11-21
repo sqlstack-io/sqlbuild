@@ -204,7 +204,7 @@
 					</td>
 					<td>
 						<span class="type-cell" title={triggerKindHelp[t.kind]}>
-							{#if t.kind === 'cron_schedule'}<ClockIcon size={14} />{:else if t.kind === 'calendar_schedule'}<CalendarIcon size={14} />{:else if t.kind === 'custom_sensor'}<CodeIcon size={14} />{:else}<RadioIcon size={14} />{/if}
+							{#if t.kind === 'cron_schedule'}<ClockIcon size={14} />{:else if t.kind === 'calendar_schedule'}<CalendarIcon size={14} />{:else if t.kind === 'polling_sensor'}<CodeIcon size={14} />{:else}<RadioIcon size={14} />{/if}
 							{triggerKindLabel[t.kind]}
 						</span>
 					</td>

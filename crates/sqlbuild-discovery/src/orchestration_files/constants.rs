@@ -68,6 +68,11 @@ pub const JOB_KIND: (&str, &str) = ("job", "_job");
 pub const GROUP_KIND: (&str, &str) = ("job group", "_job_group");
 pub const CALENDAR_KIND: (&str, &str) = ("calendar", "_calendar");
 pub const SENSOR_KIND: (&str, &str) = ("sensor", "_sensor");
+/// How to declare a sensor: a decorator with keyword arguments on the function it runs.
+pub(crate) const SENSOR_DECORATOR_HELP: &str =
+    "write @sensor(description=\"...\", when=...) above the def of the function it runs";
+/// Where a sensor's name comes from.
+pub(crate) const SENSOR_NAME_HELP: &str = "the sensor's name is its function's name, such as def orders_failed_sensor(...); pass name=\"...\" to choose another";
 /// Where jobs, job groups and schedules are declared now, for projects that still use Python.
 pub const TOML_JOBS_HELP: &str = "jobs, job groups and schedules are TOML files in orchestration/jobs/ and orchestration/job_groups/; see https://sqlbuild.com/docs/concepts/orchestration/";
 /// The folder Python writes bytecode to, which declarations never live in.

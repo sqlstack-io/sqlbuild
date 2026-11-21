@@ -8,7 +8,7 @@
 // (CLI, CI) show too.
 
 import type { Iso, PlatformEvent, Principal } from '../types';
-import type { NodeKind, QueueWait, Run, RunStatus } from './operate';
+import type { NodeKind, QueueWait, Run, RunStatus, SensorFailing } from './operate';
 import type { MigrationEvent, OldNameView, RelationName } from './platform';
 
 // ---- node build state ----
@@ -406,7 +406,9 @@ export type AttentionItem =
 	| { kind: 'stale_sources'; sources: ({ key: string } & SourceFreshness)[]; condition?: AttentionCondition }
 	| { kind: 'platform_event'; event: PlatformEvent; condition?: AttentionCondition }
 	| { kind: 'queue_blocked'; runId: string; jobKey: string | null; queuedAt: Iso; waits: QueueWait[]; condition?: AttentionCondition }
-	| { kind: 'calendar_low'; triggerId: string; triggerName: string; detail: string; condition?: AttentionCondition };
+	| { kind: 'calendar_low'; triggerId: string; triggerName: string; detail: string; condition?: AttentionCondition }
+	/** A sensor whose latest ticks failed; it leaves the list with the next good tick. */
+	| { kind: 'sensor_failing'; triggerId: string; triggerName: string; failing: SensorFailing; condition?: AttentionCondition };
 
 export type OverviewMetrics = {
 	models: { total: number; addedThisWeek: number; removedThisWeek: number };

@@ -2,22 +2,24 @@
 
 use std::collections::BTreeMap;
 
-use ruff_python_ast::{Expr, ExprCall};
+use ruff_python_ast::{Expr, ExprCall, Stmt, StmtFunctionDef};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::cpython_tree::main::walk_breadth_first::walk_breadth_first;
 use crate::cpython_tree::models::{CpythonNode, ParsedSource, SourceLines};
 use crate::orchestration_modules::_helpers::calls::{
-    authoring_call, literal, literal_strings, module_names, position,
+    authoring_call, authoring_name, literal, literal_strings, module_names, position,
 };
 use crate::orchestration_modules::_helpers::conditions::{
     condition_source, module_assignments, module_imports,
 };
 use crate::orchestration_modules::constants::{
-    JOB_KEYWORD, NAME_KEYWORD, RUN_EVENT_CALL, RUN_KEYWORD, TARGETS_KEYWORD, WHEN_KEYWORD,
+    JOB_KEYWORD, NAME_KEYWORD, RUN_EVENT_CALL, RUN_REQUEST_CALL, SENSOR_CALL, TARGETS_KEYWORD,
+    WHEN_KEYWORD,
 };
 use crate::orchestration_modules::models::{
     ConditionSource, LiteralArgument, ModuleScope, PythonDeclaration, PythonDeclarationKind,
+    SensorForm,
 };
 
 /// The names `parsed`'s authoring calls and conditions resolve against, with `imports` from `imported_names`.
@@ -39,23 +41,35 @@ pub(crate) fn module_scope<'a>(
     }
 }
 
-/// The declaration one `calendar(...)` or `sensor(...)` call makes.
+/// The declaration one `calendar(...)` or `sensor(...)` call makes; `decorated` is the function a sensor call decorates.
 pub(crate) fn call_declaration<'a>(
     call: &'a ExprCall,
     kind: PythonDeclarationKind,
-    scope: &ModuleScope<'a>,
+    (scope, decorated): (&ModuleScope<'a>, Option<&'a StmtFunctionDef>),
 ) -> PythonDeclaration {
     let lines: &SourceLines = scope.lines;
-    let name: Option<LiteralArgument> = call
-        .arguments
-        .find_argument_value(NAME_KEYWORD, 0)
-        .map(|value| literal(value, lines));
+    let sensor: bool = kind == PythonDeclarationKind::Sensor;
+    let name: Option<LiteralArgument> = if sensor {
+        call.arguments
+            .find_keyword(NAME_KEYWORD)
+            .map(|keyword| literal(&keyword.value, lines))
+            .or_else(|| {
+                decorated.map(|function| LiteralArgument {
+                    value: Some(function.name.as_str().to_owned()),
+                    position: position(lines, function.name.range().start()),
+                })
+            })
+    } else {
+        call.arguments
+            .find_argument_value(NAME_KEYWORD, 0)
+            .map(|value| literal(value, lines))
+    };
     let targets: Option<Vec<String>> = match call.arguments.find_keyword(TARGETS_KEYWORD) {
         Some(targets) => literal_strings(&targets.value),
         None => Some(Vec::new()),
     };
-    let (job_references, condition) = if kind == PythonDeclarationKind::Sensor {
-        sensor_references(call, scope)
+    let (job_references, condition) = if sensor {
+        sensor_references(call, (scope, decorated))
     } else {
         (Vec::new(), None)
     };
@@ -66,35 +80,87 @@ pub(crate) fn call_declaration<'a>(
         job_references,
         targets,
         condition,
+        sensor_form: sensor.then(|| match decorated {
+            Some(function) => SensorForm::Decorator {
+                function: function.name.as_str().to_owned(),
+            },
+            None => SensorForm::Call,
+        }),
+        positional: call
+            .arguments
+            .args
+            .first()
+            .filter(|_| sensor)
+            .map(|argument| position(lines, argument.range().start())),
     }
 }
 
-/// The sensor's `run` job, the jobs its run events name, and what its `when` condition selects.
+/// Each decorator call's function by where the call starts, and the bare `@sensor` decorators, which declare nothing.
+pub(crate) fn decorated_functions<'a>(
+    nodes: &[CpythonNode<'a>],
+    scope: &ModuleScope<'a>,
+) -> (
+    BTreeMap<TextSize, &'a StmtFunctionDef>,
+    Vec<PythonDeclaration>,
+) {
+    let mut decorated: BTreeMap<TextSize, &'a StmtFunctionDef> = BTreeMap::new();
+    let mut bare: Vec<PythonDeclaration> = Vec::new();
+    for node in nodes {
+        let CpythonNode::Stmt(Stmt::FunctionDef(function)) = node else {
+            continue;
+        };
+        for decorator in &function.decorator_list {
+            match &decorator.expression {
+                Expr::Call(call) => {
+                    decorated.insert(call.range().start(), function);
+                }
+                expression
+                    if authoring_name(expression, (&scope.imported, &scope.modules))
+                        == Some(SENSOR_CALL) =>
+                {
+                    bare.push(bare_sensor(expression, function, scope.lines));
+                }
+                _ => {}
+            }
+        }
+    }
+    (decorated, bare)
+}
+
+/// A bare `@sensor` decorator, which declares nothing until it is called with its arguments.
+fn bare_sensor(at: &Expr, function: &StmtFunctionDef, lines: &SourceLines) -> PythonDeclaration {
+    PythonDeclaration {
+        kind: PythonDeclarationKind::Sensor,
+        name: Some(LiteralArgument {
+            value: Some(function.name.as_str().to_owned()),
+            position: position(lines, function.name.range().start()),
+        }),
+        position: position(lines, at.range().start()),
+        job_references: Vec::new(),
+        targets: Some(Vec::new()),
+        condition: None,
+        sensor_form: Some(SensorForm::BareDecorator),
+        positional: None,
+    }
+}
+
+/// The jobs a sensor's run events name and its function's literal `RunRequest(job=...)` starts, and what `when` selects.
 fn sensor_references<'a>(
     call: &'a ExprCall,
-    scope: &ModuleScope<'a>,
+    (scope, decorated): (&ModuleScope<'a>, Option<&'a StmtFunctionDef>),
 ) -> (
     Vec<(&'static str, LiteralArgument)>,
     Option<ConditionSource>,
 ) {
     let lines: &SourceLines = scope.lines;
     let mut job_references: Vec<(&'static str, LiteralArgument)> = Vec::new();
-    if let Some(run) = call.arguments.find_keyword(RUN_KEYWORD) {
-        job_references.push((RUN_KEYWORD, literal(&run.value, lines)));
-    }
     let conditions: Vec<CpythonNode<'a>> = call
         .arguments
         .keywords
         .iter()
-        .filter(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .is_some_and(|arg| arg.as_str() != RUN_KEYWORD)
-        })
         .map(|keyword| CpythonNode::Expr(&keyword.value))
         .collect();
-    for inner in walk_breadth_first(conditions.clone()) {
+    for inner in walk_breadth_first(conditions) {
         let CpythonNode::Expr(Expr::Call(inner)) = inner else {
             continue;
         };
@@ -102,6 +168,21 @@ fn sensor_references<'a>(
             && let Some(job) = inner.arguments.find_keyword(JOB_KEYWORD)
         {
             job_references.push((RUN_EVENT_CALL, literal(&job.value, lines)));
+        }
+    }
+    let body: Vec<CpythonNode<'a>> = decorated
+        .into_iter()
+        .flat_map(|function| function.body.iter().map(CpythonNode::Stmt))
+        .collect();
+    for inner in walk_breadth_first(body) {
+        let CpythonNode::Expr(Expr::Call(inner)) = inner else {
+            continue;
+        };
+        if authoring_call(inner, (&scope.imported, &scope.modules)) == Some(RUN_REQUEST_CALL)
+            && let Some(job) = inner.arguments.find_keyword(JOB_KEYWORD)
+            && matches!(job.value, Expr::StringLiteral(_))
+        {
+            job_references.push((RUN_REQUEST_CALL, literal(&job.value, lines)));
         }
     }
     let condition: Option<ConditionSource> = call

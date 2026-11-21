@@ -17,7 +17,7 @@ use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 pub(crate) async fn drain_due_triggers(
     store: &ControlStore,
-    mut lease: SchedulerLease,
+    (mut lease, origin): (SchedulerLease, Option<&str>),
     mut cycle: SchedulerCycle,
 ) -> Result<(SchedulerLease, SchedulerCycle), ControlError> {
     let transaction = begin(store, TransactionMode::Read).await?;
@@ -37,7 +37,7 @@ pub(crate) async fn drain_due_triggers(
         }
         lease = renew_lease(store, &lease).await?;
     }
-    let (lease, sensor_evaluations) = drain_sensors(store, lease).await?;
+    let (lease, sensor_evaluations) = drain_sensors(store, (lease, origin)).await?;
     cycle.evaluated += sensor_evaluations;
     Ok((lease, cycle))
 }

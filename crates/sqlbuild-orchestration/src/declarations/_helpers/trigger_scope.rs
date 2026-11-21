@@ -1,4 +1,6 @@
-//! A trigger override's permission scope is every node the trigger's current job or group writes.
+//! A trigger override's permission scope is every node a schedule's job or group writes, or every node of a sensor's target.
+
+use std::collections::BTreeSet;
 
 use uuid::Uuid;
 
@@ -36,12 +38,26 @@ pub(crate) async fn trigger_scope(
         )
         .await;
     };
+    let location_id: Uuid = serde_json::from_value(row["location_id"].clone())
+        .map_err(|error| ControlError::Invalid(error.to_string()))?;
+    let target: String = row["target"].as_str().unwrap_or_default().into();
+    let Some(job_key) = row["job_key"].as_str() else {
+        let (transaction, nodes) = target_nodes(transaction, (location_id, &target)).await?;
+        return Ok((
+            transaction,
+            PermissionScope {
+                action,
+                location_id: Some(location_id),
+                target: Some(target),
+                nodes,
+            },
+        ));
+    };
     let job = JobRunRequest {
         run_id: Uuid::nil(),
-        location_id: serde_json::from_value(row["location_id"].clone())
-            .map_err(|error| ControlError::Invalid(error.to_string()))?,
-        target: row["target"].as_str().unwrap_or_default().into(),
-        job_key: row["job_key"].as_str().unwrap_or_default().into(),
+        location_id,
+        target,
+        job_key: job_key.into(),
         reason: request.reason.clone(),
         priority: 0,
         window: None,
@@ -64,5 +80,25 @@ pub(crate) async fn trigger_scope(
             target: Some(job.target),
             nodes,
         },
+    ))
+}
+
+/// Every node the target's current snapshot publishes: a sensor may start any of its jobs.
+async fn target_nodes(
+    transaction: ControlTransaction,
+    (location_id, target): (Uuid, &str),
+) -> Result<(ControlTransaction, BTreeSet<String>), ControlError> {
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT n.node_key FROM sqb_snapshot_nodes n JOIN sqb_current_snapshots c \
+         ON c.snapshot_id=n.snapshot_id WHERE c.location_id=$1 AND c.target=$2",
+        vec![Parameter::Id(location_id), Parameter::Text(target.into())],
+    )
+    .await?;
+    Ok((
+        transaction,
+        rows.iter()
+            .filter_map(|row| row["node_key"].as_str().map(str::to_owned))
+            .collect(),
     ))
 }

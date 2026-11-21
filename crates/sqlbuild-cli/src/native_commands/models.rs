@@ -9,6 +9,7 @@ use sqlbuild_orchestration::credentials::models::CredentialScope;
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWorkRequest, WarehouseReadFailure};
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
+use sqlbuild_orchestration::sensors::models::SensorEventChoice;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
     MetadataBatch, StatisticsRead, WarehouseHistoryFailure, WarehouseHistoryKind,
@@ -612,4 +613,27 @@ pub(crate) struct HeldCopy {
     pub(crate) version: String,
     pub(crate) consumption: bool,
     pub(crate) path: PathBuf,
+}
+
+/// Where the events come from: a server through the saved session, or a local `sqb dev` store.
+#[derive(Clone, Debug)]
+pub(crate) enum EventSource {
+    Server {
+        origin: String,
+        ca: Option<PathBuf>,
+        location_id: uuid::Uuid,
+    },
+    Development {
+        store_url: String,
+    },
+}
+
+/// One trial: the sensor, the project and target its code runs for, and how the event is chosen.
+#[derive(Clone, Debug)]
+pub(crate) struct SensorTrialArguments {
+    pub(crate) sensor: String,
+    pub(crate) project_dir: PathBuf,
+    pub(crate) target: String,
+    pub(crate) choice: SensorEventChoice,
+    pub(crate) source: EventSource,
 }

@@ -981,10 +981,12 @@ export type TriggerKind =
 	| 'job_sensor'
 	/** Built-in: a node or source changed in any run (rebuilt, failed, new data, stale). */
 	| 'node_sensor'
-	/** Built-in condition on platform events, with a code action. */
+	/** A check, audit or SQL test failed or warned inside a run. */
+	| 'check_sensor'
+	/** A platform event, such as an overdue tick or a failed run. */
 	| 'platform_sensor'
-	/** Custom `@sensor` evaluated in the code location. */
-	| 'custom_sensor';
+	/** No condition: the function is called every interval. */
+	| 'polling_sensor';
 
 export const TICK_OUTCOMES = ['requested', 'skipped', 'covered', 'failed'] as const;
 export type TickOutcome = (typeof TICK_OUTCOMES)[number];
@@ -1043,22 +1045,39 @@ export type TriggerStateEvent = {
 	value: string | null;
 };
 
-export type SensorEvaluationOutcome = 'requested' | 'completed' | 'failed' | 'timed_out' | 'abandoned';
+/** What one tick's function call did; `running` while it is in flight. */
+export type SensorEvaluationOutcome = 'running' | 'handled' | 'skipped' | 'started' | 'failed' | 'timed_out' | 'abandoned';
 
+/** One tick: one call of the sensor's function, on one event unless the sensor polls. */
 export type SensorEvaluation = {
 	id: string;
-	/** The latest phase recorded; `requested` alone means in flight. */
 	outcome: SensorEvaluationOutcome;
 	requestedAt: Iso;
 	finishedAt: Iso | null;
 	cursorBefore: string | null;
 	cursorAfter: string | null;
-	runRequests: number;
+	/** The event the function was called with; null for a polling sensor. */
+	eventId: string | null;
+	eventSummary: string | null;
+	/** The runs the tick started. */
+	runIds: string[];
+	/** Redacted; null without view.evidence. */
 	skipReason: string | null;
 	/** Active runs that matching requests yielded to, because the job's overlap is `skip`. */
 	skippedFor: string[];
+	failureCode: string | null;
+	/** The redacted traceback of a failed tick; null without view.evidence. */
 	error: string | null;
 	definitionFingerprint: string;
+};
+
+/** A sensor whose latest ticks failed, and the event it is stuck on. */
+export type SensorFailing = {
+	since: Iso;
+	failedTicks: number;
+	/** Null for a polling sensor. */
+	eventId: string | null;
+	eventSummary: string | null;
 };
 
 export type SensorRunRequest = {
@@ -1091,8 +1110,10 @@ export type TriggerDetail = Trigger & {
 		low: boolean;
 	} | null;
 	sensor: {
-		/** Built-in condition or the custom function, as declared. */
+		/** The declared condition in words, or the polling interval. */
 		condition: string;
+		/** The function each tick calls, such as `orders_failed()`. */
+		action: string;
 		nodeConditions: string[];
 		minimumIntervalSeconds: number;
 		timeoutSeconds: number | null;
@@ -1102,6 +1123,8 @@ export type TriggerDetail = Trigger & {
 		cursorKnown: boolean;
 		currentFingerprint: string | null;
 		lastEvaluatedFingerprint: string | null;
+		/** Present while the latest ticks fail. */
+		failing: SensorFailing | null;
 	} | null;
 	ticks: Tick[];
 	evaluations: SensorEvaluation[] | null;

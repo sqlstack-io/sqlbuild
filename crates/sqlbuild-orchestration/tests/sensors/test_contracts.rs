@@ -2,6 +2,8 @@
 
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
+#[path = "test_checks.rs"]
+mod test_checks;
 #[path = "test_custom.rs"]
 mod test_custom;
 #[path = "test_delivery.rs"]

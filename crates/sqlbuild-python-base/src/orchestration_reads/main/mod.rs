@@ -12,4 +12,7 @@ pub mod register_orchestration_declarations;
 pub mod run_controls;
 pub mod run_resources;
 pub mod secret_variables;
+pub mod sensor_event_record;
+pub mod sensor_outcome;
+pub mod sensor_traceback;
 pub mod setting_rows;

@@ -8,6 +8,7 @@ use sqlbuild_orchestration::api::main::parse_origin::parse_origin;
 use sqlbuild_orchestration::api::models::{ApiErrorBody, MutationResponse};
 use sqlbuild_orchestration::credentials::models::SessionIdentity;
 use sqlbuild_orchestration::platform::models::PersonWorkRequest;
+use sqlbuild_orchestration::sensors::models::{SensorEventChoice, SensorTrialEvents};
 use sqlbuild_orchestration::snapshots::models::NodeSql;
 use uuid::Uuid;
 
@@ -156,6 +157,41 @@ pub(crate) async fn warehouse_sync(
     )
     .await
     .map(|response| response.applied)
+}
+
+/// The published sensor and the events `choice` picks; a refusal carries the server's reason.
+pub(crate) async fn sensor_events(
+    client: &PersonClient,
+    credential: &PersonCredential,
+    (location, target, name): (Uuid, &str, &str),
+    choice: &SensorEventChoice,
+) -> Result<SensorTrialEvents, std::io::Error> {
+    let path = target_path(client, (location, target), &["sensors", name, "events"])?;
+    let query: [(&str, String); 1] = match choice {
+        SensorEventChoice::Recent { limit } => [("limit", limit.to_string())],
+        SensorEventChoice::Latest => [("latest", "true".to_owned())],
+        SensorEventChoice::Event { event_id } => [("event", event_id.clone())],
+        SensorEventChoice::Run { run_id } => [("run", run_id.to_string())],
+    };
+    let response = authorized(client, reqwest::Method::GET, &path, credential)?
+        .query(&query)
+        .send()
+        .await
+        .map_err(|_| std::io::Error::other("could not read sensor events from the server"))?;
+    if response.status() == reqwest::StatusCode::CONFLICT {
+        let body: ApiErrorBody = response
+            .json()
+            .await
+            .map_err(|_| std::io::Error::other("server returned an invalid error response"))?;
+        return Err(std::io::Error::other(body.error));
+    }
+    if !response.status().is_success() {
+        return Err(rejection(response, "Reading sensor events").await);
+    }
+    response
+        .json()
+        .await
+        .map_err(|_| std::io::Error::other("server returned invalid sensor events"))
 }
 
 /// The location targets the signed-in person can view.

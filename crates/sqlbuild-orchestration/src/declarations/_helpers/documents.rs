@@ -33,7 +33,7 @@ pub(crate) fn decode_definitions(
         ..Definitions::default()
     };
     for (name, value) in document::<Value>(documents, "triggers")? {
-        if value.get("when").is_some() {
+        if value.get("function").is_some() {
             definitions.sensors.insert(
                 name,
                 serde_json::from_value(value)

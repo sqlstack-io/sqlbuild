@@ -106,7 +106,7 @@ CREATE TABLE sqb_triggers (
     target TEXT NOT NULL,
     kind TEXT NOT NULL CHECK (kind IN ('schedule', 'sensor')),
     name TEXT NOT NULL,
-    job_key TEXT NOT NULL,
+    job_key TEXT,
     definition_json {json} NOT NULL,
     snapshot_id {uuid} NOT NULL REFERENCES sqb_snapshots(snapshot_id),
     removed_in_snapshot_id {uuid} REFERENCES sqb_snapshots(snapshot_id),
@@ -291,10 +291,17 @@ CREATE TABLE sqb_sensor_evaluation_events (
     phase TEXT NOT NULL CHECK (phase IN ('requested', 'completed', 'failed', 'timed_out', 'abandoned')),
     occurred_at {time} NOT NULL,
     fact_json {json} NOT NULL,
+    subject_event_id TEXT,
     UNIQUE (evaluation_id, phase)
 );
 CREATE INDEX sqb_sensor_evaluation_history ON sqb_sensor_evaluation_events(trigger_id, phase, occurred_at, evaluation_id);
 CREATE INDEX sqb_sensor_evaluation_expiry ON sqb_sensor_evaluation_events(occurred_at);
+CREATE INDEX sqb_sensor_evaluation_subject ON sqb_sensor_evaluation_events(trigger_id, subject_event_id) WHERE subject_event_id IS NOT NULL;
+CREATE TABLE sqb_sensor_deliveries (
+    trigger_id {uuid} NOT NULL REFERENCES sqb_triggers(trigger_id),
+    event_id TEXT NOT NULL,
+    PRIMARY KEY (trigger_id, event_id)
+);
 CREATE TABLE sqb_run_requests (
     trigger_id {uuid} NOT NULL REFERENCES sqb_triggers(trigger_id),
     run_key TEXT NOT NULL,
