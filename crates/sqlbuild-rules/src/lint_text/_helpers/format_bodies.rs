@@ -9,6 +9,7 @@ use sqlbuild_attachments::ceremonial_select::main::omitted_select_offset::omitte
 use sqlbuild_attachments::ceremonial_select::models::OmittedSelect;
 use sqlbuild_core::text::main::python_isspace::python_isspace;
 use sqlbuild_core::text::main::python_splitlines::python_splitlines;
+use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use sqlbuild_sqltext::sql_scan::main::dialect_non_code_ranges::dialect_non_code_ranges;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
@@ -29,7 +30,7 @@ use crate::lint_text::errors::LintTextError;
 use crate::lint_text::main::neutralize_interpolation::neutralize_interpolation;
 use crate::lint_text::main::restore_interpolation::restore_interpolation;
 use crate::lint_text::models::{
-    FormatFault, FormatFile, FormatRun, InterpolationSite, PreparedBody,
+    FormatFault, FormatFile, FormatRun, InterpolationSite, Neutralized, PreparedBody,
 };
 use sqlclean::sql_lint::models::{FormatRequest, FormatResponse};
 
@@ -169,6 +170,9 @@ pub(crate) fn prepare_file(
             core = statement.trim_end().to_string();
         }
         let neutralized = neutralize_interpolation(&core, dialect, true)?;
+        if !wraps_expression && omitted.is_none() && only_interpolation(&neutralized, dialect) {
+            continue;
+        }
         let mut sql: String = if wraps_expression {
             format!(
                 "{EXPRESSION_SELECT_PREFIX}{}\n{LINTED_EXPRESSION_ALIAS}",
@@ -231,6 +235,36 @@ fn macro_body_form(body: &str) -> MacroBodyForm {
         "SELECT" => MacroBodyForm::ColumnList,
         _ => MacroBodyForm::Expression,
     }
+}
+
+/// Whether a body is only SQLBuild syntax, `;` and comments, leaving a parser a lone placeholder that is no statement.
+fn only_interpolation(neutralized: &Neutralized, dialect: &str) -> bool {
+    if neutralized.sites.is_empty() {
+        return false;
+    }
+    let text: &str = &neutralized.text;
+    let syntax: LexicalSyntax = dialect_lexical_syntax(dialect);
+    let mut code: String = String::new();
+    let mut copied_to: usize = 0;
+    for (start, end) in dialect_non_code_ranges(text, &syntax) {
+        let range: &str = &text[start..end];
+        let comment: bool = range.starts_with(BLOCK_COMMENT_OPENER)
+            || syntax
+                .line_comment_prefixes
+                .iter()
+                .any(|prefix| range.starts_with(prefix.as_str()));
+        if comment {
+            code.push_str(&text[copied_to..start]);
+            code.push(' ');
+            copied_to = end;
+        }
+    }
+    code.push_str(&text[copied_to..]);
+    for site in &neutralized.sites {
+        code = code.replacen(&site.sentinel, " ", 1);
+    }
+    code.chars()
+        .all(|character| character == ';' || python_isspace(character))
 }
 
 /// The printed width of the SQLBuild syntax each sentinel stands in for, where it differs.
