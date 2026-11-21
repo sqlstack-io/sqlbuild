@@ -1120,7 +1120,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 		runIds: Array.from({ length: runRequests }, (_, i) => `run-${name.length.toString(16)}${seq.toString(16)}${i}`),
 		skipReason: null,
 		skippedFor: [],
-		failureCode: phase === 'failed' ? 'function_raised' : phase === 'timed_out' ? 'timed_out' : null,
+		failureCode: phase === 'failed' ? 'sensor_function_failed' : phase === 'timed_out' ? 'timed_out' : null,
 		error: null,
 		definitionFingerprint: fingerprint(name),
 		...extra

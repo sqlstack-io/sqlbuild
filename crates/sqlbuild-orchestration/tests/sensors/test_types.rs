@@ -43,3 +43,12 @@ pub(crate) struct SkippedMemberSensorTestCase {
     /// Sensors that fire, with how many runs each requested.
     pub(crate) expected_fired: &'static [(&'static str, usize)],
 }
+
+pub(crate) struct CheckEventTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The `check_event` kinds the sensor watches.
+    pub(crate) kinds: &'static [&'static str],
+    /// The checks whose outcome starts a run, each once.
+    pub(crate) expected_checks: &'static [&'static str],
+}

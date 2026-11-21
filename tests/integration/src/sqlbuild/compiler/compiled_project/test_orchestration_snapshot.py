@@ -1452,6 +1452,31 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             },
         ),
         SnapshotDiscoveryTestCase(
+            description="name= names the sensor apart from its function, with its own timeout",
+            files={
+                "orchestration/jobs/inventory_job.toml": (
+                    'name = "inventory_job"\ndescription = "Inventory."\nselect = "stg_orders"\n'
+                ),
+                "orchestration/sensors/orders_named_sensor.py": (
+                    "from sqlbuild.orchestration import RunRequest, sensor\n"
+                    "@sensor(name='orders_named_sensor', description='Poll orders.', timeout_seconds=15)\n"
+                    "def react(ctx):\n"
+                    "    return RunRequest(job='inventory_job', run_key='orders')\n"
+                ),
+            },
+            expected_jobs=("inventory_job",),
+            expected_sensors={
+                "orders_named_sensor": {
+                    "description": "Poll orders.",
+                    "function": "react",
+                    "timeout_seconds": 15,
+                    "minimum_interval_seconds": 30,
+                    "default_status": "running",
+                    "declared_at": {"path": "orchestration/sensors/orders_named_sensor.py", "line": 2},
+                }
+            },
+        ),
+        SnapshotDiscoveryTestCase(
             description="a run_event on a group member can watch for the group skipping it",
             files={
                 "orchestration/jobs/source_orders_job.toml": (

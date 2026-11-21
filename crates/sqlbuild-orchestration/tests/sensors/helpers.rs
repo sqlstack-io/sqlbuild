@@ -158,6 +158,13 @@ pub(crate) async fn finish_run(
     nodes: [NodeOutcome; 2],
     started: [bool; 2],
 ) -> Uuid {
+    let run_id = request_test_run(store, scope, job_key).await;
+    finish_claimed_run(store, lease, scope, run_id, outcome, nodes, started).await;
+    run_id
+}
+
+/// Queue a manual run of `job_key` as the test administrator.
+async fn request_test_run(store: &ControlStore, scope: (Uuid, &str), job_key: &str) -> Uuid {
     let run_id = Uuid::now_v7();
     let context = AuditContext {
         actor: "test-admin".into(),
@@ -183,7 +190,6 @@ pub(crate) async fn finish_run(
     )
     .await
     .expect("request source run");
-    finish_claimed_run(store, lease, scope, run_id, outcome, nodes, started).await;
     run_id
 }
 
@@ -196,6 +202,44 @@ pub(crate) async fn finish_claimed_run(
     outcome: RunOutcome,
     nodes: [NodeOutcome; 2],
     started: [bool; 2],
+) {
+    finish_checked_run(
+        store,
+        lease,
+        (scope, run_id),
+        (outcome, nodes, started),
+        &[],
+    )
+    .await;
+}
+
+/// Request a run of `job_key` and finish it with `outcome`, its nodes succeeding and each attached check ending as given.
+pub(crate) async fn finish_run_with_checks(
+    store: &ControlStore,
+    lease: &SchedulerLease,
+    (scope, job_key): ((Uuid, &str), &str),
+    outcome: RunOutcome,
+    checks: &[(&str, NodeOutcome)],
+) -> Uuid {
+    let run_id = request_test_run(store, scope, job_key).await;
+    finish_checked_run(
+        store,
+        lease,
+        (scope, run_id),
+        (outcome, [NodeOutcome::Success; 2], [true; 2]),
+        checks,
+    )
+    .await;
+    run_id
+}
+
+/// Finish a claimed run with its node outcomes, then each attached check's start and outcome.
+async fn finish_checked_run(
+    store: &ControlStore,
+    lease: &SchedulerLease,
+    (scope, run_id): ((Uuid, &str), Uuid),
+    (outcome, nodes, started): (RunOutcome, [NodeOutcome; 2], [bool; 2]),
+    checks: &[(&str, NodeOutcome)],
 ) {
     let limits = std::collections::BTreeMap::new();
     advance_groups(store, lease, (&limits, scope))
@@ -226,6 +270,15 @@ pub(crate) async fn finish_claimed_run(
             error_code: None,
             skipped_because_of: None,
             error_message: None,
+        });
+    }
+    for (check, finished) in checks {
+        changes.push(RunChange::CheckStarted {
+            node_key: (*check).into(),
+        });
+        changes.push(RunChange::CheckFinished {
+            node_key: (*check).into(),
+            outcome: *finished,
         });
     }
     for change in changes {

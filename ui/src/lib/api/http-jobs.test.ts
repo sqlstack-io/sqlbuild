@@ -89,7 +89,7 @@ describe('trigger mapping', () => {
 			event_id: after ? 'source:abc' : 'source:def',
 			event_summary: after ? 'source:stock_feed has a new version' : 'source:stock_feed has another version',
 			run_ids: after ? ['r-7'] : [],
-			failure_code: after ? null : 'function_raised',
+			failure_code: after ? null : 'sensor_function_failed',
 			error: after ? null : 'Traceback (most recent call last):\nValueError: feed down',
 			skipped_for: after ? ['r-busy', 'r-busy'] : [],
 			definition_fingerprint: fingerprint
@@ -118,7 +118,7 @@ describe('trigger mapping', () => {
 		});
 		expect(detail.definitionChanged).toBe(true);
 		expect(detail.evaluations?.map((e) => [e.id, e.outcome, e.cursorBefore, e.cursorAfter, e.eventId, e.runIds, e.failureCode, e.error, e.skippedFor])).toEqual([
-			['e-new', 'failed', 'event 40', null, 'source:def', [], 'function_raised', 'Traceback (most recent call last):\nValueError: feed down', []],
+			['e-new', 'failed', 'event 40', null, 'source:def', [], 'sensor_function_failed', 'Traceback (most recent call last):\nValueError: feed down', []],
 			['e-old', 'started', null, 'event 40', 'source:abc', ['r-7'], null, null, ['r-busy', 'r-busy']]
 		]);
 		expect(detail.runRequests).toEqual([{ runKey: 'stock-7', runId: 'r-7', evaluationId: 'e-old', requestedAt: '2026-11-07T06:00:05Z', runStatus: 'success' }]);

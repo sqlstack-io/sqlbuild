@@ -984,9 +984,16 @@ def scheduled_worker(
             | deployment.configuration
             | test_case.launcher_settings
         )
+        # The scheduler shares the server's sign-in origin, which sensor events link runs under.
+        origin: list[str] = [
+            value
+            for flag, value in zip(server_arguments, server_arguments[1:], strict=False)
+            if flag == "--password-origin"
+        ]
         write_server_config(
             configuration,
-            {"launchers": {deployment.kind: [launcher]}},
+            {"launchers": {deployment.kind: [launcher]}}
+            | ({"server": {"password_origin": origin[0]}} if origin else {}),
         )
         control_store: Path = directory / "control/.sqlbuild/control.sqlite3"
         with sqlite3.connect(control_store) as control:

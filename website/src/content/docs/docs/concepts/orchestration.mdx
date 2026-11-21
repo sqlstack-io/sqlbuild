@@ -295,7 +295,8 @@ from `sqlbuild.orchestration`. `RunEventKind` has `SUCCESS`, `WARN`, `PARTIAL`, 
 | `platform_event` | `PlatformEvent` | `id`, `occurred_at`, `event`, `details` |
 | Not set | `None` | None; keep your place between polls in `ctx.cursor` |
 
-`url` links to the run in the UI. It is `None` when the server has no sign-in origin configured.
+`url` links to the run in the UI. It is `None` when the scheduler's configuration sets no sign-in
+origin, such as `[server] password_origin`.
 
 | The function returns | The tick shows |
 | --- | --- |

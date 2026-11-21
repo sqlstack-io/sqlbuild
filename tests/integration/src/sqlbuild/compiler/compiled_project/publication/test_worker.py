@@ -1308,6 +1308,20 @@ def test_given_an_attached_check_when_a_worker_executes_then_its_own_outcome_is_
                 "models/inventory.sql": "inventory",
             },
         ),
+        WorkerExecutionTestCase(
+            "a check_event on the model reaches its attached check",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM inventory",
+            "success",
+            [(59,)],
+            files={
+                "python/checks/orders.py": "failed",
+                "orchestration/jobs/annual_orders_job.toml": "on_failure_job",
+                "orchestration/jobs/refresh_inventory_job.toml": "on_failure_destination",
+                "orchestration/sensors/failed_orders_sensor.py": "on_check_event_sensor",
+                "models/inventory.sql": "inventory",
+            },
+        ),
     ],
     ids=lambda case: case.description,
 )
