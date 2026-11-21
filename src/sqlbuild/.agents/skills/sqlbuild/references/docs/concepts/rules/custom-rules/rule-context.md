@@ -42,7 +42,8 @@ the expanded SQL after interpolation, declarations, and macros.
 ## Common SQL structures
 
 Common structures are available on expanded SQL as `SqlNode` source locations, each with a `kind`,
-a `line` and a `column`:
+a `line` and a `column`. The `kind` is the syntax tree's, such as `cte`, `join`, `subquery` or
+`star`:
 
 ```python
 for cte in sql.expanded.ctes():
@@ -58,7 +59,7 @@ for star in sql.expanded.star_projections():
 | `joins()` | Each explicit join clause, at its join keyword, not a comma-separated `FROM` item |
 | `subqueries()` | Each parenthesized subquery, at its opening parenthesis |
 | `star_projections()` | Each `*` and `table.*` that expands columns, including a function argument such as `OBJECT_CONSTRUCT(*)`, but not an aggregate's `*`, as in `COUNT(*)` |
-| `nodes(kind=...)` | Each syntax tree node of that kind, compared without case |
+| `nodes(kind=...)` | Each syntax tree node of exactly that kind, such as `column` |
 
 `line` and `column` count within the document's `source`. For expanded SQL that is the query
 text, not the model file. Authored SQL is the whole model file, including its `MODEL` header, so it
@@ -96,6 +97,45 @@ for node in sql.ast().walk():
 `kind`, a `line` and `column` where it starts, `children`, and `walk()`, which yields the node and
 its descendants in pre-order. Kinds are SQLQuack's snake_case names, such as `select`, `subquery`,
 `star`, `join`, `cte`, `alias`, `column`, `table`, `literal`, `function` and `window_function`.
+
+A statement's clauses are nodes too, each owning the expressions written in it, so a rule can look
+at one clause only:
+
+```python
+sql = ctx.sql.for_model(model).expanded
+for clause in sql.ast().walk():
+    if clause.kind == "where":
+        columns = [node for node in clause.walk() if node.kind == "column"]
+```
+
+| Clause kind | Belongs to | Children |
+| --- | --- | --- |
+| `cte` | A statement with `WITH` | The CTE's query |
+| `projection` | `select` | Each select-list item |
+| `from` | `select` | Each `FROM` source, including a comma-separated one |
+| `join` | `select`, `update`, `delete` | The joined source, then its `ON` condition |
+| `where` | `select`, `update`, `delete` | The predicate |
+| `group_by` | `select` | Each grouping key |
+| `having` | `select` | The predicate |
+| `qualify` | `select` | The predicate |
+| `order_by` | `select`, `union`, `intersect`, `except`, `update`, `delete` | Each sort key, without its direction |
+| `limit` | The same | The row count |
+| `partition_by` | `window_function` | Each partition key |
+| `window_order_by` | `window_function` | Each sort key, without its direction |
+
+A clause appears only where the SQL writes it, except `projection`, which every `select` has. An
+explicit join is a `join` node beside `from`. The `ORDER BY` and `LIMIT` after a `UNION`,
+`INTERSECT` or `EXCEPT` belong to the set operation, not to its last `select`.
+
+A statement's clause nodes come first among its children, in the order they are written: its
+`cte` nodes, `projection`, `from`, each `join`, then `where`, `group_by`, `having`, `qualify`,
+`order_by` and `limit`. Children outside any clause follow them, such as a set operation's queries,
+which therefore come after its `order_by` and `limit`.
+
+`cte` and `join` nodes have their own spans. The other clause nodes run from the start of their
+first child to the end of their last, among children with spans, so a `where` node covers the
+predicate. A clause none of whose children has a span has none either, and reports its
+statement's start.
 
 Nodes also have these attributes, which are `None` on nodes they don't apply to:
 

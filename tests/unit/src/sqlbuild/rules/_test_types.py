@@ -32,3 +32,23 @@ class UnplacedNodeTestCase:
     line: object
     column: object
     expected_position: tuple[int, int] | None
+
+
+@dataclass(frozen=True)
+class ClauseTreeTestCase:
+    """A query whose clause nodes a rule walks, with each one's children as `kind line:column`."""
+
+    description: str
+    dialect: str
+    sql: str
+    expected_clauses: dict[str, tuple[str, ...]]
+
+
+@dataclass(frozen=True)
+class CommonStructureKindTestCase:
+    """A query whose common structures a rule reads, each labelled with the syntax tree's kind."""
+
+    description: str
+    dialect: str
+    sql: str
+    expected_kinds: tuple[str, ...]
