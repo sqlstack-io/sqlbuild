@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { outputLive, pageQuery, toNodeLogEvents, toNodeOutputIndex, toNodeOutputPage } from './http-output';
+import { outputLive, pageQuery, toNodeLogEvents, toNodeOutputIndex, toNodeOutputPage, toRunOutputLines } from './http-output';
 
 type W = components['schemas'];
 
-const line = (number: number, text: string, extra: Partial<W['OutputLine']> = {}): W['OutputLine'] => ({ number, node_key: 'model:orders', stream: 'stdout', text, level: null, ...extra });
+const line = (number: number, text: string, extra: Partial<W['OutputLine']> = {}): W['OutputLine'] => ({ number, node_key: 'model:orders', stream: 'stdout', text, level: null, at: '2026-11-21T09:00:00Z', ...extra });
 
 describe('node output mapping', () => {
 	it('reads forwards from a line and backwards from just before one, leaving out the whole-output stream', () => {
@@ -82,6 +82,40 @@ describe('node output mapping', () => {
 		expect(toNodeLogEvents(index, 'run-1').map((e) => [e.type, e.nodeKey, e.level, e.message, e.occurredAt])).toEqual([
 			['node_log', 'asset:score_customers', 'info', 'scored 120 customers', '2026-11-21T09:00:00Z'],
 			['node_log', 'asset:score_customers', 'warn', '3 customers had no orders', '2026-11-21T09:00:01Z']
+		]);
+	});
+
+	it('tags the run’s newest lines with their node, and counts a node’s earlier lines before its first one shown', () => {
+		const page: W['OutputPage'] = {
+			rows: [
+				{ kind: 'line', line: line(41, 'Run inputs verified.', { node_key: 'run', stream: 'stderr' }) },
+				{ kind: 'line', line: line(42, 'batch 40 done') },
+				{ kind: 'line', line: line(43, 'loaded customers', { node_key: 'model:customers' }) }
+			],
+			line_count: 43,
+			from: 41,
+			to: 44,
+			next: null,
+			previous: 41
+		};
+		const index: W['RunOutputIndex'] = {
+			nodes: [
+				{ node_key: 'model:customers', line_count: 1, stdout_lines: 1, stderr_lines: 0, text_bytes: 17 },
+				{ node_key: 'model:orders', line_count: 40, stdout_lines: 40, stderr_lines: 0, text_bytes: 600 },
+				{ node_key: 'run', line_count: 2, stdout_lines: 1, stderr_lines: 1, text_bytes: 40 }
+			],
+			line_count: 43,
+			omitted_bytes: 0,
+			omitted_lines: 0,
+			dropped_bytes: 0,
+			marks: [],
+			logs: []
+		};
+		expect(toRunOutputLines(page, index).map((l) => [l.nodeKey, l.stream, l.text, l.omitted ?? 0])).toEqual([
+			[null, 'stderr', 'Run inputs verified.', 0],
+			['model:orders', 'stdout', '', 39],
+			['model:orders', 'stdout', 'batch 40 done', 0],
+			['model:customers', 'stdout', 'loaded customers', 0]
 		]);
 	});
 });

@@ -5,7 +5,7 @@ import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, isUnsupported, type ApiClient } from './client';
 import { applyNodeStates } from './node-states';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
-import { outputLive, pageQuery, toNodeLogEvents, toNodeOutputIndex, toNodeOutputPage, type NodeOutputAt } from './http-output';
+import { LIVE_OUTPUT_ROWS, outputLive, pageQuery, toNodeLogEvents, toNodeOutputIndex, toNodeOutputPage, toRunOutputLines, type NodeOutputAt } from './http-output';
 import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage, toNodeStates, toNodeStatusDelta } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
@@ -471,9 +471,17 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		async listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]> {
 			const refusal = `${scope.locationId}|${runId}`;
 			if (!evidenceLocations.has(scope.locationId) || outputRefused.has(refusal)) return [];
+			// The output store's newest lines, each with its node; a server that keeps no output store answers from Recall.
+			const [lines, index] = await Promise.all([
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/lines', { params: { path: runPath(scope, runId), query: { tail: true, limit: LIVE_OUTPUT_ROWS } } }),
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index', { params: { path: runPath(scope, runId) } })
+			]);
+			if (lines.response.status === 401) onUnauthorized();
+			if (lines.response.status === 403) outputRefused.add(refusal);
+			if (lines.response.status === 403) return [];
+			if (lines.data && index.data) return toRunOutputLines(lines.data, index.data);
 			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output', { params: { path: runPath(scope, runId) } });
 			if (response.status === 401) onUnauthorized();
-			if (response.status === 403) outputRefused.add(refusal);
 			if (response.status === 403) return [];
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toRunOutput(data);

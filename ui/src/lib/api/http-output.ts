@@ -1,5 +1,5 @@
 import type { components } from '$control/schema.d.ts';
-import type { NodeOutputIndex, NodeOutputLevel, NodeOutputLine, NodeOutputPage, NodeOutputRow, RunEvent, RunNode } from './types/operate';
+import type { NodeOutputIndex, NodeOutputLevel, NodeOutputLine, NodeOutputPage, NodeOutputRow, RunEvent, RunNode, RunOutputLine } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -70,4 +70,27 @@ export function toNodeLogEvents(wire: Wire['RunOutputIndex'], runId: string): Ru
 		attempt: null,
 		message: log.message
 	}));
+}
+
+/** The run's newest printed lines the log shows; earlier ones are in each node's output viewer. */
+export const LIVE_OUTPUT_ROWS = 2000;
+
+/**
+ * The run's newest printed lines, each with its node (none for lines printed outside any node), and,
+ * before a node's first line shown, how many of its earlier lines are only in its viewer.
+ */
+export function toRunOutputLines(page: Wire['OutputPage'], index: Wire['RunOutputIndex']): RunOutputLine[] {
+	const lines: Wire['OutputLine'][] = page.rows.flatMap((row) => (row.kind === 'line' ? [row.line] : []));
+	const shown = new Map<string, number>();
+	for (const line of lines) shown.set(line.node_key, (shown.get(line.node_key) ?? 0) + 1);
+	const totals = new Map(index.nodes.map((n) => [n.node_key, n.line_count]));
+	const marked = new Set<string>();
+	return lines.flatMap((line): RunOutputLine[] => {
+		const nodeKey = line.node_key === 'run' ? null : line.node_key;
+		const printed: RunOutputLine = { invocationId: '', stream: line.stream, at: line.at, text: line.text, error: false, nodeKey };
+		const earlier = (totals.get(line.node_key) ?? 0) - (shown.get(line.node_key) ?? 0);
+		if (!nodeKey || earlier <= 0 || marked.has(line.node_key)) return [printed];
+		marked.add(line.node_key);
+		return [{ ...printed, text: '', omitted: earlier }, printed];
+	});
 }
