@@ -58,5 +58,7 @@ mod test_retries;
 mod test_run_logs;
 #[path = "test_selection.rs"]
 mod test_selection;
+#[path = "test_stored_requests.rs"]
+mod test_stored_requests;
 #[path = "test_types.rs"]
 pub(crate) mod test_types;

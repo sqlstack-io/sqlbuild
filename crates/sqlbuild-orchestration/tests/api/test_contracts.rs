@@ -10,6 +10,8 @@ mod denials_helpers;
 mod fingerprint_reads_helpers;
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
+#[path = "newer_server/helpers.rs"]
+mod newer_server_helpers;
 #[path = "node_sql/helpers.rs"]
 mod node_sql_helpers;
 #[path = "node_states/helpers.rs"]
@@ -78,6 +80,8 @@ mod test_location_work;
 mod test_maintenance;
 #[path = "test_microbatch_coverage.rs"]
 mod test_microbatch_coverage;
+#[path = "test_newer_server.rs"]
+mod test_newer_server;
 #[path = "test_node_states.rs"]
 mod test_node_states;
 #[path = "test_oidc.rs"]
