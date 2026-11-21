@@ -171,7 +171,6 @@ pub enum UserCodeHost {
     ReadFactoryDefinition,
     ReadHookDefinition,
     ReadLoaderDefinition,
-    ReadTaskDefinition,
     AuditCase,
     RelationRenderer,
     SqlResourceRef,

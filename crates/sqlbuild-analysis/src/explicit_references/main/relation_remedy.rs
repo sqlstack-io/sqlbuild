@@ -15,7 +15,7 @@ pub fn relation_remedy(
         if kind != SOURCE_TYPE {
             return format!(
                 "loaders run before models and seeds and cannot read them; read \
-                 {kind}:{name} from a task or asset instead"
+                 {kind}:{name} from an asset instead"
             );
         }
         return match upstream_loaders.iter().find(|(source, _)| source == name) {

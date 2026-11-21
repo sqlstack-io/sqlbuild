@@ -751,25 +751,21 @@ class DiscoverPythonNodeFactoriesTestCase:
     description: str
     files: dict[str, str]
     expected_loader_names: tuple[str, ...]
-    expected_task_names: tuple[str, ...]
     expected_asset_names: tuple[str, ...]
     expected_check_names: tuple[str, ...]
     expected_loader_dependency_counts: tuple[int, ...] = ()
-    expected_task_dependency_counts: tuple[int, ...] = ()
     expected_asset_dependency_counts: tuple[int, ...] = ()
     expected_check_dependency_counts: tuple[int, ...] = ()
     expected_error_fragment: str = ""
 
 
 @dataclass(frozen=True)
-class DiscoverTaskAssetFunctionsTestCase:
+class DiscoverAssetFunctionsTestCase:
     description: str
     files: dict[str, str]
-    expected_task_names: tuple[str, ...]
-    expected_task_dependency_counts: tuple[int, ...]
-    expected_task_tags: tuple[tuple[str, ...], ...]
     expected_asset_names: tuple[str, ...]
     expected_asset_dependency_counts: tuple[int, ...]
+    expected_asset_tags: tuple[tuple[str, ...], ...]
     expected_asset_column_names: tuple[tuple[str, ...], ...]
     expected_asset_lineage_columns: tuple[tuple[str, ...], ...]
     expected_error_fragment: str = ""

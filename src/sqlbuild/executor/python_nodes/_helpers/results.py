@@ -54,7 +54,6 @@ def normalize_python_node_return(
             skip_reason=returned.reason,
         )
     if isinstance(returned, PythonNodeResult):
-        _validate_materialized_flag(kind=kind, materialized=returned.materialized)
         return PythonNodeExecutionResult(
             node_name=node_name,
             kind=kind,
@@ -120,8 +119,3 @@ def evaluate_python_node_fan_in(
         reason="All upstream Python nodes were skipped",
         skip_mode=SkipMode.SOFT,
     )
-
-
-def _validate_materialized_flag(*, kind: PythonNodeKind, materialized: bool | None) -> None:
-    if materialized is not None and kind != PythonNodeKind.ASSET:
-        raise ExecutorInputError("Only asset Python nodes may set materialized")

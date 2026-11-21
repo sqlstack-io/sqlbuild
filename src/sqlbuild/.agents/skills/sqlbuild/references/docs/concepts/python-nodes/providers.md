@@ -63,16 +63,16 @@ class WarehouseClient(Provider):
     api_key: str
 ```
 
-Provider names must be valid Python identifiers (`lower_snake_case`). They share the global project resource namespace with models, sources, seeds, functions, loaders, tasks, assets, checks, and hooks.
+Provider names must be valid Python identifiers (`lower_snake_case`). They share the global project resource namespace with models, sources, seeds, functions, loaders, assets, checks, and hooks.
 
 ## Using providers in Python nodes
 
 Providers are injected into Python node functions by **parameter name**. Add a parameter whose name matches the provider's runtime name:
 
 ```python
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
-@task
+@asset
 def export_orders(ctx, warehouse_client):
     """Export orders."""
     warehouse_client.session.upload(ctx.query("SELECT * FROM orders"))
@@ -83,10 +83,10 @@ SQLBuild matches the parameter name `warehouse_client` to the discovered provide
 You can also type-annotate the parameter for IDE support and compile-time validation:
 
 ```python
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 from providers.warehouse_client.provider import WarehouseClient
 
-@task
+@asset
 def export_orders(ctx, warehouse_client: WarehouseClient):
     """Export orders."""
     warehouse_client.session.upload(ctx.query("SELECT * FROM orders"))
@@ -97,7 +97,6 @@ When a type annotation is present, SQLBuild validates that the discovered provid
 Provider injection works in all Python node types:
 
 - **Loaders** (`@loader`)
-- **Tasks** (`@task`)
 - **Assets** (`@asset`)
 - **Checks** (`@check`)
 
@@ -135,10 +134,10 @@ def notify_complete(ctx):
 
 ## Using providers via context
 
-All Python node contexts (`TaskContext`, `AssetContext`, `CheckContext`, `LoaderContext`) and `HookContext` expose a `ctx.providers` container for name-based access:
+All Python node contexts (`AssetContext`, `CheckContext`, `LoaderContext`) and `HookContext` expose a `ctx.providers` container for name-based access:
 
 ```python
-@task
+@asset
 def export_orders(ctx):
     """Export orders."""
     client = ctx.providers.warehouse_client
@@ -349,7 +348,7 @@ provider with its class and docstring. A provider's page shows:
 | Tab | Shows |
 | --- | --- |
 | Settings | Each setting's type, environment variable and whether it is required; secret types are marked, and required settings are flagged **missing** when the location's environment doesn't set them |
-| Used by | The loaders, tasks, hooks and other code that take the provider, and the jobs that run that code |
+| Used by | The loaders, assets, hooks and other code that take the provider, and the jobs that run that code |
 
 Setting values, defaults included, are never published.
 

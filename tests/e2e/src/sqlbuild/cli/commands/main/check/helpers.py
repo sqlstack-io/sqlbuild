@@ -24,16 +24,16 @@ adapter = "duckdb"
 database = "python_check_project.duckdb"
 """,
             "python/tasks/orders.py": """
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task()
+@asset()
 def export_orders(ctx):
     '''Test task export_orders.'''
     return ctx.result(payload={"rows": 3}, metadata={"rows": 3})
 
 
-@task()
+@asset()
 def export_customers(ctx):
     '''Test task export_customers.'''
     return ctx.result(payload={"rows": 2}, metadata={"rows": 2})

@@ -7,9 +7,8 @@ use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// Discovered function collections and the node kind each holds.
-const COLLECTIONS: [(&str, &str); 4] = [
+const COLLECTIONS: [(&str, &str); 3] = [
     ("loader_functions", "loader"),
-    ("task_functions", "task"),
     ("asset_functions", "asset"),
     ("check_functions", "check"),
 ];

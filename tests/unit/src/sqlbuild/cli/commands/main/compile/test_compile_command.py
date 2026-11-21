@@ -178,15 +178,15 @@ def test_given_dag_flag_when_running_compile_then_writes_dag_artifact(
             expected_project_name="offline_compile",
             expected_node_ids={
                 "model:orders",
-                "task:prepare_orders",
+                "asset:prepare_orders",
                 "loader:warehouse_export",
                 "asset:orders_export",
                 "check:check_orders_export",
                 "check:check_loader_export",
             },
             expected_edges={
-                ("model:orders", "task:prepare_orders"),
-                ("task:prepare_orders", "loader:warehouse_export"),
+                ("model:orders", "asset:prepare_orders"),
+                ("asset:prepare_orders", "loader:warehouse_export"),
                 ("loader:warehouse_export", "asset:orders_export"),
                 ("loader:warehouse_export", "check:check_loader_export"),
             },

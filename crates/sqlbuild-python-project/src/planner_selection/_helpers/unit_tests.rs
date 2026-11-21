@@ -37,12 +37,7 @@ const RESOURCE_PATH_FILES: [&str; 4] = [
     "sql_function_files",
     "python_function_files",
 ];
-const RESOURCE_NODES: [&str; 4] = [
-    "loader_functions",
-    "task_functions",
-    "asset_functions",
-    "check_functions",
-];
+const RESOURCE_NODES: [&str; 3] = ["loader_functions", "asset_functions", "check_functions"];
 
 fn stem(path: &Bound<'_, PyAny>) -> PyResult<String> {
     path_stem(path)

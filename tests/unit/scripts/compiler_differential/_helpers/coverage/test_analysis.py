@@ -251,7 +251,7 @@ _CONFIG_KINDS: tuple[str, ...] = (
             description="literal_sql_relations_need_explicit_references",
             capture=empty_compiled_capture(
                 enforce_explicit_references=False,
-                unmatched_literal_sql_relations=[{"owner_label": "task:export"}],
+                unmatched_literal_sql_relations=[{"owner_label": "asset:export"}],
             ),
             expected_present=frozenset({"unmatched_literal_sql_relations"}),
             expected_absent=frozenset({"python_sql_literal_relation"}),

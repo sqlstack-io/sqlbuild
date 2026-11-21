@@ -38,7 +38,7 @@ The Rule reads the `select` of every [job](../orchestration.md#declare-a-job) an
 | Atom | Counts |
 | --- | --- |
 | A bare name, such as `order_totals` | Yes |
-| A typed name, such as `source:raw_orders` or `task:refund_review` | Yes |
+| A typed name, such as `source:raw_orders` or `asset:refund_review` | Yes |
 | Each name in an intersection, such as `order_totals,tag:finance` | The name only |
 | `tag:`, a folder path, `job:`, a job or job group name | No |
 | A name with `+` before or after it | No |

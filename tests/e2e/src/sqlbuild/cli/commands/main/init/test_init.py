@@ -36,7 +36,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
             ),
             expected_output_fragments=(
                 "SQLBuild project created",
-                "Add Python loaders, tasks, assets, checks, and factories to python/",
+                "Add Python loaders, assets, checks, and factories to python/",
                 "Add SQL hooks to hooks/sql/, Python hooks to hooks/python/",
                 "reusable audits to audits/generic/",
                 "standalone audits to audits/singular/",
@@ -77,8 +77,8 @@ def test_given_empty_project_directory_when_running_init_then_typed_resource_dir
                 "python/_helpers.py": "def order_count(rows):\n    return len(rows)\n",
                 "python/tasks/orders.py": (
                     "from python._helpers import order_count\n"
-                    "from sqlbuild.tasks import task\n\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n\n"
+                    "@asset\n"
                     "def count_orders(ctx):\n"
                     "    '''Test task count_orders.'''\n    return ctx.result(payload={'order_count': order_count([1, 2])})\n"
                 ),

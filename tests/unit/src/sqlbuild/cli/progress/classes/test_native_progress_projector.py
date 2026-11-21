@@ -70,8 +70,8 @@ def test_given_skipped_resource_when_projected_then_skip_terminal_renders_once(
         run_scope("run-skip-projection"),
         dispatcher_scope(dispatcher),
         ResourceAttemptLifecycle(
-            resource_id="task:skipped",
-            resource_kind="task",
+            resource_id="asset:skipped",
+            resource_kind="asset",
             resource_name="skipped",
         ) as lifecycle,
     ):
@@ -80,8 +80,8 @@ def test_given_skipped_resource_when_projected_then_skip_terminal_renders_once(
     assert tuple(event.event_type for event in events) == test_case.expected_event_types
     assert stream.flush_count == test_case.expected_flush_count_before_block
     lines: tuple[str, ...] = tuple(stream.getvalue().splitlines())
-    assert lines[0] == "  task      skipped START"
-    assert lines[1].startswith("  task      skipped SKIP 0.")
+    assert lines[0] == "  asset     skipped START"
+    assert lines[1].startswith("  asset     skipped SKIP 0.")
 
 
 @pytest.mark.parametrize(
@@ -90,13 +90,13 @@ def test_given_skipped_resource_when_projected_then_skip_terminal_renders_once(
         RetryProjectionCase(
             description="retry attempts flush before each blocking boundary",
             expected_lines=(
-                "  task      flaky START",
-                "    Python task attempt 1  START",
-                "    Python task attempt 1  FAIL  (0.00s)",
+                "  asset     flaky START",
+                "    Python asset attempt 1  START",
+                "    Python asset attempt 1  FAIL  (0.00s)",
                 "    retry 1->2 in 0.25s",
-                "    Python task attempt 2  START",
-                "    Python task attempt 2  OK  (0.00s)",
-                "  task      flaky OK 0.00s",
+                "    Python asset attempt 2  START",
+                "    Python asset attempt 2  OK  (0.00s)",
+                "  asset     flaky OK 0.00s",
             ),
             expected_unrelated_duration_ms=0.0,
             expected_final_duration_ms=0.0,
@@ -119,17 +119,17 @@ def test_given_retrying_child_operation_when_projected_then_each_line_flushes_be
         run_scope("run-retry-projection"),
         dispatcher_scope(dispatcher),
         ResourceAttemptLifecycle(
-            resource_id="task:flaky",
-            resource_kind="task",
+            resource_id="asset:flaky",
+            resource_kind="asset",
             resource_name="flaky",
         ),
     ):
         with OperationLifecycle(
             operation_kind="python_node",
-            operation_name="python_task",
+            operation_name="python_asset",
             metadata={"attempt_number": 1},
         ) as first_attempt:
-            assert stream.getvalue().endswith("Python task attempt 1  START\n")
+            assert stream.getvalue().endswith("Python asset attempt 1  START\n")
             first_attempt.failed(error=TimeoutError())
         publish_retry_scheduled(
             failed_attempt_number=1,
@@ -140,18 +140,18 @@ def test_given_retrying_child_operation_when_projected_then_each_line_flushes_be
         assert stream.getvalue().endswith("    retry 1->2 in 0.25s\n")
         with OperationLifecycle(
             operation_kind="python_node",
-            operation_name="python_task",
+            operation_name="python_asset",
             metadata={"attempt_number": 2},
         ):
-            assert stream.getvalue().endswith("Python task attempt 2  START\n")
+            assert stream.getvalue().endswith("Python asset attempt 2  START\n")
 
     assert stream.flush_count == len(stream.getvalue().splitlines())
     rendered_lines: tuple[str, ...] = tuple(stream.getvalue().splitlines())
     assert rendered_lines[0:2] == test_case.expected_lines[0:2]
-    assert rendered_lines[2].startswith("    Python task attempt 1  FAIL  (")
+    assert rendered_lines[2].startswith("    Python asset attempt 1  FAIL  (")
     assert rendered_lines[3:5] == test_case.expected_lines[3:5]
-    assert rendered_lines[5].startswith("    Python task attempt 2  OK  (")
-    assert rendered_lines[-1].startswith("  task      flaky OK 0.")
+    assert rendered_lines[5].startswith("    Python asset attempt 2  OK  (")
+    assert rendered_lines[-1].startswith("  asset     flaky OK 0.")
 
 
 @pytest.mark.parametrize(
@@ -267,12 +267,12 @@ def test_given_interleaved_and_duplicate_events_when_projected_then_ids_remain_i
         RetryProjectionCase(
             description="failed retry followed by successful final attempt",
             expected_lines=(
-                "  1/2  task      orders START",
-                "  2/2  task      inventory START",
-                "  task      orders FAIL 0.10s",
-                "  1/2  task      orders START",
-                "  task      inventory OK 0.30s  rich",
-                "  task      orders OK 0.25s  rich",
+                "  1/2  asset     orders START",
+                "  2/2  asset     inventory START",
+                "  asset     orders FAIL 0.10s",
+                "  1/2  asset     orders START",
+                "  asset     inventory OK 0.30s  rich",
+                "  asset     orders OK 0.25s  rich",
             ),
             expected_unrelated_duration_ms=300.0,
             expected_final_duration_ms=250.0,
@@ -290,10 +290,10 @@ def test_given_retried_resource_when_final_result_claims_then_prior_attempt_rend
         lifecycle_event(
             "resource_attempt_started",
             run_id="run",
-            resource_id="task:orders",
+            resource_id="asset:orders",
             resource_attempt_id="orders-attempt-1",
             payload={
-                "resource_kind": "task",
+                "resource_kind": "asset",
                 "resource_name": "orders",
                 "attempt_number": 1,
             },
@@ -309,10 +309,10 @@ def test_given_retried_resource_when_final_result_claims_then_prior_attempt_rend
     unrelated_start: LifecycleEvent = replace(
         first_start,
         event_id="inventory-start",
-        resource_id="task:inventory",
+        resource_id="asset:inventory",
         resource_attempt_id="inventory-attempt",
         payload={
-            "resource_kind": "task",
+            "resource_kind": "asset",
             "resource_name": "inventory",
             "attempt_number": 1,
         },
@@ -345,11 +345,11 @@ def test_given_retried_resource_when_final_result_claims_then_prior_attempt_rend
         resource_name="inventory"
     )
     stream.write(
-        f"  task      inventory OK {cast(float, unrelated_duration) / 1000.0:.2f}s  rich\n"
+        f"  asset     inventory OK {cast(float, unrelated_duration) / 1000.0:.2f}s  rich\n"
     )
     projector.consume(final_terminal)
     final_duration: float | None = projector.consume_resource_terminal(resource_name="orders")
-    stream.write(f"  task      orders OK {cast(float, final_duration) / 1000.0:.2f}s  rich\n")
+    stream.write(f"  asset     orders OK {cast(float, final_duration) / 1000.0:.2f}s  rich\n")
     projector.consume(first_failed)
     projector.consume(final_terminal)
     projector.close()
@@ -819,7 +819,7 @@ def test_given_line_lock_held_when_projector_writes_concurrently_then_no_deadloc
             run_scope("run-lock-order"),
             dispatcher_scope(dispatcher),
             ResourceAttemptLifecycle(
-                resource_id="task:writer", resource_kind="task", resource_name="writer"
+                resource_id="asset:writer", resource_kind="asset", resource_name="writer"
             ) as lifecycle,
         ):
             lifecycle.skipped(skip_code="scheduler")

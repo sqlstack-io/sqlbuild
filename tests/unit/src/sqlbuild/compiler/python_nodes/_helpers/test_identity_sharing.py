@@ -188,7 +188,7 @@ _EXPECTED: dict[str, tuple[tuple[str, ...], str]] = {
             "shop_identity/shared/text.py:ping",
             "shop_identity/shared/text.py:pong",
         ),
-        "202337d3a0810b0fb7714781365660d51b6c6f4c3bfc1d0f0bc8cb597ed9baeb",
+        "9217c1c051274c7c831ba61985ecd6ca8c3130572aada7f0a66423b6993a144b",
     ),
     "customers_node": (
         (
@@ -198,7 +198,7 @@ _EXPECTED: dict[str, tuple[tuple[str, ...], str]] = {
             "shop_identity/shared/money.py:to_units",
             "shop_identity/shared/text.py:normalize_text",
         ),
-        "bf109e7d21a57481a09980e75c2e0ab3345fec5f71018da550bcfd4eb4f122e3",
+        "5553f9d2427656bfa7c2487baa4aee685ec29d9f40ee6051ed28a6c59b9df5c4",
     ),
 }
 
@@ -259,7 +259,7 @@ def test_given_nodes_sharing_helpers_when_discovered_then_each_file_and_object_i
         project_dir=tmp_path / "large", node_count=large_count, monkeypatch=monkeypatch
     )
 
-    assert (small.tasks, large.tasks) == test_case.node_counts
+    assert (small.assets, large.assets) == test_case.node_counts
     assert (small.most_per_unit, large.most_per_unit) == (
         test_case.expected_most_per_unit,
         test_case.expected_most_per_unit,

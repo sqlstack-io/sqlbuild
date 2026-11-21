@@ -21,7 +21,7 @@ from tests.unit.src.sqlbuild.compiler.python_nodes._helpers.helpers import (
     build_orders_python_node_graph,
     build_python_node_graph_for_case,
     build_sibling_sql_ref_python_node_graph,
-    build_sql_downstream_task_to_loader_python_node_graph,
+    build_sql_downstream_asset_to_loader_python_node_graph,
     build_sql_ref_python_node_graph,
     build_terminal_loader_python_node_graph,
     model_ref,
@@ -419,17 +419,6 @@ def test_given_invalid_typed_sql_ref_when_resolving_then_raises_clear_error(
     "test_case",
     [
         PythonSqlSelectorErrorTestCase(
-            description="raises when task depends on terminal source loader",
-            select=("summarize_orders",),
-            exclude=(),
-            expected_error_type=ValueError,
-            expected_error_fragment=(
-                "Python node 'summarize_orders' depends on terminal loader 'raw_orders'; "
-                "depend on source 'raw_orders' instead"
-            ),
-            python_graph_case="terminal_loader_task_dependency",
-        ),
-        PythonSqlSelectorErrorTestCase(
             description="raises when asset depends on terminal source loader",
             select=("export_orders",),
             exclude=(),
@@ -510,7 +499,7 @@ def test_given_invalid_sql_model_dependency_when_validating_boundaries_then_rais
             exclude=(),
             expected_error_type=ValueError,
             expected_error_fragment=(
-                "loader 'load_events' depends on task 'prepare_orders', which reads SQL"
+                "loader 'load_events' depends on asset 'prepare_orders', which reads SQL"
             ),
         )
     ],
@@ -520,7 +509,7 @@ def test_given_sql_downstream_task_feeds_loader_when_validating_then_raises(
     test_case: PythonSqlSelectorErrorTestCase,
 ) -> None:
     project_graph: ProjectGraph = build_orders_project_graph()
-    python_graph: PythonNodeGraph = build_sql_downstream_task_to_loader_python_node_graph()
+    python_graph: PythonNodeGraph = build_sql_downstream_asset_to_loader_python_node_graph()
 
     with pytest.raises(test_case.expected_error_type, match=test_case.expected_error_fragment):
         resolve_run_selection(
@@ -534,14 +523,6 @@ def test_given_sql_downstream_task_feeds_loader_when_validating_then_raises(
 @pytest.mark.parametrize(
     "test_case",
     [
-        PythonSqlSelectorErrorTestCase(
-            description="allows task dependency on intermediate loader",
-            select=("summarize_orders",),
-            exclude=(),
-            expected_error_type=ValueError,
-            expected_error_fragment=None,
-            python_graph_case="intermediate_loader_task_dependency",
-        ),
         PythonSqlSelectorErrorTestCase(
             description="allows asset dependency on intermediate loader",
             select=("export_orders",),

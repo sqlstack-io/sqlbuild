@@ -1,4 +1,4 @@
-"""Public executor entrypoint for one ready task/asset Python node."""
+"""Public executor entrypoint for one ready asset Python node."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ def run_ready_python_node(
     run_state: PythonNodeRunState,
     on_result: OwnedResultCallback | None = None,
 ) -> PythonNodeExecutionResult:
-    """Execute one scheduler-ready task/asset Python node."""
+    """Execute one scheduler-ready asset Python node."""
 
     return execute_ready_python_node(
         node=node,

@@ -116,7 +116,7 @@ def test_given_an_unusable_job_warehouse_when_running_a_check_then_it_fails_alon
         upstream_python_results=(
             PythonNodeExecutionResult(
                 node_name="upstream_task",
-                kind=PythonNodeKind.TASK,
+                kind=PythonNodeKind.ASSET,
                 status=test_case.upstream_status,
             ),
         ),

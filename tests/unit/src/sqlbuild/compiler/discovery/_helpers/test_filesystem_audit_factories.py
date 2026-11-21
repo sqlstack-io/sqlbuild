@@ -26,7 +26,7 @@ from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
                 "python/factories/quality.py": """
 from sqlbuild.audits import AuditCase, audit_factory
 from sqlbuild.factories import factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 @audit_factory
 def quality_checks():
@@ -34,7 +34,7 @@ def quality_checks():
 
 @factory
 def generated_nodes():
-    @task(name="refresh_quality")
+    @asset(name="refresh_quality")
     def refresh(ctx):
         return None
     return [refresh]
@@ -48,13 +48,13 @@ def generated_nodes():
             files={
                 "python/quality.py": """
 from sqlbuild.audits import AuditCase, audit_factory
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 @audit_factory
 def quality_checks():
     return [AuditCase(name="positive_amount", definition="expression_is_true", arguments={"expression": "amount > 0"})]
 
-@task(name="refresh_quality")
+@asset(name="refresh_quality")
 def refresh(ctx):
     return None
 """,
@@ -80,7 +80,7 @@ def test_given_audit_and_node_factories_when_discovering_then_both_are_collected
     assert discovered.audit_factories[0].cases[0].name == "positive_amount"
     assert discovered.audit_factories[0].relative_path == Path(next(iter(test_case.files)))
     assert discovered.audit_factories[0].line > 0
-    assert tuple(task.name for task in discovered.tasks) == test_case.expected_task_names
+    assert tuple(task.name for task in discovered.assets) == test_case.expected_task_names
 
 
 @pytest.mark.parametrize(

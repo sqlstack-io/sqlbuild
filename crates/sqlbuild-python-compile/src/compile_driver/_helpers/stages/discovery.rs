@@ -174,7 +174,7 @@ impl Discoverer {
 }
 
 /// Python node groups whose relative paths count as imported project Python.
-const PYTHON_NODE_GROUPS: [&str; 5] = ["loaders", "tasks", "assets", "checks", "audit_factories"];
+const PYTHON_NODE_GROUPS: [&str; 4] = ["loaders", "assets", "checks", "audit_factories"];
 
 /// `OperationLifecycle(operation_kind="project", operation_name=name)`.
 pub(crate) fn lifecycle<'py>(py: Python<'py>, name: &str) -> PyResult<Bound<'py, PyAny>> {
@@ -510,7 +510,6 @@ fn project_inputs<'py>(
         python.get_item("materialization_files")?,
     ));
     fields.push(("loader_functions", loader_functions));
-    fields.push(("task_functions", tuple_of("tasks")?));
     fields.push(("asset_functions", tuple_of("assets")?));
     fields.push(("check_functions", tuple_of("checks")?));
     fields.push(("audit_factories", tuple_of("audit_factories")?));

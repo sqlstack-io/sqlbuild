@@ -447,7 +447,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 				setting('secret_access_key', 'SecretStr', 'EXPORT_BUCKET_SECRET_ACCESS_KEY', 'Access key secret', { required: true })
 			],
 			usedBy: [
-				{ kind: 'task', name: 'export_revenue_csv' },
+				{ kind: 'asset', name: 'export_revenue_csv' },
 				{ kind: 'sink', name: 'run_log_archive' }
 			],
 			nodes: ['export_revenue_csv'],

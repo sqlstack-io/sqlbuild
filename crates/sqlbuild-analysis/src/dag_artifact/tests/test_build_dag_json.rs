@@ -176,9 +176,9 @@ fn given_project_when_building_dag_json_then_python_artifact_agrees() {
 }
 
 #[test]
-fn given_a_loader_depending_on_a_task_when_building_dag_json_then_the_edge_reaches_its_source() {
+fn given_a_loader_depending_on_an_asset_when_building_dag_json_then_the_edge_reaches_its_source() {
     let test_cases = [DagEdgeTestCase {
-        description: "a task upstream of a declared loader points at the loader's source",
+        description: "an asset upstream of a declared loader points at the loader's source",
         project: DagProjectInput {
             sources: vec![source(
                 "partner_scores",
@@ -190,18 +190,18 @@ fn given_a_loader_depending_on_a_task_when_building_dag_json_then_the_edge_reach
         },
         python: DagPythonGraphInput {
             nodes: vec![
-                python_node("task", "score_orders", vec![key("model", "orders")]),
+                python_node("asset", "score_orders", vec![key("model", "orders")]),
                 python_node("loader", "partner_scores", Vec::new()),
             ],
             dependency_edges: vec![("score_orders".to_owned(), "partner_scores".to_owned())],
             kinds_by_name: vec![
-                ("score_orders".to_owned(), "task".to_owned()),
+                ("score_orders".to_owned(), "asset".to_owned()),
                 ("partner_scores".to_owned(), "loader".to_owned()),
             ],
         },
         expected_edges: &[
-            ("model:orders", "task:score_orders"),
-            ("task:score_orders", "source:partner_scores"),
+            ("asset:score_orders", "source:partner_scores"),
+            ("model:orders", "asset:score_orders"),
         ],
     }];
     for test_case in test_cases {

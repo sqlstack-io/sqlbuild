@@ -10,7 +10,6 @@ import SquareFunction from '@lucide/svelte/icons/square-function';
 import TableProperties from '@lucide/svelte/icons/table-properties';
 import Sprout from '@lucide/svelte/icons/sprout';
 import Table2 from '@lucide/svelte/icons/table-2';
-import Workflow from '@lucide/svelte/icons/workflow';
 import type {
 	BuiltDefinition,
 	CatalogNode,
@@ -33,7 +32,6 @@ export const nodeKindLabel: Record<NodeKind, string> = {
 	view: 'View',
 	table: 'Table',
 	incremental: 'Incremental',
-	task: 'Task',
 	asset: 'Asset',
 	udf: 'Function',
 	table_fn: 'Table function'
@@ -46,20 +44,19 @@ export const nodeKindPlural: Record<NodeKind, string> = {
 	view: 'Views',
 	table: 'Tables',
 	incremental: 'Incremental',
-	task: 'Tasks',
 	asset: 'Assets',
 	udf: 'Functions',
 	table_fn: 'Table functions'
 };
 
-export const NODE_KINDS: NodeKind[] = ['source', 'loader', 'seed', 'view', 'table', 'incremental', 'task', 'asset', 'udf', 'table_fn'];
+export const NODE_KINDS: NodeKind[] = ['source', 'loader', 'seed', 'view', 'table', 'incremental', 'asset', 'udf', 'table_fn'];
 
 /** The Catalog's kind tabs: SQL kinds one by one, Python nodes together, and functions together. */
 export type KindTab = 'source' | 'seed' | 'view' | 'table' | 'incremental' | 'python' | 'functions';
 
 export const KIND_TABS: KindTab[] = ['source', 'seed', 'view', 'table', 'incremental', 'python', 'functions'];
 
-export const PYTHON_KINDS: readonly NodeKind[] = ['asset', 'loader', 'task'];
+export const PYTHON_KINDS: readonly NodeKind[] = ['asset', 'loader'];
 export const FUNCTION_KINDS: readonly NodeKind[] = ['udf', 'table_fn'];
 
 export function kindTabOf(kind: NodeKind): KindTab {
@@ -88,7 +85,6 @@ export function parseKindTab(value: string | null): KindTab | null {
 /** Icon key used by the lineage cards, from the node kind and materialization. */
 export function nodeIconKey(node: Pick<CatalogNode, 'kind' | 'materialization'>): string {
 	if (node.kind === 'incremental') return node.materialization?.includes('microbatch') ? 'microbatch' : node.materialization?.includes('merge') ? 'merge' : 'delete_insert';
-	if (node.kind === 'task') return 'task';
 	return node.kind;
 }
 
@@ -102,7 +98,6 @@ export const nodeIcon: Record<string, typeof Table2> = {
 	merge: GitMerge,
 	delete_insert: Layers,
 	microbatch: Layers,
-	task: Workflow,
 	asset: Package,
 	udf: SquareFunction,
 	table_fn: TableProperties

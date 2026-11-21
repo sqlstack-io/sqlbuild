@@ -40,11 +40,7 @@ const REFERENCE_MODELS_MODULE: &str = "sqlbuild.compiler.references.models";
 const BUILTINS_MODULE: &str = "builtins";
 const VALUE_PLACEHOLDER: &str = "__sqlbuild_python_value_";
 const HARD_CODED_ALLOWED: &str = "hard-coded relation names";
-const NODE_OWNERS: [(&str, &str); 3] = [
-    ("task", "task_functions"),
-    ("asset", "asset_functions"),
-    ("check", "check_functions"),
-];
+const NODE_OWNERS: [(&str, &str); 2] = [("asset", "asset_functions"), ("check", "check_functions")];
 const NODE_KIND: &str = "node";
 const HOOK_KIND: &str = "hook";
 const LOADER_KIND: &str = "loader";
@@ -150,7 +146,7 @@ pub(crate) fn explicit_reference_report<'py>(
     }
 }
 
-/// Every task, asset, check, loader and hook function, as Python discovery lists them.
+/// Every asset, check, loader and hook function, as Python discovery lists them.
 fn python_sql_owners<'py>(
     project: &Bound<'py, PyAny>,
     discovered_inputs: &Bound<'py, PyAny>,

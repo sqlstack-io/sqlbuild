@@ -9107,7 +9107,6 @@ class SelectorKind(StrEnum):
     NAME = "name"
     SEED = "seed"
     SOURCE = "source"
-    TASK = "task"
     ASSET = "asset"
     LOADER = "loader"
     CHECK = "check"
@@ -10597,15 +10596,6 @@ class DiscoveredPythonLoaderMetadata(NativeRecord):
         unique_key: tuple[str, ...] = ...,
         columns: tuple[SourceColumnEntry, ...] = ...,
         contract: str | None = ...,
-    ) -> None: ...
-
-class DiscoveredPythonTaskMetadata(NativeRecord):
-    """Task-specific metadata carried by an internal Python task node."""
-
-    retry: RetryPolicy | None
-    def __init__(
-        self,
-        retry: RetryPolicy | None = ...,
     ) -> None: ...
 
 class DiscoveredPythonAssetMetadata(NativeRecord):
@@ -13114,7 +13104,6 @@ class DiscoveredPythonNode(NativeRecord):
     meta: dict[str, object] | None
     provider_usages: tuple[DiscoveredProviderUsage, ...]
     loader: DiscoveredPythonLoaderMetadata | None
-    task: DiscoveredPythonTaskMetadata | None
     asset: DiscoveredPythonAssetMetadata | None
     check: DiscoveredPythonCheckMetadata | None
     identity: PythonNodeIdentity | None
@@ -13133,7 +13122,6 @@ class DiscoveredPythonNode(NativeRecord):
         meta: dict[str, object] | None = ...,
         provider_usages: tuple[DiscoveredProviderUsage, ...] = ...,
         loader: DiscoveredPythonLoaderMetadata | None = ...,
-        task: DiscoveredPythonTaskMetadata | None = ...,
         asset: DiscoveredPythonAssetMetadata | None = ...,
         check: DiscoveredPythonCheckMetadata | None = ...,
         identity: PythonNodeIdentity | None = ...,
@@ -14987,37 +14975,6 @@ class DiscoveredLoaderFunction(NativeRecord):
         identity: PythonNodeIdentity | None = ...,
     ) -> None: ...
 
-class DiscoveredTaskFunction(NativeRecord):
-    """A discovered project task function."""
-
-    file_path: Path
-    relative_path: Path
-    name: str
-    function: Callable[..., object]
-    depends_on: tuple[Callable[..., object] | SqlResourceRef, ...]
-    tags: tuple[str, ...]
-    group: str | None
-    description: str | None
-    meta: dict[str, object] | None
-    retry: RetryPolicy | None
-    provider_usages: tuple[DiscoveredProviderUsage, ...]
-    identity: PythonNodeIdentity | None
-    def __init__(
-        self,
-        file_path: Path,
-        relative_path: Path,
-        name: str,
-        function: Callable[..., object],
-        depends_on: tuple[Callable[..., object] | SqlResourceRef, ...] = ...,
-        tags: tuple[str, ...] = ...,
-        group: str | None = ...,
-        description: str | None = ...,
-        meta: dict[str, object] | None = ...,
-        retry: RetryPolicy | None = ...,
-        provider_usages: tuple[DiscoveredProviderUsage, ...] = ...,
-        identity: PythonNodeIdentity | None = ...,
-    ) -> None: ...
-
 class DiscoveredAssetFunction(NativeRecord):
     """A discovered project asset function."""
 
@@ -15229,14 +15186,12 @@ class DiscoveredPythonNodeFunctions(NativeRecord):
     """Discovered project Python DAG node functions grouped by kind."""
 
     loaders: tuple[DiscoveredLoaderFunction, ...]
-    tasks: tuple[DiscoveredTaskFunction, ...]
     assets: tuple[DiscoveredAssetFunction, ...]
     checks: tuple[DiscoveredCheckFunction, ...]
     audit_factories: tuple[DiscoveredAuditFactory, ...]
     def __init__(
         self,
         loaders: tuple[DiscoveredLoaderFunction, ...] = ...,
-        tasks: tuple[DiscoveredTaskFunction, ...] = ...,
         assets: tuple[DiscoveredAssetFunction, ...] = ...,
         checks: tuple[DiscoveredCheckFunction, ...] = ...,
         audit_factories: tuple[DiscoveredAuditFactory, ...] = ...,
@@ -15264,7 +15219,6 @@ class DiscoveredProjectInputs(NativeRecord):
     macro_files: tuple[DiscoveredMacroFile, ...]
     materialization_files: tuple[DiscoveredMaterializationFile, ...]
     loader_functions: tuple[DiscoveredLoaderFunction, ...]
-    task_functions: tuple[DiscoveredTaskFunction, ...]
     asset_functions: tuple[DiscoveredAssetFunction, ...]
     check_functions: tuple[DiscoveredCheckFunction, ...]
     audit_factories: tuple[DiscoveredAuditFactory, ...]
@@ -15295,7 +15249,6 @@ class DiscoveredProjectInputs(NativeRecord):
         macro_files: tuple[DiscoveredMacroFile, ...] = ...,
         materialization_files: tuple[DiscoveredMaterializationFile, ...] = ...,
         loader_functions: tuple[DiscoveredLoaderFunction, ...] = ...,
-        task_functions: tuple[DiscoveredTaskFunction, ...] = ...,
         asset_functions: tuple[DiscoveredAssetFunction, ...] = ...,
         check_functions: tuple[DiscoveredCheckFunction, ...] = ...,
         audit_factories: tuple[DiscoveredAuditFactory, ...] = ...,

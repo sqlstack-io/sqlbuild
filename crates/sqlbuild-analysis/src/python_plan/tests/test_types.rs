@@ -20,7 +20,7 @@ pub(crate) struct LifecycleTestCase {
     pub(crate) expected_ingress: &'static [&'static str],
     pub(crate) expected_loaders: &'static [&'static str],
     pub(crate) expected_read_side: &'static [&'static str],
-    /// `(loader, SQL it waits for, tasks and assets that gate it, the gates it reads directly)`.
+    /// `(loader, SQL it waits for, assets that gate it, the gates it reads directly)`.
     pub(crate) expected_round_trips: &'static [ExpectedRoundTrip],
 }
 
@@ -31,7 +31,7 @@ pub(crate) type LifecycleNodeSpec = (
     &'static [(&'static str, &'static str)],
 );
 
-/// `(loader, SQL it waits for, tasks and assets that gate it)`.
+/// `(loader, SQL it waits for, assets that gate it)`.
 pub(crate) type ExpectedRoundTrip = (
     &'static str,
     &'static [(&'static str, &'static str)],

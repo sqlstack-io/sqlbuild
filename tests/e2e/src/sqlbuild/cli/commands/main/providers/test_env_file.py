@@ -34,18 +34,18 @@ PROVIDER_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "python/tasks/report_region.py": dedent(
+    "python/assets/report_region.py": dedent(
         """
         import os
         from pathlib import Path
 
         from providers.settings_api import SettingsApi
-        from sqlbuild.tasks import task
+        from sqlbuild.assets import asset
 
 
-        @task
+        @asset
         def report_region(ctx, settings_api: SettingsApi):
-            '''Test task report_region.'''
+            '''Test asset report_region.'''
             Path(os.environ["MARKER_PATH"]).write_text(settings_api.region, encoding="utf-8")
         """
     ).strip()

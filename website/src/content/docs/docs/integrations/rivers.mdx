@@ -3,7 +3,7 @@ title: "Rivers"
 description: "Orchestrate SQLBuild pipelines with Rivers scheduling, jobs, and asset tracking."
 ---
 
-SQLBuild includes a Rivers integration that maps your project's models, sources, seeds, loaders, tasks, assets, and functions into Rivers assets with dependency edges preserved. SQLBuild handles the SQL transformation layer. Rivers handles scheduling, execution, and the asset-centric UI.
+SQLBuild includes a Rivers integration that maps your project's models, sources, seeds, loaders, assets, and functions into Rivers assets with dependency edges preserved. SQLBuild handles the SQL transformation layer. Rivers handles scheduling, execution, and the asset-centric UI.
 
 ## Install
 
@@ -28,7 +28,7 @@ This creates a Rivers code repository with a `definitions.py` that includes asse
 ## How it works
 
 1. `sqb compile --dag` generates a static `sqlbuild_dag.json` artifact with your project's full graph (nodes, edges)
-2. `@sqlbuild_assets()` reads the artifact and creates one Rivers `AssetDef` per source, loader, seed, model, function, task, and asset, with dependency edges preserved
+2. `@sqlbuild_assets()` reads the artifact and creates one Rivers `AssetDef` per source, loader, seed, model, function, and asset, with dependency edges preserved
 3. The decorated function runs `sqb build` as a subprocess and yields `Materialization` events for each output
 
 ## Quickstart
@@ -150,7 +150,7 @@ def my_assets(context):
 
 | Method | Default behavior |
 |--------|-----------------|
-| `get_asset_name(node)` | Joins the asset key parts with `__` (e.g. `task__prepare_orders`, `asset__orders_export`) |
+| `get_asset_name(node)` | Joins the asset key parts with `__` (e.g. `asset__prepare_orders`, `loader__raw_orders`) |
 | `get_group_name(node)` | Uses the project name |
 | `get_tags(node)` | Includes `sqlbuild/kind:<kind>` plus model tags |
 | `get_kinds(node)` | Returns `["sqlbuild", "<materialization_type>"]` |

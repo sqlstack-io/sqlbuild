@@ -3,7 +3,7 @@ title: "Overview"
 description: "Orchestrate SQLBuild pipelines with Dagster scheduling, retries, and asset UI."
 ---
 
-SQLBuild includes a Dagster integration that maps your project's models, sources, seeds, functions, loaders, tasks, assets, tests, audits, scenarios, and Python checks into Dagster assets and asset checks. SQLBuild handles the SQL transformation layer. Dagster handles scheduling, retries, alerting, and the asset-centric UI.
+SQLBuild includes a Dagster integration that maps your project's models, sources, seeds, functions, loaders, assets, tests, audits, scenarios, and Python checks into Dagster assets and asset checks. SQLBuild handles the SQL transformation layer. Dagster handles scheduling, retries, alerting, and the asset-centric UI.
 
 ## Install
 
@@ -28,7 +28,7 @@ This creates a Dagster code location with a `definitions.py` that includes asset
 ## How it works
 
 1. `sqb compile --dag` generates a static `sqlbuild_dag.json` artifact with your project's full graph (nodes, edges, checks)
-2. `@sqlbuild_assets()` reads the artifact and creates one Dagster `AssetSpec` per source, seed, model, function, loader, task, and asset, with dependency edges preserved
+2. `@sqlbuild_assets()` reads the artifact and creates one Dagster `AssetSpec` per source, seed, model, function, loader, and asset, with dependency edges preserved
 3. `SqlBuildCliResource` shells out to `sqb build`, `sqb test`, `sqb scenario test`, etc. as subprocesses
 4. Execution results (materializations, audit pass/fail, scenario outcomes) are read from SQLBuild's structured integration-result stream and emitted as Dagster `MaterializeResult` and `AssetCheckResult` events
 
@@ -64,7 +64,7 @@ dagster dev -f definitions.py
 
 `definitions.py` belongs to your Dagster code location and sits next to the SQLBuild project directory (`my_sqlbuild_project/` here), not inside it. SQLBuild projects contain no orchestrator code.
 
-Dagster discovers every SQLBuild model, loader, task, and asset as a Dagster asset. Selecting a subset in the Dagster UI automatically scopes the `sqb build` invocation to those nodes via `--select`.
+Dagster discovers every SQLBuild model, loader, and asset as a Dagster asset. Selecting a subset in the Dagster UI automatically scopes the `sqb build` invocation to those nodes via `--select`.
 
 For production deployments, use `project.prepare()` or `sqb compile --dag` to generate the DAG artifact explicitly in your CI pipeline.
 
@@ -88,7 +88,7 @@ SQLBuild tests, audits, scenarios, and Python checks are registered as Dagster a
 - **Unit tests** become checks attached to the models they test
 - **Audits** become checks attached to the model, source, or seed they audit, with severity mapped to `AssetCheckSeverity.ERROR` or `AssetCheckSeverity.WARN`. A singular audit that runs at the end of the build becomes a check on each model it reads
 - **Scenarios** become checks attached to the models they exercise
-- **Python checks** (`@check`) become checks attached to the tasks, assets, or loaders they validate
+- **Python checks** (`@check`) become checks attached to the assets or loaders they validate
 
 Check results are emitted with pass/fail status and metadata from the execution JSON.
 

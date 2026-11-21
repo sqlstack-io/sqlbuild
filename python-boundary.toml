@@ -75,7 +75,7 @@ note = "Provider base class users subclass, and injection into user functions."
 [[stays]]
 path = "python_nodes"
 rule = 3
-note = "Public decorators and authoring shapes re-exported by assets.py, tasks.py, loaders.py, hooks.py and retries.py, run when user modules are imported; RetryPolicy and AuditCase validation, retry delays and hook-read normalization are native (validate_retry_policy, retry_delay_seconds, validate_audit_case, normalize_hook_reads)."
+note = "Public decorators and authoring shapes re-exported by assets.py, loaders.py, hooks.py and retries.py, run when user modules are imported; RetryPolicy and AuditCase validation, retry delays and hook-read normalization are native (validate_retry_policy, retry_delay_seconds, validate_audit_case, normalize_hook_reads)."
 
 [[stays]]
 path = "microbatches"
@@ -666,11 +666,6 @@ note = "Public facade: re-exports only."
 path = "sqlite_history.py"
 rule = 3
 note = "Public facade: re-exports only."
-
-[[stays]]
-path = "tasks.py"
-rule = 3
-note = "Public facade: re-exports plus one-line delegating wrappers (task, get_task_definition)."
 
 [[stays]]
 path = "cost/models.py"

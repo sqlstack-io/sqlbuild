@@ -75,7 +75,7 @@ def prepare_advisory_placement_dag_project(root: Path) -> Path:
 
 
 def prepare_python_dag_project(root: Path) -> Path:
-    """Create a local project with Python tasks, assets, and checks."""
+    """Create a local project with Python assets and checks."""
 
     project_dir: Path = prepare_static_dag_project(root)
     tasks_dir: Path = project_dir / "python" / "tasks"
@@ -89,10 +89,10 @@ def prepare_python_dag_project(root: Path) -> Path:
     (tasks_dir / "prepare_orders.py").write_text(
         "\n".join(
             (
-                "from sqlbuild.tasks import task",
+                "from sqlbuild.assets import asset",
                 "from sqlbuild.refs import model",
                 "",
-                "@task(",
+                "@asset(",
                 "    depends_on=model('orders'),",
                 "    tags=['daily'],",
                 "    group='python',",

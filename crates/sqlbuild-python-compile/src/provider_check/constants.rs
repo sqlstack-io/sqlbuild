@@ -1,8 +1,7 @@
 //! Discovered collections, key kinds and variables the provider check reads.
 
 /// Discovered Python nodes that run as their own node, with the key kind each publishes.
-pub(crate) const OWN_NODES: [(&str, &str); 3] = [
-    ("task_functions", "task"),
+pub(crate) const OWN_NODES: [(&str, &str); 2] = [
     ("asset_functions", "asset"),
     ("check_functions", "check"),
 ];

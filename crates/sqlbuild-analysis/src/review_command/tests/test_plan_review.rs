@@ -10,7 +10,7 @@ use crate::review_command::tests::test_types::{
     SchemaNameTestCase,
 };
 
-const EXPORT_TASK: (&str, &str) = ("task:export_revenue", "Python task, not run by review");
+const EXPORT_ASSET: (&str, &str) = ("asset:export_revenue", "Python asset, not run by review");
 const ARCHIVE_LEFT_OUT: (&str, &str) = (
     "order_archive",
     "not on a path to a critical model (--downstream critical)",
@@ -26,7 +26,7 @@ fn given_changed_models_when_planning_then_validated_set_follows_policy_and_sele
             policy: DownstreamPolicy::Critical,
             select: None,
             expected_validated: vec!["stg_orders", "order_totals", "daily_revenue"],
-            expected_not_validated: vec![ARCHIVE_LEFT_OUT, EXPORT_TASK],
+            expected_not_validated: vec![ARCHIVE_LEFT_OUT, EXPORT_ASSET],
             expected_added: vec![],
         },
         PlanTestCase {
@@ -40,7 +40,7 @@ fn given_changed_models_when_planning_then_validated_set_follows_policy_and_sele
                 "order_totals",
                 "daily_revenue",
             ],
-            expected_not_validated: vec![EXPORT_TASK],
+            expected_not_validated: vec![EXPORT_ASSET],
             expected_added: vec![],
         },
         PlanTestCase {
@@ -59,7 +59,7 @@ fn given_changed_models_when_planning_then_validated_set_follows_policy_and_sele
                     "daily_revenue",
                     "downstream of a change (--downstream none)",
                 ),
-                EXPORT_TASK,
+                EXPORT_ASSET,
             ],
             expected_added: vec![],
         },
@@ -69,7 +69,7 @@ fn given_changed_models_when_planning_then_validated_set_follows_policy_and_sele
             policy: DownstreamPolicy::Critical,
             select: None,
             expected_validated: vec!["daily_revenue"],
-            expected_not_validated: vec![EXPORT_TASK],
+            expected_not_validated: vec![EXPORT_ASSET],
             expected_added: vec![],
         },
         PlanTestCase {
@@ -99,7 +99,7 @@ fn given_changed_models_when_planning_then_validated_set_follows_policy_and_sele
                 ARCHIVE_LEFT_OUT,
                 ("order_totals", "not selected (--select)"),
                 ("daily_revenue", "not selected (--select)"),
-                EXPORT_TASK,
+                EXPORT_ASSET,
             ],
             expected_added: vec![],
         },
@@ -117,7 +117,7 @@ fn given_changed_models_when_planning_then_validated_set_follows_policy_and_sele
                 ],
             )]),
             expected_validated: vec!["stg_orders", "order_totals", "daily_revenue"],
-            expected_not_validated: vec![ARCHIVE_LEFT_OUT, EXPORT_TASK],
+            expected_not_validated: vec![ARCHIVE_LEFT_OUT, EXPORT_ASSET],
             expected_added: vec![],
         },
         PlanTestCase {
@@ -129,7 +129,7 @@ fn given_changed_models_when_planning_then_validated_set_follows_policy_and_sele
             expected_not_validated: vec![
                 ARCHIVE_LEFT_OUT,
                 ("daily_revenue", "not selected (--select)"),
-                EXPORT_TASK,
+                EXPORT_ASSET,
             ],
             expected_added: vec![("stg_orders", "order_totals")],
         },
@@ -139,7 +139,7 @@ fn given_changed_models_when_planning_then_validated_set_follows_policy_and_sele
             policy: DownstreamPolicy::Critical,
             select: Some(vec![token("daily_revenue", &["daily_revenue"])]),
             expected_validated: vec!["stg_orders", "order_totals", "daily_revenue"],
-            expected_not_validated: vec![ARCHIVE_LEFT_OUT, EXPORT_TASK],
+            expected_not_validated: vec![ARCHIVE_LEFT_OUT, EXPORT_ASSET],
             expected_added: vec![
                 ("stg_orders", "daily_revenue"),
                 ("order_totals", "daily_revenue"),

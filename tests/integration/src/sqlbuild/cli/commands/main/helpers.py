@@ -964,19 +964,19 @@ class OrdersProvider(Provider):
 """
 
 
-def write_provider_task_project(*, project_dir: Path, annotation: str) -> None:
-    """Write a DuckDB project whose task takes a provider parameter with `annotation`."""
+def write_provider_asset_project(*, project_dir: Path, annotation: str) -> None:
+    """Write a DuckDB project whose asset takes a provider parameter with `annotation`."""
 
     files: dict[str, str] = {
         "sqlbuild_project.toml": (
-            'name = "orders_tasks"\nadapter = "duckdb"\n\n'
+            'name = "orders_assets"\nadapter = "duckdb"\n\n'
             '[connection]\ndatabase = "orders.duckdb"\n'
         ),
         "providers/orders.py": PROVIDER_SOURCE,
         "python/orders.py": (
             "from providers.orders import OrdersProvider\n"
-            "from sqlbuild.tasks import task\n\n\n"
-            "@task\n"
+            "from sqlbuild.assets import asset\n\n\n"
+            "@asset\n"
             f"def refresh_orders(ctx, orders_provider: {annotation}):\n"
             '    """Refresh the order snapshot."""\n'
             "    return None\n"
@@ -1404,16 +1404,16 @@ RUN_RECORD_PROJECT_FILES: dict[str, str] = {
     "python/crash.py": (
         '"""A task that kills its process, as a crash or kill -9 would."""\n\n'
         "import os\n\n"
-        "from sqlbuild.tasks import task\n\n\n"
-        "@task()\n"
+        "from sqlbuild.assets import asset\n\n\n"
+        "@asset()\n"
         "def crash(ctx):\n"
         '    """End the process without unwinding."""\n\n'
         "    os._exit(137)\n"
     ),
     "python/fail.py": (
         '"""A task that raises, so the build exits non-zero."""\n\n'
-        "from sqlbuild.tasks import task\n\n\n"
-        "@task()\n"
+        "from sqlbuild.assets import asset\n\n\n"
+        "@asset()\n"
         "def fail(ctx):\n"
         '    """Raise."""\n\n'
         '    raise RuntimeError("task failed")\n'
@@ -1463,9 +1463,9 @@ RUN_RECORD_MARTS_FILES: dict[str, str] = {
         "  enabled false, schema archive);\nSELECT 1 AS order_id\n"
     ),
     "python/noop.py": (
-        '"""A task that writes no relation."""\n\n'
-        "from sqlbuild.tasks import task\n\n\n"
-        "@task()\n"
+        '"""An asset that writes no relation."""\n\n'
+        "from sqlbuild.assets import asset\n\n\n"
+        "@asset()\n"
         "def noop(ctx):\n"
         '    """Do nothing."""\n'
     ),
@@ -1655,8 +1655,8 @@ def write_job_warehouse_project(*, project_dir: Path) -> None:
             "models/orders_daily.sql": _job_warehouse_model(' FROM __ref("orders")'),
             "models/refunds.sql": _job_warehouse_model(' FROM __ref("orders_daily")'),
             "models/summary.sql": _job_warehouse_model(' FROM __ref("refunds")'),
-            "python/tasks.py": (
-                "from sqlbuild.tasks import task\n\n\n@task\ndef refresh_marker(ctx):\n"
+            "python/assets.py": (
+                "from sqlbuild.assets import asset\n\n\n@asset\ndef refresh_marker(ctx):\n"
                 '    """Refresh."""\n    ctx.execute_sql("SELECT \'task marker\'")\n'
             ),
             "orchestration/jobs/orders_wh_job.toml": _job_file(

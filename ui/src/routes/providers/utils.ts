@@ -4,7 +4,6 @@ import { plural } from '$lib/format/plural';
 
 export const consumerKindLabel: Record<ProviderConsumer['kind'], string> = {
 	loader: 'loader',
-	task: 'task',
 	asset: 'asset',
 	check: 'check',
 	hook: 'hook',
@@ -38,14 +37,13 @@ const KIND_WORDS: Record<string, [singular: string, plural: string]> = {
 	table: ['table', 'tables'],
 	incremental: ['incremental model', 'incremental models'],
 	model: ['model', 'models'],
-	task: ['task', 'tasks'],
 	asset: ['asset', 'assets'],
 	check: ['check', 'checks'],
 	udf: ['function', 'functions'],
 	table_fn: ['table function', 'table functions']
 };
 /** Groups in the order the Catalog lists kinds; any other kind follows, alphabetically. */
-const KIND_ORDER = ['loader', 'source', 'seed', 'view', 'table', 'incremental', 'model', 'asset', 'task', 'check', 'udf', 'table_fn'];
+const KIND_ORDER = ['loader', 'source', 'seed', 'view', 'table', 'incremental', 'model', 'asset', 'check', 'udf', 'table_fn'];
 /** Consumers that run inside other nodes or outside jobs, so they have no node of their own in the graph. */
 const OTHER_CONSUMERS: ReadonlySet<ProviderConsumer['kind']> = new Set(['hook', 'materialization', 'sink', 'event_exporter']);
 

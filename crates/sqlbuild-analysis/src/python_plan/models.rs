@@ -5,7 +5,7 @@ use crate::assembly::project::types::ObjectKey;
 /// One Python node as lifecycle classification reads it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LifecycleNode {
-    /// `task`, `asset`, `loader` or `check`.
+    /// `asset`, `loader` or `check`.
     pub kind: String,
     /// The SQL resources the node reads, in authored order.
     pub sql_deps: Vec<ObjectKey>,
@@ -15,9 +15,9 @@ pub struct LifecycleNode {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct RoundTripLoader {
     pub name: String,
-    /// The SQL its selected upstream tasks and assets read, which its load waits for; sorted.
+    /// The SQL its selected upstream assets read, which its load waits for; sorted.
     pub waits_for: Vec<ObjectKey>,
-    /// Its selected upstream tasks and assets, none of which may fail or hard-skip for it to load; sorted.
+    /// Its selected upstream assets, none of which may fail or hard-skip for it to load; sorted.
     pub gates: Vec<String>,
     /// The gates it reads directly or through other loaders, one of which must succeed for it to load; sorted.
     pub frontier: Vec<String>,

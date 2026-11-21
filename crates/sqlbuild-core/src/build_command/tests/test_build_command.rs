@@ -182,7 +182,7 @@ fn given_python_node_results_when_rendering_then_shows_status_and_detail() {
             description: "success, skip reason and failure message",
             rows: vec![
                 PythonNodeRow {
-                    kind: "task".to_owned(),
+                    kind: "asset".to_owned(),
                     node_name: "count_orders".to_owned(),
                     status: "success".to_owned(),
                     ..PythonNodeRow::default()
@@ -195,7 +195,7 @@ fn given_python_node_results_when_rendering_then_shows_status_and_detail() {
                     ..PythonNodeRow::default()
                 },
                 PythonNodeRow {
-                    kind: "task".to_owned(),
+                    kind: "asset".to_owned(),
                     node_name: "boom".to_owned(),
                     status: "failed".to_owned(),
                     error_message: Some("boom".to_owned()),
@@ -204,9 +204,9 @@ fn given_python_node_results_when_rendering_then_shows_status_and_detail() {
             ],
             expected_failed: true,
             expected_text: concat!(
-                "  python    task      count_orders                                       OK\n",
+                "  python    asset     count_orders                                       OK\n",
                 "  python    asset     extract                                            SKIP  upstream failed\n",
-                "  python    task      boom                                               FAIL  boom\n",
+                "  python    asset     boom                                               FAIL  boom\n",
             ),
         },
         PythonRowsTestCase {

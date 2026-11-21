@@ -51,13 +51,13 @@ fn given_build_results_when_formatting_footer_then_matches_python_layout() {
             },
             python: vec![PythonNodeText {
                 name: "refresh".to_owned(),
-                kind: "task".to_owned(),
+                kind: "asset".to_owned(),
                 status: "failed".to_owned(),
                 error_message: None,
                 warnings: Vec::new(),
             }],
             use_color: false,
-            expected_text: "\nWarnings:\n\n  orders\n    audit not_null returned 2 rows\n\n\u{2717} Completed with errors  PASS=1  WARN=1  FAIL=2  INSUFFICIENT=0  SKIP=1  TOTAL=5  (1.50s)\n\nFailures:\n\n  customers  (staging)\n    error     [E100] boom\n    delta table kept for inspection: orders__delta\n\n\nPython node failures:\n\n  task      refresh                                            Python node failed\n\nSkipped (1): payments",
+            expected_text: "\nWarnings:\n\n  orders\n    audit not_null returned 2 rows\n\n\u{2717} Completed with errors  PASS=1  WARN=1  FAIL=2  INSUFFICIENT=0  SKIP=1  TOTAL=5  (1.50s)\n\nFailures:\n\n  customers  (staging)\n    error     [E100] boom\n    delta table kept for inspection: orders__delta\n\n\nPython node failures:\n\n  asset     refresh                                            Python node failed\n\nSkipped (1): payments",
         },
     ];
 

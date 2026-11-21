@@ -1,14 +1,14 @@
-"""Two loaders and a task that reads both of their results.
+"""Two loaders and an asset that reads both of their results.
 
 A build that selects only one loader still reads the other loader's latest result, which may come
 from an earlier build. On Snowflake the adapter has no default schema, so the results must go to
-the target's schema for the task to find them.
+the target's schema for the asset to find them.
 """
 
+from sqlbuild.assets import asset
 from sqlbuild.executor.load.models import LoaderContext
 from sqlbuild.loaders import loader
 from sqlbuild.refs import source
-from sqlbuild.tasks import task
 
 
 @loader
@@ -23,7 +23,7 @@ def raw_customer_events(ctx: LoaderContext) -> list[dict[str, object]]:
     return [{"event_id": 1}]
 
 
-@task(depends_on=[source("raw_order_events"), source("raw_customer_events")])
+@asset(depends_on=[source("raw_order_events"), source("raw_customer_events")])
 def announce_events(ctx):
     """Record the run each loader result came from."""
     return ctx.result(

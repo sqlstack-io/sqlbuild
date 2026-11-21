@@ -38,7 +38,7 @@ const ORDERS_NODES: &[NodeSpec] = &[
     ),
     (
         "prepare_orders",
-        "task",
+        "asset",
         "python/tasks/orders.py",
         &["orders", "daily"],
         &[],
@@ -165,7 +165,7 @@ pub(super) fn published_orders_graph() -> PythonSelectionGraph {
                         let kind: &str = ORDERS_NODES
                             .iter()
                             .find(|node| node.0 == *upstream)
-                            .map_or("task", |node| node.1);
+                            .map_or("asset", |node| node.1);
                         key(&(kind, upstream))
                     })
                     .chain(sql_deps.iter().map(key))

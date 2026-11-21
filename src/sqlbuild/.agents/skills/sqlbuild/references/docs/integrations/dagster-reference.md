@@ -250,7 +250,6 @@ Python node asset keys use a two-part key with the node kind as prefix:
 
 | Kind | Asset key example |
 |------|-------------------|
-| Task | `("task", "prepare_orders")` |
 | Asset | `("asset", "orders_export")` |
 | Loader | `("loader", "raw_orders")` |
 

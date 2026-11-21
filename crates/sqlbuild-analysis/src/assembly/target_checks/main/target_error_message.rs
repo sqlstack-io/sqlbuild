@@ -50,7 +50,7 @@ pub fn target_error_message(error: &TargetError) -> String {
         ),
         TargetError::PreservedNodeResults(target) => format!(
             "Target '{target}' keeps each model's own schema, so it has no schema for the \
-             results of loaders, tasks, assets and checks. Set targets.{target}.loader_schema; \
+             results of loaders, assets and checks. Set targets.{target}.loader_schema; \
              Python node results are kept there."
         ),
     }

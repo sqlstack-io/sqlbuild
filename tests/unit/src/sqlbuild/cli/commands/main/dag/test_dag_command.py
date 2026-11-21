@@ -105,7 +105,7 @@ def test_given_local_project_when_running_dag_json_then_outputs_static_graph_wit
         PythonDagCommandTestCase(
             description="emits Python nodes and checks in static dag json",
             expected_exit_code=0,
-            expected_task_id="task:prepare_orders",
+            expected_task_id="asset:prepare_orders",
             expected_task_tags=["daily"],
             expected_task_group="python",
             expected_task_meta={"owner": "data"},
@@ -123,12 +123,12 @@ def test_given_local_project_when_running_dag_json_then_outputs_static_graph_wit
             expected_check_id="check:check_orders_export",
             expected_check_group="exports",
             expected_edges={
-                ("model:orders", "task:prepare_orders"),
-                ("task:prepare_orders", "asset:orders_export"),
-                ("task:prepare_orders", "loader:warehouse_export"),
+                ("model:orders", "asset:prepare_orders"),
+                ("asset:prepare_orders", "asset:orders_export"),
+                ("asset:prepare_orders", "loader:warehouse_export"),
                 ("loader:warehouse_export", "asset:orders_export"),
                 ("asset:orders_export", "check:check_orders_export"),
-                ("task:prepare_orders", "check:check_orders_export"),
+                ("asset:prepare_orders", "check:check_orders_export"),
                 ("loader:warehouse_export", "check:check_orders_export"),
                 ("loader:warehouse_export", "check:check_loader_export"),
             },
@@ -138,7 +138,7 @@ def test_given_local_project_when_running_dag_json_then_outputs_static_graph_wit
                 "name": "check_orders_export",
                 "checked_asset_ids": [
                     "asset:orders_export",
-                    "task:prepare_orders",
+                    "asset:prepare_orders",
                     "loader:warehouse_export",
                 ],
                 "path": "python/checks/check_orders_export.py",
@@ -191,7 +191,7 @@ def test_given_python_nodes_when_running_dag_json_then_outputs_artifact_metadata
     }
 
     assert exit_code == test_case.expected_exit_code
-    assert nodes_by_id[test_case.expected_task_id]["kind"] == "task"
+    assert nodes_by_id[test_case.expected_task_id]["kind"] == "asset"
     assert nodes_by_id[test_case.expected_task_id]["tags"] == test_case.expected_task_tags
     assert nodes_by_id[test_case.expected_task_id]["group"] == test_case.expected_task_group
     assert nodes_by_id[test_case.expected_task_id]["meta"] == test_case.expected_task_meta

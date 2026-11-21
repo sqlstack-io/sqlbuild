@@ -12,7 +12,6 @@
 		GitMerge,
 		Repeat,
 		Columns3,
-		Workflow,
 		Package,
 		TableProperties,
 		type Icon as IconType
@@ -82,7 +81,6 @@
 		merge: GitMerge,
 		delete_insert: Repeat,
 		microbatch: Layers,
-		task: Workflow,
 		asset: Package,
 		udf: FunctionSquare,
 		table_fn: TableProperties,

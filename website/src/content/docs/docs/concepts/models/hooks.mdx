@@ -112,7 +112,7 @@ A Python post-hook that returns `ctx.skip(...)` stops the remaining post-hooks a
 
 ## Names and identity
 
-SQL and Python hook names share the project-wide resource namespace with models, sources, seeds, functions, loaders, tasks, assets, checks, and providers. Any collision fails discovery, including two same-stem SQL hook files in different directories or a SQL and Python hook with the same name.
+SQL and Python hook names share the project-wide resource namespace with models, sources, seeds, functions, loaders, assets, checks, and providers. Any collision fails discovery, including two same-stem SQL hook files in different directories or a SQL and Python hook with the same name.
 
 The ordered hook list participates in each model's version identity:
 

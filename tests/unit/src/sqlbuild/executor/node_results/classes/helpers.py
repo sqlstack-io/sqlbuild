@@ -33,7 +33,7 @@ def build_node_result_record(
     materialized: bool | None = None,
 ) -> NodeResultRecord:
     return NodeResultRecord(
-        node_type="task",
+        node_type="asset",
         node_name="orders",
         target_database="analytics",
         target_schema="state",

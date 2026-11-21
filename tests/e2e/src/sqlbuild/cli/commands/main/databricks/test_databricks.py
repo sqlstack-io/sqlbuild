@@ -142,8 +142,8 @@ def test_given_databricks_dbt_profile_when_running_dbt_init_then_builds_profile_
         DatabricksNodeResultE2ETestCase(
             description="direct node results persist and read on databricks",
             expected_rows=(
+                ("asset", "produce_result", "success"),
                 ("check", "check_produce_result", "success"),
-                ("task", "produce_result", "success"),
             ),
         )
     ],
@@ -163,8 +163,8 @@ def test_given_python_result_when_running_check_on_databricks_then_persists_node
                 schema_name=schema_name,
             ),
             "python/tasks/results.py": (
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def produce_result(ctx):\n"
                 "    '''Test task produce_result.'''\n    return ctx.result(payload={'value': 42}, metadata={'source': 'databricks'})\n"
             ),

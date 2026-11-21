@@ -40,7 +40,7 @@ _EXISTING_ROWS: str = (
     [
         PythonNodeSelectionE2ETestCase(
             description="task selected alone reads the existing managed source table",
-            select=("task:count_customers",),
+            select=("asset:count_customers",),
             expected_exit_code=0,
             expected_output_patterns=(r"count_customers\s+OK",),
             expected_row_counts={"raw_customers": 3},
@@ -56,7 +56,7 @@ _EXISTING_ROWS: str = (
         ),
         PythonNodeSelectionE2ETestCase(
             description="task on an unmanaged source runs when selected alone",
-            select=("task:count_raw_orders",),
+            select=("asset:count_raw_orders",),
             expected_exit_code=0,
             expected_output_patterns=(r"count_raw_orders\s+OK",),
             expected_row_counts={},
@@ -64,7 +64,7 @@ _EXISTING_ROWS: str = (
         ),
         PythonNodeSelectionE2ETestCase(
             description="task on an unmanaged source runs when selected with upstreams",
-            select=("+task:count_raw_orders",),
+            select=("+asset:count_raw_orders",),
             expected_exit_code=0,
             expected_output_patterns=(r"count_raw_orders\s+OK",),
             expected_row_counts={},
@@ -72,7 +72,7 @@ _EXISTING_ROWS: str = (
         ),
         PythonNodeSelectionE2ETestCase(
             description="task selected alone reads the existing unselected model",
-            select=("task:count_orders",),
+            select=("asset:count_orders",),
             existing_sql=_EXISTING_ORDERS,
             expected_exit_code=0,
             expected_output_patterns=(r"count_orders\s+OK",),
@@ -90,7 +90,7 @@ _EXISTING_ROWS: str = (
         ),
         PythonNodeSelectionE2ETestCase(
             description="task waits for its selected upstream model",
-            select=("+task:count_orders",),
+            select=("+asset:count_orders",),
             expected_exit_code=0,
             expected_output_patterns=(r"count_orders\s+OK",),
             expected_row_counts={"orders": 2},
@@ -130,7 +130,7 @@ _EXISTING_ROWS: str = (
         ),
         PythonNodeSelectionE2ETestCase(
             description="task is skipped when its selected upstream model fails",
-            select=("+task:count_orders",),
+            select=("+asset:count_orders",),
             orders_sql=_FAILING_ORDERS_SQL,
             expected_exit_code=1,
             expected_output_patterns=(
@@ -154,7 +154,7 @@ _EXISTING_ROWS: str = (
         ),
         PythonNodeSelectionE2ETestCase(
             description="task is skipped when its selected upstream model is skipped",
-            select=("+task:count_order_summary",),
+            select=("+asset:count_order_summary",),
             orders_sql=_FAILING_ORDERS_SQL,
             expected_exit_code=1,
             expected_output_patterns=(
@@ -206,12 +206,12 @@ def test_given_python_node_selection_when_building_then_it_gates_only_on_schedul
     [
         PythonUpstreamResultE2ETestCase(
             description="a task reads its unselected upstream task's latest result",
-            select="task:report_order_count",
-            upstream_select="task:count_orders",
+            select="asset:report_order_count",
+            upstream_select="asset:count_orders",
             expected_error=(
-                "Upstream task 'count_orders' has no successful result to read. Build it first "
-                "with 'sqb build --select task:count_orders', or build both with "
-                "'sqb build --select +task:report_order_count'."
+                "Upstream asset 'count_orders' has no successful result to read. Build it first "
+                "with 'sqb build --select asset:count_orders', or build both with "
+                "'sqb build --select +asset:report_order_count'."
             ),
         )
     ],

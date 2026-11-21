@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "S105",
-     "message": "Target 'dev' keeps each model's own schema, so it has no schema for the results of loaders, tasks, assets and checks. Set targets.dev.loader_schema; Python node results are kept there.",
+     "message": "Target 'dev' keeps each model's own schema, so it has no schema for the results of loaders, assets and checks. Set targets.dev.loader_schema; Python node results are kept there.",
      "help": "to keep Python node results in a schema, set this in sqlbuild_project.toml:\n            [targets.dev]\n            loader_schema = \"my_schema\""
     }
    ]

@@ -216,7 +216,7 @@ fn given_project_python_when_evaluating_python_rules_then_reports_fensu_findings
                 ),
                 (
                     "python/orders/node.py",
-                    "from python.orders import _tables\n\n\n@task\ndef count() -> int:\n    return _tables.TABLES\n",
+                    "from python.orders import _tables\n\n\n@asset\ndef count() -> int:\n    return _tables.TABLES\n",
                 ),
             ],
             config: json!({ "select": ["SQBRPYTHON306"] }),

@@ -1,4 +1,4 @@
-"""Runtime relation guards for task, asset, and check contexts."""
+"""Runtime relation guards for asset and check contexts."""
 
 from __future__ import annotations
 

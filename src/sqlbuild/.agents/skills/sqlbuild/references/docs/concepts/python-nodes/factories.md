@@ -6,7 +6,7 @@
 
 Online: https://sqlbuild.com/docs/concepts/python-nodes/factories/
 
-A factory is a function that **generates** Python nodes instead of authoring them one at a time. Use `@factory` when you want to create many similar [tasks](tasks.md), [assets](assets.md), [loaders](loaders.md), or [checks](checks.md) from a list, a config, or a loop, rather than hand-writing each one.
+A factory is a function that **generates** Python nodes instead of authoring them one at a time. Use `@factory` when you want to create many similar [assets](assets.md), [loaders](loaders.md), or [checks](checks.md) from a list, a config, or a loop, rather than hand-writing each one.
 
 Factories are an advanced feature. Most projects author nodes directly; reach for a factory when you find yourself copy-pasting near-identical node definitions.
 
@@ -35,7 +35,7 @@ def export_assets():
 
 The returned nodes are discovered and added to the graph exactly as if you had written them by hand. They participate in selection, lifecycle, the DAG artifact, and integrations like any other node.
 
-A factory may return a single node or a list, tuple, or set of nodes. Every returned item must be a decorated `@task`, `@asset`, `@loader`, or `@check` function.
+A factory may return a single node or a list, tuple, or set of nodes. Every returned item must be a decorated `@asset`, `@loader`, or `@check` function.
 
 ## Where factories live
 

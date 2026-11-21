@@ -113,13 +113,13 @@ def test_given_waffle_shop_when_running_dag_json_then_it_reports_static_graph(
             expected_project_name="partner_scoring",
             expected_node_ids=(
                 "model:orders",
-                "task:score_orders",
+                "asset:score_orders",
                 "source:partner_scores",
                 "model:scored_orders",
             ),
             expected_edge_pairs=(
-                ("model:orders", "task:score_orders"),
-                ("task:score_orders", "source:partner_scores"),
+                ("model:orders", "asset:score_orders"),
+                ("asset:score_orders", "source:partner_scores"),
                 ("source:partner_scores", "model:scored_orders"),
             ),
             expected_check_ids=(),
