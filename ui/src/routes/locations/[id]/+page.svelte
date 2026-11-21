@@ -50,7 +50,7 @@
 	const instanceLabel: Record<LocationInstance['state'], string> = { live: 'Running', stale: 'Not checking in', gone: 'Stopped' };
 </script>
 
-<AppTopbar title="Locations">
+<AppTopbar title="Locations" subject={detail ? `${detail.name} · Locations` : null}>
 	<RefreshButton onclick={() => (location.refresh(), problems.refresh())} />
 </AppTopbar>
 

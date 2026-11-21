@@ -65,7 +65,7 @@
 	}
 </script>
 
-<AppTopbar title="Runs" />
+<AppTopbar title="Runs" subject={`Run ${shortRunId(runId)} · ${view.run ? (view.run.jobKey ?? 'ad hoc') : ''}`.replace(/ · $/, '')} />
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<RunHeader {view} {runId} />

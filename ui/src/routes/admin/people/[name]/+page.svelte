@@ -69,7 +69,7 @@
 	}
 </script>
 
-<AppTopbar title="People">
+<AppTopbar title="People" subject="{name} · People">
 	<RefreshButton onclick={changed} />
 </AppTopbar>
 

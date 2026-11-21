@@ -34,7 +34,7 @@
 	];
 </script>
 
-<AppTopbar title="Providers">
+<AppTopbar title="Providers" subject="{name} · Providers">
 	<RefreshButton onclick={() => providers.refresh()} />
 </AppTopbar>
 
