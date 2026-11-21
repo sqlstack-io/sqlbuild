@@ -5,6 +5,7 @@ import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, isUnsupported, type ApiClient } from './client';
 import { applyNodeStates } from './node-states';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
+import { outputLive, pageQuery, toNodeOutputIndex, toNodeOutputPage, type NodeOutputAt } from './http-output';
 import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage, toNodeStates, toNodeStatusDelta } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
@@ -23,7 +24,7 @@ import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape, AutomaticWithdrawal } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
+import type { NodeOutputIndex, NodeOutputPage, NodeOutputSearch, RunNode, AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 import { newRequestId } from '$lib/browser/request-id';
 
 type Wire = components['schemas'];
@@ -474,6 +475,44 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (response.status === 403) return [];
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toRunOutput(data);
+		},
+		async getNodeOutputIndex(scope: Scope, runId: string, nodeKey: string): Promise<NodeOutputIndex | null> {
+			if (!evidenceLocations.has(scope.locationId)) return null;
+			const [{ data, error, response }, nodes] = await Promise.all([
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index', { params: { path: runPath(scope, runId), query: { node: nodeKey } } }),
+				runNodes(scope, runId)
+			]);
+			if (response.status === 401) onUnauthorized();
+			if (response.status === 403 || response.status === 503) return null;
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toNodeOutputIndex(data, nodeKey, outputLive(nodes.map((n) => ({ nodeKey: n.node_key, status: n.status as RunNode['status'] })), nodeKey));
+		},
+		async getNodeOutputPage(scope: Scope, runId: string, nodeKey: string, at: NodeOutputAt): Promise<NodeOutputPage> {
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/lines', {
+				params: { path: runPath(scope, runId), query: pageQuery(nodeKey, at) }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toNodeOutputPage(data);
+		},
+		async searchNodeOutput(scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward'): Promise<NodeOutputSearch> {
+			// A large output is searched a bounded part at a time; carry on from where each part stopped.
+			const searchFrom = async (start: number): Promise<Wire['OutputSearch']> => {
+				const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/search', {
+					params: { path: runPath(scope, runId), query: { node: nodeKey, text: query, from: start, direction } }
+				});
+				if (response.status === 401) onUnauthorized();
+				if (!data) throw new ApiError(errorText(error, response), response.status);
+				return data;
+			};
+			let found: Wire['OutputSearch'] = await searchFrom(from);
+			while (found.line == null && found.continue_from != null) found = await searchFrom(found.continue_from);
+			return { line: found.line ?? null, count: found.count ?? null, rank: found.rank ?? null };
+		},
+		nodeOutputDownloadUrl(scope: Scope, runId: string, nodeKey: string): string {
+			const { location_id, target, run_id } = runPath(scope, runId);
+			const path = `/api/control/locations/${encodeURIComponent(location_id)}/targets/${encodeURIComponent(target)}/runs/${encodeURIComponent(run_id)}/output/download`;
+			return `${baseUrl}${path}?node=${encodeURIComponent(nodeKey)}`;
 		},
 		async getRunNodeError(scope: Scope, runId: string, nodeKey: string): Promise<RunNodeError> {
 			const refusal = `${scope.locationId}|${runId}|${nodeKey}`;

@@ -29,7 +29,13 @@
 	let target = $state<number | null>(null);
 	let lineInput = $state('');
 	let query = $state('');
-	let hits = $state<{ query: string; count: number; line: number | null; rank: number | null } | null>(null);
+	/** Where a search stands: this match of how many when the output was searched whole, else just its line. */
+	function hitText(h: { count: number | null; line: number | null; rank: number | null }): string {
+		if (h.line == null) return 'No matches';
+		if (h.count != null && h.rank != null) return `hit ${fmt(h.rank)} of ${fmt(h.count)} · line ${fmt(h.line)}`;
+		return `match at line ${fmt(h.line)}`;
+	}
+	let hits = $state<{ query: string; count: number | null; line: number | null; rank: number | null } | null>(null);
 	let searching = $state(false);
 	let stream = $state<'all' | 'stdout' | 'stderr'>('all');
 	let scroller = $state<HTMLDivElement>();
@@ -179,7 +185,7 @@
 				<input bind:value={query} placeholder="Search the whole output" aria-label="Search the whole output" />
 			</form>
 			{#if searching}<span class="faint">Searching {fmt(total)} lines…</span>
-			{:else if hits && hits.query === query}<span class="faint">{hits.count ? (hits.rank != null ? `hit ${fmt(hits.rank)} of ${fmt(hits.count)} · line ${fmt(hits.line ?? 0)}` : `${fmt(hits.count)} matches`) : 'No matches'}</span>{/if}
+			{:else if hits && hits.query === query}<span class="faint">{hitText(hits)}</span>{/if}
 			<Button size="sm" variant="ghost" onclick={() => search('backward')} disabled={!query.trim() || searching} title="Previous match">↑</Button>
 			<Button size="sm" variant="ghost" onclick={() => search('forward')} disabled={!query.trim() || searching} title="Next match">↓</Button>
 			<span class="divider"></span>
