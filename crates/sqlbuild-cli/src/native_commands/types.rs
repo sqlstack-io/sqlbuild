@@ -38,3 +38,9 @@ pub(crate) type LocationPlan = (
     serde_json::Value,
     std::collections::BTreeMap<String, sqlbuild_orchestration::platform::models::PlanModelDiff>,
 );
+
+/// The republish trigger and the location's credential and session, for discovery's checks and health.
+pub(crate) type DiscoveryControls<'a> = (
+    &'a tokio::sync::watch::Sender<crate::native_commands::models::DevControlState>,
+    (&'a str, uuid::Uuid),
+);

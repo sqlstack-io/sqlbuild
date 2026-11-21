@@ -429,6 +429,7 @@ def _to_executable_python_node(node: DiscoveredPythonNode) -> ExecutablePythonNo
         columns=node.asset.columns if node.asset is not None else (),
         column_lineage=node.asset.column_lineage if node.asset is not None else None,
         retry=node.asset.retry if node.asset is not None else None,
+        discovered=node.asset.discovered if node.asset is not None else None,
     )
 
 

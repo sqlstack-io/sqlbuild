@@ -131,6 +131,8 @@ pub struct ReadyCard {
     pub warehouse: WarehouseState,
     pub triggers: String,
     pub watching: String,
+    /// The discovered sets, such as `orders_plan 27 items`; the card leaves the row out without them.
+    pub discovered: Option<String>,
 }
 
 /// The glyph and colour of one event line.

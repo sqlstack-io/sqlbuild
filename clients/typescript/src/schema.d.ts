@@ -2034,6 +2034,25 @@ export interface components {
             /** @enum {string} */
             status: "unavailable";
         };
+        /**
+         * @description How a set's newest attempt went.
+         * @enum {string}
+         */
+        DiscoveredSetStatus: "ok" | "failed" | "never";
+        /** @description One discovered set as a location's health names it. */
+        DiscoveryHealth: {
+            /** @description Why the newest attempt failed, secrets masked. */
+            error?: string | null;
+            /**
+             * Format: int64
+             * @description How many items the set serves: its newest result, or the last good one after a failure.
+             */
+            items: number;
+            /** Format: date-time */
+            last_good_at?: string | null;
+            name: string;
+            status: components["schemas"]["DiscoveredSetStatus"];
+        };
         ExternalIdentityResponse: {
             csrf_token: string;
             /** Format: date-time */
@@ -2234,6 +2253,12 @@ export interface components {
             kind: "provider_secrets";
             /** Format: int64 */
             missing: number;
+        } | {
+            /** Format: int64 */
+            generation: number;
+            /** @enum {string} */
+            kind: "discovery";
+            sets: components["schemas"]["DiscoveryHealth"][];
         } | {
             /** Format: int64 */
             generation: number;
@@ -3395,6 +3420,8 @@ export interface components {
         /** @description Workers compile locally and compare against this immutable snapshot, not the current deploy. */
         RunExecution: {
             claim: components["schemas"]["RunClaim"];
+            /** @description The discovered sets the run's snapshot saved, which the worker compiles from. */
+            discovered?: Record<string, never>;
             environment_hash: string;
             node_hashes: {
                 [key: string]: string;
@@ -3575,6 +3602,12 @@ export interface components {
         };
         /** @description The authorized selection and pinned execution inputs are immutable once requested. */
         RunRequest: {
+            /**
+             * Format: uuid
+             * @description The first run of this run's rerun chain, which a node reads as `ctx.root_run_id`; unset when
+             *     this run is the first. Reruns and retries keep it, and a job's member runs derive theirs.
+             */
+            chain_run_id?: string | null;
             command?: components["schemas"]["RunCommand"];
             image_id?: string | null;
             job_key?: string | null;

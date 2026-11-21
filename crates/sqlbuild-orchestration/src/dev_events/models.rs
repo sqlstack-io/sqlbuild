@@ -55,6 +55,8 @@ pub enum DevEvent {
     },
     /// Something the location could not do, such as a warehouse sync that stopped; it keeps serving.
     Warning { title: String, detail: String },
+    /// The discovered sets a publication used, summarised for the ready card.
+    Discovered { summary: String },
 }
 
 /// What `sqb dev` asks its location child to do, one JSON line each on the child's stdin.

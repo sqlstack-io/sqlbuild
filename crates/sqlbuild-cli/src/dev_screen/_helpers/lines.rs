@@ -73,6 +73,7 @@ pub(crate) fn ready_lines(mut screen: DevScreen, now: Instant) -> (DevScreen, Ve
             warehouse,
             triggers: screen.triggers.clone(),
             watching: screen.watching.clone(),
+            discovered: screen.discovered.clone(),
         },
         &screen.facts,
     );

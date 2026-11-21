@@ -48,15 +48,22 @@ pub(super) async fn run_location(
         target: options.target.clone(),
     };
     let (requests, receiver) = mpsc::channel(1);
-    let controls = dev_controls(&options);
+    let (republisher, controls) = dev_controls(&options);
     let serving = async {
         tokio::select! {
             result = watch_location(&options, script, (bearer, &client, &poll), (requests, controls)) => result,
             result = location_heartbeats(&options, bearer, session_id) => result,
         }
     };
-    let (serving, compiler) =
-        tokio::join!(serving, run_location_compiler(&options, script, receiver));
+    let (serving, compiler) = tokio::join!(
+        serving,
+        run_location_compiler(
+            &options,
+            script,
+            receiver,
+            (&republisher, (bearer, session_id))
+        )
+    );
     serving.and(compiler)
 }
 

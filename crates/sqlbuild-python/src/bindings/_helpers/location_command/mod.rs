@@ -1,5 +1,6 @@
 pub(crate) mod command;
 mod constants;
+mod discovery_requests;
 mod load_rules;
 mod runtime;
 mod runtime_plan;

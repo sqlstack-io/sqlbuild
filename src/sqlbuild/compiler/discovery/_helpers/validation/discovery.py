@@ -15,7 +15,7 @@ from sqlbuild._native import (
 from sqlbuild.python_nodes.main.read_asset_definition import read_asset_definition
 from sqlbuild.python_nodes.main.read_check_definition import read_check_definition
 from sqlbuild.python_nodes.main.read_loader_definition import read_loader_definition
-from sqlbuild.python_nodes.models import NodeSetRef, SqlResourceRef
+from sqlbuild.python_nodes.models import DiscoveredItemRef, NodeSetRef, SqlResourceRef
 
 type _PythonNode = DiscoveredLoaderFunction | DiscoveredAssetFunction | DiscoveredCheckFunction
 
@@ -79,6 +79,8 @@ def _loader_has_decorator_config(loader_function: DiscoveredLoaderFunction) -> b
 
 
 def _decorated_name(dependency: object) -> str | None:
+    if isinstance(dependency, DiscoveredItemRef):
+        return dependency.name
     if not callable(dependency):
         return None
     for read_definition in _DEFINITION_READERS:

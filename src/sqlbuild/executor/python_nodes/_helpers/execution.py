@@ -19,6 +19,11 @@ from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.node_results.main._direct_store import build_direct_node_result_store
 from sqlbuild.executor.node_results.models import NodeResultRecord
 from sqlbuild.executor.node_results.types import NodeResultStatus
+from sqlbuild.executor.python_nodes._helpers.discovered_items import (
+    discovered_context,
+    item_args,
+    placeholder_failure,
+)
 from sqlbuild.executor.python_nodes._helpers.node_warehouse import node_runtime
 from sqlbuild.executor.python_nodes._helpers.relation_guard import build_python_node_relation_guard
 from sqlbuild.executor.python_nodes._helpers.results import (
@@ -190,6 +195,16 @@ def _execute_ready_node_in_cost_scope(
         )
         _persist_python_node_result(result_store=result_store, result=result, run_id=run_id)
         return result, None
+    never_discovered: str | None = placeholder_failure(node)
+    if never_discovered is not None:
+        result = PythonNodeExecutionResult(
+            node_name=node.name,
+            kind=node_kind,
+            status=PythonNodeStatus.FAILED,
+            error_message=never_discovered,
+        )
+        _persist_python_node_result(result_store=result_store, result=result, run_id=run_id)
+        return result, None
     warnings: list[str] = []
     context: AssetContext = _build_context(
         node=node,
@@ -303,6 +318,7 @@ def _call_node_with_retry(
                     function=node.function,
                     context=context,
                     providers=providers,
+                    supplied_kwargs=item_args(node),
                 )
                 result: PythonNodeExecutionResult = normalize_python_node_return(
                     node_name=node.name,
@@ -333,6 +349,7 @@ def _call_node_with_retry(
                         function=node.function,
                         context=context,
                         providers=providers,
+                        supplied_kwargs=item_args(node),
                     )
                 except retry_policy.retry_on as error:
                     retry_error = error
@@ -446,4 +463,6 @@ def _build_context(
         end_cursor_ts=runtime.end_cursor_ts,
         start_cursor_int=runtime.start_cursor_int,
         end_cursor_int=runtime.end_cursor_int,
+        discovered=discovered_context(node),
+        chain_run_id=runtime.chain_run_id,
     )

@@ -148,9 +148,18 @@ fn unknown(kind: &str, value: &str, names: &UnitTestSelectorNames) -> SelectorEr
     }
 }
 
+/// The names `value` selects: itself, else every `value[<item>]` of a `for_each` asset, else its glob matches.
 fn matching(value: &str, names: &BTreeSet<String>) -> BTreeSet<String> {
+    if names.contains(value) {
+        return BTreeSet::from([value.to_owned()]);
+    }
     if !is_pattern(value) {
-        return names.get(value).into_iter().cloned().collect();
+        let prefix: String = format!("{value}[");
+        return names
+            .iter()
+            .filter(|name| name.starts_with(&prefix) && name.ends_with(']'))
+            .cloned()
+            .collect();
     }
     names
         .iter()

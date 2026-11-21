@@ -21,12 +21,19 @@ use crate::bindings::_helpers::location_command::command::location_arguments;
 use crate::bindings::_helpers::location_command::command::publish_location;
 use crate::bindings::_helpers::location_command::constants::DUCKDB_LOCK_CONFLICT;
 use crate::bindings::_helpers::location_command::constants::PLAN_REQUEST;
+use crate::bindings::_helpers::location_command::discovery_requests::{
+    checked_set, discover_for_publication, published_sets,
+};
 use crate::bindings::_helpers::location_command::runtime_plan::runtime_plan;
 use crate::bindings::_helpers::location_command::types::HeldProject;
 use crate::bindings::_helpers::native_host::orchestration_sensors::{SensorCall, evaluate_sensor};
 use crate::bindings::_helpers::native_host::warehouse_metadata::close_history_session;
 use crate::bindings::_helpers::native_host::warehouse_metadata::open_history_session;
 use crate::bindings::_helpers::native_host::warehouse_metadata::read_history;
+use sqlbuild_orchestration::discovered_sets::constants::{CHECK_DISCOVERED_KEY, GENERATION_KEY};
+use sqlbuild_orchestration::discovered_sets::models::{
+    DiscoveredSetCheck, DiscoveryPublishRequest,
+};
 use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
@@ -53,10 +60,26 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                         "runtime expects a JSON generation, plan, metadata read, sensor evaluation or sensor trial per line",
                     )
                 })?;
-                let output = if let Some(generation) = request.as_i64() {
+                let publication: Option<DiscoveryPublishRequest> = match request.as_i64() {
+                    Some(generation) => Some(DiscoveryPublishRequest {
+                        generation,
+                        rediscover: None,
+                        previous: Default::default(),
+                        seed: true,
+                    }),
+                    None if request.get(GENERATION_KEY).is_some() => {
+                        Some(serde_json::from_value(request.clone()).map_err(|_| {
+                            PyValueError::new_err("runtime received an invalid publish request")
+                        })?)
+                    }
+                    None => None,
+                };
+                let output = if let Some(publication) = publication {
+                    let generation: i64 = publication.generation;
                     options.set_item("generation", generation)?;
                     let arguments = location_arguments(py, Some(options.clone()))?;
                     held = None;
+                    discover_for_publication(&arguments, publication)?;
                     let (published, rules) = match publish_location(py, &arguments) {
                         Ok(Ok((published, project))) => {
                             held = Some(project);
@@ -73,10 +96,22 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             (None, None)
                         }
                     };
+                    let (discovered, discover_files) = published_sets(held.as_ref())?;
                     serde_json::to_string(&serde_json::json!({
                         "published": published,
                         "rules": rules,
+                        "discovered": discovered,
+                        "discover_files": discover_files,
                     }))
+                } else if request.get(CHECK_DISCOVERED_KEY).is_some() {
+                    let check: DiscoveredSetCheck = serde_json::from_value(request.clone())
+                        .map_err(|_| {
+                            PyValueError::new_err(
+                                "runtime received an invalid discovered set check",
+                            )
+                        })?;
+                    let arguments = location_arguments(py, Some(options.clone()))?;
+                    serde_json::to_string(&checked_set(&arguments, held.as_ref(), check)?)
                 } else if let Some(plan) = request.get(PLAN_REQUEST) {
                     serde_json::to_string(&runtime_plan(py, held.as_ref(), plan)?)
                 } else if let Some(kind) = WarehouseHistoryKind::ALL

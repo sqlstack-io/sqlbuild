@@ -3,6 +3,7 @@
 use crate::api::models::ControlClient;
 use crate::credentials::models::AuditRetention;
 use crate::declarations::models::TriggerDefinition;
+use crate::discovered_sets::models::DiscoveredSetStatus;
 use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
 use crate::sensors::models::{SensorEvaluationRequest, SensorFunctionOutcome};
 use crate::snapshots::models::SnapshotRetention;
@@ -58,6 +59,11 @@ pub enum LocationHealth {
         generation: i64,
         missing: u64,
     },
+    /// The discovered sets a publication used; a failed set keeps serving its last good items.
+    Discovery {
+        generation: i64,
+        sets: Vec<DiscoveryHealth>,
+    },
     /// Jobs and groups this server's `pool_caps` clamp, derived by the server, never reported by a location.
     PoolCapped {
         generation: i64,
@@ -89,6 +95,21 @@ pub enum LocationHealth {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         mirrored_records: Option<u64>,
     },
+}
+
+/// One discovered set as a location's health names it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiscoveryHealth {
+    pub name: String,
+    pub status: DiscoveredSetStatus,
+    /// Why the newest attempt failed, secrets masked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// How many items the set serves: its newest result, or the last good one after a failure.
+    pub items: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_good_at: Option<DateTime<Utc>>,
 }
 
 /// The stage a warehouse sync failed at; only a failed read also reports its redacted error.
@@ -136,12 +157,14 @@ pub enum LocationState {
     FallingBack,
     /// A provider secret is unset in the location's environment, so runs that use the provider fail.
     MissingSecrets,
+    /// A discover function failed at the last publication, so its set serves its last good items or none.
+    DiscoveryFailed,
     /// No instance has checked in for 90 seconds.
     Broken,
 }
 
 impl LocationState {
-    /// `target`'s state at `now` from observations that may cover several targets: down without a recent check-in, then a failed load, then missing provider secrets, then a failed connection.
+    /// `target`'s state at `now` from observations that may cover several targets: down without a recent check-in, then a failed load, then missing provider secrets, then a failed discover function, then a failed connection.
     #[must_use]
     pub fn of(
         observations: &[LocationHealthObservation],
@@ -162,6 +185,7 @@ impl LocationState {
         let mut failed: Option<(DateTime<Utc>, i64)> = None;
         let mut connection: Option<(DateTime<Utc>, i64, bool)> = None;
         let mut secrets: Option<(DateTime<Utc>, u64)> = None;
+        let mut discovery: Option<(DateTime<Utc>, bool)> = None;
         for observation in own {
             let seen = observation.received_at;
             match observation.report.health {
@@ -182,6 +206,14 @@ impl LocationState {
                 {
                     secrets = Some((seen, missing));
                 }
+                LocationHealth::Discovery { ref sets, .. }
+                    if discovery.is_none_or(|(at, _)| seen > at) =>
+                {
+                    let failing: bool = sets
+                        .iter()
+                        .any(|set| set.status == DiscoveredSetStatus::Failed);
+                    discovery = Some((seen, failing));
+                }
                 _ => {}
             }
         }
@@ -191,6 +223,7 @@ impl LocationState {
             }
             (Some(_), None, _) => Self::FallingBack,
             (_, _, Some((_, missing))) if missing > 0 => Self::MissingSecrets,
+            _ if discovery.is_some_and(|(_, failing)| failing) => Self::DiscoveryFailed,
             (_, Some((_, _, false)), _) => Self::Degraded,
             _ => Self::Healthy,
         }

@@ -93,6 +93,24 @@ impl<'graph> NodeIndex<'graph> {
         self.by_name.get(name).copied()
     }
 
+    /// The node named exactly `value`, or else every node `value[<item>]` of a `for_each` asset.
+    pub(crate) fn named(&self, value: &str) -> Vec<&'graph PythonSelectionNode> {
+        if let Some(node) = self.node(value) {
+            return vec![node];
+        }
+        let prefix: String = format!("{value}[");
+        self.by_name
+            .iter()
+            .filter(|(name, _)| name.starts_with(&prefix) && name.ends_with(']'))
+            .map(|(_, node)| *node)
+            .collect()
+    }
+
+    /// Whether `value` is read as a pattern: it uses a glob character and names no node exactly.
+    pub(crate) fn is_pattern(&self, value: &str) -> bool {
+        is_pattern(value) && self.node(value).is_none()
+    }
+
     pub(crate) fn edges(&self, name: &str, direction: EdgeDirection) -> &'graph [String] {
         let edges: &HashMap<&'graph str, &'graph [String]> = match direction {
             EdgeDirection::Upstream => &self.upstream,
@@ -264,11 +282,11 @@ fn under_path(index: &NodeIndex<'_>, value: &str) -> Resolved {
 
 fn lookup(index: &NodeIndex<'_>, kind: &str, value: &str) -> Resolved {
     if kind == NAME_KIND {
-        if !is_pattern(value) {
+        if !index.is_pattern(value) {
             return Ok(index
-                .node(value)
-                .map(|node| node.name.clone())
+                .named(value)
                 .into_iter()
+                .map(|node| node.name.clone())
                 .collect());
         }
         return Ok(index
@@ -284,15 +302,12 @@ fn lookup(index: &NodeIndex<'_>, kind: &str, value: &str) -> Resolved {
             format!("selector type '{kind}' does not map to a Python node type"),
         ));
     }
-    if !is_pattern(value) {
+    if !index.is_pattern(value) {
         return Ok(index
-            .graph
-            .nodes
-            .iter()
-            .rev()
-            .find(|node| node.kind == kind && node.name == value)
-            .map(|node| node.name.clone())
+            .named(value)
             .into_iter()
+            .filter(|node| node.kind == kind)
+            .map(|node| node.name.clone())
             .collect());
     }
     Ok(index

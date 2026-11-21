@@ -90,6 +90,7 @@ use sqlbuild_orchestration::dev_events::main::emit_dev_event::emit_dev_event;
 use sqlbuild_orchestration::dev_events::main::parse_dev_control::parse_dev_control;
 use sqlbuild_orchestration::dev_events::main::parse_dev_event::parse_dev_event;
 use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
+use sqlbuild_orchestration::discovered_sets::models::DiscoveryPublishRequest;
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::health::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::installation::run_maintenance::run_maintenance;
@@ -353,6 +354,8 @@ pub(crate) async fn compile_generation(
             LocationLoad {
                 published: None,
                 rules: None,
+                discovered: Default::default(),
+                discover_files: Default::default(),
             }
         }
     };
@@ -416,12 +419,11 @@ fn rule_failure_text(rules: &LocationRuleFailure) -> String {
 /// The child is retained by its owning task while this exchange can be cancelled.
 pub(crate) async fn exchange_location_generation(
     compiler: &mut LocationCompiler,
-    generation: i64,
+    request: &DiscoveryPublishRequest,
 ) -> Result<LocationLoad, ControlError> {
-    compiler
-        .stdin
-        .write_all(format!("{generation}\n").as_bytes())
-        .await?;
+    let mut line: Vec<u8> = serde_json::to_vec(request).map_err(std::io::Error::other)?;
+    line.push(b'\n');
+    compiler.stdin.write_all(&line).await?;
     compiler.stdin.flush().await?;
     let mut line = String::new();
     loop {
@@ -1543,11 +1545,18 @@ pub(crate) async fn next_turn(
 }
 
 /// `sqb dev`'s control lines from stdin; outside `sqb dev`, a fixed connected state.
-pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevControlState> {
+pub(crate) fn dev_controls(
+    options: &LocationServe,
+) -> (
+    watch::Sender<DevControlState>,
+    watch::Receiver<DevControlState>,
+) {
     let (sender, receiver) = watch::channel(DevControlState {
         warehouse: (!options.dev_events).then_some(true),
         recompiles: 0,
+        rediscovers: 0,
     });
+    let republisher: watch::Sender<DevControlState> = sender.clone();
     if options.dev_events {
         tokio::task::spawn_blocking(move || {
             for line in std::io::stdin().lines().map_while(Result::ok) {
@@ -1555,15 +1564,21 @@ pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevContro
                     Some(DevControl::Warehouse { connected }) => {
                         sender.send_modify(|state| state.warehouse = Some(connected));
                     }
-                    Some(DevControl::Recompile) => {
-                        sender.send_modify(|state| state.recompiles += 1);
-                    }
+                    Some(DevControl::Recompile) => request_republish(&sender, true),
                     None => {}
                 }
             }
         });
     }
-    receiver
+    (republisher, receiver)
+}
+
+/// Publish a new generation even when no input changed; `rediscover` calls every discover function again.
+pub(crate) fn request_republish(controls: &watch::Sender<DevControlState>, rediscover: bool) {
+    controls.send_modify(|state| {
+        state.recompiles += 1;
+        state.rediscovers += u64::from(rediscover);
+    });
 }
 
 /// Tell `sqb dev` which inputs changed since the last compile: the first few paths and how many more.

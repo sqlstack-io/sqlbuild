@@ -197,6 +197,7 @@ The default is no retry. Set `retry_on` explicitly rather than relying on the br
 | `description` | Docs (defaults to docstring) |
 | `meta` | Freeform JSON metadata |
 | `retry` | A `RetryPolicy` |
+| `for_each` | A `@discover` function; the asset runs once per item it returns. See [Discovered nodes](discovered-nodes.md) |
 
 ## Running assets
 

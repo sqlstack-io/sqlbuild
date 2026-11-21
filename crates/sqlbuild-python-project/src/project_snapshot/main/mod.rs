@@ -7,3 +7,4 @@ pub mod python_declarations;
 pub mod register_snapshot;
 pub mod relative_path;
 pub mod resource_nodes;
+pub mod saved_discovered_sets;

@@ -26,6 +26,7 @@ pub(crate) fn new_dev_screen(setup: ScreenSetup, started: Instant) -> DevScreen 
         pending_changes: 0,
         serving: None,
         compile_detail: String::new(),
+        discovered: None,
         project_root: setup.project_root,
         client_output: false,
         client_partial: false,

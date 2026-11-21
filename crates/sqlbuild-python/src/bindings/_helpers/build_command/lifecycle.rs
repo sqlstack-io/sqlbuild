@@ -346,6 +346,8 @@ struct RuntimeParts<'a, 'py> {
     inputs: &'a LifecycleInputs<'py>,
     /// Each Python node's job warehouse, by name.
     warehouses: BTreeMap<String, String>,
+    /// The first server run of a worker's rerun chain; `None` outside a worker.
+    root_run_id: Option<String>,
 }
 
 fn node_runtime<'py>(
@@ -380,6 +382,10 @@ fn node_runtime<'py>(
             (
                 "node_warehouses",
                 pyo3::IntoPyObject::into_pyobject(parts.warehouses.clone(), py)?.into_any(),
+            ),
+            (
+                "chain_run_id",
+                pyo3::IntoPyObject::into_pyobject(parts.root_run_id.clone(), py)?.into_any(),
             ),
         ],
     )
@@ -533,6 +539,10 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
         relations: (relation_targets, project_relations),
         inputs,
         warehouses: native_field(pipeline, "python_node_warehouses")?.extract()?,
+        root_run_id: context
+            .worker
+            .as_ref()
+            .map(|worker| worker.root_run_id().to_string()),
     };
     let mut ingress_python: Bound<'py, PyAny> = tuple(py, &[])?;
     let mut ingress_loads: Bound<'py, PyAny> = tuple(py, &[])?;
@@ -581,6 +591,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
         .collect();
     let mut read_side_connection: Option<Py<PyAny>> = None;
     let mut read_side_tracker: Option<Py<PyAny>> = None;
+    let mut initial: Vec<Bound<'py, PyAny>> = Vec::new();
     if !read_side.is_empty() {
         let connection: Bound<'py, PyAny> =
             adapter.call_method1("connect", (connection_config.clone(),))?;
@@ -603,14 +614,13 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             tracker.call_method1("record_sql_result", (result?,))?;
         }
         tracker.call_method0("dispatch_ready_python_nodes")?;
-        let initial: Bound<'py, PyAny> = native_field(&tracker, "results")?;
-        if initial.is_truthy()? {
-            write_python_node_results(&context.stream, &initial, context.use_color)?;
+        for result in native_field(&tracker, "results")?.try_iter()? {
+            initial.push(result?);
         }
         read_side_tracker = Some(tracker.unbind());
     }
     let (round_trip_gates, round_trip_waits) = round_trip_ordering(&lifecycle, &plan_output)?;
-    Bound::new(
+    let prepared = Bound::new(
         py,
         DirectPythonLifecycle {
             plan: plan_output.unbind(),
@@ -628,7 +638,9 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             round_trip_waits,
             include_python,
         },
-    )
+    )?;
+    prepared.get().report(py, &initial)?;
+    Ok(prepared)
 }
 
 type RoundTripGates = HashMap<String, Vec<(ObjectKey, bool)>>;

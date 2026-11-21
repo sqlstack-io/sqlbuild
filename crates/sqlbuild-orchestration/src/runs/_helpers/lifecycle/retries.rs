@@ -180,6 +180,7 @@ async fn queue_member_retry(
         run_id: retry_id,
         origin: RunOrigin::Rerun,
         rerun_of_run_id: Some(source.run_id),
+        chain_run_id: Some(source.chain_run_id.unwrap_or(source.run_id)),
         requested_by: "system:retry".into(),
         selection,
         write_set,

@@ -48,6 +48,21 @@ symbols = ["*"]
 reason = "Native code imports this module by path and reads its attributes by name."
 
 [[targets.python.dead_code.roots]]
+modules = ["sqlbuild.python_nodes.main.discovered_result_json"]
+symbols = ["discovered_result_json"]
+reason = "Native code resolves these through the sqlbuild._native_host name table."
+
+[[targets.python.dead_code.roots]]
+modules = ["sqlbuild.python_nodes.main.read_discover_definition"]
+symbols = ["read_discover_definition"]
+reason = "Native code resolves these through the sqlbuild._native_host name table."
+
+[[targets.python.dead_code.roots]]
+modules = ["sqlbuild.python_nodes._helpers.discovered_results"]
+symbols = ["item_dependency_refs"]
+reason = "Native code resolves these through the sqlbuild._native_host name table."
+
+[[targets.python.dead_code.roots]]
 modules = ["sqlbuild.adapter.contract.classes.base_adapter"]
 symbols = ["BaseAdapter"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
@@ -1519,6 +1534,21 @@ symbols = ["asset"]
 reason = "Bare @asset is evaluated by Python as asset(function), requiring positional function calling."
 
 [[targets.python.rule_exceptions]]
+rule = "FFS010"
+path = "src/sqlbuild/assets.py"
+symbols = ["asset"]
+reason = "@asset's keywords are its public authoring API; for_each (CHI-1621) is the eleventh, and grouping them would change every project."
+[[targets.python.rule_exceptions]]
+rule = "FFS010"
+path = "src/sqlbuild/python_nodes/main/apply_asset.py"
+symbols = ["apply_asset"]
+reason = "apply_asset takes @asset's public keywords one for one, so both signatures stay readable side by side."
+[[targets.python.rule_exceptions]]
+rule = "FFS120"
+path = "src/sqlbuild/discovery.py"
+symbols = ["discover"]
+reason = "Bare @discover is evaluated by Python as discover(function), requiring positional function calling."
+[[targets.python.rule_exceptions]]
 rule = "FFS120"
 path = "src/sqlbuild/hooks.py"
 symbols = ["hook"]
@@ -1658,8 +1688,8 @@ select = [
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/Cargo.toml"]
-thresholds = { max_crate_code_lines = 51200 }
-reason = "The Python bindings crate is above the code-line limit; this caps it near its current size until it is split into crates by area. The location and plan bindings of the large-project server work and #1560 grew it to 51,122; moving them out would need new cross-crate imports or a policy exception. Lower the cap as code moves out."
+thresholds = { max_crate_code_lines = 51500 }
+reason = "The Python bindings crate is above the code-line limit; this caps it near its current size until it is split into crates by area. The location and plan bindings of the large-project server work and #1560 grew it to 51,122, and discovered nodes (CHI-1621: the discover runner, which needs the setup context these bindings own, and the location's discovery glue) to about 51,460; moving them out would need new cross-crate imports or a policy exception. Lower the cap as code moves out."
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/src/bindings/_helpers"]
@@ -3169,6 +3199,7 @@ module_layers = [
     "microbatches=registry",
     "model_config=registry",
     "native_host=front",
+    "native_host/discover_runner=commands",
     "native_host/live_reads=plan",
     "native_host/orchestration_sensors=commands",
     "native_host/setup_context=commands",

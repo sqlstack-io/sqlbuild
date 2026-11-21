@@ -101,6 +101,7 @@ pub(crate) async fn frozen_job_request(
             narrowing,
             retry: None,
             member_attempt: None,
+            chain_run_id: None,
         },
     ))
 }

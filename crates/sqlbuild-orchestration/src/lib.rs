@@ -13,6 +13,8 @@ pub mod declarations;
 
 pub mod dev_events;
 
+pub mod discovered_sets;
+
 pub mod platform;
 
 pub mod runs;

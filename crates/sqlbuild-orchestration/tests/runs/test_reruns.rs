@@ -339,6 +339,11 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                     );
                     assert_eq!(claim.request.origin, RunOrigin::Rerun);
                     assert_eq!(claim.request.priority, 7);
+                    assert_eq!(
+                        claim.request.chain_run_id,
+                        Some(Uuid::new_v5(&source_id, expected_job.as_bytes())),
+                        "a rerun's member run keeps the first run of its own chain: the source's member"
+                    );
                     assert_eq!(claim.request.settings, settings[expected_job]);
                     assert_eq!(
                         claim.request.window,

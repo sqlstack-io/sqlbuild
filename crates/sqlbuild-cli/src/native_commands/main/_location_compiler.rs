@@ -7,9 +7,14 @@ use sqlbuild_orchestration::dev_events::main::dev_event_line::dev_event_line;
 use sqlbuild_orchestration::dev_events::models::DevEvent;
 use sqlbuild_orchestration::store::errors::ControlError;
 use tokio::sync::mpsc;
+use tokio::time::Instant;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::command::terminal::write_output;
+use crate::native_commands::_helpers::location::compiler_discovery::{
+    check_discovered, discovered, sleep_until,
+};
+use crate::native_commands::_helpers::location::discovery_state::LocationDiscovery;
 use crate::native_commands::_helpers::location::execution::{
     exchange_location_generation, exchange_location_plan,
 };
@@ -20,21 +25,43 @@ use crate::native_commands::models::{
     LocationCompileRequest, LocationCompiler, LocationPlanRequest, LocationRuntimeRequest,
     LocationServe,
 };
+use crate::native_commands::types::DiscoveryControls;
 
 pub(crate) async fn run_location_compiler(
     options: &LocationServe,
     script: &Path,
     mut requests: mpsc::Receiver<LocationRuntimeRequest>,
+    controls: DiscoveryControls<'_>,
 ) -> Result<(), ControlError> {
     let mut compiler: Option<LocationCompiler> = None;
     let mut sources: Vec<PathStamp> = Vec::new();
+    let mut discovery: LocationDiscovery = LocationDiscovery::default();
     let result = async {
-        while let Some(request) = requests.recv().await {
+        loop {
+            let due: Option<Instant> = discovery.next_due().filter(|_| compiler.is_some());
+            let request: Option<LocationRuntimeRequest> = tokio::select! {
+                request = requests.recv() => match request {
+                    Some(request) => Some(request),
+                    None => break,
+                },
+                () = sleep_until(due) => None,
+            };
+            let Some(request) = request else {
+                compiler = check_discovered(compiler.take(), &mut discovery, controls).await?;
+                continue;
+            };
             let carried_on;
             (compiler, carried_on) = match request {
                 LocationRuntimeRequest::Publish(request) => {
-                    sources.clone_from(&request.python_sources);
-                    publish((options, script), compiler.take(), request).await?
+                    let before: Vec<PathStamp> =
+                        std::mem::replace(&mut sources, request.python_sources.clone());
+                    publish(
+                        (options, script),
+                        compiler.take(),
+                        (request, &before),
+                        (&mut discovery, controls),
+                    )
+                    .await?
                 }
                 LocationRuntimeRequest::Plan(request) => {
                     plan(
@@ -60,7 +87,8 @@ pub(crate) async fn run_location_compiler(
 async fn publish(
     (options, script): (&LocationServe, &Path),
     mut compiler: Option<LocationCompiler>,
-    mut request: LocationCompileRequest,
+    (mut request, before): (LocationCompileRequest, &[PathStamp]),
+    (discovery, (republish, (bearer, session_id))): (&mut LocationDiscovery, DiscoveryControls<'_>),
 ) -> Result<(Option<LocationCompiler>, bool), ControlError> {
     if compiler
         .as_ref()
@@ -76,14 +104,23 @@ async fn publish(
             )]));
         }
     }
+    let publication = discovery.publish_request(
+        request.generation,
+        (before, &request.python_sources),
+        republish.borrow().rediscovers,
+    );
     let mut active = match compiler {
         Some(active) => active,
-        None => open_location_runtime(options, script, request.python_sources)?,
+        None => open_location_runtime(options, script, request.python_sources.clone())?,
     };
     let result = tokio::select! {
         _ = request.reply.closed() => return Ok((Some(active), false)),
-        result = exchange_location_generation(&mut active, request.generation) => result,
+        result = exchange_location_generation(&mut active, &publication) => result,
     };
+    if let Ok(load) = &result {
+        discovered(options, (bearer, session_id), (request.generation, load)).await;
+        discovery.published(load, Instant::now());
+    }
     let failed = result.is_err();
     let _ = request
         .reply

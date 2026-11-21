@@ -187,6 +187,32 @@ pub(crate) fn child_event(
             now,
             clock,
         ),
+        DevEvent::Discovered { summary } => {
+            let changed: bool = screen.discovered.as_ref() != Some(&summary);
+            let lines: Vec<String> = if screen.ready && changed {
+                report_lines(
+                    &screen,
+                    Report {
+                        clock,
+                        mark: EventMark::Succeeded,
+                        title: "discovered".to_owned(),
+                        plain: format!("discovered {summary}"),
+                        detail: summary.clone(),
+                        elapsed: None,
+                        notes: Vec::new(),
+                    },
+                )
+            } else {
+                Vec::new()
+            };
+            (
+                DevScreen {
+                    discovered: Some(summary),
+                    ..screen
+                },
+                lines,
+            )
+        }
         DevEvent::Warning { title, detail } => {
             let lines: Vec<String> = report_lines(
                 &screen,

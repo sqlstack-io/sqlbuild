@@ -112,6 +112,7 @@ pub(crate) fn request(
         narrowing: None,
         retry: None,
         member_attempt: None,
+        chain_run_id: None,
     }
 }
 

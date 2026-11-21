@@ -15,7 +15,7 @@ use crate::graph::main::parse_selector::parse_selector;
 use crate::graph::main::resolve_selectors::resolve_selectors;
 use crate::graph::models::{BuildResources, EdgeDirection, ParsedSelector};
 use crate::python_selection::_helpers::nodes::{
-    Names, error, folder_root, is_pattern, select_nodes, selector_folder, unit_test_error,
+    Names, error, folder_root, select_nodes, selector_folder, unit_test_error,
 };
 use crate::python_selection::_helpers::validation::{
     source_loaders, terminal_loaders, validate_boundaries, validate_selected_dependencies,
@@ -506,9 +506,9 @@ fn unknown_name(value: &str) -> SelectorError {
 
 fn resolve_name(context: &SelectionContext<'_>, raw: &str, value: &str) -> Resolved {
     let terminal: HashMap<&str, &str> = terminal_loaders(context.sql);
-    if !is_pattern(value) {
+    if !context.nodes.is_pattern(value) {
         let sql: bool = context.sql_names.contains_key(value);
-        let python: bool = context.nodes.node(value).is_some();
+        let python: bool = !context.nodes.named(value).is_empty();
         return match (sql, python) {
             (true, _) if terminal.contains_key(value) => resolve_sql(context, raw),
             (true, true) => Err(both_error(value)),

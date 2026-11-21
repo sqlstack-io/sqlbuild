@@ -90,6 +90,7 @@ pub(crate) async fn frozen_rerun(
                 .filter(|key| key.starts_with(SOURCE_KEY_PREFIX)),
         );
     }
+    frozen.chain_run_id = Some(frozen.chain_run_id.unwrap_or(request.source_run_id));
     frozen.run_id = request.run_id;
     frozen.origin = RunOrigin::Rerun;
     frozen.parent_run_id = None;

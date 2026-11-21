@@ -200,3 +200,65 @@ pub(super) fn kept_plans(count: usize, limits: (usize, usize)) -> Mutex<Option<P
     }
     reuse
 }
+
+/// The file `orders_plan` is defined in, in the discovered-set tests.
+pub(super) const PLAN_FILE: &str = "python/plan/node.py";
+
+/// The stamps of `paths`, the ones in `edited` with another size.
+pub(super) fn stamps(
+    paths: &[&str],
+    edited: &[&str],
+) -> Vec<sqlbuild_cache::project_snapshot::models::PathStamp> {
+    paths
+        .iter()
+        .map(|path| sqlbuild_cache::project_snapshot::models::PathStamp {
+            relative_path: (*path).to_owned(),
+            kind: "file",
+            size: 1 + u64::from(edited.contains(path)),
+            mtime_ns: 0,
+            ctime_ns: 0,
+            inode: 0,
+            link: None,
+        })
+        .collect()
+}
+
+/// A published load whose `orders_plan`, checked every 15 minutes and defined in `PLAN_FILE`, has `ids`.
+pub(super) fn discovered_load(ids: &[&str]) -> crate::native_commands::models::LocationLoad {
+    use sqlbuild_orchestration::discovered_sets::main::record_attempt::record_attempt;
+    use sqlbuild_orchestration::discovered_sets::models::{DiscoveredItem, DiscoveredResult};
+    let at: DateTime<Utc> = Utc
+        .with_ymd_and_hms(2026, 11, 21, 9, 0, 0)
+        .single()
+        .expect("a valid time");
+    let result = DiscoveredResult {
+        items: ids
+            .iter()
+            .map(|id| DiscoveredItem {
+                id: (*id).to_owned(),
+                depends_on: Vec::new(),
+                args: std::collections::BTreeMap::new(),
+            })
+            .collect(),
+        tags: std::collections::BTreeMap::new(),
+        max_parallel: None,
+    };
+    let record = sqlbuild_orchestration::snapshots::models::SnapshotRecord {
+        snapshot_id: Uuid::nil(),
+        location_id: Uuid::nil(),
+        target: "dev".to_owned(),
+        generation: 1,
+        manifest_digest: String::new(),
+        published_at: at,
+    };
+    crate::native_commands::models::LocationLoad {
+        published: Some((record, None, Vec::new())),
+        rules: None,
+        discovered: [(
+            "orders_plan".to_owned(),
+            record_attempt(None, Ok(result), (at, Some(900))),
+        )]
+        .into(),
+        discover_files: [("orders_plan".to_owned(), PLAN_FILE.to_owned())].into(),
+    }
+}

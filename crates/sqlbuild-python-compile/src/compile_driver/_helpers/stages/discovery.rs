@@ -18,6 +18,7 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_front::compile_driver::main::reject_invalid_project_configuration::reject_invalid_project_configuration;
 use sqlbuild_python_front::compile_driver::models::ProjectConfiguration;
+use sqlbuild_python_front::discovered_sets::main::with_discovered_sets::with_discovered_sets;
 use sqlbuild_python_front::discovery::constants::{
     ALLOW_MISSING_SECRETS_ENV, ALLOW_MISSING_SECRETS_SETTING, TRUE_ENV_VALUES,
 };
@@ -268,6 +269,7 @@ pub(crate) fn assembled_inputs<'py>(
         ),
         secret_policy,
     )?;
+    let discovered: Bound<'py, PyAny> = with_discovered_sets(&discovered)?;
     host_entry(py, UserCodeHost::ValidateDiscoveredInputs)?.call1((&discovered,))?;
     configure_discovered_event_exporters(&discovered)?;
     Ok(discovered)
@@ -487,6 +489,8 @@ fn project_inputs<'py>(
     fields.push(("loader_functions", loader_functions));
     fields.push(("asset_functions", tuple_of("assets")?));
     fields.push(("check_functions", tuple_of("checks")?));
+    fields.push(("discover_functions", tuple_of("discover_functions")?));
+    fields.push(("for_each_assets", tuple_of("for_each_assets")?));
     fields.push(("audit_factories", tuple_of("audit_factories")?));
     for field in [
         "hook_functions",

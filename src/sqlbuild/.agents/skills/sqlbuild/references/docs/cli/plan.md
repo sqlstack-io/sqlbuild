@@ -32,6 +32,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 |------|-------------|
 | `--no-sql-analysis` | Disable compile-time SQL analysis (`--no-sql-validation` is an alias) |
 | `--no-cache` | Bypass the reusable compile-analysis cache for this invocation |
+| `--discover` | Run the project's `@discover` functions with the target's providers for this command, instead of compiling each `for_each` asset as its placeholder; nothing is saved. See [Discovered nodes](../concepts/python-nodes/discovered-nodes.md) |
 | `--no-python` | Exclude read-side Python assets from the plan |
 | `--defer-to` | Resolve unselected model references against another target |
 | `--plan-from` | Read warehouse state `live`, or from the target's `synced_state` checked against the warehouse first; overrides the target's `plan_from`. See [Planning from synced state](../concepts/project-configuration.md#planning-from-synced-state) |

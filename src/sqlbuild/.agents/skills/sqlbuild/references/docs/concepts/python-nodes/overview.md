@@ -166,7 +166,7 @@ Each node receives a context object as its first argument (`AssetContext`, `Chec
 | `ctx.results_of(node_fn, limit=N)` | Read the last N successful results of an upstream node, newest first |
 | `ctx.providers` | Access discovered [providers](providers.md) by name |
 
-Asset contexts add `ctx.result(...)` and `ctx.skip(...)`. Check contexts add `ctx.pass_(...)`, `ctx.fail(...)`, and `ctx.warn(...)`.
+Asset contexts add `ctx.result(...)`, `ctx.skip(...)`, `ctx.root_run_id` and `ctx.discovered` (see [Discovered nodes](discovered-nodes.md#in-a-node)). Check contexts add `ctx.pass_(...)`, `ctx.fail(...)`, and `ctx.warn(...)`.
 
 Providers can also be injected directly as function parameters by name. See [Providers](providers.md) for details.
 

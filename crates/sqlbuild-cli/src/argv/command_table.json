@@ -1397,6 +1397,18 @@
         "group": 1
        },
        {
+        "kind": "store_true",
+        "options": [
+         "--discover"
+        ],
+        "dest": "discover",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Run the project's @discover functions with the target's providers for this command instead of compiling each for_each asset as its placeholder; nothing is saved",
+        "group": 1
+       },
+       {
         "kind": "store",
         "options": [
          "--defer-to"
@@ -1851,6 +1863,18 @@
         "const": true,
         "default": false,
         "help": "Bypass the compile analysis cache for this invocation",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--discover"
+        ],
+        "dest": "discover",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Run the project's @discover functions with the target's providers for this command instead of compiling each for_each asset as its placeholder; nothing is saved",
         "group": 1
        },
        {
@@ -2311,6 +2335,18 @@
         "const": true,
         "default": false,
         "help": "Bypass the compile analysis cache for this invocation",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--discover"
+        ],
+        "dest": "discover",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Run the project's @discover functions with the target's providers for this command instead of compiling each for_each asset as its placeholder; nothing is saved",
         "group": 1
        },
        {

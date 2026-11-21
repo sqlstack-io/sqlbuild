@@ -689,3 +689,7 @@ def missing_warehouse_runtime(*, adapter: Any, node: str) -> PythonNodeRuntime:
         node_warehouses={node: "MISSING_WH"},
         session_warehouses=SessionWarehouses(adapter=cast(BaseAdapter, adapter), home="BUILD_WH"),
     )
+
+
+def discovered_step(ctx: object, n: int = 1) -> None:
+    del ctx, n

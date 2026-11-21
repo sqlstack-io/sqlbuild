@@ -306,6 +306,18 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "sqlbuild.runtime.event_exporting.main._invoke_recall_sink",
         "invoke_recall_sink",
     ),
+    "read_discover_definition": (
+        "sqlbuild.python_nodes.main.read_discover_definition",
+        "read_discover_definition",
+    ),
+    "discovered_result_json": (
+        "sqlbuild.python_nodes.main.discovered_result_json",
+        "discovered_result_json",
+    ),
+    "item_dependency_refs": (
+        "sqlbuild.python_nodes._helpers.discovered_results",
+        "item_dependency_refs",
+    ),
     "run_command_output_sinks": (
         "sqlbuild.runtime.event_exporting.main._run_command_output_sinks",
         "run_command_output_sinks",

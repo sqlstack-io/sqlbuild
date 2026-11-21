@@ -153,6 +153,7 @@ class PythonNodeRuntime:
     persist_node_results: bool = True
     node_warehouses: Mapping[str, str] = field(default_factory=dict)
     session_warehouses: SessionWarehouses | None = None
+    chain_run_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.node_warehouses and self.session_warehouses is None:
@@ -274,9 +275,27 @@ class BasePythonNodeContext(DependencyResultReader):
         )
 
 
+@dataclass(frozen=True)
+class DiscoveredContext:
+    """The discovered item an asset node runs for, and the tags its set was saved with."""
+
+    set: str
+    item: str
+    tags: Mapping[str, object]
+
+
 @dataclass(frozen=True, kw_only=True)
 class AssetContext(BasePythonNodeContext):
     """Runtime context passed to a SQLBuild asset function."""
+
+    discovered: DiscoveredContext | None = None
+    chain_run_id: str | None = None
+
+    @property
+    def root_run_id(self) -> str:
+        """The first run of this run's rerun chain; `run_id` unless this run reruns another."""
+
+        return self.chain_run_id or self.run_id
 
     def result(
         self,

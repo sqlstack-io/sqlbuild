@@ -22,6 +22,7 @@ use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
 
 use crate::bindings::_helpers::location_command::constants::EXECUTE_ACTION;
 use crate::bindings::_helpers::location_command::constants::PUBLISH_ACTION;
+use crate::bindings::_helpers::location_command::discovery_requests::discover_for_publication;
 use crate::bindings::_helpers::location_command::load_rules::load_rules;
 use crate::bindings::_helpers::location_command::runtime::run_runtime;
 use crate::bindings::_helpers::location_command::snapshot::build_orchestration_snapshot;
@@ -33,15 +34,19 @@ use crate::bindings::_helpers::location_command::worker::execute_worker;
 use crate::bindings::_helpers::query_command::project::ProjectAdapter;
 use crate::bindings::_helpers::query_command::project::ProjectInputs;
 use crate::bindings::_helpers::query_command::project::project_adapter;
+use sqlbuild_orchestration::discovered_sets::models::DiscoveryPublishRequest;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::write_console::write_console;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::compiled_phase::compiled_phase;
+use sqlbuild_python_front::discovered_sets::main::set_discovery_source::set_discovery_source;
+use sqlbuild_python_front::discovered_sets::models::DiscoverySource;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 use sqlbuild_python_output::recall::models::InvocationRecall;
 use sqlbuild_python_project::compiled_views::models::NativeProjectView;
+use sqlbuild_python_project::project_snapshot::main::saved_discovered_sets::saved_discovered_sets;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;
 use sqlbuild_python_project::project_snapshot::types::NodeKeys;
 
@@ -345,6 +350,12 @@ pub(crate) fn run_location<'py>(
             arguments.value("run_id")?.extract::<String>()?,
             arguments.value("claim_id")?.extract::<String>()?,
         );
+        let server_url: String = arguments.value("server_url")?.extract()?;
+        set_discovery_source(DiscoverySource::Saved(saved_discovered_sets(
+            py,
+            (&server_url, &bearer),
+            (&identity.0, &identity.1),
+        )?));
         let ((snapshot, blocked, compiled), project) = compile_location(py, &arguments, &input)?;
         return execute_worker(
             py,
@@ -362,6 +373,18 @@ pub(crate) fn run_location<'py>(
         return run_runtime(py, options.unwrap_or_else(|| PyDict::new(py)));
     }
     let publication = (|| {
+        discover_for_publication(
+            &arguments,
+            DiscoveryPublishRequest {
+                generation: arguments
+                    .value("generation")?
+                    .extract::<Option<i64>>()?
+                    .unwrap_or(1),
+                rediscover: None,
+                previous: Default::default(),
+                seed: true,
+            },
+        )?;
         let ((record, _, _), _) = publish_location(py, &arguments)?.map_err(|failure| {
             PyValueError::new_err(format!(
                 "Compile failed: {} rule findings",

@@ -7,7 +7,7 @@ use crate::screen_text::main::render_event_line::render_event_line;
 use crate::screen_text::main::render_phase_lines::render_phase_lines;
 use crate::screen_text::main::render_ready_card::render_ready_card;
 use crate::screen_text::main::render_tree_group::render_tree_group;
-use crate::screen_text::models::{PhaseLayout, PhaseState, ScreenFacts, WarehouseState};
+use crate::screen_text::models::{PhaseLayout, PhaseState, ReadyCard, ScreenFacts, WarehouseState};
 use crate::screen_text::tests::helpers::{
     chrome_rows, colour_facts, connected, edited_events, millis, not_connected, phase, plain_facts,
     ready_card, rows_wider_than_screen, semantic_group, starting_checklist,
@@ -124,6 +124,27 @@ fn given_ready_card_when_rendering_then_rows_match_the_screen() {
                 "  ➜  Warehouse   ● snowflake · ANALYST · DEVELOPER_ROLE @ DEV_ANALYST_WAREHOUSE_LARGE",
                 "  ➜  Triggers    41 paused",
                 "  ➜  Watching    project/",
+            ],
+        },
+        ReadyCardTestCase {
+            description: "discovered sets add a row after the watched paths",
+            card: ReadyCard {
+                discovered: Some(
+                    "orders_plan 27 items \u{b7} returns_plan \u{2717} ssh timeout (using last good, 11 items)"
+                        .to_owned(),
+                ),
+                ..ready_card(connected())
+            },
+            facts: plain_facts(120),
+            expected_rows: vec![
+                "  sqlbuild dev  v0.231.0   ready in 43.1s",
+                "",
+                "  ➜  UI          http://127.0.0.1:8000",
+                "  ➜  Location    dev · gen 1 · 2280 models · 412 python · 85 jobs · 7 groups",
+                "  ➜  Warehouse   ● snowflake · ANALYST · DEVELOPER_ROLE @ DEV_ANALYST_WAREHOUSE_LARGE",
+                "  ➜  Triggers    41 paused",
+                "  ➜  Watching    project/",
+                "  ➜  Discovered  orders_plan 27 items · returns_plan ✗ ssh timeout (using last good, 11 items)",
             ],
         },
         ReadyCardTestCase {

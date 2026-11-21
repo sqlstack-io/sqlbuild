@@ -90,9 +90,30 @@ fn failure(error: SelectorError) -> OwnedFailure {
     (error.code.to_owned(), error.message)
 }
 
-/// The inventory rows of the orders Python nodes.
-fn inventory_nodes() -> Vec<InventoryNode> {
-    ORDERS_NODES
+/// The orders nodes plus `step`, a `for_each` asset with items `a` and `b`, and `step_total`.
+const DISCOVERED_NODES: &[NodeSpec] = &[
+    ("step[a]", "asset", "python/plan/node.py", &[], &[], &[]),
+    (
+        "step[b]",
+        "asset",
+        "python/plan/node.py",
+        &[],
+        &["step[a]"],
+        &[],
+    ),
+    (
+        "step_total",
+        "asset",
+        "python/plan/total.py",
+        &[],
+        &["step[b]"],
+        &[],
+    ),
+];
+
+/// The inventory rows of `nodes`.
+fn inventory_nodes(nodes: &[NodeSpec]) -> Vec<InventoryNode> {
+    nodes
         .iter()
         .map(|(name, _, path, tags, upstream, _)| InventoryNode {
             name: (*name).to_owned(),
@@ -105,9 +126,19 @@ fn inventory_nodes() -> Vec<InventoryNode> {
 
 /// The orders Python node graph, indexed by the native inventory.
 pub(super) fn orders_python_graph() -> PythonSelectionGraph {
-    let indexes: InventoryIndexes = python_node_graph_indexes(&inventory_nodes());
+    python_graph(ORDERS_NODES)
+}
+
+/// The orders Python node graph with the discovered nodes of `step` and a node after them.
+pub(super) fn discovered_python_graph() -> PythonSelectionGraph {
+    python_graph(&[ORDERS_NODES, DISCOVERED_NODES].concat())
+}
+
+/// The Python node graph of `nodes`, indexed by the native inventory.
+fn python_graph(nodes: &[NodeSpec]) -> PythonSelectionGraph {
+    let indexes: InventoryIndexes = python_node_graph_indexes(&inventory_nodes(nodes));
     PythonSelectionGraph {
-        nodes: ORDERS_NODES
+        nodes: nodes
             .iter()
             .map(|(name, kind, _, _, _, sql_deps)| PythonSelectionNode {
                 name: (*name).to_owned(),
