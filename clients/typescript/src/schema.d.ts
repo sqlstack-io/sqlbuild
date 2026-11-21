@@ -1562,7 +1562,7 @@ export interface components {
          * @description Why a tick ended before its function's answer was committed.
          * @enum {string}
          */
-        AbandonReason: "unanswered" | "superseded" | "republished" | "paused" | "cursor_reset" | "leader_changed";
+        AbandonReason: "unanswered" | "superseded" | "republished" | "paused" | "cursor_reset" | "leader_changed" | "skipped";
         /** @description Marks a run as handled for everyone who can see it, or withdraws the mark; retried with the same event ID it applies once. */
         AcknowledgementRequest: {
             acknowledged: boolean;
