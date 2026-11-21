@@ -194,7 +194,7 @@ def test_given_model_with_hooks_when_running_compile_json_then_it_reports_hook_m
                 "from sqlbuild.hooks import hook\n\n"
                 "@hook\n"
                 "def notify(ctx, message):\n"
-                "    '''Test hook notify.'''\n    ctx.log(message)\n"
+                "    '''Test hook notify.'''\n    ctx.log.info(message)\n"
             ),
             "hooks/sql/select_value.sql": "HOOK (description 'Test hook select_value.');\n\nSELECT @value\n",
             "models/orders.sql": (

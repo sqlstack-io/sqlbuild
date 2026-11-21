@@ -13,7 +13,7 @@ use sqlbuild_host::models::{
     AuditOutcome, AuditRunScope, AuditSeverity, BuildExecutionResult, BuildExecutionTimings,
     BuildStatus, CancellationOutcome, ExecutionPhase, ExecutionResourceKind, ExecutionStatus,
     FunctionExecutionResult, HookExecutionResult, HookPhase, ItemKind, ItemTimeoutReport,
-    LifeCycleEvent, LifeCycleEventKind, LoadExecutionResult, MeasuredValue,
+    LifeCycleEvent, LifeCycleEventKind, LoadExecutionResult, LogLevel, MeasuredValue,
     MicrobatchAccountingInterval, MicrobatchLimitAction, ModelExecutionResult,
     ScenarioAssertionExpectationExecutionResult, ScenarioExpectedExpectationExecutionResult,
     ScenarioLocalRunStatus, ScenarioRunResult, SeedExecutionResult, SkipMode,
@@ -101,6 +101,7 @@ enums!(
     AttachedAuditTargetKind,
     AuditEvaluationMode,
     LifeCycleEventKind,
+    LogLevel,
     AuditAttachmentKind,
     AuditSeverity,
     AuditOutcome,
@@ -135,7 +136,11 @@ record!(BuildExecutionTimings {
     schema_preparation_seconds,
     execution_seconds,
 });
-record!(LifeCycleEvent { kind, content });
+record!(LifeCycleEvent {
+    kind,
+    content,
+    level
+});
 record!(HookExecutionResult {
     phase,
     index,

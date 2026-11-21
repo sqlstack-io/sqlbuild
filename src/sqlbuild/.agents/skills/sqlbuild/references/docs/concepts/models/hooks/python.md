@@ -35,7 +35,7 @@ from sqlbuild.hooks import hook
 @hook
 def notify_complete(ctx, channel="#data-builds"):
     """Notify complete."""
-    ctx.log(
+    ctx.log.info(
         f"Notify {channel}: "
         f"{ctx.model_name} completed during {ctx.phase}"
     )
@@ -134,7 +134,7 @@ Python hooks declare a `HookContext` parameter named `ctx`, `context`, `_ctx`, o
 | `ctx.connection` | Live connection |
 | `ctx.execute_sql(sql)` | Execute SQL |
 | `ctx.query(sql)` | Execute SQL and return rows |
-| `ctx.log(message)` | Write run output |
+| `ctx.log.info(message)`, `ctx.log.warning(message)`, `ctx.log.error(message)` | Log a line at that level; it shows with the run's events, while anything the hook prints stays its output |
 | `ctx.skip(reason="...", mode="soft")` | Return a soft or hard skip result; arguments are keyword-only |
 | `ctx.providers` | Access discovered [providers](../../python-nodes/providers.md) |
 

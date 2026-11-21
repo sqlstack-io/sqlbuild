@@ -158,7 +158,7 @@ Each node receives a context object as its first argument (`AssetContext`, `Chec
 | `ctx.vars` | Project variables |
 | `ctx.is_reload` | `True` when `--reload` was passed |
 | `ctx.adapter` / `ctx.connection` | Adapter and live connection |
-| `ctx.log(message)` | Log to the run output |
+| `ctx.log.info(message)`, `ctx.log.warning(message)`, `ctx.log.error(message)` | Log a line at that level; it shows with the run's events, while anything the node prints stays its output |
 | `ctx.query(sql)` / `ctx.execute_sql(sql)` | Run SQL on the connection |
 | `ctx.qualify_name(name)` | Qualify a relation name |
 | `ctx.relation(ref)` | Resolve a declared `model()`/`source()` reference to a relation |
