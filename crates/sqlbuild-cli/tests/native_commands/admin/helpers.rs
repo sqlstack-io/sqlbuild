@@ -29,6 +29,18 @@ pub(crate) fn invoke_admin(control: &TestControl, arguments: &[&str]) -> Output 
         .expect("native administration process")
 }
 
+/// `invoke_admin` with one more environment variable, such as the one `--key-from-env` names.
+pub(crate) fn invoke_admin_with(
+    control: &TestControl,
+    arguments: &[&str],
+    (name, value): (&str, &str),
+) -> Output {
+    admin_command(control, arguments)
+        .env(name, value)
+        .output()
+        .expect("native administration process")
+}
+
 fn admin_command(control: &TestControl, arguments: &[&str]) -> Command {
     let mut command = Command::new(
         control

@@ -109,3 +109,13 @@ pub(crate) struct StoreMigrationCommandTestCase {
     /// Whether the SQLite store file exists after the command.
     pub(crate) expected_store: bool,
 }
+
+pub(crate) struct ServiceAccountCliTestCase {
+    pub(crate) description: &'static str,
+    /// The arguments of `sqb admin create-service-account` after the name.
+    pub(crate) arguments: &'static [&'static str],
+    /// The key held in `SQB_TEST_IMPORTED_KEY` for `--key-from-env`, if any.
+    pub(crate) imported_key: Option<&'static str>,
+    /// Part of the refusal on stderr, or none when the account is created.
+    pub(crate) expected_error: Option<&'static str>,
+}

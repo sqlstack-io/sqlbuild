@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use sqlbuild_cache::project_snapshot::models::{PathStamp, SnapshotRules};
-use sqlbuild_orchestration::credentials::models::CredentialScope;
+use sqlbuild_orchestration::credentials::models::{CredentialScope, NewServiceAccount};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWorkRequest, WarehouseReadFailure};
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
@@ -45,6 +45,20 @@ pub(crate) enum ControlAdmin {
         change: TriggerChange,
         reason: String,
     },
+    /// A new service account, with the key read from `--key-from-env` when one is imported.
+    CreateServiceAccount {
+        request: NewServiceAccount,
+        key: Option<String>,
+    },
+    RotateServiceAccount {
+        name: String,
+        overlap_minutes: i64,
+    },
+    SetServiceAccountDisabled {
+        name: String,
+        disabled: bool,
+    },
+    ListServiceAccounts,
 }
 
 /// Parsing can finish an invocation before package discovery or any Python handoff.

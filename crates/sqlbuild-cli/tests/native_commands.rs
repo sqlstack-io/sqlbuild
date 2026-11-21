@@ -12,6 +12,8 @@ mod test_location_health;
 mod test_passwords;
 #[path = "native_commands/test_proxy.rs"]
 mod test_proxy;
+#[path = "native_commands/admin/test_service_accounts.rs"]
+mod test_service_accounts;
 #[path = "native_commands/test_types.rs"]
 mod test_types;
 #[path = "native_commands/worker/test_worker.rs"]

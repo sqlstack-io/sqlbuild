@@ -7,7 +7,9 @@ use chrono::{DateTime, Utc};
 use serde_json::json;
 use sqlbuild_orchestration::acknowledgements::models::AttentionSnooze;
 use sqlbuild_orchestration::api::models::{ApiAuthentication, HumanLogin, ServerFacts};
-use sqlbuild_orchestration::credentials::models::{AuditRetention, CredentialScope};
+use sqlbuild_orchestration::credentials::models::{
+    AuditRetention, BuiltinRole, CredentialScope, NewServiceAccount,
+};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
 use sqlbuild_orchestration::runs::models::RunLogRetention;
@@ -70,6 +72,9 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
             return Err(ControlError::Invalid("location name is required".into()));
         }
         return Ok(ControlAdmin::CreateLocation(value));
+    }
+    if let Some(service) = service_account_admin(namespace, action.as_deref(), &value)? {
+        return Ok(service);
     }
     if action.as_deref() == Some("create-principal") {
         if value.trim().is_empty() {
@@ -440,6 +445,72 @@ pub(crate) fn control_database(
 }
 
 /// The strings of a list attribute, or `None` when it holds anything else.
+/// The service account commands, which name accounts rather than numbering them; none for other commands.
+fn service_account_admin(
+    namespace: &Namespace,
+    action: Option<&str>,
+    name: &str,
+) -> Result<Option<ControlAdmin>, ControlError> {
+    let named = || {
+        if name.trim().is_empty() {
+            Err(ControlError::Invalid(
+                "service account name is required".into(),
+            ))
+        } else {
+            Ok(name.trim().to_owned())
+        }
+    };
+    Ok(Some(match action {
+        Some("create-service-account") => {
+            let role: BuiltinRole =
+                serde_json::from_value(json!(text(namespace, "admin_role").unwrap_or_default()))
+                    .map_err(|_| {
+                        ControlError::Invalid(
+                            "--role is viewer, operator, developer or admin".into(),
+                        )
+                    })?;
+            let key = match text(namespace, "admin_key_env") {
+                None => None,
+                Some(variable) => Some(
+                    std::env::var(&variable)
+                        .ok()
+                        .filter(|key| !key.is_empty())
+                        .ok_or_else(|| {
+                            ControlError::Invalid(format!(
+                                "--key-from-env names {variable}, which is not set"
+                            ))
+                        })?,
+                ),
+            };
+            ControlAdmin::CreateServiceAccount {
+                request: NewServiceAccount {
+                    name: named()?,
+                    description: text(namespace, "admin_description"),
+                    role,
+                },
+                key,
+            }
+        }
+        Some("rotate-service-account") => ControlAdmin::RotateServiceAccount {
+            name: named()?,
+            overlap_minutes: match namespace.get("admin_overlap_minutes") {
+                Some(Value::Int(minutes)) => minutes.parse::<i64>().map_err(|_| {
+                    ControlError::Invalid("--overlap-minutes must be a whole number".into())
+                })?,
+                _ => 0,
+            },
+        },
+        Some(change @ ("disable-service-account" | "enable-service-account")) => {
+            ControlAdmin::SetServiceAccountDisabled {
+                name: named()?,
+                disabled: change == "disable-service-account",
+            }
+        }
+        Some("list-service-accounts") => ControlAdmin::ListServiceAccounts,
+        _ => return Ok(None),
+    }))
+}
+
 fn texts(namespace: &Namespace, name: &str) -> Option<Vec<String>> {
     match namespace.get(name) {
         None | Some(Value::None) => Some(Vec::new()),

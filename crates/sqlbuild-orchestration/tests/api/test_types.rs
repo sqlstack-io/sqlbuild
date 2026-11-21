@@ -495,3 +495,39 @@ pub(crate) struct NoPasswordPeopleTestCase {
     pub(crate) login: fn(uuid::Uuid) -> crate::api::models::HumanLogin,
     pub(crate) expected_status: reqwest::StatusCode,
 }
+
+pub(crate) struct ServiceAccountLifecycleTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+}
+
+pub(crate) struct ServiceAccountPermissionTestCase {
+    pub(crate) description: &'static str,
+    /// The built-in role of the person who asks.
+    pub(crate) role: Option<crate::credentials::models::BuiltinRole>,
+    pub(crate) expected_list: reqwest::StatusCode,
+    pub(crate) expected_create: reqwest::StatusCode,
+}
+
+pub(crate) struct ImportedKeyTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) key: &'static str,
+    /// Part of the refusal, or none when the key is accepted.
+    pub(crate) expected_error: Option<&'static str>,
+}
+
+pub(crate) struct ProxyKeyTestCase {
+    pub(crate) description: &'static str,
+    /// Whether the test client's address is one of the proxy's trusted peers.
+    pub(crate) from_trusted_peer: bool,
+    pub(crate) with_key: bool,
+    pub(crate) expected_status: reqwest::StatusCode,
+    /// Whom the request authenticated as, when it was accepted.
+    pub(crate) expected_name: &'static str,
+}
+
+pub(crate) struct KeyOnlyTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) with_key: bool,
+    pub(crate) expected_status: reqwest::StatusCode,
+}
