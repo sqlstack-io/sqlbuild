@@ -40,6 +40,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     UnclaimedLoadTestCase,
     WorkerExecutionTestCase,
     WorkerHangUpTestCase,
+    WorkerReportTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     INTERMEDIATE_LOADER_FILES,
@@ -47,6 +48,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     REGION_PROVIDER_FILES,
     cancel_running_statement,
     claimed_worker,
+    launch_adhoc,
     processes_naming,
     provider_secrets_health,
     run_write_set,
@@ -57,6 +59,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_log,
     wait_for_run,
     without_loads,
+    worker_printed,
     worker_result,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
@@ -2095,3 +2098,105 @@ def test_given_a_provider_missing_secrets_when_a_location_publishes_then_its_hea
         assert fragment in log, log
     for fragment in test_case.unexpected_output_fragments:
         assert fragment not in log, log
+
+
+FRESHNESS_SOURCES: str = (
+    "sources:\n  - name: raw_orders\n    description: Raw orders\n"
+    "    schema: main\n    table: raw_orders\n    freshness:\n"
+    "      column: loaded_at\n    columns:\n"
+    "      - name: loaded_at\n        type: TIMESTAMP\n"
+)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerReportTestCase(
+            "a build prints its human output and no JSON report",
+            WorkerExecutionTestCase(
+                "a scheduled build",
+                "SELECT 23 AS amount",
+                "SELECT amount FROM orders",
+                "success",
+                [(23,)],
+            ),
+            ["build", "--select", "orders"],
+            "success",
+            [("model:orders", "success")],
+            "Completed successfully",
+            frozenset(
+                {
+                    "invocation_started",
+                    "invocation_completed",
+                    "run_started",
+                    "operation_started",
+                    "operation_completed",
+                }
+            ),
+        ),
+        WorkerReportTestCase(
+            "a failing build prints its failure and no JSON report",
+            WorkerExecutionTestCase(
+                "a failing scheduled build",
+                "SELECT CAST(error('boom') AS INTEGER) AS amount",
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'orders'",
+                "failed",
+                [(0,)],
+            ),
+            ["build", "--select", "orders"],
+            "failed",
+            [("model:orders", "failed")],
+            "FAIL=1",
+            frozenset(
+                {
+                    "invocation_started",
+                    "invocation_failed",
+                    "run_started",
+                    "operation_started",
+                    "resource_attempt_failed",
+                }
+            ),
+        ),
+        WorkerReportTestCase(
+            "a freshness run prints its results and no JSON report",
+            WorkerExecutionTestCase(
+                "a scheduled build, then freshness",
+                "SELECT 23 AS amount",
+                "SELECT amount FROM orders",
+                "success",
+                [(23,)],
+                files={"sources/raw.yml": FRESHNESS_SOURCES},
+            ),
+            ["freshness", "--select", "raw_orders"],
+            "success",
+            [("source:raw_orders", "success")],
+            "OBSERVED=1",
+            frozenset({"invocation_started", "invocation_completed"}),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_worker_run_when_its_output_is_captured_then_it_holds_no_json_report(
+    test_case: WorkerReportTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(
+        tmp_path,
+        monkeypatch,
+        test_case.execution,
+        server_arguments=("--password-origin", "https://control.example.com"),
+    ) as worker:
+        _ = worker_result(worker, test_case.execution)
+        with duckdb.connect(str(worker.project / "warehouse.duckdb")) as warehouse:
+            _ = warehouse.execute("CREATE TABLE raw_orders AS SELECT now() AS loaded_at")
+        run: dict[str, Any] = launch_adhoc(worker, test_case.adhoc)
+        printed, events = worker_printed(worker.control_store, run["run_id"])
+        with sqlite3.connect(worker.control_store) as control:
+            nodes: list[tuple[str, str]] = control.execute(
+                "SELECT node_key, status FROM sqb_run_nodes WHERE run_id=? ORDER BY node_key",
+                (run["run_id"],),
+            ).fetchall()
+    assert run["status"] == test_case.expected_status, printed
+    assert nodes == test_case.expected_nodes, nodes
+    assert test_case.expected_recall_events <= events, sorted(events)
+    assert test_case.expected_results in printed, printed
+    assert "{" not in [line.strip() for line in printed.splitlines()], printed

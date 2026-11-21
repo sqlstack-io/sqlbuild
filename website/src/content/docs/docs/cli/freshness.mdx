@@ -22,8 +22,8 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--state` | Compare observations against stored freshness state from the last build |
 | `--fail-on-error` | Exit with code 1 if any source observation fails or is unknown |
 | `--fail-on-stale` | Exit with code 1 if any source has changed, is unknown, or errored (requires `--state`) |
-| `--json` | Output as JSON instead of human-readable text |
-| `--json-output` | Write JSON output to a file path (also prints text to stdout unless `--json` is set) |
+| `--json` | Print the JSON report to stdout; the human-readable results go to stderr |
+| `--json-output` | Write the JSON report to a file path; the results still print to stdout, or to stderr with `--json` |
 | `--no-sql-analysis` | Disable compile-time SQL analysis (`--no-sql-validation` is an alias) |
 | `SELECTOR ...` | Positional selectors, the same as `--select` |
 | `--select`, `-s` | Select specific sources or models (sources upstream of selected models are included) |
