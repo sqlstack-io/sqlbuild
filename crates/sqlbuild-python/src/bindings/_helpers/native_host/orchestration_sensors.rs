@@ -15,7 +15,9 @@ use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::constants::SENSOR_CONTEXT_PARAMETER;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry as entry;
 use sqlbuild_python_base::orchestration_reads::main::callback_code_hash::callback_code_hash;
+use sqlbuild_python_base::orchestration_reads::main::mask_sensor_outcome::mask_sensor_outcome;
 use sqlbuild_python_base::orchestration_reads::main::orchestration_code_hash::orchestration_code_hash;
+use sqlbuild_python_base::orchestration_reads::main::provider_secret_values::provider_secret_values;
 use sqlbuild_python_base::orchestration_reads::main::sensor_event_record::sensor_event_record;
 use sqlbuild_python_base::orchestration_reads::main::sensor_outcome::sensor_outcome;
 use sqlbuild_python_base::orchestration_reads::main::sensor_traceback::sensor_traceback;
@@ -43,18 +45,21 @@ pub(crate) fn evaluate_sensor(
     project_dir: &Path,
     call: SensorCall<'_>,
 ) -> SensorFunctionOutcome {
-    match called(py, project_dir, call) {
+    let mut secrets = Vec::new();
+    let outcome = match called(py, project_dir, call, &mut secrets) {
         Ok(outcome) => outcome,
         Err(error) => SensorFunctionOutcome::Failed {
             error: sensor_traceback(py, &error),
         },
-    }
+    };
+    mask_sensor_outcome(outcome, &secrets)
 }
 
 fn called(
     py: Python<'_>,
     project_dir: &Path,
     call: SensorCall<'_>,
+    secrets: &mut Vec<String>,
 ) -> PyResult<SensorFunctionOutcome> {
     let sensor = sensor_declaration(py, project_dir, (call.sensor, call.target))?;
     let function = sensor.getattr("function")?;
@@ -77,6 +82,7 @@ fn called(
         .call((), Some(&fields))?;
     let project_path = imported(py, "pathlib", "Path")?.call1((project_dir,))?;
     let providers = discover_provider_classes(project_path.clone(), SecretPolicy::Defer.name())?;
+    *secrets = provider_secret_values(&providers)?;
     let by_name = provider_by_name(&providers)?;
     let target = (
         &PyString::new(py, call.target).into_any(),

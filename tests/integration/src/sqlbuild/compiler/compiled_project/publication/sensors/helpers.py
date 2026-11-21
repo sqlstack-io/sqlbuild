@@ -128,6 +128,9 @@ def assert_ticks(
     )
     assert "Traceback (most recent call last)" in failed["outcome"]["error"]
     assert test_case.expected_failure in failed["outcome"]["error"]
+    assert not any(
+        map(lambda secret: secret in json.dumps(failed), test_case.expected_masked.values())
+    )
     client, csrf = person_reads(harness)
     target_path: str = (
         f"{harness.origin}/api/control/locations/{worker.api.location_id}/targets/development"
@@ -263,6 +266,12 @@ def assert_trials(
             True,
         ), (trial, tried.stdout, tried.stderr)
         assert "really happens" in tried.stderr
+        assert not any(
+            map(
+                lambda secret: secret in tried.stdout + tried.stderr,
+                test_case.expected_masked.values(),
+            )
+        ), tried.stdout
         assert (
             sensor_calls(harness.calls, {"sensor": "orders_done_sensor", "mode": trial.mode})[-1][
                 "event_id"

@@ -611,6 +611,8 @@ class SensorFunctionsTestCase:
     expected_failure: str
     expected_started_job: str
     expected_trials: tuple[SensorTrialCase, ...]
+    # Provider secret values the location knows, which no stored tick or trial output may show.
+    expected_masked: dict[str, str]
 
 
 class SensorHarness(NamedTuple):
