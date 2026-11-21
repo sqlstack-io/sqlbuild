@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.257.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.256.0...v0.257.0) (2026-11-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* replace @task with @asset as the one Python node ([#1611](https://github.com/sqlstack-io/sqlbuild/issues/1611))
+
+### Features
+
+* replace [@task](https://github.com/task) with [@asset](https://github.com/asset) as the one Python node ([#1611](https://github.com/sqlstack-io/sqlbuild/issues/1611)) ([0368994](https://github.com/sqlstack-io/sqlbuild/commit/036899446446ea9aec7a0b0e0144b1f56066070c))
+
 ## [0.256.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.255.0...v0.256.0) (2026-11-20)
 
 
