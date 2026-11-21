@@ -400,6 +400,13 @@ export type Account = Principal & {
 	activeSessions: number;
 };
 
+/** A person to add who signs in with a password: their sign-in name, first password and a built-in role everywhere, or none for the default role only. */
+export type NewPasswordAccount = {
+	name: string;
+	password: string;
+	role: BuiltInRole | null;
+};
+
 /** How much an action can do: look, operate runs, change warehouse data, or administer access. */
 export type PermissionRisk = 'read' | 'operate' | 'changes_data' | 'administer';
 

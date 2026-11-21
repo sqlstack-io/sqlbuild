@@ -40,7 +40,8 @@ async function loadRecording(): Promise<Recording> {
  * adjust it for demos, `?awkward` stretches every list to thousands of rows with very long
  * names, for the layout test, `?calm` reports nothing needing attention, `?large` swaps in a catalog the size of a real project, `?huge` one
  * of about 10,000 nodes in nested folders, for the Overview's and the folder view's performance budgets,
- * and `?still` keeps runs from advancing on their own.
+ * `?still` keeps runs from advancing on their own, and `?signin=password` signs people in with
+ * passwords instead of SSO.
  */
 export function createClient(search: URLSearchParams, onUnauthorized: () => void = () => {}): ApiClient {
 	if (DEMO) return createHttpClient({ onUnauthorized, fetch: replayFetch(loadRecording), changes: new LocalChangeBus() });
@@ -52,7 +53,8 @@ export function createClient(search: URLSearchParams, onUnauthorized: () => void
 		role: ROLES.find((r) => r === role),
 		events: EVENTS.find((e) => e === events),
 		connection: LIVE.find((l) => l === live),
-		still: search.has('still')
+		still: search.has('still'),
+		signIn: search.get('signin') === 'password' ? 'password' : undefined
 	});
 	// `?summary`: the large project with a plan shaped like a large real one's summary (CHI-1563).
 	const summary = search.has('summary');

@@ -20,6 +20,8 @@ mod oidc_helpers;
 mod oidc_test_types;
 #[path = "output/helpers.rs"]
 mod output_helpers;
+#[path = "password_people/helpers.rs"]
+mod password_people_helpers;
 #[path = "person_sessions/helpers.rs"]
 mod person_sessions_helpers;
 #[path = "person_sessions/test_types.rs"]
@@ -80,6 +82,8 @@ mod test_node_states;
 mod test_oidc;
 #[path = "test_oidc_groups.rs"]
 mod test_oidc_groups;
+#[path = "test_password_people.rs"]
+mod test_password_people;
 #[path = "test_passwords.rs"]
 mod test_passwords;
 #[path = "test_person_live.rs"]

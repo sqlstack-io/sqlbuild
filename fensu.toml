@@ -1915,7 +1915,7 @@ reason = "Issued credentials and handoffs implement Debug manually to redact bea
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
 path = "crates/sqlbuild-orchestration/src/api/models.rs"
-symbols = ["PasswordLoginRequest", "PasswordChangeRequest", "PasswordSessionResponse", "ExternalIdentityResponse", "CliLoginApprovalRequest", "CliLoginClaimRequest", "CliLoginSessionResponse"]
+symbols = ["PasswordLoginRequest", "PasswordChangeRequest", "PasswordPersonRequest", "PasswordSessionResponse", "ExternalIdentityResponse", "CliLoginApprovalRequest", "CliLoginClaimRequest", "CliLoginSessionResponse"]
 reason = "Browser transport models implement Debug manually to redact passwords and CSRF secrets; other models derive Debug."
 
 [[targets.rust.rule_exceptions]]

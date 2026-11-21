@@ -13,6 +13,7 @@ import type {
 	Account,
 	AuditEntry,
 	AuditQuery,
+	AuthMode,
 	BuiltInRole,
 	Capability,
 	ConnectionDetails,
@@ -26,6 +27,7 @@ import type {
 	LocationToken,
 	MaintenanceHistory,
 	MigrationEvent,
+	NewPasswordAccount,
 	OldNameView,
 	PlatformEvent,
 	PlatformEventLink,
@@ -104,6 +106,8 @@ export type MockPlatformContext = {
 	role: BuiltInRole;
 	events: 'default' | 'none' | 'all';
 	serverVersion: string;
+	/** How people sign in; only password sign-in can add people. */
+	authMode: AuthMode;
 	user: Principal;
 	locations: Location[];
 	changes: LocalChangeBus;
@@ -808,6 +812,32 @@ export class MockPlatformApi implements PlatformApi {
 		return this.#ctx.reply(structuredClone(account));
 	}
 
+	async createPasswordAccount(request: NewPasswordAccount): Promise<Account> {
+		if (this.#ctx.authMode !== 'password') throw new ApiError('Not found', 404);
+		this.#require('user.manage');
+		if (request.role) this.#require('role.assign');
+		const name = request.name.trim();
+		if (!name) throw new ApiError('principal name is required', 400);
+		if (this.#data.accounts.some((a) => a.name === name)) throw new ApiError(`a person named ${name} already exists`, 400);
+		if ([...request.password].length < 12) throw new ApiError('password must contain at least 12 characters and at most 1024 UTF-8 bytes', 400);
+		const account: Account = {
+			kind: 'user',
+			name,
+			displayName: name,
+			email: null,
+			source: 'password',
+			ssoGroups: [],
+			createdAt: new Date().toISOString(),
+			lastSeenAt: null,
+			disabled: false,
+			activeSessions: 0
+		};
+		this.#data.accounts.push(account);
+		this.#audit('user.manage', { locationId: null, subject: name }, `Added ${name}, who signs in with a password`, null, 'active');
+		if (request.role) await this.createRoleAssignment({ principal: name, role: request.role, scope: { locationId: null } });
+		return this.#ctx.reply(structuredClone(account));
+	}
+
 	// ---- roles ----
 
 	async listRoles(locationId: string): Promise<RoleDefinition[]> {
@@ -966,7 +996,7 @@ export class MockPlatformApi implements PlatformApi {
 			schemaChecksum: '6f1c2a9e4b7d0c3f8a5e2b1d9c4f7a0e3b6d8c1f5a2e9b4d7c0f3a6e1b8d5c2f',
 			schemaAppliedAt: new Date(this.#ctx.now - 5 * DAY).toISOString(),
 			storeBytes: 1_288_490_189,
-			authMode: 'oidc',
+			authMode: this.#ctx.authMode,
 			schedulerEnabled: true,
 			retention: [
 				{ name: 'Run history', value: '90 days', description: 'Runs, schedule history and their events.' },

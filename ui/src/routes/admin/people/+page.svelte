@@ -22,6 +22,8 @@
 	import { permissionLabel } from '$lib/platform/permission-catalog';
 	import { app } from '$lib/state/app.svelte';
 	import { createAccountTable } from '$lib/state/account-table.svelte';
+	import UserPlusIcon from '@lucide/svelte/icons/user-plus';
+	import AddPersonPanel from './add-person-panel.svelte';
 	import PersonPanel from './person-panel.svelte';
 	import RoleSelect from './role-select.svelte';
 	import { defaultRoleOf, isLastAdmin } from './utils';
@@ -32,8 +34,14 @@
 	const locations = $derived(app.bootstrap?.locations ?? []);
 	const canAssign = $derived(app.can('role.assign'));
 	const defaultRole = $derived(defaultRoleOf(d.assignments.data ?? []));
-	// Behind SSO or a trusted proxy, people arrive by signing in; only password sign-in could add them here.
+	// Behind SSO or a trusted proxy, people arrive by signing in; with password sign-in they are added here.
 	const arriveBySigningIn = $derived(app.bootstrap?.authMode !== 'password');
+	const canAdd = $derived(!arriveBySigningIn && app.can('user.manage') && app.client.supports('createPasswordAccount'));
+	let adding = $state(false);
+	function added(a: Account) {
+		d.refresh();
+		pick(a.name);
+	}
 
 	/** The person whose panel is open beside the list. */
 	let selected = $state<string | null>(null);
@@ -42,7 +50,12 @@
 	function open(e: MouseEvent, a: Account) {
 		if ((e.target as Element).closest('a, button, input, select, label, [data-control]')) return;
 		if (e.metaKey || e.ctrlKey || e.button === 1) openRow(e, personHref(a));
-		else selected = a.name;
+		else pick(a.name);
+	}
+	/** Open a person's panel in place of whatever panel is open. */
+	function pick(name: string) {
+		adding = false;
+		selected = name;
 	}
 
 	const sources: AssignmentSource[] = ['manual', 'sso', 'policy', 'built_in'];
@@ -80,6 +93,7 @@
 			</label>{/if}
 		{/snippet}
 		{#snippet actions()}
+			{#if canAdd}<Button variant="outline" size="bar" onclick={() => ((selected = null), (adding = true))} data-testid="add-person"><UserPlusIcon size={14} /> Add person</Button>{/if}
 			{#if app.client.supports('explainAccess')}<Button variant="outline" size="bar" href={to(`/admin/check-access`)}><ShieldQuestionIcon size={14} /> Check access</Button>{/if}
 		{/snippet}
 	</ListToolbar>
@@ -93,7 +107,7 @@
 							<div class="cell-name">
 								<UserIcon size={15} strokeWidth={1.75} />
 								<div class="min-w-0">
-									<Button variant="link" size="inline" class="name" onclick={() => (selected = a.name)}>{a.displayName}</Button>
+									<Button variant="link" size="inline" class="name" onclick={() => pick(a.name)}>{a.displayName}</Button>
 									<div class="cell-desc"><code>{a.name}</code> · {a.source === 'oidc' ? 'SSO' : a.source ? accountSourceLabel[a.source] : 'no password'}</div>
 								</div>
 							</div>
@@ -123,7 +137,9 @@
 					</tr>
 		{/snippet}
 	</DataTable>
-	{#if selectedAccount}
+	{#if adding}
+		<AddPersonPanel {defaultRole} onadded={added} onclose={() => (adding = false)} />
+	{:else if selectedAccount}
 		<PersonPanel account={selectedAccount} assignments={d.assignmentsOf(selectedAccount.name)} rolesByLocation={d.rolesByLocation} onchange={() => d.refresh()} onclose={() => (selected = null)} />
 	{/if}
 	</div>
