@@ -107,9 +107,20 @@ pub(crate) fn line(number: i64, node_key: &str, stream: OutputStream, text: &str
         node_key: node_key.into(),
         stream,
         text: text.into(),
+        at: chrono::DateTime::UNIX_EPOCH,
         level: level_of(text),
         omitted_before: 0,
     }
+}
+
+/// `rows` as JSON with every line's arrival time left out, to compare with lines whose time a test cannot know.
+pub(crate) fn timeless(rows: &[OutputRow]) -> serde_json::Value {
+    let mut value: serde_json::Value = serde_json::to_value(rows).expect("rows");
+    for row in value.as_array_mut().expect("rows") {
+        row["line"]["at"] = serde_json::Value::Null;
+        row["sample"]["at"] = serde_json::Value::Null;
+    }
+    value
 }
 
 /// A page row of one line.

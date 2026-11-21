@@ -87,6 +87,7 @@ impl<'a> ViewReader<'a> {
                 number,
                 node_key: segment.node_key.clone(),
                 stream: segment.stream,
+                at: segment.received_at,
                 level: level_of(text),
                 text: text.to_owned(),
                 omitted_before: match self.gap {

@@ -216,6 +216,7 @@ CREATE TABLE sqb_run_output_chunks (
     batch BIGINT NOT NULL,
     object_key TEXT NOT NULL,
     text_bytes BIGINT NOT NULL,
+    received_at {time} NOT NULL,
     part TEXT NOT NULL CHECK (part IN ('head', 'tail')),
     PRIMARY KEY (run_id, chunk),
     UNIQUE (run_id, claim_id, batch)

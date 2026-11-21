@@ -43,16 +43,17 @@ pub(crate) async fn record_chunk(
         head_bytes: head,
         tail_bytes: tail,
     } = totals;
+    let received_at = transaction.now;
     let part: &str = match half {
         Some(half) if tail > 0 || head + chunk.text_bytes > half => TAIL_PART,
         _ => HEAD_PART,
     };
     (transaction, _) = query(transaction,
-        "INSERT INTO sqb_run_output_chunks (run_id, chunk, claim_id, batch, object_key, text_bytes, part) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7)",
+        "INSERT INTO sqb_run_output_chunks (run_id, chunk, claim_id, batch, object_key, text_bytes, received_at, part) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
         vec![Parameter::Id(chunk.run_id), Parameter::Integer(number), Parameter::Id(chunk.claim_id),
             Parameter::Integer(integer(chunk.batch)?), Parameter::Text(chunk.object_key.clone()),
-            Parameter::Integer(chunk.text_bytes), Parameter::Text(part.into())]).await?;
+            Parameter::Integer(chunk.text_bytes), Parameter::Time(received_at), Parameter::Text(part.into())]).await?;
     (transaction, _) = query(transaction,
         "UPDATE sqb_run_output SET next_chunk=next_chunk+1, head_bytes=head_bytes+$2, tail_bytes=tail_bytes+$3, \
          stored_bytes=stored_bytes+$4, dropped_bytes=dropped_bytes+$5 WHERE run_id=$1",

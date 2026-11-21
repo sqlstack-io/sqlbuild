@@ -2737,6 +2737,11 @@ export interface components {
         OutputLevel: "error" | "warning";
         /** @description One stored line; lines a size cap left out just before it are counted on it. */
         OutputLine: {
+            /**
+             * Format: date-time
+             * @description When the server received the batch holding the line, within a few seconds of its printing.
+             */
+            at: string;
             level?: null | components["schemas"]["OutputLevel"];
             /** @description The node that printed it, or `run`. */
             node_key: string;
