@@ -12,7 +12,7 @@ pub struct StoreMigration {
     /// Statements for PostgreSQL, separated by `;`.
     pub postgres: &'static str,
     /// A data change SQL can't make, such as rewriting compressed documents, run after the statements.
-    pub step: Option<StoreMigrationStep>,
+    pub(crate) step: Option<StoreMigrationStep>,
 }
 
 /// What opening a control store would do to its schema.
