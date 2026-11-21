@@ -414,6 +414,43 @@ export type Account = Principal & {
 	activeSessions: number;
 };
 
+/** An API key of a service account; the server stores only a hash. */
+export type ServiceAccountKey = {
+	id: string;
+	/** Non-secret start of the key, shown for identification, e.g. `sqbk_7Qm2xT`. */
+	prefix: string;
+	createdAt: Iso;
+	createdBy: Principal;
+	lastUsedAt: Iso | null;
+	/** When a key replaced by a rotation stops working; null for the current key. */
+	expiresAt: Iso | null;
+	/** `imported` keys were chosen by an operator with the CLI's `--key-from-env`. */
+	origin: 'issued' | 'imported';
+};
+
+/** A principal for automation: roles and audit entries like a person, but signs in only with an API key. */
+export type ServiceAccount = Principal & {
+	kind: 'service';
+	/** What uses it, e.g. "Deploy script in the release pipeline". */
+	description: string | null;
+	/** The built-in role it has everywhere. */
+	role: BuiltInRole;
+	createdAt: Iso;
+	createdBy: Principal;
+	/** The newest use of any of its keys. */
+	lastUsedAt: Iso | null;
+	/** Disabled accounts' keys stop working at once; enabling makes the same keys work again. */
+	disabled: boolean;
+	/** Keys that work, newest first: the current key, then any old key still in a rotation overlap. */
+	keys: ServiceAccountKey[];
+};
+
+/** A service account to add: its name, what uses it and its role. */
+export type NewServiceAccount = { name: string; description: string | null; role: BuiltInRole };
+
+/** A rotation: how many minutes the old key keeps working, or null to stop it at once. */
+export type KeyRotation = { overlapMinutes: number | null };
+
 /** A person to add who signs in with a password: their sign-in name, first password and a built-in role everywhere, or none for the default role only. */
 export type NewPasswordAccount = {
 	name: string;

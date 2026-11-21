@@ -69,6 +69,8 @@ export type MockOptions = {
 	connection?: ConnectionState;
 	/** How people sign in (`?signin=password`); SSO by default. */
 	signIn?: AuthMode;
+	/** `none` starts with no service accounts (`?serviceaccounts=none`). */
+	serviceAccounts?: 'default' | 'none';
 };
 
 /** In-memory `ApiClient` with neutral example data. Mutations persist per page load. */
@@ -96,7 +98,8 @@ export class MockApiClient implements ApiClient {
 			latencyMs: options.latencyMs ?? 120,
 			connection: options.connection ?? 'live',
 			still: options.still ?? false,
-			signIn: options.signIn ?? 'oidc'
+			signIn: options.signIn ?? 'oidc',
+			serviceAccounts: options.serviceAccounts ?? 'default'
 		};
 		this.changes.setState(this.#options.connection);
 		this.#fixtures = createFixtures(this.#createdAt);
@@ -117,6 +120,7 @@ export class MockApiClient implements ApiClient {
 			serverVersion: '0.185.0',
 			authMode: this.#options.signIn,
 			user: DEMO_USER,
+			serviceAccounts: this.#options.serviceAccounts,
 			locations: this.#fixtures.locations,
 			changes: this.changes,
 			platformEvents: () => this.#platformEvents(),
@@ -527,6 +531,24 @@ export class MockApiClient implements ApiClient {
 	}
 	createPasswordAccount(...args: Parameters<PlatformApi['createPasswordAccount']>) {
 		return this.#platform.createPasswordAccount(...args);
+	}
+	listServiceAccounts(...args: Parameters<PlatformApi['listServiceAccounts']>) {
+		return this.#platform.listServiceAccounts(...args);
+	}
+	createServiceAccount(...args: Parameters<PlatformApi['createServiceAccount']>) {
+		return this.#platform.createServiceAccount(...args);
+	}
+	rotateServiceAccountKey(...args: Parameters<PlatformApi['rotateServiceAccountKey']>) {
+		return this.#platform.rotateServiceAccountKey(...args);
+	}
+	revokeServiceAccountKey(...args: Parameters<PlatformApi['revokeServiceAccountKey']>) {
+		return this.#platform.revokeServiceAccountKey(...args);
+	}
+	setServiceAccountDisabled(...args: Parameters<PlatformApi['setServiceAccountDisabled']>) {
+		return this.#platform.setServiceAccountDisabled(...args);
+	}
+	setServiceAccountRole(...args: Parameters<PlatformApi['setServiceAccountRole']>) {
+		return this.#platform.setServiceAccountRole(...args);
 	}
 	listRoles(...args: Parameters<PlatformApi['listRoles']>) {
 		return this.#platform.listRoles(...args);

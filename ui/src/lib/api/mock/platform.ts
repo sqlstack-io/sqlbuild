@@ -20,6 +20,10 @@ import type {
 	ConnectionTest,
 	EffectiveAccess,
 	IssuedToken,
+	KeyRotation,
+	NewServiceAccount,
+	ServiceAccount,
+	ServiceAccountKey,
 	JanitorEvent,
 	Location,
 	LocationDetail,
@@ -96,6 +100,7 @@ import {
 } from './access';
 import { LOCATION_MARKETING, LOCATION_SHOP, LOCATION_SHOP_DEV, LOCATION_SHOP_STAGING, ROLE_CAPABILITIES, SHOP_LOCATIONS } from './fixtures';
 import { poolCapWarnings, triggerId } from './operate';
+import { newServiceKey, serviceAccountAudit, serviceAccountFixtures } from './service-accounts';
 import { ALEX, CI_ACCOUNT, DEMO_USER, JORDAN, OPS_USER, REPORTING, RILEY, SAM, SYSTEM, MORGAN } from './principals';
 
 const MIN = 60_000;
@@ -109,6 +114,8 @@ export type MockPlatformContext = {
 	/** How people sign in; only password sign-in can add people. */
 	authMode: AuthMode;
 	user: Principal;
+	/** `none` starts with no service accounts (`?serviceaccounts=none`). */
+	serviceAccounts: 'default' | 'none';
 	locations: Location[];
 	changes: LocalChangeBus;
 	platformEvents: () => PlatformEvent[];
@@ -611,9 +618,13 @@ export class MockPlatformApi implements PlatformApi {
 	readonly #data: ReturnType<typeof createPlatformFixtures>;
 	readonly #connectionTests = new Map<string, ConnectionTest>();
 
+	readonly #serviceAccounts: ServiceAccount[];
+
 	constructor(ctx: MockPlatformContext) {
 		this.#ctx = ctx;
 		this.#data = createPlatformFixtures(ctx.now, ctx.role);
+		this.#serviceAccounts = serviceAccountFixtures(ctx.now, ctx.serviceAccounts);
+		if (ctx.serviceAccounts === 'default') this.#data.auditEntries.push(...serviceAccountAudit(ctx.now));
 	}
 
 	/** Records an audited read of check evidence (`view.evidence`). */
@@ -948,6 +959,87 @@ export class MockPlatformApi implements PlatformApi {
 		return this.#ctx.reply(structuredClone(this.#data.ssoMappings));
 	}
 
+
+	// ---- service accounts ----
+
+	async listServiceAccounts(): Promise<ServiceAccount[]> {
+		if (!this.#can('user.manage') && !this.#can('role.assign')) throw new ApiError('Missing permission: user.manage or role.assign', 403);
+		const now = new Date().toISOString();
+		for (const account of this.#serviceAccounts) account.keys = account.keys.filter((k) => !k.expiresAt || k.expiresAt > now);
+		return this.#ctx.reply(structuredClone(this.#serviceAccounts));
+	}
+
+	async createServiceAccount(request: NewServiceAccount): Promise<IssuedToken<ServiceAccount>> {
+		this.#require('user.manage');
+		this.#require('role.assign');
+		const name = request.name.trim();
+		if (!/^[a-z][a-z0-9_-]{1,62}$/.test(name)) throw new ApiError('A name is 2 to 63 lowercase letters, digits, - or _, starting with a letter', 400);
+		if (this.#serviceAccounts.some((a) => a.name === name) || this.#data.accounts.some((a) => a.name === name)) throw new ApiError(`${name} is already taken by a person or service account`, 400);
+		const issued = newServiceKey();
+		const at = new Date().toISOString();
+		const account: ServiceAccount = {
+			kind: 'service',
+			name,
+			displayName: name,
+			description: request.description?.trim() || null,
+			role: request.role,
+			createdAt: at,
+			createdBy: this.#ctx.user,
+			lastUsedAt: null,
+			disabled: false,
+			keys: [{ id: `sak-${randomHex(6)}`, prefix: issued.prefix, createdAt: at, createdBy: this.#ctx.user, lastUsedAt: null, expiresAt: null, origin: 'issued' }]
+		};
+		this.#serviceAccounts.push(account);
+		this.#audit('service_account.created', { locationId: null, subject: name }, `Added service account ${name} as ${request.role}`, null, issued.prefix);
+		return this.#ctx.reply({ token: structuredClone(account), secret: issued.secret });
+	}
+
+	async rotateServiceAccountKey(name: string, rotation: KeyRotation): Promise<IssuedToken<ServiceAccount>> {
+		this.#require('user.manage');
+		const account = this.#serviceAccount(name);
+		const [current] = account.keys;
+		const issued = newServiceKey();
+		const at = new Date();
+		const kept: ServiceAccountKey[] = current && rotation.overlapMinutes ? [{ ...current, expiresAt: new Date(at.getTime() + rotation.overlapMinutes * 60_000).toISOString() }] : [];
+		account.keys = [{ id: `sak-${randomHex(6)}`, prefix: issued.prefix, createdAt: at.toISOString(), createdBy: this.#ctx.user, lastUsedAt: null, expiresAt: null, origin: 'issued' }, ...kept];
+		const overlap = rotation.overlapMinutes ? `; ${current?.prefix}… works for ${rotation.overlapMinutes} more minutes` : '; the old key stopped at once';
+		this.#audit('service_account.key_rotated', { locationId: null, subject: name }, `Rotated ${name}'s key${overlap}`, current?.prefix ?? null, issued.prefix);
+		return this.#ctx.reply({ token: structuredClone(account), secret: issued.secret });
+	}
+
+	async revokeServiceAccountKey(name: string, keyId: string): Promise<ServiceAccount> {
+		this.#require('user.manage');
+		const account = this.#serviceAccount(name);
+		const key = account.keys.find((k) => k.id === keyId);
+		if (!key?.expiresAt) throw new ApiError('Only an old key still in its overlap can be stopped; rotate to replace the current key', 409);
+		account.keys = account.keys.filter((k) => k.id !== keyId);
+		this.#audit('service_account.key_revoked', { locationId: null, subject: name }, `Stopped ${name}'s old key ${key.prefix}… before its overlap ended`, key.prefix, null);
+		return this.#ctx.reply(structuredClone(account));
+	}
+
+	async setServiceAccountDisabled(name: string, disabled: boolean): Promise<ServiceAccount> {
+		this.#require('user.manage');
+		const account = this.#serviceAccount(name);
+		if (account.disabled === disabled) throw new ApiError(`${name} is already ${disabled ? 'disabled' : 'enabled'}`, 409);
+		account.disabled = disabled;
+		this.#audit(disabled ? 'service_account.disabled' : 'service_account.enabled', { locationId: null, subject: name }, `${disabled ? 'Disabled' : 'Enabled'} service account ${name}`, disabled ? 'active' : 'disabled', disabled ? 'disabled' : 'active');
+		return this.#ctx.reply(structuredClone(account));
+	}
+
+	async setServiceAccountRole(name: string, role: BuiltInRole): Promise<ServiceAccount> {
+		this.#require('role.assign');
+		const account = this.#serviceAccount(name);
+		const before = account.role;
+		account.role = role;
+		this.#audit('service_account.role_changed', { locationId: null, subject: name }, `Gave ${name} ${role} everywhere`, before, role);
+		return this.#ctx.reply(structuredClone(account));
+	}
+
+	#serviceAccount(name: string): ServiceAccount {
+		const account = this.#serviceAccounts.find((a) => a.name === name);
+		if (!account) throw new ApiError(`Unknown service account ${name}`, 404);
+		return account;
+	}
 
 	// ---- audit and access ----
 
