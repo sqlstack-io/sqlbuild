@@ -2,6 +2,8 @@
 -- ticks record the event they were called with, and source events a sensor handled are kept.
 -- Sensors published before this version stay hidden until their location publishes again,
 -- and their earlier tick history and pending location work, in the old shape, are dropped.
+-- After these statements, the migration's Rust step removes those sensors from each stored
+-- snapshot `triggers` document, so older snapshots still decode and their jobs still run.
 CREATE TABLE sqb_triggers_v2 (
     trigger_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),

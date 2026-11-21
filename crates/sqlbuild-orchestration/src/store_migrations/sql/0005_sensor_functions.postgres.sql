@@ -2,6 +2,8 @@
 -- ticks record the event they were called with, and source events a sensor handled are kept.
 -- Sensors published before this version stay hidden until their location publishes again,
 -- and their earlier tick history and pending location work, in the old shape, are dropped.
+-- After these statements, the migration's Rust step removes those sensors from each stored
+-- snapshot `triggers` document, so older snapshots still decode and their jobs still run.
 ALTER TABLE sqb_triggers ALTER COLUMN job_key DROP NOT NULL;
 
 UPDATE sqb_triggers SET job_key = NULL, removed_in_snapshot_id = COALESCE(removed_in_snapshot_id, snapshot_id), definition_json = (definition_json - 'job_key' - 'when') || jsonb_build_object('function', name, 'code_hash', 'unpublished', 'timeout_seconds', 60) WHERE kind = 'sensor';

@@ -297,6 +297,7 @@ fn given_a_migration_rebuilding_a_referenced_table_when_migrating_then_rows_and_
                 name: "widen_run_status",
                 sqlite: rebuilt_runs_table(store).await,
                 postgres: WIDEN_RUN_STATUS_POSTGRES,
+                step: None,
             };
 
             migrate_with(store, &[migration])
@@ -475,6 +476,7 @@ fn given_a_store_when_planning_its_migration_then_the_plan_is_reported_without_c
                 name: "widen_run_status",
                 sqlite: "",
                 postgres: "",
+                step: None,
             });
             let after = (
                 plan_store_migration(&baseline.store)
@@ -587,6 +589,7 @@ fn given_a_migration_that_breaks_a_reference_when_migrating_then_it_is_refused_u
                 name: "dangling_run_node",
                 sqlite: DANGLING_RUN_NODE,
                 postgres: DANGLING_RUN_NODE,
+                step: None,
             };
 
             let error = migrate_with(store, &[migration])

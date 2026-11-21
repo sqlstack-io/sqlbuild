@@ -86,3 +86,10 @@ pub(crate) struct RunKeyTestCase {
     pub(crate) requests: &'static [(&'static str, &'static str)],
     pub(crate) expected_runs: usize,
 }
+
+pub(crate) struct SensorUpgradeTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The runs of the job after one fails: it and its retry.
+    pub(crate) expected_job_runs: usize,
+}

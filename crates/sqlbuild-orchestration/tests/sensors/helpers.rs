@@ -468,3 +468,75 @@ pub(crate) async fn record_tick(
     commit(transaction).await.expect("commit tick");
     request
 }
+
+/// Add a sensor in the form servers stored before sensors were functions, as a pre-upgrade server would have published it: in the snapshot's `triggers` document and in `sqb_triggers`.
+pub(crate) async fn add_old_form_sensor(
+    store: &ControlStore,
+    snapshot: &crate::snapshots::models::SnapshotRecord,
+) {
+    let definition = json!({
+        "description": "Refresh reporting on overdue ticks", "job_key": "orders",
+        "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
+        "minimum_interval_seconds": 1
+    });
+    let (transaction, rows) = query(
+        begin(store, TransactionMode::Write).await.expect("seed"),
+        "SELECT d.body FROM sqb_snapshot_documents s JOIN sqb_documents d ON d.document_hash=s.document_hash \
+         WHERE s.snapshot_id=$1 AND s.kind='triggers'",
+        vec![Parameter::Id(snapshot.snapshot_id)],
+    )
+    .await
+    .expect("read triggers document");
+    let mut document: serde_json::Value = serde_json::from_slice(
+        &crate::store::main::decompress::decompress(&rows[0]["body"]).expect("decompress"),
+    )
+    .expect("triggers document");
+    document["health_orders"] = definition.clone();
+    let bytes = crate::snapshots::_helpers::content::json_bytes(&document).expect("bytes");
+    let hash = sqlbuild_recall::records::main::sha256_hex::sha256_hex(&bytes);
+    let (transaction, _) = query(
+        transaction,
+        "INSERT INTO sqb_documents (document_hash, body) VALUES ($1, $2)",
+        vec![
+            Parameter::Text(hash.clone()),
+            Parameter::Bytes(crate::store::main::compress::compress(&bytes).expect("compress")),
+        ],
+    )
+    .await
+    .expect("store old-form document");
+    let (transaction, _) = query(
+        transaction,
+        "UPDATE sqb_snapshot_documents SET document_hash=$2 WHERE snapshot_id=$1 AND kind='triggers'",
+        vec![Parameter::Id(snapshot.snapshot_id), Parameter::Text(hash)],
+    )
+    .await
+    .expect("point the snapshot at it");
+    let (transaction, _) = query(
+        transaction,
+        "INSERT INTO sqb_triggers (trigger_id, location_id, target, kind, name, job_key, definition_json, snapshot_id) \
+         VALUES ($1, $2, $3, 'sensor', 'health_orders', 'orders', $4, $5)",
+        vec![
+            Parameter::Id(Uuid::now_v7()),
+            Parameter::Id(snapshot.location_id),
+            Parameter::Text(snapshot.target.clone()),
+            Parameter::Json(definition),
+            Parameter::Id(snapshot.snapshot_id),
+        ],
+    )
+    .await
+    .expect("old-form trigger row");
+    commit(transaction).await.expect("commit old-form sensor");
+}
+
+/// The `triggers` document hash of `snapshot_id`.
+pub(crate) async fn triggers_document(store: &ControlStore, snapshot_id: Uuid) -> String {
+    let (transaction, rows) = query(
+        begin(store, TransactionMode::Read).await.expect("read"),
+        "SELECT document_hash FROM sqb_snapshot_documents WHERE snapshot_id=$1 AND kind='triggers'",
+        vec![Parameter::Id(snapshot_id)],
+    )
+    .await
+    .expect("triggers document hash");
+    commit(transaction).await.expect("commit read");
+    rows[0]["document_hash"].as_str().expect("hash").to_owned()
+}
