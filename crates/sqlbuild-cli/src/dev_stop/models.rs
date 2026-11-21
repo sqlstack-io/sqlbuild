@@ -164,22 +164,26 @@ impl StopSwitch {
         }
     }
 
+    /// The process groups registered now.
+    pub(crate) fn groups(&self) -> Vec<i32> {
+        match self.groups.lock() {
+            Ok(groups) => groups.clone(),
+            Err(_poisoned) => Vec::new(),
+        }
+    }
+
     /// Kill every registered group, such as each local worker's, on every Unix, then on Linux any child left over.
     pub(crate) fn kill_all(&self) {
-        if let Ok(groups) = self.groups.lock() {
-            for group in groups.iter() {
-                signal_group(*group, true);
-            }
+        for group in self.groups() {
+            signal_group(group, true);
         }
         kill_children();
     }
 
     /// Ask every registered group to stop.
     pub(crate) fn terminate_groups(&self) {
-        if let Ok(groups) = self.groups.lock() {
-            for group in groups.iter() {
-                signal_group(*group, false);
-            }
+        for group in self.groups() {
+            signal_group(group, false);
         }
     }
 

@@ -124,7 +124,7 @@ pub(super) struct ClaimedWorker {
     pub(super) launch_failure: Option<&'static str>,
     /// Supervision resumed after a scheduler restart rather than from this scheduler's launch.
     pub(super) recovered: bool,
-    /// The process group a local worker this scheduler started leads, registered with the stop switch until the worker is dropped, so a forced stop kills it on every Unix.
+    /// The process group a local worker this scheduler started leads, registered with the stop switch until its exit is seen, so a forced stop kills it on every Unix and never a reused group.
     pub(super) group: Option<u32>,
 }
 

@@ -69,7 +69,8 @@ impl sqlbuild_orchestration::scheduler::types::RunLauncher for Workers {
             let worker = &mut self.active[index];
             let mut state = observe_run(store, worker.claim.request.run_id).await?;
             if let Some(child) = worker.child.as_mut() {
-                worker.exit = worker.exit.or(child.try_wait().await?);
+                let exit = child.try_wait().await?;
+                worker.record_exit(exit);
             }
             if worker.exit.is_none()
                 && let Some(child) = worker.child.as_mut()
@@ -93,7 +94,8 @@ impl sqlbuild_orchestration::scheduler::types::RunLauncher for Workers {
                     .is_some_and(|at| at.elapsed() >= Duration::from_secs(60))
                 {
                     child.kill().await?;
-                    worker.exit = child.try_wait().await?;
+                    let exit = child.try_wait().await?;
+                    worker.record_exit(exit);
                     state = observe_run(store, worker.claim.request.run_id).await?;
                 }
             }
@@ -419,15 +421,25 @@ impl LocalSpawn {
 }
 
 impl Drop for ClaimedWorker {
-    /// The worker's group may be reused once it is reaped, so a forced stop must no longer signal it.
+    /// A worker dropped before its exit was seen no longer belongs to this scheduler's stop.
     fn drop(&mut self) {
-        if let Some(group) = self.group {
+        if let Some(group) = self.group.take() {
             stop_switch().forget_group(group);
         }
     }
 }
 
 impl ClaimedWorker {
+    /// Record the worker's exit once it is seen; its process group may be reused from then on, so a forced stop, even one that retries shutdown while the store is away, must no longer signal it.
+    pub(in crate::workers) fn record_exit(&mut self, exit: Option<WorkerExit>) {
+        self.exit = self.exit.or(exit);
+        if self.exit.is_some()
+            && let Some(group) = self.group.take()
+        {
+            stop_switch().forget_group(group);
+        }
+    }
+
     pub(in crate::workers) async fn publish_launch_failure(
         &mut self,
         store: &ControlStore,
