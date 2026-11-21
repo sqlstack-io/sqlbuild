@@ -31,14 +31,18 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.wheel.
 )
 
 RECORDER: str = (
-    "import json, os, time\nfrom pathlib import Path\n"
+    "import json, os, time\nfrom pathlib import Path\nfrom urllib.parse import quote\n"
     "from pydantic import Field, SecretStr\n"
+    "from pydantic_settings import SettingsConfigDict\n"
     "from sqlbuild.orchestration import RunRequest, SkipReason\n"
     "from sqlbuild.provider.classes.provider import Provider\n"
     "class Recorder(Provider):\n"
     '    """Records each sensor call and answers as the mode file says."""\n'
     "    feed_token: SecretStr = Field(alias='SQLBUILD_TEST_FEED_TOKEN')\n"
     "    api_key: SecretStr = Field(alias='SQLBUILD_TEST_API_KEY')\n"
+    "    session_token: SecretStr = Field(alias='SQLBUILD_TEST_SESSION_TOKEN')\n"
+    "    model_config = SettingsConfigDict(extra='forbid', arbitrary_types_allowed=True,\n"
+    "                                      env_file=os.environ['SQLBUILD_TEST_ENV_FILE'])\n"
     "    def call(self, ctx, sensor):\n"
     "        mode = json.loads(Path(os.environ['SQLBUILD_SENSOR_MODE']).read_text())[sensor]\n"
     "        event = ctx.event\n"
@@ -50,9 +54,11 @@ RECORDER: str = (
     "        with Path(os.environ['SQLBUILD_SENSOR_CALLS']).open('a') as out:\n"
     "            out.write(json.dumps(record) + '\\n')\n"
     "        if mode == 'raise':\n"
-    "            raise ValueError('orders feed is down: GET https://feeds.example.test/v1/'\n"
-    "                             f'{self.feed_token.get_secret_value()}/orders refused '\n"
-    "                             f'{self.api_key.get_secret_value()}')\n"
+    "            feed = self.feed_token.get_secret_value()\n"
+    "            raise ValueError(f'orders feed is down: GET https://feeds.example.test/v1/{feed}/orders'\n"
+    "                             f'?next={quote(feed, safe=\"\")} refused '\n"
+    "                             f'{json.dumps(self.api_key.get_secret_value())} for session '\n"
+    "                             f'{self.session_token.get_secret_value()}')\n"
     "        if mode == 'sleep':\n            time.sleep(8)\n"
     "            with Path(os.environ['SQLBUILD_SENSOR_CALLS']).open('a') as out:\n"
     "                out.write(json.dumps({'sensor': sensor, 'woke': True}) + '\\n')\n"
@@ -103,8 +109,8 @@ FILES: dict[str, str] = {
             ),
             expected_failure_code="sensor_function_failed",
             expected_failure=(
-                "ValueError: orders feed is down: GET https://feeds.example.test/v1/****/orders "
-                "refused ****"
+                "ValueError: orders feed is down: GET https://feeds.example.test/v1/****/orders"
+                '?next=**** refused "****" for session ****'
             ),
             expected_started_job="orders_export_job",
             expected_trials=(
@@ -152,9 +158,10 @@ FILES: dict[str, str] = {
                 ),
             ),
             expected_masked={
-                "SQLBUILD_TEST_FEED_TOKEN": "feedtok-7f3a9c51",
-                "SQLBUILD_TEST_API_KEY": "orders-key-48d1e2",
+                "SQLBUILD_TEST_FEED_TOKEN": "feed tok+7f3a/9c51",
+                "SQLBUILD_TEST_API_KEY": 'orders"key\\48d1e2',
             },
+            dotenv_secrets={"SQLBUILD_TEST_SESSION_TOKEN": "session-5b2e81c4"},
         )
     ],
     ids=lambda case: case.description,
@@ -178,6 +185,11 @@ def test_given_sensor_functions_when_events_arrive_and_people_try_them_then_tick
     monkeypatch.setenv("SQLBUILD_SENSOR_CALLS", str(calls))
     for name, value in test_case.expected_masked.items():
         monkeypatch.setenv(name, value)
+    dotenv: Path = tmp_path / "provider.env"
+    dotenv.write_text(
+        "".join(f"{name}={value}\n" for name, value in test_case.dotenv_secrets.items())
+    )
+    monkeypatch.setenv("SQLBUILD_TEST_ENV_FILE", str(dotenv))
     home: Path = tmp_path / "home"
     home.mkdir()
     client_environment: dict[str, str] = environment({"HOME": str(home)})

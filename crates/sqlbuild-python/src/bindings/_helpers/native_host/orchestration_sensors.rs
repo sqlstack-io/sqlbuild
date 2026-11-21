@@ -15,6 +15,7 @@ use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::constants::SENSOR_CONTEXT_PARAMETER;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry as entry;
 use sqlbuild_python_base::orchestration_reads::main::callback_code_hash::callback_code_hash;
+use sqlbuild_python_base::orchestration_reads::main::instance_secret_values::instance_secret_values;
 use sqlbuild_python_base::orchestration_reads::main::mask_sensor_outcome::mask_sensor_outcome;
 use sqlbuild_python_base::orchestration_reads::main::orchestration_code_hash::orchestration_code_hash;
 use sqlbuild_python_base::orchestration_reads::main::provider_secret_values::provider_secret_values;
@@ -83,21 +84,26 @@ fn called(
     let project_path = imported(py, "pathlib", "Path")?.call1((project_dir,))?;
     let providers = discover_provider_classes(project_path.clone(), SecretPolicy::Defer.name())?;
     let secrets: Vec<String> = provider_secret_values(&providers)?;
-    let outcome = match with_providers(py, (&function, &context, call), (&project_path, providers))
-    {
-        Ok(outcome) => outcome,
-        Err(error) => SensorFunctionOutcome::Failed {
-            error: sensor_traceback(py, &error),
-        },
-    };
-    Ok(mask_sensor_outcome(outcome, &secrets))
+    match with_providers(
+        py,
+        (&function, &context, call),
+        (&project_path, providers, &secrets),
+    ) {
+        Ok(outcome) => Ok(outcome),
+        Err(error) => Ok(mask_sensor_outcome(
+            SensorFunctionOutcome::Failed {
+                error: sensor_traceback(py, &error),
+            },
+            &secrets,
+        )),
+    }
 }
 
-/// The function called with the target's providers, its context the sensor's.
+/// The function called with the target's providers, its context the sensor's; its outcome masks `secrets` and the secret settings of the providers it was given.
 fn with_providers<'py>(
     py: Python<'py>,
     (function, context, call): (&Bound<'py, PyAny>, &Bound<'py, PyAny>, SensorCall<'_>),
-    (project_path, providers): (&Bound<'py, PyAny>, Bound<'py, PyAny>),
+    (project_path, providers, secrets): (&Bound<'py, PyAny>, Bound<'py, PyAny>, &[String]),
 ) -> PyResult<SensorFunctionOutcome> {
     let by_name = provider_by_name(&providers)?;
     let target = (
@@ -116,18 +122,28 @@ fn with_providers<'py>(
     within(&session, |_| {
         let arguments = PyDict::new(py);
         arguments.set_item(SENSOR_CONTEXT_PARAMETER, context)?;
+        let mut instances: Vec<Bound<'py, PyAny>> = Vec::new();
         for usage in provider_usages(function, &by_name)?.try_iter()? {
             let usage = usage?;
             if usage.getattr("parameter_name")?.extract::<String>()? != SENSOR_CONTEXT_PARAMETER {
-                arguments.set_item(
-                    usage.getattr("parameter_name")?,
-                    session.call_method1("get", (usage.getattr("provider_name")?,))?,
-                )?;
+                let instance = session.call_method1("get", (usage.getattr("provider_name")?,))?;
+                arguments.set_item(usage.getattr("parameter_name")?, &instance)?;
+                instances.push(instance);
             }
         }
-        let result = function.call((), Some(&arguments))?;
-        let cursor: Option<String> = context.getattr("cursor")?.extract()?;
-        let cursor = cursor.filter(|_| call.event.is_none());
-        sensor_outcome(py, &result, (call.event, cursor))
+        let mut masked: Vec<String> = instance_secret_values(&instances)?;
+        masked.extend_from_slice(secrets);
+        let called = function.call((), Some(&arguments)).and_then(|result| {
+            let cursor: Option<String> = context.getattr("cursor")?.extract()?;
+            sensor_outcome(
+                py,
+                &result,
+                (call.event, cursor.filter(|_| call.event.is_none())),
+            )
+        });
+        let outcome = called.unwrap_or_else(|error| SensorFunctionOutcome::Failed {
+            error: sensor_traceback(py, &error),
+        });
+        Ok(mask_sensor_outcome(outcome, &masked))
     })
 }

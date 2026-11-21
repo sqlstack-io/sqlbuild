@@ -3,6 +3,7 @@ pub mod declared_at;
 pub mod dependency_failures;
 pub mod environment_hash;
 pub mod imported_declarations;
+pub mod instance_secret_values;
 pub mod mask_sensor_outcome;
 pub mod missing_secrets;
 pub mod module_declarations;

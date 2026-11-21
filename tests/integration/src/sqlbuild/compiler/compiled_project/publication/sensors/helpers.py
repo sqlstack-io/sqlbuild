@@ -7,6 +7,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ScheduledWorker,
@@ -128,9 +129,7 @@ def assert_ticks(
     )
     assert "Traceback (most recent call last)" in failed["outcome"]["error"]
     assert test_case.expected_failure in failed["outcome"]["error"]
-    assert not any(
-        map(lambda secret: secret in json.dumps(failed), test_case.expected_masked.values())
-    )
+    assert not any(map(lambda form: form in failed["outcome"]["error"], masked_forms(test_case)))
     client, csrf = person_reads(harness)
     target_path: str = (
         f"{harness.origin}/api/control/locations/{worker.api.location_id}/targets/development"
@@ -276,10 +275,7 @@ def assert_trials(
         ), (trial, tried.stdout, tried.stderr)
         assert "really happens" in tried.stderr
         assert not any(
-            map(
-                lambda secret: secret in tried.stdout + tried.stderr,
-                test_case.expected_masked.values(),
-            )
+            map(lambda form: form in tried.stdout + tried.stderr, masked_forms(test_case))
         ), tried.stdout
         assert (
             sensor_calls(harness.calls, {"sensor": "orders_done_sensor", "mode": trial.mode})[-1][
@@ -348,3 +344,11 @@ RECORDING_SENSORS: dict[str, str] = {
 def recording_sensors(select: str) -> dict[str, str]:
     """Both recording sensors, the check sensor watching the checks on `select`."""
     return {path: text.replace("{select}", select) for path, text in RECORDING_SENSORS.items()}
+
+
+def masked_forms(test_case: SensorFunctionsTestCase) -> list[str]:
+    """Every secret value the case sets, raw, percent-encoded and JSON-escaped."""
+    values: list[str] = [*test_case.expected_masked.values(), *test_case.dotenv_secrets.values()]
+    return [
+        form for value in values for form in (value, quote(value, safe=""), json.dumps(value)[1:-1])
+    ]
