@@ -24,7 +24,7 @@ import type {
 } from '../types';
 import { CI_ACCOUNT, DEMO_USER, OPS_USER, SCHEDULER, SENSOR_DAEMON } from './principals';
 import { BIG_GROUP, bigGroupFile, bigGroupSelect, bigGroupShape } from './big-group';
-import { resolveSelection, writeSetOf } from './operate-graph';
+import { resolveSelection, setJobResolver, writeSetOf } from './operate-graph';
 import type { RunEnd, RunRecord, RunScript } from './run-detail';
 
 const MIN = 60_000;
@@ -121,6 +121,33 @@ export const JOB_DEFS: JobDef[] = [
     ignore_audit_failures=True,
     owner="data-platform",
     schedule=schedule(cron="{cron:core_build}", timezone="UTC"),
+)`
+		)
+	},
+	{
+		key: 'shop_daily',
+		kind: 'job',
+		description: 'Every model of the shop, daily: staging, marts, finance, inventory, fulfillment and reporting',
+		select: 'path:models',
+		exclude: [],
+		members: [],
+		overlap: 'skip',
+		onFailure: null,
+		pools: {},
+		priority: 0,
+		sourceFile: 'orchestration/jobs.py',
+		settings: {},
+		targets: null,
+		owner: 'data-platform',
+		criticalNodes: [],
+		declaration: decl(
+			'orchestration/jobs.py',
+			40,
+			`shop_daily = job(
+    "shop_daily",
+    description="Every model of the shop, daily",
+    select="path:models",
+    owner="data-platform",
 )`
 		)
 	},
@@ -375,6 +402,8 @@ JOB_DEFS.push(
 
 /** Waits a group declares instead of those its members' lineage gives: the big group's whole upstreams. */
 export const DECLARED_WAITS: Record<string, ReadonlyMap<string, string[]>> = { [BIG_GROUP]: BIG.waits };
+
+setJobResolver(jobNodes);
 
 export function jobDef(key: string | null): JobDef | undefined {
 	return key ? JOB_DEFS.find((j) => j.key === key) : undefined;
@@ -979,6 +1008,33 @@ export function createOperateFixtures(now: number): OperateFixtures {
 		{ load_sources: { durationMin: 3 }, core_build: { durationMin: 8 }, activity_microbatch: { durationMin: 6 }, reporting_exports: { durationMin: 3 } },
 		nightlyStages
 	);
+
+	// ---- prototype runs (CHI-1591): a failed, a running, a group and a successful run ----
+
+	record({
+		id: 'run-pf31', origin: 'manual', job: 'shop_daily', by: DEMO_USER, queuedAgo: 14.2, startedAgo: 14, durationMin: 3.2,
+		fail: ['fct_order_margin', 'fct_refunds', 'score_customers_v2'], warn: ['stg_inventory', 'fct_shipments', 'fct_payment_daily', 'fct_order_lines'],
+		errors: { fct_order_margin: 'Division by zero in margin_pct', fct_refunds: 'Check unique(order_id) failed: 14 duplicate rows', score_customers_v2: "KeyError: 'customer_segment'" }
+	});
+	record({ id: 'run-pr02', origin: 'manual', job: 'shop_daily', by: DEMO_USER, queuedAgo: 0.6, startedAgo: 0.5, durationMin: 20, running: true, warn: ['stg_inventory'] });
+	record({ id: 'run-ps07', origin: 'schedule', job: 'shop_daily', by: SCHEDULER, queuedAgo: 1442, startedAgo: 1441.8, durationMin: 2.6 });
+	groupRun(
+		{ id: 'run-pg40', origin: 'manual', job: 'nightly_all', by: DEMO_USER, queuedAgo: 42, startedAgo: 41.8 },
+		{
+			load_sources: { durationMin: 2 },
+			core_build: { durationMin: 4, fail: ['daily_revenue'], errors: { daily_revenue: 'Division by zero in revenue_per_order' } },
+			activity_microbatch: { durationMin: 3 },
+			reporting_exports: { durationMin: 1 }
+		},
+		nightlyStages
+	);
+	{
+		// The last member never starts: the group stops it after core_build failed.
+		const last = records.find((r) => r.run.id === 'run-pg40-rep')!;
+		const parentEnd = Date.parse(records.find((r) => r.run.id === 'run-pg40-act')!.run.endedAt!);
+		Object.assign(last.run, { status: 'skipped', startedAt: null, launchedAt: null, endedAt: new Date(parentEnd).toISOString(), statusReason: 'Not started: core_build failed earlier in this group run' });
+		last.script.end = 'never_started';
+	}
 
 	// ---- generated schedule history ----
 

@@ -33,6 +33,10 @@ import type {
 	RunListQuery,
 	RunNodeError,
 	RunOutputLine,
+	NodeOutputIndex,
+	NodeOutputPage,
+	NodeOutputSearch,
+	CheckSample,
 	RunStatement,
 	RunCostRow,
 	IgnoredAuditFailure,
@@ -293,6 +297,27 @@ export class MockApiClient implements ApiClient {
 	async listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]> {
 		this.#location(scope);
 		return this.#operate.listRunOutput(scope, runId);
+	}
+
+	// A node's bulk output, paged as the output store would serve it (prototype, CHI-1597).
+	async getNodeOutputIndex(scope: Scope, runId: string, nodeKey: string): Promise<NodeOutputIndex | null> {
+		this.#location(scope);
+		return this.#operate.getNodeOutputIndex(scope, runId, nodeKey);
+	}
+	async getNodeOutputPage(scope: Scope, runId: string, nodeKey: string, at: { from: number; rows: number; direction: 'forward' | 'backward'; collapse: boolean; stream?: 'all' | 'stdout' | 'stderr'; around?: number }): Promise<NodeOutputPage> {
+		this.#location(scope);
+		return this.#operate.getNodeOutputPage(scope, runId, nodeKey, at);
+	}
+	async searchNodeOutput(scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward'): Promise<NodeOutputSearch> {
+		this.#location(scope);
+		return this.#operate.searchNodeOutput(scope, runId, nodeKey, query, from, direction);
+	}
+	nodeOutputDownloadUrl(scope: Scope, runId: string, nodeKey: string): string {
+		return this.#operate.nodeOutputDownloadUrl(scope, runId, nodeKey);
+	}
+	async getCheckSample(scope: Scope, runId: string, statementId: string): Promise<CheckSample | null> {
+		this.#location(scope);
+		return this.#operate.getCheckSample(scope, runId, statementId);
 	}
 
 	async getRunNodeError(scope: Scope, runId: string, nodeKey: string): Promise<RunNodeError> {

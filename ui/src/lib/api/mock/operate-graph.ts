@@ -40,7 +40,39 @@ export const SNAPSHOT_NODES: SnapshotNode[] = [
 	node('daily_activity_rollup', 'incremental', 'activity', ['hourly_activity_ctx'], { cursor: 'timestamp' }),
 	node('revenue_report', 'table', 'reporting', ['daily_revenue'], { tags: ['finance'] }),
 	node('activity_report', 'table', 'reporting', ['hourly_activity_ctx']),
-	node('export_revenue_csv', 'asset', 'exports', ['revenue_report'], { tags: ['export'] })
+	node('export_revenue_csv', 'asset', 'exports', ['revenue_report'], { tags: ['export'] }),
+	// Prototype (CHI-1591): finance, inventory and fulfillment folders, so a job run has about 30 nodes.
+	node('raw__cost_prices', 'source', 'sources', []),
+	node('raw__inventory', 'source', 'sources', []),
+	node('raw__products', 'source', 'sources', []),
+	node('raw__shipments', 'source', 'sources', []),
+	node('stg_cost_prices', 'view', 'finance', ['raw__cost_prices']),
+	node('fct_order_margin', 'table', 'finance', ['fact_orders', 'stg_cost_prices'], { tags: ['finance'] }),
+	node('agg_margin_daily', 'incremental', 'finance', ['fct_order_margin'], { cursor: 'timestamp', tags: ['finance'] }),
+	node('rpt_margin_weekly', 'table', 'finance', ['agg_margin_daily'], { tags: ['finance'] }),
+	node('rpt_margin_by_category', 'table', 'finance', ['agg_margin_daily', 'dim_products'], { tags: ['finance'] }),
+	node('stg_inventory', 'view', 'inventory', ['raw__inventory']),
+	node('stg_products', 'view', 'inventory', ['raw__products']),
+	node('dim_products', 'table', 'inventory', ['stg_products']),
+	node('fct_stock_levels', 'incremental', 'inventory', ['stg_inventory', 'dim_products'], { cursor: 'timestamp' }),
+	node('agg_stock_daily', 'table', 'inventory', ['fct_stock_levels']),
+	node('rpt_low_stock', 'table', 'inventory', ['agg_stock_daily', 'dim_products']),
+	node('stg_shipments', 'view', 'fulfillment', ['raw__shipments']),
+	node('fct_shipments', 'incremental', 'fulfillment', ['stg_shipments', 'fact_orders'], { cursor: 'timestamp' }),
+	node('agg_delivery_times', 'table', 'fulfillment', ['fct_shipments']),
+	node('rpt_late_deliveries', 'table', 'fulfillment', ['agg_delivery_times', 'dim_customers']),
+	// Python nodes (CHI-1591): a loader that prints its paging, and a task that warns.
+	node('raw_events', 'loader', 'ingest', [], { cursor: 'timestamp', path: 'models/ingest/raw_events.py' }),
+	node('score_customers', 'task', 'ml', ['dim_customers'], { path: 'models/ml/score_customers.py' }),
+	// Several checks on one node (CHI-1591): all passing, one warning, two warnings, and a failure with warnings.
+	node('stg_sessions', 'view', 'staging', ['raw__customers']),
+	node('fct_payment_daily', 'table', 'finance', ['stg_payments']),
+	node('fct_order_lines', 'table', 'marts', ['stg_orders', 'stg_payments']),
+	node('fct_refunds', 'table', 'finance', ['stg_payments', 'fact_orders']),
+	// A Python task that fails with a pandas KeyError traceback after printing a few thousand lines.
+	node('score_customers_v2', 'task', 'ml', ['dim_customers'], { path: 'models/ml/score_customers_v2.py' }),
+	// A notebook runner that prints about 2 million lines (CHI-1597).
+	node('notebook_runner', 'task', 'ml', ['fact_orders'], { path: 'models/ml/notebook_runner.py' })
 ];
 
 const BY_KEY = new Map(SNAPSHOT_NODES.map((n) => [n.key, n]));
@@ -150,13 +182,21 @@ function folderOf(n: SnapshotNode): string {
 	return n.path.includes('/') ? n.path.slice(0, n.path.lastIndexOf('/')) : '';
 }
 
+/** `job:<key>`: the job's nodes, as `operate.ts` resolves them (set there, which imports this module). */
+let jobNodesOf: (key: string) => string[] = () => [];
+export function setJobResolver(resolve: (key: string) => string[]) {
+	jobNodesOf = resolve;
+}
+
 /** One comma part of a selector, with its own `+`; `null` when it matches nothing. */
 function matchPart(part: string): Set<string> | null {
 	const up = part.startsWith('+');
 	const down = part.endsWith('+') && part.length > 1;
 	const body = part.replace(/^\+/, '').replace(/\+$/, '');
 	const [type, value] = body.includes(':') ? [body.slice(0, body.indexOf(':')), body.slice(body.indexOf(':') + 1)] : ['name', body];
+	const jobKeys = type === 'job' ? new Set(jobNodesOf(value)) : null;
 	const base = SNAPSHOT_NODES.filter((n) =>
+		jobKeys ? jobKeys.has(n.key) :
 		type === 'tag' ? n.tags.includes(value) : type === 'kind' ? selectorKind(n) === value : type === 'path' ? folderOf(n) === value || folderOf(n).startsWith(`${value}/`) : n.key === value
 	);
 	if (!base.length) return null;

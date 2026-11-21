@@ -55,7 +55,10 @@
 		warn: 'var(--sb-warning)',
 		run: 'var(--sb-running)',
 		src: 'var(--sb-text-faint)',
-		none: 'var(--sb-text-faint)'
+		none: 'var(--sb-text-faint)',
+		skip: 'var(--sb-skipped, var(--sb-text-faint))',
+		wait: 'var(--sb-text-faint)',
+		notrun: 'var(--sb-text-faint)'
 	};
 	const statusLabel: Record<string, string> = {
 		ok: 'Success',
@@ -63,7 +66,11 @@
 		warn: 'Warning',
 		run: 'Running',
 		src: 'Source',
-		none: 'Not built'
+		none: 'Not built',
+		// A run's own graph (CHI-1591 prototype): what happened to the node in that run.
+		skip: 'Skipped',
+		wait: 'Waiting',
+		notrun: 'Not run'
 	};
 	const staleLabel: Record<string, string> = { changed: 'changed', compiled: 'changed', upstream: 'upstream', behind: 'behind' };
 	const staleTitle: Record<string, string> = {

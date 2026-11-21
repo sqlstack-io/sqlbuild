@@ -10,26 +10,103 @@
 	import CostTab from './cost-tab.svelte';
 	import type { BottomTab } from './types';
 	import { bottomTabs, logEntries } from './utils';
+	import { tick } from 'svelte';
+	import { plural } from '$lib/format/plural';
+	import { skipCause } from './utils/proto';
 
 	let { view }: { view: RunDetailState } = $props();
 
-	const sel = $derived(new Set(view.selected));
+	// The log follows a summary figure or a node picked in the log, else the selection (until "Show all").
+	// Back to the page restores the log as it was (CHI-1591): these too, and where it was scrolled.
+	// svelte-ignore state_referenced_locally
+	const mem = view.memory;
+	let ignoreSelection = $state((mem.ignoreSelection as boolean) ?? false);
+	let lastSelection = (mem.lastSelection as string) ?? '';
+	$effect(() => {
+		const key = view.selected.join(',');
+		if (key !== lastSelection) {
+			lastSelection = key;
+			ignoreSelection = false;
+		}
+		Object.assign(mem, { ignoreSelection, lastSelection });
+	});
+	const filterKeys = $derived(view.focus ? view.focus.keys : ignoreSelection ? [] : view.selected);
+	const sel = $derived(new Set(filterKeys));
 	const filtering = $derived(sel.size > 0);
-	const entries = $derived(logEntries(view.eventsRes.data ?? [], view.outputRes.data ?? []));
+	// One line per node outcome, with its checks folded in (CHI-1591, change 3); `app.now` keeps a building node's line current.
+	const edges = $derived(view.detail?.edges ?? []);
+	const entries = $derived(logEntries(view.eventsRes.data ?? [], view.outputRes.data ?? [], { nodes: view.nodes, skipCause: (n) => skipCause(n, view.nodes, edges), now: app.now }));
 	const statements = $derived(filtering ? view.statements.filter((s) => sel.has(s.nodeKey)) : view.statements);
-	// Printed lines name no node, so a node filter keeps the lines that mention one of the selected nodes.
-	const shownEntries = $derived(filtering ? entries.filter((e) => (e.nodeKey ? sel.has(e.nodeKey) : view.selected.some((k) => e.text.includes(k)))) : entries);
+	// Printed lines carry their node when sqb printed them for one; others are kept when they mention it.
+	const shownEntries = $derived(filtering ? entries.filter((e) => (e.nodeKey ? sel.has(e.nodeKey) : filterKeys.some((k) => e.text.includes(k)))) : entries);
 	const grouped = $derived((view.detail?.children.length ?? 0) > 0);
 	// Kept here so the choice survives switching tabs, and the Log count matches the rows shown.
-	let printed = $state(false);
-	const logCount = $derived(shownEntries.filter((e) => printed || e.category !== 'output' || e.pinned).length);
+	// Events | Output (CHI-1591): the log opens on its events, one line per node; Output is what sqb printed.
+	let printed = $state((mem.printed as boolean) ?? false);
+	$effect(() => {
+		mem.printed = printed;
+	});
+	const logCount = $derived(shownEntries.filter((e) => (printed ? e.category === 'output' : e.category !== 'output')).length);
 
 	const TABS = $derived(bottomTabs(app.client, (c) => app.can(c), !!view.cost && view.cost.status !== 'none'));
 	$effect(() => {
 		if (TABS.length && !TABS.some((t) => t.value === view.tab)) view.tab = TABS[0].value;
 	});
-	const count = (t: BottomTab) => (t === 'statements' ? statements.length : t === 'cost' ? (view.cost?.resources.length ?? 0) : logCount);
-	const chipText = $derived(view.selected.length === 1 ? view.selected[0] : `${view.selected.length} nodes`);
+	const count = (t: BottomTab) => (t === 'statements' ? statements.length : t === 'cost' ? (view.cost?.resources.filter((r) => !filtering || sel.has(r.nodeKey)).length ?? 0) : logCount);
+	const chipText = $derived(view.focus ? view.focus.label : filterKeys.length === 1 ? filterKeys[0] : `${filterKeys.length} selected nodes`);
+	function showAll() {
+		if (view.focus) view.clearFocus();
+		else ignoreSelection = true;
+	}
+
+	// ---- the log follows new lines while it is at the bottom (CHI-1591, change 7) ----
+	let scroller = $state<HTMLDivElement>();
+	// A running run's log opens at its newest line; a finished run's at its first.
+	let atBottom = $state(untrackActive());
+	function untrackActive() {
+		return view.active;
+	}
+	let seen = $state(0);
+	const fresh = $derived(Math.max(0, logCount - seen));
+	// Where the log was scrolled, put back once its rows are in.
+	let restored = !('logScroll' in mem);
+	$effect(() => {
+		if (restored || !scroller || !logCount) return;
+		restored = true;
+		const top = mem.logScroll as number;
+		void tick().then(() => scroller && (scroller.scrollTop = top));
+	});
+	function onscroll() {
+		if (!scroller) return;
+		if (restored) mem.logScroll = scroller.scrollTop;
+		atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 24;
+		if (atBottom) seen = logCount;
+	}
+	async function toBottom() {
+		await tick();
+		if (!scroller) return;
+		scroller.scrollTop = scroller.scrollHeight;
+		atBottom = true;
+		seen = logCount;
+	}
+	// A new filter or the printed-output switch changes what is shown, not what is new.
+	let shownKey = '';
+	$effect(() => {
+		const key = `${filterKeys.join(',')}|${printed}`;
+		if (key === shownKey) return;
+		shownKey = key;
+		seen = untrackCount();
+	});
+	function untrackCount() {
+		return logCount;
+	}
+	$effect(() => {
+		void logCount;
+		if (view.tab !== 'log') return;
+		// Only a run still going adds lines; a finished run's log arrives in parts, which are not new.
+		if (!view.active) seen = logCount;
+		if (atBottom) void toBottom();
+	});
 </script>
 
 <div class="bar">
@@ -40,27 +117,52 @@
 	/>
 	{#if filtering}
 		<span class="chip" title={view.selected.join(', ')}>
-			Filtered: <b>{chipText}</b>
-			<Button variant="ghost" size="icon-xs" class="rounded-full" onclick={() => view.clearSelection()} aria-label="Clear the node filter"><XIcon /></Button>
+			Filtered to <b>{chipText}</b>
+			<Button variant="ghost" size="icon-xs" class="rounded-full" onclick={showAll} aria-label="Show all" title="Show the whole log"><XIcon /></Button>
 		</span>
 	{/if}
 </div>
 
-<PageBody padding="0">
+<div class="log-area">
+<PageBody padding="0" bind:scroller {onscroll}>
 	{#if view.tab === 'statements'}
-		<StatementsTab {statements} total={view.statements.length} {grouped} />
+		<StatementsTab {statements} total={view.statements.length} {grouped} focusId={view.statementFocus} />
 	{:else if view.tab === 'cost'}
 		{#if view.cost}
-			<CostTab cost={view.cost} filteredBy={view.selected} onnode={(key) => view.focusNode(key, 'cost')} />
+			<CostTab cost={view.cost} filteredBy={filterKeys} onnode={(key) => view.focusNode(key, 'cost')} />
 		{:else if view.costRes.error}
 			<p class="err">Couldn't load this run's cost: {view.costRes.error}</p>
 		{/if}
 	{:else}
-		<LogTab entries={shownEntries} {grouped} bind:printed runId={view.run?.id ?? ''} filteredBy={view.selected} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
+		<LogTab entries={shownEntries} {grouped} memory={mem} statements={view.statements} onquery={(id, key) => view.showStatement(id, key)} onframe={(key, line) => view.openCode(key, line)} memberOf={(id) => view.detail?.children.find((c) => c.id === id)?.jobKey ?? null} bind:printed runId={view.run?.id ?? ''} filteredBy={filterKeys} onnode={(key) => view.focusNode(key, 'log')} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
 	{/if}
 </PageBody>
+{#if view.tab === 'log' && !atBottom && fresh > 0}
+	<!-- raw-button: the jump to the newest lines, floating over the log -->
+	<button class="new-lines" onclick={toBottom} data-testid="new-lines">↓ {plural(fresh, 'new line')}</button>
+{/if}
+</div>
 
 <style>
+	.log-area {
+		position: relative;
+		display: flex;
+		min-height: 0;
+		flex: 1;
+		flex-direction: column;
+	}
+	.new-lines {
+		position: absolute;
+		right: 18px;
+		bottom: 12px;
+		padding: 4px 12px;
+		border-radius: 999px;
+		background: var(--primary);
+		box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+		color: var(--primary-foreground);
+		font-size: 12px;
+		font-weight: 500;
+	}
 	.err {
 		padding: 12px 16px;
 		color: var(--destructive);

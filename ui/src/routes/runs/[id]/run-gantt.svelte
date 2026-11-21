@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { plural } from '$lib/format/plural';
 	import MinusIcon from '@lucide/svelte/icons/minus';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -17,21 +16,33 @@
 		origin,
 		now,
 		selected = [],
+		excluded = [],
 		groups = [],
 		active = false,
-		onselect
+		skipText: causeOf = () => null,
+		tag = () => null,
+		onselect,
+		onopen
 	}: {
 		nodes: RunNode[];
 		/** Time zero of the axis (ms): the first node's start. */
 		origin: number;
 		now: number;
 		selected?: string[];
+		/** Nodes the selection leaves out (`--exclude`): struck through, faintly. */
+		excluded?: string[];
 		/** Child runs of a group, to section the rows. */
 		groups?: GanttGroup[];
 		/** The run is still going, so a node that hasn't started is waiting, not left out. */
 		active?: boolean;
-		/** `add` is true for Ctrl-, Cmd- or Shift-click. */
-		onselect: (nodeKey: string, add: boolean) => void;
+		/** A quiet tag after the name: a group run's member job. */
+		tag?: (n: RunNode) => string | null;
+		/** Why a node was skipped, on one line, chain included; null for the plain status. */
+		skipText?: (nodeKey: string) => string | null;
+		/** The tick box: adds the node to the selection, or takes it out. */
+		onselect: (nodeKey: string) => void;
+		/** A click on the row or its bar: selects the node and shows it in the drawer. */
+		onopen: (nodeKey: string) => void;
 	} = $props();
 
 	const startOf = (n: RunNode) => (n.startedAt ? (Date.parse(n.startedAt) - origin) / 1000 : null);
@@ -49,7 +60,7 @@
 	let gutterDragging = $state(false);
 	let scrolledX = $state(false);
 	const GUTTER_MIN = 140;
-	const GUTTER_MAX = 560;
+	const GUTTER_MAX = 720;
 
 	const trackBaseW = $derived(Math.max(120, viewportW - gutterW - 24));
 	const trackW = $derived(trackBaseW * zoom);
@@ -75,8 +86,10 @@
 		const ctx = document.createElement('canvas').getContext('2d');
 		if (!ctx) return 250;
 		ctx.font = '12px "IBM Plex Mono", ui-monospace, monospace';
-		const widest = Math.max(0, ...nodes.map((n) => ctx.measureText(nodeLabel(n.nodeKey)).width));
-		return Math.min(360, Math.max(GUTTER_MIN, Math.ceil(widest) + 60));
+		// A member tag adds about 7px a character (11px sans) and its gap.
+		const widest = Math.max(0, ...nodes.map((n) => ctx.measureText(nodeLabel(n.nodeKey)).width + (tag(n) ? tag(n)!.length * 6.2 + 12 : 0)));
+		// Names are never cut: the column fits the longest, up to the most it may take.
+		return Math.min(GUTTER_MAX, Math.max(GUTTER_MIN, Math.ceil(widest) + 84));
 	}
 
 	onMount(() => {
@@ -119,6 +132,8 @@
 	});
 
 	function skipText(n: RunNode): string {
+		const cause = causeOf(n.nodeKey);
+		if (cause) return cause;
 		if (n.status === 'skipped' && n.skippedBecauseOf) {
 			const across = n.skippedBecauseOf.runId !== n.runId;
 			return `skipped: ${n.skippedBecauseOf.nodeKey} failed${across ? ` in ${n.skippedBecauseOf.jobKey ?? n.skippedBecauseOf.runId}` : ''}`;
@@ -132,7 +147,6 @@
 
 <div class="gantt">
 <div class="gantt-head">
-	<span class="count">{plural(nodes.length, 'node')}</span>
 	<div class="zoom">
 		<Button variant="ghost" size="icon-sm" onclick={() => zoomBy(1 / 1.5)} disabled={zoom <= ZOOM_MIN} title="Zoom out" aria-label="Zoom out"><MinusIcon /></Button>
 		<input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step="0.1" bind:value={zoom} title="Zoom" />
@@ -192,8 +206,8 @@
 					{@const n = row.node}
 					{@const s = startOf(n)}
 					{@const e = endOf(n)}
-					<!-- raw-button: a row of the chart, clickable as a whole to select its node -->
-					<button class="row" class:sel={selected.includes(n.nodeKey)} onclick={(ev) => onselect(n.nodeKey, ev.metaKey || ev.ctrlKey || ev.shiftKey)}>
+					<!-- A row of the chart: a click opens its node's details; its tick box selects it. -->
+					<div class="row" class:sel={selected.includes(n.nodeKey)} role="button" tabindex="0" onclick={() => onopen(n.nodeKey)} onkeydown={(ev) => (ev.key === 'Enter' || ev.key === ' ') && onopen(n.nodeKey)} title="Select {n.nodeKey} and show its details">
 						<span
 							class="gutter cell"
 							class:shadow={scrolledX}
@@ -202,18 +216,30 @@
 							title={n.nodeKey}
 						>
 							{#if selected.includes(n.nodeKey)}<span class="sel-bar"></span>{/if}
-							{nodeLabel(n.nodeKey)}{#if n.critical}<em title="Marked critical: if it fails, the whole group stops">critical</em>{/if}
+							<input
+								type="checkbox"
+								class="sb-check tick"
+								checked={selected.includes(n.nodeKey)}
+								onclick={(ev) => {
+									ev.stopPropagation();
+									onselect(n.nodeKey);
+								}}
+								aria-label="Select {n.nodeKey}"
+								title="Add to the selection, or take it out"
+							/>
+							<a class="name" class:excluded={excluded.includes(n.nodeKey)} href={to(`/catalog/${n.nodeKey}`)} onclick={(ev) => ev.stopPropagation()} title="Open {n.nodeKey} in the Catalog">{nodeLabel(n.nodeKey)}</a>{#if tag(n)}<span class="mtag">{tag(n)}</span>{/if}{#if n.critical}<em title="Marked critical: if it fails, the whole group stops">critical</em>{/if}
 						</span>
 						<span class="track">
 							{#if s == null || e == null}
 								<span class="note">{skipText(n)}</span>
 							{:else}
 								<span class="bar" class:live={n.status === 'running'} style:--s={s} style:--e={e} style:background={nodeStatusTone[n.status]}></span>
-								{@const dur = `${formatSpan(e - s)}${n.status === 'running' ? ' so far' : ''}`}
+								<!-- A building node's live progress, on its bar (CHI-1591, change 4). -->
+								{@const dur = `${formatSpan(e - s)}${n.status === 'running' ? ` so far${n.rowsAffected != null ? ` · ${n.rowsAffected.toLocaleString('en-GB')} rows` : ''}` : ''}`}
 								<span class="dur" style:--s={s} style:--e={e} class:flip={durFlips(dur, s, e)}>{dur}</span>
 							{/if}
 						</span>
-					</button>
+					</div>
 				{/if}
 			{/each}
 		</div>
@@ -223,23 +249,26 @@
 
 <style>
 	.gantt {
+		position: relative;
 		display: flex;
 		min-height: 0;
 		flex: 1;
 		flex-direction: column;
 	}
+	/* The zoom sits on the axis row (CHI-1591), so the chart keeps the row a toolbar would take. */
 	.gantt-head {
+		position: absolute;
+		top: 0;
+		right: 12px;
+		z-index: 40;
 		display: flex;
-		justify-content: flex-end;
+		height: 28px;
 		align-items: center;
 		gap: 6px;
-		padding: 4px 14px;
-		border-bottom: 1px solid var(--border-subtle);
-	}
-	.count {
-		margin-right: 6px;
-		color: var(--sb-text-faint);
-		font-size: 11px;
+		padding-left: 8px;
+		background: var(--card);
+		transform-origin: right center;
+		scale: 0.86;
 	}
 	.zoom {
 		display: flex;
@@ -364,11 +393,14 @@
 		content-visibility: auto;
 		contain-intrinsic-size: auto 32px;
 		align-items: center;
-		border-bottom: 1px solid var(--border-subtle);
+		border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 45%, transparent);
 		text-align: left;
 	}
-	button.row:hover,
-	button.row:hover .gutter,
+	.row[role="button"] {
+		cursor: pointer;
+	}
+	.row[role="button"]:hover,
+	.row[role="button"]:hover .gutter,
 	.row.sel,
 	.row.sel .gutter {
 		background: var(--sb-hover);
@@ -379,7 +411,7 @@
 		align-items: center;
 		gap: 6px;
 		overflow: hidden;
-		padding: 0 12px 0 24px;
+		padding: 0 12px 0 10px;
 		color: var(--muted-foreground);
 		font-family: var(--font-mono);
 		font-size: 12px;
@@ -497,5 +529,22 @@
 	}
 	.note {
 		left: 8px;
+	}
+	.name.excluded {
+		opacity: 0.55;
+		text-decoration: line-through;
+	}
+	.name:hover {
+		color: var(--primary);
+		text-decoration: underline;
+	}
+	.mtag {
+		color: var(--sb-text-faint);
+		font-family: var(--font-sans);
+		font-size: 11px;
+	}
+	.tick {
+		flex: none;
+		margin: 0 2px 0 0;
 	}
 </style>

@@ -7,13 +7,18 @@
 	import { to } from '$lib/paths';
 	import DisclosureButton from '$lib/components/disclosure-button.svelte';
 	import DownloadIcon from '@lucide/svelte/icons/download';
-	import SearchIcon from '@lucide/svelte/icons/search';
-	import type { RunEventLevel } from '$lib/api';
+	import type { RunEventLevel, RunStatement } from '$lib/api';
+	import CheckList from './check-list.svelte';
+	import QueryPanel from './query-panel.svelte';
+	import TracebackPanel from './traceback-panel.svelte';
 	import { formatStamp } from '$lib/format/time';
-	import { clockTime, nodeLabel, shortRunId } from '$lib/operate/labels';
-	import type { EventCategory } from './types';
-	import { EVENT_CATEGORIES, type LogEntry } from './utils';
+	import { nodeLabel, shortRunId } from '$lib/operate/labels';
+	import type { LogEntry } from './utils';
+	import { fullStamp } from './utils/proto';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import LogFilter, { type FilterOption } from './log-filter.svelte';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 
 	let {
 		entries,
@@ -21,6 +26,12 @@
 		runId,
 		filteredBy,
 		printed = $bindable(false),
+		memberOf = () => null,
+		memory,
+		statements = [],
+		onquery,
+		onframe,
+		onnode,
 		onstatement
 	}: {
 		entries: LogEntry[];
@@ -29,6 +40,18 @@
 		filteredBy: string[];
 		/** Whether what the run printed is shown; a failing run's last printed block always is. */
 		printed?: boolean;
+		/** A node name clicked: the log shows only that node. */
+		onnode?: (nodeKey: string) => void;
+		/** The page's memory, so Back restores the log as it was. */
+		memory?: Record<string, unknown>;
+		/** A frame in a node's own code: show that line in the drawer. */
+		onframe?: (nodeKey: string, line: number) => void;
+		/** The run's statements, for a check's query ID and duration. */
+		statements?: readonly RunStatement[];
+		/** Shows a check's query in the Statements tab. */
+		onquery?: (statementId: string, nodeKey: string) => void;
+		/** A group run's member job, by member run, for the quiet tag beside a node. */
+		memberOf?: (runId: string) => string | null;
 		/** Opens a query's statement, with its SQL. */
 		onstatement?: (nodeKey: string) => void;
 	} = $props();
@@ -41,30 +64,90 @@
 		{ value: 'info', label: 'Info' },
 		{ value: 'debug', label: 'Debug' }
 	];
-	let level = $state<RunEventLevel | 'all'>('all');
-	let category = $state<EventCategory | 'all'>('all');
-	let query = $state('');
+	// One source of truth (CHI-1591): the filter text. The Levels and Kinds menus and the counts only write
+	// `level:` and `kind:` into it.
+	// Back to the page restores the log as it was: its filter, stream and open rows (CHI-1591).
+	const mem = <T>(key: string, fallback: T): T => (memory && key in memory ? (memory[key] as T) : fallback);
+	// svelte-ignore state_referenced_locally
+	let query = $state(mem('logQuery', ''));
 	// Long printed blocks fold to their first lines.
 	const FOLD = 4;
-	let open = $state<Set<string>>(new Set());
+	// svelte-ignore state_referenced_locally
+	let open = $state<Set<string>>(new Set(mem<string[]>('logFolded', [])));
 	// Nodes whose queries are listed under their outcome row.
-	let expanded = $state<Set<string>>(new Set());
+	// svelte-ignore state_referenced_locally
+	let expanded = $state<Set<string>>(new Set(mem<string[]>('logQueries', [])));
 
-	// Printed output has its own switch; a kind chip shows only when the log has that kind.
-	const present = $derived(EVENT_CATEGORIES.filter((c) => c.value !== 'output' && entries.some((e) => e.category === c.value)));
+	// Events | Output: the run's events, or what sqb and the nodes printed (`printed`).
 	const hasOutput = $derived(entries.some((e) => e.category === 'output'));
-	const hidden = $derived(entries.filter((e) => e.category === 'output' && !e.pinned).length);
-	const kindShown = (e: LogEntry) => (e.category === 'output' ? printed || e.pinned : category === 'all' || e.category === category);
-	const levelShown = (e: LogEntry) => level === 'all' || e.level === level;
-	const q = $derived(query.trim().toLowerCase());
-	const matches = (e: LogEntry) => !q || [e.nodeKey ?? '', e.text, e.title, ...e.queries.map((x) => x.text)].join(' ').toLowerCase().includes(q);
-	const byCategory = $derived(entries.filter(kindShown));
-	const byLevel = $derived(entries.filter((e) => levelShown(e) && e.category !== 'output'));
-	const shown = $derived(entries.filter((e) => levelShown(e) && kindShown(e) && matches(e)));
-	const levelCounts = $derived(countBy(byCategory, (e) => e.level));
-	const categoryCounts = $derived(countBy(byLevel, (e) => e.category));
-	const levelOptions = $derived(LEVELS.map((l) => ({ ...l, count: l.value === 'all' ? byCategory.length : (levelCounts.get(l.value) ?? 0) })));
-	const kindOptions = $derived([{ value: 'all' as const, label: 'All kinds', count: byLevel.length }, ...present.map((c) => ({ value: c.value, label: c.label, count: categoryCounts.get(c.value) ?? 0 }))]);
+	const inMode = (e: LogEntry) => (printed ? e.category === 'output' : e.category !== 'output');
+	const modeEntries = $derived(entries.filter(inMode));
+	// svelte-ignore state_referenced_locally
+	let stream = $state<'all' | 'stdout' | 'stderr'>(mem('logStream', 'all'));
+	const kindOf = (e: LogEntry) => e.tag?.text.replace(/ /g, '-') ?? null;
+	type Term = { key: string; value: string };
+	const terms = $derived(
+		query
+			.trim()
+			.split(/\s+/)
+			.filter(Boolean)
+			.map((t): Term => {
+				const m = t.match(/^(node|kind|level|job|stream):(.*)$/i);
+				return m ? { key: m[1].toLowerCase(), value: m[2].toLowerCase() } : { key: 'text', value: t.toLowerCase() };
+			})
+	);
+	const holds = (e: LogEntry, t: Term) => {
+		if (!t.value) return true;
+		if (t.key === 'node') return !!e.nodeKey && nodeLabel(e.nodeKey).toLowerCase() === t.value;
+		if (t.key === 'kind') return kindOf(e) === t.value;
+		if (t.key === 'level') return e.level === (t.value === 'warning' ? 'warn' : t.value);
+		if (t.key === 'job') return memberOf(e.runId)?.toLowerCase() === t.value;
+		if (t.key === 'stream') return e.stream === t.value;
+		return [e.nodeKey ?? '', e.text, e.title, ...e.queries.map((x) => x.text)].join(' ').toLowerCase().includes(t.value);
+	};
+	const matchesExcept = (e: LogEntry, skip: string | null) => terms.every((t) => t.key === skip || holds(e, t)) && (!printed || stream === 'all' || e.stream === stream);
+	const shown = $derived(modeEntries.filter((e) => matchesExcept(e, null)));
+	const termValue = (key: string) => terms.find((t) => t.key === key && t.value)?.value ?? null;
+	const level = $derived((termValue('level') === 'warning' ? 'warn' : termValue('level')) ?? 'all');
+	const kind = $derived(termValue('kind') ?? 'all');
+	/** Writes `key:value` into the filter text, in place of any earlier one; null takes it out. */
+	function setTerm(key: string, value: string | null) {
+		const kept = query.split(/\s+/).filter((t) => t && !t.toLowerCase().startsWith(`${key}:`));
+		query = [...kept, ...(value ? [`${key}:${value}`] : [])].join(' ') + (kept.length || value ? ' ' : '');
+	}
+	const uniq = (xs: (string | null | undefined)[]) => [...new Set(xs.filter((x): x is string => !!x))].sort();
+	const kindValues = $derived(printed ? [] : uniq(modeEntries.map(kindOf)));
+	const filterOptions = $derived<FilterOption[]>([
+		{ prefix: 'node', hint: 'a node', values: uniq(entries.map((e) => (e.nodeKey ? nodeLabel(e.nodeKey) : null))) },
+		{ prefix: 'kind', hint: 'built, merged, failed, check, log…', values: kindValues },
+		{ prefix: 'level', hint: 'error, warn, info', values: uniq(modeEntries.map((e) => e.level)) },
+		{ prefix: 'job', hint: 'a member job', values: grouped ? uniq(entries.map((e) => memberOf(e.runId))) : [] },
+		{ prefix: 'stream', hint: 'stdout or stderr', values: printed ? uniq(entries.map((e) => e.stream)) : [] }
+	]);
+	// Counts for each menu choice: what the rest of the filter leaves, by level or by kind.
+	const levelCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'level')), (e) => e.level));
+	const kindCounts = $derived(countBy(modeEntries.filter((e) => matchesExcept(e, 'kind')), (e) => kindOf(e) ?? ''));
+	// A count shows only when it matters: errors and warnings in what the switch shows, none when zero.
+	const errors = $derived(levelCounts.get('error') ?? 0);
+	const warnings = $derived(levelCounts.get('warn') ?? 0);
+	const levelText = $derived(LEVELS.find((l) => l.value === level)?.label ?? 'Levels');
+	const levelOptions = $derived(LEVELS.map((l) => ({ ...l, count: l.value === 'all' ? [...levelCounts.values()].reduce((a, b) => a + b, 0) : (levelCounts.get(l.value) ?? 0) })));
+	const kindOptions = $derived([{ value: 'all', label: 'All kinds', count: [...kindCounts.values()].reduce((a, b) => a + b, 0) }, ...kindValues.map((k) => ({ value: k, label: k, count: kindCounts.get(k) ?? 0 }))]);
+	// Rows whose structured details are open in place; long text stays folded until "show more".
+	// svelte-ignore state_referenced_locally
+	let detailOpen = $state<Set<string>>(new Set(mem<string[]>('logDetails', [])));
+	// svelte-ignore state_referenced_locally
+	let longOpen = $state<Set<string>>(new Set(mem<string[]>('logLong', [])));
+	$effect(() => {
+		if (memory) Object.assign(memory, { logQuery: query, logStream: stream, logFolded: [...open], logQueries: [...expanded], logDetails: [...detailOpen], logLong: [...longOpen] });
+	});
+
+	/** A node line's queries (its build statements, not its checks'), or a query row's own statement. */
+	function queriesOf(e: LogEntry): RunStatement[] {
+		if (e.statementId && e.category === 'queries') return statements.filter((q) => q.id === e.statementId);
+		if (!e.node) return [];
+		return statements.filter((q) => q.nodeKey === e.node!.nodeKey && q.runId === e.runId && q.kind !== 'audit');
+	}
 
 	function toggle<T>(set: Set<T>, value: T): Set<T> {
 		const next = new Set(set);
@@ -84,152 +167,337 @@
 		URL.revokeObjectURL(url);
 	}
 	const logColumns = $derived<TableColumn[]>([
-		{ id: 'time', label: 'Time', width: '110px' },
-		...(grouped ? [{ id: 'run', label: 'Job run', width: '100px' }] : []),
-		{ id: 'node', label: 'Node', width: '220px' },
+		// Full timestamps, never cropped (CHI-1591, change 6).
+		{ id: 'time', label: 'Time', width: '206px' },
+		// A group run's member job is a quiet tag beside the node, not a column of its own.
+		{ id: 'node', label: 'Node', width: grouped ? '320px' : '230px' },
+		...(printed ? [] : [{ id: 'tag', label: '', width: '78px' }]),
 		{ id: 'what', label: 'What happened', minWidth: 300, truncate: false }
 	]);
 </script>
 
+<!-- Controls right after what they act on, from the left: what to show, then narrow it (CHI-1591). -->
 <div class="filters">
-	<SegmentedFilter bind:value={level} options={levelOptions} />
-	{#if present.length > 1}<SegmentedFilter bind:value={category} options={kindOptions} />{/if}
 	{#if hasOutput}
-		<label class="switch" title="What sqb printed while the run worked. A failing run's last block, with its failures, is always shown.">
-			<input type="checkbox" class="sb-check" bind:checked={printed} /> Show printed output <span>{hidden}</span>
-		</label>
+		<SegmentedFilter
+			label="Show"
+			value={printed ? 'output' : 'events'}
+			onselect={(v: string) => (printed = v === 'output')}
+			options={[
+				{ value: 'events', label: 'Events' },
+				{ value: 'output', label: 'Output' }
+			]}
+		/>
 	{/if}
-	<label class="search">
-		<SearchIcon size={13} />
-		<input bind:value={query} placeholder="Search the log" aria-label="Search the log" />
-	</label>
-	<Button size="sm" onclick={download} disabled={!shown.length} title="Download the rows shown as a text file"><DownloadIcon />Download</Button>
+	{#if printed}
+		<SegmentedFilter
+			label="Stream"
+			bind:value={stream}
+			options={[
+				{ value: 'all', label: 'All' },
+				{ value: 'stdout', label: 'stdout' },
+				{ value: 'stderr', label: 'stderr' }
+			]}
+		/>
+	{/if}
+	<LogFilter bind:value={query} options={filterOptions} />
+	<DropdownMenu.Root>
+		<DropdownMenu.Trigger class="menu-trigger" aria-label="Levels">{level === 'all' ? 'Levels' : levelText} <ChevronDownIcon size={13} /></DropdownMenu.Trigger>
+		<DropdownMenu.Content class="w-44">
+			<DropdownMenu.RadioGroup value={level} onValueChange={(v) => setTerm('level', v === 'all' ? null : v)}>
+				{#each levelOptions as l (l.value)}<DropdownMenu.RadioItem value={l.value}>{l.label}<span class="menu-count">{l.count}</span></DropdownMenu.RadioItem>{/each}
+			</DropdownMenu.RadioGroup>
+		</DropdownMenu.Content>
+	</DropdownMenu.Root>
+	{#if !printed && kindValues.length > 1}
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger class="menu-trigger" aria-label="Kinds">{kind === 'all' ? 'Kinds' : kind} <ChevronDownIcon size={13} /></DropdownMenu.Trigger>
+			<DropdownMenu.Content class="w-44">
+				<DropdownMenu.RadioGroup value={kind} onValueChange={(v) => setTerm('kind', v === 'all' ? null : v)}>
+					{#each kindOptions as k (k.value)}<DropdownMenu.RadioItem value={k.value}>{k.label}<span class="menu-count">{k.count}</span></DropdownMenu.RadioItem>{/each}
+				</DropdownMenu.RadioGroup>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
+	{/if}
+	{#if errors}<Button variant="link" size="inline" class="count err" onclick={() => setTerm('level', level === 'error' ? null : 'error')} title="Show only errors">Errors {errors}</Button>{/if}
+	{#if warnings}<Button variant="link" size="inline" class="count warn" onclick={() => setTerm('level', level === 'warn' ? null : 'warn')} title="Show only warnings">Warnings {warnings}</Button>{/if}
+	<span class="grow"></span>
+	<Button variant="ghost" size="sm" onclick={download} disabled={!shown.length} title="Download the rows shown as a text file"><DownloadIcon />Download</Button>
 </div>
 
 <DataTable class="static compact log" embedded columns={logColumns} rows={shown} key={(e) => e.id} empty={entries.length ? 'Nothing in the log matches these filters.' : 'Nothing logged yet.'}>
 	{#snippet row(e)}
-			<tr class:error={e.level === 'error'} class:warn={e.level === 'warn'}>
-				<td class="faint nowrap" title={formatStamp(e.at)}>{clockTime(e.at)}</td>
-				{#if grouped}<td class="mono faint"><a href={to(`/runs/${e.runId}`)}>{shortRunId(e.runId)}</a></td>{/if}
-				<td class="mono" class:faint={!e.nodeKey} title={e.nodeKey ?? undefined}>{e.nodeKey ? nodeLabel(e.nodeKey) : (e.stream ?? 'run')}</td>
-				<td class:out={e.stream}>
-					{#if e.stream}
+			<tr class:error={e.level === 'error'} class:warn={e.level === 'warn'} class:stderr={e.stream === 'stderr'}>
+				<td class="faint nowrap mono stamp" title={formatStamp(e.at)}>{fullStamp(e.at)}</td>
+				<td class="mono" class:faint={!e.nodeKey} title={e.nodeKey ? `Show only ${e.nodeKey} in the log` : undefined}>
+					<!-- A real link (CHI-1591): it filters the log to the node, and reads as the node's name anywhere. -->
+					{#if e.nodeKey && onnode}<a
+							class="node-link"
+							href="?node={encodeURIComponent(e.nodeKey)}"
+							onclick={(ev) => {
+								ev.preventDefault();
+								onnode(e.nodeKey!);
+							}}>{nodeLabel(e.nodeKey)}</a
+						>{:else}{e.nodeKey ? nodeLabel(e.nodeKey) : 'run'}{/if}
+					{#if grouped && memberOf(e.runId)}<a class="member" href={to(`/runs/${e.runId}`)} title="In member job run {shortRunId(e.runId)}">{memberOf(e.runId)}</a>{/if}
+				</td>
+				{#if !printed}<td class="tagcell">{#if e.tag}<span class="tag" style:--tone={e.tag.tone}>{e.tag.text}</span>{/if}</td>{/if}
+				<td class:out={e.stream} class:opens={!!e.details?.length} onclick={() => e.details?.length && (detailOpen = toggle(detailOpen, e.id))}>
+					{#if e.omitted && e.nodeKey}
+						<!-- The live view is capped (CHI-1597): earlier lines are in the paged viewer, not here. -->
+						<a class="omitted" href={to(`/runs/${e.runId}/output/${e.nodeKey}`)}>+{e.omitted.toLocaleString('en-GB')} lines · open in viewer →</a>
+					{:else if e.stream}
 						{@const lines = e.text.split('\n')}
 						<span title={e.title}>{open.has(e.id) || lines.length <= FOLD ? e.text : lines.slice(0, FOLD).join('\n')}</span>
 						{#if lines.length > FOLD}<Button variant="link" size="inline" class="mt-0.5 flex font-sans text-[11.5px]" onclick={() => (open = toggle(open, e.id))}>{open.has(e.id) ? 'Show less' : `Show all ${lines.length} lines`}</Button>{/if}
 					{:else}
-						<span class="dot" style:background={e.tone}></span><span title={e.title}>{e.text}</span>
-						{#if e.queries.length}
-							<DisclosureButton open={expanded.has(e.id)} onclick={() => (expanded = toggle(expanded, e.id))} class="ml-2 gap-0.5 text-[11.5px]">{plural(e.queries.length, 'query', 'queries')}</DisclosureButton>
+						{#if e.category === 'nodes' && e.id.startsWith('node-')}
+							<!-- A node's outcome line: its glyph in its colour, then what it did. -->
+							<span><b class="glyph" style:color={e.tone}>{e.text.slice(0, 1)}</b>{e.text.slice(1)}</span>
+						{:else}
+							<span>{e.text}</span>
+						{/if}
+						{#if e.details?.length}<span class="caret" class:open={detailOpen.has(e.id)} aria-hidden="true">▸</span>{/if}
+						{#if queriesOf(e).length}
+							<!-- The node's queries open in place, under its line; only "In Statements" changes tab. -->
+							<DisclosureButton
+								open={expanded.has(e.id)}
+								onclick={(ev: MouseEvent) => {
+									ev.stopPropagation();
+									expanded = toggle(expanded, e.id);
+								}}
+								class="ml-2 gap-0.5 text-[11.5px]">{plural(queriesOf(e).length, 'query', 'queries')}</DisclosureButton
+							>
 						{/if}
 					{/if}
-					{#if e.statementId && e.nodeKey && onstatement && e.category === 'queries'}
-						<Button variant="link" size="inline" class="ml-2 font-mono text-[11px]" onclick={() => onstatement(e.nodeKey!)} title="Show this node's queries and their SQL">SQL</Button>
+					{#if e.statementId && e.category === 'queries' && queriesOf(e).length}
+						<Button
+							variant="link"
+							size="inline"
+							class="ml-2 font-mono text-[11px]"
+							onclick={(ev: MouseEvent) => {
+								ev.stopPropagation();
+								expanded = toggle(expanded, e.id);
+							}}
+							title="Show this query here">SQL {expanded.has(e.id) ? '▾' : '▸'}</Button
+						>
 					{/if}
 				</td>
 			</tr>
-			{#if expanded.has(e.id)}
-				{#each e.queries as x (x.id)}
-					<tr class="query" class:error={x.level === 'error'}>
-						<td class="faint nowrap" title={formatStamp(x.at)}>{clockTime(x.at)}</td>
-						{#if grouped}<td></td>{/if}
-						<td></td>
-						<td>
-							<span class="dot" style:background={x.tone}></span><span title={x.title}>{x.text}</span>
-							{#if x.statementId && x.nodeKey && onstatement}
-								<Button variant="link" size="inline" class="ml-2 font-mono text-[11px]" onclick={() => onstatement(x.nodeKey!)} title="Show this node's queries and their SQL">SQL</Button>
-							{/if}
-						</td>
-					</tr>
-				{/each}
+			{#if detailOpen.has(e.id) && e.details?.length}
+				<!-- The row's details, in place: a small key/value table, long text behind "show more". -->
+				<tr class="detail">
+					<td></td>
+					<td colspan={printed ? 2 : 3}>
+						<dl>
+							{#each e.details as [k, v], i (i)}<dt>{k}</dt><dd>{v}</dd>{/each}
+						</dl>
+						{#if e.checks?.length}
+							<div class="checks-wrap"><CheckList checks={e.checks} runId={e.runId} {statements} onstatement={onquery && e.nodeKey ? (id) => onquery(id, e.nodeKey!) : undefined} /></div>
+						{/if}
+						{#if e.node?.errorCode === 'python_exception' && e.long}
+							<!-- A Python failure in place: the exception and the last of its traceback; the output viewer for the rest. -->
+							<div class="inline-wrap"><TracebackPanel detail={e.long} file={e.node.errorLocation?.file ?? null} runId={e.runId} nodeKey={e.node.nodeKey} onframe={onframe ? (line) => onframe(e.node!.nodeKey, line) : undefined} /></div>
+						{:else if e.node?.status === 'failed' && queriesOf(e).some((q) => q.status === 'failed')}
+							<!-- A SQL failure in place: the statement as it ran and its error. -->
+							{#each queriesOf(e).filter((q) => q.status === 'failed') as q (q.id)}
+								<div class="inline-wrap"><QueryPanel statement={q} onstatements={onquery ? () => onquery(q.id, q.nodeKey) : undefined} /></div>
+							{/each}
+						{:else if e.long && e.node?.errorCode !== 'check_failed'}
+							{@const lines = e.long.split('\n')}
+							<pre>{longOpen.has(e.id) ? e.long : lines.slice(0, 3).join('\n')}</pre>
+							{#if lines.length > 3}<Button variant="link" size="inline" class="text-[12px]" onclick={() => (longOpen = toggle(longOpen, e.id))}>{longOpen.has(e.id) ? 'Show less' : `Show more (${lines.length} lines)`}</Button>{/if}
+						{/if}
+					</td>
+				</tr>
+			{/if}
+			{#if expanded.has(e.id) && queriesOf(e).length}
+				<tr class="detail">
+					<td></td>
+					<td colspan={printed ? 2 : 3}>
+						{#each queriesOf(e) as q (q.id)}
+							<div class="inline-wrap"><QueryPanel statement={q} onstatements={onquery ? () => onquery(q.id, q.nodeKey) : undefined} /></div>
+						{/each}
+					</td>
+				</tr>
 			{/if}
 	{/snippet}
 </DataTable>
 
 <style>
+	/* Calmer (CHI-1591): no rules between rows, one text size, muted secondary text, room around the toolbar. */
 	.filters {
 		position: sticky;
 		top: 0;
-		z-index: 2;
+		z-index: 6;
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 6px 8px;
-		padding: 6px 16px;
-		border-bottom: 1px solid var(--border);
+		gap: 8px 12px;
+		padding: 10px 24px;
 		background: var(--background);
 	}
-	.switch {
+	.filters :global(.menu-trigger) {
 		display: inline-flex;
 		align-items: center;
-		gap: 5px;
+		gap: 4px;
+		padding: 3px 4px;
 		color: var(--muted-foreground);
-		font-size: 11.5px;
-		white-space: nowrap;
-	}
-	.switch span {
-		color: var(--sb-text-faint);
-	}
-	tr.query td {
-		padding-top: 3px;
-		padding-bottom: 3px;
-		border-bottom: 0;
-		color: var(--muted-foreground);
-		font-size: 11.5px;
-	}
-	.search {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		margin-left: auto;
-		padding: 3px 8px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		color: var(--sb-text-faint);
-	}
-	.search input {
-		width: 200px;
-		border: 0;
-		outline: 0;
-		background: transparent;
-		color: var(--foreground);
 		font-size: 12px;
+	}
+	.filters :global(.menu-trigger:hover) {
+		color: var(--foreground);
+	}
+	:global(.menu-count) {
+		margin-left: auto;
+		color: var(--sb-text-faint);
+		font-size: 11.5px;
+	}
+	.filters :global(.count) {
+		font-size: 12px;
+		font-weight: 500;
+	}
+	.filters :global(.count.err) {
+		color: var(--sb-error);
+	}
+	.filters :global(.count.warn) {
+		color: var(--sb-warning);
+	}
+	.grow {
+		flex: 1;
+	}
+	:global(.sb-table.log) td {
+		border-bottom-color: transparent;
 	}
 	td {
 		padding: 5px 16px;
-		border-bottom: 1px solid var(--border-subtle);
+		border-bottom: 0;
+		font-size: 12px;
 		vertical-align: top;
 	}
 	tr:hover td {
 		background: var(--sb-hover);
 	}
 	tr.error td {
-		background: color-mix(in srgb, var(--sb-error) 9%, transparent);
-		color: var(--sb-error);
+		background: color-mix(in srgb, var(--sb-error) 6%, transparent);
 	}
 	tr.warn td {
-		background: color-mix(in srgb, var(--sb-warning) 6%, transparent);
-	}
-	td.out {
-		font-family: var(--font-mono);
-		font-size: 11.5px;
-		white-space: pre-wrap;
-		word-break: break-word;
+		background: color-mix(in srgb, var(--sb-warning) 4%, transparent);
 	}
 	td.out {
 		color: var(--muted-foreground);
+		font-family: var(--font-mono);
+		white-space: pre-wrap;
+		word-break: break-word;
 	}
-	.dot {
+	/* What a node or sqb wrote to stderr: tinted, so warnings and tracebacks stand out from stdout. */
+	tr.stderr td.out {
+		background: color-mix(in srgb, var(--sb-warning) 5%, transparent);
+		color: color-mix(in srgb, var(--sb-warning) 70%, var(--foreground));
+	}
+	td.opens {
+		cursor: pointer;
+	}
+	.tagcell {
+		padding-right: 0;
+		padding-left: 0;
+	}
+	.tag {
 		display: inline-block;
-		width: 6px;
-		height: 6px;
-		margin-right: 8px;
-		border-radius: 50%;
-		vertical-align: middle;
+		min-width: 52px;
+		padding: 0 6px;
+		border-radius: 2px;
+		background: color-mix(in srgb, var(--tone) 12%, transparent);
+		color: var(--tone);
+		font-size: 11px;
+		line-height: 17px;
+		text-align: center;
+	}
+	.caret {
+		display: inline-block;
+		margin-left: 8px;
+		color: var(--sb-text-faint);
+		transition: transform 0.12s;
+	}
+	.caret.open {
+		transform: rotate(90deg);
+	}
+	tr.detail td {
+		padding-top: 0;
+		padding-bottom: 10px;
+		background: transparent;
+	}
+	tr.detail:hover td {
+		background: transparent;
+	}
+	dl {
+		display: grid;
+		grid-template-columns: max-content 1fr;
+		gap: 2px 16px;
+		margin: 2px 0 0;
+		padding: 8px 12px;
+		border-left: 2px solid var(--border-subtle);
+		color: var(--muted-foreground);
+	}
+	dt {
+		color: var(--sb-text-faint);
+	}
+	dd {
+		margin: 0;
+		font-family: var(--font-mono);
+		overflow-wrap: anywhere;
+	}
+	pre {
+		margin: 6px 0 2px 14px;
+		color: var(--muted-foreground);
+		font-family: var(--font-mono);
+		font-size: 12px;
+		white-space: pre-wrap;
+	}
+	.node-link {
+		color: var(--primary);
+		font-family: var(--font-mono);
+		font-size: 12px;
+	}
+	.node-link:hover {
+		text-decoration: underline;
+	}
+	.inline-wrap {
+		margin: 8px 0 2px;
+		max-width: 980px;
+	}
+	.checks-wrap {
+		margin: 8px 0 0;
+		padding: 8px 12px;
+		border-left: 2px solid var(--border-subtle);
+	}
+	.omitted {
+		color: var(--primary);
+		font-family: var(--font-sans);
+	}
+	.omitted:hover {
+		text-decoration: underline;
+	}
+	.member {
+		margin-left: 8px;
+		color: var(--sb-text-faint);
+		font-family: var(--font-sans);
+		font-size: 11px;
+	}
+	.member:hover {
+		color: var(--primary);
+	}
+	.glyph {
+		display: inline-block;
+		width: 1.1em;
+		font-weight: 600;
 	}
 	.mono {
 		font-family: var(--font-mono);
-		font-size: 11.5px;
+		font-size: 12px;
+	}
+	.stamp {
+		color: var(--sb-text-faint);
 	}
 	.faint {
 		color: var(--muted-foreground);
