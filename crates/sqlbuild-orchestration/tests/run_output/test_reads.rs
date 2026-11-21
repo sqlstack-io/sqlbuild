@@ -15,6 +15,7 @@ use crate::run_output::models::{
 };
 use crate::run_output::tests::helpers::{
     batch, claimed_run, line, line_row, output_store, page_query, reader, segment, similar_row,
+    timeless,
 };
 use crate::run_output::tests::test_types::{
     OutputFoldTestCase, OutputReadTestCase, OutputSearchTestCase, PageRead, PageStart, SearchRead,
@@ -264,8 +265,8 @@ fn given_worker_batches_when_a_person_reads_a_node_or_the_run_then_pages_streams
                 .expect("page")
                 .expect("run");
                 assert_eq!(
-                    (&page.rows, (page.next, page.previous)),
-                    (&read.expected_rows, read.expected_links),
+                    (timeless(&page.rows), (page.next, page.previous)),
+                    (timeless(&read.expected_rows), read.expected_links),
                     "{}: {:?} {:?} from {:?}",
                     test_case.description,
                     read.node,
@@ -415,8 +416,8 @@ fn given_runs_of_similar_lines_when_a_folding_page_is_read_then_four_or_more_fol
             .expect("page")
             .expect("run");
             assert_eq!(
-                (&page.rows, (page.from, page.to)),
-                (&test_case.expected_rows, test_case.expected_span),
+                (timeless(&page.rows), (page.from, page.to)),
+                (timeless(&test_case.expected_rows), test_case.expected_span),
                 "{}",
                 test_case.description
             );

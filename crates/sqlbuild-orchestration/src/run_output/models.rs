@@ -215,6 +215,8 @@ pub struct OutputLine {
     pub node_key: String,
     pub stream: OutputStream,
     pub text: String,
+    /// When the server received the batch holding the line, within a few seconds of its printing.
+    pub at: chrono::DateTime<chrono::Utc>,
     pub level: Option<OutputLevel>,
     #[serde(
         default,
@@ -307,6 +309,7 @@ pub(crate) struct StoredSegment {
     pub(crate) text_bytes: i64,
     pub(crate) object_key: String,
     pub(crate) chunk_text_bytes: i64,
+    pub(crate) received_at: chrono::DateTime<chrono::Utc>,
 }
 
 /// A node's line count and its marks so far in one stream, before a segment adds to them.

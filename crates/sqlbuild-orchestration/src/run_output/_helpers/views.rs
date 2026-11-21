@@ -29,28 +29,28 @@ pub(crate) async fn view_segments(
     let sql: &str = match (view.node.is_some(), direction) {
         (true, SearchDirection::Forward) => {
             "SELECT s.node_line AS first_line, s.line_count, s.node_key, s.stream, s.text_offset, s.text_bytes, \
-             c.object_key, c.text_bytes AS chunk_text_bytes FROM sqb_run_output_segments s \
+             c.object_key, c.text_bytes AS chunk_text_bytes, c.received_at FROM sqb_run_output_segments s \
              JOIN sqb_run_output_chunks c ON c.run_id=s.run_id AND c.chunk=s.chunk \
              WHERE s.run_id=$1 AND s.node_key=$2 AND ($3 IS NULL OR s.stream=$3) AND s.node_line+s.line_count>$4 \
              ORDER BY s.node_line ASC LIMIT $5"
         }
         (true, SearchDirection::Backward) => {
             "SELECT s.node_line AS first_line, s.line_count, s.node_key, s.stream, s.text_offset, s.text_bytes, \
-             c.object_key, c.text_bytes AS chunk_text_bytes FROM sqb_run_output_segments s \
+             c.object_key, c.text_bytes AS chunk_text_bytes, c.received_at FROM sqb_run_output_segments s \
              JOIN sqb_run_output_chunks c ON c.run_id=s.run_id AND c.chunk=s.chunk \
              WHERE s.run_id=$1 AND s.node_key=$2 AND ($3 IS NULL OR s.stream=$3) AND s.node_line<$4 \
              ORDER BY s.node_line DESC LIMIT $5"
         }
         (false, SearchDirection::Forward) => {
             "SELECT s.run_line AS first_line, s.line_count, s.node_key, s.stream, s.text_offset, s.text_bytes, \
-             c.object_key, c.text_bytes AS chunk_text_bytes FROM sqb_run_output_segments s \
+             c.object_key, c.text_bytes AS chunk_text_bytes, c.received_at FROM sqb_run_output_segments s \
              JOIN sqb_run_output_chunks c ON c.run_id=s.run_id AND c.chunk=s.chunk \
              WHERE s.run_id=$1 AND $2 IS NULL AND ($3 IS NULL OR s.stream=$3) AND s.run_line+s.line_count>$4 \
              ORDER BY s.run_line ASC LIMIT $5"
         }
         (false, SearchDirection::Backward) => {
             "SELECT s.run_line AS first_line, s.line_count, s.node_key, s.stream, s.text_offset, s.text_bytes, \
-             c.object_key, c.text_bytes AS chunk_text_bytes FROM sqb_run_output_segments s \
+             c.object_key, c.text_bytes AS chunk_text_bytes, c.received_at FROM sqb_run_output_segments s \
              JOIN sqb_run_output_chunks c ON c.run_id=s.run_id AND c.chunk=s.chunk \
              WHERE s.run_id=$1 AND $2 IS NULL AND ($3 IS NULL OR s.stream=$3) AND s.run_line<$4 \
              ORDER BY s.run_line DESC LIMIT $5"
