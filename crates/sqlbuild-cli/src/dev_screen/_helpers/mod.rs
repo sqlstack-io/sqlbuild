@@ -6,4 +6,5 @@ pub(crate) mod labels;
 pub(crate) mod lines;
 pub(crate) mod new_dev_screen;
 pub(crate) mod rows;
+pub(crate) mod secrets;
 pub(crate) mod transitions;

@@ -27,6 +27,13 @@ pub struct SourcePosition {
     pub column: u32,
 }
 
+/// A provider whose unset secrets stop the runs that use it: the variables it reads, never their values.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnsetProviderSecrets {
+    pub provider: String,
+    pub variables: Vec<String>,
+}
+
 /// What happened in the location child.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
@@ -61,6 +68,10 @@ pub enum DevEvent {
     },
     /// Something the location could not do, such as a warehouse sync that stopped; it keeps serving.
     Warning { title: String, detail: String },
+    /// The providers the latest provider-secrets health shows missing secrets the target doesn't allow to miss; empty once none is.
+    MissingSecrets {
+        providers: Vec<UnsetProviderSecrets>,
+    },
 }
 
 /// What `sqb dev` asks its location child to do, one JSON line each on the child's stdin.

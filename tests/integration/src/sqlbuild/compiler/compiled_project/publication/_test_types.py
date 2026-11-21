@@ -407,6 +407,15 @@ class DevelopmentEnvFileTestCase:
 
 
 @dataclass(frozen=True)
+class DevelopmentMissingSecretsTestCase:
+    description: str
+    first_env_file: str
+    second_env_file: str
+    # What the warning row shows while the secrets are missing.
+    expected_warning: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ComposeDeploymentTestCase:
     description: str
     expected_warehouse_rows: list[list[int]]

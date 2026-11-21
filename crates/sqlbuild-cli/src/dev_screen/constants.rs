@@ -44,3 +44,10 @@ pub(crate) const SUSPEND_BYTE: u8 = 0x1a;
 /// What the log says when Ctrl+Z is pressed.
 pub(crate) const SUSPEND_UNSUPPORTED: &str =
     "Ctrl+Z does not suspend sqb dev; press q to stop it, or Ctrl+C";
+
+/// The warning row's label while providers miss secrets.
+pub(crate) const SECRETS_MISSING: &str = "Secrets missing";
+/// What the warning row says to do about the missing secrets.
+pub(crate) const SECRETS_FIX: &str = "set them in .env or the environment; press r to reload";
+/// The plain line once no provider misses a secret.
+pub(crate) const SECRETS_SET: &str = "Secrets set";

@@ -98,7 +98,7 @@ use sqlbuild_orchestration::dev_events::main::dev_events_enabled::dev_events_ena
 use sqlbuild_orchestration::dev_events::main::emit_dev_event::emit_dev_event;
 use sqlbuild_orchestration::dev_events::main::parse_dev_control::parse_dev_control;
 use sqlbuild_orchestration::dev_events::main::parse_dev_event::parse_dev_event;
-use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
+use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent, UnsetProviderSecrets};
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::health::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::health::unallowed_secret_count::unallowed_secret_count;
@@ -834,7 +834,7 @@ pub(crate) fn location_warning(title: &str, detail: String) {
     }));
 }
 
-/// Report the providers a publication shows missing secrets; under `sqb dev`, also warn about them.
+/// Report the providers a publication shows missing secrets; under `sqb dev`, also tell the screen, which warns until a report shows none.
 pub(crate) async fn report_provider_secrets(
     options: &LocationServe,
     (bearer, session_id): (&str, Uuid),
@@ -855,11 +855,21 @@ pub(crate) async fn report_provider_secrets(
                 variables.join(", ")
             ),
         )]));
-        location_warning(
-            "provider secrets unset",
-            format!("{missing} unset; runs that use them fail; sqb debug lists them"),
-        );
     }
+    let mut unset: Vec<UnsetProviderSecrets> = Vec::new();
+    for provider in providers.iter().filter(|provider| !provider.allowed) {
+        let mut variables: Vec<String> = Vec::new();
+        for setting in &provider.settings {
+            variables.push(setting.variable.clone());
+        }
+        unset.push(UnsetProviderSecrets {
+            provider: provider.provider.clone(),
+            variables,
+        });
+    }
+    drop(emit_dev_event(&DevEvent::MissingSecrets {
+        providers: unset,
+    }));
     report_location_health(
         options,
         bearer,

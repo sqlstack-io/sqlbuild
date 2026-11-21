@@ -16,6 +16,7 @@ use sqlbuild_orchestration::dev_events::models::{
 use crate::dev_screen::_helpers::labels::elapsed_since;
 use crate::dev_screen::_helpers::lines::lasting_step;
 use crate::dev_screen::_helpers::rows::step_line;
+use crate::dev_screen::_helpers::secrets::secrets_reported;
 use crate::dev_screen::constants::{LOG_RING_LINES, SIGN_IN_DETAIL, SNAPSHOT_ID_CHARS};
 use crate::dev_screen::models::{DevScreen, DevStep, Prompt, ScreenAction, StepRow};
 
@@ -210,6 +211,7 @@ pub(crate) fn child_event(
             );
             failed(screen, problem, now, clock)
         }
+        DevEvent::MissingSecrets { providers } => secrets_reported(screen, providers),
         DevEvent::Warning { title, detail } => {
             let lines: Vec<String> = render_problem(
                 &Problem {

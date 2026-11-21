@@ -59,6 +59,18 @@ it set. After editing the file, press `r`: the location reads it again and resta
 interpreter when a value changed, so the next compile and run use the new values. Variables set
 in the shell that started `sqb dev` still win.
 
+While a provider is missing secrets that the target doesn't
+[allow to be missing](/docs/concepts/project-configuration#allowed-missing-secrets), a **Secrets missing** warning above the
+keys names the provider and the variables it reads, never their values:
+
+```text
+⚠ Secrets missing                region WORKER_TOKEN, REGION_CODE; set them in .env or
+                                 the environment; press r to reload
+```
+
+Runs that use the provider stop before they reach the warehouse. The warning clears once the next
+publication finds every secret set; with `--plain`, a `Secrets set` line says so.
+
 ## Sign in to the warehouse
 
 Once the first version is published, `sqb dev` connects to the target's warehouse in the

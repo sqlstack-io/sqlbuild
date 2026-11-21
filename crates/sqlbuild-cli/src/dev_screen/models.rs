@@ -13,7 +13,7 @@ use tokio::task::JoinHandle;
 use sqlbuild_core::screen_text::models::{
     DevHeader, PhaseState, Problem, ResultLine, ScreenFacts, WarehouseState,
 };
-use sqlbuild_orchestration::dev_events::models::DevEvent;
+use sqlbuild_orchestration::dev_events::models::{DevEvent, UnsetProviderSecrets};
 
 /// One start-up step, in the order pending steps are listed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -139,6 +139,8 @@ pub(crate) struct DevScreen {
     pub(crate) location: String,
     /// The env file row of the ready box.
     pub(crate) env_file: Option<String>,
+    /// Providers the latest health read shows missing secrets; drawn as a warning row until a read shows none.
+    pub(crate) missing_secrets: Vec<UnsetProviderSecrets>,
     pub(crate) triggers: String,
     pub(crate) steps: Vec<StepRow>,
     pub(crate) ready: bool,

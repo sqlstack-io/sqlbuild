@@ -8,7 +8,7 @@ use sqlbuild_core::screen_text::models::{
 };
 use sqlbuild_core::text::main::cell_len::cell_len;
 use sqlbuild_orchestration::dev_events::models::{
-    DevEvent, DevPhase, DevStepState, SourcePosition,
+    DevEvent, DevPhase, DevStepState, SourcePosition, UnsetProviderSecrets,
 };
 
 use crate::dev_screen::_helpers::apply_screen_message::apply_screen_message;
@@ -140,6 +140,23 @@ pub(super) fn ready() -> Vec<ScreenMessage> {
             .to_vec(),
         },
     });
+    messages
+}
+
+/// Start-up through the ready box, then one health read per report of the providers missing secrets.
+pub(super) fn secrets_reported(reports: Vec<Vec<(&str, Vec<&str>)>>) -> Vec<ScreenMessage> {
+    let mut messages: Vec<ScreenMessage> = ready();
+    for report in reports {
+        messages.push(ScreenMessage::Child(DevEvent::MissingSecrets {
+            providers: report
+                .into_iter()
+                .map(|(provider, variables)| UnsetProviderSecrets {
+                    provider: provider.to_owned(),
+                    variables: variables.into_iter().map(str::to_owned).collect(),
+                })
+                .collect(),
+        }));
+    }
     messages
 }
 

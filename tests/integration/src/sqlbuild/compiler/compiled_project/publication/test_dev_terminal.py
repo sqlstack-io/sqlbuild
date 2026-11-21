@@ -20,12 +20,14 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     DevelopmentEnvFileTestCase,
     DevelopmentHangUpTestCase,
     DevelopmentKeyStopTestCase,
+    DevelopmentMissingSecretsTestCase,
     DevelopmentSignalStopTestCase,
     DevelopmentStartFailureTestCase,
     DevelopmentStartupStopTestCase,
     DevelopmentTerminalTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    REGION_PROVIDER_FILES,
     development_environment,
     development_run_state,
     drain_terminal,
@@ -548,3 +550,80 @@ def test_given_an_env_file_when_developing_then_start_up_names_it_and_r_reloads_
     assert probes.read_text().split()[0] == "first", probes.read_text()
     assert exit_code == 128 + signal.SIGTERM, shown
     assert left == [], shown
+
+
+def _latest_redraw(shown: str) -> str:
+    """The rows the live screen drew last, uncoloured: everything after its last clear."""
+    return re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", shown.rsplit("\x1b[J", 1)[-1])
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX pseudo-terminal contract")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DevelopmentMissingSecretsTestCase(
+            "a provider missing secrets is warned about until .env sets them and r reloads it",
+            "UNRELATED_SETTING=1\n",
+            "WORKER_ENV_REGION_CODE=42\nWORKER_ENV_TOKEN=worker-token\n",
+            (
+                "Secrets missing",
+                "region WORKER_ENV_TOKEN, WORKER_ENV_REGION_CODE",
+                "set them in .env or the environment; press r to reload",
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_provider_missing_secrets_when_developing_then_a_warning_names_them_until_reloaded(
+    test_case: DevelopmentMissingSecretsTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "duckdb"\ndefault_target = "development"\n'
+                '[connections.local]\ndatabase = "warehouse.duckdb"\n'
+                '[targets.development]\nschema = "main"\n'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Orders.', materialized table);\n"
+                'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")\n'
+            ),
+        }
+        | REGION_PROVIDER_FILES,
+    )
+    env_file: Path = project / ".env"
+    _ = env_file.write_text(test_case.first_env_file)
+    env_file.chmod(0o600)
+    terminal, process = start_development_on_terminal(
+        project, ["--no-scheduler"], development_environment({}, NO_PLAIN)
+    )
+    try:
+        warned: str = read_terminal_until(
+            terminal,
+            process,
+            lambda shown: "\u2500 ready " in shown and "press r to reload" in _latest_redraw(shown),
+        )
+        _ = env_file.write_text(test_case.second_env_file)
+        _ = os.write(terminal, b"r")
+        reloaded: str = read_terminal_until(
+            terminal,
+            process,
+            lambda shown: (
+                "env file changed" in shown
+                and "keys " in _latest_redraw(shown)
+                and "Secrets missing" not in _latest_redraw(shown)
+            ),
+        )
+        process.send_signal(signal.SIGTERM)
+        exit_code: int = process.wait(timeout=15)
+    finally:
+        left: list[str] = reap_development(process, project)
+        os.close(terminal)
+
+    warning: str = " ".join(_latest_redraw(warned).split())
+    assert all(" ".join(part.split()) in warning for part in test_case.expected_warning), warning
+    assert "worker-token" not in warned + reloaded
+    assert exit_code == 128 + signal.SIGTERM, reloaded
+    assert left == [], reloaded

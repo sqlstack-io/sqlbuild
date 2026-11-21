@@ -8,6 +8,7 @@ use sqlbuild_core::screen_text::main::render_step_line::render_step_line;
 use sqlbuild_core::screen_text::models::{Hotkey, PhaseState, PromptBlock, StepLine};
 
 use crate::dev_screen::_helpers::labels::{elapsed_since, step_label};
+use crate::dev_screen::_helpers::secrets::secrets_rows;
 use crate::dev_screen::constants::{READY_KEYS, STARTING_KEYS};
 use crate::dev_screen::models::{DevScreen, StepRow};
 
@@ -55,20 +56,23 @@ pub(crate) fn live_rows(screen: &DevScreen, now: Instant) -> Vec<String> {
             rows(|state| state == PhaseState::Pending),
         )
     };
+    let secrets: Vec<String> = secrets_rows(screen);
     let key: String = render_key_line(&hotkeys(screen), facts);
     let budget: usize = facts.rows.saturating_sub(1).max(1);
-    let room: usize = budget.saturating_sub(prompt.len() + running.len() + 1);
+    let fixed: usize = secrets.len() + 1;
+    let room: usize = budget.saturating_sub(prompt.len() + running.len() + fixed);
     let waiting: Vec<String> = fit_waiting(waiting, room, facts);
-    let over: usize = (prompt.len() + running.len() + waiting.len() + 1).saturating_sub(budget);
+    let over: usize = (prompt.len() + running.len() + waiting.len() + fixed).saturating_sub(budget);
     if over > 0 {
-        let keep: usize = budget.saturating_sub(prompt.len() + 1).max(1);
+        let keep: usize = budget.saturating_sub(prompt.len() + fixed).max(1);
         running.truncate(keep);
-        let over: usize = (prompt.len() + running.len() + 1).saturating_sub(budget);
+        let over: usize = (prompt.len() + running.len() + fixed).saturating_sub(budget);
         prompt.drain(..over.min(prompt.len()));
     }
     let mut rows: Vec<String> = prompt;
     rows.extend(running);
     rows.extend(waiting);
+    rows.extend(secrets);
     rows.push(key);
     let extra: usize = rows.len().saturating_sub(budget);
     rows.drain(..extra);

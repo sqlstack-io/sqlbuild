@@ -19,6 +19,16 @@ pub(super) struct ScreenTestCase {
     pub(super) expected_viewport: Vec<&'static str>,
 }
 
+/// Providers missing secrets reported after the ready screen, then the next reports: the rows a session ends on.
+pub(super) struct MissingSecretsTestCase {
+    pub(super) description: &'static str,
+    pub(super) size: Option<(usize, usize)>,
+    /// Each health read's providers and the variables they miss, in order.
+    pub(super) reports: Vec<Vec<(&'static str, Vec<&'static str>)>>,
+    /// The last rows the terminal shows.
+    pub(super) expected_tail: Vec<&'static str>,
+}
+
 /// Every session's layout at one terminal size, and what is wrong with it.
 pub(super) struct LayoutTestCase {
     pub(super) description: &'static str,
