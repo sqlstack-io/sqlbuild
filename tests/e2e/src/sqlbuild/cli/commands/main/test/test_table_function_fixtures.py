@@ -49,6 +49,16 @@ _CALL: str = (
             expected_exit_code=0,
             expected_stdout_fragment="PASS=1",
         ),
+        PartitionedCallFixtureE2ETestCase(
+            description="a join before the call keeps reading its partition column as an input",
+            query=(
+                f'SELECT p.customer_id, s.amount_smoothed FROM {_INPUT} JOIN __ref("payments") '
+                f"AS c ON c.customer_id = p.customer_id, {_CALL} AS s WHERE p.customer_id = 1"
+            ),
+            expected_rows="SELECT 1 AS customer_id, 20.0::DOUBLE AS amount_smoothed",
+            expected_exit_code=0,
+            expected_stdout_fragment="PASS=1",
+        ),
     ],
     ids=lambda case: case.description,
 )

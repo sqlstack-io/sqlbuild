@@ -117,6 +117,7 @@ pub(crate) fn collapse_partition_inputs(
             let scope = select_scope(sql, (scan.from, relation.1), &mut protected);
             let read = PartitionRead {
                 relation,
+                inputs_from: scan.from,
                 references: &references,
                 scope,
                 ordinal: collapsed,
@@ -163,6 +164,8 @@ struct Inputs {
 struct PartitionRead<'a> {
     /// The call as a relation, `TABLE( )` included.
     relation: (usize, usize),
+    /// Where the call's FROM clause starts; the inputs before the call, read as NULL, keep their columns.
+    inputs_from: usize,
     /// Each `qualifier.column` partition reference whose column the fixture has.
     references: &'a [(String, String)],
     /// The SELECT the call stands in.
@@ -253,8 +256,8 @@ fn read_partition_columns(
                 .next_back()
                 .is_some_and(|byte| is_word_byte(byte) || byte == b'.')
                 && !sql.as_bytes().get(end).copied().is_some_and(is_word_byte);
-            let outside_call = start < read.relation.0 || start >= read.relation.1;
-            if standalone && outside_call && !protected.contains(start) {
+            let outside_inputs = start < read.inputs_from || start >= read.relation.1;
+            if standalone && outside_inputs && !protected.contains(start) {
                 let _ = edits
                     .entry(start)
                     .or_insert((end, format!("{alias}.{}", &sql[end - column.len()..end])));

@@ -104,6 +104,16 @@ fn given_a_mocked_partitioned_call_when_collapsing_then_its_inputs_read_as_one_n
             ),
         },
         PartitionInputsTestCase {
+            description: "a join before the call keeps its partition columns, which it reads as inputs",
+            sql: "SELECT p.k FROM p JOIN c ON c.id = p.k, __table_fn(\"f\")(p.x) OVER (PARTITION BY p.k) s \
+                  JOIN d ON d.id = p.k WHERE p.k = 1",
+            expected_outcome: Ok(
+                "SELECT s.k FROM p JOIN c ON c.id = p.k RIGHT JOIN (SELECT 1 AS \
+                 __sqb_partition_inputs) AS __sqb_partition_inputs_0 ON FALSE CROSS JOIN \
+                 __table_fn(\"f\")(p.x) OVER (PARTITION BY p.k) s JOIN d ON d.id = s.k WHERE s.k = 1",
+            ),
+        },
+        PartitionInputsTestCase {
             description: "partition columns read the fixture only in the call's own SELECT",
             sql: "SELECT p.k FROM p UNION ALL SELECT p.k FROM p, __table_fn(\"f\")(p.x) OVER \
                   (PARTITION BY p.k) s",

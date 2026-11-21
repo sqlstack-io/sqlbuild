@@ -395,8 +395,9 @@ How often the fixture's rows appear depends on the call:
   fixture's column with the same name, for a partition column written as `p.customer_id` and a
   fixture that names its columns. Otherwise it is NULL too.
 
-  Conditions in `WHERE` or `ON` on the relations before the call therefore remove the fixture rows,
-  unless they test only `PARTITION BY` columns the fixture supplies. With several partitioned calls
+  Conditions in `WHERE`, or in an `ON` after the call, on the relations before the call therefore
+  remove the fixture rows, unless they test only `PARTITION BY` columns the fixture supplies. Joins
+  before the call only combine its inputs, so they read the inputs' own columns. With several partitioned calls
   in one `FROM` clause, a later call's inputs include the earlier calls' rows, so their columns
   read as NULL in the later call's rows.
 
