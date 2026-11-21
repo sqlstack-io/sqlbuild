@@ -10,7 +10,7 @@ use crate::sql_tree::_helpers::node_facts::{named, node_literal, node_name, tabl
 use crate::sql_tree::_helpers::source_map::SourceMap;
 use crate::sql_tree::constants::OPAQUE_KINDS;
 use crate::sql_tree::errors::SqlTreeError;
-use crate::sql_tree::models::SqlTreeNode;
+use crate::sql_tree::models::{NodeExtent, SqlTreeNode};
 
 /// Child expressions mapped to the index of the clause node that owns them.
 type Owners = HashMap<*const Expression, usize>;
@@ -26,12 +26,16 @@ pub(crate) fn walk(
         .rev()
         .map(|statement| (statement, None))
         .collect();
+    let mut covering: Vec<usize> = Vec::new();
     while let Some((expression, parent)) = stack.pop() {
         let index: usize = nodes.len();
         let node: SqlTreeNode = expression_node(&nodes, expression, parent, map)?;
         let (clause_nodes, owners) = clause_nodes(expression, &node, index, map);
         nodes.push(node);
-        nodes.extend(clause_nodes);
+        for clause in clause_nodes {
+            covering.extend(clause.1.then_some(nodes.len()));
+            nodes.push(clause.0);
+        }
         for child in expression.children().into_iter().rev() {
             let owner: usize = owners
                 .get(&std::ptr::from_ref(child))
@@ -40,7 +44,34 @@ pub(crate) fn walk(
             stack.push((child, Some(owner)));
         }
     }
+    cover_children(&mut nodes, &covering);
     Ok(nodes)
+}
+
+/// Give each of `covering`, a clause without its own span, the extent from its first child's start to its last child's end, among children with spans.
+fn cover_children(nodes: &mut [SqlTreeNode], covering: &[usize]) {
+    let mut extents: HashMap<usize, (usize, usize, NodeExtent)> = HashMap::new();
+    for child in nodes.iter() {
+        let (Some(parent), Some(extent)) = (child.parent, child.extent.as_ref()) else {
+            continue;
+        };
+        let covered = extents
+            .entry(parent)
+            .or_insert_with(|| (child.line, child.column, extent.clone()));
+        if extent.span.0 < covered.2.span.0 {
+            (covered.0, covered.1, covered.2.span.0) = (child.line, child.column, extent.span.0);
+        }
+        if extent.span.1 > covered.2.span.1 {
+            covered.2.span.1 = extent.span.1;
+            (covered.2.end_line, covered.2.end_column) = (extent.end_line, extent.end_column);
+        }
+    }
+    for index in covering {
+        if let Some((line, column, extent)) = extents.remove(index) {
+            let clause: &mut SqlTreeNode = &mut nodes[*index];
+            (clause.line, clause.column, clause.extent) = (line, column, Some(extent));
+        }
+    }
 }
 
 /// `expression`'s node, at its own start or else at its parent's, with its end only where the parser recorded one.
@@ -72,33 +103,30 @@ fn expression_node(
     })
 }
 
-/// The clause nodes `expression` holds, numbered after `index`, and the children each one owns.
+/// The clause nodes `expression` holds, numbered after `index`, each with whether it covers its children, and the children each one owns.
 fn clause_nodes(
     expression: &Expression,
     node: &SqlTreeNode,
     index: usize,
     map: &SourceMap<'_>,
-) -> (Vec<SqlTreeNode>, Owners) {
-    let mut built: Vec<SqlTreeNode> = Vec::new();
+) -> (Vec<(SqlTreeNode, bool)>, Owners) {
+    let mut built: Vec<(SqlTreeNode, bool)> = Vec::new();
     let mut owners: Owners = HashMap::new();
     for clause in clauses(expression) {
         let clause_index: usize = index + 1 + built.len();
         let (line, column) = clause
             .span
             .map_or((node.line, node.column), |span| map.start(span.start));
-        built.push(SqlTreeNode {
+        let node = SqlTreeNode {
             kind: clause.kind,
             line,
             column,
             parent: Some(index),
-            extent: match clause.span {
-                Some(span) => Some(map.extent(span)),
-                None if clause.spans_statement => node.extent.clone(),
-                None => None,
-            },
+            extent: clause.span.map(|span| map.extent(span)),
             name: clause.name.map(|name| named(name, &[], map)),
             literal: None,
-        });
+        };
+        built.push((node, clause.span.is_none() && clause.spans_children));
         for child in clause.children {
             let _ = owners.insert(std::ptr::from_ref(child), clause_index);
         }

@@ -216,7 +216,7 @@ impl SqlDocument {
         tree_node(py, tree, tree.nodes.len())
     }
 
-    /// Every node of `kind`, compared without case, as a stable source location.
+    /// Every node of exactly `kind`, a snake_case syntax tree kind, as a stable source location.
     #[pyo3(signature = (*, kind))]
     fn nodes<'py>(&self, py: Python<'py>, kind: &str) -> PyResult<Bound<'py, PyTuple>> {
         self.source_nodes(py, kind, |_, _| true)
@@ -272,19 +272,18 @@ impl SqlDocument {
 }
 
 impl SqlDocument {
-    /// The nodes of `kind`, compared without case, that `keep` accepts, as `SqlNode` locations labelled with the tree's kind.
+    /// The nodes of exactly `kind` that `keep` accepts, as `SqlNode` locations.
     fn source_nodes<'py>(
         &self,
         py: Python<'py>,
         kind: &str,
         keep: impl Fn(&[TreeNode], &TreeNode) -> bool,
     ) -> PyResult<Bound<'py, PyTuple>> {
-        let wanted: String = kind.to_lowercase();
         let nodes: &[TreeNode] = &self.parsed(py)?.nodes;
         let mut found: Vec<Bound<'py, PyAny>> = Vec::new();
         for node in nodes
             .iter()
-            .filter(|node| node.kind == wanted && keep(nodes, node))
+            .filter(|node| node.kind == kind && keep(nodes, node))
         {
             found.push(new_record_with(
                 py,

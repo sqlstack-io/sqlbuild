@@ -99,7 +99,7 @@ def test_given_wide_model_query_when_placing_every_column_then_time_stays_linear
 
     started: float = time.perf_counter()
     positions: list[tuple[int, int] | None] = [
-        document.file_position(node=node) for node in document.nodes(kind="Column")
+        document.file_position(node=node) for node in document.nodes(kind="column")
     ]
 
     assert time.perf_counter() - started < test_case.expected_max_seconds
@@ -174,7 +174,7 @@ def test_given_a_query_when_walking_its_tree_then_each_clause_holds_its_expressi
     "test_case",
     [
         CommonStructureKindTestCase(
-            description=f"{dialect}: common structures carry the tree's snake_case kinds",
+            description=f"{dialect}: common structures carry the tree's kinds, matched exactly",
             dialect=dialect,
             sql=(
                 "WITH x AS (SELECT 1 AS id)\n"
@@ -198,6 +198,7 @@ def test_given_common_structures_when_reading_them_then_each_has_the_tree_s_kind
             *document.joins(),
             *document.subqueries(),
             *document.star_projections(),
+            *document.nodes(kind="cte"),
             *document.nodes(kind="CTE"),
         )
     )

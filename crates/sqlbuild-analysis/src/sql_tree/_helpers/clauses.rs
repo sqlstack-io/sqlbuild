@@ -18,19 +18,28 @@ pub(crate) struct Clause<'ast> {
     pub(crate) span: Option<Span>,
     pub(crate) name: Option<&'ast Identifier>,
     pub(crate) children: Vec<&'ast Expression>,
-    /// Whether a clause without its own span takes its statement's, as the clauses the parser records no span for do.
-    pub(crate) spans_statement: bool,
+    /// Whether a clause without its own span covers its children's, as the clauses the parser records no span for do.
+    pub(crate) spans_children: bool,
 }
 
-/// The clauses `expression` holds directly: CTEs, then joins, then the rest in the order they are written.
+/// The clauses `expression` holds directly, as written: CTEs, the select list, `FROM`, its joins, then the rest.
 pub(crate) fn clauses(expression: &Expression) -> Vec<Clause<'_>> {
-    let mut found: Vec<Clause<'_>> = ctes_and_joins(expression);
-    found.extend(written_clauses(expression));
-    found
+    let (ctes, joins) = ctes_and_joins(expression);
+    let mut written: Vec<Clause<'_>> = written_clauses(expression);
+    let after_sources: usize = written
+        .iter()
+        .rposition(|clause| [PROJECTION_KIND, FROM_KIND].contains(&clause.kind))
+        .map_or(0, |index| index + 1);
+    let rest: Vec<Clause<'_>> = written.split_off(after_sources);
+    ctes.into_iter()
+        .chain(written)
+        .chain(joins)
+        .chain(rest)
+        .collect()
 }
 
-/// The CTEs and explicit joins `expression` holds directly, CTEs first.
-fn ctes_and_joins(expression: &Expression) -> Vec<Clause<'_>> {
+/// The CTEs and the explicit joins `expression` holds directly.
+fn ctes_and_joins(expression: &Expression) -> (Vec<Clause<'_>>, Vec<Clause<'_>>) {
     let (with, joins): (Option<&With>, Vec<&[Join]>) = match expression {
         Expression::Select(select) => (select.with.as_ref(), vec![select.joins.as_slice()]),
         Expression::Union(union) => (union.with.as_ref(), Vec::new()),
@@ -54,7 +63,7 @@ fn ctes_and_joins(expression: &Expression) -> Vec<Clause<'_>> {
         .flatten()
         .filter(|join| !is_comma_item(join))
         .map(join_clause);
-    ctes.chain(joins).collect()
+    (ctes.collect(), joins.collect())
 }
 
 fn cte_clause(cte: &Cte) -> Clause<'_> {
@@ -63,7 +72,7 @@ fn cte_clause(cte: &Cte) -> Clause<'_> {
         span: cte.span.0,
         name: Some(&cte.alias),
         children: vec![&cte.this],
-        spans_statement: false,
+        spans_children: false,
     }
 }
 
@@ -77,7 +86,7 @@ fn join_clause(join: &Join) -> Clause<'_> {
         span: join.span.0,
         name: None,
         children,
-        spans_statement: false,
+        spans_children: false,
     }
 }
 
@@ -205,6 +214,6 @@ fn owning<'ast>(kind: &'static str, children: Vec<&'ast Expression>) -> Clause<'
         span: None,
         name: None,
         children,
-        spans_statement: true,
+        spans_children: true,
     }
 }

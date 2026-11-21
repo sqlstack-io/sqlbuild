@@ -47,7 +47,7 @@ for star in sql.expanded.star_projections():
 | `joins()` | Each explicit join clause, at its join keyword, not a comma-separated `FROM` item |
 | `subqueries()` | Each parenthesized subquery, at its opening parenthesis |
 | `star_projections()` | Each `*` and `table.*` that expands columns, including a function argument such as `OBJECT_CONSTRUCT(*)`, but not an aggregate's `*`, as in `COUNT(*)` |
-| `nodes(kind=...)` | Each syntax tree node of that kind, compared without case |
+| `nodes(kind=...)` | Each syntax tree node of exactly that kind, such as `column` |
 
 `line` and `column` count within the document's `source`. For expanded SQL that is the query
 text, not the model file. Authored SQL is the whole model file, including its `MODEL` header, so it
@@ -113,8 +113,17 @@ for clause in sql.ast().walk():
 
 A clause appears only where the SQL writes it, except `projection`, which every `select` has. An
 explicit join is a `join` node beside `from`. The `ORDER BY` and `LIMIT` after a `UNION`,
-`INTERSECT` or `EXCEPT` belong to the set operation, not to its last `select`. `cte` and `join`
-nodes have their own spans; the other clause nodes report their statement's start, end and span.
+`INTERSECT` or `EXCEPT` belong to the set operation, not to its last `select`.
+
+A statement's clause nodes come first among its children, in the order they are written: its
+`cte` nodes, `projection`, `from`, each `join`, then `where`, `group_by`, `having`, `qualify`,
+`order_by` and `limit`. Children outside any clause follow them, such as a set operation's queries,
+which therefore come after its `order_by` and `limit`.
+
+`cte` and `join` nodes have their own spans. The other clause nodes run from the start of their
+first child to the end of their last, among children with spans, so a `where` node covers the
+predicate. A clause none of whose children has a span has none either, and reports its
+statement's start.
 
 Nodes also have these attributes, which are `None` on nodes they don't apply to:
 

@@ -103,3 +103,12 @@ pub(crate) fn clauses(nodes: &[SqlTreeNode]) -> Vec<(&'static str, Vec<String>)>
         })
         .collect()
 }
+
+/// The kinds of the first statement's direct children, in tree order.
+pub(crate) fn statement_children(nodes: &[SqlTreeNode]) -> Vec<&'static str> {
+    nodes
+        .iter()
+        .filter(|node| node.parent == Some(0))
+        .map(|node| node.kind)
+        .collect()
+}

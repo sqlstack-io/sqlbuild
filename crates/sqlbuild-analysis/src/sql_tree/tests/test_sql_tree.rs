@@ -1,8 +1,11 @@
 use crate::sql_tree::errors::SqlTreeError;
 use crate::sql_tree::main::sql_tree_nodes::sql_tree_nodes;
-use crate::sql_tree::tests::helpers::{clauses, expression_facts, facts, shape};
+use crate::sql_tree::tests::helpers::{
+    clauses, expression_facts, facts, shape, statement_children,
+};
 use crate::sql_tree::tests::test_types::{
-    TreeClausesTestCase, TreeFactsTestCase, TreeFailureTestCase, TreeShapeTestCase,
+    TreeChildrenTestCase, TreeClausesTestCase, TreeFactsTestCase, TreeFailureTestCase,
+    TreeShapeTestCase,
 };
 
 const CTE_AND_JOIN_SQL: &str =
@@ -347,6 +350,28 @@ fn given_a_query_when_building_a_rule_tree_then_each_clause_owns_its_expressions
             ],
         },
         TreeClausesTestCase {
+            description: "SQLite: an UPDATE's WHERE, ORDER BY and LIMIT own their expressions",
+            dialect: "sqlite",
+            sql: "UPDATE t SET a = 1\nWHERE b = 2\nORDER BY c\nLIMIT 3",
+            expected_clauses: vec![
+                ("where", vec!["eq 2:7"]),
+                ("order_by", vec!["column 3:10"]),
+                ("limit", vec!["literal 1:1"]),
+            ],
+        },
+        TreeClausesTestCase {
+            description: "Snowflake: an UPDATE's WHERE owns its predicate",
+            dialect: "snowflake",
+            sql: "UPDATE t SET a = 1\nFROM u\nWHERE t.b = u.b",
+            expected_clauses: vec![("where", vec!["eq 3:7"])],
+        },
+        TreeClausesTestCase {
+            description: "DuckDB: an UPDATE's WHERE owns its predicate",
+            dialect: "duckdb",
+            sql: "UPDATE t SET a = 1\nWHERE b = 2",
+            expected_clauses: vec![("where", vec!["eq 2:7"])],
+        },
+        TreeClausesTestCase {
             description: "a DELETE's WHERE owns its predicate",
             dialect: "snowflake",
             sql: "DELETE FROM t\nWHERE t.a = 1",
@@ -371,23 +396,40 @@ fn given_a_query_when_building_a_rule_tree_then_each_clause_owns_its_expressions
 }
 
 #[test]
-fn given_a_clause_without_its_own_span_when_building_a_rule_tree_then_it_takes_its_statement_s() {
-    let test_cases = [TreeFactsTestCase {
-        description: "Snowflake: each clause reports the statement's start, end and text",
-        dialect: "snowflake",
-        sql: "SELECT a\nFROM t\nWHERE a > 1",
-        expected_facts: &[
-            "select 1:1 to 3:12 \"SELECT a\\nFROM t\\nWHERE a > 1\"",
-            "projection 1:1 to 3:12 \"SELECT a\\nFROM t\\nWHERE a > 1\"",
-            "from 1:1 to 3:12 \"SELECT a\\nFROM t\\nWHERE a > 1\"",
-            "where 1:1 to 3:12 \"SELECT a\\nFROM t\\nWHERE a > 1\"",
-            "column 1:8 name=a to 1:9 \"a\"",
-            "table 2:6 name=t to 2:7 \"t\"",
-            "gt 3:7 to 3:12 \"a > 1\"",
-            "column 3:7 name=a to 3:8 \"a\"",
-            "literal 3:7 number=1",
-        ],
-    }];
+fn given_a_clause_without_its_own_span_when_building_a_rule_tree_then_it_covers_its_children() {
+    let test_cases = [
+        TreeFactsTestCase {
+            description: "Snowflake: each clause runs from its first child's start to its last child's end",
+            dialect: "snowflake",
+            sql: "SELECT a, b\nFROM t\nWHERE a > 1",
+            expected_facts: &[
+                "select 1:1 to 3:12 \"SELECT a, b\\nFROM t\\nWHERE a > 1\"",
+                "projection 1:8 to 1:12 \"a, b\"",
+                "from 2:6 to 2:7 \"t\"",
+                "where 3:7 to 3:12 \"a > 1\"",
+                "column 1:8 name=a to 1:9 \"a\"",
+                "column 1:11 name=b to 1:12 \"b\"",
+                "table 2:6 name=t to 2:7 \"t\"",
+                "gt 3:7 to 3:12 \"a > 1\"",
+                "column 3:7 name=a to 3:8 \"a\"",
+                "literal 3:7 number=1",
+            ],
+        },
+        TreeFactsTestCase {
+            description: "DuckDB: a clause whose children have no span has none, and reports its statement's start",
+            dialect: "duckdb",
+            sql: "SELECT a\nFROM t\nLIMIT 5",
+            expected_facts: &[
+                "select 1:1 to 3:8 \"SELECT a\\nFROM t\\nLIMIT 5\"",
+                "projection 1:8 to 1:9 \"a\"",
+                "from 2:6 to 2:7 \"t\"",
+                "limit 1:1",
+                "column 1:8 name=a to 1:9 \"a\"",
+                "table 2:6 name=t to 2:7 \"t\"",
+                "literal 1:1 number=5",
+            ],
+        },
+    ];
 
     for test_case in test_cases {
         let nodes = sql_tree_nodes(test_case.sql, test_case.dialect).expect(test_case.description);
@@ -395,6 +437,49 @@ fn given_a_clause_without_its_own_span_when_building_a_rule_tree_then_it_takes_i
         assert_eq!(
             facts(test_case.sql, &nodes),
             test_case.expected_facts,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_query_when_building_a_rule_tree_then_its_clauses_come_in_the_order_written() {
+    const EVERY_CLAUSE_SQL: &str = "WITH x AS (SELECT 1 AS id)\nSELECT x.id\nFROM x\nJOIN y ON y.id = x.id\nLEFT JOIN z ON z.id = x.id\nWHERE x.id > 0\nGROUP BY x.id\nHAVING COUNT(*) > 0\nQUALIFY ROW_NUMBER() OVER (ORDER BY x.id) = 1\nORDER BY x.id\nLIMIT 3";
+    const WRITTEN: &[&str] = &[
+        "cte",
+        "projection",
+        "from",
+        "join",
+        "join",
+        "where",
+        "group_by",
+        "having",
+        "qualify",
+        "order_by",
+        "limit",
+    ];
+    let test_cases = [
+        TreeChildrenTestCase {
+            description: "Snowflake: CTEs, the select list, FROM, its joins, then the other clauses",
+            dialect: "snowflake",
+            sql: EVERY_CLAUSE_SQL,
+            expected_children: WRITTEN,
+        },
+        TreeChildrenTestCase {
+            description: "DuckDB: CTEs, the select list, FROM, its joins, then the other clauses",
+            dialect: "duckdb",
+            sql: EVERY_CLAUSE_SQL,
+            expected_children: WRITTEN,
+        },
+    ];
+
+    for test_case in test_cases {
+        let nodes = sql_tree_nodes(test_case.sql, test_case.dialect).expect(test_case.description);
+
+        assert_eq!(
+            statement_children(&nodes),
+            test_case.expected_children,
             "{}",
             test_case.description
         );

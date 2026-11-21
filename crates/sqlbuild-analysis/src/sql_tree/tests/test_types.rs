@@ -33,3 +33,11 @@ pub(crate) struct TreeClausesTestCase {
     pub(crate) sql: &'static str,
     pub(crate) expected_clauses: Vec<(&'static str, Vec<&'static str>)>,
 }
+
+/// SQL, its dialect, and the kinds of its first statement's direct children, in tree order.
+pub(crate) struct TreeChildrenTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
+    pub(crate) sql: &'static str,
+    pub(crate) expected_children: &'static [&'static str],
+}
