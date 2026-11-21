@@ -6,3 +6,5 @@ pub const SENSOR_AUTHORING_MODULE: &str = "sqlbuild.orchestration_declarations.m
 pub const SENSOR_EVENTS_MODULE: &str = "sqlbuild.orchestration_declarations.models.sensor_events";
 /// The module the event kind enums live in.
 pub const SENSOR_KINDS_MODULE: &str = "sqlbuild.orchestration_declarations.types";
+/// What replaces a provider secret value in a sensor's traceback or skip reason.
+pub const SECRET_MASK: &str = "****";

@@ -25,7 +25,7 @@ fn given_a_member_with_some_permissions_when_changing_a_sensor_then_each_change_
             backend: Backend::Sqlite,
             permissions: &["view", "trigger.toggle", "sensor.reset_cursor"],
             nodes: &["orders"],
-            expected: [
+            expected_outcomes: [
                 Err("missing trigger.toggle permission for this target"),
                 Err("missing sensor.reset_cursor permission for this target"),
                 Err("missing sensor.reset_cursor permission for this target"),
@@ -36,7 +36,7 @@ fn given_a_member_with_some_permissions_when_changing_a_sensor_then_each_change_
             backend: Backend::Postgres,
             permissions: &["view", "trigger.toggle"],
             nodes: ALL_NODES,
-            expected: [
+            expected_outcomes: [
                 Ok(true),
                 Err("missing sensor.reset_cursor permission for this target"),
                 Err("missing sensor.reset_cursor permission for this target"),
@@ -47,7 +47,7 @@ fn given_a_member_with_some_permissions_when_changing_a_sensor_then_each_change_
             backend: Backend::Sqlite,
             permissions: &["view", "sensor.reset_cursor"],
             nodes: ALL_NODES,
-            expected: [
+            expected_outcomes: [
                 Err("missing trigger.toggle permission for this target"),
                 Ok(true),
                 Err("invalid control-plane data: the sensor hasn't been called with an event yet"),
@@ -95,7 +95,7 @@ fn given_a_member_with_some_permissions_when_changing_a_sensor_then_each_change_
             assert_eq!(
                 outcomes,
                 test_case
-                    .expected
+                    .expected_outcomes
                     .map(|expected| expected.map_err(str::to_owned)),
                 "{}",
                 test_case.description

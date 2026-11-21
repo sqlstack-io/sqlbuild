@@ -492,15 +492,13 @@ pub(crate) async fn add_old_form_sensor(
     )
     .expect("triggers document");
     document["health_orders"] = definition.clone();
-    let bytes = crate::snapshots::_helpers::content::json_bytes(&document).expect("bytes");
-    let hash = sqlbuild_recall::records::main::sha256_hex::sha256_hex(&bytes);
+    let (hash, body) =
+        crate::snapshots::main::publication::stored_document::stored_document(&document)
+            .expect("stored document");
     let (transaction, _) = query(
         transaction,
         "INSERT INTO sqb_documents (document_hash, body) VALUES ($1, $2)",
-        vec![
-            Parameter::Text(hash.clone()),
-            Parameter::Bytes(crate::store::main::compress::compress(&bytes).expect("compress")),
-        ],
+        vec![Parameter::Text(hash.clone()), Parameter::Bytes(body)],
     )
     .await
     .expect("store old-form document");
@@ -569,4 +567,49 @@ pub(crate) async fn member_sensor_change(
             .unwrap_or_default()
             .to_owned()
     })
+}
+
+/// A tick whose function returned `None`.
+pub(crate) fn completed_tick() -> crate::sensors::models::SensorEvaluationOutcome {
+    crate::sensors::models::SensorEvaluationOutcome::Completed {
+        cursor: Default::default(),
+        run_ids: Vec::new(),
+        skipped: Vec::new(),
+        skip_reason: None,
+        skipped_by: None,
+    }
+}
+
+/// A tick whose function raised.
+pub(crate) fn failed_tick() -> crate::sensors::models::SensorEvaluationOutcome {
+    crate::sensors::models::SensorEvaluationOutcome::Failed {
+        code: "sensor_function_failed".into(),
+        error: Some("ValueError: orders feed is down".into()),
+    }
+}
+
+fn abandoned_tick(
+    reason: crate::sensors::models::AbandonReason,
+) -> crate::sensors::models::SensorEvaluationOutcome {
+    crate::sensors::models::SensorEvaluationOutcome::Abandoned { reason }
+}
+
+/// A tick the location never answered.
+pub(crate) fn unanswered_tick() -> crate::sensors::models::SensorEvaluationOutcome {
+    abandoned_tick(crate::sensors::models::AbandonReason::Unanswered)
+}
+
+/// A tick cut short by a pause.
+pub(crate) fn paused_tick() -> crate::sensors::models::SensorEvaluationOutcome {
+    abandoned_tick(crate::sensors::models::AbandonReason::Paused)
+}
+
+/// A tick cut short by a new publication.
+pub(crate) fn republished_tick() -> crate::sensors::models::SensorEvaluationOutcome {
+    abandoned_tick(crate::sensors::models::AbandonReason::Republished)
+}
+
+/// A tick cut short by a cursor reset.
+pub(crate) fn cursor_reset_tick() -> crate::sensors::models::SensorEvaluationOutcome {
+    abandoned_tick(crate::sensors::models::AbandonReason::CursorReset)
 }

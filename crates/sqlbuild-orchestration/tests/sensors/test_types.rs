@@ -56,20 +56,15 @@ pub(crate) struct CheckEventTestCase {
 pub(crate) struct SensorFailingTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
-    /// How the ticks after one good tick end, oldest first.
-    pub(crate) ticks: &'static [FailingTick],
+    /// How the ticks after one good tick end, oldest first: how many in a row end each way.
+    pub(crate) ticks: &'static [(
+        usize,
+        fn() -> crate::sensors::models::SensorEvaluationOutcome,
+    )],
     pub(crate) expected_failed_ticks: Option<usize>,
     pub(crate) expected_reason: Option<&'static str>,
     /// Why the newest tick was abandoned, as people see it.
     pub(crate) expected_abandoned_because: Option<crate::sensors::models::AbandonReason>,
-}
-
-/// One tick's ending in a failing-streak case; `Failed(n)` is `n` failed ticks in a row.
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum FailingTick {
-    Failed(usize),
-    Completed,
-    Abandoned(crate::sensors::models::AbandonReason),
 }
 
 pub(crate) struct FunctionCursorTestCase {
@@ -108,5 +103,5 @@ pub(crate) struct SensorPermissionTestCase {
     pub(crate) permissions: &'static [&'static str],
     pub(crate) nodes: &'static [&'static str],
     /// Pause, reset-cursor and skip-event: applied, or why each was refused.
-    pub(crate) expected: [Result<bool, &'static str>; 3],
+    pub(crate) expected_outcomes: [Result<bool, &'static str>; 3],
 }

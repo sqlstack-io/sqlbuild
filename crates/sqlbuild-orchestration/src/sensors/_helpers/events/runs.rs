@@ -179,11 +179,8 @@ async fn run_event(
         let mut keys: Vec<String> = rows
             .iter()
             .filter(|row| {
-                let key = row["node_key"].as_str().unwrap_or_default();
                 let check = row["kind"] == CHECK_ROW_KIND
-                    || CHECK_KEY_PREFIXES
-                        .iter()
-                        .any(|prefix| key.starts_with(prefix));
+                    || is_check_key(row["node_key"].as_str().unwrap_or_default());
                 check == checks
             })
             .filter_map(|row| row["node_key"].as_str().map(str::to_owned))
@@ -247,4 +244,11 @@ async fn matching_executions(
         eligible = matches.into_iter().map(|run| run.run_id).collect();
     }
     Ok((transaction, eligible))
+}
+
+/// Whether `key` names a check, audit or SQL test, which a run records as a node when it selects it.
+fn is_check_key(key: &str) -> bool {
+    CHECK_KEY_PREFIXES
+        .iter()
+        .any(|prefix| key.starts_with(prefix))
 }

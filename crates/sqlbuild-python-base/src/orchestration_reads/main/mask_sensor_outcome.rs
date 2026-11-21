@@ -3,7 +3,7 @@
 use sqlbuild_core::redaction::main::redact_text::redact_text;
 use sqlbuild_orchestration::sensors::models::SensorFunctionOutcome;
 
-const MASK: &str = "****";
+use crate::orchestration_reads::constants::SECRET_MASK;
 
 /// `outcome` with each of `secrets` replaced by `****` in its traceback or skip reason, then the usual pattern redaction.
 #[must_use]
@@ -12,11 +12,9 @@ pub fn mask_sensor_outcome(
     secrets: &[String],
 ) -> SensorFunctionOutcome {
     let mask = |text: String| {
-        redact_text(
-            &secrets
-                .iter()
-                .fold(text, |text, secret| text.replace(secret.as_str(), MASK)),
-        )
+        redact_text(&secrets.iter().fold(text, |text, secret| {
+            text.replace(secret.as_str(), SECRET_MASK)
+        }))
     };
     match outcome {
         SensorFunctionOutcome::Failed { error } => {

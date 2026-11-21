@@ -10,9 +10,12 @@ use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
 use crate::sensors::main::read_person_sensor::read_person_sensor;
 use crate::sensors::main::sensor_failing::sensor_failing;
-use crate::sensors::models::{AbandonReason, SensorEvaluationOutcome};
-use crate::sensors::tests::helpers::{append_events, record_tick, snapshot};
-use crate::sensors::tests::test_types::{FailingTick, SensorFailingTestCase};
+use crate::sensors::models::AbandonReason;
+use crate::sensors::tests::helpers::{
+    append_events, completed_tick, cursor_reset_tick, failed_tick, paused_tick, record_tick,
+    republished_tick, snapshot, unanswered_tick,
+};
+use crate::sensors::tests::test_types::SensorFailingTestCase;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::{begin::begin, commit::commit, migrate_store::migrate_store};
 use crate::store::models::TransactionMode;
@@ -26,10 +29,7 @@ fn given_a_long_failing_streak_when_reading_whether_a_sensor_fails_then_since_is
         SensorFailingTestCase {
             description: "SQLite: 205 failures, then the location never answers",
             backend: Backend::Sqlite,
-            ticks: &[
-                FailingTick::Failed(205),
-                FailingTick::Abandoned(AbandonReason::Unanswered),
-            ],
+            ticks: &[(205, failed_tick), (1, unanswered_tick)],
             expected_failed_ticks: Some(206),
             expected_reason: Some("the location didn't answer within 60s"),
             expected_abandoned_because: Some(AbandonReason::Unanswered),
@@ -37,11 +37,7 @@ fn given_a_long_failing_streak_when_reading_whether_a_sensor_fails_then_since_is
         SensorFailingTestCase {
             description: "PostgreSQL: a pause and a republish while failing raise nothing more",
             backend: Backend::Postgres,
-            ticks: &[
-                FailingTick::Failed(3),
-                FailingTick::Abandoned(AbandonReason::Paused),
-                FailingTick::Abandoned(AbandonReason::Republished),
-            ],
+            ticks: &[(3, failed_tick), (1, paused_tick), (1, republished_tick)],
             expected_failed_ticks: Some(3),
             expected_reason: None,
             expected_abandoned_because: Some(AbandonReason::Republished),
@@ -49,7 +45,7 @@ fn given_a_long_failing_streak_when_reading_whether_a_sensor_fails_then_since_is
         SensorFailingTestCase {
             description: "SQLite: a good tick ends the streak",
             backend: Backend::Sqlite,
-            ticks: &[FailingTick::Failed(2), FailingTick::Completed],
+            ticks: &[(2, failed_tick), (1, completed_tick)],
             expected_failed_ticks: None,
             expected_reason: None,
             expected_abandoned_because: None,
@@ -57,7 +53,7 @@ fn given_a_long_failing_streak_when_reading_whether_a_sensor_fails_then_since_is
         SensorFailingTestCase {
             description: "PostgreSQL: a reset abandonment alone is not failing",
             backend: Backend::Postgres,
-            ticks: &[FailingTick::Abandoned(AbandonReason::CursorReset)],
+            ticks: &[(1, cursor_reset_tick)],
             expected_failed_ticks: None,
             expected_reason: None,
             expected_abandoned_because: Some(AbandonReason::CursorReset),
@@ -88,21 +84,13 @@ fn given_a_long_failing_streak_when_reading_whether_a_sensor_fails_then_since_is
                 .await
                 .expect("request")
                 .expect("due");
-            let good = record_tick(store, &first, TimeDelta::zero(), completed()).await;
+            let good = record_tick(store, &first, TimeDelta::zero(), completed_tick()).await;
             let mut offset = 1;
             let mut first_failure = None;
-            for tick in test_case.ticks {
-                let (count, outcome) = match tick {
-                    FailingTick::Failed(count) => (*count, failed()),
-                    FailingTick::Completed => (1, completed()),
-                    FailingTick::Abandoned(reason) => {
-                        (1, SensorEvaluationOutcome::Abandoned { reason: *reason })
-                    }
-                };
-                for _ in 0..count {
+            for (count, outcome) in test_case.ticks {
+                for _ in 0..*count {
                     let request =
-                        record_tick(store, &good, TimeDelta::seconds(offset), outcome.clone())
-                            .await;
+                        record_tick(store, &good, TimeDelta::seconds(offset), outcome()).await;
                     first_failure.get_or_insert(request.requested_at);
                     offset += 1;
                 }
@@ -149,22 +137,5 @@ fn given_a_long_failing_streak_when_reading_whether_a_sensor_fails_then_since_is
             );
             close_test_store(fixture).await;
         });
-    }
-}
-
-fn completed() -> SensorEvaluationOutcome {
-    SensorEvaluationOutcome::Completed {
-        cursor: Default::default(),
-        run_ids: Vec::new(),
-        skipped: Vec::new(),
-        skip_reason: None,
-        skipped_by: None,
-    }
-}
-
-fn failed() -> SensorEvaluationOutcome {
-    SensorEvaluationOutcome::Failed {
-        code: "sensor_function_failed".into(),
-        error: Some("ValueError: orders feed is down".into()),
     }
 }

@@ -3,15 +3,12 @@
 use std::future::Future;
 use std::pin::Pin;
 
-use serde_json::Value;
-use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
-
-use crate::snapshots::_helpers::content::json_bytes;
+use crate::snapshots::main::publication::stored_document::stored_document;
 use crate::store::errors::ControlError;
-use crate::store::main::compress::compress;
 use crate::store::main::decompress::decompress;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
+use serde_json::Value;
 
 /// Rewrite each stored `triggers` document without its old-form sensors, which have neither a `function` nor a `schedule`; their `sqb_triggers` rows stay, hidden by the migration's SQL.
 pub(crate) fn drop_old_form_sensors(
@@ -43,12 +40,11 @@ async fn rewrite_documents(
         if entries.len() == before {
             continue;
         }
-        let bytes = json_bytes(&document)?;
-        let hash = sha256_hex(&bytes);
+        let (hash, body) = stored_document(&document)?;
         (transaction, _) = query(
             transaction,
             "INSERT INTO sqb_documents (document_hash, body) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-            vec![Parameter::Text(hash.clone()), Parameter::Bytes(compress(&bytes)?)],
+            vec![Parameter::Text(hash.clone()), Parameter::Bytes(body)],
         )
         .await?;
         (transaction, _) = query(

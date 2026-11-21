@@ -36,7 +36,7 @@ pub(crate) async fn sensor_failing(
     if failed_ticks == 0 {
         return Ok((transaction, None));
     }
-    let mut ends = Vec::new();
+    let mut ends: Vec<SensorEvaluationFact> = Vec::new();
     let mut transaction = transaction;
     for order in ["ASC", "DESC"] {
         let rows;

@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{PyAnyMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyString};
 use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_orchestration::sensors::models::{SensorEvent, SensorFunctionOutcome};
@@ -45,21 +45,21 @@ pub(crate) fn evaluate_sensor(
     project_dir: &Path,
     call: SensorCall<'_>,
 ) -> SensorFunctionOutcome {
-    let mut secrets = Vec::new();
-    let outcome = match called(py, project_dir, call, &mut secrets) {
+    match called(py, project_dir, call) {
         Ok(outcome) => outcome,
-        Err(error) => SensorFunctionOutcome::Failed {
-            error: sensor_traceback(py, &error),
-        },
-    };
-    mask_sensor_outcome(outcome, &secrets)
+        Err(error) => mask_sensor_outcome(
+            SensorFunctionOutcome::Failed {
+                error: sensor_traceback(py, &error),
+            },
+            &[],
+        ),
+    }
 }
 
 fn called(
     py: Python<'_>,
     project_dir: &Path,
     call: SensorCall<'_>,
-    secrets: &mut Vec<String>,
 ) -> PyResult<SensorFunctionOutcome> {
     let sensor = sensor_declaration(py, project_dir, (call.sensor, call.target))?;
     let function = sensor.getattr("function")?;
@@ -82,13 +82,29 @@ fn called(
         .call((), Some(&fields))?;
     let project_path = imported(py, "pathlib", "Path")?.call1((project_dir,))?;
     let providers = discover_provider_classes(project_path.clone(), SecretPolicy::Defer.name())?;
-    *secrets = provider_secret_values(&providers)?;
+    let secrets: Vec<String> = provider_secret_values(&providers)?;
+    let outcome = match with_providers(py, (&function, &context, call), (&project_path, providers))
+    {
+        Ok(outcome) => outcome,
+        Err(error) => SensorFunctionOutcome::Failed {
+            error: sensor_traceback(py, &error),
+        },
+    };
+    Ok(mask_sensor_outcome(outcome, &secrets))
+}
+
+/// The function called with the target's providers, its context the sensor's.
+fn with_providers<'py>(
+    py: Python<'py>,
+    (function, context, call): (&Bound<'py, PyAny>, &Bound<'py, PyAny>, SensorCall<'_>),
+    (project_path, providers): (&Bound<'py, PyAny>, Bound<'py, PyAny>),
+) -> PyResult<SensorFunctionOutcome> {
     let by_name = provider_by_name(&providers)?;
     let target = (
         &PyString::new(py, call.target).into_any(),
         &py.None().into_bound(py),
     );
-    let setup_context = project_setup_context((&project_path, &providers), target, true)?;
+    let setup_context = project_setup_context((project_path, &providers), target, true)?;
     let session = call_with(
         &entry(py, UserCodeHost::BuildProviderSession)?,
         &[
@@ -99,8 +115,8 @@ fn called(
     )?;
     within(&session, |_| {
         let arguments = PyDict::new(py);
-        arguments.set_item(SENSOR_CONTEXT_PARAMETER, &context)?;
-        for usage in provider_usages(&function, &by_name)?.try_iter()? {
+        arguments.set_item(SENSOR_CONTEXT_PARAMETER, context)?;
+        for usage in provider_usages(function, &by_name)?.try_iter()? {
             let usage = usage?;
             if usage.getattr("parameter_name")?.extract::<String>()? != SENSOR_CONTEXT_PARAMETER {
                 arguments.set_item(
