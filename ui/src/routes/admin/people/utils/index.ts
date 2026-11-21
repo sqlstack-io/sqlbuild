@@ -17,3 +17,4 @@ export {
   serviceState,
   statusLine,
 } from "./service-accounts";
+export { accountToggle } from "./account-toggle";

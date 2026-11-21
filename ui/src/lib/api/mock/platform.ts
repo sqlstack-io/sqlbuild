@@ -865,7 +865,7 @@ export class MockPlatformApi implements PlatformApi {
 			...this.#withCounts(role),
 			baseGrants: baseGrantsOf(role),
 			selectors: selectorMatches(role),
-			assignments: this.#data.assignments.filter((a) => a.role === role.name),
+			assignments: this.#allAssignments().filter((a) => a.role === role.name),
 			definition: definitionText(role)
 		};
 		return this.#ctx.reply(structuredClone(detail));
@@ -873,7 +873,17 @@ export class MockPlatformApi implements PlatformApi {
 
 	async listRoleAssignments(): Promise<RoleAssignment[]> {
 		this.#require('role.assign');
-		return this.#ctx.reply(structuredClone(this.#data.assignments));
+		return this.#ctx.reply(structuredClone(this.#allAssignments()));
+	}
+
+	/** People's assignments and each service account's one role everywhere, as the server lists them. */
+	#allAssignments(): RoleAssignment[] {
+		const services: RoleAssignment[] = this.#serviceAccounts.flatMap((a) =>
+			a.role
+				? [{ id: `sa-role-${a.name}`, principal: { kind: 'service', name: a.name, displayName: a.name }, role: a.role, scope: { locationId: null }, source: 'manual', ssoGroup: null, definedIn: null, assignedBy: null, assignedAt: a.createdAt, stale: false }]
+				: []
+		);
+		return [...this.#data.assignments, ...services];
 	}
 
 	async createRoleAssignment(request: RoleAssignmentRequest): Promise<RoleAssignment> {

@@ -1,1 +1,1 @@
-export { changeRole, toggleAccount } from "./account";
+export { changeRole, setAccountEnabled } from "./account";

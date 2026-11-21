@@ -51,7 +51,7 @@
 		</div>
 		<p class="note">
 			{#if minutes}
-				Both keys work until {formatStamp(new Date(app.now + minutes * 60_000).toISOString())}, so whatever uses this account can switch to the new key first.{#if account.keys.length > 1} The key already being replaced stops now.{/if}
+				Both keys work until {formatStamp(new Date(app.now + minutes * 60_000).toISOString())}, so whatever uses this account can switch to the new key first.{#if account.keys.length > 1}{' '}The key already being replaced stops now.{/if}
 			{:else}
 				Anything still using the current key is refused from now on. Choose this if the key may have leaked.
 			{/if}

@@ -800,8 +800,10 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			return role ? roleDetailOf(role, assignments, locationId) : null;
 		},
 		async listRoleAssignments(): Promise<RoleAssignment[]> {
-			// Group members come from the people read; without it, SSO-derived roles stay unlisted.
-			return toRoleAssignments(await roleHoldings(), await people().catch(() => []));
+			// Group members come from the people read; without it, SSO-derived roles stay unlisted, and without
+			// the service account read its holders read as people.
+			const [holdings, members, services] = await Promise.all([roleHoldings(), people().catch(() => []), serviceAccounts().catch(() => [])]);
+			return toRoleAssignments(holdings, members, new Set(services.map((s) => s.name)));
 		},
 		async createRoleAssignment(request: RoleAssignmentRequest): Promise<RoleAssignment> {
 			const person = await personNamed(request.principal);
