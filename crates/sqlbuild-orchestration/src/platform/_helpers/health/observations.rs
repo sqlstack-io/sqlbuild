@@ -4,6 +4,7 @@ use chrono::{DateTime, DurationRound, TimeDelta, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::platform::constants::OBSERVATION_WINDOW_SECONDS;
 use crate::platform::models::PlatformEvent;
 use crate::store::errors::ControlError;
 use crate::store::main::append_control_event::append_control_event;
@@ -18,7 +19,7 @@ pub(crate) async fn observe(
 ) -> Result<ControlTransaction, ControlError> {
     let occurred_at = transaction
         .now
-        .duration_trunc(TimeDelta::seconds(30))
+        .duration_trunc(TimeDelta::seconds(OBSERVATION_WINDOW_SECONDS))
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let occurrence = match event {
         PlatformEvent::Heartbeat { .. } => Some(occurred_at),

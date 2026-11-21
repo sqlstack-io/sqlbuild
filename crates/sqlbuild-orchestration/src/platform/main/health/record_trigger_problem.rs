@@ -1,5 +1,6 @@
 //! The scheduler and publication record a trigger's health problem as one event per payload.
 
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::platform::_helpers::health::observations::observe;
@@ -8,10 +9,10 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::ControlTransaction;
 
-/// Record `event`, a trigger's problem such as `PlatformEvent::TriggerSkipped`; the same payload again adds nothing.
+/// Record `event`, a trigger's problem such as `PlatformEvent::TriggerSkipped`; the same payload and `incident` again add nothing.
 pub(crate) async fn record_trigger_problem(
     transaction: ControlTransaction,
-    event: PlatformEvent,
+    (event, incident): (PlatformEvent, Option<DateTime<Utc>>),
 ) -> Result<ControlTransaction, ControlError> {
     let (transaction, rows) = query(
         transaction,
@@ -24,5 +25,5 @@ pub(crate) async fn record_trigger_problem(
     };
     let installation_id = serde_json::from_value::<Uuid>(row["installation_id"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
-    observe(transaction, installation_id, (event, None)).await
+    observe(transaction, installation_id, (event, incident)).await
 }

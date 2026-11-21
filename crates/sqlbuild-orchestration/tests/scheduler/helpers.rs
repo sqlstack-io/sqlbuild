@@ -379,7 +379,7 @@ pub(crate) async fn dropped_calendar_times(
         .collect()
 }
 
-/// Publish sensor `health_orders` in `location_id`, let it check once, apply `earlier_form`, then make it due again with a new overdue tick to see; the scheduler's state and the sensor.
+/// Publish sensor `health_orders`, and a healthy `watch_overdue` that only notes events, in `location_id`, let them check once, apply `earlier_form`, then make them due again with a new overdue tick to see; the scheduler's state and `health_orders`.
 pub(crate) async fn sensor_due_again(
     store: &ControlStore,
     location_id: uuid::Uuid,
@@ -389,6 +389,10 @@ pub(crate) async fn sensor_due_again(
         location_id,
         serde_json::json!({"health_orders": {"description": "Refresh orders on overdue ticks",
             "function": "start_orders", "code_hash": "v1", "timeout_seconds": 60,
+            "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
+            "minimum_interval_seconds": 1},
+            "watch_overdue": {"description": "Note overdue ticks",
+            "function": "note_overdue", "code_hash": "v1", "timeout_seconds": 60,
             "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
             "minimum_interval_seconds": 1}}),
     );
@@ -415,7 +419,7 @@ pub(crate) async fn sensor_due_again(
     let trigger_id = serde_json::from_value(
         crate::runs::tests::helpers::rows(
             store,
-            "SELECT trigger_id FROM sqb_triggers WHERE kind='sensor'",
+            "SELECT trigger_id FROM sqb_triggers WHERE kind='sensor' AND name='health_orders'",
             vec![],
         )
         .await[0]["trigger_id"]
@@ -521,11 +525,20 @@ pub(crate) fn group_snapshot(location: uuid::Uuid) -> crate::snapshots::models::
 
 /// Execute `sql` against the store as it stands, such as to put a stored row in the form an earlier release wrote it.
 pub(crate) async fn execute(store: &ControlStore, sql: &str) {
+    execute_with(store, sql, vec![]).await;
+}
+
+/// Run `sql` with `parameters` in its own write transaction.
+pub(crate) async fn execute_with(
+    store: &ControlStore,
+    sql: &str,
+    parameters: Vec<crate::store::models::Parameter>,
+) {
     use crate::store::main::{begin::begin, commit::commit, query::query};
     use crate::store::models::TransactionMode;
 
     let transaction = begin(store, TransactionMode::Write).await.expect("begin");
-    let (transaction, _) = query(transaction, sql, vec![]).await.expect(sql);
+    let (transaction, _) = query(transaction, sql, parameters).await.expect(sql);
     commit(transaction).await.expect("commit");
 }
 

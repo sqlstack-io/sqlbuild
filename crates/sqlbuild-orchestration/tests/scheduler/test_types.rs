@@ -94,6 +94,8 @@ pub(crate) struct UnreadableSensorTestCase {
     pub(crate) expected_sensor_runs: i64,
     /// `sensor_rechecked` events recorded by then; a completed re-check withdraws its problem.
     pub(crate) expected_rechecked_events: i64,
+    /// Checks the healthy sensor `watch_overdue` has completed by then.
+    pub(crate) expected_healthy_checks: i64,
 }
 
 pub(crate) struct RunningMemberOldDocumentTestCase {
@@ -142,4 +144,28 @@ pub(crate) struct CoveredTickTestCase {
     pub(crate) backend: Backend,
     /// The skipped triggers listed before and after the covered tick, as `name: reason`.
     pub(crate) expected_skipped: &'static [&'static str],
+}
+
+/// A sensor whose check fails with an error of its own, while another sensor is healthy.
+pub(crate) struct FailedSensorTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The cycle in which the check fails: `ok` when it carries on.
+    pub(crate) expected_cycle: &'static str,
+    /// The triggers the live problems list as skipped after it, as `name: reason`.
+    pub(crate) expected_skipped: &'static [&'static str],
+    /// Checks the healthy sensor `watch_overdue` has completed by then.
+    pub(crate) expected_healthy_checks: i64,
+    /// The triggers listed as skipped once the failed check completes after all.
+    pub(crate) expected_skipped_after: &'static [&'static str],
+}
+
+/// An operator skipping the event of a sensor whose newest tick can't be read.
+pub(crate) struct UnreadableSkipTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Changes applied before the skip, such as pausing the sensor.
+    pub(crate) before: &'static [crate::declarations::models::TriggerChange],
+    /// The refusal, as the operator reads it.
+    pub(crate) expected_refusal: &'static str,
 }

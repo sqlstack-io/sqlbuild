@@ -12,17 +12,24 @@ use crate::sensors::models::{
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;
 
-/// Skip `event`, which the sensor's newest tick, finished or still out, hasn't handled and its cursor still waits on: the cursor after it.
+/// Skip `event`, which the sensor's newest tick, finished or still out, hasn't handled and its cursor still waits on: the cursor after it; `paused` says no next tick comes.
 pub(crate) async fn skip_sensor_event(
     transaction: ControlTransaction,
     request: &TriggerChangeRequest,
-    event: &str,
+    (event, paused): (&str, bool),
 ) -> Result<(ControlTransaction, SensorCursor), ControlError> {
     let (transaction, last) = last_attempt(transaction, request.trigger_id).await?;
     let (stuck, terminal) = match last {
         None => {
             return Err(ControlError::Invalid(
                 "the sensor hasn't been called with an event yet".into(),
+            ));
+        }
+        Some(Err(_)) if paused => {
+            return Err(ControlError::Invalid(
+                "the sensor's newest tick can't be read, and the sensor is paused, so no next tick \
+                 checks it again; resume the sensor, or reset its cursor"
+                    .into(),
             ));
         }
         Some(Err(_)) => {

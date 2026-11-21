@@ -86,11 +86,14 @@ pub async fn begin_sensor_evaluation(
     if rechecked {
         transaction = record_trigger_problem(
             transaction,
-            PlatformEvent::SensorRechecked {
-                trigger_id: request.trigger_id,
-                snapshot_id: request.snapshot_id,
-                evaluation_id: request.evaluation_id,
-            },
+            (
+                PlatformEvent::SensorRechecked {
+                    trigger_id: request.trigger_id,
+                    snapshot_id: request.snapshot_id,
+                    evaluation_id: request.evaluation_id,
+                },
+                None,
+            ),
         )
         .await?;
     }

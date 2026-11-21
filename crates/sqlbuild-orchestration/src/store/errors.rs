@@ -61,6 +61,20 @@ impl ControlError {
         }
     }
 
+    /// The control store itself failed or the scheduler lost its lease, so no other trigger can carry on either.
+    #[must_use]
+    pub fn ends_cycle(&self) -> bool {
+        matches!(
+            self,
+            Self::Database(_)
+                | Self::Sqlite(_)
+                | Self::Worker(_)
+                | Self::Io(_)
+                | Self::Schema(_)
+                | Self::Fenced
+        )
+    }
+
     /// A store that is briefly busy or unreachable; the same operation may succeed when retried.
     #[must_use]
     pub fn transient(&self) -> bool {

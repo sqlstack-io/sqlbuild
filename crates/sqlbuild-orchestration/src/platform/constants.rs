@@ -56,5 +56,7 @@ pub const MAX_RULE_FINDING_CHARS: usize = 500;
 /// The most rows one page of a plan section returns.
 pub const PLAN_ROWS_LIMIT: usize = 1000;
 
+/// A platform observation's time is rounded down to this window; a heartbeat is one fact per window.
+pub(crate) const OBSERVATION_WINDOW_SECONDS: i64 = 30;
 /// The newest `trigger_skipped` events the live problems read; each trigger counts once.
 pub(crate) const SKIPPED_TRIGGER_EVENTS: i64 = 200;

@@ -247,6 +247,9 @@ seconds, stops delivery and retries the same event. Deduplicate by `event_id`, w
 | `location_broken` | Every instance of a location and target has stopped reporting for over 90 seconds | `location_id`, `target`, `last_seen_at` |
 | `launch_failed` | Starting a worker failed; it may still start | `run_id`, `claim_id`, `code` |
 | `run_failed` | A job, group or ad-hoc run ends `failed` or `partial` | `run_id`, `run_kind`, `job_key`, `location_id`, `target`, `outcome`, `failed_nodes`, `failed_node_count` |
+| `trigger_skipped` | The scheduler skips a trigger whose stored job or snapshot can't be read, or a sensor whose check failed; the sensor is checked again a minute later | `trigger_id`, `snapshot_id`, `reason` |
+| `sensor_rechecked` | A sensor's last check can't be read, so it is checked again from scratch | `trigger_id`, `snapshot_id`, `evaluation_id` |
+| `calendar_times_dropped` | A publish drops a calendar schedule's due times | `trigger_id`, `snapshot_id`, `times` |
 
 Each condition is sent once when it starts, not on every 30-second scan. Monitor heartbeats from
 outside the server too: a stopped server can't report its own outage.
