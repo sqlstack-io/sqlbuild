@@ -21,7 +21,7 @@ import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf
 import { toSelectionEvaluation, toSelectionVocabulary } from './http-selection';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
-import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
+import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, NewPasswordAccount, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape, AutomaticWithdrawal } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 import { newRequestId } from '$lib/browser/request-id';
@@ -83,6 +83,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'deleteRoleAssignment',
 	'disableAccount',
 	'enableAccount',
+	'createPasswordAccount',
 	'listLocations',
 	'getLocation',
 	'listPlatformEvents',
@@ -816,6 +817,16 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		},
 		disableAccount: (name: string): Promise<Account> => changePerson(name, 'disable'),
 		enableAccount: (name: string): Promise<Account> => changePerson(name, 'enable'),
+		/** The server offers this only under password sign-in. */
+		async createPasswordAccount(request: NewPasswordAccount): Promise<Account> {
+			const { error, response } = await http.POST('/api/auth/password/people', {
+				body: { name: request.name, password: request.password, role: request.role },
+				params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+			return toAccount(await personNamed(request.name));
+		},
 		async getColumnLineage(scope: Scope, ref: string, listing?: CatalogNode[]): Promise<ColumnLineage | null> {
 			const nodes = listing ?? (await listingWithStates(scope));
 			const node = findNode(nodes, ref);

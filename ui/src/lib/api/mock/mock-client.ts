@@ -4,6 +4,7 @@ import { ApiError } from '../client';
 import { LocalChangeBus, type ConnectionState } from '../signals';
 import { stateOf } from '../node-states';
 import type {
+	AuthMode,
 	AdhocRunCheck,
 	AttentionAcknowledgement,
 	AutomaticWithdrawal,
@@ -66,6 +67,8 @@ export type MockOptions = {
 	latencyMs?: number;
 	/** Simulated state of the live-signal connection. */
 	connection?: ConnectionState;
+	/** How people sign in (`?signin=password`); SSO by default. */
+	signIn?: AuthMode;
 };
 
 /** In-memory `ApiClient` with neutral example data. Mutations persist per page load. */
@@ -92,7 +95,8 @@ export class MockApiClient implements ApiClient {
 			events: options.events ?? 'default',
 			latencyMs: options.latencyMs ?? 120,
 			connection: options.connection ?? 'live',
-			still: options.still ?? false
+			still: options.still ?? false,
+			signIn: options.signIn ?? 'oidc'
 		};
 		this.changes.setState(this.#options.connection);
 		this.#fixtures = createFixtures(this.#createdAt);
@@ -111,6 +115,7 @@ export class MockApiClient implements ApiClient {
 			role: this.#options.role,
 			events: this.#options.events,
 			serverVersion: '0.185.0',
+			authMode: this.#options.signIn,
 			user: DEMO_USER,
 			locations: this.#fixtures.locations,
 			changes: this.changes,
@@ -152,7 +157,7 @@ export class MockApiClient implements ApiClient {
 		const user: CurrentUser = { ...DEMO_USER, kind: 'user', role: this.#options.role };
 		return this.#reply({
 			serverVersion: '0.185.0',
-			authMode: 'oidc',
+			authMode: this.#options.signIn,
 			user,
 			capabilities: ROLE_CAPABILITIES[this.#options.role],
 			locations: this.#fixtures.locations.map((location) => ({
@@ -519,6 +524,9 @@ export class MockApiClient implements ApiClient {
 	}
 	enableAccount(...args: Parameters<PlatformApi['enableAccount']>) {
 		return this.#platform.enableAccount(...args);
+	}
+	createPasswordAccount(...args: Parameters<PlatformApi['createPasswordAccount']>) {
+		return this.#platform.createPasswordAccount(...args);
 	}
 	listRoles(...args: Parameters<PlatformApi['listRoles']>) {
 		return this.#platform.listRoles(...args);

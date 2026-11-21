@@ -210,6 +210,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/password/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPasswordPerson"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/session": {
         parameters: {
             query?: never;
@@ -2693,6 +2709,12 @@ export interface components {
             password: string;
             username: string;
         };
+        /** @description A person to add who signs in with a password: their sign-in name, first password and built-in role everywhere, if any. */
+        PasswordPersonRequest: {
+            name: string;
+            password: string;
+            role?: null | components["schemas"]["BuiltinRole"];
+        };
         PasswordSessionResponse: {
             csrf_token: string;
             identity: components["schemas"]["SessionIdentity"];
@@ -2702,6 +2724,11 @@ export interface components {
             actions: components["schemas"]["Action"][];
             locations: components["schemas"]["LocationAccess"][];
             name: string;
+            /** Format: uuid */
+            principal_id: string;
+        };
+        /** @description The person just added. */
+        PersonCreated: {
             /** Format: uuid */
             principal_id: string;
         };
@@ -5025,6 +5052,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+        };
+    };
+    createPasswordPerson: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordPersonRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonCreated"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

@@ -511,3 +511,23 @@ pub(crate) struct IngestionTurnTestCase {
     pub(crate) relations_per_page: usize,
     pub(crate) expected_writer_first: bool,
 }
+
+/// One request to add a person who signs in with a password, and what it leaves behind.
+pub(crate) struct PasswordPersonTestCase {
+    pub(crate) description: &'static str,
+    /// Whose session asks, signed in with the shared password; none asks signed out.
+    pub(crate) signed_in_as: &'static [&'static str],
+    pub(crate) body: serde_json::Value,
+    pub(crate) expected_status: reqwest::StatusCode,
+    /// Whether the new person can then sign in with the password given.
+    pub(crate) expected_sign_in: bool,
+    /// The built-in roles the new person holds everywhere afterwards.
+    pub(crate) expected_roles: &'static [&'static str],
+}
+
+/// A way people sign in other than passwords, built for the development person.
+pub(crate) struct NoPasswordPeopleTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) login: fn(uuid::Uuid) -> crate::api::models::HumanLogin,
+    pub(crate) expected_status: reqwest::StatusCode,
+}

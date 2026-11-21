@@ -1,16 +1,14 @@
 //! Only active people have passwords; changing one rotates its identity and audits atomically.
 
 use serde_json::json;
-use uuid::Uuid;
 
-use crate::credentials::_helpers::passwords::hash_password;
-use crate::credentials::constants::{MAX_PASSWORD_BYTES, MIN_PASSWORD_CHARACTERS};
-use crate::credentials::main::audit::append_audit::append_audit;
+use crate::credentials::main::sessions::hash_new_password::hash_new_password;
 use crate::credentials::main::sessions::revoke_session::revoke_session;
+use crate::credentials::main::sessions::store_password::store_password;
 use crate::credentials::models::{AuditContext, PasswordAuthority};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
-use crate::store::models::{Change, ControlStore, Parameter, TransactionMode};
+use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 /// The trusted caller authorizes password management before invoking this storage operation.
 pub async fn set_password(
@@ -19,18 +17,13 @@ pub async fn set_password(
     authority: PasswordAuthority,
     password: &str,
 ) -> Result<(), ControlError> {
-    if password.len() > MAX_PASSWORD_BYTES || password.chars().count() < MIN_PASSWORD_CHARACTERS {
-        return Err(ControlError::Invalid(format!(
-            "password must contain at least {MIN_PASSWORD_CHARACTERS} characters and at most {MAX_PASSWORD_BYTES} UTF-8 bytes"
-        )));
-    }
     let (principal_id, expected) = match authority {
         PasswordAuthority::Operator(id) => (id, None),
         PasswordAuthority::Reauthenticated { proof, session_id } => {
             (proof.principal_id, Some((proof.credential_id, session_id)))
         }
     };
-    let hash = hash_password(password.into()).await?;
+    let hash = hash_new_password(password).await?;
     let transaction = begin(store, TransactionMode::Write).await?;
     let (mut transaction, rows) = query(
         transaction,
@@ -71,28 +64,7 @@ pub async fn set_password(
     } else {
         json!({"credential_id": rows[0]["credential_id"]})
     };
-    let credential_id = Uuid::now_v7();
-    let now = transaction.now;
-    let (transaction, _) = query(
-        transaction,
-        "INSERT INTO sqb_password_credentials (principal_id, credential_id, password_hash, changed_at) \
-         VALUES ($1,$2,$3,$4) ON CONFLICT (principal_id) DO UPDATE \
-         SET credential_id=excluded.credential_id, password_hash=excluded.password_hash, changed_at=excluded.changed_at",
-        vec![Parameter::Id(principal_id), Parameter::Id(credential_id), Parameter::Text(hash), Parameter::Time(now)],
-    )
-    .await?;
     let (transaction, _) = revoke_session(transaction, context, (principal_id, None)).await?;
-    let mut transaction = append_audit(
-        transaction,
-        context,
-        (credential_id, "password.changed"),
-        (
-            json!({"principal_id": principal_id}),
-            before,
-            json!({"credential_id": credential_id}),
-        ),
-    )
-    .await?;
-    transaction.changes.insert(Change::Credentials);
+    let transaction = store_password(transaction, context, (principal_id, hash), before).await?;
     commit(transaction).await
 }

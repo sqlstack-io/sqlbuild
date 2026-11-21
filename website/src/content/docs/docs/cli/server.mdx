@@ -90,6 +90,14 @@ warning: the bearer token for http://control.example.com travels unencrypted ove
 
 Connections to `localhost`, `127.0.0.1` or `::1` print no warning.
 
+## Add people who sign in with passwords
+
+With `password_origin` set, people sign in with a name and password. Someone with `user.manage`
+adds a person from **People → Add person** with their sign-in name, a first password of at least
+12 characters and, with `role.assign` as well, a built-in role everywhere. Share the password with
+them; they can change it after they sign in. Behind OIDC or a trusted proxy, people appear the
+first time they sign in instead, and the button isn't shown.
+
 ## Sign in through a reverse proxy
 
 A reverse proxy such as Apache or nginx can sign people in and tell the server who they are in a

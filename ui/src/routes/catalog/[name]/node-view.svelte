@@ -111,7 +111,7 @@
 	];
 </script>
 
-<AppTopbar title="Catalog">
+<AppTopbar title="Catalog" subject="{name} · Catalog">
 	<RefreshButton onclick={() => res.refresh()} />
 	{#if n && n.kind !== 'source' && canRun}
 		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => execute([name])}><PlayIcon class="size-3.5 fill-current stroke-none" />Build</GatedButton>

@@ -404,9 +404,8 @@
 	];
 </script>
 
-<svelte:head><title>Plan · {cmd.trim() || 'sqb'}</title></svelte:head>
 
-<AppTopbar title="Plan" events={affectsPlan} />
+<AppTopbar title="Plan" subject="Plan · {cmd.trim() || 'sqb'}" events={affectsPlan} />
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="px-4 pt-3 empty:hidden"><SyncingNote what="Plan previews" /></div>
