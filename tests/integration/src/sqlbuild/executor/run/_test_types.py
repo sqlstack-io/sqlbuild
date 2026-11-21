@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from sqlbuild.adapter.contract.types import TablePromotionMode
@@ -67,3 +68,13 @@ class AuditSqlResolutionTestCase:
     attached_target_name: str
     resolved_target_name: str
     expected_resolved_sql: str
+
+
+@dataclass(frozen=True)
+class RebuiltRowCountTestCase:
+    """A rebuilt table whose adapter row count read returns or raises."""
+
+    description: str
+    promotion_mode: TablePromotionMode
+    row_count: Callable[..., int | None]
+    expected_table_rows: int | None

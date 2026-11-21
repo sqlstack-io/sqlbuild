@@ -234,7 +234,7 @@ pub(crate) fn execute_dbt_sqlbuild_work<'py>(
             ),
         ],
     )?;
-    let result = call_with(
+    let ran = call_with(
         &host_entry(py, ExecutorHost::RunBuildPipeline)?,
         &[
             ("plan", plan.clone()),
@@ -247,7 +247,13 @@ pub(crate) fn execute_dbt_sqlbuild_work<'py>(
             ("runtime", runtime),
             ("callbacks", hooks),
         ],
-    )?;
+    );
+    let closed = callbacks
+        .downcast::<BuildProgressCallbacks>()?
+        .get()
+        .close(py);
+    let result = ran?;
+    closed?;
     let result = BuildExecutionResult::read(&result)?;
     write_runtime_target(
         &joined(&args.value("project_dir")?, &["target"])?,

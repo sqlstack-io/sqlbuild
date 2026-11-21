@@ -899,8 +899,8 @@ impl BuildProgressCallbacks {
         self.write_event(py, result)
     }
 
-    /// Close the optional structured execution event stream.
-    pub(crate) fn close(&self, py: Python<'_>) -> PyResult<()> {
+    /// Stop the heartbeat and close the optional structured execution event stream.
+    pub fn close(&self, py: Python<'_>) -> PyResult<()> {
         heartbeat::stop(py, self);
         let (scheduler, query) = {
             let state = self.state();

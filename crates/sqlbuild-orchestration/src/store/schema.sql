@@ -190,6 +190,7 @@ CREATE TABLE sqb_run_nodes (
     table_rows BIGINT,
     rows_so_far BIGINT,
     no_change_reason TEXT,
+    materialization TEXT,
     PRIMARY KEY (run_id, node_key)
 );
 CREATE INDEX sqb_run_nodes_node ON sqb_run_nodes(node_key, run_id);

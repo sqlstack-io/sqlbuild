@@ -1,6 +1,5 @@
 //! Frozen run requests and the run, node and claim records the control store keeps.
 
-use crate::runs::constants::RUN_LAUNCHED_EVENT;
 use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Utc};
@@ -9,6 +8,7 @@ use uuid::Uuid;
 
 use crate::credentials::models::Action;
 use crate::declarations::models::PoolSlots;
+use crate::runs::constants::RUN_LAUNCHED_EVENT;
 use crate::runs::types::{CommandPlanner, PreparedPublication};
 use crate::snapshots::models::WriterNode;
 
