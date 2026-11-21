@@ -224,17 +224,17 @@ impl SqlDocument {
 
     /// Every common table expression.
     fn ctes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
-        self.nodes(py, "CTE")
+        self.nodes(py, "cte")
     }
 
     /// Every join clause.
     fn joins<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
-        self.nodes(py, "Join")
+        self.nodes(py, "join")
     }
 
     /// Every parenthesized subquery.
     fn subqueries<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
-        self.nodes(py, "Subquery")
+        self.nodes(py, "subquery")
     }
 
     /// Where `node`, read from this model query, is in the model file; `None` for other SQL.
@@ -264,7 +264,7 @@ impl SqlDocument {
 
     /// Every projected star, bare or qualified; a star a function call takes, such as `COUNT(*)`, is no projection.
     fn star_projections<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
-        self.source_nodes(py, "Star", |nodes, node| {
+        self.source_nodes(py, "star", |nodes, node| {
             node.parent
                 .is_none_or(|parent| nodes[parent].kind != AGGREGATE_KIND)
         })
@@ -272,7 +272,7 @@ impl SqlDocument {
 }
 
 impl SqlDocument {
-    /// The nodes of `kind` that `keep` accepts, labelled `kind`, as `SqlNode` locations.
+    /// The nodes of `kind`, compared without case, that `keep` accepts, as `SqlNode` locations labelled with the tree's kind.
     fn source_nodes<'py>(
         &self,
         py: Python<'py>,
@@ -290,7 +290,7 @@ impl SqlDocument {
                 py,
                 RecordId::SqlNode,
                 &[
-                    ("kind", kind.into_pyobject(py)?.into_any()),
+                    ("kind", node.kind.into_pyobject(py)?.into_any()),
                     ("line", node.line.into_pyobject(py)?.into_any()),
                     ("column", node.column.into_pyobject(py)?.into_any()),
                 ],

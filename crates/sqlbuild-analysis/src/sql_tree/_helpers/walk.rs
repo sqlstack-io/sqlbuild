@@ -91,7 +91,11 @@ fn clause_nodes(
             line,
             column,
             parent: Some(index),
-            extent: clause.span.map(|span| map.extent(span)),
+            extent: match clause.span {
+                Some(span) => Some(map.extent(span)),
+                None if clause.spans_statement => node.extent.clone(),
+                None => None,
+            },
             name: clause.name.map(|name| named(name, &[], map)),
             literal: None,
         });

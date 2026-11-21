@@ -42,7 +42,8 @@ the expanded SQL after interpolation, declarations, and macros.
 ## Common SQL structures
 
 Common structures are available on expanded SQL as `SqlNode` source locations, each with a `kind`,
-a `line` and a `column`:
+a `line` and a `column`. The `kind` is the syntax tree's, such as `cte`, `join`, `subquery` or
+`star`:
 
 ```python
 for cte in sql.expanded.ctes():
@@ -96,6 +97,36 @@ for node in sql.ast().walk():
 `kind`, a `line` and `column` where it starts, `children`, and `walk()`, which yields the node and
 its descendants in pre-order. Kinds are SQLQuack's snake_case names, such as `select`, `subquery`,
 `star`, `join`, `cte`, `alias`, `column`, `table`, `literal`, `function` and `window_function`.
+
+A statement's clauses are nodes too, each owning the expressions written in it, so a rule can look
+at one clause only:
+
+```python
+sql = ctx.sql.for_model(model).expanded
+for clause in sql.ast().walk():
+    if clause.kind == "where":
+        columns = [node for node in clause.walk() if node.kind == "column"]
+```
+
+| Clause kind | Belongs to | Children |
+| --- | --- | --- |
+| `cte` | A statement with `WITH` | The CTE's query |
+| `projection` | `select` | Each select-list item |
+| `from` | `select` | Each `FROM` source, including a comma-separated one |
+| `join` | `select`, `update`, `delete` | The joined source, then its `ON` condition |
+| `where` | `select`, `update`, `delete` | The predicate |
+| `group_by` | `select` | Each grouping key |
+| `having` | `select` | The predicate |
+| `qualify` | `select` | The predicate |
+| `order_by` | `select`, `union`, `intersect`, `except`, `update`, `delete` | Each sort key, without its direction |
+| `limit` | The same | The row count |
+| `partition_by` | `window_function` | Each partition key |
+| `window_order_by` | `window_function` | Each sort key, without its direction |
+
+A clause appears only where the SQL writes it, except `projection`, which every `select` has. An
+explicit join is a `join` node beside `from`. The `ORDER BY` and `LIMIT` after a `UNION`,
+`INTERSECT` or `EXCEPT` belong to the set operation, not to its last `select`. `cte` and `join`
+nodes have their own spans; the other clause nodes report their statement's start, end and span.
 
 Nodes also have these attributes, which are `None` on nodes they don't apply to:
 

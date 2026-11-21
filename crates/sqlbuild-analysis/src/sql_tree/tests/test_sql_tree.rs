@@ -1,14 +1,16 @@
 use crate::sql_tree::errors::SqlTreeError;
 use crate::sql_tree::main::sql_tree_nodes::sql_tree_nodes;
-use crate::sql_tree::tests::helpers::{facts, shape};
+use crate::sql_tree::tests::helpers::{clauses, expression_facts, facts, shape};
 use crate::sql_tree::tests::test_types::{
-    TreeFactsTestCase, TreeFailureTestCase, TreeShapeTestCase,
+    TreeClausesTestCase, TreeFactsTestCase, TreeFailureTestCase, TreeShapeTestCase,
 };
 
 const CTE_AND_JOIN_SQL: &str =
     "WITH x AS (SELECT 1 AS id)\nSELECT *\n  FROM x JOIN (SELECT 2 AS id) s ON x.id = s.id";
 
 const SNOWFLAKE_MARKER_SQL: &str = "WITH o AS (SELECT * FROM __ref(\"orders\"))\nSELECT o.*, c.name\nFROM o JOIN __ref(\"customers\") c ON o.id = c.id JOIN (SELECT 2 AS id) s ON s.id = o.id\nWHERE o.id IN (SELECT id FROM __source(\"raw_returns\"))";
+
+const CLAUSES_SQL: &str = "SELECT o.order_id, o.total > 2, COUNT(*) AS c\nFROM orders o\nWHERE o.is_paid\nGROUP BY o.order_id, o.region\nHAVING COUNT(*) > 1\nQUALIFY ROW_NUMBER() OVER (PARTITION BY o.order_id ORDER BY o.placed_at) = 1\nORDER BY o.order_id\nLIMIT 5";
 
 const NAMES_AND_LITERALS_SQL: &str =
     "SELECT o.\"Id\" AS order_id, 'x''y' AS s, 42 + 1\nFROM db.sch.orders AS o WHERE o.v = N'z'";
@@ -24,7 +26,7 @@ fn given_sql_when_building_a_rule_tree_then_clauses_own_their_queries_at_their_s
                 ("select", 1, 1, None),
                 ("cte", 1, 6, Some("select")),
                 ("select", 1, 12, Some("cte")),
-                ("star", 2, 8, Some("select")),
+                ("star", 2, 8, Some("projection")),
                 ("join", 3, 10, Some("select")),
                 ("subquery", 3, 15, Some("join")),
                 ("select", 3, 16, Some("subquery")),
@@ -38,7 +40,7 @@ fn given_sql_when_building_a_rule_tree_then_clauses_own_their_queries_at_their_s
                 ("select", 1, 1, None),
                 ("cte", 1, 6, Some("select")),
                 ("select", 1, 12, Some("cte")),
-                ("star", 2, 8, Some("select")),
+                ("star", 2, 8, Some("projection")),
                 ("join", 3, 10, Some("select")),
                 ("select", 3, 15, Some("subquery")),
                 ("subquery", 3, 15, Some("join")),
@@ -50,7 +52,7 @@ fn given_sql_when_building_a_rule_tree_then_clauses_own_their_queries_at_their_s
             sql: "SELECT o.*,\n  (SELECT MAX(id) FROM orders) AS top_id\nFROM orders o",
             expected_nodes: vec![
                 ("select", 1, 1, None),
-                ("star", 1, 8, Some("select")),
+                ("star", 1, 8, Some("projection")),
                 ("select", 2, 3, Some("subquery")),
                 ("subquery", 2, 3, Some("alias")),
             ],
@@ -63,8 +65,8 @@ fn given_sql_when_building_a_rule_tree_then_clauses_own_their_queries_at_their_s
                 ("select", 1, 1, None),
                 ("cte", 1, 6, Some("select")),
                 ("select", 1, 12, Some("cte")),
-                ("star", 1, 19, Some("select")),
-                ("star", 2, 8, Some("select")),
+                ("star", 1, 19, Some("projection")),
+                ("star", 2, 8, Some("projection")),
                 ("join", 3, 8, Some("select")),
                 ("join", 3, 49, Some("select")),
                 ("select", 3, 54, Some("subquery")),
@@ -78,7 +80,7 @@ fn given_sql_when_building_a_rule_tree_then_clauses_own_their_queries_at_their_s
             sql: "SELECT l.*\nFROM __table_fn(\"lines_for\")('B-1', __ref(\"orders\").k) AS l JOIN (SELECT 1 AS k) s ON s.k = l.k",
             expected_nodes: vec![
                 ("select", 1, 1, None),
-                ("star", 1, 8, Some("select")),
+                ("star", 1, 8, Some("projection")),
                 ("join", 2, 61, Some("select")),
                 ("select", 2, 66, Some("subquery")),
                 ("subquery", 2, 66, Some("join")),
@@ -91,8 +93,8 @@ fn given_sql_when_building_a_rule_tree_then_clauses_own_their_queries_at_their_s
             expected_nodes: vec![
                 ("select", 1, 1, None),
                 ("select", 2, 6, Some("subquery")),
-                ("subquery", 2, 6, Some("select")),
-                ("star", 2, 14, Some("select")),
+                ("subquery", 2, 6, Some("from")),
+                ("star", 2, 14, Some("projection")),
                 ("join", 2, 43, Some("select")),
                 ("select", 2, 48, Some("subquery")),
                 ("subquery", 2, 48, Some("join")),
@@ -130,7 +132,7 @@ fn given_sql_when_building_a_rule_tree_then_clauses_own_their_queries_at_their_s
                 ("select", 1, 1, None),
                 ("join", 2, 8, Some("select")),
                 ("select", 2, 31, Some("subquery")),
-                ("subquery", 2, 31, Some("select")),
+                ("subquery", 2, 31, Some("from")),
             ],
         },
     ];
@@ -235,7 +237,9 @@ fn given_sql_when_building_a_rule_tree_then_nodes_carry_names_literals_and_sourc
     for test_case in test_cases {
         let nodes = sql_tree_nodes(test_case.sql, test_case.dialect);
         assert_eq!(
-            nodes.as_deref().map(|nodes| facts(test_case.sql, nodes)),
+            nodes
+                .as_deref()
+                .map(|nodes| expression_facts(test_case.sql, nodes)),
             Ok(test_case
                 .expected_facts
                 .iter()
@@ -286,6 +290,112 @@ fn given_sql_without_a_full_tree_when_building_a_rule_tree_then_the_reason_is_re
         assert!(
             error.as_ref().is_some_and(test_case.expected_error),
             "{}: {error:?}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_query_when_building_a_rule_tree_then_each_clause_owns_its_expressions() {
+    let every_clause = || {
+        vec![
+            ("projection", vec!["column 1:8", "gt 1:20", "alias 1:33"]),
+            ("from", vec!["table 2:6"]),
+            ("where", vec!["column 3:7"]),
+            ("group_by", vec!["column 4:10", "column 4:22"]),
+            ("having", vec!["gt 5:8"]),
+            ("qualify", vec!["eq 6:9"]),
+            ("order_by", vec!["column 7:10"]),
+            ("limit", vec!["literal 1:1"]),
+            ("partition_by", vec!["column 6:41"]),
+            ("window_order_by", vec!["column 6:61"]),
+        ]
+    };
+    let test_cases = [
+        TreeClausesTestCase {
+            description: "Snowflake: every clause, and a window's partition and order keys apart",
+            dialect: "snowflake",
+            sql: CLAUSES_SQL,
+            expected_clauses: every_clause(),
+        },
+        TreeClausesTestCase {
+            description: "DuckDB: every clause, and a window's partition and order keys apart",
+            dialect: "duckdb",
+            sql: CLAUSES_SQL,
+            expected_clauses: every_clause(),
+        },
+        TreeClausesTestCase {
+            description: "a set operation's ORDER BY and LIMIT belong to the whole query",
+            dialect: "duckdb",
+            sql: "SELECT a FROM t\nUNION ALL\nSELECT a FROM u\nORDER BY a\nLIMIT 3",
+            expected_clauses: vec![
+                ("order_by", vec!["column 4:10"]),
+                ("limit", vec!["literal 1:1"]),
+                ("projection", vec!["column 1:8"]),
+                ("from", vec!["table 1:15"]),
+                ("projection", vec!["column 3:8"]),
+                ("from", vec!["table 3:15"]),
+            ],
+        },
+        TreeClausesTestCase {
+            description: "a comma-separated source after an explicit join belongs to FROM",
+            dialect: "snowflake",
+            sql: "SELECT 1\nFROM a JOIN b ON a.k = b.k, c",
+            expected_clauses: vec![
+                ("projection", vec!["literal 1:1"]),
+                ("from", vec!["table 2:6", "table 2:29"]),
+            ],
+        },
+        TreeClausesTestCase {
+            description: "a DELETE's WHERE owns its predicate",
+            dialect: "snowflake",
+            sql: "DELETE FROM t\nWHERE t.a = 1",
+            expected_clauses: vec![("where", vec!["eq 2:7"])],
+        },
+    ];
+
+    for test_case in test_cases {
+        let nodes = sql_tree_nodes(test_case.sql, test_case.dialect).expect(test_case.description);
+        let found: Vec<(&str, Vec<String>)> = clauses(&nodes);
+        let described: Vec<(&str, Vec<&str>)> = found
+            .iter()
+            .map(|(kind, children)| (*kind, children.iter().map(String::as_str).collect()))
+            .collect();
+
+        assert_eq!(
+            described, test_case.expected_clauses,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_clause_without_its_own_span_when_building_a_rule_tree_then_it_takes_its_statement_s() {
+    let test_cases = [TreeFactsTestCase {
+        description: "Snowflake: each clause reports the statement's start, end and text",
+        dialect: "snowflake",
+        sql: "SELECT a\nFROM t\nWHERE a > 1",
+        expected_facts: &[
+            "select 1:1 to 3:12 \"SELECT a\\nFROM t\\nWHERE a > 1\"",
+            "projection 1:1 to 3:12 \"SELECT a\\nFROM t\\nWHERE a > 1\"",
+            "from 1:1 to 3:12 \"SELECT a\\nFROM t\\nWHERE a > 1\"",
+            "where 1:1 to 3:12 \"SELECT a\\nFROM t\\nWHERE a > 1\"",
+            "column 1:8 name=a to 1:9 \"a\"",
+            "table 2:6 name=t to 2:7 \"t\"",
+            "gt 3:7 to 3:12 \"a > 1\"",
+            "column 3:7 name=a to 3:8 \"a\"",
+            "literal 3:7 number=1",
+        ],
+    }];
+
+    for test_case in test_cases {
+        let nodes = sql_tree_nodes(test_case.sql, test_case.dialect).expect(test_case.description);
+
+        assert_eq!(
+            facts(test_case.sql, &nodes),
+            test_case.expected_facts,
+            "{}",
             test_case.description
         );
     }
