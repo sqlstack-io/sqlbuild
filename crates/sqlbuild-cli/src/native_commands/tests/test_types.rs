@@ -353,3 +353,11 @@ pub(super) struct FastClockScanTestCase {
     /// Whether a table altered a second after the page read is still described live.
     pub(super) expected_described_live: bool,
 }
+
+/// Providers a health report shows missing secrets, and those `sqb dev` warns about.
+pub(super) struct UnsetProviderSecretsTestCase {
+    pub(super) description: &'static str,
+    /// Each provider, whether the target allows it to miss secrets, and the variables it misses.
+    pub(super) providers: Vec<(&'static str, bool, Vec<&'static str>)>,
+    pub(super) expected_unset: Vec<(&'static str, Vec<&'static str>)>,
+}

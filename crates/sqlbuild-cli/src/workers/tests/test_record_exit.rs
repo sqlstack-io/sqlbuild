@@ -5,24 +5,27 @@ use crate::workers::models::WorkerExit;
 use crate::workers::tests::helpers::worker_leading;
 use crate::workers::tests::test_types::RecordExitTestCase;
 
+/// Far above the highest process ID any Unix hands out (Linux caps `pid_max` at 2^22, macOS and the BSDs at 99,999), so signalling these groups can never reach a real process.
+const IMPOSSIBLE_GROUP: u32 = 2_000_000_001;
+
 #[test]
 fn given_a_registered_worker_group_when_its_exit_is_seen_then_a_forced_stop_no_longer_signals_it() {
     let test_cases = [
         RecordExitTestCase {
             description: "the worker exited and was reaped",
-            group: 4_000_001,
+            group: IMPOSSIBLE_GROUP,
             seen: Some(WorkerExit::Code(0)),
             expected_registered: false,
         },
         RecordExitTestCase {
             description: "a recovered worker reported absent",
-            group: 4_000_002,
+            group: IMPOSSIBLE_GROUP + 1,
             seen: Some(WorkerExit::Absent),
             expected_registered: false,
         },
         RecordExitTestCase {
             description: "the worker is still running",
-            group: 4_000_003,
+            group: IMPOSSIBLE_GROUP + 2,
             seen: None,
             expected_registered: true,
         },

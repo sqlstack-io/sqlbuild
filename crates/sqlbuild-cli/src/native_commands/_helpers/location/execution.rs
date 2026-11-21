@@ -834,6 +834,24 @@ pub(crate) fn location_warning(title: &str, detail: String) {
     }));
 }
 
+/// The providers whose missing secrets stop runs, by the variables they read: a provider the target allows to miss secrets is left out.
+pub(crate) fn unset_provider_secrets(
+    providers: &[MissingProviderSecrets],
+) -> Vec<UnsetProviderSecrets> {
+    let mut unset: Vec<UnsetProviderSecrets> = Vec::new();
+    for provider in providers.iter().filter(|provider| !provider.allowed) {
+        let mut variables: Vec<String> = Vec::new();
+        for setting in &provider.settings {
+            variables.push(setting.variable.clone());
+        }
+        unset.push(UnsetProviderSecrets {
+            provider: provider.provider.clone(),
+            variables,
+        });
+    }
+    unset
+}
+
 /// Report the providers a publication shows missing secrets; under `sqb dev`, also tell the screen, which warns until a report shows none.
 pub(crate) async fn report_provider_secrets(
     options: &LocationServe,
@@ -856,19 +874,8 @@ pub(crate) async fn report_provider_secrets(
             ),
         )]));
     }
-    let mut unset: Vec<UnsetProviderSecrets> = Vec::new();
-    for provider in providers.iter().filter(|provider| !provider.allowed) {
-        let mut variables: Vec<String> = Vec::new();
-        for setting in &provider.settings {
-            variables.push(setting.variable.clone());
-        }
-        unset.push(UnsetProviderSecrets {
-            provider: provider.provider.clone(),
-            variables,
-        });
-    }
     drop(emit_dev_event(&DevEvent::MissingSecrets {
-        providers: unset,
+        providers: unset_provider_secrets(&providers),
     }));
     report_location_health(
         options,
