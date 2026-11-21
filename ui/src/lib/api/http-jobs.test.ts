@@ -92,6 +92,7 @@ describe('trigger mapping', () => {
 			failure_code: after ? null : 'sensor_function_failed',
 			error: after ? null : 'Traceback (most recent call last):\nValueError: feed down',
 			skipped_for: after ? ['r-busy', 'r-busy'] : [],
+			abandoned_because: null,
 			definition_fingerprint: fingerprint
 		});
 		const state: W['PersonSensorState'] = {
@@ -114,7 +115,7 @@ describe('trigger mapping', () => {
 			lastEvaluatedFingerprint: 'v1',
 			action: 'inventory_landed()',
 			timeoutSeconds: 45,
-			failing: { since: '2026-11-07T06:10:00Z', failedTicks: 1, eventId: 'source:def', eventSummary: 'source:stock_feed has another version' }
+			failing: { reason: null, since: '2026-11-07T06:10:00Z', failedTicks: 1, eventId: 'source:def', eventSummary: 'source:stock_feed has another version' }
 		});
 		expect(detail.definitionChanged).toBe(true);
 		expect(detail.evaluations?.map((e) => [e.id, e.outcome, e.cursorBefore, e.cursorAfter, e.eventId, e.runIds, e.failureCode, e.error, e.skippedFor])).toEqual([

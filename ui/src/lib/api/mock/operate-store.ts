@@ -1506,5 +1506,5 @@ function failingOf(evaluations: SensorEvaluation[]): SensorFailing | null {
 	const end = done.findIndex((e) => e.outcome !== 'failed' && e.outcome !== 'timed_out');
 	const failed = end === -1 ? done : done.slice(0, end);
 	const first = failed.at(-1);
-	return first ? { since: first.requestedAt, failedTicks: failed.length, eventId: first.eventId, eventSummary: first.eventSummary } : null;
+	return first ? { reason: null, since: first.requestedAt, failedTicks: failed.length, eventId: first.eventId, eventSummary: first.eventSummary } : null;
 }

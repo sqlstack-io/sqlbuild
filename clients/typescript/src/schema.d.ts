@@ -1558,6 +1558,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description Why a tick ended before its function's answer was committed.
+         * @enum {string}
+         */
+        AbandonReason: "unanswered" | "superseded" | "republished" | "paused" | "cursor_reset" | "leader_changed";
         /** @description Marks a run as handled for everyone who can see it, or withdraws the mark; retried with the same event ID it applies once. */
         AcknowledgementRequest: {
             acknowledged: boolean;
@@ -2698,6 +2703,7 @@ export interface components {
             event_storage_id: number;
         };
         PersonSensorEvaluation: {
+            abandoned_because?: null | components["schemas"]["AbandonReason"];
             cursor_after?: null | components["schemas"]["PersonSensorCursor"];
             cursor_before: components["schemas"]["PersonSensorCursor"];
             definition_fingerprint: string;
@@ -3876,6 +3882,8 @@ export interface components {
             event_id?: string | null;
             event_summary?: string | null;
             failed_ticks: number;
+            /** @description Why the newest failing tick failed, when the function gave no error, as for a location that didn't answer. */
+            reason?: string | null;
             /**
              * Format: date-time
              * @description When the first of the failed ticks since the last good one started.

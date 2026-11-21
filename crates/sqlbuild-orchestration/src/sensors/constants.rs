@@ -11,8 +11,6 @@ pub(crate) const TIMESTAMP_VALUE_KIND: &str = "timestamp";
 pub const MAX_SENSOR_RUN_REQUESTS: usize = 100;
 /// Pages a person's look at recent events reads back at most.
 pub(crate) const RECENT_EVENT_PAGES: usize = 10;
-/// Finished ticks read back to find when a failing sensor started failing.
-pub(crate) const FAILING_TICKS_READ: usize = 200;
 /// Events `sqb sensor try` lists at most.
 pub(crate) const MAX_TRIAL_EVENTS: usize = 100;
 /// The runtime request key of `sqb sensor try`: `{"try_sensor": SensorTrial}`.
@@ -29,3 +27,5 @@ pub(crate) const TICK_STARTED: &str = "started";
 pub(crate) const NODE_EVENT_ROWS: &str = " AND n.started_at IS NOT NULL AND r.kind<>'group'";
 /// The rows `check_event` reads: checks, audits and SQL tests of any run.
 pub(crate) const CHECK_EVENT_ROWS: &str = " AND n.kind='check'";
+/// The tick phases a failing streak counts: failed, timed out, or abandoned because the location didn't answer.
+pub(crate) const FAILING_TICK_PHASES: &str = "(phase IN ('failed','timed_out') OR (phase='abandoned' AND fact_json -> 'outcome' ->> 'reason'='unanswered'))";

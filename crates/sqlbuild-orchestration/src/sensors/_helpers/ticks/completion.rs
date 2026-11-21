@@ -8,7 +8,7 @@ use crate::scheduler::models::SchedulerLease;
 use crate::sensors::_helpers::ticks::attempts::{defer_sensor, last_attempt, read_sensor};
 use crate::sensors::_helpers::ticks::facts::{append_evaluation, commit_cursor, record_delivery};
 use crate::sensors::main::read_sensor_cursor::read_sensor_cursor;
-use crate::sensors::models::{SensorEvaluationOutcome, SensorEvaluationRequest};
+use crate::sensors::models::{AbandonReason, SensorEvaluationOutcome, SensorEvaluationRequest};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -36,12 +36,22 @@ pub(crate) async fn pending_evaluation(
     }
     let (transaction, sensor) = read_sensor(transaction, evaluation.trigger_id).await?;
     let (transaction, cursor) = read_sensor_cursor(transaction, evaluation.trigger_id).await?;
-    if sensor.is_none_or(|sensor| {
-        sensor.status != TriggerStatus::Running || sensor.snapshot_id != evaluation.snapshot_id
-    }) || cursor != evaluation.cursor
-    {
-        let transaction =
-            append_evaluation(transaction, evaluation, SensorEvaluationOutcome::Abandoned).await?;
+    let reason = match sensor {
+        None => Some(AbandonReason::Republished),
+        Some(sensor) if sensor.status != TriggerStatus::Running => Some(AbandonReason::Paused),
+        Some(sensor) if sensor.snapshot_id != evaluation.snapshot_id => {
+            Some(AbandonReason::Republished)
+        }
+        Some(_) if cursor != evaluation.cursor => Some(AbandonReason::CursorReset),
+        Some(_) => None,
+    };
+    if let Some(reason) = reason {
+        let transaction = append_evaluation(
+            transaction,
+            evaluation,
+            SensorEvaluationOutcome::Abandoned { reason },
+        )
+        .await?;
         commit(transaction).await?;
         return Ok(None);
     }

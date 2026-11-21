@@ -130,6 +130,7 @@ async fn evaluations(
                 failure_code: None,
                 error: None,
                 skipped_for: Vec::new(),
+                abandoned_because: None,
                 definition_fingerprint: request.definition_fingerprint.clone(),
             });
         let outcome = event.fact_json.outcome;
@@ -164,6 +165,9 @@ async fn evaluations(
             SensorEvaluationOutcome::Failed { code, error } => {
                 check.failure_code = Some(code);
                 check.error = error.filter(|_| evidence).map(|error| redact_text(&error));
+            }
+            SensorEvaluationOutcome::Abandoned { reason } => {
+                check.abandoned_because = Some(reason);
             }
             _ => {}
         }

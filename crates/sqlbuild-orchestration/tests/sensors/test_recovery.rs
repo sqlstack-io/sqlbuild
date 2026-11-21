@@ -10,7 +10,7 @@ use crate::platform::_helpers::maintenance::retention::retain;
 use crate::runs::main::listings::list_runs::list_runs;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
-use crate::sensors::models::SensorEvaluationOutcome;
+use crate::sensors::models::{AbandonReason, SensorEvaluationOutcome};
 use crate::sensors::tests::helpers::complete_starting_job;
 use crate::sensors::tests::helpers::{append_events, change, evaluations, snapshot};
 use crate::sensors::tests::test_types::SensorTestCase;
@@ -90,7 +90,9 @@ fn given_a_crashed_sensor_when_leadership_or_snapshot_changes_then_stale_results
                     .last()
                     .expect("abandoned fact")
                     .outcome,
-                SensorEvaluationOutcome::Abandoned
+                SensorEvaluationOutcome::Abandoned {
+                    reason: AbandonReason::LeaderChanged
+                }
             ));
             tokio::time::sleep(Duration::from_secs(1)).await;
             let requested = begin_sensor_evaluation(store, &successor, (trigger.trigger_id, None))
@@ -169,7 +171,9 @@ fn given_a_crashed_sensor_when_leadership_or_snapshot_changes_then_stale_results
                     .last()
                     .expect("reset abandonment")
                     .outcome,
-                SensorEvaluationOutcome::Abandoned
+                SensorEvaluationOutcome::Abandoned {
+                    reason: AbandonReason::CursorReset
+                }
             ));
             tokio::time::sleep(Duration::from_secs(1)).await;
             let before_pause =
@@ -190,7 +194,9 @@ fn given_a_crashed_sensor_when_leadership_or_snapshot_changes_then_stale_results
                     .last()
                     .expect("pause abandonment")
                     .outcome,
-                SensorEvaluationOutcome::Abandoned
+                SensorEvaluationOutcome::Abandoned {
+                    reason: AbandonReason::Paused
+                }
             ));
             change(store, trigger.trigger_id, TriggerChange::ResetDefault).await;
             tokio::time::sleep(Duration::from_secs(1)).await;

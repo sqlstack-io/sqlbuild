@@ -123,7 +123,7 @@ describe('a failing sensor on the overview', () => {
 				kind: 'sensor_failing',
 				triggerId: 't-orders',
 				triggerName: 'orders_failed_sensor',
-				failing: { since: hoursAgo(2), failedTicks: 3, eventId: 'run:r-1', eventSummary: 'orders_job failed' },
+				failing: { reason: null, since: hoursAgo(2), failedTicks: 3, eventId: 'run:r-1', eventSummary: 'orders_job failed' },
 				condition: { key: 'sensor:t-orders', shape: { occurrence: hoursAgo(2) }, acknowledged: null, lapsed: null }
 			}
 		]);

@@ -154,7 +154,7 @@ export function attentionView(item: AttentionItem, now: number, changedBuild: Ch
 				key: `sensor:${item.triggerId}`,
 				tone: 'error',
 				title: `Sensor ${item.triggerName} is failing`,
-				detail: [item.failing.eventId ? `Stuck on ${item.failing.eventId}` : null, plural(item.failing.failedTicks, 'failed tick')].filter(Boolean).join(' · '),
+				detail: [item.failing.reason, item.failing.eventId ? `Stuck on ${item.failing.eventId}` : null, plural(item.failing.failedTicks, 'failed tick')].filter(Boolean).join(' · '),
 				since: formatAgo(item.failing.since, now),
 				href: `/triggers/${item.triggerId}`,
 				action: 'View sensor',

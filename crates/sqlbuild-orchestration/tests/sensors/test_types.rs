@@ -52,3 +52,22 @@ pub(crate) struct CheckEventTestCase {
     /// The checks whose outcome starts a run, each once.
     pub(crate) expected_checks: &'static [&'static str],
 }
+
+pub(crate) struct SensorFailingTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// How the ticks after one good tick end, oldest first.
+    pub(crate) ticks: &'static [FailingTick],
+    pub(crate) expected_failed_ticks: Option<usize>,
+    pub(crate) expected_reason: Option<&'static str>,
+    /// Why the newest tick was abandoned, as people see it.
+    pub(crate) expected_abandoned_because: Option<crate::sensors::models::AbandonReason>,
+}
+
+/// One tick's ending in a failing-streak case; `Failed(n)` is `n` failed ticks in a row.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum FailingTick {
+    Failed(usize),
+    Completed,
+    Abandoned(crate::sensors::models::AbandonReason),
+}

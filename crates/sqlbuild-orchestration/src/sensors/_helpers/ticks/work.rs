@@ -10,8 +10,8 @@ use crate::platform::models::{LocationWork, LocationWorkOutcome, LocationWorkReq
 use crate::sensors::_helpers::ticks::requests::{queue_sensor_run, unknown_job};
 use crate::sensors::constants::SENSOR_WORK_GRACE_SECONDS;
 use crate::sensors::models::{
-    RequestedRun, SensorEvaluationOutcome, SensorEvaluationRequest, SensorFunctionOutcome,
-    SensorRequests,
+    AbandonReason, RequestedRun, SensorEvaluationOutcome, SensorEvaluationRequest,
+    SensorFunctionOutcome, SensorRequests,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -59,16 +59,21 @@ pub(crate) async fn read_evaluation_result(
         let expired = work.record.expires_at <= transaction.now;
         return Ok((
             transaction,
-            expired.then_some(SensorEvaluationOutcome::Abandoned),
+            expired.then_some(SensorEvaluationOutcome::Abandoned {
+                reason: AbandonReason::Unanswered,
+            }),
         ));
     }
     match work.record.result_json.map(|result| result.outcome) {
         Some(LocationWorkOutcome::SensorEvaluation { outcome }) => {
             apply_result(transaction, evaluation, outcome).await
         }
-        Some(LocationWorkOutcome::Superseded {}) => {
-            Ok((transaction, Some(SensorEvaluationOutcome::Abandoned)))
-        }
+        Some(LocationWorkOutcome::Superseded {}) => Ok((
+            transaction,
+            Some(SensorEvaluationOutcome::Abandoned {
+                reason: AbandonReason::Superseded,
+            }),
+        )),
         _ => Err(ControlError::Invalid(
             "sensor has an invalid location result".into(),
         )),

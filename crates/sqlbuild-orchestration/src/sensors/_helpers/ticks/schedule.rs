@@ -7,8 +7,8 @@ use crate::sensors::_helpers::events::conditions::next_event;
 use crate::sensors::_helpers::ticks::attempts::{defer_sensor, last_attempt};
 use crate::sensors::_helpers::ticks::facts::{append_evaluation, commit_cursor};
 use crate::sensors::models::{
-    DueSensor, EventScope, NextEvent, PreviousTick, SensorCursor, SensorEvaluationOutcome,
-    SensorEvent,
+    AbandonReason, DueSensor, EventScope, NextEvent, PreviousTick, SensorCursor,
+    SensorEvaluationOutcome, SensorEvent,
 };
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;
@@ -34,10 +34,17 @@ pub(crate) async fn previous_tick(
                 PreviousTick::Resume(Box::new(previous.request)),
             ));
         }
+        let reason = if previous.request.epoch != lease.epoch {
+            AbandonReason::LeaderChanged
+        } else if previous.request.snapshot_id != sensor.snapshot_id {
+            AbandonReason::Republished
+        } else {
+            AbandonReason::CursorReset
+        };
         transaction = append_evaluation(
             transaction,
             &previous.request,
-            SensorEvaluationOutcome::Abandoned,
+            SensorEvaluationOutcome::Abandoned { reason },
         )
         .await?;
     }

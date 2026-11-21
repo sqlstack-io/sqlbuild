@@ -1048,6 +1048,9 @@ export type TriggerStateEvent = {
 /** What one tick's function call did; `running` while it is in flight. */
 export type SensorEvaluationOutcome = 'running' | 'handled' | 'skipped' | 'started' | 'failed' | 'timed_out' | 'abandoned';
 
+/** Why a tick ended before its answer was committed; only `unanswered` counts toward a failing sensor. */
+export type AbandonReason = 'unanswered' | 'superseded' | 'republished' | 'paused' | 'cursor_reset' | 'leader_changed';
+
 /** One tick: one call of the sensor's function, on one event unless the sensor polls. */
 export type SensorEvaluation = {
 	id: string;
@@ -1068,11 +1071,15 @@ export type SensorEvaluation = {
 	failureCode: string | null;
 	/** The redacted traceback of a failed tick; null without view.evidence. */
 	error: string | null;
+	/** Why an abandoned tick ended unfinished. */
+	abandonedBecause: AbandonReason | null;
 	definitionFingerprint: string;
 };
 
 /** A sensor whose latest ticks failed, and the event it is stuck on. */
 export type SensorFailing = {
+	/** Why the newest failing tick failed when the function gave no error, as for a location that didn't answer. */
+	reason: string | null;
 	since: Iso;
 	failedTicks: number;
 	/** Null for a polling sensor. */

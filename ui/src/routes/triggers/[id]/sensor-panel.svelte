@@ -9,7 +9,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { runStatusLabel, runStatusTone } from '$lib/status';
-	import { evaluationHelp, evaluationLabel, evaluationTone, shortRunId } from '$lib/operate/labels';
+	import { abandonReasonLabel, evaluationHelp, evaluationLabel, evaluationTone, shortRunId } from '$lib/operate/labels';
 	import { plural } from '$lib/format/plural';
 
 	let { trigger }: { trigger: TriggerDetail } = $props();
@@ -65,7 +65,7 @@
 	{#if sensor.failing}
 		<p class="warn" title="A failed tick leaves its event undelivered; it is retried after the minimum interval and later events wait">
 			<!-- copy-allow: consequence of a failing sensor -->
-			Stuck{#if sensor.failing.eventId} on <code>{sensor.failing.eventId}</code>{/if} since {formatAgo(sensor.failing.since, app.now)} · {plural(sensor.failing.failedTicks, 'failed tick')}
+			Stuck{#if sensor.failing.eventId} on <code>{sensor.failing.eventId}</code>{/if} since {formatAgo(sensor.failing.since, app.now)} · {plural(sensor.failing.failedTicks, 'failed tick')}{#if sensor.failing.reason} · {sensor.failing.reason}{/if}
 		</p>
 	{/if}
 	{#if changed}
@@ -111,6 +111,7 @@
 						{#if e.outcome === 'failed' || e.outcome === 'timed_out'}
 							{#if e.error}<details class="trace"><summary class="err">{e.error.split('\n').at(-1)}</summary><pre>{e.error}</pre></details>{:else}<span class="err" title="The traceback needs view.evidence">{e.failureCode ?? e.outcome}</span>{/if}
 						{/if}
+						{#if e.abandonedBecause}<span class:err={e.abandonedBecause === 'unanswered'}>{abandonReasonLabel[e.abandonedBecause]}</span>{/if}
 						{#if e.skippedFor.length}<span title="The job's overlap is skip, so matching requests that arrived while a run was active were dropped">{e.skippedFor.length} skipped · {#each [...new Set(e.skippedFor)] as id, i (id)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${id}`)} title={id}>{shortRunId(id)}</a>{/each}</span>{/if}
 						{#if e.definitionFingerprint !== sensor.currentFingerprint}<span class="sb-tag ml-1.5" title="Checked with code fingerprint {e.definitionFingerprint}">older code</span>{/if}
 					</td>

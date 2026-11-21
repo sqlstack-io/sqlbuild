@@ -440,3 +440,31 @@ pub(crate) async fn drain_sensor(
     }
     started
 }
+
+/// Record a finished tick like `like`, requested `after` it, ending in `outcome`: the request it recorded.
+pub(crate) async fn record_tick(
+    store: &ControlStore,
+    like: &SensorEvaluationRequest,
+    after: chrono::TimeDelta,
+    outcome: crate::sensors::models::SensorEvaluationOutcome,
+) -> SensorEvaluationRequest {
+    let request = SensorEvaluationRequest {
+        evaluation_id: Uuid::now_v7(),
+        requested_at: like.requested_at + after,
+        ..like.clone()
+    };
+    let transaction = begin(store, TransactionMode::Write).await.expect("record");
+    let transaction = crate::sensors::_helpers::ticks::facts::append_evaluation(
+        transaction,
+        &request,
+        crate::sensors::models::SensorEvaluationOutcome::Requested,
+    )
+    .await
+    .expect("requested");
+    let transaction =
+        crate::sensors::_helpers::ticks::facts::append_evaluation(transaction, &request, outcome)
+            .await
+            .expect("finished");
+    commit(transaction).await.expect("commit tick");
+    request
+}

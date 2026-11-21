@@ -473,7 +473,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                     .await
                     .iter()
                     .filter(|fact| fact.request.evaluation_id == stale.evaluation_id
-                        && fact.outcome == SensorEvaluationOutcome::Abandoned)
+                        && matches!(fact.outcome, SensorEvaluationOutcome::Abandoned { .. }))
                     .count(),
                 1
             );

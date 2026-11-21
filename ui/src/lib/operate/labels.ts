@@ -13,6 +13,7 @@ import type {
 	RunEvent,
 	RunNodeStatus,
 	SensorEvaluationOutcome,
+	AbandonReason,
 	TickOutcome,
 	TriggerKind,
 	TriggerStateEventKind
@@ -253,7 +254,16 @@ export const evaluationHelp: Record<SensorEvaluationOutcome, string> = {
 	started: 'The function returned run requests, which started runs (started)',
 	failed: 'The function raised, or returned something it may not; the event is retried after the minimum interval (failed)',
 	timed_out: 'The function took longer than its timeout; the event is retried after the minimum interval (timed_out)',
-	abandoned: 'Replaced by a newer publication, a cursor reset or a pause before it finished (abandoned)'
+	abandoned: 'Ended before it finished; only a location that did not answer counts as failing (abandoned)'
+};
+
+export const abandonReasonLabel: Record<AbandonReason, string> = {
+	unanswered: "The location didn't answer in time",
+	superseded: 'The location replaced it, as when it restarted',
+	republished: 'The location published again',
+	paused: 'The sensor was paused',
+	cursor_reset: 'The cursor was reset or moved',
+	leader_changed: 'Another server took over scheduling'
 };
 
 export const triggerKindLabel: Record<TriggerKind, string> = {

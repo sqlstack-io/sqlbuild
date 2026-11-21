@@ -126,13 +126,14 @@ function toEvaluation(wire: Wire['PersonSensorEvaluation']): SensorEvaluation {
 		skippedFor: wire.skipped_for,
 		failureCode: wire.failure_code ?? null,
 		error: wire.error ?? null,
+		abandonedBecause: wire.abandoned_because ?? null,
 		definitionFingerprint: wire.definition_fingerprint
 	};
 }
 
 /** A sensor whose latest ticks failed, as the trigger list and Overview show it. */
 export function toSensorFailing(wire: Wire['SensorFailing'] | null | undefined): SensorFailing | null {
-	return wire ? { since: wire.since, failedTicks: wire.failed_ticks, eventId: wire.event_id ?? null, eventSummary: wire.event_summary ?? null } : null;
+	return wire ? { reason: wire.reason ?? null, since: wire.since, failedTicks: wire.failed_ticks, eventId: wire.event_id ?? null, eventSummary: wire.event_summary ?? null } : null;
 }
 
 /** The cursor last moved when a check completed or an operator set or reset it, whichever is newer. */

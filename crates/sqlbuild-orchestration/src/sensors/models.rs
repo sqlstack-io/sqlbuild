@@ -378,7 +378,28 @@ pub enum SensorEvaluationOutcome {
         error: Option<String>,
     },
     TimedOut,
-    Abandoned,
+    /// The tick ended unfinished; only `Unanswered` counts toward a failing sensor.
+    Abandoned {
+        reason: AbandonReason,
+    },
+}
+
+/// Why a tick ended before its function's answer was committed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AbandonReason {
+    /// The location didn't answer before the tick's work expired.
+    Unanswered,
+    /// The location replaced the work, as when it restarted.
+    Superseded,
+    /// The location published again while the tick ran.
+    Republished,
+    /// The sensor was paused while the tick ran.
+    Paused,
+    /// The sensor's cursor was reset or moved while the tick ran.
+    CursorReset,
+    /// Another scheduler took over while the tick ran.
+    LeaderChanged,
 }
 
 /// A run key the sensor matched but did not queue: the job's overlap is `skip` and `active_run_id` was active.
@@ -407,7 +428,7 @@ impl SensorEvaluationOutcome {
             Self::Completed { .. } => "completed",
             Self::Failed { .. } => "failed",
             Self::TimedOut => "timed_out",
-            Self::Abandoned => "abandoned",
+            Self::Abandoned { .. } => "abandoned",
         }
     }
 }
@@ -485,12 +506,17 @@ pub struct PersonSensorEvaluation {
     pub error: Option<String>,
     /// For each requested run the job's `skip` overlap dropped, the run that was active.
     pub skipped_for: Vec<Uuid>,
+    /// Why an abandoned tick ended before its answer was committed.
+    pub abandoned_because: Option<AbandonReason>,
     pub definition_fingerprint: String,
 }
 
 /// A sensor whose latest ticks failed: since when, and the event it is stuck on.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SensorFailing {
+    /// Why the newest failing tick failed, when the function gave no error, as for a location that didn't answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
     /// When the first of the failed ticks since the last good one started.
     pub since: DateTime<Utc>,
     pub failed_ticks: usize,
