@@ -61,6 +61,36 @@ impl ControlError {
         }
     }
 
+    /// The control store itself failed or the scheduler lost its lease, so no other trigger can carry on either.
+    #[must_use]
+    pub fn ends_cycle(&self) -> bool {
+        matches!(
+            self,
+            Self::Database(_)
+                | Self::Sqlite(_)
+                | Self::Worker(_)
+                | Self::Io(_)
+                | Self::Schema(_)
+                | Self::Fenced
+        )
+    }
+
+    /// What kind of failure this is, in the same words every time: no IDs and no data values.
+    #[must_use]
+    pub fn kind_description(&self) -> &'static str {
+        match self {
+            Self::Database(_) | Self::Sqlite(_) | Self::Worker(_) | Self::Io(_) => {
+                "the control store failed"
+            }
+            Self::Invalid(_) => "control-plane data this release can't read or accept",
+            Self::Denied { .. } => "a control-plane operation was denied",
+            Self::Schema(_) => "the control-store schema is unsupported",
+            Self::StaleGeneration => "a snapshot generation was not newer than the current one",
+            Self::Fenced => "the scheduler lease was lost",
+            Self::UnreadableSnapshot { .. } => "a pinned snapshot can't be read",
+        }
+    }
+
     /// A store that is briefly busy or unreachable; the same operation may succeed when retried.
     #[must_use]
     pub fn transient(&self) -> bool {

@@ -14,5 +14,10 @@ pub(crate) const TICK_RETENTION_BATCHES_PER_PASS: usize = 10;
 pub(crate) const TICK_RETENTION_INTERVAL_SECONDS: u64 = 60;
 /// A trigger whose stored job or snapshot can't be read is evaluated again after this long, so it never holds the scheduler in a busy loop.
 pub(crate) const UNREADABLE_TRIGGER_RETRY_SECONDS: i64 = 60;
+/// A sensor whose check failed is checked again after this long, so it never holds the scheduler in a busy loop.
+pub(crate) const FAILED_SENSOR_RETRY_SECONDS: i64 = 60;
+/// Why a sensor is skipped after its check failed, before the error itself.
+pub(crate) const FAILED_SENSOR: &str =
+    "this sensor's check failed and was skipped; it is checked again in a minute";
 /// Why a trigger is skipped while its stored job or snapshot can't be read.
 pub(crate) const UNREADABLE_TRIGGER: &str = "this trigger's job was published by an earlier SQLBuild release and can't be read; it runs again after its location publishes again";

@@ -436,7 +436,7 @@ pub enum PlatformEvent {
         failed_nodes: Vec<RunNodeFailure>,
         failed_node_count: i64,
     },
-    /// A trigger was skipped because its stored job or pinned snapshot can't be read; it runs again after its location publishes again.
+    /// A trigger was skipped because its stored job or pinned snapshot can't be read, or a sensor because its check failed; `reason` says which.
     TriggerSkipped {
         trigger_id: Uuid,
         snapshot_id: Uuid,
@@ -607,7 +607,7 @@ pub struct RecheckedSensor {
     pub rechecked_at: DateTime<Utc>,
 }
 
-/// A trigger the scheduler skips because its stored job or pinned snapshot can't be read; it clears once its location publishes again.
+/// A trigger the scheduler skips because its stored job or pinned snapshot can't be read, or a sensor whose check failed; it clears once its location publishes again or, for a sensor, a later check completes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SkippedTrigger {
     pub trigger_id: Uuid,

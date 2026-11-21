@@ -1,6 +1,6 @@
-//! Drain a bounded page of due schedules or sensors, renewing the lease between persisted evaluations; a trigger whose job or snapshot can't be read is skipped on its own.
+//! Drain a bounded page of due schedules or sensors, renewing the lease between persisted evaluations; a trigger whose job or snapshot can't be read, or a sensor whose check fails, is skipped on its own.
 
-use crate::scheduler::_helpers::unreadable_trigger::skip_unreadable_trigger;
+use crate::scheduler::_helpers::unreadable_trigger::{skip_failed_sensor, skip_unreadable_trigger};
 use crate::scheduler::main::_evaluate_trigger::evaluate_trigger;
 use crate::scheduler::main::renew_lease::renew_lease;
 use crate::scheduler::models::{DueKind, SchedulerLease};
@@ -39,6 +39,9 @@ pub(crate) async fn drain_due(
             Ok(None) => {}
             Err(ControlError::UnreadableSnapshot { .. }) => {
                 skip_unreadable_trigger(store, &lease, trigger_id).await?;
+            }
+            Err(error) if kind == DueKind::Sensor && !error.ends_cycle() => {
+                skip_failed_sensor(store, &lease, trigger_id, &error).await?;
             }
             Err(error) => return Err(error),
         }

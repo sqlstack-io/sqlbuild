@@ -72,11 +72,14 @@ pub(crate) async fn publish_projections(
         if !dropped.is_empty() {
             transaction = record_trigger_problem(
                 transaction,
-                PlatformEvent::CalendarTimesDropped {
-                    trigger_id: id,
-                    snapshot_id: snapshot.snapshot_id,
-                    times: dropped,
-                },
+                (
+                    PlatformEvent::CalendarTimesDropped {
+                        trigger_id: id,
+                        snapshot_id: snapshot.snapshot_id,
+                        times: dropped,
+                    },
+                    None,
+                ),
             )
             .await?;
         }

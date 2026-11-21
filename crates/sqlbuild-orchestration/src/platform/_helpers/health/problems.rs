@@ -7,7 +7,7 @@ use crate::declarations::models::Schedule;
 use crate::platform::constants::LOCATION_SILENCE_SECONDS;
 use std::collections::BTreeSet;
 
-use crate::platform::constants::SKIPPED_TRIGGER_EVENTS;
+use crate::platform::constants::{OBSERVATION_WINDOW_SECONDS, SKIPPED_TRIGGER_EVENTS};
 use crate::platform::models::{
     DroppedCalendarTimes, LateTarget, LowCalendar, OverdueTick, PlatformEvent,
     PlatformEventEnvelope, ProblemScan, PublishedTrigger, RecheckedSensor, RunningSchedule,
@@ -100,12 +100,17 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
     })
 }
 
-/// Each trigger's live problems, all for the snapshot it is still published in: skipped until the location publishes again, a sensor's re-check from scratch until it or a later check completes, and dropped calendar times until the next successful tick.
+/// Each trigger's live problems, all for the snapshot it is still published in: skipped until the location publishes again or, for a sensor, a later check completes; a sensor's re-check from scratch until it or a later check completes; and dropped calendar times until the next successful tick.
 async fn trigger_problems(
     transaction: ControlTransaction,
 ) -> Result<(ControlTransaction, TriggerProblems), ControlError> {
-    let (transaction, skipped) =
-        open_problems(transaction, "platform_trigger_skipped", "TRUE").await?;
+    let (transaction, skipped) = open_problems(
+        transaction,
+        "platform_trigger_skipped",
+        "NOT EXISTS (SELECT 1 FROM sqb_sensor_evaluation_events e WHERE e.trigger_id=t.trigger_id \
+         AND e.phase='completed' AND e.occurred_at>=$2)",
+    )
+    .await?;
     let (transaction, rechecked) = open_problems(
         transaction,
         "platform_sensor_rechecked",
@@ -166,7 +171,7 @@ async fn trigger_problems(
     Ok((transaction, problems))
 }
 
-/// Each trigger's newest `event_type` event whose trigger is still published in the event's snapshot and whose `open` condition holds, with `$2` bound to a re-check's evaluation.
+/// Each trigger's newest `event_type` event whose trigger is still published in the event's snapshot and whose `open` condition holds, with `$2` bound to a re-check's evaluation or the end of a skip's observation window.
 async fn open_problems(
     transaction: ControlTransaction,
     event_type: &str,
@@ -187,12 +192,22 @@ async fn open_problems(
                 trigger_id,
                 snapshot_id,
                 ..
-            } => (*trigger_id, *snapshot_id, None),
+            } => (
+                *trigger_id,
+                *snapshot_id,
+                Some(Parameter::Time(
+                    envelope.occurred_at + TimeDelta::seconds(OBSERVATION_WINDOW_SECONDS),
+                )),
+            ),
             PlatformEvent::SensorRechecked {
                 trigger_id,
                 snapshot_id,
                 evaluation_id,
-            } => (*trigger_id, *snapshot_id, Some(*evaluation_id)),
+            } => (
+                *trigger_id,
+                *snapshot_id,
+                Some(Parameter::Id(*evaluation_id)),
+            ),
             PlatformEvent::CalendarTimesDropped {
                 trigger_id,
                 snapshot_id,
@@ -230,11 +245,11 @@ async fn newest_events(
     .await
 }
 
-/// Trigger `trigger_id` while it is still published in `snapshot_id` (as `t`, its snapshot as `p`) and the `open` condition holds, with `$2` bound to the given ID.
+/// Trigger `trigger_id` while it is still published in `snapshot_id` (as `t`, its snapshot as `p`) and the `open` condition holds, with `$2` bound to the given value.
 async fn open_trigger(
     transaction: ControlTransaction,
     (trigger_id, snapshot_id): (Uuid, Uuid),
-    (open, bound): (&str, Option<Uuid>),
+    (open, bound): (&str, Option<Parameter>),
 ) -> Result<(ControlTransaction, Option<PublishedTrigger>), ControlError> {
     let (transaction, rows) = query(
         transaction,
@@ -246,7 +261,7 @@ async fn open_trigger(
         ),
         [Parameter::Id(trigger_id)]
             .into_iter()
-            .chain(bound.map(Parameter::Id))
+            .chain(bound)
             .collect(),
     )
     .await?;

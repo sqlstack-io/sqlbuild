@@ -4104,7 +4104,7 @@ export interface components {
             /** Format: uuid */
             session_id: string;
         };
-        /** @description A trigger the scheduler skips because its stored job or pinned snapshot can't be read; it clears once its location publishes again. */
+        /** @description A trigger the scheduler skips because its stored job or pinned snapshot can't be read, or a sensor whose check failed; it clears once its location publishes again or, for a sensor, a later check completes. */
         SkippedTrigger: {
             /** Format: uuid */
             location_id: string;

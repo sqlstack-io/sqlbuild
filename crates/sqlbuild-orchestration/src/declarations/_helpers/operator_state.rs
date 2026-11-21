@@ -67,8 +67,11 @@ pub(crate) async fn apply_operator_change(
                     moved = Some(SensorCursor::default());
                 }
                 TriggerChange::SkipEvent { event } => {
+                    let paused = state.status_override.unwrap_or(definition.default_status)
+                        == TriggerStatus::Paused;
                     let after;
-                    (transaction, after) = skip_sensor_event(transaction, request, event).await?;
+                    (transaction, after) =
+                        skip_sensor_event(transaction, request, (event, paused)).await?;
                     moved = Some(after);
                 }
                 _ => {}
