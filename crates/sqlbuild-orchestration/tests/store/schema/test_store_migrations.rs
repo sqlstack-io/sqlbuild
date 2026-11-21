@@ -54,6 +54,10 @@ const SQLITE_CHECKSUMS: &[(i64, &str)] = &[
         6,
         "efeb5ed2f8bd2d191ec6848427c47201892b299d92c92ca7d0fcdacd0a49d69e",
     ),
+    (
+        7,
+        "a8cb01b0237b5fa2b4a326e65f5512f038032c7a64d82fca9aa95be794a3ccf9",
+    ),
 ];
 const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
     (
@@ -80,6 +84,10 @@ const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
     (
         6,
         "b6400df03f6b2bf630f7a26b4f1f070fd12dfe5097fe471cb175a65b002a0c08",
+    ),
+    (
+        7,
+        "262524dbeb115364afca2d773ddecc33e2035ab51dc320105567043a51434997",
     ),
 ];
 /// A version 1 store mid-run: a child run holding a concurrency slot, a jobs document and an audit result.
