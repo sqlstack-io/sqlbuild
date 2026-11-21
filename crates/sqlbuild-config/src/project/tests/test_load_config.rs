@@ -79,6 +79,20 @@ fn given_project_files_when_loading_then_rejections_match_python_loader() {
             )),
         },
         ProjectFailureTestCase {
+            description: "a project may switch Python table functions to pandas frames",
+            project: "name = 'orders'\nadapter = 'snowflake'\n[defaults]\nfunction_dataframe = 'pandas'\n",
+            local: "",
+            expected_failure: None,
+        },
+        ProjectFailureTestCase {
+            description: "a function frame library is polars or pandas",
+            project: "name = 'orders'\nadapter = 'snowflake'\n[defaults]\nfunction_dataframe = 'arrow'\n",
+            local: "",
+            expected_failure: Some(ConfigFailure::plain(
+                "Expected 'function_dataframe' to be one of: polars, pandas",
+            )),
+        },
+        ProjectFailureTestCase {
             description: "an invalid dynamic section fails the project load",
             project: "name = 'orders'\nadapter = 'snowflake'\n[dynamic]\nheartbeat_grace = 'soon'\n",
             local: "",

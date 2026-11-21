@@ -86,6 +86,7 @@ def execute_function(
                 runtime_version=function_entry.runtime_version,
                 entry_point=function_entry.entry_point,
                 packages=function_entry.packages,
+                dataframe=function_entry.dataframe,
                 source_file_path=function_entry.source_file_path,
             ),
             statement_recorder=statement_recorder,

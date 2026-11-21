@@ -52,6 +52,8 @@ pub struct FunctionFingerprintFields {
     pub runtime_version: String,
     pub entry_point: String,
     pub packages: Vec<String>,
+    /// A Python table function's frame library; other functions have none.
+    pub dataframe: Option<String>,
     pub body_sql: String,
 }
 

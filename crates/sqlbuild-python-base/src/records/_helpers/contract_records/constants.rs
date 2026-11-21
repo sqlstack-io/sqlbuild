@@ -343,6 +343,7 @@ const R_DEFAULTS_CONFIG: RecordSpec = RecordSpec {
         FieldSpec::new("seed_schema", FieldDefault::None),
         FieldSpec::new("function_database", FieldDefault::None),
         FieldSpec::new("function_schema", FieldDefault::None),
+        FieldSpec::new("function_dataframe", FieldDefault::Text("polars")),
         FieldSpec::new("incremental_strategy", FieldDefault::None),
         FieldSpec::new("incremental_mode", FieldDefault::None),
         FieldSpec::new("microbatch_strategy", FieldDefault::None),

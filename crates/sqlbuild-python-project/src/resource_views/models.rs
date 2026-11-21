@@ -240,6 +240,7 @@ impl NativeCompiledFunction {
             self.runtime_version(py)?.into_bound_py_any(py)?,
             self.entry_point(py)?.into_bound_py_any(py)?,
             self.packages(py)?.into_any(),
+            self.dataframe(py)?.into_bound_py_any(py)?,
             self.tags(py)?.into_any(),
             self.description(py)?.into_bound_py_any(py)?,
         ])

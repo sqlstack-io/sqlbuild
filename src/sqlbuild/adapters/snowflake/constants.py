@@ -50,3 +50,7 @@ NAME_SEPARATOR: str = "."
 FIXED_POINT_RESULT_TYPE: str = "FIXED"
 PLATFORM_DETECTION_VARIABLE: str = "SNOWFLAKE_DISABLE_PLATFORM_DETECTION"
 PLATFORM_DETECTION_DISABLED: str = "true"
+POLARS_DATAFRAME: str = "polars"
+PYTHON_TABLE_FUNCTION_HANDLER: str = "_SqbHandler"
+PANDAS_PACKAGES: tuple[str, ...] = ("pandas",)
+POLARS_PACKAGES: tuple[str, ...] = ("pandas", "polars", "pyarrow")

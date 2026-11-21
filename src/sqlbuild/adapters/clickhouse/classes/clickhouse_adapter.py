@@ -930,10 +930,11 @@ class ClickHouseAdapter(
         runtime_version: str | None = None,
         entry_point: str | None = None,
         packages: tuple[str, ...] = (),
+        dataframe: str | None = None,
     ) -> tuple[str, ...]:
         """Create a server-global SQL lambda named ``<schema>__<function>``."""
 
-        del runtime_version, entry_point, packages
+        del runtime_version, entry_point, packages, dataframe
         if language != FunctionLanguage.SQL:
             raise AdapterUserError(
                 message="ClickHouse does not deploy Python functions; executable UDFs need "

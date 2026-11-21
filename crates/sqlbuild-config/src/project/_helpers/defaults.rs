@@ -4,8 +4,8 @@ use crate::models::ConfigValue;
 use crate::project::_helpers::durations::parse_duration;
 use crate::project::_helpers::fields::{
     bool_or_none, coerce_mapping, get, key_name, keyed, object, optional_batch_size,
-    optional_contract_policy, optional_cursor_start, optional_int, optional_mapping,
-    optional_non_negative_int, optional_nullable_bool, optional_strict_int,
+    optional_choice, optional_contract_policy, optional_cursor_start, optional_int,
+    optional_mapping, optional_non_negative_int, optional_nullable_bool, optional_strict_int,
     optional_templated_bool, optional_text_field, string_sequence, value_or_none,
 };
 use crate::project::_helpers::help::{change_policy_problem, change_policy_toml_help};
@@ -13,9 +13,9 @@ use crate::project::_helpers::keys::{Place, reject_removed_virtual_keys, validat
 use crate::project::_helpers::sections::item_timeout;
 use crate::project::constants::{
     BATCH_CONCURRENCY_KEY, CHANGE_POLICY_KEYS, CONTRACT_POLICIES, DEFAULTS_KEYS, DISABLED_VALUE,
-    GLOB_SEGMENTS, INHERIT_VALUE, MATERIALIZATION_DEFAULT_KEYS, MAX_MICROBATCHES_KEY,
-    MODEL_HEADER_KEYS, MODELS_DIRECTORY_NAME, RETENTION_MATERIALIZATIONS, TABLE_TYPES,
-    TEMPLATE_OPEN_TOKEN, UNSUPPORTED_GLOB_MARKERS,
+    FUNCTION_DATAFRAMES, GLOB_SEGMENTS, INHERIT_VALUE, MATERIALIZATION_DEFAULT_KEYS,
+    MAX_MICROBATCHES_KEY, MODEL_HEADER_KEYS, MODELS_DIRECTORY_NAME, RETENTION_MATERIALIZATIONS,
+    TABLE_TYPES, TEMPLATE_OPEN_TOKEN, UNSUPPORTED_GLOB_MARKERS,
 };
 use crate::project::errors::ConfigFailure;
 use crate::project::models::{Built, ConfigFile};
@@ -148,6 +148,15 @@ pub(crate) fn load_defaults(payload: Option<&ConfigValue>, file: ConfigFile) -> 
     fields.push((
         "contract",
         optional_contract_policy(mapping, "contract", &CONTRACT_POLICIES)?,
+    ));
+    fields.push((
+        "function_dataframe",
+        Built::Value(ConfigValue::String(optional_choice(
+            mapping,
+            "function_dataframe",
+            &FUNCTION_DATAFRAMES,
+            FUNCTION_DATAFRAMES[0],
+        )?)),
     ));
     fields.extend(optional_text_fields(
         mapping,

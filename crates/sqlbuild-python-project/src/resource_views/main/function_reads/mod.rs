@@ -1,5 +1,6 @@
 pub mod arguments;
 pub mod body_sql;
+pub mod dataframe;
 pub mod deps;
 pub mod destination;
 pub mod entry_point;

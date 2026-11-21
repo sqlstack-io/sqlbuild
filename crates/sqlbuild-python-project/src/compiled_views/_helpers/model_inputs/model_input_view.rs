@@ -187,5 +187,6 @@ pub(crate) fn reference_row_of(reference: &Bound<'_, PyAny>) -> PyResult<Referen
         name: native_field(reference, "ref_name")?.extract()?,
         package: native_field(reference, "ref_package")?.extract()?,
         call_argument_count: native_field(reference, "call_argument_count")?.extract()?,
+        call_partitioned: native_field(reference, "call_partitioned")?.extract()?,
     })
 }

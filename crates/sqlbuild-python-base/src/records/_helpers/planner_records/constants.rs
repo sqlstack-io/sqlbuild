@@ -749,6 +749,7 @@ const R_FUNCTION_PLAN_ENTRY: RecordSpec = RecordSpec {
         FieldSpec::new("runtime_version", FieldDefault::None),
         FieldSpec::new("entry_point", FieldDefault::None),
         FieldSpec::new("packages", FieldDefault::EmptyTuple),
+        FieldSpec::new("dataframe", FieldDefault::None),
         FieldSpec::new("previous_query_sql", FieldDefault::None),
         FieldSpec::new(
             "reason",

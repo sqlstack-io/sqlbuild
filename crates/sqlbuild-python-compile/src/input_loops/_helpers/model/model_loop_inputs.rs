@@ -73,6 +73,7 @@ pub(crate) fn reference_row(reference: &SqlReference) -> ReferenceRow {
         name: reference.name.clone(),
         package: reference.package.clone(),
         call_argument_count: reference.call_argument_count,
+        call_partitioned: reference.call_partitioned,
     }
 }
 

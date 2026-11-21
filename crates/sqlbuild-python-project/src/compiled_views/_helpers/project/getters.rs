@@ -328,6 +328,9 @@ pub(crate) fn read_native_compiled_function<'py>(
         "packages" => this
             .packages(py)
             .and_then(|value| value.into_bound_py_any(py)),
+        "dataframe" => this
+            .dataframe(py)
+            .and_then(|value| value.into_bound_py_any(py)),
         "tags" => this.tags(py).and_then(|value| value.into_bound_py_any(py)),
         "description" => this
             .description(py)
@@ -389,6 +392,9 @@ pub(crate) fn read_native_function_input<'py>(
             .and_then(|value| value.into_bound_py_any(py)),
         "packages" => this
             .packages(py)
+            .and_then(|value| value.into_bound_py_any(py)),
+        "dataframe" => this
+            .dataframe(py)
             .and_then(|value| value.into_bound_py_any(py)),
         "tags" => this.tags(py).and_then(|value| value.into_bound_py_any(py)),
         "description" => this

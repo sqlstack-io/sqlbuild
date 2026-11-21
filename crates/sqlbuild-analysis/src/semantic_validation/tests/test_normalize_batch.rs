@@ -204,6 +204,18 @@ fn given_cursor_stubs_when_normalizing_for_a_native_parser_then_only_whole_names
             sql: "SELECT l.a FROM b, -- not lateral\n__table_fn(\"f\")(1) AS l",
             expected_sql: "SELECT l.a FROM b, -- not lateral\n__sqlbuild_table_function_f AS l",
         },
+        NativeStubTestCase {
+            dialect: "snowflake",
+            description: "a whole-partition table function's OVER clause belongs to its stub relation",
+            sql: "SELECT l.a FROM b, __table_fn(\"f\")(b.id)\n  over (PARTITION BY COALESCE(b.x, b.id)) AS l",
+            expected_sql: "SELECT l.a FROM b, __sqlbuild_table_function_f AS l",
+        },
+        NativeStubTestCase {
+            dialect: "snowflake",
+            description: "an alias starting with over is not an OVER clause",
+            sql: "SELECT overview.a FROM __table_fn(\"f\")(1) overview",
+            expected_sql: "SELECT overview.a FROM __sqlbuild_table_function_f overview",
+        },
     ];
     for test_case in test_cases {
         assert_eq!(

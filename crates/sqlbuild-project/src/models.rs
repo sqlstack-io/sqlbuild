@@ -13,13 +13,15 @@ use sqlbuild_core::json::models::JsonValue;
 
 use crate::types::{InferredRow, NamedTypeRow, ObjectKeyRow, ProjectHost, SourceNamespace};
 
-/// One reference a resource's SQL makes: kind, name, package and call argument count.
+/// One reference a resource's SQL makes: kind, name, package and its call's arguments and partition.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReferenceRow {
     pub kind: String,
     pub name: String,
     pub package: Option<String>,
     pub call_argument_count: Option<usize>,
+    /// Whether a table function call is followed by `OVER (PARTITION BY ...)`.
+    pub call_partitioned: bool,
 }
 
 /// A compiled relation location's parts.
@@ -134,12 +136,14 @@ pub struct SourceRecord<H: ProjectHost> {
     pub host: H::Source,
 }
 
-/// A Python function's runtime, entry point and packages.
+/// A Python function's runtime, entry point, packages and, for a table function, its frame.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PythonRuntime {
     pub runtime_version: Option<String>,
     pub entry_point: Option<String>,
     pub packages: Vec<String>,
+    /// A table function's partition frame library, `"polars"` or `"pandas"`.
+    pub dataframe: Option<String>,
 }
 
 /// What the function loop attached for one SQL or Python function.

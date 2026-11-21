@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.256.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.255.0...v0.256.0) (2026-11-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* a published job's `resolved_concurrency` is now `{limit}`. Its `source` field and the `ConcurrencySource` schema are removed from the control API, and `sqb build --verbose` no longer names the setting the concurrency came from. Control store migration 0004 removes the field from each stored job definition. Let queued and running runs finish, or cancel them, before upgrading: a group run or retry pinned to a snapshot published by an earlier release fails with `jobs: unknown field 'source'` and stops the scheduler. After upgrading the server, restart every location so each publishes its project again.
+
+### Features
+
+* Python table functions on Snowflake ([#1610](https://github.com/sqlstack-io/sqlbuild/issues/1610)) ([6352fa6](https://github.com/sqlstack-io/sqlbuild/commit/6352fa6cf21137293d69cbe85f21c9dd3a63f081))
+* remove the concurrency source label ([#1607](https://github.com/sqlstack-io/sqlbuild/issues/1607)) ([0707d18](https://github.com/sqlstack-io/sqlbuild/commit/0707d18171e9b56c8f96d7e5253aa8d99d4f835e))
+
 ## [0.255.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.254.0...v0.255.0) (2026-11-19)
 
 

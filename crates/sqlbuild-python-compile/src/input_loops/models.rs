@@ -401,7 +401,7 @@ impl NativeModelLoop {
         host: &Bound<'py, ConstantRendering>,
         rows: (&[TestFileRow], &[ScenarioRow]),
         settings: &SqlTestSettings,
-        table_function_arities: HashMap<String, usize>,
+        (table_function_arities, whole_partition): (HashMap<String, usize>, HashSet<String>),
     ) -> PyResult<AttachedSqlTests> {
         let py: Python<'py> = host.py();
         let contracts: ContractClasses<'py> = self.contract_classes.bind(py).extract()?;
@@ -457,6 +457,7 @@ impl NativeModelLoop {
             },
             functions: known.functions.clone(),
             table_function_arities,
+            whole_partition,
         };
         let tests: Vec<Py<PyAny>> = scope.attached(rows.0)?;
         let scenarios: Vec<Py<PyAny>> = scope.attached_scenarios(rows.1)?;

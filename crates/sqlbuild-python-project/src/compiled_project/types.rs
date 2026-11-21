@@ -34,6 +34,7 @@ pub type FunctionSettingsTuple = (
     Option<(Option<String>, Option<String>)>,
     bool,
     Py<PyAny>,
+    String,
 );
 
 /// The tuple Python sends for a `TestBlockRow`, in field order.

@@ -21,6 +21,7 @@ from sqlbuild._native import (
 )
 from sqlbuild.adapter.contract.types import CursorKind
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
+from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from tests.unit.src.sqlbuild.compiler.planner._helpers.resolve._test_types import (
     ApplyDeferredTargetsTestCase,
     RefResolutionTestCase,
@@ -328,6 +329,55 @@ def test_given_table_function_marker_when_resolving_then_returns_expected_sql(
         query_sql=test_case.query_sql,
         function_locations=_FUNCTION_TARGETS,
         dialect=Dialect(DuckDbAdapter()),
+    )
+
+    assert result == test_case.expected_sql
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RefResolutionTestCase(
+            description="moves a partition clause inside Snowflake's TABLE()",
+            query_sql=(
+                'SELECT s.* FROM r, __table_fn("customer_orders")(r.id) '
+                "OVER (PARTITION BY COALESCE(r.region, r.id)) s"
+            ),
+            expected_sql=(
+                "SELECT s.* FROM r, TABLE(analytics.customer_orders(r.id) "
+                "OVER (PARTITION BY COALESCE(r.region, r.id))) s"
+            ),
+        ),
+        RefResolutionTestCase(
+            description="keeps a lower-case partition clause across lines",
+            query_sql='SELECT * FROM r, __table_fn("customer_orders")(r.id)\n  over\n(partition by r.id)',
+            expected_sql="SELECT * FROM r, TABLE(analytics.customer_orders(r.id)\n  over\n(partition by r.id))",
+        ),
+        RefResolutionTestCase(
+            description="keeps a comment before the partition clause inside TABLE()",
+            query_sql='SELECT * FROM r, __table_fn("customer_orders")(r.id) /* c */ OVER (PARTITION BY r.id) s',
+            expected_sql="SELECT * FROM r, TABLE(analytics.customer_orders(r.id) /* c */ OVER (PARTITION BY r.id)) s",
+        ),
+        RefResolutionTestCase(
+            description="keeps a Snowflake // comment before the partition clause inside TABLE()",
+            query_sql='SELECT * FROM r, __table_fn("customer_orders")(r.id) // c\n OVER (PARTITION BY r.id) s',
+            expected_sql="SELECT * FROM r, TABLE(analytics.customer_orders(r.id) // c\n OVER (PARTITION BY r.id)) s",
+        ),
+        RefResolutionTestCase(
+            description="an alias starting with over is not a partition clause",
+            query_sql='SELECT * FROM __table_fn("customer_orders")(42) overview',
+            expected_sql="SELECT * FROM TABLE(analytics.customer_orders(42)) overview",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_partitioned_table_function_when_resolving_for_snowflake_then_partition_is_inside_table(
+    test_case: RefResolutionTestCase,
+) -> None:
+    result: str = resolve_table_function_references(
+        query_sql=test_case.query_sql,
+        function_locations=_FUNCTION_TARGETS,
+        dialect=Dialect(SnowflakeAdapter()),
     )
 
     assert result == test_case.expected_sql

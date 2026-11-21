@@ -32,3 +32,6 @@ pub(crate) const PLACEHOLDER_NAMES: [(&str, &[&str]); 6] = [
     ("table_fn", &["function_name"]),
     ("dbt_ref", &["package_name", "model_name"]),
 ];
+
+/// The words that open a partition clause inside `OVER (`, in order.
+pub(crate) const PARTITION_CLAUSE_WORDS: [&str; 2] = ["PARTITION", "BY"];

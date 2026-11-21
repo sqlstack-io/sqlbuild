@@ -1,11 +1,12 @@
 //! The model loop's attachment of the project's sources, functions, SQL tests and audits.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 
 use crate::input_loops::_helpers::resources::audit_loop::model_owner;
 use crate::input_loops::_helpers::resources::audit_loop::resource_owner;
+use crate::input_loops::_helpers::resources::function_loop::whole_partition_functions;
 use crate::input_loops::models::AttachmentOwner;
 use crate::input_loops::models::NativeModelLoop;
 use sqlbuild_project::models::ReferenceRow;
@@ -103,9 +104,19 @@ pub(crate) fn attach_sql_tests(
             )
         })
         .collect();
-    model_loop
-        .get()
-        .run_sql_tests(host.bind(py), (&files, &scenarios), &settings, arities)
+    let whole_partition: HashSet<String> = whole_partition_functions(
+        project
+            .borrow()
+            .functions()
+            .iter()
+            .map(|record| &record.attached),
+    );
+    model_loop.get().run_sql_tests(
+        host.bind(py),
+        (&files, &scenarios),
+        &settings,
+        (arities, whole_partition),
+    )
 }
 
 /// Attach singular, then resource-attached, audits; return views and override warnings.

@@ -1,7 +1,9 @@
 //! Public SQL resolution decisions.
 
+pub mod code_start;
 pub mod column_name_key;
 pub mod cursor_subquery;
+pub mod over_clause_open;
 pub mod quoted_name;
 pub mod ref_alias;
 pub mod reference_spans;
