@@ -455,6 +455,15 @@ pub struct RunEventRecord {
     /// A summary the scheduler writes for a group run's member events, such as a member retry; never error or SQL text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// For a check's result: its name as declared, its ID and this result's, and the rows it found; never its SQL or rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_binding_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_result_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_rows: Option<i64>,
 }
 
 /// One error-severity audit failure a run or one of its current members let through; never its SQL or evidence.

@@ -3,6 +3,7 @@
 use std::collections::BTreeSet;
 
 use serde_json::{Value, json};
+use sqlbuild_recall::records::constants::AUDIT_COMPLETED_EVENT;
 use uuid::Uuid;
 
 use crate::authorization::main::decisions::authorize_listing::authorize_listing;
@@ -236,7 +237,12 @@ pub(crate) async fn run_events_in(
                 format!("SELECT storage_id, event_id, invocation_id, occurred_at, event_type, severity, producer, resource_id, \
                  resource_kind, resource_name, resource_attempt_id, statement_id, error_type, error_code, duration_ms, outcome, \
                  row_count, affected_rows, CASE WHEN event_type IN ('{MEMBER_RETRYING_EVENT}','{MEMBER_RECOVERED_EVENT}','{RUN_LAUNCHED_EVENT}') \
-                 THEN payload END AS member_payload, {} FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", node_columns(), next + 1)
+                 THEN payload END AS member_payload, \
+                 CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN payload->>'audit_name' END AS check_name, \
+                 CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN payload->>'binding_key' END AS check_binding_key, \
+                 CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN payload->>'result_id' END AS check_result_id, \
+                 CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN CAST(payload->>'violation_count' AS BIGINT) END AS check_rows, \
+                 {} FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", node_columns(), next + 1)
             },
             vec![
                 Parameter::Integer(after),
