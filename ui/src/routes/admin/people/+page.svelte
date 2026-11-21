@@ -15,19 +15,35 @@
 	import NoAccess from '$lib/components/platform/no-access.svelte';
 	import RoleCell from '$lib/components/admin/role-cell.svelte';
 	import SourceChip from '$lib/components/admin/source-chip.svelte';
-	import type { AssignmentSource, RoleAssignment } from '$lib/api';
+	import type { Account, AssignmentSource, RoleAssignment } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { assignmentSourceLabel, personHref } from '$lib/platform/access';
 	import { accountSourceLabel } from '$lib/platform/labels';
 	import { permissionLabel } from '$lib/platform/permission-catalog';
 	import { app } from '$lib/state/app.svelte';
 	import { createAccountTable } from '$lib/state/account-table.svelte';
+	import PersonPanel from './person-panel.svelte';
+	import RoleSelect from './role-select.svelte';
+	import { defaultRoleOf, isLastAdmin } from './utils';
 
 	const people = createAccountTable('user');
 	const d = people.directory;
 	const allowed = $derived(app.can('user.manage') || app.can('role.assign'));
 	const locations = $derived(app.bootstrap?.locations ?? []);
-	const opensPeople = $derived(app.client.supports('effectiveAccess'));
+	const canAssign = $derived(app.can('role.assign'));
+	const defaultRole = $derived(defaultRoleOf(d.assignments.data ?? []));
+	// Behind SSO or a trusted proxy, people arrive by signing in; only password sign-in could add them here.
+	const arriveBySigningIn = $derived(app.bootstrap?.authMode !== 'password');
+
+	/** The person whose panel is open beside the list. */
+	let selected = $state<string | null>(null);
+	const selectedAccount = $derived(selected ? (people.accounts.find((a) => a.name === selected) ?? null) : null);
+	/** A plain click opens the panel; a modifier click opens their full page in a new tab, as other lists do. */
+	function open(e: MouseEvent, a: Account) {
+		if ((e.target as Element).closest('a, button, input, select, label, [data-control]')) return;
+		if (e.metaKey || e.ctrlKey || e.button === 1) openRow(e, personHref(a));
+		else selected = a.name;
+	}
 
 	const sources: AssignmentSource[] = ['manual', 'sso', 'policy', 'built_in'];
 
@@ -39,7 +55,7 @@
 	}
 	const tableColumns = $derived<TableColumn[]>([
 		{ id: 'person', label: 'Person', minWidth: 220 },
-		{ id: 'role', label: people.locationId ? `Role in ${locations.find((l) => l.id === people.locationId)?.name}` : 'Highest role', width: '26%', truncate: false },
+		{ id: 'role', label: people.locationId ? `Role in ${locations.find((l) => l.id === people.locationId)?.name}` : 'Role', width: '26%', truncate: false },
 		{ id: 'from', label: 'From', width: '22%', truncate: false },
 		{ id: 'active', label: 'Last active', width: '130px' },
 		{ id: 'status', label: 'Status', width: '110px' }
@@ -67,21 +83,27 @@
 			{#if app.client.supports('explainAccess')}<Button variant="outline" size="bar" href={to(`/admin/check-access`)}><ShieldQuestionIcon size={14} /> Check access</Button>{/if}
 		{/snippet}
 	</ListToolbar>
+	{#if arriveBySigningIn}<p class="arrive" data-testid="people-arrive">People appear here the first time they sign in. Pick a role to change it.</p>{/if}
+	<div class="body">
 	<DataTable columns={tableColumns} rows={people.shown} key={(a) => a.name} resource={d.accounts} empty={people.accounts.length ? 'No one matches these filters.' : 'No one has signed in yet.'}>
 		{#snippet row(a)}
 					{@const risky = d.riskyOf(a.name)}
-					<tr class:sb-row-off={a.disabled} class:static={!opensPeople} onclick={(e) => opensPeople && openRow(e, personHref(a))}>
+					<tr class:sb-row-off={a.disabled} class:picked={selected === a.name} onclick={(e) => open(e, a)}>
 						<td>
 							<div class="cell-name">
 								<UserIcon size={15} strokeWidth={1.75} />
 								<div class="min-w-0">
-									{#if opensPeople}<a href={to(personHref(a))}>{a.displayName}</a>{:else}{a.displayName}{/if}
+									<Button variant="link" size="inline" class="name" onclick={() => (selected = a.name)}>{a.displayName}</Button>
 									<div class="cell-desc"><code>{a.name}</code> · {a.source === 'oidc' ? 'SSO' : a.source ? accountSourceLabel[a.source] : 'no password'}</div>
 								</div>
 							</div>
 						</td>
 						<td>
-							<RoleCell assignments={d.assignmentsOf(a.name)} roles={d.allRoles} locationId={people.locationId} />
+							{#if people.locationId}
+								<RoleCell assignments={d.assignmentsOf(a.name)} roles={d.allRoles} locationId={people.locationId} />
+							{:else}
+								<RoleSelect account={a} assignments={d.assignmentsOf(a.name)} {defaultRole} lastAdmin={isLastAdmin(a.name, d.assignments.data ?? [], people.accounts)} {canAssign} onchange={() => d.refresh()} />
+							{/if}
 							{#if risky.length}
 								<div class="cell-desc risky" title={risky.map((r) => `${permissionLabel(r)} (${r})`).join('\n')}>
 									<TriangleAlertIcon size={11} /> Can {permissionLabel(risky[0]).toLowerCase()}{risky.length > 1 ? ` and ${risky.length - 1} more risky actions` : ''}
@@ -101,6 +123,10 @@
 					</tr>
 		{/snippet}
 	</DataTable>
+	{#if selectedAccount}
+		<PersonPanel account={selectedAccount} assignments={d.assignmentsOf(selectedAccount.name)} rolesByLocation={d.rolesByLocation} onchange={() => d.refresh()} onclose={() => (selected = null)} />
+	{/if}
+	</div>
 {/if}
 
 <style>
@@ -127,7 +153,23 @@
 		gap: 4px;
 		color: var(--sb-warning) !important;
 	}
-	tr.static {
-		cursor: default;
+	.body {
+		display: flex;
+		min-height: 0;
+		flex: 1;
+	}
+	.body > :global(:first-child) {
+		min-width: 0;
+		flex: 1;
+	}
+	tr.picked {
+		background: var(--sb-row-selected, color-mix(in srgb, var(--primary) 8%, transparent));
+	}
+	.arrive {
+		margin: 0;
+		padding: 8px 20px;
+		border-bottom: 1px solid var(--border);
+		color: var(--muted-foreground);
+		font-size: 12.5px;
 	}
 </style>

@@ -25,6 +25,7 @@
 	import { createAccessDirectory } from '$lib/state/access-directory.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { toggleAccount } from '../api';
 
 	const name = $derived(page.params.name ?? '');
 	const d = createAccessDirectory();
@@ -53,14 +54,10 @@
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 	async function toggle(a: Account) {
-		const sessions = a.activeSessions === 1 ? 'their 1 signed-in session ends' : `their ${a.activeSessions} signed-in sessions end`;
-		const ask = a.disabled ? `Enable ${a.displayName} (${a.name})? They can sign in again.` : `Disable ${a.displayName} (${a.name})? They can't sign in any more, in the browser or with sqb login, and ${sessions} now.`;
-		if (!confirm(ask)) return;
 		busy = true;
 		error = null;
 		try {
-			await (a.disabled ? app.client.enableAccount(a.name) : app.client.disableAccount(a.name));
-			changed();
+			if (await toggleAccount(a)) changed();
 		} catch (e) {
 			error = errorMessage(e);
 		} finally {

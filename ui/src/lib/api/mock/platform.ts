@@ -94,7 +94,7 @@ import {
 } from './access';
 import { LOCATION_MARKETING, LOCATION_SHOP, LOCATION_SHOP_DEV, LOCATION_SHOP_STAGING, ROLE_CAPABILITIES, SHOP_LOCATIONS } from './fixtures';
 import { poolCapWarnings, triggerId } from './operate';
-import { ALEX, CI_ACCOUNT, DEMO_USER, JORDAN, OPS_USER, REPORTING, RILEY, SAM, SYSTEM } from './principals';
+import { ALEX, CI_ACCOUNT, DEMO_USER, JORDAN, OPS_USER, REPORTING, RILEY, SAM, SYSTEM, MORGAN } from './principals';
 
 const MIN = 60_000;
 const DAY = 24 * 60 * MIN;
@@ -135,7 +135,8 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 		{ ...OPS_USER, kind: 'user', email: 'ops-oncall@example.com', source: 'oidc', ssoGroups: ['data-platform'], createdAt: ago(days(150)), lastSeenAt: ago(1.5), disabled: false, activeSessions: 3 },
 		{ ...RILEY, kind: 'user', email: 'riley@example.com', source: 'oidc', ssoGroups: ['support-ops'], createdAt: ago(days(300)), lastSeenAt: ago(days(61)), disabled: true, activeSessions: 0 },
 		{ ...CI_ACCOUNT, kind: 'user', email: 'ci@example.com', source: 'password', ssoGroups: [], createdAt: ago(days(200)), lastSeenAt: ago(42), disabled: false, activeSessions: 0 },
-		{ ...REPORTING, kind: 'user', email: 'reporting@example.com', source: 'password', ssoGroups: [], createdAt: ago(days(120)), lastSeenAt: ago(300), disabled: false, activeSessions: 0 }
+		{ ...REPORTING, kind: 'user', email: 'reporting@example.com', source: 'password', ssoGroups: [], createdAt: ago(days(120)), lastSeenAt: ago(300), disabled: false, activeSessions: 0 },
+		{ ...MORGAN, kind: 'user', email: 'morgan@example.com', source: 'password', ssoGroups: [], createdAt: ago(days(12)), lastSeenAt: ago(days(2)), disabled: false, activeSessions: 0 }
 	];
 
 	const locationTokens: LocationToken[] = [
@@ -221,7 +222,8 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 		manual('asg-9', REPORTING, 'viewer', LOCATION_MARKETING, days(120)),
 		manual('asg-11', OPS_USER, 'operator', null, days(150)),
 		sso('asg-13', OPS_USER, 'platform_on_call', null, 'data-platform', days(150)),
-		sso('asg-10', RILEY, 'support_viewer', null, 'support-ops', days(300))
+		sso('asg-10', RILEY, 'support_viewer', null, 'support-ops', days(300)),
+		{ id: 'asg-default-morgan', principal: MORGAN, role: 'viewer', scope: { locationId: null }, source: 'built_in', ssoGroup: null, definedIn: 'sqb-server.toml:24', assignedBy: null, assignedAt: ago(days(12)), stale: false }
 	];
 
 	const ssoMappings: SsoMapping[] = [
@@ -881,6 +883,12 @@ export class MockPlatformApi implements PlatformApi {
 		if (assignment.source === 'sso') throw new ApiError(`This comes from the SSO group ${assignment.ssoGroup}; change the group mapping in the server config`, 409);
 		if (assignment.source === 'policy') throw new ApiError(`This is set in ${assignment.definedIn}; change it there`, 409);
 		if (assignment.source === 'built_in') throw new ApiError('Everyone who signs in gets this default role; change default_role in the server config', 409);
+		// As the server does, the last enabled admin can't be demoted.
+		const enabled = new Set(this.#data.accounts.filter((a) => !a.disabled).map((a) => a.name));
+		const admins = new Set(this.#data.assignments.filter((a) => a.role === 'admin' && a.scope.locationId === null && !a.stale && enabled.has(a.principal.name)).map((a) => a.principal.name));
+		if (assignment.role === 'admin' && assignment.scope.locationId === null && admins.size === 1 && admins.has(assignment.principal.name)) {
+			throw new ApiError("The last admin can't be demoted; make someone else an admin first", 409);
+		}
 		const ownAdmin = this.#data.assignments.filter((a) => a.principal.name === this.#ctx.user.name && a.role === 'admin' && !a.stale);
 		if (assignment.principal.name === this.#ctx.user.name && assignment.role === 'admin' && ownAdmin.length <= 1) {
 			const scope = { ...assignment.scope, subject: assignment.principal.name };
