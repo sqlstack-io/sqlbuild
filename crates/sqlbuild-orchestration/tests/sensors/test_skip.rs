@@ -2,8 +2,9 @@
 
 use uuid::Uuid;
 
-use crate::credentials::models::{AuditContext, DefaultRole};
-use crate::credentials::tests::role_helpers::{credentials, role_fixture};
+use crate::credentials::main::identities::create_principal::create_principal;
+use crate::credentials::models::{AuditContext, BuiltinRole, DefaultRole, RoleAssignmentRequest};
+use crate::credentials::tests::role_helpers::{assign, credentials, role_fixture};
 use crate::declarations::main::change_trigger::change_trigger;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
@@ -82,6 +83,52 @@ fn given_a_sensor_stuck_on_a_failing_event_when_an_operator_skips_it_then_the_ne
                 stuck_on[1].as_ref(),
                 Some(&stuck),
                 "{}: a later event waits behind the failed one",
+                test_case.description
+            );
+
+            let viewer = create_principal(store, &roles.context, "orders-viewer")
+                .await
+                .expect("viewer");
+            assign(
+                store,
+                (&roles.context, &roles.administrator),
+                RoleAssignmentRequest {
+                    principal_id: viewer,
+                    role: BuiltinRole::Viewer.into(),
+                    location_id: None,
+                    target: None,
+                    revoke: false,
+                },
+            )
+            .await;
+            let mut tracebacks = Vec::new();
+            for who in [
+                (&roles.context, credentials(&roles.administrator)),
+                (&roles.context, viewer),
+            ] {
+                let failed = read_person_sensor(
+                    store,
+                    who,
+                    ((roles.location_id, "development"), (trigger.trigger_id, 1)),
+                    DefaultRole::None,
+                )
+                .await
+                .expect("person read")
+                .expect("sensor")
+                .evaluations
+                .remove(0);
+                tracebacks.push((failed.failure_code, failed.error));
+            }
+            assert_eq!(
+                tracebacks,
+                vec![
+                    (
+                        Some("sensor_function_failed".to_owned()),
+                        Some("ValueError: orders feed is down".to_owned())
+                    ),
+                    (Some("sensor_function_failed".to_owned()), None),
+                ],
+                "{}: the traceback needs view.evidence; the failure code doesn't",
                 test_case.description
             );
 

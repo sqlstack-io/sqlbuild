@@ -147,6 +147,15 @@ def assert_ticks(
     assert (latest["outcome"], latest["event_id"]) == ("failed", event_id)
     assert test_case.expected_failure in latest["error"]
 
+    # A call past timeout_seconds times out, and the location kills it before it wakes.
+    set_mode(harness, "orders_done_sensor", "sleep")
+    wait_until(
+        lambda: tick_rows(worker.control_store, "orders_done_sensor", "timed_out"),
+        "a call past its timeout times out",
+    )
+    time.sleep(5)
+    assert sensor_calls(harness.calls, {"sensor": "orders_done_sensor", "woke": True}) == []
+
     # The next good tick delivers the same event, starts the run once and withdraws the failure.
     set_mode(harness, "orders_done_sensor", "request")
     export: dict[str, Any] = wait_for_run(
