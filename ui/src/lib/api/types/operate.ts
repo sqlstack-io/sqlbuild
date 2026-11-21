@@ -296,6 +296,18 @@ export type RunEvent = {
 	statementId: string | null;
 	attempt: number | null;
 	message: string;
+	/** For `audit_completed`: which check ran, how it came out and how many rows it found. */
+	check?: RunEventCheck | null;
+};
+
+/** A check's result in a run: its name as declared, its outcome, the rows it found, and its identity for its evidence. */
+export type RunEventCheck = {
+	name: string;
+	outcome: 'passed' | 'warned' | 'failed' | 'skipped';
+	rows: number | null;
+	/** The check's ID on the Checks page and this result's, to read the rows it found once they are synced. */
+	bindingKey: string | null;
+	resultId: string | null;
 };
 
 export type RunEventPage = {

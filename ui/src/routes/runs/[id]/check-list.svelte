@@ -54,8 +54,8 @@
 		}
 	}
 	const statementOf = (c: CheckResult) => statements.find((s) => s.id === c.statementId) ?? null;
-	const GLYPH = { failed: '✗', warned: '⚠', passed: '✓' } as const;
-	const SEVERITY = { failed: 'error', warned: 'warn', passed: '' } as const;
+	const GLYPH = { failed: '✗', warned: '⚠', passed: '✓', skipped: '–' } as const;
+	const SEVERITY = { failed: 'error', warned: 'warn', passed: '', skipped: '' } as const;
 </script>
 
 <div class="checks">

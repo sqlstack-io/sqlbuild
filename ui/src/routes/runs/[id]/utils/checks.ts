@@ -1,9 +1,8 @@
-// Several checks on one node: each check's outcome from its event, problems first, and the
-// short form a node's one log line uses. Pure.
+// A node's checks from their results in the run, problems first, and the short form a node's one log line uses. Pure.
 
 import type { RunEvent } from '$lib/api';
 
-export type CheckOutcome = 'failed' | 'warned' | 'passed';
+export type CheckOutcome = 'failed' | 'warned' | 'passed' | 'skipped';
 export type CheckResult = {
 	id: string;
 	/** As declared, such as `not_null(payment_id)`. */
@@ -14,18 +13,30 @@ export type CheckResult = {
 	noun: string | null;
 	/** The check's own query, for its SQL, query ID and failing rows. */
 	statementId: string | null;
+	/** The check's ID and this result's, for the rows it found. */
+	bindingKey: string | null;
+	resultId: string | null;
 };
 
-const RANK: Record<CheckOutcome, number> = { failed: 0, warned: 1, passed: 2 };
+const RANK: Record<CheckOutcome, number> = { failed: 0, warned: 1, passed: 2, skipped: 3 };
 
-/** A node's checks from its `audit_completed` events, problems first (failed, then warned), then passed. */
+/** A node's checks from its `audit_completed` events, problems first (failed, then warned), then passed and skipped. */
 export function checksOf(events: readonly RunEvent[]): CheckResult[] {
 	return events
 		.filter((e) => e.type === 'audit_completed')
 		.map((e): CheckResult => {
-			const m = e.message.match(/^(.*?): ([\d,]+) (.*?) \(severity (\w+)\)$/);
-			if (m) return { id: e.id, name: m[1], outcome: m[4] === 'error' ? 'failed' : 'warned', count: Number(m[2].replace(/,/g, '')), noun: m[3], statementId: e.statementId };
-			return { id: e.id, name: e.message.replace(/ passed$/, ''), outcome: 'passed', count: null, noun: null, statementId: e.statementId };
+			const check = e.check ?? { name: e.message || 'check', outcome: e.level === 'error' ? 'failed' : e.level === 'warn' ? 'warned' : 'passed', rows: null, bindingKey: null, resultId: null };
+			const problem = check.outcome === 'failed' || check.outcome === 'warned';
+			return {
+				id: e.id,
+				name: check.name,
+				outcome: check.outcome,
+				count: problem ? check.rows : null,
+				noun: problem ? (check.name.startsWith('unique') ? 'duplicate rows' : 'failing rows') : null,
+				statementId: e.statementId,
+				bindingKey: check.bindingKey,
+				resultId: check.resultId
+			};
 		})
 		.sort((a, b) => RANK[a.outcome] - RANK[b.outcome]);
 }
@@ -46,7 +57,7 @@ export function checksText(checks: readonly CheckResult[]): string | null {
 	if (!checks.length) return null;
 	const failed = checks.filter((c) => c.outcome === 'failed');
 	const warned = checks.filter((c) => c.outcome === 'warned');
-	const passed = checks.length - failed.length - warned.length;
+	const passed = checks.filter((c) => c.outcome === 'passed').length;
 	const problems = failed.length + warned.length;
 	if (!problems) return `${passed} ${passed === 1 ? 'check' : 'checks'} passed`;
 	const parts: string[] = [];

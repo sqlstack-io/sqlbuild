@@ -3,6 +3,7 @@
 // facts. Pure: the same record and clock always give the same detail.
 
 import type {
+	RunEventCheck,
 	CancelProgress,
 	LaunchVerb,
 	NodeCounts,
@@ -556,7 +557,8 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 			nodeKey: d.nodeKey,
 			statementId: d.statementId,
 			attempt: d.attempt,
-			message: d.message
+			message: d.message,
+			...(d.type === 'audit_completed' ? { check: mockCheck(d.message) } : {})
 		}));
 	return { events, statements, output: output.sort((a, b) => a.at.localeCompare(b.at)) };
 }
@@ -794,4 +796,11 @@ export function liveness(record: RunRecord, now: number): RunLiveness | null {
 	if (run.status === 'unresponsive') return { ...base, state: 'unresponsive', lastHeartbeatAt: iso(heartbeat), exitCode: null };
 	if (isTerminal(run.status)) return { ...base, state: 'exited', lastHeartbeatAt: iso(heartbeat), exitCode };
 	return { ...base, state: 'healthy', lastHeartbeatAt: iso(heartbeat), exitCode: null };
+}
+
+/** The check an `audit_completed` message of this mock describes, as the server reports it. */
+function mockCheck(message: string): RunEventCheck {
+	const m = message.match(/^(.*?): ([\d,]+) .*? \(severity (\w+)\)$/);
+	if (m) return { name: m[1], outcome: m[3] === 'error' ? 'failed' : 'warned', rows: Number(m[2].replace(/,/g, '')), bindingKey: null, resultId: null };
+	return { name: message.replace(/ passed$/, ''), outcome: 'passed', rows: null, bindingKey: null, resultId: null };
 }
