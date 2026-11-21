@@ -4,6 +4,7 @@ import { MockApiClient, type MockOptions } from './mock/mock-client';
 import { largeProject } from './mock/large-project';
 import { hugeProject } from './mock/huge-project';
 import { awkward } from './mock/awkward';
+import { hoverProject } from './mock/hover-project';
 import { replayFetch, type Recording } from './replay';
 import { LocalChangeBus } from './signals';
 import { to } from '$lib/paths';
@@ -55,7 +56,7 @@ export function createClient(search: URLSearchParams, onUnauthorized: () => void
 	});
 	// `?summary`: the large project with a plan shaped like a large real one's summary (CHI-1563).
 	const summary = search.has('summary');
-	const sized = search.has('huge') ? hugeProject(mock) : search.has('large') || summary ? largeProject(mock, { summary }) : mock;
+	const sized = search.has('proto') ? hoverProject(mock) : search.has('huge') ? hugeProject(mock) : search.has('large') || summary ? largeProject(mock, { summary }) : mock;
 	return countedReads(search.has('awkward') ? awkward(sized) : sized);
 }
 

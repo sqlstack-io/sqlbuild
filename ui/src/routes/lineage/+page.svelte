@@ -65,6 +65,7 @@
 	import { MAX_DRAWN, expandAll, folderBoxId, folderCardId, opensByFolder, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
 	import { FOLDERS_PARAM, NODES_PARAM, foldersParam, foldersToOpen, inSelection, lineageGraph, parseFolders, parseNodes, shownNodes, withFolderAdded, withFolderToggled } from '$lib/lineage/folder-selection';
 	import JobBoxNode from '$lib/lineage/job-box-node.svelte';
+	import { HOVER_PROJECT_OPEN } from '$lib/api/mock/hover-project';
 
 	let browserOpen = $state(false);
 	// Closed until something is selected, then as the person last left it (remembered in this browser).
@@ -157,6 +158,8 @@
 						if (selectedFolders.length) {
 							treeOpen = new Set(selectedFolders.flatMap((f) => foldersToOpen(latestTree, [f]).filter((open) => open !== f)));
 						}
+						// PROTOTYPE: the hover dataset opens with some folders open and some closed.
+						if (page.url.searchParams.has('proto')) expanded = new Set(HOVER_PROJECT_OPEN.filter((f) => latestTree.folders.has(f)));
 						if (focus) {
 							expanded = withFoldersOpen(latestTree, focus.key, expanded);
 							treeOpen = withFoldersOpen(latestTree, focus.key, treeOpen);
@@ -190,6 +193,7 @@
 		neighbourhoodOnly = false;
 		// The card under the pointer may be gone, and it never reports the pointer leaving.
 		hoveredId = null;
+		protoReset();
 		lastLayoutKey = '';
 		draw(graphOf(data), selected);
 	}
@@ -401,6 +405,103 @@
 	// --- selection + hover driven highlighting ---
 	let hoveredId = $state<string | null>(null);
 
+	// ===== PROTOTYPE: hover variants (wip/proto-lineage-hover) =====
+	// A: today. B: an open box only outlines on hover; clicking its body traces its edges.
+	// C: B, and cards/closed folders light only after the pointer rests 250 ms. D: only an open box's header lights its edges.
+	type HoverVariant = 'A' | 'B' | 'C' | 'D';
+	const VARIANTS: { id: HoverVariant; label: string }[] = [
+		{ id: 'A', label: 'A · today' },
+		{ id: 'B', label: 'B · quiet boxes' },
+		{ id: 'C', label: 'C · B + 250 ms delay' },
+		{ id: 'D', label: 'D · header only' }
+	];
+	const HOVER_DELAY = 250;
+	const fromUrl = (page.url.searchParams.get('hover') ?? 'A').toUpperCase();
+	let hoverVariant = $state<HoverVariant>(VARIANTS.some((v) => v.id === fromUrl) ? (fromUrl as HoverVariant) : 'A');
+	// The box under the pointer (outlined in B/C), the box whose header is under the pointer (D), the selected box (B/C).
+	let protoBoxHover = $state<string | null>(null);
+	let protoHeaderHover = $state<string | null>(null);
+	let protoBoxSelected = $state<string | null>(null);
+	let protoTimer: ReturnType<typeof setTimeout> | null = null;
+	const isBox = (id: string | null) => !!id && nodes.find((n) => n.id === id)?.type === 'folderBox';
+	function setHoverVariant(v: HoverVariant) {
+		hoverVariant = v;
+		protoReset();
+		hoveredId = null;
+		const url = new URL(page.url);
+		url.searchParams.set('hover', v);
+		void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
+	}
+	function protoReset() {
+		if (protoTimer) clearTimeout(protoTimer);
+		protoTimer = null;
+		protoBoxHover = null;
+		protoHeaderHover = null;
+		protoBoxSelected = null;
+	}
+	function protoEnter(node: Node) {
+		if (protoTimer) clearTimeout(protoTimer);
+		protoTimer = null;
+		if (node.type === 'folderBox') {
+			protoBoxHover = node.id;
+			// A: a box lights everything inside it. B, C, D: the body lights nothing (D lights from the header).
+			hoveredId = hoverVariant === 'A' ? node.id : null;
+			return;
+		}
+		protoBoxHover = null;
+		if (hoverVariant === 'C') {
+			hoveredId = null;
+			protoTimer = setTimeout(() => {
+				protoTimer = null;
+				hoveredId = node.id;
+			}, HOVER_DELAY);
+		} else hoveredId = node.id;
+	}
+	function protoLeave() {
+		if (protoTimer) clearTimeout(protoTimer);
+		protoTimer = null;
+		protoBoxHover = null;
+		hoveredId = null;
+	}
+	/** D: which open box's header the pointer is over, if any. */
+	function protoPointerOver(event: PointerEvent) {
+		if (hoverVariant !== 'D') return;
+		const target = event.target as Element | null;
+		const head = target?.closest?.('.folder-head, .head-hit');
+		const id = head ? ((head.closest('.svelte-flow__node') as HTMLElement | null)?.dataset.id ?? null) : null;
+		if (id !== protoHeaderHover) protoHeaderHover = id;
+	}
+	function protoNodeClick(node: Node) {
+		if (node.type === 'folderBox' && (hoverVariant === 'B' || hoverVariant === 'C')) {
+			protoBoxSelected = protoBoxSelected === node.id ? null : node.id;
+			if (protoBoxSelected) nodes = nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
+			return;
+		}
+		protoBoxSelected = null;
+	}
+	// Outline the hovered box (B/C) and the selected box straight on the DOM, so the node array is left alone.
+	$effect(() => {
+		const panel = graphPanel;
+		const hover = hoverVariant === 'B' || hoverVariant === 'C' ? protoBoxHover : null;
+		const header = hoverVariant === 'D' ? protoHeaderHover : null;
+		const picked = protoBoxSelected;
+		if (!panel) return;
+		const mark = (id: string | null, cls: string) => {
+			if (!id) return null;
+			const el = panel.querySelector(`.svelte-flow__node[data-id="${CSS.escape(id)}"]`);
+			el?.classList.add(cls);
+			return () => el?.classList.remove(cls);
+		};
+		const undo = [mark(hover, 'proto-box-hover'), mark(header, 'proto-box-hover'), mark(picked, 'proto-box-selected')];
+		return () => undo.forEach((u) => u?.());
+	});
+	// The id whose edges light on hover, per variant.
+	const hoverLit = $derived.by(() => {
+		if (hoverVariant === 'D') return protoHeaderHover ?? (isBox(hoveredId) ? null : hoveredId);
+		return hoveredId;
+	});
+	// ===== end PROTOTYPE =====
+
 	// ids of currently-selected nodes (Svelte Flow sets node.selected)
 	const selectedIds = $derived(new Set(nodes.filter((n) => n.selected).map((n) => n.id)));
 
@@ -410,9 +511,16 @@
 		if (selectedIds.size > 0) {
 			return tracePath(selectedIds, edges);
 		}
-		if (hoveredId) {
+		if (protoBoxSelected) {
+			// PROTOTYPE B/C: a selected box traces every edge of its contents, and keeps both ends of each lit.
+			const touching = edgesTouching(protoBoxSelected, edges, nodes);
+			const ends = new Set<string>([protoBoxSelected]);
+			for (const e of edges) if (touching.has(e.id)) ends.add(e.source).add(e.target);
+			return { nodes: ends, edges: touching };
+		}
+		if (hoverLit) {
 			// A hovered box lights the edges of everything inside it.
-			return { nodes: new Set([hoveredId]), edges: edgesTouching(hoveredId, edges, nodes) };
+			return { nodes: new Set([hoverLit]), edges: edgesTouching(hoverLit, edges, nodes) };
 		}
 		return null;
 	});
@@ -428,7 +536,7 @@
 			// Thickness keeps saying how many node links an edge stands for, lit or dimmed.
 			const count = (e.data as { count?: number } | undefined)?.count ?? 1;
 			const style = edgeStyle(count, !l ? 'neutral' : l.edges.has(e.id) ? 'on' : 'dim');
-			const animated = !!l && l.edges.has(e.id) && selectedIds.size > 0;
+			const animated = !!l && l.edges.has(e.id) && (selectedIds.size > 0 || !!protoBoxSelected);
 			if (e.style !== style || e.animated !== animated) edgesChanged = true;
 			return { ...e, style, animated };
 		});
@@ -913,7 +1021,7 @@
 		</aside>
 	{/if}
 	<!-- graph canvas -->
-	<div class="graph-panel sb-flow relative min-w-0 flex-1 overflow-hidden" style="background: var(--sb-inset)" bind:this={graphPanel}>
+	<div class="graph-panel sb-flow relative min-w-0 flex-1 overflow-hidden" style="background: var(--sb-inset)" bind:this={graphPanel} onpointerover={protoPointerOver} onpointerleave={() => (protoHeaderHover = null)}>
 		<GraphCanvas
 			bind:nodes
 			bind:edges
@@ -931,15 +1039,29 @@
 			fitViewOptions={{ padding: 0.08, maxZoom: 1, minZoom: scaleMode ? undefined : FIT_FLOOR, includeHiddenNodes: scaleMode }}
 			minZoom={scaleMode ? 0.02 : 0.05}
 			onlyRenderVisibleElements={scaleMode}
-			onpaneclick={onFarClick}
+			onpaneclick={(event) => {
+				protoBoxSelected = null;
+				onFarClick(event);
+			}}
 			elementsSelectable
 			nodesDraggable
 			multiSelectionKey={['Shift', 'Meta', 'Control']}
 			selectionKey="Shift"
-			onnodeclick={({ node }) => node.type === 'folder' && openFolder(String(node.data.group))}
-			onnodepointerenter={({ node }) => (hoveredId = node.id)}
-			onnodepointerleave={() => (hoveredId = null)}
+			onnodeclick={({ node }) => {
+				protoNodeClick(node);
+				if (node.type === 'folder') openFolder(String(node.data.group));
+			}}
+			onnodepointerenter={({ node }) => protoEnter(node)}
+			onnodepointerleave={() => protoLeave()}
 		/>
+		<!-- PROTOTYPE: hover variant switcher -->
+		<div class="proto-hover-toggle" role="radiogroup" aria-label="Hover behaviour">
+			<span>Hover</span>
+			{#each VARIANTS as v (v.id)}
+				<!-- raw-button: prototype-only variant switch -->
+				<button role="radio" aria-checked={hoverVariant === v.id} class:on={hoverVariant === v.id} onclick={() => setHoverVariant(v.id)}>{v.label}</button>
+			{/each}
+		</div>
 		{#if tooMany}
 			<div class="graph-too-many">
 				<div class="too-many-card" role="status">
@@ -1175,6 +1297,47 @@
 </div>
 
 <style>
+	/* PROTOTYPE: hover variants */
+	.proto-hover-toggle {
+		position: absolute;
+		top: 10px;
+		left: 50%;
+		z-index: 20;
+		display: flex;
+		gap: 2px;
+		align-items: center;
+		padding: 3px;
+		transform: translateX(-50%);
+		border: 1px solid var(--border-strong);
+		border-radius: 6px;
+		background: var(--card);
+		box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+		font-size: 12px;
+	}
+	.proto-hover-toggle span {
+		padding: 0 6px;
+		color: var(--sb-text-faint);
+	}
+	.proto-hover-toggle button {
+		padding: 3px 8px;
+		border-radius: 4px;
+		color: var(--muted-foreground);
+	}
+	.proto-hover-toggle button:hover {
+		background: var(--sb-hover);
+	}
+	.proto-hover-toggle button.on {
+		background: var(--primary);
+		color: var(--primary-foreground);
+	}
+	:global(.svelte-flow__node.proto-box-hover > .box) {
+		border-color: color-mix(in srgb, var(--primary) 60%, var(--border-strong));
+	}
+	:global(.svelte-flow__node.proto-box-selected > .box) {
+		border-color: var(--primary);
+		box-shadow: 0 0 0 1px var(--primary);
+	}
+
 	.far-canvas {
 		position: absolute;
 		inset: 0;
