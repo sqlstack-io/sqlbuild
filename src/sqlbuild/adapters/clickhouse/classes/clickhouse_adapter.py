@@ -476,6 +476,22 @@ class ClickHouseAdapter(
             return None
         return generation_comment(tuple(row)).removeprefix(GENERATION_COMMENT_PREFIX)
 
+    def rebuilt_table_row_count(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> int | None:
+        """``total_rows`` of a MergeTree-family table; other engines may not count exactly."""
+
+        del database
+        row: Any = self.execute(
+            connection=connection,
+            sql="SELECT engine, total_rows FROM system.tables WHERE "
+            + _database_filter(schema)
+            + f" AND name = {quote_string(name)}",
+        ).fetchone()
+        if row is None or row[1] is None or not str(row[0]).endswith("MergeTree"):
+            return None
+        return int(row[1])
+
     def estimate_relation_row_count(
         self,
         *,

@@ -49,7 +49,8 @@ const SQLITE_CHECKSUMS: &[(i64, &str)] = &[
     (
         5,
         "48d191962e39b22a3b95b9495da6371067a3fd3cfc51192bcfe0ac0192edcba2",
-    ),    (
+    ),
+    (
         6,
         "d4c0b67120e01decbba6387fb736b58d4a7ac3af4d0d0ff15dc325e61a3cfe11",
     ),

@@ -30,7 +30,12 @@ from sqlbuild.executor.run.constants import (
     RUN_TYPE_ENFORCEMENT_FAILED_CODE,
     RUN_UNKNOWN_FAILED_CODE,
 )
-from sqlbuild.executor.run.models import HookExecutionResult, ModelExecutionResult
+from sqlbuild.executor.run.models import (
+    HookExecutionResult,
+    ModelExecutionResult,
+    ModelMaterializationContext,
+    TableTargets,
+)
 from sqlbuild.executor.run.types import ExecutionPhase
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 
@@ -206,3 +211,18 @@ def with_waiting_on_empty_inputs_warning(result: ModelExecutionResult) -> ModelE
     if message in result.warning_messages:
         return result
     return replace(result, warning_messages=(*result.warning_messages, message))
+
+
+def rebuilt_table_rows(
+    *, context: ModelMaterializationContext, targets: TableTargets
+) -> int | None:
+    """Rows of a table just rebuilt in full, where exact and no post-hook could change them."""
+
+    if context.entry.post_hooks:
+        return None
+    return context.adapter.rebuilt_table_row_count(
+        connection=context.connection,
+        database=targets.target_database,
+        schema=targets.target_schema,
+        name=targets.target_table,
+    )

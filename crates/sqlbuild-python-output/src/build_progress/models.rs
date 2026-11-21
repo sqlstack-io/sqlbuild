@@ -750,13 +750,28 @@ impl BuildProgressCallbacks {
         Ok(())
     }
 
-    /// Keep a line per completed microbatch when no live spinner row shows batch progress.
+    /// Keep a line per completed microbatch when no live spinner row shows batch progress; a worker reports the rows so far.
     pub(crate) fn on_batch_complete(
         &self,
         py: Python<'_>,
         progress: &Bound<'_, PyAny>,
     ) -> PyResult<()> {
+        if let Some(worker) = &self.worker {
+            worker.batch_rows(
+                py,
+                &format!("model:{}", text(progress, "model_name")?),
+                native_field(progress, "rows_affected")?.extract()?,
+            )?;
+        }
         self.write_batch_complete(py, progress)
+    }
+
+    /// A worker reports the rows a running loader has written so far.
+    pub(crate) fn on_rows_written(&self, py: Python<'_>, key: &str, rows: i64) -> PyResult<()> {
+        match &self.worker {
+            Some(worker) => worker.rows_written(py, key, rows),
+            None => Ok(()),
+        }
     }
 
     /// Report one deduplicated concurrent scheduler state transition.

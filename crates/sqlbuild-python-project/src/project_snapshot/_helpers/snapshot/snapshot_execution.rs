@@ -1,8 +1,10 @@
 //! Frozen selection, executor callbacks and completion belong to one verified worker build.
 
 use pyo3::exceptions::PyRuntimeError;
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use sqlbuild_core::models::CompiledResourceType;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
+use sqlbuild_python_base::records::main::fields::field::field;
 
 /// Failure outranks cancellation, then warnings, then success.
 pub(crate) fn severity(outcome: NodeOutcome) -> u8 {
@@ -22,6 +24,13 @@ pub(crate) fn is_function(key: &str) -> bool {
             .iter()
             .any(|function| function.as_str() == kind)
     })
+}
+
+/// A plan key such as a `CompiledObjectKey` as its run node key, `<kind>:<name>`.
+pub(crate) fn planned_key(key: &Bound<'_, PyAny>) -> PyResult<String> {
+    let kind: String = field(key, "resource_type")?.str()?.extract()?;
+    let name: String = field(key, "name")?.str()?.extract()?;
+    Ok(format!("{kind}:{name}"))
 }
 
 pub(crate) fn poisoned() -> pyo3::PyErr {

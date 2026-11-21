@@ -15,7 +15,7 @@ pub fn batch_complete_callback<'py>(callbacks: &Bound<'py, PyAny>) -> PyResult<B
           -> PyResult<()> {
         owned
             .get()
-            .write_batch_complete(arguments.py(), &arguments.get_item(0)?)
+            .on_batch_complete(arguments.py(), &arguments.get_item(0)?)
     };
     Ok(PyCFunction::new_closure(callbacks.py(), None, None, forward)?.into_any())
 }

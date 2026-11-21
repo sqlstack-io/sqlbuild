@@ -34,6 +34,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     ClaimedLoadTestCase,
     ClaimedWorker,
     GroupExecutionTestCase,
+    NodeResultsTestCase,
     SnapshotWorkerTestCase,
     UnclaimedLoadTestCase,
     WorkerExecutionTestCase,
@@ -1121,7 +1122,7 @@ def test_given_a_load_the_job_does_not_claim_when_a_worker_plans_then_the_run_is
     with scheduled_worker(tmp_path, monkeypatch, worker_case) as worker:
         run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
         log: str = worker.log.read_text()
-        assert (run["status"], run["node_counts_json"]) == ("failed", {"skipped": 1}), log
+        assert (run["status"], run["node_counts_json"]) == ("failed", {"not_run": 1}), log
         assert (
             f"planned writer {test_case.refused_writer} is outside the frozen run write set" in log
         )
@@ -1635,7 +1636,7 @@ def test_given_a_rejected_node_report_when_concurrent_then_the_run_stops_before_
                 "WHERE run_id=? AND kind='node' ORDER BY node_key",
                 (run["run_id"],),
             ).fetchall()
-        assert ("model:returns", "skipped", False) in nodes, (nodes, worker.log.read_text())
+        assert ("model:returns", "not_run", False) in nodes, (nodes, worker.log.read_text())
         with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
             assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
 
@@ -1754,7 +1755,7 @@ def test_given_a_committed_claim_when_launch_preparation_fails_then_unstarted_wo
             runs: list[dict[str, Any]] = json.load(response)
         assert len(runs) == 1
         assert runs[0]["status"] == test_case.expected_status, worker.log.read_text()
-        assert runs[0]["node_counts_json"] == {"skipped": 1}
+        assert runs[0]["node_counts_json"] == {"not_run": 1}
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
             assert control.execute("SELECT count(*) FROM sqb_concurrency_slots").fetchone() == (0,)
@@ -1872,3 +1873,114 @@ def test_given_an_uncooperative_worker_when_scheduler_stops_then_the_fence_and_c
                 "SELECT json_extract(payload, '$.change.change.exit_code') FROM recall_events "
                 "WHERE event_type='run_terminated'"
             ).fetchone() == (137,)
+
+
+NODE_RESULT_FILES: dict[str, str] = {
+    "python/loaders.py": (
+        "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
+        "from sqlbuild.loaders import loader\n\n\n"
+        "@loader\n"
+        "def raw_gate(ctx):\n"
+        '    """A gate that stays closed."""\n'
+        '    return ctx.skip(reason="gate closed", mode=SkipMode.HARD)\n\n\n'
+        "@loader(depends_on=[raw_gate])\n"
+        "def raw_gated(ctx):\n"
+        '    """Rows behind the gate."""\n'
+        '    return [{"gated_id": 1}]\n\n\n'
+        "@loader\n"
+        "def raw_events(ctx):\n"
+        '    """Three events."""\n'
+        '    return [{"event_id": event_id} for event_id in range(3)]\n'
+    ),
+    "sources/raw.yml": (
+        "sources:\n"
+        "  - name: raw_gated\n    description: Gated rows.\n    managed: true\n"
+        "    write_strategy: table\n"
+        "  - name: raw_events\n    description: Events.\n    managed: true\n"
+        "    write_strategy: table\n"
+    ),
+    "models/events.sql": (
+        "MODEL (description 'Events.', materialized table);\n"
+        'SELECT event_id FROM __source("raw_events")\n'
+    ),
+    "models/event_view.sql": (
+        "MODEL (description 'Events as a view.', materialized view);\n"
+        'SELECT event_id FROM __ref("events")\n'
+    ),
+    "models/gated.sql": (
+        "MODEL (description 'Gated rows.', materialized table);\n"
+        'SELECT gated_id FROM __source("raw_gated")\n'
+    ),
+    "orchestration/jobs/annual_orders_job.toml": (
+        'name = "annual_orders_job"\n'
+        'description = "Build orders."\n'
+        'select = "+orders +event_view +gated"\n'
+        'schedule = { cron = "0 0 * * *", timezone = "UTC", starts_at = "2000-01-01T00:00:00Z" }\n'
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        NodeResultsTestCase(
+            "rebuilt tables report their rows and a hard skip names itself to what it blocks",
+            "SELECT 11 AS amount",
+            "SELECT count(*) FROM events",
+            "partial",
+            [(3,)],
+            files=NODE_RESULT_FILES,
+            expected_node_results=[
+                ("model:event_view", "success", None, None, None, None),
+                ("model:events", "success", None, 3, None, None),
+                ("model:gated", "skipped", None, None, None, "source:raw_gate"),
+                ("model:orders", "success", None, 1, None, None),
+                ("source:raw_events", "success", 3, None, 3, None),
+                ("source:raw_gate", "skipped", None, None, None, None),
+                ("source:raw_gated", "skipped", None, None, None, "source:raw_gate"),
+            ],
+        ),
+        NodeResultsTestCase(
+            "a worker that cannot import the project leaves every node not run",
+            "SELECT 11 AS amount",
+            "",
+            "failed",
+            [],
+            files=NODE_RESULT_FILES
+            | {
+                "python/broken.py": (
+                    "import os\n"
+                    "if 'SQLBUILD_RUN_TOKEN' in os.environ:\n"
+                    "    raise RuntimeError('this module breaks inside a worker')\n"
+                ),
+            },
+            expected_node_results=[
+                ("model:event_view", "not_run", None, None, None, None),
+                ("model:events", "not_run", None, None, None, None),
+                ("model:gated", "not_run", None, None, None, None),
+                ("model:orders", "not_run", None, None, None, None),
+                ("source:raw_events", "not_run", None, None, None, None),
+                ("source:raw_gate", "not_run", None, None, None, None),
+                ("source:raw_gated", "not_run", None, None, None, None),
+            ],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_worker_build_when_it_finishes_then_each_node_reports_what_it_did(
+    test_case: NodeResultsTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
+        )
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            nodes: list[tuple[str, str, int | None, int | None, int | None, str | None]] = list(
+                control.execute(
+                    "SELECT node_key, status, rows_affected, table_rows, rows_so_far, skipped_because_of "
+                    "FROM sqb_run_nodes WHERE run_id=? AND kind='node' ORDER BY node_key",
+                    (run["run_id"],),
+                )
+            )
+        assert nodes == test_case.expected_node_results, f"{nodes}\n{worker.log.read_text()}"

@@ -147,6 +147,15 @@ class WorkerExecutionTestCase:
 
 
 @dataclass(frozen=True)
+class NodeResultsTestCase(WorkerExecutionTestCase):
+    description: str
+    # Each run node as (key, status, rows affected, table rows, rows so far, skipped because of).
+    expected_node_results: list[tuple[str, str, int | None, int | None, int | None, str | None]] = (
+        field(default_factory=list)
+    )
+
+
+@dataclass(frozen=True)
 class ClaimedLoadTestCase(WorkerExecutionTestCase):
     description: str
     expected_write_set: frozenset[str] = frozenset()
@@ -457,7 +466,7 @@ class ChangedJobTestCase(WorkerExecutionTestCase):
     raw_tables_sql: tuple[str, ...]
     new_order_sql: str
     execute: Callable[[Path, str], list[tuple[Any, ...]]]
-    expected_runs: tuple[tuple[str, frozenset[str], dict[str, int]], ...]
+    expected_runs: tuple[tuple[str, frozenset[str], dict[str, int], frozenset[str]], ...]
 
 
 @dataclass(frozen=True)

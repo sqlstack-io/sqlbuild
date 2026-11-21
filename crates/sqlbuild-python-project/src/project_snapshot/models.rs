@@ -1,6 +1,8 @@
 //! Public records of project snapshot.
 
+use crate::compiled_project::constants::HARD_SKIP_MODE;
 use crate::compiled_project::constants::NO_CHANGE_REASON;
+use crate::compiled_project::constants::PROGRESS_INTERVAL;
 use crate::compiled_project::constants::REPORT_ATTEMPTS;
 use crate::compiled_project::constants::SKIP_ACTION;
 use crate::compiled_project::constants::SQL_TEST_KEY_PREFIX;
@@ -8,6 +10,7 @@ use crate::compiled_project::constants::STORE_BUSY_STATUS;
 use crate::compiled_project::constants::UNCHANGED_REASON;
 use crate::native_host::models::DeferredCost;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::is_function;
+use crate::project_snapshot::_helpers::snapshot::snapshot_execution::planned_key;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::poisoned;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::severity;
 use crate::project_snapshot::_helpers::snapshot::snapshot_worker::WorkerOwner;
@@ -57,6 +60,7 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
+use std::time::Instant;
 use uuid::Uuid;
 
 /// A data-only publication; this object never contains adapters, connections or user callables.
@@ -122,6 +126,13 @@ impl NativeOrchestrationSnapshot {
     }
 }
 
+/// Rows a running node has written, unknown once a batch reports no count, and the last report sent.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RowProgress {
+    pub(crate) rows: Option<i64>,
+    pub(crate) reported: Option<(Instant, i64)>,
+}
+
 /// A finished node's result as the worker reports it.
 #[derive(Clone, Debug)]
 pub(crate) struct Completion {
@@ -132,6 +143,8 @@ pub(crate) struct Completion {
     pub(crate) no_change_reason: Option<String>,
     pub(crate) error_code: Option<String>,
     pub(crate) error_message: Option<String>,
+    /// The node skipped itself with a hard skip, so the nodes it blocks name it as their cause.
+    pub(crate) skipped_itself: bool,
 }
 
 impl Completion {
@@ -143,6 +156,7 @@ impl Completion {
             no_change_reason: None,
             error_code: None,
             error_message: None,
+            skipped_itself: false,
         }
     }
 
@@ -172,6 +186,8 @@ pub struct WorkerBuild {
     held: Mutex<BTreeMap<String, Completion>>,
     /// Each snapshot node's direct upstream node keys, for naming what a skipped node waited on.
     upstream: BTreeMap<String, Vec<String>>,
+    /// The build plan's upstream edges, which also join loaders that depend on other loaders.
+    planned_upstream: Mutex<BTreeMap<String, Vec<String>>>,
     /// The failed node each finished node traces back to: itself when it failed, its cause when skipped.
     causes: Mutex<BTreeMap<String, String>>,
     /// The worst attached outcome of each node, for commands that only run tests or audits.
@@ -184,6 +200,8 @@ pub struct WorkerBuild {
     ignored_audit_failures: AtomicU32,
     /// The build's cost finalization, collected once the run has reported its outcome.
     deferred_cost: DeferredCost,
+    /// Rows each running node has written so far, and when the worker last reported them.
+    progress: Mutex<BTreeMap<String, RowProgress>>,
 }
 
 impl WorkerBuild {
@@ -201,12 +219,14 @@ impl WorkerBuild {
             untested: Mutex::default(),
             held: Mutex::default(),
             upstream,
+            planned_upstream: Mutex::default(),
             causes: Mutex::default(),
             checked: Mutex::default(),
             returned: AtomicBool::new(false),
             ignored_audit_failures: AtomicU32::new(0),
             refusal: Mutex::default(),
             deferred_cost: DeferredCost::default(),
+            progress: Mutex::default(),
         });
         for key in state.execution.skipped_nodes.keys() {
             state.complete(worker.py(), key, Completion::of(NodeOutcome::Skipped))?;
@@ -315,6 +335,7 @@ impl WorkerBuild {
         self.check_cancelled(pipeline.py())?;
         let plan = field(pipeline, "plan_output")?;
         self.count_planned_tests(&plan)?;
+        self.record_planned_upstream(&plan)?;
         for collection in [
             "model_entries",
             "seed_entries",
@@ -346,6 +367,23 @@ impl WorkerBuild {
                     self.complete(pipeline.py(), &key, completion)?;
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// Keep the plan's upstream edges, keyed `<kind>:<name>`, so a skip names a blocker the snapshot does not link.
+    fn record_planned_upstream(&self, plan: &Bound<'_, PyAny>) -> PyResult<()> {
+        let mut planned = self.planned_upstream.lock().map_err(|_| poisoned())?;
+        for item in field(plan, "upstream_deps")?
+            .call_method0("items")?
+            .try_iter()?
+        {
+            let (node, deps): (Bound<'_, PyAny>, Bound<'_, PyAny>) = item?.extract()?;
+            let mut keys: Vec<String> = Vec::new();
+            for dep in deps.try_iter()? {
+                keys.push(planned_key(&dep?)?);
+            }
+            planned.insert(planned_key(&node)?, keys);
         }
         Ok(())
     }
@@ -431,6 +469,9 @@ impl WorkerBuild {
         )?;
         let cause = match outcome {
             NodeOutcome::Failed => Some(key.to_owned()),
+            NodeOutcome::Skipped if completion.skipped_itself => {
+                skipped_because_of.or_else(|| Some(key.to_owned()))
+            }
             _ => skipped_because_of,
         };
         if let Some(cause) = cause {
@@ -581,10 +622,12 @@ impl WorkerBuild {
     /// The failed node nearest upstream of `key` in this run, or the cause a skipped one carries.
     fn failed_upstream(&self, key: &str) -> PyResult<Option<String>> {
         let causes = self.causes.lock().map_err(|_| poisoned())?;
+        let planned = self.planned_upstream.lock().map_err(|_| poisoned())?;
         let mut seen: BTreeSet<&str> = BTreeSet::from([key]);
         let mut pending: VecDeque<&str> = VecDeque::from([key]);
         while let Some(node) = pending.pop_front() {
-            for upstream in self.upstream.get(node).into_iter().flatten() {
+            let snapshot = self.upstream.get(node).into_iter().flatten();
+            for upstream in snapshot.chain(planned.get(node).into_iter().flatten()) {
                 if let Some(cause) = causes.get(upstream) {
                     return Ok(Some(cause.clone()));
                 }
@@ -675,6 +718,56 @@ impl WorkerBuild {
         self.complete(py, key, completion)
     }
 
+    /// Add a finished batch's rows to a node's progress; a batch with no row count leaves its total unknown.
+    pub fn batch_rows(&self, py: Python<'_>, key: &str, rows: Option<i64>) -> PyResult<()> {
+        let total = {
+            let mut progress = self.progress.lock().map_err(|_| poisoned())?;
+            let node = progress.entry(key.into()).or_insert(RowProgress {
+                rows: Some(0),
+                reported: None,
+            });
+            node.rows = node.rows.zip(rows).map(|(total, batch)| total + batch);
+            node.rows
+        };
+        match total {
+            Some(total) => self.rows_written(py, key, total),
+            None => Ok(()),
+        }
+    }
+
+    /// Report the rows a running node has written so far, at most once every few seconds per node.
+    pub fn rows_written(&self, py: Python<'_>, key: &str, total: i64) -> PyResult<()> {
+        if !self.execution.claim.request.selection.contains(key) {
+            return Ok(());
+        }
+        let due = {
+            let mut progress = self.progress.lock().map_err(|_| poisoned())?;
+            let node = progress.entry(key.into()).or_insert(RowProgress {
+                rows: Some(total),
+                reported: None,
+            });
+            node.rows = Some(total);
+            let due = node
+                .reported
+                .is_none_or(|(at, rows)| rows != total && at.elapsed() >= PROGRESS_INTERVAL);
+            if due {
+                node.reported = Some((Instant::now(), total));
+            }
+            due
+        };
+        if !due {
+            return Ok(());
+        }
+        self.worker.bind(py).get().change(
+            py,
+            &format!("node-progress/{key}/{total}"),
+            RunChange::NodeProgress {
+                node_key: key.into(),
+                rows_so_far: total,
+            },
+        )
+    }
+
     /// Existing native progress callbacks publish selected-node evidence without Python relays.
     pub fn completed(&self, result: &Bound<'_, PyAny>, key: &str) -> PyResult<()> {
         if key.starts_with(SQL_TEST_KEY_PREFIX) {
@@ -719,6 +812,10 @@ impl WorkerBuild {
                 Some(value) => value.extract()?,
                 None => None,
             };
+            let skip_mode: Option<String> = match result.getattr_opt("skip_mode")? {
+                Some(value) if !value.is_none() => Some(value.str()?.extract()?),
+                _ => None,
+            };
             let error = match result.getattr_opt("error_code")? {
                 Some(value) => value.extract()?,
                 None => None,
@@ -735,6 +832,8 @@ impl WorkerBuild {
                     table_rows,
                     error_code: error,
                     error_message: message,
+                    skipped_itself: outcome == NodeOutcome::Skipped
+                        && skip_mode.as_deref() == Some(HARD_SKIP_MODE),
                     ..Completion::of(outcome)
                 },
             )?;

@@ -175,6 +175,7 @@ class ModelExecutionResult:
     batch_count: int | None = None
     batch_size: str | None = None
     rows_affected: int | None = None
+    table_rows: int | None = None
     cursor_range_start: str | None = None
     cursor_range_end: str | None = None
     cursor_type: str | None = None
