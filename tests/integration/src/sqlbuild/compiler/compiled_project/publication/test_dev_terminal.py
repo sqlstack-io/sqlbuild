@@ -32,6 +32,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     development_run_state,
     drain_terminal,
     endless_build_files,
+    latest_redraw,
     linked_project,
     processes_naming,
     read_terminal_until,
@@ -552,11 +553,6 @@ def test_given_an_env_file_when_developing_then_start_up_names_it_and_r_reloads_
     assert left == [], shown
 
 
-def _latest_redraw(shown: str) -> str:
-    """The rows the live screen drew last, uncoloured: everything after its last clear."""
-    return re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", shown.rsplit("\x1b[J", 1)[-1])
-
-
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX pseudo-terminal contract")
 @pytest.mark.parametrize(
     "test_case",
@@ -603,7 +599,7 @@ def test_given_a_provider_missing_secrets_when_developing_then_a_warning_names_t
         warned: str = read_terminal_until(
             terminal,
             process,
-            lambda shown: "\u2500 ready " in shown and "press r to reload" in _latest_redraw(shown),
+            lambda shown: "\u2500 ready " in shown and "press r to reload" in latest_redraw(shown),
         )
         _ = env_file.write_text(test_case.second_env_file)
         _ = os.write(terminal, b"r")
@@ -612,8 +608,8 @@ def test_given_a_provider_missing_secrets_when_developing_then_a_warning_names_t
             process,
             lambda shown: (
                 "env file changed" in shown
-                and "keys " in _latest_redraw(shown)
-                and "Secrets missing" not in _latest_redraw(shown)
+                and "keys " in latest_redraw(shown)
+                and "Secrets missing" not in latest_redraw(shown)
             ),
         )
         process.send_signal(signal.SIGTERM)
@@ -622,7 +618,7 @@ def test_given_a_provider_missing_secrets_when_developing_then_a_warning_names_t
         left: list[str] = reap_development(process, project)
         os.close(terminal)
 
-    warning: str = " ".join(_latest_redraw(warned).split())
+    warning: str = " ".join(latest_redraw(warned).split())
     assert all(" ".join(part.split()) in warning for part in test_case.expected_warning), warning
     assert "worker-token" not in warned + reloaded
     assert exit_code == 128 + signal.SIGTERM, reloaded

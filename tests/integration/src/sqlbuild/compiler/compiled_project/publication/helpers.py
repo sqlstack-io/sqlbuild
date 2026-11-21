@@ -10,6 +10,7 @@ import json
 import os
 import pty
 import random
+import re
 import secrets
 import select
 import signal
@@ -2306,3 +2307,8 @@ def linked_project(project: Path) -> Path:
     link: Path = project.with_name(f"{project.name}_link")
     link.symlink_to(project, target_is_directory=True)
     return link
+
+
+def latest_redraw(shown: str) -> str:
+    """The rows the live screen drew last, uncoloured: everything after its last clear."""
+    return re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", shown.rsplit("\x1b[J", 1)[-1])
