@@ -30,12 +30,13 @@
 	let lineInput = $state('');
 	let query = $state('');
 	/** Where a search stands: this match of how many when the output was searched whole, else just its line. */
-	function hitText(h: { count: number | null; line: number | null; rank: number | null }): string {
+	function hitText(h: { count: number | null; line: number | null; rank: number | null; continueFrom: number | null }): string {
+		if (h.line == null && h.continueFrom != null) return `No match up to line ${fmt(h.continueFrom)} · search again to go on`;
 		if (h.line == null) return 'No matches';
 		if (h.count != null && h.rank != null) return `hit ${fmt(h.rank)} of ${fmt(h.count)} · line ${fmt(h.line)}`;
 		return `match at line ${fmt(h.line)}`;
 	}
-	let hits = $state<{ query: string; count: number | null; line: number | null; rank: number | null } | null>(null);
+	let hits = $state<{ query: string; count: number | null; line: number | null; rank: number | null; continueFrom: number | null } | null>(null);
 	let searching = $state(false);
 	let stream = $state<'all' | 'stdout' | 'stderr'>('all');
 	let scroller = $state<HTMLDivElement>();
@@ -96,13 +97,25 @@
 		const line = Math.min(Math.max(1, n), total);
 		void load(Math.max(1, line - 3), 'forward', line);
 	}
+	let searchAbort: AbortController | null = null;
 	async function search(direction: 'forward' | 'backward') {
 		if (!app.scope || !app.client.searchNodeOutput || !query.trim()) return;
+		// A new search replaces one still going.
+		searchAbort?.abort();
+		const abort = (searchAbort = new AbortController());
 		searching = true;
-		const from = hits?.query === query && hits.line != null ? hits.line + (direction === 'forward' ? 1 : -1) : direction === 'forward' ? (view?.from ?? 1) : (view?.to ?? total);
-		const res = await app.client.searchNodeOutput(app.scope, runId, nodeKey, query.trim(), from, direction);
-		hits = { query, count: res.count, line: res.line, rank: res.rank };
-		searching = false;
+		const again = hits?.query === query;
+		const from = again && hits!.continueFrom != null ? hits!.continueFrom : again && hits!.line != null ? hits!.line + (direction === 'forward' ? 1 : -1) : direction === 'forward' ? (view?.from ?? 1) : (view?.to ?? total);
+		let res;
+		try {
+			res = await app.client.searchNodeOutput(app.scope, runId, nodeKey, query.trim(), from, direction, abort.signal);
+		} catch (error) {
+			if (abort.signal.aborted) return;
+			throw error;
+		} finally {
+			if (searchAbort === abort) searching = false;
+		}
+		hits = { query, count: res.count, line: res.line, rank: res.rank, continueFrom: res.continueFrom ?? null };
 		if (res.line != null) await load(Math.max(1, res.line - 3), 'forward', res.line);
 	}
 	function mark(level: 'error' | 'warn', direction: 'forward' | 'backward') {
