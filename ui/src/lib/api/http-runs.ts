@@ -137,6 +137,7 @@ function countsOf(wire: Wire['RunRecord']): NodeCounts {
 		warn: n('warn'),
 		failed: n('failed') + n('cancelled'),
 		skipped: n('skipped') + n('not_run'),
+		notRun: n('not_run'),
 		running: n('running'),
 		pending: n('pending')
 	};

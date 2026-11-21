@@ -51,17 +51,17 @@ describe('run mapping', () => {
 		expect([part.narrowing, whole.narrowing]).toEqual([{ select: [], exclude: ['customers'] }, null]);
 	});
 
-	it('counts cancelled nodes as failed and counts each run’s direct children', () => {
+	it('counts cancelled nodes as failed, not-run nodes among the skipped as well as on their own, and each run’s direct children', () => {
 		const runs = toRuns(
 			[
-				wire('group', { kind: 'group', node_counts_json: { success: 3, cancelled: 2, failed: 1, pending: 4 } }),
+				wire('group', { kind: 'group', node_counts_json: { success: 3, cancelled: 2, failed: 1, pending: 4, skipped: 1, not_run: 2 } }),
 				wire('child-1', { parent_run_id: 'group', root_run_id: 'group' }),
 				wire('child-2', { parent_run_id: 'group', root_run_id: 'group' }),
 				wire('grandchild', { parent_run_id: 'child-1', root_run_id: 'group' })
 			],
 			LOCATION
 		);
-		expect(runs[0].nodeCounts).toEqual({ success: 3, warn: 0, failed: 3, skipped: 0, running: 0, pending: 4 });
+		expect(runs[0].nodeCounts).toEqual({ success: 3, warn: 0, failed: 3, skipped: 3, notRun: 2, running: 0, pending: 4 });
 		expect(runs.map((r) => r.childRunCount)).toEqual([2, 1, 0, 0]);
 	});
 });
