@@ -1049,7 +1049,7 @@ export type TriggerStateEvent = {
 export type SensorEvaluationOutcome = 'running' | 'handled' | 'skipped' | 'started' | 'failed' | 'timed_out' | 'abandoned';
 
 /** Why a tick ended before its answer was committed; only `unanswered` counts toward a failing sensor. */
-export type AbandonReason = 'unanswered' | 'superseded' | 'republished' | 'paused' | 'cursor_reset' | 'leader_changed';
+export type AbandonReason = 'unanswered' | 'superseded' | 'republished' | 'paused' | 'cursor_reset' | 'leader_changed' | 'skipped';
 
 /** One tick: one call of the sensor's function, on one event unless the sensor polls. */
 export type SensorEvaluation = {

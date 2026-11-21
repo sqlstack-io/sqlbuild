@@ -6,11 +6,13 @@ use crate::declarations::models::TriggerChangeRequest;
 use crate::sensors::_helpers::ticks::attempts::last_attempt;
 use crate::sensors::_helpers::ticks::facts::{append_evaluation, commit_cursor, record_delivery};
 use crate::sensors::main::read_sensor_cursor::read_sensor_cursor;
-use crate::sensors::models::{SensorCursor, SensorEvaluationOutcome, SensorEvaluationRequest};
+use crate::sensors::models::{
+    AbandonReason, SensorCursor, SensorEvaluationOutcome, SensorEvaluationRequest,
+};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;
 
-/// Skip `event`, which the sensor's newest finished tick didn't handle and its cursor still waits on: the cursor after it.
+/// Skip `event`, which the sensor's newest tick, finished or still out, hasn't handled and its cursor still waits on: the cursor after it.
 pub(crate) async fn skip_sensor_event(
     transaction: ControlTransaction,
     request: &TriggerChangeRequest,
@@ -33,18 +35,10 @@ pub(crate) async fn skip_sensor_event(
             None => "a polling sensor has no event to skip".into(),
         }));
     }
-    match terminal.as_deref() {
-        None => {
-            return Err(ControlError::Invalid(
-                "a tick is handling this event now; skip it once the tick finishes".into(),
-            ));
-        }
-        Some(SensorEvaluationOutcome::COMPLETED) => {
-            return Err(ControlError::Invalid(format!(
-                "the sensor already handled {event}"
-            )));
-        }
-        Some(_) => {}
+    if terminal.as_deref() == Some(SensorEvaluationOutcome::COMPLETED) {
+        return Err(ControlError::Invalid(format!(
+            "the sensor already handled {event}"
+        )));
     }
     let (transaction, cursor) = read_sensor_cursor(transaction, request.trigger_id).await?;
     if cursor != stuck.request.cursor {
@@ -52,6 +46,19 @@ pub(crate) async fn skip_sensor_event(
             "the sensor has moved past {event} since its last tick"
         )));
     }
+    // A tick still out on the event, as a timing-out or paused sensor's usually is, ends here: its late answer starts nothing.
+    let transaction = if terminal.is_none() {
+        append_evaluation(
+            transaction,
+            &stuck.request,
+            SensorEvaluationOutcome::Abandoned {
+                reason: AbandonReason::Skipped,
+            },
+        )
+        .await?
+    } else {
+        transaction
+    };
     let skipped = SensorEvaluationRequest {
         evaluation_id: Uuid::now_v7(),
         requested_at: transaction.now,

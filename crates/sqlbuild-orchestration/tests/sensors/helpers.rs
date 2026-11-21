@@ -362,7 +362,7 @@ pub(crate) async fn evaluate_sensors(
 }
 
 /// What a test sensor's function does, read from its name: `start_<job>` starts the job for the event.
-fn stand_in_outcome(evaluation: &SensorEvaluationRequest) -> SensorFunctionOutcome {
+pub(crate) fn stand_in_outcome(evaluation: &SensorEvaluationRequest) -> SensorFunctionOutcome {
     let Some(job) = evaluation.definition.function.strip_prefix("start_") else {
         return SensorFunctionOutcome::Handled { cursor: None };
     };

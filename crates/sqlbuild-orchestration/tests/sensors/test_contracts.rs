@@ -30,6 +30,8 @@ mod test_run_keys;
 mod test_runs;
 #[path = "test_skip.rs"]
 mod test_skip;
+#[path = "test_skip_in_flight.rs"]
+mod test_skip_in_flight;
 #[path = "test_sources.rs"]
 mod test_sources;
 #[path = "test_transitions.rs"]

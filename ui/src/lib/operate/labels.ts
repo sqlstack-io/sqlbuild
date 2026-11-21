@@ -263,7 +263,8 @@ export const abandonReasonLabel: Record<AbandonReason, string> = {
 	republished: 'The location published again',
 	paused: 'The sensor was paused',
 	cursor_reset: 'The cursor was reset or moved',
-	leader_changed: 'Another server took over scheduling'
+	leader_changed: 'Another server took over scheduling',
+	skipped: 'An operator skipped its event'
 };
 
 export const triggerKindLabel: Record<TriggerKind, string> = {

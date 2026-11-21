@@ -403,6 +403,8 @@ pub enum AbandonReason {
     CursorReset,
     /// Another scheduler took over while the tick ran.
     LeaderChanged,
+    /// An operator skipped the tick's event while the tick was still out.
+    Skipped,
 }
 
 /// A run key the sensor matched but did not queue: the job's overlap is `skip` and `active_run_id` was active.

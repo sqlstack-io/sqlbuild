@@ -352,7 +352,9 @@ by a new publication, a pause or a reset doesn't.
 To move past an event the function can't handle, use **Skip this event** on the stuck tick, or
 `sqb admin change-trigger <TRIGGER_ID> skip-event --event <event id> --event-id <uuid> --reason
 "..."`. It marks that one event delivered without calling the function, and the tick history
-and audit log record who skipped it and why. **Start over** (`reset-cursor`) instead re-delivers
+and audit log record who skipped it and why. It works while a tick for the event is still out,
+as it usually is for a sensor that times out or is paused; that tick's late answer starts nothing.
+**Start over** (`reset-cursor`) instead re-delivers
 every retained event from the start, the skipped one too. Both need `sensor.reset_cursor`.
 
 ### Try a sensor

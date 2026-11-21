@@ -108,3 +108,12 @@ pub(crate) struct SensorPermissionTestCase {
     /// Pause, reset-cursor and skip-event: applied, or why each was refused.
     pub(crate) expected_outcomes: [Result<bool, &'static str>; 3],
 }
+
+pub(crate) struct SkipInFlightTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Operator changes before the skip, such as a pause, and after it.
+    pub(crate) before_skip: &'static [crate::declarations::models::TriggerChange],
+    pub(crate) after_skip: &'static [crate::declarations::models::TriggerChange],
+    pub(crate) expected_next_event: &'static str,
+}
