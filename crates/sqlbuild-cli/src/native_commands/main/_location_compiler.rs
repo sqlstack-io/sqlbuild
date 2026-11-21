@@ -15,15 +15,13 @@ use crate::native_commands::_helpers::location::compiler_discovery::{
     check_discovered, discovered, sleep_until,
 };
 use crate::native_commands::_helpers::location::discovery_state::LocationDiscovery;
-use crate::native_commands::_helpers::location::execution::{
-    exchange_location_generation, exchange_location_plan,
-};
+use crate::native_commands::_helpers::location::execution::exchange_reply;
 use crate::native_commands::_helpers::location::execution::{
     open_location_runtime, stop_location_runtime,
 };
 use crate::native_commands::models::{
-    LocationCompileRequest, LocationCompiler, LocationPlanRequest, LocationRuntimeRequest,
-    LocationServe,
+    LocationCompileRequest, LocationCompiler, LocationLoad, LocationPlanRequest,
+    LocationRuntimeRequest, LocationServe,
 };
 use crate::native_commands::types::DiscoveryControls;
 
@@ -115,7 +113,7 @@ async fn publish(
     };
     let result = tokio::select! {
         _ = request.reply.closed() => return Ok((Some(active), false)),
-        result = exchange_location_generation(&mut active, &publication) => result,
+        result = exchange_reply::<LocationLoad>(&mut active, &publication, "publication record") => result,
     };
     if let Ok(load) = &result {
         discovered(options, (bearer, session_id), (request.generation, load)).await;
@@ -143,7 +141,7 @@ async fn plan(
         None => open_location_runtime(options, script, sources.to_vec())?,
     };
     let result = {
-        let exchange = exchange_location_plan(&mut active, &request.request);
+        let exchange = exchange_reply::<serde_json::Value>(&mut active, &request.request, "plan");
         tokio::pin!(exchange);
         tokio::select! {
             () = request.reply.closed() => {

@@ -90,7 +90,6 @@ use sqlbuild_orchestration::dev_events::main::emit_dev_event::emit_dev_event;
 use sqlbuild_orchestration::dev_events::main::parse_dev_control::parse_dev_control;
 use sqlbuild_orchestration::dev_events::main::parse_dev_event::parse_dev_event;
 use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
-use sqlbuild_orchestration::discovered_sets::models::DiscoveryPublishRequest;
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::health::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::installation::run_maintenance::run_maintenance;
@@ -419,16 +418,8 @@ fn rule_failure_text(rules: &LocationRuleFailure) -> String {
     )
 }
 
-/// The child is retained by its owning task while this exchange can be cancelled.
-pub(crate) async fn exchange_location_generation(
-    compiler: &mut LocationCompiler,
-    request: &DiscoveryPublishRequest,
-) -> Result<LocationLoad, ControlError> {
-    exchange_reply(compiler, request, "publication record").await
-}
-
-/// Write `request` as one JSON line and read the reply line as a `what`, passing `sqb dev` event lines on.
-async fn exchange_reply<T: serde::de::DeserializeOwned>(
+/// Send `request` as a JSON line and read the runtime's reply, a `what`; `sqb dev` events pass on.
+pub(crate) async fn exchange_reply<T: serde::de::DeserializeOwned>(
     compiler: &mut LocationCompiler,
     request: &impl serde::Serialize,
     what: &str,
@@ -1946,14 +1937,6 @@ pub(crate) async fn compile_next_generation(
     )
     .await?;
     Ok(load.map(|load| (Some((load, generation)), metadata, compiled_inputs)))
-}
-
-/// Ask the runtime interpreter for one plan preview; its reply is one JSON line.
-pub(crate) async fn exchange_location_plan(
-    compiler: &mut LocationCompiler,
-    request: &serde_json::Value,
-) -> Result<serde_json::Value, ControlError> {
-    exchange_reply(compiler, request, "plan").await
 }
 
 /// The safety sync interval from the flag, then the environment, then the project; `None` when unset.

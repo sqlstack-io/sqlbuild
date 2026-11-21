@@ -16,7 +16,7 @@ use crate::argv::models::Stream;
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::discovery_state::LocationDiscovery;
 use crate::native_commands::_helpers::location::execution::{
-    exchange_location_plan, report_location_health, request_republish, stop_location_runtime,
+    exchange_reply, report_location_health, request_republish, stop_location_runtime,
 };
 use crate::native_commands::models::{LocationCompiler, LocationLoad, LocationServe};
 use crate::native_commands::types::DiscoveryControls;
@@ -40,14 +40,11 @@ pub(crate) async fn check_discovered(
     };
     let request: DiscoveredSetCheck = check;
     let name: String = request.check_discovered.clone();
-    let reply = exchange_location_plan(
-        &mut active,
-        &serde_json::to_value(&request).map_err(std::io::Error::other)?,
-    )
-    .await;
-    let reply: DiscoveredSetChecked = match reply.map(serde_json::from_value) {
-        Ok(Ok(reply)) => reply,
-        Ok(Err(_)) | Err(_) => {
+    let reply: Result<DiscoveredSetChecked, ControlError> =
+        exchange_reply(&mut active, &request, "discovered set check").await;
+    let reply: DiscoveredSetChecked = match reply {
+        Ok(reply) => reply,
+        Err(_) => {
             drop(write_output(&[(
                 Stream::Stderr,
                 &format!(
