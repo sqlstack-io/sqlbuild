@@ -868,7 +868,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				implemented.listSnapshotChanges(scope, { limit: 100 }),
 				implemented.listPlatformEvents(),
 				acknowledgementsOf(scope),
-				attentionAcknowledgementsOf(scope)
+				attentionAcknowledgementsOf(scope),
+				listedTriggers(scope)
 			]);
 			// Every listing needs view on all of the target, so a partial viewer gets no counts at all.
 			const read = await reads.catch((error: unknown) => {
@@ -876,8 +877,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				throw error;
 			});
 			if (!read) return null;
-			const [runs, checks, nodes, changes, events, acknowledgements, conditions] = read;
-			return overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now: Date.now(), scopeKey: scope.locationId });
+			const [runs, checks, nodes, changes, events, acknowledgements, conditions, triggers] = read;
+			return overviewOf({ runs, checks, nodes, changes, events, triggers, acknowledgements, conditions, now: Date.now(), scopeKey: scope.locationId });
 		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),

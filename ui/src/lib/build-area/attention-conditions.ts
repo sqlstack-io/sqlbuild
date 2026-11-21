@@ -35,6 +35,9 @@ export function conditionOf(item: AttentionItem): { key: string; shape: Conditio
 			return { key: `queue:${item.runId}`, noun: 'wait', shape: { members: [...new Set(item.waits.map((w) => w.kind))].sort() } };
 		case 'calendar_low':
 			return { key: `calendar:${item.triggerId}`, noun: 'warning', shape: {} };
+		case 'sensor_failing':
+			// A sensor that recovers and fails again is a new occurrence, so an acknowledgement doesn't hide it.
+			return { key: `sensor:${item.triggerId}`, noun: 'failed tick', shape: { occurrence: item.failing.since } };
 		case 'run_problem':
 		case 'run_unresponsive':
 			return null;
@@ -141,6 +144,7 @@ export const CLEARED_REASON = 'automatic: the condition cleared';
  */
 export function visibleEventKey(key: string, scopeKey: string): boolean {
 	if (key === boundedKey('event:scheduler_no_leader::')) return true;
+	if (key.startsWith('sensor:')) return true;
 	return ['location_broken', 'tick_overdue', 'calendar_horizon_low'].some((kind) => key.startsWith(`event:${kind}:${scopeKey}:`));
 }
 

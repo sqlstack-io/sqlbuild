@@ -51,6 +51,7 @@ describe('overview from live reads', () => {
 		],
 		changes: [change(1, [['added', 'model:orders'], ['added', 'seed:regions'], ['removed', 'model:old']]), change(24 * 8, [['added', 'model:totals']])],
 		events: [event('scheduler', true), event('cleared', false)],
+		triggers: [],
 		acknowledgements: new Map([['orders-new', { by: 'ada', at: hoursAgo(1) }]]),
 		conditions: { snoozeSeconds: 86_400, acknowledgements: [] }, scopeKey: 'loc-1:dev',
 		now
@@ -103,7 +104,35 @@ describe('overview from live reads', () => {
 
 	it('leaves parts without a server read empty instead of zero', () => {
 		expect(overview.metrics.cost).toBeNull();
-		const unknown = overviewOf({ runs: [], checks: [], nodes: [{ ...node('model:a', 'table', 'models/a.sql'), stale: null }], changes: [], events: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: [] }, scopeKey: 'loc-1:dev', now });
+		const unknown = overviewOf({ runs: [], checks: [], nodes: [{ ...node('model:a', 'table', 'models/a.sql'), stale: null }], changes: [], events: [], triggers: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: [] }, scopeKey: 'loc-1:dev', now });
 		expect(unknown.groups).toBeNull();
+	});
+});
+
+describe('a failing sensor on the overview', () => {
+	type TriggerRecord = Parameters<typeof overviewOf>[0]['triggers'][number];
+	const sensor = (failing: TriggerRecord['sensor_failing']): TriggerRecord =>
+		({ trigger_id: 't-orders', name: 'orders_failed_sensor', status: 'running', definition_json: {}, upcoming: [], sensor_failing: failing }) as unknown as TriggerRecord;
+	const read = (triggers: TriggerRecord[]) =>
+		overviewOf({ runs: [], checks: [], nodes: [], changes: [], events: [], triggers, acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: [] }, scopeKey: 'loc-1:dev', now });
+
+	it('appears from the first failed tick, naming the stuck event and since when', () => {
+		const failing = { since: hoursAgo(2), failed_ticks: 3, event_id: 'run:r-1', event_summary: 'orders_job failed' };
+		expect(read([sensor(failing)]).attention).toEqual([
+			{
+				kind: 'sensor_failing',
+				triggerId: 't-orders',
+				triggerName: 'orders_failed_sensor',
+				failing: { since: hoursAgo(2), failedTicks: 3, eventId: 'run:r-1', eventSummary: 'orders_job failed' },
+				condition: { key: 'sensor:t-orders', shape: { occurrence: hoursAgo(2) }, acknowledged: null, lapsed: null }
+			}
+		]);
+	});
+
+	it('is withdrawn once a tick succeeds, and its acknowledgement counts as cleared', () => {
+		const ack = { eventId: 'ack-sensor', key: 'sensor:t-orders', shape: { occurrence: hoursAgo(2) }, by: 'ada', at: hoursAgo(1), until: null };
+		const recovered = overviewOf({ runs: [], checks: [], nodes: [], changes: [], events: [], triggers: [sensor(null)], acknowledgements: new Map(), conditions: { snoozeSeconds: null, acknowledgements: [ack] }, scopeKey: 'loc-1:dev', now });
+		expect(recovered.attention).toEqual([]);
+		expect(recovered.clearedAcknowledgements).toEqual([ack]);
 	});
 });

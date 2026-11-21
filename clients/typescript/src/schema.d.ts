@@ -914,6 +914,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/sensors/{name}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonSensorEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/snapshots": {
         parameters: {
             query?: never;
@@ -1800,6 +1816,11 @@ export interface components {
             /** Format: uuid */
             session_id: string;
         };
+        /**
+         * @description How a check, audit or SQL test that ran inside a run fell short.
+         * @enum {string}
+         */
+        CheckEventKind: "failed" | "warn";
         /** @description One result's stored evidence rows; `view.evidence` reads them, audited. */
         CheckEvidence: {
             binding_key: string;
@@ -1985,24 +2006,6 @@ export interface components {
                 [key: string]: components["schemas"]["SnapshotNode"];
             };
             record: components["schemas"]["SnapshotRecord"];
-        };
-        /** @description Location-owned Python returns data; only the fenced scheduler may apply it. */
-        CustomSensorOutcome: {
-            cursor?: string | null;
-            run_keys: string[];
-            /** @enum {string} */
-            status: "completed";
-        } | {
-            cursor?: string | null;
-            reason: string;
-            /** @enum {string} */
-            status: "skipped";
-        } | {
-            /** @enum {string} */
-            status: "failed";
-        } | {
-            /** @enum {string} */
-            status: "timed_out";
         };
         /** @description Where a declaration was written, relative to the project root. */
         DeclaredAt: {
@@ -2331,7 +2334,7 @@ export interface components {
         } | {
             /** @enum {string} */
             kind: "sensor_evaluation";
-            outcome: components["schemas"]["CustomSensorOutcome"];
+            outcome: components["schemas"]["SensorFunctionOutcome"];
         } | {
             /** @description Model diff text, which the document never carries; stored apart, never read back here. */
             diffs?: {
@@ -2688,7 +2691,7 @@ export interface components {
             role_key: string;
             target?: string | null;
         };
-        /** @description The control event position built-in conditions read from, and a custom sensor's own value after secret redaction; the value needs view.evidence. */
+        /** @description The event position a condition reads from, and a polling sensor's own value after secret redaction; the value needs view.evidence. */
         PersonSensorCursor: {
             custom?: string | null;
             /** Format: int64 */
@@ -2698,18 +2701,28 @@ export interface components {
             cursor_after?: null | components["schemas"]["PersonSensorCursor"];
             cursor_before: components["schemas"]["PersonSensorCursor"];
             definition_fingerprint: string;
+            /** @description The traceback or refusal of a failed tick, redacted; needs view.evidence. */
+            error?: string | null;
             /** Format: uuid */
             evaluation_id: string;
-            /** @description The failure code of a failed check. */
+            /** @description The event the function was called with; absent for a polling sensor. */
+            event_id?: string | null;
+            event_summary?: string | null;
+            /** @description The failure code of a failed tick. */
             failure_code?: string | null;
             /** Format: date-time */
             finished_at?: string | null;
-            /** @description The latest phase: `requested` alone means the check is in flight; otherwise `completed`, `failed`, `timed_out` or `abandoned`. */
+            /** @description What the function did: `handled`, `skipped`, `started`, `failed`, `timed_out`, `abandoned`, or `running` while in flight. */
+            outcome: string;
+            /** @description The latest phase: `requested` alone means the tick is in flight; otherwise `completed`, `failed`, `timed_out` or `abandoned`. */
             phase: string;
             /** Format: date-time */
             requested_at: string;
-            run_count: number;
-            /** @description For each matched request the job's `skip` overlap dropped, the run that was active. */
+            /** @description The runs the tick started. */
+            run_ids: string[];
+            /** @description Why the function skipped, redacted; needs view.evidence. */
+            skip_reason?: string | null;
+            /** @description For each requested run the job's `skip` overlap dropped, the run that was active. */
             skipped_for: string[];
         };
         /** @description A run key is redacted and withheld like the custom cursor it usually derives from: empty without view.evidence. */
@@ -2730,6 +2743,7 @@ export interface components {
             definition_fingerprint: string;
             /** @description Newest first. */
             evaluations: components["schemas"]["PersonSensorEvaluation"][];
+            failing?: null | components["schemas"]["SensorFailing"];
             /** @description Runs the sensor requested, by run key, newest first. */
             run_requests: components["schemas"]["PersonSensorRunRequest"][];
         };
@@ -2778,6 +2792,7 @@ export interface components {
         /** @description A trigger as people list it, with its newest tick so a list needs no read per trigger. */
         PersonTriggerRecord: components["schemas"]["TriggerRecord"] & {
             latest_tick?: null | components["schemas"]["TickRecord"];
+            sensor_failing?: null | components["schemas"]["SensorFailing"];
             /** @description A running schedule's next due times from `next_due_at` on, at most five; empty otherwise. */
             upcoming: string[];
         };
@@ -3161,6 +3176,11 @@ export interface components {
             /** @enum {string} */
             kind: "blob";
             value: number[];
+        };
+        /** @description A run a sensor's function asked for; the key defaults to the event ID and the job. */
+        RequestedRun: {
+            job: string;
+            run_key: string;
         };
         /** @description A retry derives its execution scope from a terminal run, never from caller selectors. */
         RerunRequest: {
@@ -3728,6 +3748,7 @@ export interface components {
             /** @description `tag:` values: the SQL resources and Python nodes with each tag. */
             tags: components["schemas"]["VocabularyEntry"][];
         };
+        /** @description What wakes a sensor; a sensor without one polls every `minimum_interval_seconds`. */
         SensorCondition: {
             /** @enum {string} */
             kind: "platform_event";
@@ -3745,6 +3766,11 @@ export interface components {
             selection: string[];
         } | {
             /** @enum {string} */
+            kind: "check_event";
+            kinds: components["schemas"]["CheckEventKind"][];
+            selection: string[];
+        } | {
+            /** @enum {string} */
             kind: "source_new_data";
             selection: string[];
         } | {
@@ -3753,22 +3779,140 @@ export interface components {
             /** @enum {string} */
             kind: "source_stale";
             selection: string[];
-        } | {
-            code_hash: string;
-            function: string;
-            /** @enum {string} */
-            kind: "custom";
         };
+        /** @description A sensor: the function the location runs, and the condition that wakes it. */
         SensorDefinition: {
+            code_hash: string;
             declared_at?: null | components["schemas"]["DeclaredAt"];
             default_status?: components["schemas"]["TriggerStatus"];
             description: string;
-            job_key: string;
+            /** @description The decorated function's name, such as `orders_failed`. */
+            function: string;
             /** Format: int32 */
             minimum_interval_seconds: number;
             /** @description The targets the declaration is limited to; empty for every target. */
             targets?: string[];
-            when: components["schemas"]["SensorCondition"];
+            /**
+             * Format: int32
+             * @description How long one call of the function may take before its tick fails.
+             */
+            timeout_seconds: number;
+            when?: null | components["schemas"]["SensorCondition"];
+        };
+        /** @description One event a sensor's function is called with; `id` is stable across redeliveries. */
+        SensorEvent: {
+            error?: string | null;
+            failed_checks: string[];
+            failed_nodes: string[];
+            id: string;
+            job: string;
+            /** @enum {string} */
+            kind: "run";
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: uuid */
+            run_id: string;
+            status: components["schemas"]["RunOutcome"];
+            target: string;
+            url?: string | null;
+        } | {
+            event: components["schemas"]["NodeEventKind"];
+            id: string;
+            job?: string | null;
+            /** @enum {string} */
+            kind: "node";
+            node: string;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: uuid */
+            run_id: string;
+            target: string;
+            url?: string | null;
+        } | {
+            check: string;
+            id: string;
+            job?: string | null;
+            /** @enum {string} */
+            kind: "check";
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: uuid */
+            run_id: string;
+            status: components["schemas"]["CheckEventKind"];
+            target: string;
+            url?: string | null;
+        } | {
+            data_version?: string | null;
+            id: string;
+            /** @enum {string} */
+            kind: "source_new_data";
+            /** Format: date-time */
+            occurred_at: string;
+            source: string;
+            target: string;
+        } | {
+            /** Format: int32 */
+            after_seconds: number;
+            data_version?: string | null;
+            id: string;
+            /** @enum {string} */
+            kind: "source_stale";
+            /** Format: date-time */
+            occurred_at: string;
+            source: string;
+            target: string;
+        } | {
+            details: Record<string, never>;
+            event: components["schemas"]["PlatformEventKind"];
+            id: string;
+            /** @enum {string} */
+            kind: "platform";
+            /** Format: date-time */
+            occurred_at: string;
+        };
+        /** @description A sensor whose latest ticks failed: since when, and the event it is stuck on. */
+        SensorFailing: {
+            /** @description The event the failed ticks were called with; absent for a polling sensor. */
+            event_id?: string | null;
+            event_summary?: string | null;
+            failed_ticks: number;
+            /**
+             * Format: date-time
+             * @description When the first of the failed ticks since the last good one started.
+             */
+            since: string;
+        };
+        /** @description What one call of a sensor's function returned; only the fenced scheduler applies it. */
+        SensorFunctionOutcome: {
+            cursor?: string | null;
+            /** @enum {string} */
+            status: "handled";
+        } | {
+            cursor?: string | null;
+            reason: string;
+            /** @enum {string} */
+            status: "skipped";
+        } | {
+            cursor?: string | null;
+            runs: components["schemas"]["RequestedRun"][];
+            /** @enum {string} */
+            status: "requested";
+        } | {
+            error: string;
+            /** @enum {string} */
+            status: "failed";
+        } | {
+            /** @enum {string} */
+            status: "timed_out";
+        };
+        /** @description A published sensor and the events a trial chose for it, newest first. */
+        SensorTrialEvents: {
+            events: components["schemas"]["SensorEvent"][];
+            function: string;
+            sensor: string;
+            /** Format: int32 */
+            timeout_seconds: number;
+            when?: null | components["schemas"]["SensorCondition"];
         };
         /** @description How long the server keeps each kind of record. */
         ServerRetention: {
@@ -3988,7 +4132,8 @@ export interface components {
         };
         TriggerRecord: {
             definition_json: components["schemas"]["TriggerDeclaration"];
-            job_key: string;
+            /** @description The job or group a schedule starts; `None` for a sensor, whose function chooses. */
+            job_key?: string | null;
             /** Format: date-time */
             last_tick_for?: string | null;
             name: string;
@@ -6742,6 +6887,67 @@ export interface operations {
                 content?: never;
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonSensorEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                name: string;
+                limit: number | null;
+                latest: boolean | null;
+                event: string | null;
+                run: string | null;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The published sensor and the chosen events, newest first; reading them changes nothing */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SensorTrialEvents"];
+                };
+            };
+            /** @description More than one of latest, event and run */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description No such sensor, event or matching run, and why */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

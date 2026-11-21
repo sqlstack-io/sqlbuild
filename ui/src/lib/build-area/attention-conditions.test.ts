@@ -134,7 +134,7 @@ describe('acknowledgements of conditions that cleared', () => {
 	const built = (stale: StaleReason[] | null): CatalogNode => ({ key: 'model:orders', kind: 'table', path: 'models/orders.sql', group: null, upstream: [], stale, lastOutcome: 'success', lastBuild: { builtAt: iso(-1) } }) as unknown as CatalogNode;
 	const changed: StaleReason = { reason: 'changed', change: 'definition', detail: '', since: iso(-3) };
 	const read = (nodes: CatalogNode[], acks: AttentionAcknowledgement[]) =>
-		overviewOf({ runs: [], checks: [], nodes, changes: [], events: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: acks }, now, scopeKey: 'loc-1:dev' });
+		overviewOf({ runs: [], checks: [], nodes, changes: [], events: [], triggers: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: acks }, now, scopeKey: 'loc-1:dev' });
 
 	it('lists one whose condition the read can see and no longer finds', () => {
 		const nodesOutOfDate = ack('stale_models', { counts: { changed: 2, behind: 0 } });

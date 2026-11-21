@@ -2,6 +2,8 @@ import { topFolder } from '$lib/lineage/catalog-graph';
 import { recentDeploys } from '$lib/build-area/overview-panels';
 import { clearedAcknowledgements, visibleEventKey, withConditions } from '$lib/build-area/attention-conditions';
 import { checkCountsOf } from './http-catalog';
+import type { components } from '$control/schema.d.ts';
+import { toSensorFailing } from './http-jobs';
 import type { Acknowledgement, AttentionAcknowledgement, AttentionItem, AttentionRun, CatalogNode, Check, GroupStatus, Overview, PlatformEvent, Run, SnapshotChange } from './types';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -17,6 +19,8 @@ export type OverviewInputs = {
 	/** Publications, newest first. */
 	changes: SnapshotChange[];
 	events: PlatformEvent[];
+	/** The target's triggers; a sensor whose latest ticks failed carries `sensor_failing`. */
+	triggers: components['schemas']['PersonTriggerRecord'][];
 	/** Problem runs marked handled, by run ID. */
 	acknowledgements: Map<string, Acknowledgement>;
 	/** The location key (`<location>:<target>`) the read was for. */
@@ -70,7 +74,7 @@ export function groupStatusOf(nodes: CatalogNode[]): GroupStatus[] {
  * does not check source freshness, so late sources stay unknown. Groups are top-level folders, and
  * group status is null when the server reports no build state. There is no cost read, so the page hides cost.
  */
-export function overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now, scopeKey }: OverviewInputs): Overview {
+export function overviewOf({ runs, checks, nodes, changes, events, triggers, acknowledgements, conditions, now, scopeKey }: OverviewInputs): Overview {
 	const acknowledged = (r: Run) => acknowledgements.get(r.id) ?? null;
 	const topLevel = runs.filter((r) => !r.parentRunId);
 	const recent = topLevel.filter((r) => Date.parse(r.queuedAt) >= now - DAY);
@@ -80,7 +84,11 @@ export function overviewOf({ runs, checks, nodes, changes, events, acknowledgeme
 		...topLevel
 			.filter((r) => r.status === 'unresponsive')
 			.map((r): AttentionItem => ({ kind: 'run_unresponsive', run: attentionRun(r), lastHeartbeatAt: null, acknowledged: acknowledged(r) })),
-		...events.filter((e) => e.active).map((event): AttentionItem => ({ kind: 'platform_event', event }))
+		...events.filter((e) => e.active).map((event): AttentionItem => ({ kind: 'platform_event', event })),
+		...triggers.flatMap((t): AttentionItem[] => {
+			const failing = toSensorFailing(t.sensor_failing);
+			return failing ? [{ kind: 'sensor_failing', triggerId: t.trigger_id, triggerName: t.name, failing }] : [];
+		})
 	];
 	const staleKeys = (test: (reason: string) => boolean) => nodes.filter((n) => n.stale?.some((r) => test(r.reason))).map((n) => n.key);
 	const changed = staleKeys((reason) => reason !== 'behind');
