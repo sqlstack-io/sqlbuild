@@ -14,6 +14,8 @@ mod test_reads;
 mod test_retention;
 #[path = "test_store.rs"]
 mod test_store;
+#[path = "test_audit.rs"]
+mod test_audit;
 #[path = "test_types.rs"]
 pub(crate) mod test_types;
 #[path = "test_upload.rs"]

@@ -123,3 +123,10 @@ pub(crate) struct OutputStoreSettingTestCase {
     /// The error opening it gives, or none when it opens.
     pub(crate) expected_error: Option<&'static str>,
 }
+
+pub(crate) struct OutputAuditTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Audit rows after two of each read, by action.
+    pub(crate) expected_audits: Vec<(&'static str, usize)>,
+}
