@@ -3,11 +3,10 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
-	import { app } from '$lib/state/app.svelte';
 	import CopyButton from '$lib/components/copy-button.svelte';
-	import type { RunNode, RunNodeError } from '$lib/api';
+	import type { RunNode } from '$lib/api';
 	import { shortRunId } from '$lib/operate/labels';
-	import { errorMessage } from '$lib/platform/labels';
+	import { errorTextOf, tracebackOf } from './utils';
 	import type { RunDetailState } from './state.svelte';
 	import QueryPanel from './query-panel.svelte';
 	import TracebackPanel from './traceback-panel.svelte';
@@ -16,45 +15,33 @@
 
 	const failed = $derived(view.nodes.filter((n) => n.status === 'failed'));
 	const skipped = $derived(view.nodes.filter((n) => n.status === 'skipped').length);
-	// Error text is an audited evidence read, so it is fetched once per node and only when asked for.
-	const readable = $derived(app.client.supports('getRunNodeError') && app.can('view.evidence'));
 	let open = $state<Set<string>>(new Set());
 	let listOpen = $state(false);
-	let errors = $state<Record<string, RunNodeError | { failure: string } | undefined>>({});
 
-	async function toggle(n: RunNode) {
+	function toggle(n: RunNode) {
 		const key = `${n.runId}/${n.nodeKey}`;
 		const next = new Set(open);
 		if (next.has(key)) next.delete(key);
 		else next.add(key);
 		open = next;
-		if (!next.has(key) || n.errorDetail || errors[key] || !app.scope) return;
-		try {
-			errors[key] = await app.client.getRunNodeError(app.scope, n.runId, n.nodeKey);
-		} catch (error) {
-			errors[key] = { failure: errorMessage(error) };
-		}
+		if (next.has(key)) void view.loadNodeError(n);
 	}
 
 	// Collapsed by default: one line per failure, opening to where it points and its text.
 	const single = $derived(failed.length === 1);
 
-	function read(key: string): RunNodeError | null {
-		const found = errors[key];
-		return found && 'nodeKey' in found ? found : null;
-	}
-
-	function place(n: RunNode, key: string): string | null {
+	function place(n: RunNode): string | null {
 		if (n.errorLocation) return n.errorLocation.line === null ? n.errorLocation.file : `${n.errorLocation.file}:${n.errorLocation.line}`;
-		return read(key)?.file ?? null;
+		return view.nodeError(n)?.file ?? null;
 	}
 </script>
 
 {#snippet line(n: RunNode)}
 	{@const key = `${n.runId}/${n.nodeKey}`}
-	{@const loaded = read(key)}
-	{@const where = place(n, key)}
-	{@const detail = n.errorDetail ?? loaded?.message ?? null}
+	{@const loaded = view.nodeError(n)}
+	{@const where = place(n)}
+	{@const detail = errorTextOf(n, loaded)}
+	{@const traceback = tracebackOf(detail)}
 	<li>
 		<!-- raw-button: the failure's one line, opening its location and text -->
 		<button class="row" onclick={() => toggle(n)} aria-expanded={open.has(key)} title={open.has(key) ? 'Hide the error' : 'Show where it failed and the error'}>
@@ -65,7 +52,7 @@
 			<ChevronRightIcon class={open.has(key) ? 'caret open' : 'caret'} size={14} aria-hidden="true" />
 		</button>
 		{#if open.has(key)}
-			{@const got = errors[key]}
+			{@const failure = view.nodeErrorFailure(n)}
 			{@const failedQueries = view.statements.filter((q) => q.nodeKey === n.nodeKey && q.runId === n.runId && q.status === 'failed')}
 			<div class="more">
 				{#if where}
@@ -74,17 +61,17 @@
 					</div>
 				{/if}
 				<!-- The failure in place: a Python exception's traceback, or the failed query and its error. -->
-				{#if n.errorCode === 'python_exception' && n.errorDetail}
-					<TracebackPanel detail={n.errorDetail} file={n.errorLocation?.file ?? null} runId={n.runId} nodeKey={n.nodeKey} onframe={(line) => view.openCode(n.nodeKey, line)} />
+				{#if traceback}
+					<TracebackPanel detail={traceback} file={n.errorLocation?.file ?? null} runId={n.runId} nodeKey={n.nodeKey} onframe={(line) => view.openCode(n.nodeKey, line)} />
 				{:else if failedQueries.length}
 					{#each failedQueries as q (q.id)}<QueryPanel statement={q} onstatements={() => view.showStatement(q.id, n.nodeKey)} />{/each}
 				{:else if detail}
 					<pre>{detail}</pre>
-				{:else if got && 'failure' in got}
-					<p class="faint">{got.failure}</p>
-				{:else if got}
+				{:else if failure}
+					<p class="faint">{failure}</p>
+				{:else if loaded}
 					<p class="faint">No error text was recorded for this node.</p>
-				{:else if !n.errorDetail && readable}
+				{:else if view.errorsReadable}
 					<p class="faint">Loading the error…</p>
 				{/if}
 			</div>

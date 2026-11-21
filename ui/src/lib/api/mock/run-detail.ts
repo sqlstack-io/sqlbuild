@@ -181,7 +181,8 @@ export function computeNodes(record: RunRecord, siblings: RunRecord[], now: numb
 				startedAt: iso(s),
 				endedAt: iso(e),
 				rowsAffected: (fails && !CHECK_FAILS.has(key)) || snapshotNode(key)?.kind === 'view' ? null : PROTO.test(run.id) ? finishedRows(key, e - s) : 120 + (hash(key + run.id) % 48000),
-				errorCode: fails ? (CHECK_FAILS.has(key) ? 'check_failed' : python ? 'python_exception' : 'E2103') : null,
+				// As sqb reports them: R006 for a failed check, no code for a Python exception, the warehouse's own otherwise.
+				errorCode: fails ? (CHECK_FAILS.has(key) ? 'R006' : python ? null : 'E2103') : null,
 				errorMessage: message,
 				...(fails ? (CHECK_FAILS.has(key) ? checkFailureDetail(key) : python ? pythonFailureDetail() : failureDetail(key, run, message ?? '')) : {})
 			};

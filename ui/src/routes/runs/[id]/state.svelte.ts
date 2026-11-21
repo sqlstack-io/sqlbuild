@@ -1,6 +1,7 @@
 import { to } from '$lib/paths';
 import { goto } from '$app/navigation';
-import type { RerunMode } from '$lib/api';
+import type { RerunMode, RunNode, RunNodeError } from '$lib/api';
+import { errorMessage } from '$lib/platform/labels';
 import { app } from '$lib/state/app.svelte';
 import { rerunHref } from '$lib/run/command';
 import { createResource } from '$lib/state/resource.svelte';
@@ -133,6 +134,22 @@ export function createRunDetailState(runId: string) {
 		focus = { label, keys: group?.nodes.map((n) => n.nodeKey) ?? [] };
 	}
 
+	// ---- failed nodes' error text ----
+	// An audited evidence read: once per node, and only when the error is shown.
+	const errorsReadable = $derived(app.client.supports('getRunNodeError') && app.can('view.evidence'));
+	let nodeErrors = $state<Record<string, RunNodeError | { failure: string }>>({});
+	const errorsAsked = new Set<string>();
+	async function loadNodeError(n: RunNode) {
+		const k = `${n.runId}/${n.nodeKey}`;
+		if (!errorsReadable || n.errorDetail || errorsAsked.has(k) || !app.scope) return;
+		errorsAsked.add(k);
+		try {
+			nodeErrors[k] = await app.client.getRunNodeError(app.scope, n.runId, n.nodeKey);
+		} catch (error) {
+			nodeErrors[k] = { failure: errorMessage(error) };
+		}
+	}
+
 	// ---- the node drawer ----
 	let drawer = $state<string | null>(remembered('drawer', null));
 	/** The statement a check's "In Statements" opened. */
@@ -242,6 +259,20 @@ export function createRunDetailState(runId: string) {
 			statusFilter = null;
 		},
 		focusGroup,
+		get errorsReadable() {
+			return errorsReadable;
+		},
+		loadNodeError,
+		/** The error read for a failed node, once it has been. */
+		nodeError(n: RunNode): RunNodeError | null {
+			const found = nodeErrors[`${n.runId}/${n.nodeKey}`];
+			return found && 'nodeKey' in found ? found : null;
+		},
+		/** Why a failed node's error could not be read. */
+		nodeErrorFailure(n: RunNode): string | null {
+			const found = nodeErrors[`${n.runId}/${n.nodeKey}`];
+			return found && 'failure' in found ? found.failure : null;
+		},
 		get drawer() {
 			return drawer;
 		},

@@ -3,6 +3,7 @@
 import type { RunEvent, RunEventLevel, RunNode, RunOutputLine } from '$lib/api';
 import { eventTone } from '$lib/operate/labels';
 import { fullStamp } from './stamps';
+import { CHECK_FAILED_CODE } from './failures';
 import { checksOf, checksText, worstCheck, type CheckResult } from './checks';
 import type { EventCategory } from '../types';
 
@@ -248,7 +249,7 @@ export function outcomeText(n: RunNode, checks: readonly RunEvent[], skip: strin
 		}
 		case 'failed': {
 			// Built, then failed by an error-severity check: the build's line, with its checks.
-			if (n.errorCode === 'check_failed') return { text: join([`✗ ${BUILT[n.kind ?? 'table'] ?? `built ${n.kind}`}`, rows, took, checksText(checksOf(checks))]), level: 'error', tone: 'var(--sb-error)' };
+			if (n.errorCode === CHECK_FAILED_CODE) return { text: join([`✗ ${BUILT[n.kind ?? 'table'] ?? `built ${n.kind}`}`, rows, took, checksText(checksOf(checks))]), level: 'error', tone: 'var(--sb-error)' };
 			const where = n.errorLocation ? (n.errorLocation.line == null ? n.errorLocation.file : `${n.errorLocation.file}:${n.errorLocation.line}`) : null;
 			return { text: join(['✗ failed', n.errorMessage ?? n.errorCode, where]), level: 'error', tone: 'var(--sb-error)' };
 		}

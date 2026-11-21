@@ -19,7 +19,7 @@
 	import TracebackPanel from './traceback-panel.svelte';
 	import { checksOf } from './utils/checks';
 	import { formatQueryCost } from './utils';
-	import { fullStamp, rowsText, skipCause, warehouseQueryUrl } from './utils';
+	import { errorTextOf, fullStamp, rowsText, skipCause, tracebackOf, warehouseQueryUrl } from './utils';
 
 	// A node in this run, in a drawer from the right, modelled on the Lineage sidebar but
 	// scoped to the run: what it did here, its SQL as it ran, its last builds, what it printed, and where
@@ -47,6 +47,13 @@
 	const STATUS: Record<string, string> = { success: 'Built', warn: 'Built, with warnings', failed: 'Failed', skipped: 'Skipped', running: 'Building', pending: 'Waiting', not_run: 'Not run', cancelled: 'Not run (cancelled)' };
 	// Rows only where they are real: added rows, a rebuilt table's count, or what a running node has written so far.
 	const rows = $derived(n ? rowsText(n) : null);
+	// A failed node's error, read when the drawer shows it: a Python traceback in place, else its first line.
+	$effect(() => {
+		if (n?.status === 'failed') void view.loadNodeError(n);
+	});
+	const errorText = $derived(n?.status === 'failed' ? errorTextOf(n, view.nodeError(n)) : null);
+	const traceback = $derived(tracebackOf(errorText));
+	const errorLine = $derived(n?.errorMessage ?? errorText?.split('\n')[0] ?? null);
 
 	// The node's catalog facts: SQL or code, relation, description, and its last builds.
 	const catalog = useCatalogNodes();
@@ -125,12 +132,12 @@
 					<div><span>Cost</span><b>{cost ? formatQueryCost(cost) : '—'}</b></div>
 				</div>
 				{#if cause}<p class="why">{cause}</p>{/if}
-				{#if n.status === 'failed' && n.errorCode === 'python_exception' && n.errorDetail}
+				{#if traceback}
 					<!-- The exception and the last of its traceback; the output viewer has the rest. -->
-					<div class="tb-wrap"><TracebackPanel detail={n.errorDetail} file={n.errorLocation?.file ?? null} runId={n.runId} nodeKey={key} onframe={(line) => view.openCode(key, line)} /></div>
-				{:else if n.status === 'failed' && n.errorMessage}
+					<div class="tb-wrap"><TracebackPanel detail={traceback} file={n.errorLocation?.file ?? null} runId={n.runId} nodeKey={key} onframe={(line) => view.openCode(key, line)} /></div>
+				{:else if errorLine}
 					<div class="error">
-						<b>{n.errorMessage}</b>
+						<b>{errorLine}</b>
 						{#if n.errorLocation}<div class="faint mono">{n.errorLocation.file}{n.errorLocation.line != null ? `:${n.errorLocation.line}` : ''}</div>{/if}
 					</div>
 				{/if}

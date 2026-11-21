@@ -14,7 +14,7 @@
 	import { formatStamp } from '$lib/format/time';
 	import { nodeLabel, shortRunId } from '$lib/operate/labels';
 	import type { LogEntry } from './utils';
-	import { fullStamp } from './utils';
+	import { CHECK_FAILED_CODE, fullStamp, tracebackOf } from './utils';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import LogFilter, { type FilterOption } from './log-filter.svelte';
@@ -297,15 +297,15 @@
 						{#if e.checks?.length}
 							<div class="checks-wrap"><CheckList checks={e.checks} runId={e.runId} {statements} onstatement={onquery && e.nodeKey ? (id) => onquery(id, e.nodeKey!) : undefined} /></div>
 						{/if}
-						{#if e.node?.errorCode === 'python_exception' && e.long}
+						{#if e.node && tracebackOf(e.long)}
 							<!-- A Python failure in place: the exception and the last of its traceback; the output viewer for the rest. -->
-							<div class="inline-wrap"><TracebackPanel detail={e.long} file={e.node.errorLocation?.file ?? null} runId={e.runId} nodeKey={e.node.nodeKey} onframe={onframe ? (line) => onframe(e.node!.nodeKey, line) : undefined} /></div>
+							<div class="inline-wrap"><TracebackPanel detail={tracebackOf(e.long)!} file={e.node.errorLocation?.file ?? null} runId={e.runId} nodeKey={e.node.nodeKey} onframe={onframe ? (line) => onframe(e.node!.nodeKey, line) : undefined} /></div>
 						{:else if e.node?.status === 'failed' && queriesOf(e).some((q) => q.status === 'failed')}
 							<!-- A SQL failure in place: the statement as it ran and its error. -->
 							{#each queriesOf(e).filter((q) => q.status === 'failed') as q (q.id)}
 								<div class="inline-wrap"><QueryPanel statement={q} onstatements={onquery ? () => onquery(q.id, q.nodeKey) : undefined} /></div>
 							{/each}
-						{:else if e.long && e.node?.errorCode !== 'check_failed'}
+						{:else if e.long && e.node?.errorCode !== CHECK_FAILED_CODE}
 							{@const lines = e.long.split('\n')}
 							<pre>{longOpen.has(e.id) ? e.long : lines.slice(0, 3).join('\n')}</pre>
 							{#if lines.length > 3}<Button variant="link" size="inline" class="text-[12px]" onclick={() => (longOpen = toggle(longOpen, e.id))}>{longOpen.has(e.id) ? 'Show less' : `Show more (${lines.length} lines)`}</Button>{/if}

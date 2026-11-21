@@ -11,3 +11,4 @@ export { warehouseQueryUrl } from './queries';
 export { skipCause } from './skips';
 export { fullStamp } from './stamps';
 export { summaryOf, type RunSummary } from './summary';
+export { CHECK_FAILED_CODE, errorTextOf, tracebackOf } from './failures';
