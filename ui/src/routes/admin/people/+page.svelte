@@ -26,9 +26,26 @@
 	import AddPersonPanel from './add-person-panel.svelte';
 	import PersonPanel from './person-panel.svelte';
 	import RoleSelect from './role-select.svelte';
-	import { defaultRoleOf, isLastAdmin } from './utils';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import PageTabs from '$lib/components/platform/page-tabs.svelte';
+	import ServiceAccountsTab from './service-accounts-tab.svelte';
+	import { createServiceAccountsState } from './service-accounts.svelte';
+	import type { PeopleTab } from './types';
+	import { defaultRoleOf, isLastAdmin, parsePeopleTab } from './utils';
 
 	const people = createAccountTable('user');
+	// Service accounts sit in a tab beside People; servers without them show People alone.
+	const hasServiceAccounts = $derived(app.client.supports('listServiceAccounts'));
+	const tab = $derived(hasServiceAccounts ? parsePeopleTab(page.url.searchParams.get('tab')) : 'people');
+	const sa = createServiceAccountsState(() => page.url.searchParams.get('open'));
+	function selectTab(value: PeopleTab) {
+		const url = new URL(page.url);
+		url.searchParams.delete('open');
+		if (value === 'people') url.searchParams.delete('tab');
+		else url.searchParams.set('tab', value);
+		void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
+	}
 	const d = people.directory;
 	const allowed = $derived(app.can('user.manage') || app.can('role.assign'));
 	const locations = $derived(app.bootstrap?.locations ?? []);
@@ -50,7 +67,12 @@
 	function open(e: MouseEvent, a: Account) {
 		if ((e.target as Element).closest('a, button, input, select, label, [data-control]')) return;
 		if (e.metaKey || e.ctrlKey || e.button === 1) openRow(e, personHref(a));
-		else pick(a.name);
+		else toggle(a.name);
+	}
+	/** A click on the open person's row closes their panel, as on Service accounts. */
+	function toggle(name: string) {
+		if (selected === name && !adding) selected = null;
+		else pick(name);
 	}
 	/** Open a person's panel in place of whatever panel is open. */
 	function pick(name: string) {
@@ -76,12 +98,24 @@
 </script>
 
 <AppTopbar title="People">
-	<RefreshButton onclick={() => d.refresh()} />
+	<RefreshButton onclick={() => (tab === 'service-accounts' ? sa.list.refresh() : d.refresh())} />
 </AppTopbar>
 
 {#if !allowed}
-	<NoAccess what="people" requires={['user.manage', 'role.assign']} />
+	<NoAccess what={tab === 'service-accounts' ? 'service accounts' : 'people'} requires={['user.manage', 'role.assign']} />
 {:else}
+	{#if hasServiceAccounts}
+		<PageTabs
+			bind:value={() => tab, selectTab}
+			tabs={[
+				{ value: 'people', label: 'People', count: d.accounts.data ? people.accounts.length : undefined },
+				{ value: 'service-accounts', label: 'Service accounts', count: sa.list.data?.length, title: 'Scripts and automation that call SQLBuild with an API key' }
+			]}
+		/>
+	{/if}
+	{#if tab === 'service-accounts'}
+		<ServiceAccountsTab {sa} />
+	{:else}
 	<ListToolbar loading={d.accounts.data === undefined} bind:query={people.query} placeholder="Search people and roles" total="{people.shown.length} of {people.accounts.length} people">
 		{#snippet filters()}
 			<ChoiceFilter multiple label="Role" bind:values={people.role} options={people.roleNames.map((r) => ({ value: r, label: r }))} />
@@ -107,7 +141,7 @@
 							<div class="cell-name">
 								<UserIcon size={15} strokeWidth={1.75} />
 								<div class="min-w-0">
-									<Button variant="link" size="inline" class="name" onclick={() => pick(a.name)}>{a.displayName}</Button>
+									<Button variant="link" size="inline" class="name" onclick={() => toggle(a.name)}>{a.displayName}</Button>
 									<div class="cell-desc"><code>{a.name}</code> · {a.source === 'oidc' ? 'SSO' : a.source ? accountSourceLabel[a.source] : 'no password'}</div>
 								</div>
 							</div>
@@ -143,6 +177,7 @@
 		<PersonPanel account={selectedAccount} assignments={d.assignmentsOf(selectedAccount.name)} rolesByLocation={d.rolesByLocation} onchange={() => d.refresh()} onclose={() => (selected = null)} />
 	{/if}
 	</div>
+{/if}
 {/if}
 
 <style>

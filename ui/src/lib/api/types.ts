@@ -34,7 +34,7 @@ export const CAPABILITIES = [
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
-export type PrincipalKind = 'user' | 'scheduler' | 'sensor' | 'system';
+export type PrincipalKind = 'user' | 'service' | 'scheduler' | 'sensor' | 'system';
 export type Principal = {
 	kind: PrincipalKind;
 	/** Stable handle, e.g. a user name or `scheduler`. */
