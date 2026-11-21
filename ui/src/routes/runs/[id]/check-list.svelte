@@ -5,7 +5,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import type { CheckResult } from './utils/checks';
 
-	// A node's checks as a small table (CHI-1591): problems first, each with its SQL as it ran and, for
+	// A node's checks as a small table: problems first, each with its SQL as it ran and, for
 	// a problem, the failing rows it found. Used in a log line's details and in the drawer.
 	let {
 		checks,

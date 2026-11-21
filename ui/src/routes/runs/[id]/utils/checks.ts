@@ -1,4 +1,4 @@
-// Several checks on one node (CHI-1591): each check's outcome from its event, problems first, and the
+// Several checks on one node: each check's outcome from its event, problems first, and the
 // short form a node's one log line uses. Pure.
 
 import type { RunEvent } from '$lib/api';

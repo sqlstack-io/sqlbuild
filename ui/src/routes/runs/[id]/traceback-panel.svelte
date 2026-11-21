@@ -2,7 +2,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 
-	// A Python node's exception, in place (CHI-1591): the exception and the last part of its traceback,
+	// A Python node's exception, in place: the exception and the last part of its traceback,
 	// with links from the node's own frames to its code. The full context is the output viewer, opened
 	// at the error line.
 	let {

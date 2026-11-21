@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 	import type { RunNode } from '$lib/api';
 	import { nodeLabel, nodeStatusTone } from '$lib/operate/labels';
-	import { axisTicks as ticksFor, formatSpan, formatTick, tickStep as stepFor } from './utils';
+	import { axisTicks as ticksFor, formatSpan, formatTick, rowsText, tickStep as stepFor } from './utils';
 
 	export type GanttGroup = { runId: string; label: string; tone: string; href: string };
 
@@ -234,8 +234,8 @@
 								<span class="note">{skipText(n)}</span>
 							{:else}
 								<span class="bar" class:live={n.status === 'running'} style:--s={s} style:--e={e} style:background={nodeStatusTone[n.status]}></span>
-								<!-- A building node's live progress, on its bar (CHI-1591, change 4). -->
-								{@const dur = `${formatSpan(e - s)}${n.status === 'running' ? ` so far${n.rowsAffected != null ? ` · ${n.rowsAffected.toLocaleString('en-GB')} rows` : ''}` : ''}`}
+								<!-- A building node's live progress, on its bar. -->
+								{@const dur = `${formatSpan(e - s)}${n.status === 'running' ? ` so far${rowsText(n) ? ` · ${rowsText(n)?.replace(/ so far$/, '')}` : ''}` : ''}`}
 								<span class="dur" style:--s={s} style:--e={e} class:flip={durFlips(dur, s, e)}>{dur}</span>
 							{/if}
 						</span>
@@ -255,7 +255,7 @@
 		flex: 1;
 		flex-direction: column;
 	}
-	/* The zoom sits on the axis row (CHI-1591), so the chart keeps the row a toolbar would take. */
+	/* The zoom sits on the axis row, so the chart keeps the row a toolbar would take. */
 	.gantt-head {
 		position: absolute;
 		top: 0;

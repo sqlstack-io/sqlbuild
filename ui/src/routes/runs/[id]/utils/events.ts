@@ -2,7 +2,7 @@
 
 import type { RunEvent, RunEventLevel, RunNode, RunOutputLine } from '$lib/api';
 import { eventTone } from '$lib/operate/labels';
-import { fullStamp } from './proto';
+import { fullStamp } from './stamps';
 import { checksOf, checksText, worstCheck, type CheckResult } from './checks';
 import type { EventCategory } from '../types';
 
@@ -25,7 +25,7 @@ export function eventSummary(e: RunEvent): string {
 		case 'requested':
 			return e.message;
 		case 'node_log':
-			// A Python node's `ctx.log` line, as it wrote it (CHI-1597).
+			// A Python node's `ctx.log` line, as it wrote it.
 			return e.message.replace(/^\[warning\] /, '');
 		case 'queued':
 			return 'Queued';
@@ -38,7 +38,7 @@ export function eventSummary(e: RunEvent): string {
 		case 'presumed_failed':
 			return 'Lost contact · failed';
 		case 'terminated':
-			// A run that never started says so, in the same words everywhere (CHI-1591).
+			// A run that never started says so, in the same words everywhere.
 			if (/^Terminated: skipped/.test(e.message)) return 'Not started';
 			return `Finished${e.message.match(/^Terminated: (\w+)/) ? `: ${e.message.match(/^Terminated: (\w+)/)![1].replace('_', ' ')}` : ''}`;
 		case 'invocation_started':
@@ -94,9 +94,9 @@ export type LogEntry = {
 	tag?: { text: string; tone: string };
 	/** A node line's node: its failure, file and statements, for what its details open to. */
 	node?: RunNode;
-	/** A node line's checks, problems first, for the table its details open to (CHI-1591). */
+	/** A node line's checks, problems first, for the table its details open to. */
 	checks?: CheckResult[];
-	/** A capped live view's marker: this many earlier lines of the node's output are in the viewer (CHI-1597). */
+	/** A capped live view's marker: this many earlier lines of the node's output are in the viewer. */
 	omitted?: number;
 	/** Structured details the row opens to in place, as key and value; `long` is text behind "show more". */
 	details?: [string, string][];
@@ -188,7 +188,7 @@ export function logEntries(events: readonly RunEvent[], output: readonly (RunOut
 	return [...fromEvents, ...fromOutput].sort((a, b) => a.at.localeCompare(b.at));
 }
 
-// ---- one line per node outcome (CHI-1591) ----
+// ---- one line per node outcome ----
 
 export type NodeOutcomes = {
 	nodes: readonly RunNode[];
@@ -213,23 +213,37 @@ function nodeTag(n: RunNode, checks: readonly RunEvent[]): LogEntry['tag'] {
 	return { text: 'not run', tone: TAG_TONE.quiet };
 }
 
-const rowsText = (n: number) => n.toLocaleString('en-GB');
 const secsText = (ms: number) => (ms < 60_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`);
-const BUILT: Record<string, string> = { table: 'rebuilt table', view: 'rebuilt view', incremental: 'incremental merge', seed: 'loaded seed', loader: 'loaded', task: 'ran task' };
-const BUILDING: Record<string, string> = { table: 'building table', view: 'building view', incremental: 'incremental merge', seed: 'loading seed', loader: 'loading', task: 'running task' };
+const BUILT: Record<string, string> = { table: 'rebuilt table', view: 'rebuilt view', incremental: 'incremental merge', seed: 'loaded seed', loader: 'loaded', asset: 'ran asset' };
+const BUILDING: Record<string, string> = { table: 'building table', view: 'building view', incremental: 'incremental merge', seed: 'loading seed', loader: 'loading', asset: 'running asset' };
+/** Kinds whose rows are what they added rather than what the table now holds. */
+const ADDS_ROWS = new Set(['incremental', 'loader']);
+
+/**
+ * The rows a node can honestly report: what an incremental merge or a load added, what a table rebuilt in
+ * full now holds, or, while it runs, what it has written so far; nothing for a view or an unknown count.
+ */
+export function rowsText(n: RunNode): string | null {
+	const count = (rows: number) => `${rows.toLocaleString('en-GB')} ${rows === 1 ? 'row' : 'rows'}`;
+	if (n.status === 'running') return n.rowsSoFar == null ? null : `${count(n.rowsSoFar)} so far`;
+	if (n.kind != null && ADDS_ROWS.has(n.kind)) return n.rowsAffected == null ? null : `+${count(n.rowsAffected)}`;
+	if (n.tableRows != null) return count(n.tableRows);
+	return null;
+}
 
 
 /** What a node did, on one line: its outcome, rows, time and checks, with a warning or failed check named on it. */
 export function outcomeText(n: RunNode, checks: readonly RunEvent[], skip: string | null, now: number): { text: string; level: RunEventLevel; tone: string } {
 	const took = n.startedAt ? secsText((n.endedAt ? Date.parse(n.endedAt) : now) - Date.parse(n.startedAt)) : null;
-	const rows = n.rowsAffected == null ? null : `${n.kind === 'incremental' || n.kind === 'loader' ? '+' : ''}${rowsText(n.rowsAffected)} rows`;
+	const rows = rowsText(n);
 	const join = (parts: (string | null | false)[]) => parts.filter(Boolean).join(' · ');
 	switch (n.status) {
 		case 'success':
 		case 'warn': {
-			// One line however many checks: the worst outcome sets its colour (CHI-1591).
+			// One line however many checks: the worst outcome sets its colour.
 			const results = checksOf(checks);
 			const warned = n.status === 'warn' || worstCheck(results) === 'warned' || worstCheck(results) === 'failed';
+			if (n.noChangeReason && !warned) return { text: join(['✓ no change', n.noChangeReason, took, checksText(results)]), level: 'info', tone: 'var(--sb-text-faint)' };
 			return { text: join([`${warned ? '⚠' : '✓'} ${BUILT[n.kind ?? 'table'] ?? `built ${n.kind}`}`, rows, took, checksText(results)]), level: warned ? 'warn' : 'info', tone: warned ? 'var(--sb-warning)' : 'var(--sb-success)' };
 		}
 		case 'failed': {
@@ -241,7 +255,7 @@ export function outcomeText(n: RunNode, checks: readonly RunEvent[], skip: strin
 		case 'skipped':
 			return { text: join(['⊘ skipped', skip?.replace(/^skipped: /, '') ?? null]), level: 'info', tone: 'var(--sb-text-faint)' };
 		case 'running':
-			return { text: join([`▸ ${BUILDING[n.kind ?? 'table'] ?? `building ${n.kind}`}`, rows && `${rows} so far`, took && `${took} so far`]), level: 'info', tone: 'var(--sb-running)' };
+			return { text: join([`▸ ${BUILDING[n.kind ?? 'table'] ?? `building ${n.kind}`}`, rows, took && `${took} so far`]), level: 'info', tone: 'var(--sb-running)' };
 		case 'pending':
 			return { text: '· waiting', level: 'info', tone: 'var(--sb-text-faint)' };
 		default:
@@ -260,7 +274,7 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 	const byNode = new Map<string, RunEvent[]>();
 	for (const e of events) if (e.nodeKey && known.has(id(e.runId, e.nodeKey))) byNode.set(id(e.runId, e.nodeKey), [...(byNode.get(id(e.runId, e.nodeKey)) ?? []), e]);
 
-	// Run-level events, and a node's `ctx.log` lines, which keep their own rows (CHI-1597).
+	// Run-level events, and a node's `ctx.log` lines, which keep their own rows.
 	const runLines = events.filter((e) => (e.type === 'node_log' || !(e.nodeKey && known.has(id(e.runId, e.nodeKey)))) && !e.type.startsWith('statement_')).map(entryOf);
 	// One failure, one line: a failed query of a node folds into the node's line, with its query in place.
 	const failedQueries = events.filter((e) => e.type === 'statement_failed' && !(e.nodeKey && known.has(id(e.runId, e.nodeKey)))).map(entryOf);
@@ -275,7 +289,8 @@ function withOutcomes(events: readonly RunEvent[], output: readonly (RunOutputLi
 			['Kind', n.kind ?? 'node'],
 			...(n.startedAt ? [['Started', fullStamp(n.startedAt)] as [string, string]] : []),
 			...(n.endedAt && n.startedAt ? [['Took', secsText(Date.parse(n.endedAt) - Date.parse(n.startedAt))] as [string, string]] : []),
-			...(n.rowsAffected != null ? [[n.status === 'running' ? 'Rows so far' : 'Rows', `${n.kind === 'incremental' || n.kind === 'loader' ? '+' : ''}${rowsText(n.rowsAffected)}`] as [string, string]] : []),
+			...(rowsText(n) ? [['Rows', rowsText(n)!] as [string, string]] : []),
+			...(n.noChangeReason ? [['No change', n.noChangeReason] as [string, string]] : []),
 			...(n.errorMessage ? [['Error', n.errorMessage] as [string, string]] : []),
 			...(where ? [['Location', where] as [string, string]] : []),
 			...(n.status === 'skipped' && skipCause(n) ? [['Why', skipCause(n)!.replace(/^skipped: /, '')] as [string, string]] : []),

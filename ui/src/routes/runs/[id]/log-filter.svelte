@@ -1,7 +1,7 @@
 <script lang="ts">
 	import SearchIcon from '@lucide/svelte/icons/search';
 
-	// The log's filter, read like the selector syntax (CHI-1591): `node:`, `kind:`, `level:`, `job:` and
+	// The log's filter, read like the selector syntax: `node:`, `kind:`, `level:`, `job:` and
 	// `stream:` narrow the log, anything else is a free search. Typing lists the options that fit the
 	// word at the caret; arrows move, Enter or Tab picks, Escape closes.
 	export type FilterOption = { prefix: string; hint: string; values: string[] };

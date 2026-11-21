@@ -41,7 +41,7 @@
 		details?: { open: boolean; toggle: () => void };
 		/** Members open in place when the graph first shows, such as a run's failed member. */
 		initialExpanded?: readonly string[];
-		/** Open on the whole graph, even when its cards turn compact (a run's graph, CHI-1591). */
+		/** Open on the whole graph, even when its cards turn compact (a run's graph). */
 		fitWhole?: boolean;
 	} = $props();
 

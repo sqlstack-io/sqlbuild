@@ -14,7 +14,7 @@
 	import { formatStamp } from '$lib/format/time';
 	import { nodeLabel, shortRunId } from '$lib/operate/labels';
 	import type { LogEntry } from './utils';
-	import { fullStamp } from './utils/proto';
+	import { fullStamp } from './utils';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import LogFilter, { type FilterOption } from './log-filter.svelte';
@@ -66,9 +66,9 @@
 		{ value: 'info', label: 'Info' },
 		{ value: 'debug', label: 'Debug' }
 	];
-	// One source of truth (CHI-1591): the filter text. The Levels and Kinds menus and the counts only write
+	// One source of truth: the filter text. The Levels and Kinds menus and the counts only write
 	// `level:` and `kind:` into it.
-	// Back to the page restores the log as it was: its filter, stream and open rows (CHI-1591).
+	// Back to the page restores the log as it was: its filter, stream and open rows.
 	const mem = <T>(key: string, fallback: T): T => (memory && key in memory ? (memory[key] as T) : fallback);
 	// svelte-ignore state_referenced_locally
 	let query = $state(mem('logQuery', ''));
@@ -169,7 +169,7 @@
 		URL.revokeObjectURL(url);
 	}
 	const logColumns = $derived<TableColumn[]>([
-		// Full timestamps, never cropped (CHI-1591, change 6).
+		// Full timestamps, never cropped.
 		{ id: 'time', label: 'Time', width: '206px' },
 		// A group run's member job is a quiet tag beside the node, not a column of its own.
 		{ id: 'node', label: 'Node', width: grouped ? '320px' : '230px' },
@@ -178,7 +178,7 @@
 	]);
 </script>
 
-<!-- Controls right after what they act on, from the left: what to show, then narrow it (CHI-1591). -->
+<!-- Controls right after what they act on, from the left: what to show, then narrow it. -->
 <div class="filters">
 	{#if hasOutput}
 		<SegmentedFilter
@@ -232,7 +232,7 @@
 			<tr class:error={e.level === 'error'} class:warn={e.level === 'warn'} class:stderr={e.stream === 'stderr'}>
 				<td class="faint nowrap mono stamp" title={formatStamp(e.at)}>{fullStamp(e.at)}</td>
 				<td class="mono" class:faint={!e.nodeKey} title={e.nodeKey ? `Show only ${e.nodeKey} in the log` : undefined}>
-					<!-- A real link (CHI-1591): it filters the log to the node, and reads as the node's name anywhere. -->
+					<!-- A real link: it filters the log to the node, and reads as the node's name anywhere. -->
 					{#if e.nodeKey && onnode}<a
 							class="node-link"
 							href="?node={encodeURIComponent(e.nodeKey)}"
@@ -246,7 +246,7 @@
 				{#if !printed}<td class="tagcell">{#if e.tag}<span class="tag" style:--tone={e.tag.tone}>{e.tag.text}</span>{/if}</td>{/if}
 				<td class:out={e.stream} class:opens={!!e.details?.length} onclick={() => e.details?.length && (detailOpen = toggle(detailOpen, e.id))}>
 					{#if e.omitted && e.nodeKey}
-						<!-- The live view is capped (CHI-1597): earlier lines are in the paged viewer, not here. -->
+						<!-- The live view is capped: earlier lines are in the paged viewer, not here. -->
 						<a class="omitted" href={to(`/runs/${e.runId}/output/${e.nodeKey}`)}>+{e.omitted.toLocaleString('en-GB')} lines · open in viewer →</a>
 					{:else if e.stream}
 						{@const lines = e.text.split('\n')}
@@ -327,7 +327,7 @@
 </DataTable>
 
 <style>
-	/* Calmer (CHI-1591): no rules between rows, one text size, muted secondary text, room around the toolbar. */
+	/* Calmer: no rules between rows, one text size, muted secondary text, room around the toolbar. */
 	.filters {
 		position: sticky;
 		top: 0;

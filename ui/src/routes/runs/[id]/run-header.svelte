@@ -51,7 +51,7 @@
 			<CopyButton value={runId} label="Copy run ID" />
 		</nav>
 		{#if run}
-			<!-- Two lines (CHI-1591, change 1): what ran and how it ended, then what it did. The rest is under Details. -->
+			<!-- Two lines: what ran and how it ended, then what it did. The rest is under Details. -->
 			<div class="title-row">
 				<h2>
 					{#if run.jobKey}<a href={to(`/jobs/${run.jobKey}`)}>{run.jobKey}</a>{:else}<span class="adhoc">ad hoc: <code>{what}</code></span>{/if}

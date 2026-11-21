@@ -1,4 +1,4 @@
-// What a run page showed, kept while the app is open (CHI-1591), so Back from the output viewer, or
+// What a run page showed, kept while the app is open, so Back from the output viewer, or
 // any page a link opened, returns to the page exactly as it was: selection, filters, open rows, tab,
 // drawer and scroll. It lives in memory only; a reload starts afresh.
 

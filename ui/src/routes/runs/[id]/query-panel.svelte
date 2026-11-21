@@ -3,9 +3,9 @@
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import type { RunStatement } from '$lib/api';
 	import { app } from '$lib/state/app.svelte';
-	import { warehouseQueryUrl } from './utils/proto';
+	import { warehouseQueryUrl } from './utils';
 
-	// A query, in place (CHI-1591): the statement as it ran, its outcome, rows, duration and query ID,
+	// A query, in place: the statement as it ran, its outcome, rows, duration and query ID,
 	// with copy, and for a failure its error. "In Statements" is a small secondary link; only it changes tab.
 	let { statement: st, onstatements }: { statement: RunStatement; onstatements?: () => void } = $props();
 

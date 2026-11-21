@@ -8,7 +8,7 @@ import { createSelection } from '$lib/state/selection.svelte';
 import { nodeLabel } from '$lib/operate/labels';
 import { planHref } from '$lib/run/command';
 import { pageMemory } from './utils/page-memory';
-import { quickPickText, summaryOf, withNameToggled, type QuickPick } from './utils/proto';
+import { quickPickText, summaryOf, withNameToggled, type QuickPick } from './utils';
 import { isActiveRun } from '$lib/status';
 import type { BottomTab, NodeGroupKey } from './types';
 import { bannersFor, groupNodes, primaryChoice, progressOf, rerunChoices, runCostOf } from './utils';
@@ -19,7 +19,7 @@ function message(error: unknown): string {
 
 /** Run detail state: data, the node selection that filters the bottom pane, and actions. */
 export function createRunDetailState(runId: string) {
-	// Back to this page restores it as it was (CHI-1591).
+	// Back to this page restores it as it was.
 	const memory = pageMemory(runId);
 	const remembered = <T>(key: string, fallback: T): T => (key in memory ? (memory[key] as T) : fallback);
 	const topics = [`run:${runId}`, 'runs'];
@@ -83,7 +83,7 @@ export function createRunDetailState(runId: string) {
 	});
 
 	/**
-	 * Ticking a node always toggles whether it is shown (CHI-1591): its plain name comes out of, or goes
+	 * Ticking a node always toggles whether it is shown: its plain name comes out of, or goes
 	 * into, the selection; a node selected through a pick such as `fct_order_margin+` is excluded instead,
 	 * and ticking it again takes the exclude back out.
 	 */

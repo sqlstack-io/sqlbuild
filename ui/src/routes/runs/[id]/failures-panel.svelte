@@ -36,7 +36,7 @@
 		}
 	}
 
-	// Collapsed by default (CHI-1591, change 2): one line per failure, opening to where it points and its text.
+	// Collapsed by default: one line per failure, opening to where it points and its text.
 	const single = $derived(failed.length === 1);
 
 	function read(key: string): RunNodeError | null {
@@ -73,7 +73,7 @@
 						{#if n.runId !== view.run?.id}<a class="faint" href={to(`/runs/${n.runId}`)}>Open its job run</a>{/if}
 					</div>
 				{/if}
-				<!-- The failure in place (CHI-1591): a Python exception's traceback, or the failed query and its error. -->
+				<!-- The failure in place: a Python exception's traceback, or the failed query and its error. -->
 				{#if n.errorCode === 'python_exception' && n.errorDetail}
 					<TracebackPanel detail={n.errorDetail} file={n.errorLocation?.file ?? null} runId={n.runId} nodeKey={n.nodeKey} onframe={(line) => view.openCode(n.nodeKey, line)} />
 				{:else if failedQueries.length}

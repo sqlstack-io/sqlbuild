@@ -19,9 +19,9 @@
 	import TracebackPanel from './traceback-panel.svelte';
 	import { checksOf } from './utils/checks';
 	import { formatQueryCost } from './utils';
-	import { fullStamp, skipCause, warehouseQueryUrl } from './utils/proto';
+	import { fullStamp, rowsText, skipCause, warehouseQueryUrl } from './utils';
 
-	// A node in this run, in a drawer from the right (CHI-1591), modelled on the Lineage sidebar but
+	// A node in this run, in a drawer from the right, modelled on the Lineage sidebar but
 	// scoped to the run: what it did here, its SQL as it ran, its last builds, what it printed, and where
 	// it lives. It shows the node last clicked on the timeline or the graph.
 	let { view }: { view: RunDetailState } = $props();
@@ -45,9 +45,8 @@
 	const cost = $derived(key ? (view.cost?.resources.find((r) => r.nodeKey === key) ?? null) : null);
 	const output = $derived(key ? (view.outputRes.data ?? []).filter((l) => l.nodeKey === key && l.runId === n?.runId) : []);
 	const STATUS: Record<string, string> = { success: 'Built', warn: 'Built, with warnings', failed: 'Failed', skipped: 'Skipped', running: 'Building', pending: 'Waiting', not_run: 'Not run', cancelled: 'Not run (cancelled)' };
-	const added = $derived(n?.kind === 'incremental' || n?.kind === 'loader');
-	// Rows only where they are real: added rows, or a rebuilt table's count; while running only loaders and microbatches know.
-	const rows = $derived(n?.rowsAffected == null ? null : `${added ? '+' : ''}${n.rowsAffected.toLocaleString('en-GB')}${n.status === 'running' ? ' so far' : ''}`);
+	// Rows only where they are real: added rows, a rebuilt table's count, or what a running node has written so far.
+	const rows = $derived(n ? rowsText(n) : null);
 
 	// The node's catalog facts: SQL or code, relation, description, and its last builds.
 	const catalog = useCatalogNodes();
@@ -175,7 +174,7 @@
 					<div class="output">
 						{#each output.slice(-60) as l, i (i)}
 							{#if l.omitted}
-								<!-- The live view is capped (CHI-1597): the rest is in the paged viewer. -->
+								<!-- The live view is capped: the rest is in the paged viewer. -->
 								<a class="omitted" href={to(`/runs/${n.runId}/output/${key}`)}>+{l.omitted.toLocaleString('en-GB')} lines · open in viewer →</a>
 							{:else}
 								<div class:err={l.stream === 'stderr'}><span class="stream">{l.stream}</span><pre>{l.text}</pre></div>

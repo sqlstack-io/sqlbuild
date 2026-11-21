@@ -12,7 +12,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { nodeLabel, shortRunId } from '$lib/operate/labels';
 
-	// A node's whole output, read a page at a time from the output store (prototype, CHI-1597): tail,
+	// A node's whole output, read a page at a time from the output store: tail,
 	// jump to a line, page, search the whole output, jump between errors and warnings from the index,
 	// similar lines folded, and a download. The browser only ever holds one page.
 	const runId = $derived(page.params.id ?? '');

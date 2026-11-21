@@ -50,7 +50,7 @@
 		{@const p = d.provenance}
 		<div class="details">
 			<dl>
-				<!-- Moved here from the header (CHI-1591): nodes, cost and related runs. -->
+				<!-- Moved here from the header: nodes, cost and related runs. -->
 				{#if view.progress.total}<div><dt>Nodes</dt><dd>{view.progress.done}/{view.progress.total} finished</dd></div>{/if}
 				{#if view.cost && view.cost.status !== 'none'}
 					<div><dt>Cost</dt><dd><Button variant="link" size="inline" onclick={() => (view.tab = 'cost')}>{costSummary(view.cost).text}</Button></dd></div>

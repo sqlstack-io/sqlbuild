@@ -17,7 +17,7 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import type { RunDetailState } from './state.svelte';
 
-	// The run's Graph (CHI-1591, change 2): the Lineage page's own graph, by folder, with each card coloured
+	// The run's Graph: the Lineage page's own graph, by folder, with each card coloured
 	// by what happened to it in this run. A group run draws the group's lineage instead, its member jobs as
 	// boxes, as the group's job page does, coloured by this run's member runs and nodes.
 	let { view }: { view: RunDetailState } = $props();
@@ -128,13 +128,13 @@
 	</div>
 {:else}
 	<div class="sb-flow relative flex-1" style="background: var(--sb-inset)">
-		<!-- Opens zoomed to fit the whole run (CHI-1591), compact cards and all; zoom in to read them. -->
+		<!-- Opens zoomed to fit the whole run, compact cards and all; zoom in to read them. -->
 		<GraphCanvas bind:nodes bind:edges bind:fit fitOnInit readable={false} fitFloor={0.1} controls="fit" {nodeTypes} elementsSelectable nodesDraggable {onnodeclick} fitViewOptions={{ padding: 0.06, maxZoom: 1, minZoom: 0.1 }} minZoom={0.05} />
 	</div>
 {/if}
 
 <style>
-	/* A node the selection leaves out: faint and struck through (CHI-1591). */
+	/* A node the selection leaves out: faint and struck through. */
 	:global(.svelte-flow__node.excluded) {
 		opacity: 0.5;
 		text-decoration: line-through;

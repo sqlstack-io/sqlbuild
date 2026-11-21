@@ -38,7 +38,7 @@ export type NodeCounts = {
 	skipped: number;
 	running: number;
 	pending: number;
-	/** Of `skipped`, the nodes that never ran because the run stopped first (prototype, CHI-1591): "not run", not "skipped". */
+	/** Of `skipped`, the nodes that never ran because the run stopped first: "not run", not "skipped". */
 	notRun?: number;
 };
 
@@ -220,6 +220,12 @@ export type RunNode = {
 	startedAt: Iso | null;
 	endedAt: Iso | null;
 	rowsAffected: number | null;
+	/** Rows a table rebuilt in full holds, read from warehouse metadata where that is exact and free. */
+	tableRows?: number | null;
+	/** Rows a running node has written so far, where its warehouse reports them. */
+	rowsSoFar?: number | null;
+	/** Why a node that ran changed nothing, such as `unchanged since its last build`. */
+	noChangeReason?: string | null;
 	errorCode: string | null;
 	errorMessage: string | null;
 	/** Where in the project the failure points: the model file, and the line when it is known. */
@@ -244,7 +250,7 @@ export type RunNodeError = {
 export type RunEdge = { from: string; to: string };
 
 export const RECALL_EVENT_TYPES = [
-	// A Python node's `ctx.log` line (prototype, CHI-1597): few, deliberate, kept as events.
+	// A Python node's `ctx.log` line: few, deliberate, kept as events.
 	'node_log',
 	'invocation_started',
 	'invocation_completed',
@@ -416,13 +422,13 @@ export type RunOutputLine = {
 	text: string;
 	/** The error the invocation recorded when it failed, rather than a line it printed. */
 	error: boolean;
-	/** The node the line is about, when sqb printed it for one (prototype, CHI-1591). */
+	/** The node the line is about, when sqb printed it for one. */
 	nodeKey?: string | null;
-	/** A marker in a capped live view: this many earlier lines of the node's output are in the viewer, not here (CHI-1597). */
+	/** A marker in a capped live view: this many earlier lines of the node's output are in the viewer, not here. */
 	omitted?: number;
 };
 
-// ---- a node's bulk output, paged from the output store (prototype, CHI-1597) ----
+// ---- a node's bulk output, paged from the output store ----
 
 export type NodeOutputLevel = 'info' | 'warn' | 'error';
 /** What the output store's index knows about a node's output, without reading it. */
@@ -446,7 +452,7 @@ export type NodeOutputPage = { total: number; from: number; to: number; rows: No
  * how many lines match and this one's place among them (1-based); null for a large output.
  */
 export type NodeOutputSearch = { count: number | null; line: number | null; rank: number | null };
-/** The rows a failing check found: a sample, and how many there were in all (prototype, CHI-1591). */
+/** The rows a failing check found: a sample, and how many there were in all. */
 export type CheckSample = { columns: string[]; rows: (string | number | null)[][]; total: number };
 
 export type RunInvocation = {

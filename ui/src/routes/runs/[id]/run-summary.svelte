@@ -3,7 +3,7 @@
 	import type { RunDetailState } from './state.svelte';
 	import type { NodeGroupKey } from './types';
 
-	// What the run did, in one line (CHI-1591, change 1): problems first, then what it built. Each figure
+	// What the run did, in one line: problems first, then what it built. Each figure
 	// filters the timeline and the log to its nodes; picking it again shows everything. A figure that is
 	// zero is left out, and with it its separator.
 	let { view }: { view: RunDetailState } = $props();
@@ -30,7 +30,7 @@
 	{#each figs as f, i (f.key)}
 		<!-- Separators and spaces are real text, so the line reads the same copied or read aloud. -->
 		{#if i}<span class="sep">{' · '}</span>{/if}
-		<!-- A real link (CHI-1591): the figure reads as text anywhere, and filters the timeline and log. -->
+		<!-- A real link: the figure reads as text anywhere, and filters the timeline and log. -->
 		<span class="part"
 			><a
 				class="fig {f.tone ?? ''}"

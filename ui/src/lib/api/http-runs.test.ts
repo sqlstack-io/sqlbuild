@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { groupRunNodes, mergePlanPage, parseRunCursor, queueEntriesOf, planResultOf, runDetailOf, runRowPage, runRowPageOver, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
+import { groupRunNodes, mergePlanPage, nodeKindOf, parseRunCursor, queueEntriesOf, planResultOf, runDetailOf, runRowPage, runRowPageOver, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
 
 type RunRecord = components['schemas']['RunRecord'];
 type W = components['schemas'];
@@ -410,5 +410,18 @@ describe('mergePlanPage', () => {
 		const page = { total: 1, section_total: 1, rows: [{ name: 'orders', reason: 'query_changed' }], runs: [], warnings: [warning], cursor_window_starts: { orders: '2026-11-01' } };
 		const once = mergePlanPage(mergePlanPage(withCopy, 'query_changed', page as never), 'warnings', { ...page, rows: [warning], warnings: [], cursor_window_starts: {} } as never);
 		expect({ warnings: once.warnings, starts: once.synced_copy?.cursor_window_starts }).toEqual({ warnings: [warning], starts: { orders: '2026-11-01' } });
+	});
+});
+
+describe('run node kinds', () => {
+	it('read a model’s kind from its materialization and any other node’s from its key', () => {
+		expect([nodeKindOf('model:orders', 'incremental'), nodeKindOf('model:orders', 'view'), nodeKindOf('model:orders', null), nodeKindOf('seed:countries', null), nodeKindOf('loader:raw_events', null), nodeKindOf('check:orders_valid', null)]).toEqual([
+			'incremental',
+			'view',
+			null,
+			'seed',
+			'loader',
+			null
+		]);
 	});
 });

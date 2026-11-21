@@ -12,12 +12,12 @@
 	import { bottomTabs, logEntries } from './utils';
 	import { tick } from 'svelte';
 	import { plural } from '$lib/format/plural';
-	import { skipCause } from './utils/proto';
+	import { skipCause } from './utils';
 
 	let { view }: { view: RunDetailState } = $props();
 
 	// The log follows a summary figure or a node picked in the log, else the selection (until "Show all").
-	// Back to the page restores the log as it was (CHI-1591): these too, and where it was scrolled.
+	// Back to the page restores the log as it was: these too, and where it was scrolled.
 	// svelte-ignore state_referenced_locally
 	const mem = view.memory;
 	let ignoreSelection = $state((mem.ignoreSelection as boolean) ?? false);
@@ -33,7 +33,7 @@
 	const filterKeys = $derived(view.focus ? view.focus.keys : ignoreSelection ? [] : view.selected);
 	const sel = $derived(new Set(filterKeys));
 	const filtering = $derived(sel.size > 0);
-	// One line per node outcome, with its checks folded in (CHI-1591, change 3); `app.now` keeps a building node's line current.
+	// One line per node outcome, with its checks folded in; `app.now` keeps a building node's line current.
 	const edges = $derived(view.detail?.edges ?? []);
 	const entries = $derived(logEntries(view.eventsRes.data ?? [], view.outputRes.data ?? [], { nodes: view.nodes, skipCause: (n) => skipCause(n, view.nodes, edges), now: app.now }));
 	const statements = $derived(filtering ? view.statements.filter((s) => sel.has(s.nodeKey)) : view.statements);
@@ -41,7 +41,7 @@
 	const shownEntries = $derived(filtering ? entries.filter((e) => (e.nodeKey ? sel.has(e.nodeKey) : filterKeys.some((k) => e.text.includes(k)))) : entries);
 	const grouped = $derived((view.detail?.children.length ?? 0) > 0);
 	// Kept here so the choice survives switching tabs, and the Log count matches the rows shown.
-	// Events | Output (CHI-1591): the log opens on its events, one line per node; Output is what sqb printed.
+	// Events | Output: the log opens on its events, one line per node; Output is what sqb printed.
 	let printed = $state((mem.printed as boolean) ?? false);
 	$effect(() => {
 		mem.printed = printed;
@@ -59,7 +59,7 @@
 		else ignoreSelection = true;
 	}
 
-	// ---- the log follows new lines while it is at the bottom (CHI-1591, change 7) ----
+	// ---- the log follows new lines while it is at the bottom ----
 	let scroller = $state<HTMLDivElement>();
 	// A running run's log opens at its newest line; a finished run's at its first.
 	let atBottom = $state(untrackActive());

@@ -67,7 +67,7 @@
 		run: 'Running',
 		src: 'Source',
 		none: 'Not built',
-		// A run's own graph (CHI-1591 prototype): what happened to the node in that run.
+		// A run's own graph: what happened to the node in that run.
 		skip: 'Skipped',
 		wait: 'Waiting',
 		notrun: 'Not run'

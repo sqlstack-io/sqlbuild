@@ -13,7 +13,7 @@
 	import SelectionBar from '$lib/components/selection/selection-bar.svelte';
 	import { to } from '$lib/paths';
 	import { nodeLabel } from '$lib/operate/labels';
-	import { skipCause, QUICK_PICKS } from './utils/proto';
+	import { skipCause, QUICK_PICKS } from './utils';
 	import RelatedRuns from './related-runs.svelte';
 	import RunBanners from './run-banners.svelte';
 	import RunGantt from './run-gantt.svelte';
@@ -29,10 +29,10 @@
 
 	const detail = $derived(view.detail);
 	const nodes = $derived(view.nodes);
-	// Back to the page restores the view and the split as they were (CHI-1591).
+	// Back to the page restores the view and the split as they were.
 	const mem = view.memory;
 	let topView = $state<'timeline' | 'graph'>((mem.topView as 'timeline' | 'graph') ?? 'timeline');
-	// A group run opens on its Graph: when groups get big, the graph is how you see them (CHI-1591).
+	// A group run opens on its Graph: when groups get big, the graph is how you see them.
 	let viewChosen = 'topView' in mem;
 	$effect(() => {
 		if (viewChosen || !detail) return;
@@ -43,7 +43,7 @@
 	$effect(() => {
 		if (topView === 'graph') untrack(() => (topFrac = Math.max(topFrac, 0.68)));
 	});
-	/** The graph is always offered (CHI-1591, change 2): the run's nodes on their lineage, by folder. */
+	/** The graph is always offered: the run's nodes on their lineage, by folder. */
 	const hasGraph = $derived(nodes.length > 0);
 	const names = $derived([...new Map(nodes.map((n) => [nodeLabel(n.nodeKey), { value: nodeLabel(n.nodeKey), hint: n.jobKey ?? '' }])).values()]);
 	const causeOf = (key: string) => {
@@ -91,7 +91,7 @@
 
 <AppTopbar title="Runs" />
 
-<!-- The drawer sits beside the page and pushes it aside (CHI-1591), so the toolbar and Plan these stay in view. -->
+<!-- The drawer sits beside the page and pushes it aside, so the toolbar and Plan these stay in view. -->
 <div class="flex min-h-0 min-w-0 flex-1">
 <div class="flex min-h-0 min-w-0 flex-1 flex-col">
 	<RunHeader {view} {runId} />
@@ -105,7 +105,7 @@
 		<div bind:this={splitEl} class="flex min-h-0 flex-1 flex-col" class:select-none={dragging}>
 			<div class="flex min-h-0 flex-col" style:flex={hasBottom ? topFrac : 1}>
 				{#if nodes.length}
-					<!-- One toolbar row above the chart (CHI-1591): the view, the selection to plan with its quick picks, and Plan these. -->
+					<!-- One toolbar row above the chart: the view, the selection to plan with its quick picks, and Plan these. -->
 					<div class="pick">
 						<SelectionBar selection={view.selection} {names} total={nodes.length} build={false} copy={false}>
 							{#snippet leading()}
