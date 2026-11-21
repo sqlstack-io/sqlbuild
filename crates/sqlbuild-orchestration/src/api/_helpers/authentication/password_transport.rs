@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::api::_helpers::authentication::proxy_settings::ProxySettings;
 use crate::api::_helpers::authentication::service_keys::presented_key;
+
 use crate::api::constants::{
     EVENT_STREAM_MEDIA_TYPE, PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE, PASSWORD_CSRF_HEADER,
     STREAM_BUFFERING_HEADER, STREAM_CACHE_CONTROL,
@@ -24,6 +25,9 @@ use crate::credentials::models::{
 };
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
+
+/// The sign-in and session routes, which never accept a service key.
+const SIGN_IN_ROUTES: &str = "/api/auth/";
 
 /// Refuses a trusted peer under another site's `Host`, as a DNS-rebinding page sends, then checks writes.
 pub(crate) async fn guard(
@@ -53,7 +57,9 @@ pub(crate) async fn guard(
         .cloned();
     // A service key is no browser credential: a page can't send one cross-site without CORS, which the
     // server never grants, so keyed callers skip the browser's host and origin checks on any address.
-    let keyed = presented_key(request.headers()).is_some();
+    // Sign-in routes take no keys, so they keep those checks whatever a request carries.
+    let keyed = presented_key(request.headers()).is_some()
+        && !request.uri().path().starts_with(SIGN_IN_ROUTES);
     if let Some(settings) = proxy.as_ref().filter(|_| !keyed) {
         let host = single_header(request.headers(), header::HOST.as_str());
         if !settings.host_allowed(host) {

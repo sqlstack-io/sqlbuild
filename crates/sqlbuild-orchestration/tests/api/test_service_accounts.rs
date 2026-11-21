@@ -165,6 +165,19 @@ fn given_a_service_account_when_its_key_is_used_rotated_and_disabled_then_only_w
                 StatusCode::UNAUTHORIZED,
                 "{what}: no sessions"
             );
+            let foreign_login = keyed
+                .post(format!("{url}/api/auth/password/login"))
+                .header(HOST, NETWORK_HOST)
+                .bearer_auth(&key)
+                .json(&json!({"username": "ada", "password": "a long enough password"}))
+                .send()
+                .await
+                .expect("login under a foreign host");
+            assert_eq!(
+                foreign_login.status(),
+                StatusCode::UNAUTHORIZED,
+                "{what}: a key doesn't lift sign-in's host check"
+            );
 
             // Its actions are audited under its name: an allowed change and a refusal.
             let ops = service_account(store, "ops-bot", BuiltinRole::Admin).await;
