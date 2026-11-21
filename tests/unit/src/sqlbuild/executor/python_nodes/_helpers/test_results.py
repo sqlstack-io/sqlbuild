@@ -17,6 +17,7 @@ from sqlbuild.executor.python_nodes._helpers.results import (
     evaluate_python_node_fan_in,
     normalize_python_check_return,
     normalize_python_node_return,
+    traceback_tail,
 )
 from sqlbuild.executor.python_nodes.models import (
     CheckContext,
@@ -34,6 +35,7 @@ from tests.unit.src.sqlbuild.executor.python_nodes._helpers._test_types import (
     PythonNodeFailureResultTestCase,
     PythonNodeFanInPolicyTestCase,
     PythonNodeReturnNormalizationTestCase,
+    TracebackTailTestCase,
 )
 from tests.unit.src.sqlbuild.executor.python_nodes._helpers.helpers import (
     PythonNodeContextTestAdapter,
@@ -335,3 +337,55 @@ def test_given_upstream_python_node_results_when_evaluating_fan_in_then_returns_
 
     assert decision.action == test_case.expected_action
     assert decision.reason == test_case.expected_reason
+
+
+def _failure(depth: int) -> BaseException:
+    def lookup(row: dict[str, int], left: int) -> int:
+        return row["customer_segment"] if left == 0 else lookup(row, left - 1)
+
+    try:
+        lookup({"customer_id": 1}, depth)
+    except KeyError as error:
+        return error
+    raise AssertionError("lookup did not raise")
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        TracebackTailTestCase(
+            description="a short traceback is kept whole",
+            depth=1,
+            expected_start="Traceback (most recent call last):\n  File ",
+            expected_end="KeyError: 'customer_segment'\n",
+            expected_elided=False,
+        ),
+        TracebackTailTestCase(
+            description="a long traceback keeps its header, then its end with the exception",
+            depth=80,
+            expected_start="Traceback (most recent call last):\n  ... ",
+            expected_end="KeyError: 'customer_segment'\n",
+            expected_elided=True,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_python_failure_when_its_traceback_is_kept_then_its_end_fits_the_run_error(
+    test_case: TracebackTailTestCase,
+) -> None:
+    error: BaseException = _failure(test_case.depth)
+    result: PythonNodeExecutionResult = build_python_node_failure_result(
+        node_name="score_orders", kind=PythonNodeKind.ASSET, error=error
+    )
+    detail: str = result.error_detail or ""
+    assert (
+        detail.startswith(test_case.expected_start),
+        detail.endswith(test_case.expected_end),
+        "earlier lines" in detail,
+        len(detail) <= 1_900,
+        detail == traceback_tail(error=error),
+        result.error_message,
+    ) == (True, True, test_case.expected_elided, True, True, "'customer_segment'"), (
+        test_case.description,
+        detail,
+    )

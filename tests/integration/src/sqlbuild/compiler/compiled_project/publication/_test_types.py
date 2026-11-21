@@ -656,3 +656,11 @@ class CheckSensorsTestCase:
     # The run event's failed checks and failed nodes.
     expected_failed_checks: list[str]
     expected_failed_nodes: list[str]
+
+
+@dataclass(frozen=True)
+class PythonFailureTestCase(WorkerExecutionTestCase):
+    description: str
+    expected_error_start: str = ""
+    expected_error_end: str = ""
+    expected_error_below: int = 0

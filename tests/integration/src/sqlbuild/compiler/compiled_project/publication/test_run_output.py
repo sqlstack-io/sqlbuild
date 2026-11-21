@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    PythonFailureTestCase,
     RunOutputTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
@@ -123,3 +124,59 @@ def test_given_a_node_printing_a_large_log_when_a_worker_runs_it_then_its_lines_
         assert any(node == "run" for node, _ in streams), streams
         assert logs == test_case.expected_logs
         assert any((worker.control_store.parent / "output" / "runs").rglob("*.zst"))
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PythonFailureTestCase(
+            "an asset failing sixty calls deep",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM orders",
+            "failed",
+            [(17,)],
+            files={
+                "python/assets/score_orders.py": (
+                    "from sqlbuild.assets import asset\n\n\n"
+                    "def lookup(row, depth):\n"
+                    "    if depth == 0:\n"
+                    "        return row['customer_segment']\n"
+                    "    return lookup(row, depth - 1)\n\n\n"
+                    "@asset(description='Scores orders.')\n"
+                    "def score_orders(ctx):\n"
+                    "    return lookup({'customer_id': 1}, 60)\n"
+                ),
+                "orchestration/jobs/annual_orders_job.toml": (
+                    'name = "annual_orders_job"\n'
+                    'description = "Build orders and score them."\n'
+                    'select = "orders score_orders"\n'
+                    'schedule = { cron = "0 0 * * *", timezone = "UTC", '
+                    'starts_at = "2000-01-01T00:00:00Z" }\n'
+                ),
+            },
+            expected_error_start="Traceback (most recent call last):\n  ... ",
+            expected_error_end="KeyError: 'customer_segment'\n",
+            expected_error_below=2_000,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_failing_python_node_when_a_worker_runs_it_then_its_run_error_is_the_end_of_its_traceback(
+    test_case: PythonFailureTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
+        assert run["status"] == test_case.expected_status, worker.log.read_text()[-4000:]
+        with sqlite3.connect(worker.control_store) as control:
+            (error,) = control.execute(
+                "SELECT json_extract(e.payload, '$.change.change.error_message') "
+                "FROM sqb_run_nodes n JOIN recall_events e ON e.storage_id=n.finished_storage_id "
+                "WHERE n.run_id=? AND n.node_key LIKE '%score_orders'",
+                (run["run_id"],),
+            ).fetchone()
+        assert (
+            error.startswith(test_case.expected_error_start),
+            error.endswith(test_case.expected_error_end),
+            len(error) < test_case.expected_error_below,
+            "in lookup" in error,
+        ) == (True, True, True, True), error

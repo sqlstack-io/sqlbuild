@@ -266,3 +266,12 @@ class CheckWarehouseFailureTestCase:
     upstream_status: PythonNodeStatus
     expected_error_message: str | None
     expected_switch_attempts: int
+
+
+@dataclass(frozen=True)
+class TracebackTailTestCase:
+    description: str
+    depth: int
+    expected_start: str
+    expected_end: str
+    expected_elided: bool
