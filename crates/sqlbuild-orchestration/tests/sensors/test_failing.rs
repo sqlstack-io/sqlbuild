@@ -158,6 +158,7 @@ fn completed() -> SensorEvaluationOutcome {
         run_ids: Vec::new(),
         skipped: Vec::new(),
         skip_reason: None,
+        skipped_by: None,
     }
 }
 

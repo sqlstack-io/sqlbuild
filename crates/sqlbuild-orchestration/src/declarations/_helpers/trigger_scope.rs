@@ -24,7 +24,9 @@ pub(crate) async fn trigger_scope(
         TriggerChange::Enable | TriggerChange::Pause | TriggerChange::ResetDefault => {
             Action::TriggerToggle
         }
-        TriggerChange::SetCursor { .. } | TriggerChange::ResetCursor => Action::SensorResetCursor,
+        TriggerChange::SetCursor { .. }
+        | TriggerChange::ResetCursor
+        | TriggerChange::SkipEvent { .. } => Action::SensorResetCursor,
     };
     let (transaction, rows) = query(transaction,
         "SELECT location_id,target,job_key FROM sqb_triggers WHERE trigger_id=$1 AND removed_in_snapshot_id IS NULL",

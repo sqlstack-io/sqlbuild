@@ -2728,6 +2728,8 @@ export interface components {
             run_ids: string[];
             /** @description Why the function skipped, redacted; needs view.evidence. */
             skip_reason?: string | null;
+            /** @description The operator who skipped the tick's event, so the function wasn't called. */
+            skipped_by?: string | null;
             /** @description For each requested run the job's `skip` overlap dropped, the run that was active. */
             skipped_for: string[];
         };
@@ -4108,6 +4110,10 @@ export interface components {
         } | {
             /** @enum {string} */
             kind: "reset_cursor";
+        } | {
+            event: string;
+            /** @enum {string} */
+            kind: "skip_event";
         };
         TriggerChangeRecord: {
             /** Format: date-time */

@@ -923,10 +923,11 @@
               "pause",
               "reset-default",
               "set-cursor",
-              "reset-cursor"
+              "reset-cursor",
+              "skip-event"
              ],
              "required": true,
-             "help": "runtime change; reset-default restores the published status default",
+             "help": "runtime change; reset-default restores the published status default, reset-cursor re-delivers every retained event to a sensor, skip-event marks one sensor event delivered",
              "group": 0
             },
             {
@@ -956,6 +957,15 @@
              ],
              "dest": "admin_cursor",
              "help": "RFC3339 timestamp with offset; required only for set-cursor",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--event"
+             ],
+             "dest": "admin_sensor_event",
+             "help": "the sensor event ID to mark delivered without calling the function; required only for skip-event",
              "group": 1
             }
            ]

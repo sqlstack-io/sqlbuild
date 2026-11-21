@@ -1123,6 +1123,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 		failureCode: phase === 'failed' ? 'sensor_function_failed' : phase === 'timed_out' ? 'timed_out' : null,
 		error: null,
 		abandonedBecause: phase === 'abandoned' ? 'superseded' : null,
+		skippedBy: null,
 		definitionFingerprint: fingerprint(name),
 		...extra
 	});

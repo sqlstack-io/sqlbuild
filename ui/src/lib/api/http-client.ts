@@ -66,6 +66,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'setTriggerStates',
 	'resetTriggerToDefault',
 	'resetSensorCursor',
+	'skipSensorEvent',
 	'listChecks',
 	'getCheck',
 	'getCheckSql',
@@ -931,6 +932,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		},
 		async resetSensorCursor(scope: Scope, id: string, reason?: string | null): Promise<TriggerDetail> {
 			await changeTrigger(id, { kind: 'reset_cursor' }, reason);
+			const detail = await implemented.getTrigger(scope, id);
+			if (!detail) throw new ApiError('The trigger is no longer published', 404);
+			return detail;
+		},
+		async skipSensorEvent(scope: Scope, id: string, eventId: string, reason: string): Promise<TriggerDetail> {
+			await changeTrigger(id, { kind: 'skip_event', event: eventId }, reason);
 			const detail = await implemented.getTrigger(scope, id);
 			if (!detail) throw new ApiError('The trigger is no longer published', 404);
 			return detail;

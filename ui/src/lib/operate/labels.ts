@@ -291,7 +291,8 @@ export const stateEventLabel: Record<TriggerStateEventKind, string> = {
 	paused: 'Paused',
 	reset_to_default: 'Reset to code',
 	cursor_set: 'Position set',
-	cursor_reset: 'Started over'
+	cursor_reset: 'Started over',
+	event_skipped: 'Event skipped'
 };
 
 export const eventTone = (event: RunEvent): string =>

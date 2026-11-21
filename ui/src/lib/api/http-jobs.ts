@@ -90,7 +90,8 @@ const CHANGE_KINDS: Record<Wire['TriggerChange']['kind'], TriggerStateEventKind>
 	pause: 'paused',
 	reset_default: 'reset_to_default',
 	set_cursor: 'cursor_set',
-	reset_cursor: 'cursor_reset'
+	reset_cursor: 'cursor_reset',
+	skip_event: 'event_skipped'
 };
 
 /** One operator change, newest first as the server lists them; a person shows by name. */
@@ -102,7 +103,7 @@ export function toTriggerStateEvent(wire: Wire['PersonTriggerChange']): TriggerS
 		kind: CHANGE_KINDS[wire.change.kind],
 		actor: { kind: wire.actor_name ? 'user' : 'system', name, displayName: name },
 		reason: wire.reason.trim() || null,
-		value: wire.change.kind === 'set_cursor' ? wire.change.time : null
+		value: wire.change.kind === 'set_cursor' ? wire.change.time : wire.change.kind === 'skip_event' ? wire.change.event : null
 	};
 }
 
@@ -127,6 +128,7 @@ function toEvaluation(wire: Wire['PersonSensorEvaluation']): SensorEvaluation {
 		failureCode: wire.failure_code ?? null,
 		error: wire.error ?? null,
 		abandonedBecause: wire.abandoned_because ?? null,
+		skippedBy: wire.skipped_by ?? null,
 		definitionFingerprint: wire.definition_fingerprint
 	};
 }

@@ -136,6 +136,7 @@ async fn apply_result(
             run_ids: requests.run_ids,
             skipped: requests.skipped,
             skip_reason,
+            skipped_by: None,
         }),
     ))
 }

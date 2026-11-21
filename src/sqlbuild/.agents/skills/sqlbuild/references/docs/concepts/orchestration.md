@@ -352,7 +352,15 @@ messages can use `ctx.event.id` to skip an event it has already handled.
 
 Each tick on the sensor's page shows its event and outcome. People with `view.evidence` also see a
 failed tick's traceback. From the first failed tick, the Overview lists "Sensor `<name>` is
-failing" with the stuck event and since when. The item goes away when a tick succeeds.
+failing" with the stuck event and since when. The item goes away when a tick succeeds. A
+location that doesn't answer within `timeout_seconds` counts as a failed tick too; a tick cut short
+by a new publication, a pause or a reset doesn't.
+
+To move past an event the function can't handle, use **Skip this event** on the stuck tick, or
+`sqb admin change-trigger <TRIGGER_ID> skip-event --event <event id> --event-id <uuid> --reason
+"..."`. It marks that one event delivered without calling the function, and the tick history
+and audit log record who skipped it and why. **Start over** (`reset-cursor`) instead re-delivers
+every retained event from the start, the skipped one too. Both need `sensor.reset_cursor`.
 
 ### Try a sensor
 

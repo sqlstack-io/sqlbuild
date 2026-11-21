@@ -964,7 +964,7 @@ permissions = ["view.evidence"]
 | No matching nodes | Publication succeeds with a warning; the grant gives nothing |
 | Permissions | Any non-administrative action; `user.manage`, `role.assign` and `audit.view` are rejected |
 | Runs | `job.run`, `run.rerun` and `run.rewrite_history` need the permission on every node the run writes; an [ad-hoc command](#run-ad-hoc-commands) needs `run.adhoc` and its flags' permissions on every node it selects; a priority above 0 also needs `run.prioritise` |
-| Triggers | `trigger.toggle` and `sensor.reset_cursor` need the permission on every node a schedule's job writes, and for a sensor on every node of the target |
+| Triggers | `trigger.toggle` (on, off) and `sensor.reset_cursor` (start over, skip an event) need the permission on every node a schedule's job writes, and for a sensor on every node of the target |
 | Listings | The catalog, statistics, providers and run list need `view` on every node of the current publication; partial coverage is denied, not filtered |
 | Several roles | Grants add up across a person's roles |
 

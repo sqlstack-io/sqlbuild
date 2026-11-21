@@ -809,6 +809,23 @@ export class MockOperate {
 		return this.#ctx.reply(this.#triggerDetail(def, scope));
 	}
 
+	skipSensorEvent(scope: Scope, id: string, eventId: string, reason: string): Promise<TriggerDetail> {
+		this.#need('sensor.reset_cursor');
+		const def = TRIGGER_DEFS.find((t) => triggerId(t.name) === id);
+		if (!def?.sensor) throw new ApiError(`${id} is not a sensor`, 422);
+		const stuck = (this.#fx.evaluations[def.name] ?? []).find((e) => e.outcome !== 'running');
+		if (!stuck || stuck.eventId !== eventId || stuck.outcome === 'handled' || stuck.outcome === 'skipped' || stuck.outcome === 'started') throw new ApiError(`The sensor isn't waiting on ${eventId}`, 422);
+		const now = new Date().toISOString();
+		const actor = this.#ctx.user();
+		this.#fx.evaluations[def.name] = [
+			{ ...stuck, id: `eval-skip-${++this.#seq}`, outcome: 'skipped', requestedAt: now, finishedAt: now, runIds: [], skippedFor: [], failureCode: null, error: null, abandonedBecause: null, skipReason: reason, skippedBy: actor.displayName },
+			...(this.#fx.evaluations[def.name] ?? [])
+		];
+		this.#runtime(scope, def.name).history.unshift(this.#stateEvent('event_skipped', reason, eventId));
+		this.#ctx.changes.emit('triggers');
+		return this.#ctx.reply(this.#triggerDetail(def, scope));
+	}
+
 	// ---- shell counts ----
 
 	activeRunCount(): number {

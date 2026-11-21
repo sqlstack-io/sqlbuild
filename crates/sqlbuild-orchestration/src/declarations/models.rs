@@ -423,8 +423,15 @@ pub enum TriggerChange {
     Enable,
     Pause,
     ResetDefault,
-    SetCursor { time: DateTime<Utc> },
+    SetCursor {
+        time: DateTime<Utc>,
+    },
+    /// A sensor reads every retained event again from the start.
     ResetCursor,
+    /// A sensor's stuck `event` counts as delivered without calling the function again.
+    SkipEvent {
+        event: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

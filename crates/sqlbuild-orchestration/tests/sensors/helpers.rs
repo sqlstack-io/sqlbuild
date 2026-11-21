@@ -540,3 +540,33 @@ pub(crate) async fn triggers_document(store: &ControlStore, snapshot_id: Uuid) -
     commit(transaction).await.expect("commit read");
     rows[0]["document_hash"].as_str().expect("hash").to_owned()
 }
+
+/// The member's change of the sensor, or why it was refused.
+pub(crate) async fn member_sensor_change(
+    store: &ControlStore,
+    who: (&AuditContext, Uuid),
+    trigger_id: Uuid,
+    change: TriggerChange,
+) -> Result<bool, String> {
+    crate::declarations::main::change_person_trigger::change_person_trigger(
+        store,
+        who,
+        &TriggerChangeRequest {
+            event_id: Uuid::now_v7(),
+            trigger_id,
+            actor: String::new(),
+            reason: "Unblock the orders sensor".into(),
+            change,
+        },
+    )
+    .await
+    .map_err(|error| {
+        error
+            .to_string()
+            .trim_start_matches("control-plane operation denied: ")
+            .split("; decision ")
+            .next()
+            .unwrap_or_default()
+            .to_owned()
+    })
+}

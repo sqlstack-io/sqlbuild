@@ -263,5 +263,7 @@ describe('trigger on/off history', () => {
 		});
 		const cursor = toTriggerStateEvent(change({ change: { kind: 'set_cursor', time: '2026-11-01T00:00:00Z' }, actor: 'local-operator', actor_name: null, reason: '  ' }));
 		expect([cursor.kind, cursor.value, cursor.actor.kind, cursor.actor.name, cursor.reason]).toEqual(['cursor_set', '2026-11-01T00:00:00Z', 'system', 'local-operator', null]);
+		const skipped = toTriggerStateEvent(change({ change: { kind: 'skip_event', event: 'run:r-9' }, reason: 'The partner re-sent it by hand' }));
+		expect([skipped.kind, skipped.value, skipped.actor.name, skipped.reason]).toEqual(['event_skipped', 'run:r-9', 'ada-admin', 'The partner re-sent it by hand']);
 	});
 });

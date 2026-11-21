@@ -370,6 +370,9 @@ pub enum SensorEvaluationOutcome {
         skipped: Vec<SkippedRequest>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         skip_reason: Option<String>,
+        /// The operator who skipped the event instead of the function handling it; `skip_reason` is theirs.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        skipped_by: Option<String>,
     },
     /// The function raised, or asked for something the server refused; `error` explains it.
     Failed {
@@ -518,6 +521,8 @@ pub struct PersonSensorEvaluation {
     pub skipped_for: Vec<Uuid>,
     /// Why an abandoned tick ended before its answer was committed.
     pub abandoned_because: Option<AbandonReason>,
+    /// The operator who skipped the tick's event, so the function wasn't called.
+    pub skipped_by: Option<String>,
     pub definition_fingerprint: String,
 }
 

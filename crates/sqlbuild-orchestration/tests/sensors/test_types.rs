@@ -93,3 +93,20 @@ pub(crate) struct SensorUpgradeTestCase {
     /// The runs of the job after one fails: it and its retry.
     pub(crate) expected_job_runs: usize,
 }
+
+pub(crate) struct SkipEventTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The event the next tick is called with after the stuck one is skipped.
+    pub(crate) expected_next_event: &'static str,
+}
+
+pub(crate) struct SensorPermissionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// The member's permissions, and the nodes of the target they cover.
+    pub(crate) permissions: &'static [&'static str],
+    pub(crate) nodes: &'static [&'static str],
+    /// Pause, reset-cursor and skip-event: applied, or why each was refused.
+    pub(crate) expected: [Result<bool, &'static str>; 3],
+}

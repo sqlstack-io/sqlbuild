@@ -1034,7 +1034,7 @@ export type Trigger = {
 	warning: string | null;
 };
 
-export type TriggerStateEventKind = 'enabled' | 'paused' | 'reset_to_default' | 'cursor_set' | 'cursor_reset';
+export type TriggerStateEventKind = 'enabled' | 'paused' | 'reset_to_default' | 'cursor_set' | 'cursor_reset' | 'event_skipped';
 
 export type TriggerStateEvent = {
 	id: string;
@@ -1073,6 +1073,8 @@ export type SensorEvaluation = {
 	error: string | null;
 	/** Why an abandoned tick ended unfinished. */
 	abandonedBecause: AbandonReason | null;
+	/** The operator who skipped the tick's event, so the function wasn't called; `skipReason` is theirs. */
+	skippedBy: string | null;
 	definitionFingerprint: string;
 };
 

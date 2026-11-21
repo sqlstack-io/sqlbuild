@@ -131,6 +131,7 @@ async fn evaluations(
                 error: None,
                 skipped_for: Vec::new(),
                 abandoned_because: None,
+                skipped_by: None,
                 definition_fingerprint: request.definition_fingerprint.clone(),
             });
         let outcome = event.fact_json.outcome;
@@ -146,7 +147,9 @@ async fn evaluations(
                 run_ids,
                 skipped,
                 skip_reason,
+                skipped_by,
             } => {
+                check.skipped_by = skipped_by;
                 check.cursor_after = Some(shown_cursor(&cursor, evidence));
                 check.outcome = if !run_ids.is_empty() || !skipped.is_empty() {
                     TICK_STARTED

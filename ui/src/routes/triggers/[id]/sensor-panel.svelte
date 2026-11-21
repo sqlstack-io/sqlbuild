@@ -20,6 +20,25 @@
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 
+	let confirmSkip = $state(false);
+	let skipReason = $state('');
+
+	async function skipEvent(eventId: string) {
+		const scope = app.scope;
+		if (!scope) return;
+		busy = true;
+		error = null;
+		try {
+			await app.client.skipSensorEvent(scope, trigger.id, eventId, skipReason.trim());
+			confirmSkip = false;
+			skipReason = '';
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			busy = false;
+		}
+	}
+
 	async function resetCursor() {
 		const scope = app.scope;
 		if (!scope) return;
@@ -36,6 +55,11 @@
 		}
 	}
 
+	/** The newest finished tick, when it left its event undelivered: the one an operator can skip. */
+	const stuckTick = $derived.by(() => {
+		const newest = trigger.evaluations?.find((e) => e.outcome !== 'running');
+		return newest?.eventId && (newest.outcome === 'failed' || newest.outcome === 'timed_out' || newest.outcome === 'abandoned') ? newest : null;
+	});
 	const changed = $derived(sensor.lastEvaluatedFingerprint !== null && sensor.lastEvaluatedFingerprint !== sensor.currentFingerprint);
 	const evaluationColumns: TableColumn[] = [
 		{ id: 'when', label: 'When', width: '120px' },
@@ -85,7 +109,7 @@
 	{#if confirmReset}
 		<div class="confirm">
 			<!-- copy-allow: consequence of a reset -->
-			<p>Re-reads everything from the start. Runs with an existing run key aren't repeated.</p>
+			<p>Re-delivers every retained event from the start, including ones already handled or skipped. Runs with an existing run key aren't repeated.</p>
 			<input bind:value={reason} placeholder="Why? (saved in the history)" />
 			<div class="row">
 				<GatedButton requires="sensor.reset_cursor" variant="default" size="sm" {busy} onclick={resetCursor}>Start over</GatedButton>
@@ -106,10 +130,25 @@
 					<td title={e.eventSummary ?? undefined}>{#if e.eventId}<code>{e.eventId}</code>{:else}<span class="faint" title="A polling sensor's tick has no event">Poll</span>{/if}</td>
 					<td title="{evaluationHelp[e.outcome]} · {e.id}"><StatusLabel tone={evaluationTone[e.outcome]} label={evaluationLabel[e.outcome]} /></td>
 					<td class:faint={!e.error}>
-						{#if e.outcome === 'skipped'}{e.skipReason ?? ''}{/if}
+						{#if e.outcome === 'skipped' && !e.skippedBy}{e.skipReason ?? ''}{/if}
 						{#if e.runIds.length}→ {#each e.runIds as id, i (id)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${id}`)} title={id}>{shortRunId(id)}</a>{/each}{/if}
 						{#if e.outcome === 'failed' || e.outcome === 'timed_out'}
 							{#if e.error}<details class="trace"><summary class="err">{e.error.split('\n').at(-1)}</summary><pre>{e.error}</pre></details>{:else}<span class="err" title="The traceback needs view.evidence">{e.failureCode ?? e.outcome}</span>{/if}
+						{/if}
+						{#if e.skippedBy}<span title="Skipped without calling the function">Skipped by {e.skippedBy}{#if e.skipReason}: {e.skipReason}{/if}</span>{/if}
+						{#if e.id === stuckTick?.id && e.eventId}
+							<GatedButton requires="sensor.reset_cursor" size="sm" onclick={() => (confirmSkip = !confirmSkip)}>Skip this event</GatedButton>
+							{#if confirmSkip}
+								<div class="confirm">
+									<!-- copy-allow: consequence of skipping an event -->
+									<p>Marks <code>{e.eventId}</code> handled without calling the function, so the next event runs. It isn't retried unless the sensor starts over.</p>
+									<input bind:value={skipReason} placeholder="Why? (required, saved in the history)" />
+									<div class="row">
+										<GatedButton requires="sensor.reset_cursor" variant="default" size="sm" {busy} disabled={!skipReason.trim()} reason="Give a reason" onclick={() => skipEvent(e.eventId!)}>Skip this event</GatedButton>
+										<Button variant="ghost" size="sm" onclick={() => (confirmSkip = false)}>Cancel</Button>
+									</div>
+								</div>
+							{/if}
 						{/if}
 						{#if e.abandonedBecause}<span class:err={e.abandonedBecause === 'unanswered'}>{abandonReasonLabel[e.abandonedBecause]}</span>{/if}
 						{#if e.skippedFor.length}<span title="The job's overlap is skip, so matching requests that arrived while a run was active were dropped">{e.skippedFor.length} skipped · {#each [...new Set(e.skippedFor)] as id, i (id)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${id}`)} title={id}>{shortRunId(id)}</a>{/each}</span>{/if}
