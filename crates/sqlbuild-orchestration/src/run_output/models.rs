@@ -271,3 +271,40 @@ pub(crate) type PersonRunRead<'a> = (
     (uuid::Uuid, &'a str, uuid::Uuid),
     crate::credentials::models::DefaultRole,
 );
+
+/// A worker's run output on its way to the server: lines assembled per node and stream, sent in batches by one thread.
+#[derive(Debug)]
+pub struct RunOutputUploader {
+    pub(crate) shared: Arc<UploadShared>,
+    pub(crate) sender: std::sync::Mutex<Option<std::thread::JoinHandle<()>>>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct UploadShared {
+    pub(crate) state: std::sync::Mutex<UploadState>,
+    pub(crate) wake: std::sync::Condvar,
+}
+
+/// What the capture has handed over and the sender has still to send.
+#[derive(Debug, Default)]
+pub(crate) struct UploadState {
+    /// The bytes after each node and stream's last newline, keyed by node key, empty outside any node.
+    pub(crate) partial: std::collections::BTreeMap<(String, OutputStream), Vec<u8>>,
+    pub(crate) segments: Vec<OutputSegment>,
+    pub(crate) batch_bytes: usize,
+    pub(crate) batch_started: Option<std::time::Instant>,
+    pub(crate) queued: std::collections::VecDeque<OutputBatch>,
+    pub(crate) next_batch: u64,
+    /// Bytes dropped since the last segment, reported on the next one.
+    pub(crate) unreported_drops: u64,
+    pub(crate) closing: Option<std::time::Instant>,
+    pub(crate) summary: UploadSummary,
+}
+
+/// How a worker's run output went: batches stored, bytes it could not send, and why sending stopped.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct UploadSummary {
+    pub stored_batches: u64,
+    pub dropped_bytes: u64,
+    pub failure: Option<String>,
+}

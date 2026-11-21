@@ -177,6 +177,12 @@ class CheckExecutionTestCase(WorkerExecutionTestCase):
 
 
 @dataclass(frozen=True, kw_only=True)
+class RunOutputTestCase(WorkerExecutionTestCase):
+    expected_lines: int
+    expected_logs: list[tuple[str, str, str]]
+
+
+@dataclass(frozen=True, kw_only=True)
 class PersonJourneyTestCase(WorkerExecutionTestCase):
     description: str
     default_role: Literal["none", "viewer"]

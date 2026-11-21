@@ -49,3 +49,18 @@ pub const NODE_LOGS_PER_NODE: usize = 200;
 
 /// The folder an output store defaults to, beside a SQLite control store.
 pub const DEFAULT_OUTPUT_FOLDER: &str = "output";
+
+/// A worker holds at most this many batches waiting to send; past them the printing thread waits.
+pub const MAX_QUEUED_BATCHES: usize = 4;
+
+/// How long a printing thread waits for a full queue to drain before it drops the newest batches and counts them.
+pub const UPLOAD_STALL: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// A line longer than this is sent in pieces rather than held until its newline.
+pub const MAX_PARTIAL_LINE_BYTES: usize = 1024 * 1024;
+
+/// A batch is sent at most this many times while the server is unreachable or busy.
+pub const UPLOAD_ATTEMPTS: u32 = 3;
+
+/// How long a finishing worker waits for its last batches to send.
+pub const UPLOAD_CLOSE_BUDGET: std::time::Duration = std::time::Duration::from_secs(30);
