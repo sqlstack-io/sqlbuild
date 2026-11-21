@@ -120,14 +120,12 @@ fn given_a_sensor_an_earlier_release_left_unreadable_when_the_scheduler_cycles_t
             let (state, _) =
                 sensor_due_again(store, roles.location_id, test_case.earlier_form).await;
 
-            let cycled = match scheduler_cycle(store, state).await {
-                Ok((state, _)) => {
-                    answer_sensor_work(store).await;
-                    make_sensors_due(store).await;
-                    scheduler_cycle(store, state).await
-                }
-                failed => failed,
-            };
+            let (state, _) = scheduler_cycle(store, state)
+                .await
+                .expect("the cycle that meets the unreadable sensor carries on");
+            answer_sensor_work(store).await;
+            make_sensors_due(store).await;
+            let cycled = scheduler_cycle(store, state).await;
 
             let count = |sql: &'static str| async move {
                 rows(store, sql, vec![]).await[0]["count"].as_i64()
@@ -234,7 +232,6 @@ fn given_a_sensor_whose_check_fails_when_the_scheduler_cycles_then_only_that_sen
         FailedSensorTestCase {
             description: "SQLite store",
             backend: Backend::Sqlite,
-            expected_cycle: "ok",
             expected_skipped: &[FAILED],
             expected_healthy_checks: 2,
             expected_skipped_after: &[],
@@ -242,7 +239,6 @@ fn given_a_sensor_whose_check_fails_when_the_scheduler_cycles_then_only_that_sen
         FailedSensorTestCase {
             description: "PostgreSQL store",
             backend: Backend::Postgres,
-            expected_cycle: "ok",
             expected_skipped: &[FAILED],
             expected_healthy_checks: 2,
             expected_skipped_after: &[],
@@ -285,7 +281,9 @@ fn given_a_sensor_whose_check_fails_when_the_scheduler_cycles_then_only_that_sen
             move_work(pending, hidden).await;
             make_sensors_due(store).await;
 
-            let cycled = scheduler_cycle(store, state).await;
+            let (state, _) = scheduler_cycle(store, state)
+                .await
+                .expect("the cycle in which the check fails carries on");
             let skipped = trigger_problems(store, credentials(&roles.administrator))
                 .await
                 .0;
@@ -300,20 +298,12 @@ fn given_a_sensor_whose_check_fails_when_the_scheduler_cycles_then_only_that_sen
             )
             .await;
             make_sensors_due(store).await;
-            let (cycle, after) = match cycled {
-                Ok((state, _)) => {
-                    scheduler_cycle(store, state)
-                        .await
-                        .expect("the failed check completes");
-                    (
-                        "ok".to_owned(),
-                        trigger_problems(store, credentials(&roles.administrator))
-                            .await
-                            .0,
-                    )
-                }
-                failed => (outcome(failed), Vec::new()),
-            };
+            scheduler_cycle(store, state)
+                .await
+                .expect("the failed check completes");
+            let after = trigger_problems(store, credentials(&roles.administrator))
+                .await
+                .0;
             let names = |lines: &[&str]| {
                 lines
                     .iter()
@@ -322,9 +312,8 @@ fn given_a_sensor_whose_check_fails_when_the_scheduler_cycles_then_only_that_sen
             };
 
             assert_eq!(
-                (cycle, skipped, healthy, after),
+                (skipped, healthy, after),
                 (
-                    test_case.expected_cycle.to_owned(),
                     names(test_case.expected_skipped),
                     Some(test_case.expected_healthy_checks),
                     names(test_case.expected_skipped_after),

@@ -150,9 +150,7 @@ pub(crate) struct CoveredTickTestCase {
 pub(crate) struct FailedSensorTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
-    /// The cycle in which the check fails: `ok` when it carries on.
-    pub(crate) expected_cycle: &'static str,
-    /// The triggers the live problems list as skipped after it, as `name: reason`.
+    /// The triggers the live problems list as skipped after it fails, as `name: reason`.
     pub(crate) expected_skipped: &'static [&'static str],
     /// Checks the healthy sensor `watch_overdue` has completed by then.
     pub(crate) expected_healthy_checks: i64,

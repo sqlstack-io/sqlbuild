@@ -443,23 +443,23 @@ pub(crate) async fn make_sensors_due(store: &ControlStore) {
 pub(crate) async fn answer_sensor_work(store: &ControlStore) {
     let pending = crate::runs::tests::helpers::rows(
         store,
-        "SELECT request_json FROM sqb_location_work WHERE completed_at IS NULL",
+        "SELECT request_json FROM sqb_location_work WHERE completed_at IS NULL \
+         AND requested_by='system:sensor'",
         vec![],
     )
     .await;
     for row in pending {
-        let request: crate::platform::models::LocationWorkRequest = serde_json::from_value(
-            crate::runs::tests::helpers::json_column(&row["request_json"]),
+        let evaluation: crate::sensors::models::SensorEvaluationRequest = serde_json::from_value(
+            crate::runs::tests::helpers::json_column(&row["request_json"])["work"]["evaluation"]
+                .clone(),
         )
-        .expect("location work request");
-        if let crate::platform::models::LocationWork::EvaluateSensor { evaluation } = request.work {
-            crate::sensors::tests::helpers::answer_sensor(
-                store,
-                &evaluation,
-                crate::sensors::tests::helpers::stand_in_outcome(&evaluation),
-            )
-            .await;
-        }
+        .expect("a sensor tick's location work");
+        crate::sensors::tests::helpers::answer_sensor(
+            store,
+            &evaluation,
+            crate::sensors::tests::helpers::stand_in_outcome(&evaluation),
+        )
+        .await;
     }
 }
 
