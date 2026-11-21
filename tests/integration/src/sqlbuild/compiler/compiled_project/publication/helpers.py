@@ -83,6 +83,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalo
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.docker.helpers import (
     docker_deployment,
 )
+from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person.helpers import (
+    person_login,
+    person_request,
+    provision_person,
+)
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 from tests.integration.src.sqlbuild.executor.audit_results.main.helpers import build_record
 
@@ -2314,20 +2319,50 @@ def latest_redraw(shown: str) -> str:
     return re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", shown.rsplit("\x1b[J", 1)[-1])
 
 
-def worker_printed(control_store: Path) -> tuple[str, frozenset[str]]:
-    """What the run's worker printed, both streams in order, and its Recall event types."""
+def worker_printed(control_store: Path, run_id: str) -> tuple[str, frozenset[str]]:
+    """What the run's workers printed, both streams in order, and their Recall event types."""
+    invocations: str = (
+        "SELECT invocation_id FROM recall_invocations WHERE invocation_id LIKE 'worker/%' "
+        "AND json_extract(external_context, '$.run_id')=?"
+    )
     with sqlite3.connect(control_store) as control:
         printed: str = "".join(
             data
             for (data,) in control.execute(
-                "SELECT CAST(data AS TEXT) FROM recall_output WHERE invocation_id LIKE 'worker/%' "
-                "ORDER BY occurred_at, sequence"
+                "SELECT CAST(data AS TEXT) FROM recall_output "
+                f"WHERE invocation_id IN ({invocations}) ORDER BY occurred_at, sequence",
+                (run_id,),
             ).fetchall()
         )
         events: frozenset[str] = frozenset(
             event_type
             for (event_type,) in control.execute(
-                "SELECT DISTINCT event_type FROM recall_events WHERE invocation_id LIKE 'worker/%'"
+                "SELECT DISTINCT event_type FROM recall_events "
+                f"WHERE invocation_id IN ({invocations})",
+                (run_id,),
             ).fetchall()
         )
     return printed, events
+
+
+def launch_adhoc(worker: ScheduledWorker, command: list[str]) -> dict[str, Any]:
+    """Launch `command` as an admin's ad-hoc run on `worker`'s location: the run once it ends."""
+    admin: dict[str, Any] = provision_person(
+        worker.control_store.parent.parent, "create-user", "orders-admin"
+    )
+    session: tuple[str, str] = person_login(worker.api, admin["name"])
+    run_id: str = str(uuid4())
+    assert person_request(
+        worker.api,
+        "/api/control/runs/adhoc",
+        body={
+            "location_id": worker.api.location_id,
+            "target": "development",
+            "run_id": run_id,
+            "command": command,
+            "reason": "Check the worker's output",
+            "priority": 0,
+        },
+        session=session,
+    ) == {"applied": True}
+    return wait_for_run(worker.api, worker.process, worker.log, run_id=run_id)

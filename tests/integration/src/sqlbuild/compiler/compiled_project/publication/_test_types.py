@@ -410,9 +410,13 @@ class DevelopmentEnvFileTestCase:
 class WorkerReportTestCase:
     description: str
     execution: WorkerExecutionTestCase
-    # The run's node statuses and the Recall event types the worker always records;
-    # the report never fed them.
-    expected_nodes: list[tuple[str, str, int | None]]
+    # The ad-hoc command an admin launches once the scheduled run ends; that run is the one checked.
+    adhoc: list[str]
+    expected_status: str
+    expected_nodes: list[tuple[str, str]]
+    # A line of the run's human results, which its printed output must hold.
+    expected_results: str
+    # Recall event types the worker always records; the report never fed them.
     expected_recall_events: frozenset[str]
 
 
