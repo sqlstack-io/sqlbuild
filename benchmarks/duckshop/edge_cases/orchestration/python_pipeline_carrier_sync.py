@@ -2,9 +2,9 @@
 
 from python.orders.partner_export.node import partner_orders_file
 
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task(depends_on=partner_orders_file, tags=["orders"], description="Book collection.")
+@asset(depends_on=partner_orders_file, tags=["orders"], description="Book collection.")
 def request_carrier_collection(ctx):
     return None

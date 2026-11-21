@@ -46,7 +46,7 @@ pub(super) fn orders_publication()
             Some("python/orders/partner_export"),
         ),
         resource(
-            "task:request_carrier_collection",
+            "asset:request_carrier_collection",
             &["asset:partner_orders_file"],
             &["orders"],
             Some("python/fulfillment/carrier_sync"),
@@ -71,7 +71,7 @@ pub(super) fn orders_publication()
     ];
     let jobs = std::collections::BTreeMap::from([(
         "carrier_sync".to_owned(),
-        std::collections::BTreeSet::from(["task:request_carrier_collection".to_owned()]),
+        std::collections::BTreeSet::from(["asset:request_carrier_collection".to_owned()]),
     )]);
     crate::adhoc::main::adhoc_planner::adhoc_planner().prepare(resources, jobs)
 }

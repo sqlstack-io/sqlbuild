@@ -18,11 +18,9 @@ from sqlbuild.python_nodes.models import (
     FactoryDefinition,
     NodeSetRef,
     RetryPolicy,
-    TaskDefinition,
 )
 from sqlbuild.python_nodes.types import NodeSetKind, PythonCheckSeverity
 from sqlbuild.refs import job, model, seed, tag
-from sqlbuild.tasks import get_task_definition, task
 from tests.unit.src.sqlbuild.python_nodes.decorators._test_types import (
     AssetDecoratorMetadataTestCase,
     CheckDecoratorMetadataTestCase,
@@ -30,62 +28,8 @@ from tests.unit.src.sqlbuild.python_nodes.decorators._test_types import (
     FactoryDecoratorMetadataTestCase,
     HookReadsTestCase,
     NodeSetDependencyTestCase,
-    TaskDecoratorMetadataTestCase,
 )
-from tests.unit.src.sqlbuild.python_nodes.decorators.helpers import upstream_asset, upstream_task
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        TaskDecoratorMetadataTestCase(
-            description="stores task metadata and normalizes single dependency",
-            expected_name="fetch_window",
-            expected_dep_count=1,
-            expected_tags=("api", "hourly"),
-            expected_group="ingestion",
-            expected_description="Fetch an API window.",
-            expected_meta={"owner": "data-eng"},
-            expected_retry=RetryPolicy(
-                max_attempts=3,
-                retry_on=[TimeoutError, ConnectionError],
-                initial_delay_seconds=0.5,
-                jitter=False,
-            ),
-        )
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_task_decorator_when_reading_definition_then_returns_metadata(
-    test_case: TaskDecoratorMetadataTestCase,
-) -> None:
-    @task(
-        name=test_case.expected_name,
-        depends_on=upstream_task,
-        tags=test_case.expected_tags,
-        group=test_case.expected_group,
-        meta=test_case.expected_meta,
-        retry=test_case.expected_retry,
-    )
-    def fetch_window(_ctx: object) -> dict[str, object]:
-        """Fetch an API window."""
-
-        return {"window": "2026-05-30"}
-
-    definition: TaskDefinition | None = get_task_definition(fetch_window)
-
-    assert definition == TaskDefinition(
-        name=test_case.expected_name,
-        depends_on=(upstream_task,),
-        tags=test_case.expected_tags,
-        group=test_case.expected_group,
-        description=test_case.expected_description,
-        meta=test_case.expected_meta,
-        retry=test_case.expected_retry,
-    )
-    assert definition is not None
-    assert len(definition.depends_on) == test_case.expected_dep_count
-    assert get_asset_definition(fetch_window) is None
+from tests.unit.src.sqlbuild.python_nodes.decorators.helpers import upstream_asset
 
 
 @pytest.mark.parametrize(
@@ -156,7 +100,6 @@ def test_given_asset_decorator_when_reading_definition_then_returns_metadata(
         test_case.expected_column_descriptions
     )
     assert definition.column_lineage == test_case.expected_column_lineage
-    assert get_task_definition(export_customers) is None
 
 
 @pytest.mark.parametrize(
@@ -205,7 +148,7 @@ def test_given_check_decorator_when_reading_definition_then_returns_metadata(
     assert definition is not None
     assert len(definition.depends_on) == test_case.expected_dep_count
     assert get_asset_definition(export_customers_exists) is None
-    assert get_task_definition(export_customers_exists) is None
+    assert get_asset_definition(export_customers_exists) is None
 
 
 @pytest.mark.parametrize(
@@ -229,7 +172,7 @@ def test_given_factory_decorator_when_reading_definition_then_returns_metadata(
 
     assert decorated is generated_nodes
     assert definition == FactoryDefinition(name=test_case.expected_name)
-    assert get_task_definition(generated_nodes) is None
+    assert get_asset_definition(generated_nodes) is None
     assert get_asset_definition(generated_nodes) is None
     assert get_check_definition(generated_nodes) is None
 
@@ -332,14 +275,14 @@ def test_given_non_reference_hook_read_when_decorating_then_raises(
     ],
     ids=lambda case: case.description,
 )
-def test_given_job_or_tag_dependency_when_decorating_a_task_then_keeps_it_as_declared(
+def test_given_job_or_tag_dependency_when_decorating_an_asset_then_keeps_it_as_declared(
     test_case: NodeSetDependencyTestCase,
 ) -> None:
-    @task(depends_on=cast(Any, test_case.dependency))
+    @asset(depends_on=cast(Any, test_case.dependency))
     def report() -> None:
-        """Test task report."""
+        """Test asset report."""
 
-    definition: TaskDefinition | None = get_task_definition(report)
+    definition: AssetDefinition | None = get_asset_definition(report)
 
     assert definition is not None
     assert definition.depends_on == (test_case.expected_dependency,)

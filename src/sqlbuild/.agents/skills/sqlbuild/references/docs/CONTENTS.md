@@ -96,11 +96,10 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [RuleContext and compiler facts](concepts/rules/custom-rules/rule-context.md) (`concepts/rules/custom-rules/rule-context`) - Inspect stable compiler-owned facts and opt into lazy SQL AST access.
 - [Testing and deterministic Rules](concepts/rules/custom-rules/testing-and-determinism.md) (`concepts/rules/custom-rules/testing-and-determinism`) - Test custom findings and keep implementations safe for dependency-aware caching.
 - [Published-layer Rules](concepts/rules/published-layer-rules.md) (`concepts/rules/published-layer-rules`) - Keep each domain's published layer free of consumer-specific variants.
-- [Overview](concepts/python-nodes/overview.md) (`concepts/python-nodes/overview`) - Tasks, assets, loaders, and checks as first-class nodes in the SQLBuild graph.
+- [Overview](concepts/python-nodes/overview.md) (`concepts/python-nodes/overview`) - Loaders, assets, and checks as first-class nodes in the SQLBuild graph.
 - [Loaders](concepts/python-nodes/loaders.md) (`concepts/python-nodes/loaders`) - Load external data into source tables with Python functions.
-- [Tasks](concepts/python-nodes/tasks.md) (`concepts/python-nodes/tasks`) - Run Python computation and side effects as nodes in the SQLBuild graph.
-- [Assets](concepts/python-nodes/assets.md) (`concepts/python-nodes/assets`) - Produce or observe external artifacts as nodes in the SQLBuild graph.
-- [Checks](concepts/python-nodes/checks.md) (`concepts/python-nodes/checks`) - Validate tasks, assets, loaders, and SQL relations with Python checks.
+- [Assets](concepts/python-nodes/assets.md) (`concepts/python-nodes/assets`) - Run Python computation, side effects and external artifacts as nodes in the SQLBuild graph.
+- [Checks](concepts/python-nodes/checks.md) (`concepts/python-nodes/checks`) - Validate assets, loaders, and SQL relations with Python checks.
 - [Factories](concepts/python-nodes/factories.md) (`concepts/python-nodes/factories`) - Generate Python nodes programmatically with @factory.
 - [Providers](concepts/python-nodes/providers.md) (`concepts/python-nodes/providers`) - Shared runtime services for Python nodes and hooks.
 - [SQL References](concepts/python-nodes/sql-references.md) (`concepts/python-nodes/sql-references`) - Read SQL models, sources, and seeds from Python nodes without creating SQL dependencies.
@@ -153,7 +152,7 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [sqb load](cli/load.md) (`cli/load`) - Load managed sources into the warehouse.
 - [sqb seed](cli/seed.md) (`cli/seed`) - Load seed CSV files into the warehouse.
 - [sqb audit](cli/audit.md) (`cli/audit`) - Run data quality audits in isolation.
-- [sqb check](cli/check.md) (`cli/check`) - Run Python checks against tasks, assets, and loaders.
+- [sqb check](cli/check.md) (`cli/check`) - Run Python checks against assets and loaders.
 - [sqb freshness](cli/freshness.md) (`cli/freshness`) - Observe source freshness without writing state.
 - [sqb diff](cli/diff.md) (`cli/diff`) - Compare schemas and data between targets.
 - [sqb review](cli/review.md) (`cli/review`) - Build what a branch changed in a temporary schema, test it, compare it with a target and report.

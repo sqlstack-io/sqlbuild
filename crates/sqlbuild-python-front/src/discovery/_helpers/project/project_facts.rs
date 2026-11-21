@@ -20,9 +20,8 @@ const CSV_MODULE: &str = "csv";
 /// `DeclarationKind.AUDIT`: a generic audit file.
 const GENERIC_AUDIT_KIND: &str = "audit";
 /// Each Python node kind and the discovered inputs field that lists it, in discovery order.
-pub(crate) const PYTHON_NODE_FIELDS: [(&str, &str); 4] = [
+pub(crate) const PYTHON_NODE_FIELDS: [(&str, &str); 3] = [
     ("loader", "loader_functions"),
-    ("task", "task_functions"),
     ("asset", "asset_functions"),
     ("check", "check_functions"),
 ];
@@ -173,7 +172,6 @@ pub(crate) fn declarations_fact(file: &Bound<'_, PyAny>) -> PyResult<ScopedDecla
 fn node_kind(kind: &str) -> PyResult<NodeKind> {
     match kind {
         "loader" => Ok(NodeKind::Loader),
-        "task" => Ok(NodeKind::Task),
         "asset" => Ok(NodeKind::Asset),
         "check" => Ok(NodeKind::Check),
         other => Err(PyValueError::new_err(format!(

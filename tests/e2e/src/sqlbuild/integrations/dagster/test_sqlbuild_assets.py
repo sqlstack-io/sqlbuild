@@ -156,7 +156,7 @@ def test_given_model_level_column_audits_when_loading_dagster_assets_then_checks
             description="dagster consumes real Python-node dag artifact",
             expected_asset_keys=(
                 ("main", "orders"),
-                ("task", "prepare_orders"),
+                ("asset", "prepare_orders"),
                 ("warehouse_export",),
                 ("asset", "orders_export"),
             ),
@@ -191,7 +191,7 @@ def test_given_python_nodes_project_when_loading_dagster_assets_then_maps_real_a
         tuple(spec.key.path): (spec,) for spec in sqlbuild_python_nodes.specs
     }
     assert len(specs_by_key) == len(sqlbuild_python_nodes.specs)
-    task_spec: object = next(iter(specs_by_key.get(("task", "prepare_orders"), ())))
+    task_spec: object = next(iter(specs_by_key.get(("asset", "prepare_orders"), ())))
     asset_spec: object = next(iter(specs_by_key.get(("asset", "orders_export"), ())))
 
     assert sqlbuild_project.dag_path.exists()

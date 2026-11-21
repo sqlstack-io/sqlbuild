@@ -270,8 +270,8 @@ def set_dependency_project(
             'select = "stg_orders orders order_items"\n'
         ),
         "python/tasks/report.py": (
-            "from sqlbuild.refs import job, model, tag\nfrom sqlbuild.tasks import task\n\n\n"
-            f"@task(depends_on={depends_on})\n"
+            "from sqlbuild.refs import job, model, tag\nfrom sqlbuild.assets import asset\n\n\n"
+            f"@asset(depends_on={depends_on})\n"
             'def report(ctx):\n    """Test task report."""\n    return None\n'
         ),
     }

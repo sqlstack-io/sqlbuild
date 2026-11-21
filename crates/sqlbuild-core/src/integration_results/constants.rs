@@ -22,9 +22,9 @@ pub(crate) const MAX_STRING_CHARS: usize = 2_048;
 pub(crate) const MAX_IDENTIFIER_CHARS: usize = 512;
 pub(crate) const MAX_COLLECTION_ITEMS: usize = 128;
 pub(crate) const MAX_NESTING_DEPTH: usize = 6;
-pub(crate) const ASSET_KINDS: [&str; 12] = [
-    "asset", "custom", "loader", "model", "seed", "snapshot", "source", "table", "table_fn",
-    "task", "udf", "view",
+pub(crate) const ASSET_KINDS: [&str; 11] = [
+    "asset", "custom", "loader", "model", "seed", "snapshot", "source", "table", "table_fn", "udf",
+    "view",
 ];
 pub(crate) const CHECK_KINDS: [&str; 3] = [AUDIT_KIND, "python_check", "sql_test"];
 pub(crate) const EXTRA_RESOURCE_KINDS: [&str; 3] = ["audit", "check", "test"];

@@ -423,7 +423,7 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 			if (n.status === 'warn') {
 				ev('audit_completed', e - 60, n.nodeKey, 'not_null(payment_id): 2 failing rows (severity warn)');
 				out('stdout', e - 60, `WARN  ${n.nodeKey}  audit not_null(payment_id): 2 rows`);
-			} else if (n.status === 'success' && k !== 'task' && k !== 'loader') {
+			} else if (n.status === 'success' && k !== 'asset' && k !== 'loader') {
 				ev('audit_completed', e - 60, n.nodeKey, 'All audits passed');
 			}
 			const dur = ((e - s) / 1000).toFixed(2);

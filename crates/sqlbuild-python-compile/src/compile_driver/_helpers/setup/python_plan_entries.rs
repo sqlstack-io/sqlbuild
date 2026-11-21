@@ -25,7 +25,6 @@ const SKIPPED_UPSTREAM_CODE: &str = "P501";
 
 /// The Python node kinds and plan phases entries are built from.
 pub(crate) struct NodeKinds<'py> {
-    task: Bound<'py, PyAny>,
     asset: Bound<'py, PyAny>,
 }
 
@@ -33,14 +32,13 @@ impl<'py> NodeKinds<'py> {
     pub(crate) fn load(py: Python<'py>) -> PyResult<Self> {
         let kinds: Bound<'py, PyAny> = host_entry(py, UserCodeHost::PythonNodeKind)?;
         Ok(Self {
-            task: native_field(&kinds, "TASK")?,
             asset: native_field(&kinds, "ASSET")?,
         })
     }
 
-    /// Whether `kind` is a task or an asset.
+    /// Whether `kind` is an asset.
     fn runs(&self, kind: &Bound<'py, PyAny>) -> PyResult<bool> {
-        Ok(kind.eq(&self.task)? || kind.eq(&self.asset)?)
+        kind.eq(&self.asset)
     }
 }
 
@@ -67,7 +65,7 @@ pub(crate) fn node_graph<'py>(discovered: &Bound<'py, PyAny>) -> PyResult<Bound<
     python_node_graph(discovered)
 }
 
-/// Return task/asset plan entries ordered by lifecycle dependency readiness.
+/// Return asset plan entries ordered by lifecycle dependency readiness.
 #[pyfunction]
 #[pyo3(signature = (**options))]
 pub(crate) fn build_python_plan_entries<'py>(
@@ -96,7 +94,7 @@ pub(crate) fn build_python_plan_entries<'py>(
     )
 }
 
-/// The entries of the lifecycle's ingress and then read-side tasks and assets.
+/// The entries of the lifecycle's ingress and then read-side assets.
 pub(crate) fn plan_entries<'py>(
     lifecycle: &Bound<'py, PyAny>,
     (graph, kinds): (&Bound<'py, PyAny>, &NodeKinds<'py>),
@@ -201,7 +199,7 @@ fn identity_status<'py>(
     native_field(&statuses, "CHANGED")
 }
 
-/// Warnings for skipped task/asset deps of planned source loaders.
+/// Warnings for skipped asset deps of planned source loaders.
 pub(crate) fn skipped_ingress_warnings<'py>(
     plan_output: &Bound<'py, PyAny>,
     run_selection: &Bound<'py, PyAny>,

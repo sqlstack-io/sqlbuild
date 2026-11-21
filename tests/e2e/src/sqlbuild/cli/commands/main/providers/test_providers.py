@@ -80,17 +80,17 @@ PROVIDER_MARKER_FILE: str = (
             expected_text_fragments=(
                 "Providers",
                 "\u2514\u2500\u2500 marker_provider",
+                "    ├── asset publish_orders (MarkerProvider)",
                 "    ├── custom materialization copy_table (MarkerProvider)",
                 "    ├── hook mark_pre (MarkerProvider)",
-                "    ├── loader raw_orders (MarkerProvider)",
-                "    └── task publish_orders (MarkerProvider)",
+                "    └── loader raw_orders (MarkerProvider)",
             ),
             expected_provider_name="marker_provider",
             expected_used_by=(
+                ("asset", "publish_orders", "marker_provider"),
                 ("custom materialization", "copy_table", "marker_provider"),
                 ("hook", "mark_pre", "marker_provider"),
                 ("loader", "raw_orders", "marker_provider"),
-                ("task", "publish_orders", "marker_provider"),
             ),
         )
     ],
@@ -146,10 +146,10 @@ def test_given_provider_usages_when_planning_then_text_and_json_include_selected
             "python/tasks/publish_orders.py": dedent(
                 """
                 from providers.marker import MarkerProvider
-                from sqlbuild.tasks import task
+                from sqlbuild.assets import asset
 
 
-                @task
+                @asset
                 def publish_orders(marker_provider: MarkerProvider):
                     '''Test task publish_orders.'''
                     marker_provider.label
@@ -326,10 +326,10 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
             "python/tasks/provider_task.py": dedent(
                 """
                 from providers.marker import MarkerProvider
-                from sqlbuild.tasks import task
+                from sqlbuild.assets import asset
 
 
-                @task
+                @asset
                 def provider_task(ctx, marker_provider: MarkerProvider):
                     '''Test task provider_task.'''
                     marker_provider.mark(f"run_task:{marker_provider.label}")
@@ -448,10 +448,10 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                 "python/tasks/failing_task.py": dedent(
                     """
                     from providers.marker import MarkerProvider
-                    from sqlbuild.tasks import task
+                    from sqlbuild.assets import asset
 
 
-                    @task
+                    @asset
                     def failing_task(ctx, marker_provider: MarkerProvider):
                         '''Test task failing_task.'''
                         marker_provider.mark("task")
@@ -599,10 +599,10 @@ def test_given_provider_project_when_running_compile_or_plan_then_provider_setup
             "python/tasks/provider_task.py": dedent(
                 """
                 from providers.marker import MarkerProvider
-                from sqlbuild.tasks import task
+                from sqlbuild.assets import asset
 
 
-                @task
+                @asset
                 def provider_task(ctx, marker_provider: MarkerProvider):
                     '''Test task provider_task.'''
                     marker_provider.mark("task")
@@ -653,7 +653,7 @@ def test_given_alias_imported_provider_annotation_when_running_command_then_cli_
                 import sys
                 from pathlib import Path
 
-                from sqlbuild.tasks import task
+                from sqlbuild.assets import asset
 
                 provider_path = Path(__file__).parents[2] / "providers" / "marker.py"
                 spec = importlib.util.spec_from_file_location("alias_marker", provider_path)
@@ -664,7 +664,7 @@ def test_given_alias_imported_provider_annotation_when_running_command_then_cli_
                 AliasMarkerProvider = alias_marker.MarkerProvider
 
 
-                @task
+                @asset
                 def alias_task(ctx, marker_provider: AliasMarkerProvider):
                     '''Test task alias_task.'''
                     marker_provider.mark("task")

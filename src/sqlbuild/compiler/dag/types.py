@@ -14,7 +14,6 @@ class NodeKind(StrEnum):
     UDF = "udf"
     TABLE_FN = "table_fn"
     MODEL = "model"
-    TASK = "task"
     ASSET = "asset"
     CHECK = "check"
     SQL_TEST = "sql_test"

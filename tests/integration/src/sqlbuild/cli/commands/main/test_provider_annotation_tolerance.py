@@ -15,7 +15,7 @@ from sqlbuild._native import run_cli as main
 from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     ProviderAnnotationToleranceTestCase,
 )
-from tests.integration.src.sqlbuild.cli.commands.main.helpers import write_provider_task_project
+from tests.integration.src.sqlbuild.cli.commands.main.helpers import write_provider_asset_project
 
 
 @pytest.mark.parametrize(
@@ -41,14 +41,14 @@ def test_given_provider_parameter_annotation_when_compiling_then_usage_is_record
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    write_provider_task_project(project_dir=tmp_path, annotation=test_case.annotation)
+    write_provider_asset_project(project_dir=tmp_path, annotation=test_case.annotation)
 
     discovered: DiscoveredPythonNodeFunctions = discover_python_node_functions(
         project_dir=tmp_path, providers=discover_provider_classes(project_dir=tmp_path)
     )
     exit_code: int = main(["--project-dir", str(tmp_path), "compile"])
 
-    assert tuple(usage.annotation_class_name for usage in discovered.tasks[0].provider_usages) == (
+    assert tuple(usage.annotation_class_name for usage in discovered.assets[0].provider_usages) == (
         test_case.expected_annotation_class_name,
     )
     assert exit_code == test_case.expected_exit_code, capsys.readouterr()

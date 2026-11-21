@@ -2373,8 +2373,8 @@ def build_since_indirect_files() -> dict[str, str]:
             "__expected__archive_counts AS (SELECT 1 AS archived)\nSELECT 1\n"
         ),
         "python/tasks/report.py": (
-            "from sqlbuild.tasks import task\n\n\n"
-            "@task()\ndef report_orders(ctx):\n"
+            "from sqlbuild.assets import asset\n\n\n"
+            "@asset()\ndef report_orders(ctx):\n"
             '    """Report orders."""\n\n'
             "    return ctx.result(payload={})\n"
         ),

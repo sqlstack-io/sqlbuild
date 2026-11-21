@@ -522,7 +522,7 @@ pub struct ProviderSetting {
     pub missing: bool,
 }
 
-/// Code that injects a provider: a node (`loader`, `task`, `asset`, `check`, `hook` or `materialization`, keyed `kind:name`), an `event_exporter` or a `sink`.
+/// Code that injects a provider: a node (`loader`, `asset`, `check`, `hook` or `materialization`, keyed `kind:name`), an `event_exporter` or a `sink`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ProviderConsumer {
     pub kind: String,

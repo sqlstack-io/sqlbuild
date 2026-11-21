@@ -219,7 +219,7 @@ from sqlbuild.assets import asset
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
 PROJECT_DIR = Path(__file__).parents[2]
@@ -227,7 +227,7 @@ PROJECT_DIR = Path(__file__).parents[2]
 
 @factory
 def generated_pipeline():
-    @task(name="prepare_orders", tags=("factory", "runtime"))
+    @asset(name="prepare_orders", tags=("factory", "runtime"))
     def prepare(ctx):
         '''Test task prepare.'''
         PROJECT_DIR.joinpath("prepare_marker.txt").write_text("ran", encoding="utf-8")
@@ -304,7 +304,7 @@ def generated_pipeline():
     )
     dag_payload: dict[str, object] = json.loads(dag_result.stdout)
     dag_node_ids: set[str] = {str(node["id"]) for node in dag_payload["nodes"]}
-    assert {"task:prepare_orders", "asset:orders_export", "source:raw_orders"} <= dag_node_ids
+    assert {"asset:prepare_orders", "asset:orders_export", "source:raw_orders"} <= dag_node_ids
     assert "factory:generated_pipeline" not in dag_node_ids
     assert compile_dag_result.returncode == test_case.expected_exit_code, (
         compile_dag_result.stdout + compile_dag_result.stderr
@@ -421,8 +421,8 @@ def test_given_task_selector_when_running_run_then_task_executes(
             ),
             "python/tasks/orders.py": (
                 "from pathlib import Path\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def prepare_orders(ctx):\n"
                 "    '''Test task prepare_orders.'''\n    Path(__file__).parents[2].joinpath('task_marker.txt').write_text('ran')\n"
                 "    return ctx.result(payload={'status': 'ok'})\n"
@@ -437,13 +437,13 @@ def test_given_task_selector_when_running_run_then_task_executes(
             "--no-tests",
             "--no-audits",
             "--select",
-            "task:prepare_orders",
+            "asset:prepare_orders",
         ),
         project_dir=project_dir,
     )
 
     assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
-    assert "python    task      prepare_orders" in result.stdout
+    assert "python    asset     prepare_orders" in result.stdout
     assert "OK" in result.stdout
     assert (project_dir / "task_marker.txt").read_text(encoding="utf-8") == "ran"
 
@@ -531,8 +531,8 @@ def test_given_task_selector_with_json_output_when_running_run_then_json_include
                 'database = "python_run_json_project.duckdb"\n'
             ),
             "python/tasks/orders.py": (
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def prepare_orders(ctx):\n"
                 "    '''Test task prepare_orders.'''\n    return ctx.result(metadata={'rows': 3})\n"
             ),
@@ -548,7 +548,7 @@ def test_given_task_selector_with_json_output_when_running_run_then_json_include
             "--json-output",
             str(json_output_path),
             "--select",
-            "task:prepare_orders",
+            "asset:prepare_orders",
         ),
         project_dir=project_dir,
     )
@@ -557,7 +557,7 @@ def test_given_task_selector_with_json_output_when_running_run_then_json_include
     payload: dict[str, object] = json.loads(json_output_path.read_text(encoding="utf-8"))
     assets: list[dict[str, object]] = list(payload["assets"])  # type: ignore[arg-type]
     assert {
-        "kind": "task",
+        "kind": "asset",
         "name": "prepare_orders",
         "status": "success",
         "metadata": {"rows": 3},
@@ -602,8 +602,8 @@ def test_given_failing_task_selector_when_running_run_then_command_fails(
                 'database = "python_failed_run_project.duckdb"\n'
             ),
             "python/tasks/orders.py": (
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def fail_orders(ctx):\n"
                 "    '''Test task fail_orders.'''\n    raise RuntimeError('API unavailable')\n"
             ),
@@ -619,14 +619,14 @@ def test_given_failing_task_selector_when_running_run_then_command_fails(
             "--json-output",
             str(json_output_path),
             "--select",
-            "task:fail_orders",
+            "asset:fail_orders",
         ),
         project_dir=project_dir,
     )
 
     assert result.returncode == test_case.expected_exit_code
     combined_output: str = result.stdout + result.stderr
-    assert "python    task      fail_orders" in combined_output
+    assert "python    asset     fail_orders" in combined_output
     assert "FAIL" in combined_output
     assert "\u2717 Completed with errors" in combined_output
     assert "Python node failures:" in combined_output
@@ -672,8 +672,8 @@ def test_given_task_loader_source_model_chain_when_running_model_then_task_runs_
             ),
             "python/tasks/orders.py": (
                 "from pathlib import Path\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def prepare_orders(ctx):\n"
                 "    '''Test task prepare_orders.'''\n    Path(__file__).parents[2].joinpath('orders_ready.txt').write_text('ready')\n"
                 "    return ctx.result(metadata={'prepared': True})\n"
@@ -713,7 +713,7 @@ def test_given_task_loader_source_model_chain_when_running_model_then_task_runs_
     )
 
     assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
-    assert "python    task      prepare_orders" in result.stdout
+    assert "python    asset     prepare_orders" in result.stdout
     execution_output: str = result.stdout[result.stdout.index("Execution  sqb build") :]
     assert execution_output.index("prepare_orders") < execution_output.index("fact_orders")
     db_path: Path = project_dir / "python_loader_run_project.duckdb"
@@ -765,8 +765,8 @@ def test_given_model_and_task_selector_when_running_run_then_task_can_read_built
             "python/tasks/orders.py": (
                 "from pathlib import Path\n"
                 "from sqlbuild.refs import model\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=model('fact_orders'))\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=model('fact_orders'))\n"
                 "def summarize_orders(ctx):\n"
                 "    '''Test task summarize_orders.'''\n    orders = ctx.relation(model('fact_orders'))\n"
                 "    rows = ctx.query(f'SELECT COUNT(*) FROM {orders}').fetchall()[0][0]\n"
@@ -896,16 +896,16 @@ def test_given_task_asset_task_chain_when_running_final_task_then_chain_executes
                 'database = "python_task_asset_task_run_project.duckdb"\n'
             ),
             "python/tasks/fetch_orders.py": (
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def fetch_orders(ctx):\n"
                 "    '''Test task fetch_orders.'''\n    return ctx.result(payload={'rows': 1})\n"
             ),
             "python/tasks/notify_orders.py": (
                 "from pathlib import Path\n"
                 "from python.assets.orders import publish_orders\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=publish_orders)\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=publish_orders)\n"
                 "def notify_orders(ctx):\n"
                 "    '''Test task notify_orders.'''\n    metadata = ctx.result_of(node_function=publish_orders).metadata\n"
                 "    output = Path(__file__).parents[2].joinpath('notify.txt')\n"
@@ -979,8 +979,8 @@ def test_given_source_task_asset_selection_when_running_run_then_task_reads_load
             ),
             "python/tasks/orders.py": (
                 "from sqlbuild.refs import source\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=source('raw_orders'))\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=source('raw_orders'))\n"
                 "def summarize_loaded_orders(ctx):\n"
                 "    '''Test task summarize_loaded_orders.'''\n    orders = ctx.relation(source('raw_orders'))\n"
                 "    rows = ctx.query(f'SELECT COUNT(*) FROM {orders}').fetchall()[0][0]\n"
@@ -1048,8 +1048,8 @@ def test_given_skip_and_asset_selection_with_json_when_running_run_then_json_rec
                 'database = "python_json_fields_run_project.duckdb"\n'
             ),
             "python/tasks/orders.py": (
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def optional_orders(ctx):\n"
                 "    '''Test task optional_orders.'''\n    return ctx.skip(reason='no files')\n\n"
             ),
@@ -1138,12 +1138,12 @@ def test_given_independent_python_and_sql_selectors_when_running_run_then_all_br
             ),
             "python/tasks/branches.py": (
                 "from pathlib import Path\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def branch_a(ctx):\n"
                 "    '''Test task branch_a.'''\n    Path(__file__).parents[2].joinpath('branch_a.txt').write_text('a')\n"
                 "    return ctx.result()\n\n"
-                "@task\n"
+                "@asset\n"
                 "def branch_b(ctx):\n"
                 "    '''Test task branch_b.'''\n    Path(__file__).parents[2].joinpath('branch_b.txt').write_text('b')\n"
                 "    return ctx.result()\n"
@@ -1215,8 +1215,8 @@ def test_given_task_depends_on_model_when_running_run_then_task_runs_before_down
             ),
             "python/tasks/profile.py": (
                 "from sqlbuild.refs import model\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=model('stg_orders'))\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=model('stg_orders'))\n"
                 "def profile_stg_orders(ctx):\n"
                 "    '''Test task profile_stg_orders.'''\n    orders = ctx.relation(model('stg_orders'))\n"
                 "    rows = ctx.query(f'SELECT COUNT(*) FROM {orders}').fetchall()[0][0]\n"
@@ -1291,8 +1291,8 @@ def test_given_task_depends_on_source_when_running_run_then_task_runs_after_sour
             ),
             "python/tasks/profile.py": (
                 "from sqlbuild.refs import source\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=source('raw_orders'))\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=source('raw_orders'))\n"
                 "def profile_raw_orders(ctx):\n"
                 "    '''Test task profile_raw_orders.'''\n    orders = ctx.relation(source('raw_orders'))\n"
                 "    rows = ctx.query(f'SELECT COUNT(*) FROM {orders}').fetchall()[0][0]\n"
@@ -1364,8 +1364,8 @@ def test_given_sql_ready_task_fails_when_running_run_then_footer_json_and_exit_f
             ),
             "python/tasks/profile.py": (
                 "from sqlbuild.refs import model\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=model('stg_orders'))\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=model('stg_orders'))\n"
                 "def fail_after_stg_orders(ctx):\n"
                 "    '''Test task fail_after_stg_orders.'''\n    raise RuntimeError('profile failed')\n"
             ),
@@ -1388,7 +1388,7 @@ def test_given_sql_ready_task_fails_when_running_run_then_footer_json_and_exit_f
 
     assert result.returncode == test_case.expected_exit_code
     combined_output: str = result.stdout + result.stderr
-    assert "python    task      fail_after_stg_orders" in combined_output
+    assert "python    asset     fail_after_stg_orders" in combined_output
     assert "FAIL" in combined_output
     assert "Python node failures:" in combined_output
     payload: dict[str, object] = json.loads(json_output_path.read_text(encoding="utf-8"))
@@ -1444,8 +1444,8 @@ def test_given_task_depends_on_terminal_loader_when_running_run_then_command_rej
             ),
             "python/tasks/orders.py": (
                 "from python.loaders.orders import raw_orders\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=raw_orders)\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=raw_orders)\n"
                 "def summarize_orders(ctx):\n"
                 "    '''Test task summarize_orders.'''\n    return ctx.result()\n"
             ),
@@ -1511,8 +1511,8 @@ def test_given_task_asset_depend_on_intermediate_loader_when_running_run_then_lo
             ),
             "python/tasks/orders.py": (
                 "from python.loaders.orders import stage_orders\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=stage_orders)\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=stage_orders)\n"
                 "def summarize_stage_orders(ctx):\n"
                 "    '''Test task summarize_stage_orders.'''\n    rows = ctx.query('SELECT COUNT(*) FROM stage_orders').fetchall()[0][0]\n"
                 "    return ctx.result(payload={'rows': rows}, metadata={'rows': rows})\n"
@@ -1590,8 +1590,8 @@ def test_given_loader_task_loader_chain_when_running_model_then_ingress_orders_c
             "python/tasks/orders.py": (
                 "from pathlib import Path\n"
                 "from python.loaders.window import load_window_orders\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=load_window_orders)\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=load_window_orders)\n"
                 "def prepare_raw_orders(ctx):\n"
                 "    '''Test task prepare_raw_orders.'''\n    rows = ctx.query('SELECT COUNT(*) FROM window_orders').fetchall()[0][0]\n"
                 "    Path(__file__).parents[2].joinpath('prepared.txt').write_text(str(rows))\n"
@@ -1664,8 +1664,8 @@ def test_given_task_asset_loader_chain_when_running_model_then_ingress_orders_ch
                 'database = "python_task_asset_loader_run_project.duckdb"\n'
             ),
             "python/tasks/orders.py": (
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def fetch_orders(ctx):\n"
                 "    '''Test task fetch_orders.'''\n    return ctx.result(payload={'order_id': 1})\n"
             ),
@@ -1917,8 +1917,8 @@ def test_given_loader_task_asset_loader_model_task_asset_task_spine_when_running
             ),
             "python/tasks/prepare.py": (
                 "from python.loaders.window import load_window_orders\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=load_window_orders)\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=load_window_orders)\n"
                 "def prepare_orders(ctx):\n"
                 "    '''Test task prepare_orders.'''\n    rows = ctx.query('SELECT order_id FROM window_orders').fetchall()\n"
                 "    return ctx.result(payload={'order_id': rows[0][0]})\n"
@@ -1957,8 +1957,8 @@ def test_given_loader_task_asset_loader_model_task_asset_task_spine_when_running
             ),
             "python/tasks/profile.py": (
                 "from sqlbuild.refs import model\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=model('fact_orders'))\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=model('fact_orders'))\n"
                 "def profile_fact_orders(ctx):\n"
                 "    '''Test task profile_fact_orders.'''\n    orders = ctx.relation(model('fact_orders'))\n"
                 "    order_id = ctx.query(f'SELECT order_id FROM {orders}').fetchall()[0][0]\n"
@@ -1975,8 +1975,8 @@ def test_given_loader_task_asset_loader_model_task_asset_task_spine_when_running
             "python/tasks/notify.py": (
                 "from pathlib import Path\n"
                 "from python.assets.export import export_fact_orders\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=export_fact_orders)\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=export_fact_orders)\n"
                 "def notify_fact_orders(ctx):\n"
                 "    '''Test task notify_fact_orders.'''\n    payload = ctx.result_of(node_function=export_fact_orders).payload\n"
                 "    output = Path(__file__).parents[2].joinpath('notify.txt')\n"
@@ -2059,8 +2059,8 @@ def test_given_source_task_loader_chain_when_running_run_then_command_rejects_bo
             ),
             "python/tasks/orders.py": (
                 "from sqlbuild.refs import source\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=source('raw_orders'))\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=source('raw_orders'))\n"
                 "def prepare_orders(ctx):\n"
                 "    '''Test task prepare_orders.'''\n    return ctx.result()\n"
             ),
@@ -2138,8 +2138,8 @@ def test_given_model_task_loader_chain_when_running_run_then_command_rejects_bou
             ),
             "python/tasks/orders.py": (
                 "from sqlbuild.refs import model\n"
-                "from sqlbuild.tasks import task\n\n"
-                "@task(depends_on=model('stg_orders'))\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset(depends_on=model('stg_orders'))\n"
                 "def prepare_orders(ctx):\n"
                 "    '''Test task prepare_orders.'''\n    return ctx.result()\n"
             ),
@@ -2187,7 +2187,7 @@ def test_given_model_task_loader_chain_when_running_run_then_command_rejects_bou
             expected_table_names=(),
             expected_view_names=(),
             expected_output_fragments=(
-                "Python check 'check_orders_export' checks task:prepare_orders, which the "
+                "Python check 'check_orders_export' checks asset:prepare_orders, which the "
                 "selection does not include; select it too, or narrow the selector so it no "
                 "longer matches the check.",
             ),
@@ -2199,7 +2199,7 @@ def test_given_model_task_loader_chain_when_running_run_then_command_rejects_bou
             expected_table_names=(),
             expected_view_names=(),
             expected_output_fragments=("check     check_orders_export START", "PASS=2"),
-            select=("check:check_orders_export", "task:prepare_orders"),
+            select=("check:check_orders_export", "asset:prepare_orders"),
         ),
         RunE2ETestCase(
             description="build rejects a selected check on a source no loader writes",
@@ -2238,8 +2238,8 @@ def test_given_check_selector_when_running_build_then_check_needs_its_checked_no
                 "    '''Test check check_orders_export.'''\n    return ctx.pass_()\n"
             ),
             "python/tasks/orders.py": (
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def prepare_orders(ctx):\n"
                 "    '''Test task prepare_orders.'''\n    return ctx.result()\n"
             ),

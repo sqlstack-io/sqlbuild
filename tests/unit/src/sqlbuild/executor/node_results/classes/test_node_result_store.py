@@ -69,7 +69,7 @@ _PERSISTED_SUCCESS: NodeResultEnvelope = envelope_from_record(
             expected_result=_PERSISTED_SUCCESS,
             expected_queries=(
                 NodeResultQuery(
-                    node_type="task",
+                    node_type="asset",
                     node_name="orders",
                     target_database="analytics",
                     target_schema="state",
@@ -88,7 +88,7 @@ _PERSISTED_SUCCESS: NodeResultEnvelope = envelope_from_record(
             expected_result=_PERSISTED_SUCCESS,
             expected_queries=(
                 NodeResultQuery(
-                    node_type="task",
+                    node_type="asset",
                     node_name="orders",
                     target_database="analytics",
                     target_schema="state",
@@ -113,7 +113,7 @@ def test_given_cached_and_persisted_results_when_reading_one_then_contract_is_pr
         store.write(record)
 
     result: NodeResultEnvelope | object = store.result_of(
-        node_type="task",
+        node_type="asset",
         node_name="orders",
         run_id=test_case.run_id,
     )
@@ -141,7 +141,7 @@ def test_given_cached_and_persisted_results_when_reading_one_then_contract_is_pr
             expected_run_ids=("persisted-success",),
             expected_queries=(
                 NodeResultQuery(
-                    node_type="task",
+                    node_type="asset",
                     node_name="orders",
                     target_database="analytics",
                     target_schema="state",
@@ -166,7 +166,7 @@ def test_given_cached_and_persisted_results_when_reading_history_then_contract_i
         store.write(record)
 
     results: tuple[NodeResultEnvelope, ...] = store.results_of(
-        node_type="task",
+        node_type="asset",
         node_name="orders",
         limit=test_case.limit,
     )
@@ -194,11 +194,11 @@ def test_given_missing_result_when_reading_then_default_and_error_contract_are_p
 
     assert (
         store.result_of(
-            node_type="task",
+            node_type="asset",
             node_name="missing",
             default=test_case.default,
         )
         == test_case.expected_default
     )
     with pytest.raises(ExecutorInputError, match=test_case.expected_error_fragment):
-        store.result_of(node_type="task", node_name="missing")
+        store.result_of(node_type="asset", node_name="missing")

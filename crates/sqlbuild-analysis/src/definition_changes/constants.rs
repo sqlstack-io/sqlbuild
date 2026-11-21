@@ -22,7 +22,7 @@ pub const DEPENDENCIES_KIND: &str = "dependencies";
 /// The one node of each project-wide kind.
 pub const PROJECT_NODE_NAME: &str = "project";
 /// Python nodes by decorator.
-pub const PYTHON_NODE_KINDS: [&str; 4] = ["loader", "task", "asset", "check"];
+pub const PYTHON_NODE_KINDS: [&str; 3] = ["loader", "asset", "check"];
 
 /// Normalised SQL of a model, a function body or a scenario.
 pub const SQL_ASPECT: &str = "sql";
@@ -54,7 +54,7 @@ pub(crate) const ASPECT_LABELS: [(&str, &str); 8] = [
 ];
 
 /// How each node kind reads in summaries: singular, plural.
-pub(crate) const KIND_LABELS: [(&str, &str, &str); 23] = [
+pub(crate) const KIND_LABELS: [(&str, &str, &str); 22] = [
     (SETTINGS_KIND, "project settings", "project settings"),
     (
         CONNECTION_KIND,
@@ -81,7 +81,6 @@ pub(crate) const KIND_LABELS: [(&str, &str, &str); 23] = [
     ("python_hook", "Python hook", "Python hooks"),
     (MATERIALIZATION_KIND, "materialization", "materializations"),
     ("loader", "loader", "loaders"),
-    ("task", "task", "tasks"),
     ("asset", "asset", "assets"),
     ("check", "check", "checks"),
     (TEST_FILE_KIND, "test file", "test files"),

@@ -3010,7 +3010,7 @@ export interface components {
             state_database?: string | null;
             state_schema: string;
         };
-        /** @description Code that injects a provider: a node (`loader`, `task`, `asset`, `check`, `hook` or `materialization`, keyed `kind:name`), an `event_exporter` or a `sink`. */
+        /** @description Code that injects a provider: a node (`loader`, `asset`, `check`, `hook` or `materialization`, keyed `kind:name`), an `event_exporter` or a `sink`. */
         ProviderConsumer: {
             kind: string;
             name: string;
@@ -3703,7 +3703,7 @@ export interface components {
             index: number;
             /** @description The part as typed, such as `+tag:finanse`. */
             part: string;
-            /** @description `tag`, `path`, `job`, `source`, `seed`, `kind`, `test`, `name`, `glob`, or a Python node type such as `task`. */
+            /** @description `tag`, `path`, `job`, `source`, `seed`, `kind`, `test`, `name`, `glob`, or a Python node type such as `asset`. */
             type: string;
             /** @description The value the part names, without its type prefix or `+` markers, such as `finanse`. */
             value: string;

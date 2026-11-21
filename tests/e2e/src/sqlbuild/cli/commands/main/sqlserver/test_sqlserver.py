@@ -410,8 +410,8 @@ def test_given_sqlserver_dbt_profile_when_running_dbt_init_then_builds_profile_l
         SqlServerNodeResultE2ETestCase(
             description="direct node results persist and read on SQL Server",
             expected_rows=(
+                ("asset", "produce_result", "success"),
                 ("check", "check_produce_result", "success"),
-                ("task", "produce_result", "success"),
             ),
         )
     ],
@@ -433,8 +433,8 @@ def test_given_python_result_when_running_check_on_sqlserver_then_persists_node_
                 config=config,
             ),
             "python/tasks/results.py": (
-                "from sqlbuild.tasks import task\n\n"
-                "@task\n"
+                "from sqlbuild.assets import asset\n\n"
+                "@asset\n"
                 "def produce_result(ctx):\n"
                 "    '''Test task produce_result.'''\n    return ctx.result(payload={'value': 42}, metadata={'source': 'sqlserver'})\n"
             ),

@@ -164,8 +164,8 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             expected_code="P010",
             files={
                 "python/tasks/exports.py": (
-                    "from sqlbuild.tasks import TaskContext, task\n\n\n"
-                    "@task\ndef export_orders(ctx: TaskContext):\n    return None\n"
+                    "from sqlbuild.assets import AssetContext, asset\n\n\n"
+                    "@asset\ndef export_orders(ctx: AssetContext):\n    return None\n"
                 )
             },
         ),
@@ -174,8 +174,8 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             expected_code="P027",
             files={
                 "python/tasks/exports.py": (
-                    "from sqlbuild.tasks import TaskContext, task\n\n\n"
-                    "@task\ndef export_orders(ctx: TaskContext):\n"
+                    "from sqlbuild.assets import AssetContext, asset\n\n\n"
+                    "@asset\ndef export_orders(ctx: AssetContext):\n"
                     '    """'
                     + "\n\n    ".join(f"Orders paragraph {index}." for index in range(6))
                     + '"""\n    return None\n'

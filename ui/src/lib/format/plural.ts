@@ -23,7 +23,6 @@ export const NODE_NOUNS: Record<string, readonly [string, string]> = {
 	snapshot: ['snapshot', 'snapshots'],
 	loader: ['loader', 'loaders'],
 	asset: ['asset', 'assets'],
-	task: ['task', 'tasks'],
 	check: ['Python check', 'Python checks'],
 	python_check: ['Python check', 'Python checks'],
 	audit: ['audit', 'audits'],

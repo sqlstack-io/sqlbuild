@@ -223,11 +223,11 @@ def build_python_augmented_dagster_test_dag() -> Mapping[str, Any]:
     dag["nodes"] = [
         *dag["nodes"],
         {
-            "id": "task:prepare_orders",
-            "kind": "task",
+            "id": "asset:prepare_orders",
+            "kind": "asset",
             "name": "prepare_orders",
-            "asset_key": ["task", "prepare_orders"],
-            "path": "python/tasks/prepare_orders.py",
+            "asset_key": ["asset", "prepare_orders"],
+            "path": "python/assets/prepare_orders.py",
             "tags": ["daily"],
             "group": "python",
             "meta": {"owner": "data"},
@@ -255,8 +255,8 @@ def build_python_augmented_dagster_test_dag() -> Mapping[str, Any]:
     ]
     dag["edges"] = [
         *dag["edges"],
-        {"from_id": "model:orders", "to_id": "task:prepare_orders"},
-        {"from_id": "task:prepare_orders", "to_id": "asset:orders_export"},
+        {"from_id": "model:orders", "to_id": "asset:prepare_orders"},
+        {"from_id": "asset:prepare_orders", "to_id": "asset:orders_export"},
         {"from_id": "asset:orders_export", "to_id": "check:check_orders_export"},
     ]
     dag["checks"] = [

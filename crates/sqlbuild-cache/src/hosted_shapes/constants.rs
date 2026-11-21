@@ -1,7 +1,7 @@
 //! The Python shape names of the natively hosted compiler shapes.
 
 /// The Python model type a natively hosted compiler shape is captured as.
-pub const HOSTED_SHAPE_TYPES: [(&str, &str); 488] = [
+pub const HOSTED_SHAPE_TYPES: [(&str, &str); 486] = [
     (
         "sqlbuild._native:AlignedInterval",
         "sqlbuild.cursor_algebra.models:AlignedInterval",
@@ -579,10 +579,6 @@ pub const HOSTED_SHAPE_TYPES: [(&str, &str); 488] = [
         "sqlbuild.compiler.discovery.models:DiscoveredPythonNodeFunctions",
     ),
     (
-        "sqlbuild._native:DiscoveredPythonTaskMetadata",
-        "sqlbuild.compiler.python_nodes.models:DiscoveredPythonTaskMetadata",
-    ),
-    (
         "sqlbuild._native:DiscoveredRuntimeExtensions",
         "sqlbuild.compiler.discovery.models:DiscoveredRuntimeExtensions",
     ),
@@ -621,10 +617,6 @@ pub const HOSTED_SHAPE_TYPES: [(&str, &str); 488] = [
     (
         "sqlbuild._native:DiscoveredSqlTestFile",
         "sqlbuild.compiler.discovery.models:DiscoveredSqlTestFile",
-    ),
-    (
-        "sqlbuild._native:DiscoveredTaskFunction",
-        "sqlbuild.compiler.discovery.models:DiscoveredTaskFunction",
     ),
     (
         "sqlbuild._native:DiscoveryConflictError",

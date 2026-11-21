@@ -867,10 +867,10 @@ def _counting_python_node(*, decorator: str, name: str, ref: str, returned: str)
 
 
 def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
-    """Return a DuckDB project whose tasks and assets count managed, unmanaged, and model rows."""
+    """Return a DuckDB project whose assets count managed, unmanaged, and model rows."""
 
     task_nodes: str = "".join(
-        _counting_python_node(decorator="task", name=name, ref=ref, returned="None")
+        _counting_python_node(decorator="asset", name=name, ref=ref, returned="None")
         for name, ref in (
             ("count_customers", 'source("raw_customers")'),
             ("count_raw_orders", 'source("raw_orders")'),
@@ -907,7 +907,7 @@ def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
             "    return [{'customer_id': 99}]\n"
         ),
         "python/tasks/counts.py": (
-            "from sqlbuild.refs import model, source\nfrom sqlbuild.tasks import task\n\n\n"
+            "from sqlbuild.refs import model, source\nfrom sqlbuild.assets import asset\n\n\n"
             + task_nodes
         ),
         "python/assets/extracts.py": (
@@ -921,8 +921,8 @@ def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
         ),
         **duckshop_orchestration("python_node_jobs"),
         "python/tasks/reports.py": (
-            "from python.tasks.counts import count_orders\nfrom sqlbuild.tasks import task\n\n\n"
-            "@task(depends_on=count_orders)\n"
+            "from python.tasks.counts import count_orders\nfrom sqlbuild.assets import asset\n\n\n"
+            "@asset(depends_on=count_orders)\n"
             "def report_order_count(ctx):\n"
             "    '''Test task report_order_count.'''\n"
             "    upstream = ctx.result_of(node_function=count_orders)\n"
@@ -1574,8 +1574,8 @@ def ranking_task_files(body: str) -> dict[str, str]:
     return {
         "python/tasks/ranking.py": (
             "from sqlbuild.refs import model\n"
-            "from sqlbuild.tasks import task\n\n\n"
-            '@task(depends_on=model("orders"))\n'
+            "from sqlbuild.assets import asset\n\n\n"
+            '@asset(depends_on=model("orders"))\n'
             "def rank_orders(ctx):\n"
             '    """Rank the orders for the partner."""\n' + body
         ),

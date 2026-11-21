@@ -225,7 +225,7 @@ RELATION_EXISTS: Callable[..., bool] = DuckDbAdapter().relation_exists
                     ts=datetime(2026, 1, 15, 11, 0, 0),
                 ),
                 Fingerprint(
-                    node_type="task",
+                    node_type="asset",
                     node_name="orders",
                     target_database=None,
                     target_schema=None,
@@ -243,7 +243,7 @@ RELATION_EXISTS: Callable[..., bool] = DuckDbAdapter().relation_exists
             expected_latest_target_names={"orders": "orders"},
             expected_identity_definition_hashes={
                 ("model", "orders"): "model_hash_new",
-                ("task", "orders"): "task_hash_new",
+                ("asset", "orders"): "task_hash_new",
             },
         ),
     ],
@@ -725,7 +725,7 @@ def test_given_multiple_fingerprints_when_reading_then_resolves_latest(
                     ts=datetime(2026, 1, 15, 11, 0, 0),
                 ),
                 Fingerprint(
-                    node_type="task",
+                    node_type="asset",
                     node_name="orders",
                     target_database=None,
                     target_schema=None,
@@ -738,7 +738,7 @@ def test_given_multiple_fingerprints_when_reading_then_resolves_latest(
                     ts=datetime(2026, 1, 15, 9, 0, 0),
                 ),
                 Fingerprint(
-                    node_type="task",
+                    node_type="asset",
                     node_name="orders",
                     target_database=None,
                     target_schema=None,
@@ -751,7 +751,7 @@ def test_given_multiple_fingerprints_when_reading_then_resolves_latest(
                     ts=datetime(2026, 1, 15, 11, 0, 0),
                 ),
                 Fingerprint(
-                    node_type="task",
+                    node_type="asset",
                     node_name="orders",
                     target_database=None,
                     target_schema=None,
@@ -767,7 +767,7 @@ def test_given_multiple_fingerprints_when_reading_then_resolves_latest(
             expected_run_ids_by_identity={
                 ("model", "orders"): ("run_003", "run_002"),
                 ("model", "customers"): ("run_011", "run_010"),
-                ("task", "orders"): ("run_task_002", "run_task_001"),
+                ("asset", "orders"): ("run_task_002", "run_task_001"),
             },
             expected_latest_run_id="run_003",
         )

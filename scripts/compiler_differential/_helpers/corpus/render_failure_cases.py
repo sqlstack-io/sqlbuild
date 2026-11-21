@@ -508,8 +508,8 @@ def _reference_cases() -> tuple[FailureCase, ...]:
             expected_code="P008",
             files={
                 "python/tasks/exports.py": (
-                    "from sqlbuild.tasks import task\n\n\n"
-                    '@task\ndef export_orders(ctx):\n    """Export orders."""\n'
+                    "from sqlbuild.assets import asset\n\n\n"
+                    '@asset\ndef export_orders(ctx):\n    """Export orders."""\n'
                     '    return ctx.query("SELECT * FROM stg_orders")\n'
                 )
             },

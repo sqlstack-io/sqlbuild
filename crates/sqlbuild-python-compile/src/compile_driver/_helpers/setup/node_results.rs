@@ -14,12 +14,7 @@ use sqlbuild_python_base::boundary::main::optional_text::optional_text;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
 /// The discovered inputs' Python node functions, each kind of which keeps node results.
-const PYTHON_NODE_FIELDS: [&str; 4] = [
-    "loader_functions",
-    "task_functions",
-    "asset_functions",
-    "check_functions",
-];
+const PYTHON_NODE_FIELDS: [&str; 3] = ["loader_functions", "asset_functions", "check_functions"];
 
 /// Raise when a `preserve` target has Python nodes but no usable loader schema, after `effective_vars`, to keep their results in.
 pub(crate) fn require_node_results_schema(
@@ -68,7 +63,7 @@ fn resolved_loader_schema(
     }
 }
 
-/// How many loaders, tasks, assets and checks the project declares in Python.
+/// How many loaders, assets and checks the project declares in Python.
 pub(crate) fn python_node_count(discovered: &Bound<'_, PyAny>) -> PyResult<usize> {
     PYTHON_NODE_FIELDS
         .iter()

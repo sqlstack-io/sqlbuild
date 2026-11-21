@@ -8,7 +8,7 @@ import type { NodeKind } from './types/operate';
 type Wire = components['schemas'];
 
 /** Snapshot kinds that are graph nodes under their own name; models take theirs from the materialization. */
-const GRAPH_KINDS: ReadonlySet<string> = new Set<NodeKind>(['source', 'seed', 'asset', 'loader', 'task', 'udf', 'table_fn']);
+const GRAPH_KINDS: ReadonlySet<string> = new Set<NodeKind>(['source', 'seed', 'asset', 'loader', 'udf', 'table_fn']);
 
 /**
  * Every graph node kind is a catalog node: models, sources, seeds, Python nodes and functions.

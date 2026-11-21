@@ -18,7 +18,7 @@ pub enum DownstreamPolicy {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ReviewNode {
     pub name: String,
-    /// `model` or `seed`, or the Python node kind: `loader`, `task`, `asset` or `check`.
+    /// `model` or `seed`, or the Python node kind: `loader`, `asset` or `check`.
     pub kind: String,
     pub critical: bool,
     pub materialized: String,

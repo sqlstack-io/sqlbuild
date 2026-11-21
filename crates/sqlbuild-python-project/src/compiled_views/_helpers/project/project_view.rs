@@ -35,7 +35,7 @@ pub(crate) struct BoundaryInputs {
     pub(crate) compile_cache_dir: Py<PyAny>,
     /// Discovered loader functions, user callables.
     pub(crate) loader_functions: Py<PyAny>,
-    /// Task/asset/check source locations, without retaining additional Python callables.
+    /// Asset and check source locations, without retaining additional Python callables.
     pub(crate) python_execution_inputs: BTreeMap<String, (String, PathBuf)>,
     /// Discovered Python hooks, user callables.
     pub(crate) hook_functions: Py<PyAny>,

@@ -416,7 +416,7 @@ def test_given_sqlbuild_dag_when_building_specs_then_maps_assets_deps_and_checks
                 ("analytics", "normalize_email"),
                 ("analytics", "orders"),
                 ("analytics", "customers"),
-                ("task", "prepare_orders"),
+                ("asset", "prepare_orders"),
                 ("asset", "orders_export"),
             ),
             expected_check_names=(
@@ -427,9 +427,9 @@ def test_given_sqlbuild_dag_when_building_specs_then_maps_assets_deps_and_checks
                 "python_check__check_orders_export",
             ),
             expected_task_deps=(("analytics", "orders"),),
-            expected_asset_deps=(("task", "prepare_orders"),),
+            expected_asset_deps=(("asset", "prepare_orders"),),
             expected_python_kinds_by_asset_key=(
-                (("task", "prepare_orders"), frozenset({"sqlbuild", "task"})),
+                (("asset", "prepare_orders"), frozenset({"sqlbuild", "asset"})),
                 (("asset", "orders_export"), frozenset({"sqlbuild", "asset"})),
             ),
             expected_task_group="python",
@@ -455,7 +455,7 @@ def test_given_python_augmented_dag_when_building_specs_then_maps_python_nodes(
         tuple(spec.key.path): (spec,) for spec in asset_specs
     }
     assert len(specs_by_key) == len(asset_specs)
-    task_spec: Any = next(iter(specs_by_key.get(("task", "prepare_orders"), ())))
+    task_spec: Any = next(iter(specs_by_key.get(("asset", "prepare_orders"), ())))
     python_asset_spec: Any = next(iter(specs_by_key.get(("asset", "orders_export"), ())))
 
     assert tuple(tuple(spec.key.path) for spec in asset_specs) == test_case.expected_asset_keys

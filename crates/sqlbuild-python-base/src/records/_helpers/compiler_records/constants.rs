@@ -503,11 +503,6 @@ const R_DISCOVERED_PYTHON_LOADER_METADATA: RecordSpec = RecordSpec {
         FieldSpec::new("contract", FieldDefault::None),
     ],
 };
-const R_DISCOVERED_PYTHON_TASK_METADATA: RecordSpec = RecordSpec {
-    name: "DiscoveredPythonTaskMetadata",
-    doc: "Task-specific metadata carried by an internal Python task node.",
-    fields: &[FieldSpec::new("retry", FieldDefault::None)],
-};
 const R_DISCOVERED_PYTHON_ASSET_METADATA: RecordSpec = RecordSpec {
     name: "DiscoveredPythonAssetMetadata",
     doc: "Asset-specific metadata carried by an internal Python asset node.",
@@ -794,7 +789,6 @@ const R_DISCOVERED_PYTHON_NODE: RecordSpec = RecordSpec {
         FieldSpec::new("meta", FieldDefault::None),
         FieldSpec::new("provider_usages", FieldDefault::EmptyTuple),
         FieldSpec::new("loader", FieldDefault::None),
-        FieldSpec::new("task", FieldDefault::None),
         FieldSpec::new("asset", FieldDefault::None),
         FieldSpec::new("check", FieldDefault::None),
         FieldSpec::new("identity", FieldDefault::None),
@@ -927,7 +921,6 @@ pub(crate) const COMPILER_RECORDS: &[RecordSpec] = &[
     R_CLONE_PIPELINE_CONNECTION,
     R_CLONE_PIPELINE_RESULT,
     R_DISCOVERED_PYTHON_LOADER_METADATA,
-    R_DISCOVERED_PYTHON_TASK_METADATA,
     R_DISCOVERED_PYTHON_ASSET_METADATA,
     R_DISCOVERED_PYTHON_CHECK_METADATA,
     R_PYTHON_NODE_DEPENDENCY_EDGE,

@@ -6,7 +6,7 @@ use crate::assembly::project::types::ObjectKey;
 use crate::python_plan::_helpers::lifecycle::gate_frontier::gate_frontier;
 use crate::python_plan::main::upstream_closure::upstream_closure;
 use crate::python_plan::models::{LifecycleNode, RoundTripLoader, RunLifecycle};
-use crate::python_selection::constants::{ASSET_KIND, LOADER_KIND, TASK_KIND};
+use crate::python_selection::constants::{ASSET_KIND, LOADER_KIND};
 
 /// Ingress is each selected loader whose selected upstream reads no SQL, with that upstream; the rest load after the SQL.
 #[must_use]
@@ -16,7 +16,7 @@ pub fn run_lifecycle(
     upstream: &HashMap<String, Vec<String>>,
 ) -> RunLifecycle {
     let kind = |name: &str| nodes.get(name).map_or("", |node| node.kind.as_str());
-    let runs = |name: &str| [TASK_KIND, ASSET_KIND].contains(&kind(name));
+    let runs = |name: &str| kind(name) == ASSET_KIND;
     let mut ingress_loaders: BTreeSet<String> = BTreeSet::new();
     let mut round_trip_loaders: Vec<RoundTripLoader> = Vec::new();
     for loader in selected.iter().filter(|name| kind(name) == LOADER_KIND) {
@@ -45,9 +45,7 @@ pub fn run_lifecycle(
     let mut ingress: BTreeSet<String> = ingress_loaders.clone();
     for loader in &ingress_loaders {
         for name in upstream_closure(loader, upstream) {
-            if selected.contains(&name)
-                && [TASK_KIND, ASSET_KIND, LOADER_KIND].contains(&kind(&name))
-            {
+            if selected.contains(&name) && [ASSET_KIND, LOADER_KIND].contains(&kind(&name)) {
                 ingress.insert(name);
             }
         }

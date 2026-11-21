@@ -14,9 +14,8 @@ use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 
 /// The discovered Python declarations whose files a refactoring searches.
-const PYTHON_DECLARATIONS: [&str; 8] = [
+const PYTHON_DECLARATIONS: [&str; 7] = [
     "loader_functions",
-    "task_functions",
     "asset_functions",
     "check_functions",
     "hook_functions",

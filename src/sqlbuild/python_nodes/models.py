@@ -137,19 +137,6 @@ class HookDefinition:
 
 
 @dataclass(frozen=True)
-class TaskDefinition:
-    """Metadata attached to a decorated SQLBuild task function."""
-
-    name: str
-    depends_on: tuple[Callable[..., object] | SqlResourceRef | NodeSetRef, ...] = ()
-    tags: tuple[str, ...] = ()
-    group: str | None = None
-    description: str | None = None
-    meta: dict[str, object] | None = None
-    retry: RetryPolicy | None = None
-
-
-@dataclass(frozen=True)
 class AssetDefinition:
     """Metadata attached to a decorated SQLBuild asset function."""
 

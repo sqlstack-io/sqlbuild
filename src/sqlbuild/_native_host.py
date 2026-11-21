@@ -276,10 +276,6 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "sqlbuild.python_nodes.main.read_loader_definition",
         "read_loader_definition",
     ),
-    "read_task_definition": (
-        "sqlbuild.python_nodes.main.read_task_definition",
-        "read_task_definition",
-    ),
     "AuditCase": ("sqlbuild.python_nodes.models", "AuditCase"),
     "RELATION_RENDERER": ("sqlbuild.python_nodes.models", "RELATION_RENDERER"),
     "SqlResourceRef": ("sqlbuild.python_nodes.models", "SqlResourceRef"),

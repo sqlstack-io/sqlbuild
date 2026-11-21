@@ -28,7 +28,7 @@ pub fn discover_python_node_functions<'py>(
         None => PyDict::new(py),
     };
     let mut buckets = Buckets {
-        nodes: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
+        nodes: [Vec::new(), Vec::new(), Vec::new()],
         audit_factories: Vec::new(),
     };
     let node_root: Bound<'py, PyAny> = project.child(PYTHON_NODE_ROOT)?;
@@ -48,13 +48,12 @@ pub fn discover_python_node_functions<'py>(
         )?;
         discovered_nodes?;
     }
-    let [loaders, tasks, assets, checks] = buckets.nodes;
+    let [loaders, assets, checks] = buckets.nodes;
     discovered(
         py,
         RecordId::DiscoveredPythonNodeFunctions,
         &[
             ("loaders", tuple_of(py, loaders)?),
-            ("tasks", tuple_of(py, tasks)?),
             ("assets", tuple_of(py, assets)?),
             ("checks", tuple_of(py, checks)?),
             (

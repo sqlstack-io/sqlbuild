@@ -10,5 +10,5 @@ sqb build --select +fact_orders --select +orders_export
 sqb check --select check_orders_export
 ```
 
-The project includes a task feeding a loader, a model feeding Python assets through
+The project includes an asset feeding a loader, a model feeding Python assets through
 `ctx.relation(model(...))`, soft skip fan-in, `materialized=False`, and a Python check.

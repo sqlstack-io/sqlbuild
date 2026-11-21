@@ -644,7 +644,7 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
             python_plan_entries=(
                 PythonPlanEntry(
                     name="prepare_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.PRE_SQL_INGRESS,
                 ),
                 PythonPlanEntry(
@@ -654,7 +654,7 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
                 ),
                 PythonPlanEntry(
                     name="profile_fact_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.READ_SIDE,
                 ),
             ),
@@ -662,7 +662,6 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
                 "Plan ready  1 selected, 1 source to load, 3 Python nodes",
                 "Python ingress (2)",
                 "prepare_orders",
-                "task",
                 "publish_orders",
                 "asset",
                 "Python read-side (1)",
@@ -681,7 +680,7 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
             python_plan_entries=(
                 PythonPlanEntry(
                     name="prepare_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.PRE_SQL_INGRESS,
                     identity_status=PythonIdentityStatus.CHANGED,
                     previous_definition_json=json.dumps(
@@ -723,7 +722,7 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
             expected_fragments=(
                 "Python ingress (1)",
                 "prepare_orders",
-                "task (changed)",
+                "asset (changed)",
                 "python diff:",
                 "source diff:",
                 "dependency diff:",
@@ -1164,7 +1163,7 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
             python_plan_entries=(
                 PythonPlanEntry(
                     name="publish_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.READ_SIDE,
                     provider_usages=(build_discovered_provider_usage(),),
                 ),
@@ -1194,7 +1193,7 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
             python_plan_entries=(
                 PythonPlanEntry(
                     name="publish_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.READ_SIDE,
                     provider_usages=(build_discovered_provider_usage(),),
                 ),
@@ -1202,9 +1201,9 @@ from tests.unit.src.sqlbuild.cli.output.main.plan.helpers import (
             expected_fragments=(
                 "Providers",
                 "\u2514\u2500\u2500 marker_provider",
+                "    ├── asset publish_orders (MarkerProvider)",
                 "    ├── hook mark_pre (MarkerProvider)",
-                "    ├── loader raw_orders (MarkerProvider)",
-                "    └── task publish_orders (MarkerProvider)",
+                "    └── loader raw_orders (MarkerProvider)",
             ),
             unexpected_fragments=("used by 3 selected Python surfaces", "parameter"),
         ),
@@ -1435,7 +1434,7 @@ def test_given_plan_output_when_formatting_then_contains_expected_fragments(
             python_plan_entries=(
                 PythonPlanEntry(
                     name="prepare_orders",
-                    kind=PythonNodeKind.TASK,
+                    kind=PythonNodeKind.ASSET,
                     phase=PythonRunPhase.PRE_SQL_INGRESS,
                     identity_status=PythonIdentityStatus.CHANGED,
                     previous_metadata_json=json.dumps(

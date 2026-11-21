@@ -53,7 +53,9 @@ def test_given_mixed_lifecycle_nodes_when_running_scheduler_then_runs_in_topolog
             name="load_orders", kind="loader", upstream_names=("summarize_pages",)
         ),
         LifecycleExecutionNode(name="load_pages", kind="loader"),
-        LifecycleExecutionNode(name="summarize_pages", kind="task", upstream_names=("load_pages",)),
+        LifecycleExecutionNode(
+            name="summarize_pages", kind="asset", upstream_names=("load_pages",)
+        ),
     )
 
     result: LifecycleSchedulerResult = run_lifecycle_scheduler(
@@ -93,7 +95,9 @@ def test_given_failed_lifecycle_node_when_running_scheduler_then_skips_downstrea
     calls: list[str] = []
     nodes: tuple[LifecycleExecutionNode, ...] = (
         LifecycleExecutionNode(name="load_pages", kind="loader"),
-        LifecycleExecutionNode(name="summarize_pages", kind="task", upstream_names=("load_pages",)),
+        LifecycleExecutionNode(
+            name="summarize_pages", kind="asset", upstream_names=("load_pages",)
+        ),
         LifecycleExecutionNode(
             name="load_orders", kind="loader", upstream_names=("summarize_pages",)
         ),
@@ -136,9 +140,9 @@ def test_given_soft_skip_and_successful_sibling_when_running_scheduler_then_runs
 ) -> None:
     calls: list[str] = []
     nodes: tuple[LifecycleExecutionNode, ...] = (
-        LifecycleExecutionNode(name="A", kind="task"),
-        LifecycleExecutionNode(name="X", kind="task"),
-        LifecycleExecutionNode(name="C", kind="task", upstream_names=("A", "X")),
+        LifecycleExecutionNode(name="A", kind="asset"),
+        LifecycleExecutionNode(name="X", kind="asset"),
+        LifecycleExecutionNode(name="C", kind="asset", upstream_names=("A", "X")),
     )
 
     result: LifecycleSchedulerResult = run_lifecycle_scheduler(
@@ -176,9 +180,9 @@ def test_given_all_upstreams_soft_skipped_when_running_scheduler_then_soft_skips
 ) -> None:
     calls: list[str] = []
     nodes: tuple[LifecycleExecutionNode, ...] = (
-        LifecycleExecutionNode(name="A", kind="task"),
-        LifecycleExecutionNode(name="B", kind="task"),
-        LifecycleExecutionNode(name="C", kind="task", upstream_names=("A", "B")),
+        LifecycleExecutionNode(name="A", kind="asset"),
+        LifecycleExecutionNode(name="B", kind="asset"),
+        LifecycleExecutionNode(name="C", kind="asset", upstream_names=("A", "B")),
     )
 
     def handler(node: LifecycleExecutionNode) -> LifecycleNodeResult:
@@ -217,9 +221,9 @@ def test_given_hard_skip_and_successful_sibling_when_running_scheduler_then_skip
 ) -> None:
     calls: list[str] = []
     nodes: tuple[LifecycleExecutionNode, ...] = (
-        LifecycleExecutionNode(name="A", kind="task"),
-        LifecycleExecutionNode(name="X", kind="task"),
-        LifecycleExecutionNode(name="C", kind="task", upstream_names=("A", "X")),
+        LifecycleExecutionNode(name="A", kind="asset"),
+        LifecycleExecutionNode(name="X", kind="asset"),
+        LifecycleExecutionNode(name="C", kind="asset", upstream_names=("A", "X")),
     )
 
     result: LifecycleSchedulerResult = run_lifecycle_scheduler(
@@ -249,7 +253,7 @@ def test_given_unknown_dependency_when_running_scheduler_then_raises_input_error
     test_case: LifecycleSchedulerErrorTestCase,
 ) -> None:
     nodes: tuple[LifecycleExecutionNode, ...] = (
-        LifecycleExecutionNode(name="summarize_pages", kind="task", upstream_names=("missing",)),
+        LifecycleExecutionNode(name="summarize_pages", kind="asset", upstream_names=("missing",)),
     )
 
     with pytest.raises(ExecutorInputError) as exc_info:

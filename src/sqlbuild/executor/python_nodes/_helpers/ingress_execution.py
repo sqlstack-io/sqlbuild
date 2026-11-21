@@ -13,7 +13,6 @@ from sqlbuild._native import (
     DiscoveredAssetFunction,
     DiscoveredLoaderFunction,
     DiscoveredPythonNode,
-    DiscoveredTaskFunction,
     PythonNodeGraph,
     PythonSqlRunLifecyclePlan,
     SourceEntry,
@@ -68,7 +67,7 @@ def execute_ingress_python_loader_nodes(
     runtime: PythonNodeRuntime,
     callbacks: IngressCallbacks | None = None,
 ) -> PythonIngressLoaderExecutorResult:
-    """Execute Python ingress task/asset/loader nodes in lifecycle topological order."""
+    """Execute Python ingress asset and loader nodes in lifecycle topological order."""
 
     resolved_callbacks: IngressCallbacks = IngressCallbacks() if callbacks is None else callbacks
     run_state: PythonNodeRunState = PythonNodeRunState()
@@ -417,22 +416,7 @@ def _record_scheduler_skips(
 
 
 def _to_executable_python_node(node: DiscoveredPythonNode) -> ExecutablePythonNode:
-    if node.kind == PythonNodeKind.ASSET:
-        return DiscoveredAssetFunction(
-            file_path=node.file_path,
-            relative_path=node.relative_path,
-            name=node.name,
-            function=node.function,
-            depends_on=node.depends_on,
-            tags=node.tags,
-            group=node.group,
-            description=node.description,
-            meta=node.meta,
-            columns=node.asset.columns if node.asset is not None else (),
-            column_lineage=node.asset.column_lineage if node.asset is not None else None,
-            retry=node.asset.retry if node.asset is not None else None,
-        )
-    return DiscoveredTaskFunction(
+    return DiscoveredAssetFunction(
         file_path=node.file_path,
         relative_path=node.relative_path,
         name=node.name,
@@ -442,7 +426,9 @@ def _to_executable_python_node(node: DiscoveredPythonNode) -> ExecutablePythonNo
         group=node.group,
         description=node.description,
         meta=node.meta,
-        retry=node.task.retry if node.task is not None else None,
+        columns=node.asset.columns if node.asset is not None else (),
+        column_lineage=node.asset.column_lineage if node.asset is not None else None,
+        retry=node.asset.retry if node.asset is not None else None,
     )
 
 

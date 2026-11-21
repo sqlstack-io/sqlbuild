@@ -1,8 +1,8 @@
+from sqlbuild.assets import asset
 from sqlbuild.refs import model
-from sqlbuild.tasks import task
 
 
-@task(depends_on=model("orders"))
+@asset(depends_on=model("orders"))
 def score_orders(ctx):
     """Send the orders to the partner and keep the scores it returns."""
     relation = ctx.relation(model("orders"))

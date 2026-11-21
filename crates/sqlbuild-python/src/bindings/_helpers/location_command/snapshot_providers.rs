@@ -25,9 +25,8 @@ enum RunsIn {
 }
 
 /// Discovered collections whose items inject providers, the kind each is published as, and where it runs.
-const CONSUMERS: [(&str, &str, RunsIn); 8] = [
+const CONSUMERS: [(&str, &str, RunsIn); 7] = [
     ("loader", "loader_functions", RunsIn::SourceLoader),
-    ("task", "task_functions", RunsIn::Itself),
     ("asset", "asset_functions", RunsIn::Itself),
     ("check", "check_functions", RunsIn::Itself),
     ("hook", "hook_functions", RunsIn::ModelHooks),

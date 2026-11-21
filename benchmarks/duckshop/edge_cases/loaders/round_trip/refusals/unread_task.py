@@ -1,7 +1,7 @@
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task()
+@asset()
 def score_orders(ctx):
     """Fetch the partner scores."""
     return ctx.result(payload={})

@@ -128,11 +128,11 @@ def export_task_module() -> str:
     return dedent(
         """
         from sqlbuild.refs import model
-        from sqlbuild.tasks import TaskContext, task
+        from sqlbuild.assets import AssetContext, asset
 
 
-        @task(depends_on=model("order_totals"))
-        def export_totals(ctx: TaskContext):
+        @asset(depends_on=model("order_totals"))
+        def export_totals(ctx: AssetContext):
             \"\"\"Export order totals.\"\"\"
             return ctx.result(metadata={"rows": 0})
         """

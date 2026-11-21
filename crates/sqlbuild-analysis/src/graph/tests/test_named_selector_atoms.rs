@@ -16,9 +16,9 @@ fn given_a_selection_when_listing_named_atoms_then_only_single_node_names_count(
         },
         NamedAtomsTestCase {
             description: "typed names count",
-            selection: "task:refund_review source:raw_orders seed:countries test:orders_unique",
+            selection: "asset:refund_review source:raw_orders seed:countries test:orders_unique",
             expected_atoms: &[
-                "task:refund_review",
+                "asset:refund_review",
                 "source:raw_orders",
                 "seed:countries",
                 "test:orders_unique",
@@ -31,7 +31,7 @@ fn given_a_selection_when_listing_named_atoms_then_only_single_node_names_count(
         },
         NamedAtomsTestCase {
             description: "kinds do not count",
-            selection: "kind:model kind:task",
+            selection: "kind:model kind:asset",
             expected_atoms: &[],
         },
         NamedAtomsTestCase {
@@ -46,7 +46,7 @@ fn given_a_selection_when_listing_named_atoms_then_only_single_node_names_count(
         },
         NamedAtomsTestCase {
             description: "globs do not count",
-            selection: "fct_orders_* task:refund_? fct_[ab]",
+            selection: "fct_orders_* asset:refund_? fct_[ab]",
             expected_atoms: &[],
         },
         NamedAtomsTestCase {

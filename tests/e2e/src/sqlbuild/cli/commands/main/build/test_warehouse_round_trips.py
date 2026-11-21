@@ -42,7 +42,7 @@ _ORDERS_WITH_A_THIRD: str = (
             expected_exit_code=0,
             expected_output_order=(
                 "table     orders               OK",
-                "task      score_orders OK",
+                "asset     score_orders OK",
                 "source    partner_scores       OK",
                 "table     scored_orders        OK",
             ),
@@ -79,11 +79,11 @@ def test_given_a_warehouse_round_trip_when_building_then_the_loader_runs_between
             expected_exit_code=1,
             expected_output_order=(
                 "table     orders               OK",
-                "task      score_orders FAIL",
+                "asset     score_orders FAIL",
                 "source    partner_scores       SKIP",
                 "table     scored_orders        SKIP",
             ),
-            expected_output_fragments=("hard skip: Upstream task 'score_orders' failed",),
+            expected_output_fragments=("hard skip: Upstream asset 'score_orders' failed",),
             expected_scored_rows=None,
             expected_scored_table_exists=False,
         ),
@@ -94,7 +94,7 @@ def test_given_a_warehouse_round_trip_when_building_then_the_loader_runs_between
             expected_exit_code=1,
             expected_output_order=(),
             expected_output_fragments=(
-                "loader 'partner_scores' depends on task 'score_orders', which reads SQL",
+                "loader 'partner_scores' depends on asset 'score_orders', which reads SQL",
                 "set `allow_warehouse_round_trips = true` under [settings]",
             ),
             expected_scored_rows=None,
@@ -125,7 +125,7 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
                 "SELECT 1 AS order_id UNION ALL SELECT 2 UNION ALL SELECT 3\n"
             ),
             expected_output_fragments=(
-                "task      score_orders OK",
+                "asset     score_orders OK",
                 "source    partner_scores       OK",
                 "table     scored_orders        OK",
             ),
@@ -138,7 +138,7 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
                 "SELECT 1 AS order_id UNION ALL SELECT 2 AS order_id\n"
             ),
             expected_output_fragments=(
-                "soft skip: Upstream task 'score_orders' did not run; the SQL it reads was not "
+                "soft skip: Upstream asset 'score_orders' did not run; the SQL it reads was not "
                 "rebuilt",
                 "Completed successfully",
             ),
@@ -151,8 +151,8 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
                 "SELECT 1 AS order_id UNION ALL SELECT 2 UNION ALL SELECT 3\n"
             ),
             expected_output_fragments=(
-                "soft skip: Upstream task 'score_orders' did not run; --no-python skips "
-                "read-side tasks and assets",
+                "soft skip: Upstream asset 'score_orders' did not run; --no-python skips "
+                "read-side assets",
                 "Completed successfully",
             ),
             expected_scored_rows=((1, 10), (2, 20)),
@@ -166,7 +166,7 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
             ),
             extra_files=scoring_task_files('    return ctx.skip(reason="partner offline")\n'),
             expected_output_fragments=(
-                "soft skip: Upstream task 'score_orders' was skipped",
+                "soft skip: Upstream asset 'score_orders' was skipped",
                 "table     scored_orders        OK",
                 "Completed successfully",
             ),
@@ -182,7 +182,7 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
                 '    return ctx.skip(reason="partner offline", mode="hard")\n'
             ),
             expected_output_fragments=(
-                "hard skip: Upstream task 'score_orders' was skipped",
+                "hard skip: Upstream asset 'score_orders' was skipped",
                 "table     scored_orders        SKIP",
             ),
             expected_scored_rows=((1, 10), (2, 20)),
@@ -195,7 +195,7 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
                 **ranking_task_files('    return ctx.result(payload={"ranked": True})\n'),
             },
             expected_output_fragments=(
-                "task      rank_orders OK",
+                "asset     rank_orders OK",
                 "source    partner_scores       OK",
                 "table     scored_orders        OK",
             ),
@@ -210,7 +210,7 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
             },
             expected_output_fragments=(
                 "partner_scores       SKIP",
-                "soft skip: Upstream task '",
+                "soft skip: Upstream asset '",
                 "table     scored_orders        OK",
             ),
             expected_scored_rows=((1, 10), (2, 20)),
@@ -225,7 +225,7 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
                 **ranking_task_files('    return ctx.result(payload={"ranked": True})\n'),
             },
             expected_output_fragments=(
-                "hard skip: Upstream task 'score_orders' was skipped",
+                "hard skip: Upstream asset 'score_orders' was skipped",
                 "table     scored_orders        SKIP",
             ),
             expected_scored_rows=((1, 10), (2, 20)),
@@ -241,7 +241,7 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
                 },
             ),
             expected_output_fragments=(
-                "soft skip: Upstream task 'package_scores'",
+                "soft skip: Upstream asset 'package_scores'",
                 "table     scored_orders        OK",
                 "Completed successfully",
             ),
@@ -260,8 +260,8 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
                 },
             ),
             expected_output_fragments=(
-                "soft skip: Upstream task 'score_orders' did not run; --no-python skips "
-                "read-side tasks and assets",
+                "soft skip: Upstream asset 'score_orders' did not run; --no-python skips "
+                "read-side assets",
                 "Completed successfully",
             ),
             expected_scored_rows=((1, 10), (2, 20)),

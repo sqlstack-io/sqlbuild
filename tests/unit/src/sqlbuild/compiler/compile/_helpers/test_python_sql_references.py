@@ -75,7 +75,7 @@ _RAW_SOURCES: dict[str, str] = {
             },
             expected_error_fragments=(
                 "[P008]",
-                "task:export_orders names model:customers as 'customers' in SQL passed to "
+                "asset:export_orders names model:customers as 'customers' in SQL passed to "
                 "ctx.query()",
                 "python/tasks/export.py:7",
                 'depends_on=model("customers")',
@@ -103,11 +103,11 @@ _RAW_SOURCES: dict[str, str] = {
             expected_error_fragments=(
                 "[P008] check:orders_present names model:customers as 'customers' in SQL passed "
                 "to ctx.query() --> python/checks/orders.py:7",
-                "[P008] task:export_orders names model:customers as 'customers' in SQL passed to "
+                "[P008] asset:export_orders names model:customers as 'customers' in SQL passed to "
                 "ctx.query() --> python/tasks/export.py:7",
-                "[P008] task:export_orders names model:customers as 'customers' in SQL passed to "
+                "[P008] asset:export_orders names model:customers as 'customers' in SQL passed to "
                 "ctx.query() --> python/tasks/export.py:8",
-                "[P008] task:export_orders names model:orders as 'orders' in SQL passed to "
+                "[P008] asset:export_orders names model:orders as 'orders' in SQL passed to "
                 "ctx.query() --> python/tasks/export.py:8",
             ),
         ),
@@ -121,7 +121,7 @@ _RAW_SOURCES: dict[str, str] = {
                 ),
             },
             expected_error_fragments=(
-                "[P008] task:export_orders names model:customers as 'customers' in SQL passed to "
+                "[P008] asset:export_orders names model:customers as 'customers' in SQL passed to "
                 "ctx.query() --> python/tasks/export.py:7",
             ),
         ),
@@ -148,7 +148,7 @@ _RAW_SOURCES: dict[str, str] = {
                 ),
             },
             expected_error_fragments=(
-                "[P008] task:export_orders names model:customers as 'customers' in SQL passed to "
+                "[P008] asset:export_orders names model:customers as 'customers' in SQL passed to "
                 "ctx.query()",
             ),
         ),
@@ -163,7 +163,7 @@ _RAW_SOURCES: dict[str, str] = {
                 ),
             },
             expected_error_fragments=(
-                "task:export_orders names seed:country_codes",
+                "asset:export_orders names seed:country_codes",
                 'declare it with depends_on=seed("country_codes") and use '
                 'ctx.relation(seed("country_codes"))',
             ),
@@ -226,7 +226,7 @@ _RAW_SOURCES: dict[str, str] = {
             expected_error_fragments=(
                 "loader:raw_customers names model:customers as 'customers'",
                 "loaders run before models and seeds and cannot read them; read model:customers "
-                "from a task or asset instead",
+                "from an asset instead",
             ),
         ),
         PythonSqlReferenceErrorTestCase(

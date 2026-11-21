@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 import logging
 from datetime import datetime
 
@@ -12,6 +11,7 @@ from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecord
 from sqlbuild.adapter.contract.models import LifeCycleEvent
 from sqlbuild.assets import AssetContext
 from sqlbuild.assets import SkipMode as AssetSkipMode
+from sqlbuild.assets import SkipMode as TaskSkipMode
 from sqlbuild.compiler.python_nodes.types import PythonNodeKind, PythonNodeStatus, SkipMode
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.node_results.models import NodeResultEnvelope
@@ -21,8 +21,6 @@ from sqlbuild.executor.python_nodes.models import (
 )
 from sqlbuild.python_nodes.models import SqlResourceRef
 from sqlbuild.refs import model, source
-from sqlbuild.tasks import SkipMode as TaskSkipMode
-from sqlbuild.tasks import TaskContext
 from tests.unit.src.sqlbuild.executor.python_nodes._helpers._test_types import (
     PublicSkipModeExportTestCase,
     PythonNodeContextHelperTestCase,
@@ -35,7 +33,6 @@ from tests.unit.src.sqlbuild.executor.python_nodes._helpers.helpers import (
     assert_base_context_fields,
     build_asset_context,
     build_task_context,
-    loader_only_attribute_names,
     skipped_upstream_task,
     upstream_task,
 )
@@ -71,7 +68,7 @@ def test_given_task_context_when_using_helpers_then_records_and_qualifies_names(
 ) -> None:
     adapter: PythonNodeContextTestAdapter = PythonNodeContextTestAdapter()
     statement_recorder: StatementRecorder = StatementRecorder()
-    context: TaskContext = build_task_context(
+    context: AssetContext = build_task_context(
         adapter=adapter,
         statement_recorder=statement_recorder,
         logger_name=test_case.expected_logger_name,
@@ -195,7 +192,7 @@ def test_given_public_task_and_asset_modules_when_importing_skip_mode_then_expor
 def test_given_context_skip_when_mode_is_string_then_normalizes_to_skip_mode(
     test_case: PythonNodeSkipModeInputTestCase,
 ) -> None:
-    context: TaskContext = build_task_context(
+    context: AssetContext = build_task_context(
         adapter=PythonNodeContextTestAdapter(),
         statement_recorder=StatementRecorder(),
         logger_name="sqlbuild.task.fetch_orders",
@@ -204,59 +201,6 @@ def test_given_context_skip_when_mode_is_string_then_normalizes_to_skip_mode(
     skip_result: PythonNodeSkipResult = context.skip(reason="optional", mode=test_case.raw_mode)
 
     assert skip_result.mode is test_case.expected_mode
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        PythonNodeContextHelperTestCase(
-            description="task context result omits materialized flag and loader-only fields",
-            raw_name="scratch_orders",
-            database=None,
-            schema=None,
-            expected_qualified_name="default_db.default_schema.scratch_orders",
-            expected_execute_result="payload",
-            expected_query_result="ignored",
-            expected_recorded_events=(),
-            expected_logger_name="sqlbuild.task.fetch_orders",
-            expected_run_id="test_run",
-            expected_target="dev",
-            expected_vars={"batch": "hourly"},
-            expected_error_fragment="materialized",
-        )
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_task_context_when_inspecting_api_then_loader_only_fields_are_absent(
-    test_case: PythonNodeContextHelperTestCase,
-) -> None:
-    adapter: PythonNodeContextTestAdapter = PythonNodeContextTestAdapter()
-    context: TaskContext = build_task_context(
-        adapter=adapter,
-        statement_recorder=StatementRecorder(),
-        logger_name=test_case.expected_logger_name,
-    )
-
-    result: PythonNodeResult = context.result(
-        payload=test_case.expected_execute_result,
-        metadata={"source": "api"},
-    )
-
-    assert result == PythonNodeResult(
-        payload=test_case.expected_execute_result,
-        metadata={"source": "api"},
-        materialized=None,
-    )
-    assert test_case.expected_error_fragment not in inspect.signature(context.result).parameters
-    assert context.qualify_name(name=test_case.raw_name) == test_case.expected_qualified_name
-    assert not hasattr(context, loader_only_attribute_names()[0])
-    assert not hasattr(context, loader_only_attribute_names()[1])
-    assert not hasattr(context, loader_only_attribute_names()[2])
-    assert not hasattr(context, loader_only_attribute_names()[3])
-    assert not hasattr(context, loader_only_attribute_names()[4])
-    assert not hasattr(context, loader_only_attribute_names()[5])
-    assert not hasattr(context, loader_only_attribute_names()[6])
-    assert not hasattr(context, loader_only_attribute_names()[7])
 
 
 @pytest.mark.parametrize(
@@ -285,7 +229,7 @@ def test_given_task_context_when_resolving_sql_relations_then_validates_declared
 ) -> None:
     model_ref: SqlResourceRef = model(test_case.raw_name)
     source_ref: SqlResourceRef = source("orders")
-    context: TaskContext = TaskContext(
+    context: AssetContext = AssetContext(
         adapter=PythonNodeContextTestAdapter(),
         connection_config={"warehouse": "dev"},
         connection=object(),
@@ -326,7 +270,7 @@ def test_given_context_with_result_store_when_reading_upstream_outputs_then_retu
     test_case: PythonNodeRunStateTestCase,
 ) -> None:
     expected_result: NodeResultEnvelope = NodeResultEnvelope(
-        node_type=PythonNodeKind.TASK.value,
+        node_type=PythonNodeKind.ASSET.value,
         node_name="upstream_task",
         run_id="test_run",
         status=PythonNodeStatus.SUCCESS.value,
@@ -341,7 +285,7 @@ def test_given_context_with_result_store_when_reading_upstream_outputs_then_retu
         statement_recorder=StatementRecorder(),
         logger_name="sqlbuild.asset.export_customers",
         result_store=PythonNodeContextTestResultStore(
-            {(PythonNodeKind.TASK.value, "upstream_task"): (expected_result,)}
+            {(PythonNodeKind.ASSET.value, "upstream_task"): (expected_result,)}
         ),
     )
 
@@ -370,7 +314,7 @@ def test_given_context_with_result_store_when_reading_upstream_outputs_then_retu
 def test_given_context_without_result_store_when_reading_result_then_raises_or_returns_default(
     test_case: PythonNodeRunStateTestCase,
 ) -> None:
-    context: TaskContext = build_task_context(
+    context: AssetContext = build_task_context(
         adapter=PythonNodeContextTestAdapter(),
         statement_recorder=StatementRecorder(),
         logger_name="sqlbuild.task.fetch_orders",

@@ -317,7 +317,7 @@ def test_given_python_check_when_executing_then_returns_expected_result(
     run_state: PythonNodeRunState = PythonNodeRunState()
     upstream_result: PythonNodeExecutionResult = PythonNodeExecutionResult(
         node_name="upstream_task",
-        kind=PythonNodeKind.TASK,
+        kind=PythonNodeKind.ASSET,
         status=test_case.upstream_status,
         payload={"rows": 3},
         metadata={"rows": 3},
@@ -327,9 +327,9 @@ def test_given_python_check_when_executing_then_returns_expected_result(
     run_state.record_result(node_function=check_upstream_task, result=upstream_result)
     result_store: PythonNodeContextTestResultStore = PythonNodeContextTestResultStore(
         {
-            (PythonNodeKind.TASK.value, "upstream_task"): (
+            (PythonNodeKind.ASSET.value, "upstream_task"): (
                 NodeResultEnvelope(
-                    node_type=PythonNodeKind.TASK.value,
+                    node_type=PythonNodeKind.ASSET.value,
                     node_name="upstream_task",
                     run_id="run_1",
                     status=test_case.upstream_status.value,
@@ -410,7 +410,7 @@ def test_given_blocked_python_check_when_persisted_then_terminal_precedes_integr
     graph: PythonNodeGraph = build_python_check_graph(check_function=check_function)
     upstream_result: PythonNodeExecutionResult = PythonNodeExecutionResult(
         node_name="upstream_task",
-        kind=PythonNodeKind.TASK,
+        kind=PythonNodeKind.ASSET,
         status=test_case.upstream_status,
         skip_mode=test_case.upstream_skip_mode,
         skip_reason="blocked",

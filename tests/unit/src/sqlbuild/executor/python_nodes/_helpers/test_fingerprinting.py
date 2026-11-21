@@ -25,7 +25,7 @@ from tests.unit.src.sqlbuild.executor.python_nodes._helpers.helpers import (
             expected_sql_count=2,
             expected_fragments=(
                 "_sqlbuild_fingerprints",
-                "task",
+                "asset",
                 "build_orders",
                 "definition_b64",
                 "metadata_json_b64",
@@ -50,7 +50,7 @@ def test_given_python_identity_when_writing_fingerprint_then_uses_fingerprint_st
 
     try_write_python_node_identity_fingerprint(
         identity=PythonNodeIdentity(
-            node_type="task",
+            node_type="asset",
             node_name="build_orders",
             source_path="python/tasks/orders.py",
             source_hash="source-hash",

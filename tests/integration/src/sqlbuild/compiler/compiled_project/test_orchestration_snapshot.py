@@ -58,7 +58,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
 ORCHESTRATION_NAME_CONFLICT: str = (
-    "; model, source, seed, function, loader, task, asset, check, provider, hook, unit test, "
+    "; model, source, seed, function, loader, asset, check, provider, hook, unit test, "
     "scenario, job, job group, sensor, and calendar names must be globally unique; rename one of "
     "them (a job or job group takes its name from `name` in its TOML file, and a calendar or "
     "sensor from its `name` argument)"
@@ -147,14 +147,18 @@ _PRICE_MODELS: dict[str, str] = {
             "DuckShop Python execution inputs",
             TYPE_PROOF_FILES
             | {
-                f"python/{kind}s/orders.py": json.loads(
+                path: json.loads(
                     Path(
                         "benchmarks/duckshop/edge_cases/orchestration/python_execution_inputs.json"
                     ).read_text()
                 )[source]
-                for kind, source in (("task", "task"), ("asset", "asset"), ("check", "initial"))
+                for path, source in (
+                    ("python/notify/orders.py", "side_effect"),
+                    ("python/assets/orders.py", "asset"),
+                    ("python/checks/orders.py", "initial"),
+                )
             },
-            frozenset({"model", "task", "asset", "check"}),
+            frozenset({"model", "asset", "check"}),
         ),
         SnapshotCatalogTestCase(
             "SQL hooks",
@@ -456,8 +460,8 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                 ),
                 "python/tasks/publish_orders.py": (
                     "from providers.fulfillment import FulfillmentApi\n"
-                    "from sqlbuild.tasks import task\n\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n\n"
+                    "@asset\n"
                     "def publish_orders(fulfillment_api: FulfillmentApi):\n"
                     '    """Send orders to fulfillment."""\n'
                 ),
@@ -537,10 +541,14 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                             },
                         ],
                         "used_by": [
-                            {"kind": "task", "name": "publish_orders"},
+                            {"kind": "asset", "name": "publish_orders"},
                             {"kind": "hook", "name": "notify_fulfillment"},
                         ],
-                        "nodes": ["hook:notify_fulfillment", "model:orders", "task:publish_orders"],
+                        "nodes": [
+                            "asset:publish_orders",
+                            "hook:notify_fulfillment",
+                            "model:orders",
+                        ],
                     }
                 ]
             },
@@ -2196,22 +2204,22 @@ def test_given_projects_compiled_in_one_process_when_one_imports_orchestration_t
         ),
         PythonJobSelectionTestCase(
             description="a task selector selects only the task",
-            select="task:request_carrier_collection",
-            expected_selection=("task:request_carrier_collection",),
+            select="asset:request_carrier_collection",
+            expected_selection=("asset:request_carrier_collection",),
         ),
         PythonJobSelectionTestCase(
             description="typed selectors select the task and the asset it depends on",
-            select="task:request_carrier_collection asset:partner_orders_file",
-            expected_selection=("asset:partner_orders_file", "task:request_carrier_collection"),
+            select="asset:request_carrier_collection asset:partner_orders_file",
+            expected_selection=("asset:partner_orders_file", "asset:request_carrier_collection"),
         ),
         PythonJobSelectionTestCase(
-            description="upstream of a task crosses its Python and SQL dependencies",
-            select="+task:request_carrier_collection",
+            description="upstream of an asset crosses its Python and SQL dependencies",
+            select="+asset:request_carrier_collection",
             expected_selection=(
                 "asset:partner_orders_file",
+                "asset:request_carrier_collection",
                 "model:orders",
                 "model:stg_orders",
-                "task:request_carrier_collection",
             ),
         ),
         PythonJobSelectionTestCase(
@@ -2224,9 +2232,9 @@ def test_given_projects_compiled_in_one_process_when_one_imports_orchestration_t
             select="tag:orders",
             expected_selection=(
                 "asset:partner_orders_file",
+                "asset:request_carrier_collection",
                 "model:orders",
                 "model:stg_orders",
-                "task:request_carrier_collection",
             ),
         ),
     ],
@@ -2291,14 +2299,14 @@ def test_given_python_dependencies_across_jobs_when_publishing_a_group_then_jobs
         PythonJobGroupCycleTestCase(
             description="a Python edge that closes a cycle names both jobs and the edges",
             jobs=(
-                ("staging_job", "stg_orders task:request_carrier_collection"),
+                ("staging_job", "stg_orders asset:request_carrier_collection"),
                 ("export_job", "asset:partner_orders_file"),
             ),
             expected_message=(
                 "group dependencies contain a cycle in job group orders_nightly_job_group: "
                 "export_job waits for staging_job (model:orders reads model:stg_orders); "
                 "staging_job waits for export_job "
-                "(task:request_carrier_collection reads asset:partner_orders_file)"
+                "(asset:request_carrier_collection reads asset:partner_orders_file)"
             ),
         ),
     ],

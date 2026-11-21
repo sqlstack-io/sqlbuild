@@ -1,4 +1,4 @@
-"""Tests for task and asset discovery."""
+"""Tests for asset discovery."""
 
 from __future__ import annotations
 
@@ -14,17 +14,16 @@ from sqlbuild._native import (
     DiscoveredAssetFunction,
     DiscoveredCheckFunction,
     DiscoveredPythonNodeFunctions,
-    DiscoveredTaskFunction,
     PythonNodeDiscoveryError,
     PythonNodeIdentity,
     discover_python_node_functions,
 )
 from sqlbuild.compiler.python_nodes.main.identity import build_python_node_identity
 from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
+    DiscoverAssetFunctionsTestCase,
     DiscoverCheckFunctionsTestCase,
     DiscoverPythonRootImportTestCase,
     DiscoverPythonRootNodesTestCase,
-    DiscoverTaskAssetFunctionsTestCase,
     PythonRootHelperIdentityTestCase,
     PythonRootProjectIsolationTestCase,
     RestoredPythonPackageIdentityTestCase,
@@ -48,10 +47,10 @@ def normalize_status(value):
 """,
     "python/orders.py": """
 import python.helpers.clean
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task
+@asset
 def orders(ctx):
     return python.helpers.clean.normalize_status(" Shipped ")
 """,
@@ -61,13 +60,13 @@ def orders(ctx):
 @pytest.mark.parametrize(
     "test_case",
     [
-        DiscoverTaskAssetFunctionsTestCase(
-            description="discovers decorated tasks and assets from explicit folders",
+        DiscoverAssetFunctionsTestCase(
+            description="discovers decorated assets from explicit folders",
             files={
                 "python/tasks/windows.py": """
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
-@task(tags=("api",), group="ingestion")
+@asset(tags=("api",), group="ingestion")
 def fetch_window(ctx):
     '''Fetch an API window.'''
     return {"window": "today"}
@@ -95,22 +94,18 @@ def ignored_init_asset(ctx):
     return None
 """,
             },
-            expected_task_names=("fetch_window",),
-            expected_task_dependency_counts=(0,),
-            expected_task_tags=(("api",),),
-            expected_asset_names=("export_customers",),
-            expected_asset_dependency_counts=(1,),
-            expected_asset_column_names=(("customer_id",),),
-            expected_asset_lineage_columns=(("customer_id",),),
+            expected_asset_names=("export_customers", "fetch_window"),
+            expected_asset_dependency_counts=(1, 0),
+            expected_asset_tags=((), ("api",)),
+            expected_asset_column_names=(("customer_id",), ()),
+            expected_asset_lineage_columns=(("customer_id",), ()),
         ),
-        DiscoverTaskAssetFunctionsTestCase(
-            description="returns empty tuples when task and asset folders do not exist",
+        DiscoverAssetFunctionsTestCase(
+            description="returns empty tuples when asset folders do not exist",
             files={},
-            expected_task_names=(),
-            expected_task_dependency_counts=(),
-            expected_task_tags=(),
             expected_asset_names=(),
             expected_asset_dependency_counts=(),
+            expected_asset_tags=(),
             expected_asset_column_names=(),
             expected_asset_lineage_columns=(),
         ),
@@ -118,7 +113,7 @@ def ignored_init_asset(ctx):
     ids=lambda case: case.description,
 )
 def test_given_project_dir_when_discovering_python_nodes_then_returns_expected(
-    test_case: DiscoverTaskAssetFunctionsTestCase,
+    test_case: DiscoverAssetFunctionsTestCase,
     tmp_path: Path,
 ) -> None:
     relative_path: str
@@ -128,19 +123,12 @@ def test_given_project_dir_when_discovering_python_nodes_then_returns_expected(
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(contents, encoding="utf-8")
 
-    tasks: tuple[DiscoveredTaskFunction, ...] = tuple(
-        discover_python_node_functions(project_dir=tmp_path).tasks
-    )
     assets: tuple[DiscoveredAssetFunction, ...] = tuple(
         discover_python_node_functions(project_dir=tmp_path).assets
     )
 
-    assert tuple(task.name for task in tasks) == test_case.expected_task_names
-    assert (
-        tuple(len(task.depends_on) for task in tasks) == test_case.expected_task_dependency_counts
-    )
-    assert tuple(task.tags for task in tasks) == test_case.expected_task_tags
     assert tuple(asset.name for asset in assets) == test_case.expected_asset_names
+    assert tuple(asset.tags for asset in assets) == test_case.expected_asset_tags
     assert tuple(len(asset.depends_on) for asset in assets) == (
         test_case.expected_asset_dependency_counts
     )
@@ -160,14 +148,12 @@ def test_given_project_dir_when_discovering_python_nodes_then_returns_expected(
 @pytest.mark.parametrize(
     "test_case",
     [
-        DiscoverTaskAssetFunctionsTestCase(
-            description="raises clear error when task import fails",
+        DiscoverAssetFunctionsTestCase(
+            description="raises clear error when a node import fails",
             files={"python/tasks/broken.py": "import missing_task_dependency\n"},
-            expected_task_names=(),
-            expected_task_dependency_counts=(),
-            expected_task_tags=(),
             expected_asset_names=(),
             expected_asset_dependency_counts=(),
+            expected_asset_tags=(),
             expected_asset_column_names=(),
             expected_asset_lineage_columns=(),
             expected_error_fragment="Failed to import Python node file",
@@ -176,7 +162,7 @@ def test_given_project_dir_when_discovering_python_nodes_then_returns_expected(
     ids=lambda case: case.description,
 )
 def test_given_python_node_import_error_when_discovering_then_raises_clear_error(
-    test_case: DiscoverTaskAssetFunctionsTestCase,
+    test_case: DiscoverAssetFunctionsTestCase,
     tmp_path: Path,
 ) -> None:
     relative_path: str
@@ -272,9 +258,9 @@ def test_given_project_dir_when_discovering_checks_then_returns_expected(
 from sqlbuild.assets import asset
 from sqlbuild.checks import check
 from sqlbuild.loaders import loader
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
-@task
+@asset
 def prepare_orders(ctx):
     return None
 
@@ -293,8 +279,8 @@ def orders_export_exists(ctx):
             },
             expected_nodes=(
                 ("loader", "raw_orders", "python/orders.py"),
-                ("task", "prepare_orders", "python/orders.py"),
                 ("asset", "orders_export", "python/orders.py"),
+                ("asset", "prepare_orders", "python/orders.py"),
                 ("check", "orders_export_exists", "python/orders.py"),
             ),
         ),
@@ -307,12 +293,12 @@ def export_uri(name):
 """,
                 "python/orders/__init__.py": "",
                 "python/orders/utils.py": """
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 def order_label(value):
     return str(value)
 
-LABEL = task
+LABEL = asset
 """,
                 "python/orders/ingest/loaders.py": """
 from sqlbuild.loaders import loader
@@ -323,9 +309,9 @@ def raw_orders(ctx):
 """,
                 "python/orders/pipeline/tasks.py": """
 from python.orders.utils import order_label
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
-@task
+@asset
 def label_orders(ctx):
     return order_label(1)
 """,
@@ -349,8 +335,8 @@ def orders_export_exists(ctx):
             },
             expected_nodes=(
                 ("loader", "raw_orders", "python/orders/ingest/loaders.py"),
-                ("task", "label_orders", "python/orders/pipeline/tasks.py"),
                 ("asset", "orders_export", "python/exports/assets.py"),
+                ("asset", "label_orders", "python/orders/pipeline/tasks.py"),
                 ("check", "orders_export_exists", "python/exports/deep/nested/checks.py"),
             ),
         ),
@@ -380,7 +366,6 @@ def test_given_python_root_when_discovering_python_nodes_then_decorators_define_
 
     discovered: tuple[tuple[str, str, str], ...] = (
         *(("loader", node.name, node.relative_path.as_posix()) for node in result.loaders),
-        *(("task", node.name, node.relative_path.as_posix()) for node in result.tasks),
         *(("asset", node.name, node.relative_path.as_posix()) for node in result.assets),
         *(("check", node.name, node.relative_path.as_posix()) for node in result.checks),
     )
@@ -406,19 +391,19 @@ Path(__file__).resolve().parents[1].joinpath("init_count.txt").open("a").write("
 """,
                 "python/tasks/first.py": """
 import python._counter
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task
+@asset
 def first_task(ctx):
     return None
 """,
                 "python/tasks/second.py": """
 from python import _counter
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task
+@asset
 def second_task(ctx):
     return None
 """,
@@ -438,8 +423,8 @@ def test_given_python_root_helpers_when_discovering_then_modules_import_under_pa
 
     result: DiscoveredPythonNodeFunctions = discover_python_node_functions(project_dir=tmp_path)
 
-    assert tuple(node.name for node in result.tasks) == test_case.expected_task_names
-    assert all(node.function.__module__.startswith("python.") for node in result.tasks)
+    assert tuple(node.name for node in result.assets) == test_case.expected_task_names
+    assert all(node.function.__module__.startswith("python.") for node in result.assets)
     init_lines: list[str] = (tmp_path / "init_count.txt").read_text().splitlines()
     assert len(init_lines) == test_case.expected_init_count
 
@@ -453,10 +438,10 @@ def test_given_python_root_helpers_when_discovering_then_modules_import_under_pa
                 "python/_values.py": "STATUS = 'first'\n",
                 "python/orders.py": """
 from python._values import STATUS
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task
+@asset
 def orders(ctx):
     return STATUS
 """,
@@ -465,10 +450,10 @@ def orders(ctx):
                 "python/_values.py": "STATUS = 'second'\n",
                 "python/orders.py": """
 from python._values import STATUS
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task
+@asset
 def orders(ctx):
     return STATUS
 """,
@@ -492,8 +477,8 @@ def test_given_two_projects_when_discovering_sequentially_then_python_modules_ar
     first: DiscoveredPythonNodeFunctions = discover_python_node_functions(project_dir=first_dir)
     second: DiscoveredPythonNodeFunctions = discover_python_node_functions(project_dir=second_dir)
 
-    assert first.tasks[0].function(None) == test_case.expected_first_result
-    assert second.tasks[0].function(None) == test_case.expected_second_result
+    assert first.assets[0].function(None) == test_case.expected_first_result
+    assert second.assets[0].function(None) == test_case.expected_second_result
 
 
 @pytest.mark.parametrize(
@@ -516,11 +501,11 @@ def test_given_python_root_helper_edit_when_rediscovering_then_node_identity_cha
     write_repo_files: Callable[[Path, dict[str, str]], None],
 ) -> None:
     write_repo_files(tmp_path, test_case.files)
-    before_task: DiscoveredTaskFunction = discover_python_node_functions(
+    before_task: DiscoveredAssetFunction = discover_python_node_functions(
         project_dir=tmp_path
-    ).tasks[0]
+    ).assets[0]
     before: PythonNodeIdentity = build_python_node_identity(
-        node_type="task",
+        node_type="asset",
         node_name=before_task.name,
         function=before_task.function,
         project_dir=tmp_path,
@@ -531,11 +516,11 @@ def test_given_python_root_helper_edit_when_rediscovering_then_node_identity_cha
         encoding="utf-8",
     )
 
-    after_task: DiscoveredTaskFunction = discover_python_node_functions(project_dir=tmp_path).tasks[
-        0
-    ]
+    after_task: DiscoveredAssetFunction = discover_python_node_functions(
+        project_dir=tmp_path
+    ).assets[0]
     after: PythonNodeIdentity = build_python_node_identity(
-        node_type="task",
+        node_type="asset",
         node_name=after_task.name,
         function=after_task.function,
         project_dir=tmp_path,
@@ -577,10 +562,10 @@ class Cleaner:
 """,
                 "python/orders.py": """
 import python.helpers.cleaner
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task
+@asset
 def orders(ctx):
     return python.helpers.cleaner.Cleaner().run(" Shipped ")
 """,
@@ -613,10 +598,10 @@ class Cleaner:
 """,
                 "python/orders.py": """
 import python.helpers.cleaner
-from sqlbuild.tasks import task
+from sqlbuild.assets import asset
 
 
-@task
+@asset
 def orders(ctx):
     return python.helpers.cleaner.Cleaner().run(" Shipped ")
 """,
@@ -641,9 +626,11 @@ def test_given_unrelated_python_package_restored_when_building_identity_then_hel
     monkeypatch.setitem(sys.modules, "python", importlib.import_module("python"))
     monkeypatch.setitem(sys.modules, "python.orders", importlib.import_module("python.orders"))
 
-    task: DiscoveredTaskFunction = discover_python_node_functions(project_dir=project_dir).tasks[0]
+    task: DiscoveredAssetFunction = discover_python_node_functions(project_dir=project_dir).assets[
+        0
+    ]
     identity: PythonNodeIdentity = build_python_node_identity(
-        node_type="task",
+        node_type="asset",
         node_name=task.name,
         function=task.function,
         project_dir=project_dir,
@@ -689,7 +676,7 @@ def test_given_unrelated_python_package_when_discovering_then_project_resolves_a
 
     result: DiscoveredPythonNodeFunctions = discover_python_node_functions(project_dir=project_dir)
 
-    assert tuple(node.name for node in result.tasks) == test_case.expected_task_names
-    assert result.tasks[0].function(None) == test_case.expected_task_result
+    assert tuple(node.name for node in result.assets) == test_case.expected_task_names
+    assert result.assets[0].function(None) == test_case.expected_task_result
     assert sys.modules["python"] is unrelated
     assert sys.modules["python.other"] is unrelated_other

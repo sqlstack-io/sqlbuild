@@ -275,24 +275,6 @@ class BasePythonNodeContext(DependencyResultReader):
 
 
 @dataclass(frozen=True, kw_only=True)
-class TaskContext(BasePythonNodeContext):
-    """Runtime context passed to a SQLBuild task function."""
-
-    def result(
-        self,
-        *,
-        payload: object | None = None,
-        metadata: dict[str, object] | None = None,
-    ) -> PythonNodeResult:
-        """Return a successful task result."""
-
-        return PythonNodeResult(
-            payload=payload,
-            metadata={} if metadata is None else metadata,
-        )
-
-
-@dataclass(frozen=True, kw_only=True)
 class AssetContext(BasePythonNodeContext):
     """Runtime context passed to a SQLBuild asset function."""
 

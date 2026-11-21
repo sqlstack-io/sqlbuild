@@ -1,4 +1,4 @@
-/// One set dependency of the `report` task and the end nodes it resolves to.
+/// One set dependency of the `report` asset and the end nodes it resolves to.
 pub(super) struct EndNodesTestCase {
     pub(super) description: &'static str,
     /// `(kind, name, exclude)` of each `job(...)` or `tag(...)` dependency.

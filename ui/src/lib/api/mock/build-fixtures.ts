@@ -176,7 +176,7 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
 
 export const PYTHON_SOURCE: Record<string, { file: string; source: string }> = {
 	raw__orders: {
-		file: 'tasks/raw__orders.py',
+		file: 'python/raw__orders.py',
 		source: `from sqlbuild.loaders import loader
 from sqlbuild.executor.load.models import LoaderContext
 
@@ -189,13 +189,13 @@ def raw__orders(ctx: LoaderContext):
     return fetch_since(ctx.current_cursor_value)`
 	},
 	export_revenue_csv: {
-		file: 'tasks/export_revenue_csv.py',
-		source: `from sqlbuild.tasks import task
+		file: 'python/export_revenue_csv.py',
+		source: `from sqlbuild.assets import asset
 
 from shop.file_drop import upload_csv
 
 
-@task(upstream=["revenue_report"])
+@asset(upstream=["revenue_report"])
 def export_revenue_csv(ctx):
     """Exports the revenue report as CSV to the finance file drop."""
     rows = ctx.query('SELECT * FROM __ref("revenue_report") ORDER BY revenue_date')

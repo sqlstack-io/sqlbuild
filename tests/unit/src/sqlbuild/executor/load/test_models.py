@@ -169,10 +169,10 @@ def test_given_loader_context_when_resolving_relation_refs_then_returns_cursor_v
     "test_case",
     [
         LoaderReferenceRejectionTestCase(
-            description="a task points to ctx.result_of",
+            description="an asset points to ctx.result_of",
             reference=score_orders,
             expected_message=(
-                "ctx.loader() takes a loader, not the task 'score_orders'; read its result with "
+                "ctx.loader() takes a loader, not the asset 'score_orders'; read its result with "
                 "ctx.result_of(node_function=score_orders) instead"
             ),
         ),

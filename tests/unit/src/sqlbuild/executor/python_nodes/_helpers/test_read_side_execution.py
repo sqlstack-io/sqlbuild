@@ -168,8 +168,8 @@ def test_given_sql_dep_fails_when_finalizing_read_side_then_skips_unrun_python_n
     assert tuple(event.resource_id for event in events) == (
         "asset:export_stg_profile",
         "asset:export_stg_profile",
-        "task:profile_stg_orders",
-        "task:profile_stg_orders",
+        "asset:profile_stg_orders",
+        "asset:profile_stg_orders",
     )
     assert len({event.resource_attempt_id for event in events}) == 2
     assert all(event.run_id == "test_run" for event in events)

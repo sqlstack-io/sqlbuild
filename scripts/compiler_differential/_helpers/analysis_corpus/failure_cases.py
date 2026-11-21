@@ -467,8 +467,8 @@ def _target_cases() -> tuple[FailureCase, ...]:
                 )
                 + '\n[defaults]\nschema = "mart"\n\n[targets.dev]\nschema = "preserve"\n',
                 "python/tasks/announce.py": (
-                    "from sqlbuild.tasks import task\n\n\n"
-                    "@task\n"
+                    "from sqlbuild.assets import asset\n\n\n"
+                    "@asset\n"
                     "def announce_orders(ctx):\n"
                     '    """Announce the loaded orders."""\n'
                     "    return ctx.result(payload={'announced': True})\n"

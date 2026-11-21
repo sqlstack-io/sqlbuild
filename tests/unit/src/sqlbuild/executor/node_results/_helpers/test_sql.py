@@ -23,7 +23,7 @@ from tests.unit.src.sqlbuild.executor.node_results._helpers.helpers import (
             description="builds scoped read SQL with deterministic ordering",
             expected_fragments=(
                 "FROM analytics._sqlbuild_node_results",
-                "node_type = 'task'",
+                "node_type = 'asset'",
                 "node_name = 'produce_result'",
                 "target_schema = 'analytics'",
                 "status IN ('success')",
@@ -40,7 +40,7 @@ def test_given_node_result_read_request_when_building_sql_then_scopes_and_orders
         database=None,
         schema="analytics",
         query=NodeResultQuery(
-            node_type="task",
+            node_type="asset",
             node_name="produce_result",
             target_database=None,
             target_schema="analytics",
@@ -66,7 +66,7 @@ def test_given_node_result_read_request_when_building_sql_then_scopes_and_orders
                 "INSERT INTO analytics._sqlbuild_node_results (node_type, node_name, "
                 "target_database, target_schema, target_name, run_id, status, "
                 "payload_json_b64, metadata_json_b64, error_message, materialized, ts) VALUES "
-                "('task', 'node''name', NULL, 'analytics', NULL, 'run-1', 'success', 'e30=', "
+                "('asset', 'node''name', NULL, 'analytics', NULL, 'run-1', 'success', 'e30=', "
                 "'e30=', 'it''s fine', 'true', '2026-01-01T00:00:00+00:00')"
             ),
         )
@@ -80,7 +80,7 @@ def test_given_representative_node_result_when_rendering_insert_then_sql_matches
         database=None,
         schema="analytics",
         record=NodeResultRecord(
-            node_type="task",
+            node_type="asset",
             node_name="node'name",
             target_database=None,
             target_schema="analytics",

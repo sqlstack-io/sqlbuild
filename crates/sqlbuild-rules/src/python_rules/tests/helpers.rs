@@ -232,12 +232,12 @@ fn unit_files(unit: usize, upstream: &str, arguments: &str) -> [(String, String)
         (
             format!("{dir}/node.py"),
             format!(
-                "{upstream}from {module}.main import main\n\n\n@task({arguments})\ndef node_{unit}(ctx: TaskContext) -> None:\n    return main(ctx=ctx)\n"
+                "{upstream}from {module}.main import main\n\n\n@asset({arguments})\ndef node_{unit}(ctx: AssetContext) -> None:\n    return main(ctx=ctx)\n"
             ),
         ),
         (
             format!("{dir}/main.py"),
-            "from sqlbuild import PythonNodeResult\n\nfrom python.utils.text.join import joined\n\n\ndef main(ctx: TaskContext) -> PythonNodeResult:\n    return ctx.result(joined(\"\"))\n".to_owned(),
+            "from sqlbuild import PythonNodeResult\n\nfrom python.utils.text.join import joined\n\n\ndef main(ctx: AssetContext) -> PythonNodeResult:\n    return ctx.result(joined(\"\"))\n".to_owned(),
         ),
         (
             format!("{dir}/checks.py"),

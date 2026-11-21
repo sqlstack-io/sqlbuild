@@ -268,7 +268,7 @@ def test_given_known_scoped_event_without_correlation_when_constructing_then_err
             description="retry requires safe error type",
             event_type="retry_scheduled",
             run_id="run-1",
-            resource_id="task:orders",
+            resource_id="asset:orders",
             payload={
                 "failed_attempt_number": 1,
                 "next_attempt_number": 2,
@@ -280,7 +280,7 @@ def test_given_known_scoped_event_without_correlation_when_constructing_then_err
             description="retry attempts must be consecutive",
             event_type="retry_scheduled",
             run_id="run-1",
-            resource_id="task:orders",
+            resource_id="asset:orders",
             payload={
                 "failed_attempt_number": 1,
                 "next_attempt_number": 3,

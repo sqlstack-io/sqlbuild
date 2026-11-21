@@ -87,7 +87,7 @@ SQLBuild, dbt, and SQLMesh are all SQL pipeline frameworks. They share common gr
 | Feature | SQLBuild | dbt | SQLMesh |
 |---------|----------|-----|---------|
 | SQL models | `MODEL()` header with inline config | Jinja-templated SQL + YAML sidecar | `MODEL` DDL |
-| Python models | Python nodes (tasks, assets, loaders, checks); no dataframe models | Pandas, PySpark, Snowpark, BigFrames | Pandas, PySpark, Snowpark, BigFrames |
+| Python models | Python nodes (assets, loaders, checks); no dataframe models | Pandas, PySpark, Snowpark, BigFrames | Pandas, PySpark, Snowpark, BigFrames |
 | Custom materializations | Python with full framework hooks | Jinja-based | Python-based custom model kinds |
 | Lifecycle hooks | Typed inline SQL, reusable parameterized SQL resources, and Python hooks with compile-time validation and `HookContext` | Jinja pre/post hooks | Python pre/post hooks |
 
@@ -95,9 +95,8 @@ SQLBuild, dbt, and SQLMesh are all SQL pipeline frameworks. They share common gr
 
 | Feature | SQLBuild | dbt | SQLMesh |
 |---------|----------|-----|---------|
-| Tasks | `@task` - Python computation as DAG nodes | No | No |
 | Assets | `@asset` - external artifact production/observation | No | No |
-| Checks | `@check` - Python validation of tasks, assets, and loaders | No | No |
+| Checks | `@check` - Python validation of assets and loaders | No | No |
 | Factories | `@factory` - programmatic node generation | No | No |
 | Providers | Shared runtime services with name-based injection into nodes and hooks | No | No |
 

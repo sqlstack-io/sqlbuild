@@ -17,18 +17,18 @@ const UNIT_RULES: [&str; 10] = [
     "SQBRPYTHON012",
 ];
 
-const DAILY_TASK: &str = r#"from .main import main
+const DAILY_ASSET: &str = r#"from .main import main
 
 
-@task(description="Daily.")
-def daily(ctx: TaskContext) -> None:
+@asset(description="Daily.")
+def daily(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#;
 
-const TASK_MAIN: &str = r#"from sqlbuild import PythonNodeResult
+const ASSET_MAIN: &str = r#"from sqlbuild import PythonNodeResult
 
 
-def main(ctx: TaskContext) -> PythonNodeResult:
+def main(ctx: AssetContext) -> PythonNodeResult:
     return ctx.result()
 "#;
 
@@ -56,8 +56,8 @@ fn given_node_units_when_evaluating_unit_rules_then_reports_each_broken_conventi
 from .main import main
 
 
-@task(description="Daily.")
-def daily(ctx: TaskContext, *, store: Store) -> None:
+@asset(description="Daily.")
+def daily(ctx: AssetContext, *, store: Store) -> None:
     return main(ctx=ctx, store=store)
 "#,
                 ),
@@ -74,7 +74,7 @@ from python.utils.text import clean
 from ._helpers.rows import rows
 
 
-def main(ctx: TaskContext, store: Store) -> PythonNodeResult | PythonNodeSkipResult:
+def main(ctx: AssetContext, store: Store) -> PythonNodeResult | PythonNodeSkipResult:
     return ctx.result(rows(today(), clean(), LIMIT, store))
 "#,
                 ),
@@ -131,8 +131,8 @@ from .main import main
 def region_exports():
     for region in REGIONS:
 
-        @task(name=f"export_{region}", description="Export one region.")
-        def export(ctx: TaskContext) -> None:
+        @asset(name=f"export_{region}", description="Export one region.")
+        def export(ctx: AssetContext) -> None:
             return main(ctx=ctx, region=region)
 
         @check(name=f"export_{region}_ok", depends_on=[export], description="Exported.")
@@ -146,7 +146,7 @@ def region_exports():
                 ),
                 (
                     "python/orders/regions/main.py",
-                    "def main(ctx: TaskContext, region: str) -> PythonNodeResult:\n    return ctx.result()\n",
+                    "def main(ctx: AssetContext, region: str) -> PythonNodeResult:\n    return ctx.result()\n",
                 ),
             ],
             config: json!({ "select": UNIT_RULES }),
@@ -155,7 +155,7 @@ def region_exports():
         PythonRunTestCase {
             description: "unit layout: a missing main.py, a stray module and a folder that is not _helpers/",
             files: &[
-                ("python/orders/daily/node.py", DAILY_TASK),
+                ("python/orders/daily/node.py", DAILY_ASSET),
                 ("python/orders/weekly/node.py", ""),
                 ("python/orders/weekly/main.py", ""),
                 ("python/orders/weekly/report.py", ""),
@@ -184,13 +184,13 @@ def helper() -> int:
     return 1
 
 
-@task(description="Daily.")
-def daily(ctx: TaskContext) -> None:
+@asset(description="Daily.")
+def daily(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 
 
-@task(description="Extra.")
-def extra(ctx: TaskContext) -> None:
+@asset(description="Extra.")
+def extra(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#,
                 ),
@@ -213,39 +213,39 @@ def extra(ctx: TaskContext) -> None:
 from python.orders.weekly.main import main as weekly_main
 
 
-@task(description="A.")
-def by_keyword(ctx: TaskContext) -> None:
+@asset(description="A.")
+def by_keyword(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 
 
-@task(description="B.")
-def positional(ctx: TaskContext) -> None:
+@asset(description="B.")
+def positional(ctx: AssetContext) -> None:
     return main(ctx)
 
 
-@task(description="C.")
-def computes(ctx: TaskContext) -> None:
+@asset(description="C.")
+def computes(ctx: AssetContext) -> None:
     rows = main(ctx=ctx)
     return rows
 
 
-@task(description="D.")
-def unpacked(ctx: TaskContext) -> None:
+@asset(description="D.")
+def unpacked(ctx: AssetContext) -> None:
     return main(**ctx)
 "#,
                 ),
-                ("python/orders/daily/main.py", TASK_MAIN),
+                ("python/orders/daily/main.py", ASSET_MAIN),
                 (
                     "python/orders/weekly/node.py",
                     r#"from python.orders.daily.main import main
 
 
-@task(description="W.")
-def weekly(ctx: TaskContext) -> None:
+@asset(description="W.")
+def weekly(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#,
                 ),
-                ("python/orders/weekly/main.py", TASK_MAIN),
+                ("python/orders/weekly/main.py", ASSET_MAIN),
             ],
             config: json!({ "select": ["SQBRPYTHON005"] }),
             expected_faults: vec![
@@ -258,7 +258,7 @@ def weekly(ctx: TaskContext) -> None:
         PythonRunTestCase {
             description: "main.py: other statements, a result that does not fit the node kind, and no main()",
             files: &[
-                ("python/orders/daily/node.py", DAILY_TASK),
+                ("python/orders/daily/node.py", DAILY_ASSET),
                 (
                     "python/orders/daily/main.py",
                     r#"from sqlbuild import PythonNodeResult
@@ -266,7 +266,7 @@ def weekly(ctx: TaskContext) -> None:
 LIMIT = 3
 
 
-def main(ctx: TaskContext) -> list:
+def main(ctx: AssetContext) -> list:
     return []
 
 
@@ -309,23 +309,23 @@ def helper() -> None:
                     r#"from .main import main
 
 
-@task(description="A.")
-def no_ctx(context: TaskContext) -> None:
+@asset(description="A.")
+def no_ctx(context: AssetContext) -> None:
     return main(ctx=context)
 
 
-@task(description="B.")
-def wrong_type(ctx: AssetContext, *, store: Store) -> None:
+@asset(description="B.")
+def wrong_type(ctx: LoaderContext, *, store: Store) -> None:
     return main(ctx=ctx, store=store)
 
 
-@task(description="C.")
-def loose(ctx: TaskContext, *args, store, **kwargs) -> None:
+@asset(description="C.")
+def loose(ctx: AssetContext, *args, store, **kwargs) -> None:
     return main(ctx=ctx)
 
 
-@task(description="D.")
-def positional_only(ctx: TaskContext, /) -> None:
+@asset(description="D.")
+def positional_only(ctx: AssetContext, /) -> None:
     return main(ctx=ctx)
 "#,
                 ),
@@ -335,7 +335,7 @@ def positional_only(ctx: TaskContext, /) -> None:
 
 
 @check(depends_on=[no_ctx], description="Q.")
-def quality(ctx: TaskContext) -> bool:
+def quality(ctx: AssetContext) -> bool:
     return True
 "#,
                 ),
@@ -361,7 +361,7 @@ def quality(ctx: TaskContext) -> bool:
                     "from python.orders.weekly.main import main\n",
                 ),
                 ("python/orders/_helpers/dates.py", ""),
-                ("python/orders/daily/node.py", DAILY_TASK),
+                ("python/orders/daily/node.py", DAILY_ASSET),
                 ("python/orders/daily/_helpers/rows.py", ""),
                 (
                     "python/orders/daily/main.py",
@@ -380,7 +380,7 @@ from python.billing.invoices.node import invoices
 from providers.store.client import Client
 
 
-def main(ctx: TaskContext) -> PythonNodeResult:
+def main(ctx: AssetContext) -> PythonNodeResult:
     return invoices
 "#,
                 ),
@@ -390,12 +390,12 @@ def main(ctx: TaskContext) -> PythonNodeResult:
 from .main import main
 
 
-@task(depends_on=[daily], description="W.")
-def weekly(ctx: TaskContext) -> None:
+@asset(depends_on=[daily], description="W.")
+def weekly(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#,
                 ),
-                ("python/orders/weekly/main.py", TASK_MAIN),
+                ("python/orders/weekly/main.py", ASSET_MAIN),
                 ("python/orders/weekly/constants.py", ""),
                 ("python/orders/weekly/_helpers/x.py", ""),
                 ("python/billing/invoices/node.py", ""),
@@ -414,10 +414,10 @@ def weekly(ctx: TaskContext) -> None:
         PythonRunTestCase {
             description: "checks.py: statements, a check of another unit's node, a check that computes, and a plain function report",
             files: &[
-                ("python/orders/daily/node.py", DAILY_TASK),
+                ("python/orders/daily/node.py", DAILY_ASSET),
                 (
                     "python/orders/weekly/node.py",
-                    "@task\ndef weekly(ctx):\n    pass\n",
+                    "@asset\ndef weekly(ctx):\n    pass\n",
                 ),
                 (
                     "python/orders/daily/checks.py",
@@ -471,8 +471,8 @@ from .main import main
 def market_exports():
     for market in MARKETS:
 
-        @task(description="M.")
-        def export(ctx: TaskContext) -> None:
+        @asset(description="M.")
+        def export(ctx: AssetContext) -> None:
             return main(ctx=ctx)
 "#,
                 ),
@@ -483,8 +483,8 @@ def market_exports():
 
 @factory
 def once():
-    @task(name="once", description="O.")
-    def run(ctx: TaskContext) -> None:
+    @asset(name="once", description="O.")
+    def run(ctx: AssetContext) -> None:
         return main(ctx=ctx)
 "#,
                 ),
@@ -504,8 +504,8 @@ def once():
                     r#"from .main import main
 
 
-@task(description="A.")
-def described(ctx: TaskContext) -> None:
+@asset(description="A.")
+def described(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 
 
@@ -560,7 +560,7 @@ def raw_orders_present(ctx: CheckContext) -> bool:
                 ),
                 (
                     "python/orders/daily/main.py",
-                    "@task(description=\"X.\")\ndef stray(ctx: TaskContext) -> None:\n    return None\n",
+                    "@asset(description=\"X.\")\ndef stray(ctx: AssetContext) -> None:\n    return None\n",
                 ),
                 (
                     "python/orders/daily/node.py",
@@ -572,8 +572,8 @@ from .main import main
 def tables():
     for table in TABLES:
 
-        @task(name=table, description="T.")
-        def load(ctx: TaskContext) -> None:
+        @asset(name=table, description="T.")
+        def load(ctx: AssetContext) -> None:
             return main(ctx=ctx)
 
         @check(name=f"{table}_ok", depends_on=[load], description="C.")
@@ -591,7 +591,7 @@ def tables():
                 ),
                 (
                     "python/utils/flat.py",
-                    "@task\ndef util_task(ctx):\n    return 1\n",
+                    "@asset\ndef util_asset(ctx):\n    return 1\n",
                 ),
             ],
             config: json!({ "select": ["SQBRPYTHON012"] }),
@@ -625,8 +625,8 @@ fn given_valid_shapes_and_hidden_mistakes_when_evaluating_unit_rules_then_report
             files: &[
                 ("python/utils/graph/node.py", "class Node:\n    pass\n"),
                 ("python/orders/models/node.py", "class Node:\n    pass\n"),
-                ("python/orders/daily/node.py", DAILY_TASK),
-                ("python/orders/daily/main.py", TASK_MAIN),
+                ("python/orders/daily/node.py", DAILY_ASSET),
+                ("python/orders/daily/main.py", ASSET_MAIN),
                 (
                     "python/orders/daily/_helpers/node.py",
                     "class Node:\n    pass\n",
@@ -658,18 +658,18 @@ def region_exports():
     for region, spec in SPECS.items():
         for column in spec.columns:
 
-            @task(name=f"export_{region}_{column}", description="E.")
-            def export(ctx: TaskContext) -> None:
+            @asset(name=f"export_{region}_{column}", description="E.")
+            def export(ctx: AssetContext) -> None:
                 return main(ctx=ctx, region=region)
 
     for table in constants.TABLES:
 
-        @task(name=table, description="T.")
-        def load(ctx: TaskContext) -> None:
+        @asset(name=table, description="T.")
+        def load(ctx: AssetContext) -> None:
             return main(ctx=ctx)
 "#,
                 ),
-                ("python/orders/regions/main.py", TASK_MAIN),
+                ("python/orders/regions/main.py", ASSET_MAIN),
                 ("python/orders/ranked/constants.py", "SPECS: dict = {}\n"),
                 (
                     "python/orders/ranked/node.py",
@@ -681,12 +681,12 @@ from .main import main
 def ranked_exports():
     for rank, region in enumerate(sorted(SPECS)):
 
-        @task(name=f"export_{rank}_{region}", description="E.")
-        def export(ctx: TaskContext) -> None:
+        @asset(name=f"export_{rank}_{region}", description="E.")
+        def export(ctx: AssetContext) -> None:
             return main(ctx=ctx, region=region)
 "#,
                 ),
-                ("python/orders/ranked/main.py", TASK_MAIN),
+                ("python/orders/ranked/main.py", ASSET_MAIN),
             ],
             config: json!({ "select": ["SQBRPYTHON010"] }),
             expected_faults: vec![],
@@ -706,14 +706,14 @@ if TYPE_CHECKING:
     from python.orders.weekly.main import main as weekly_main
 
 
-@task(description="Daily.")
-def daily(ctx: TaskContext, *, store: "Store") -> None:
+@asset(description="Daily.")
+def daily(ctx: AssetContext, *, store: "Store") -> None:
     return main(ctx=ctx, store=store)
 "#,
                 ),
-                ("python/orders/daily/main.py", TASK_MAIN),
-                ("python/orders/weekly/node.py", DAILY_TASK),
-                ("python/orders/weekly/main.py", TASK_MAIN),
+                ("python/orders/daily/main.py", ASSET_MAIN),
+                ("python/orders/weekly/node.py", DAILY_ASSET),
+                ("python/orders/weekly/main.py", ASSET_MAIN),
             ],
             config: json!({ "select": ["SQBRPYTHON004", "SQBRPYTHON007", "SQBRPYTHON008"] }),
             expected_faults: vec![("SQBRPYTHON008", "python/orders/daily/node.py", 7, 43)],
@@ -721,8 +721,8 @@ def daily(ctx: TaskContext, *, store: "Store") -> None:
         PythonRunTestCase {
             description: "a node named through import a.b in depends_on passes; an unused import of a node does not",
             files: &[
-                ("python/orders/daily/node.py", DAILY_TASK),
-                ("python/orders/daily/main.py", TASK_MAIN),
+                ("python/orders/daily/node.py", DAILY_ASSET),
+                ("python/orders/daily/main.py", ASSET_MAIN),
                 (
                     "python/orders/weekly/node.py",
                     r#"import python.orders.daily.node
@@ -730,12 +730,12 @@ def daily(ctx: TaskContext, *, store: "Store") -> None:
 from .main import main
 
 
-@task(depends_on=[python.orders.daily.node.daily], description="W.")
-def weekly(ctx: TaskContext) -> None:
+@asset(depends_on=[python.orders.daily.node.daily], description="W.")
+def weekly(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#,
                 ),
-                ("python/orders/weekly/main.py", TASK_MAIN),
+                ("python/orders/weekly/main.py", ASSET_MAIN),
                 (
                     "python/orders/weekly/_helpers/rows.py",
                     "from python.orders.daily.node import daily\n",
@@ -752,10 +752,10 @@ def weekly(ctx: TaskContext) -> None:
         PythonRunTestCase {
             description: "a quoted union result and a loader's tuple of rows fit their node",
             files: &[
-                ("python/orders/daily/node.py", DAILY_TASK),
+                ("python/orders/daily/node.py", DAILY_ASSET),
                 (
                     "python/orders/daily/main.py",
-                    "def main(ctx: TaskContext) -> \"PythonNodeResult | PythonNodeSkipResult\":\n    return ctx.result()\n",
+                    "def main(ctx: AssetContext) -> \"PythonNodeResult | PythonNodeSkipResult\":\n    return ctx.result()\n",
                 ),
                 (
                     "python/orders/raw/node.py",
@@ -774,9 +774,9 @@ def weekly(ctx: TaskContext) -> None:
             files: &[
                 (
                     "python/orders/daily/node.py",
-                    "from . import main\n\n\n@task(description=\"D.\")\ndef daily(ctx: TaskContext) -> None:\n    return main(ctx=ctx)\n",
+                    "from . import main\n\n\n@asset(description=\"D.\")\ndef daily(ctx: AssetContext) -> None:\n    return main(ctx=ctx)\n",
                 ),
-                ("python/orders/daily/main.py", TASK_MAIN),
+                ("python/orders/daily/main.py", ASSET_MAIN),
             ],
             config: json!({ "select": ["SQBRPYTHON005"] }),
             expected_faults: vec![("SQBRPYTHON005", "python/orders/daily/node.py", 5, 5)],

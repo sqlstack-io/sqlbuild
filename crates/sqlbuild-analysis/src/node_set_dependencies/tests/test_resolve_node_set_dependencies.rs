@@ -28,8 +28,8 @@ fn given_job_and_tag_dependencies_when_resolving_then_each_reduces_to_its_end_no
         EndNodesTestCase {
             description: "a Python node reading the job's model is its end",
             groups: &[],
-            sets: &[("job", "with_task", None)],
-            expected_ends: &[&["task 'export_orders'"]],
+            sets: &[("job", "with_asset", None)],
+            expected_ends: &[&["asset 'export_orders'"]],
         },
         EndNodesTestCase {
             description: "exclude removes nodes before reducing to end nodes",
@@ -69,7 +69,7 @@ fn given_job_and_tag_dependencies_when_resolving_then_each_reduces_to_its_end_no
         },
     ];
     for test_case in test_cases {
-        let resolved = resolve(("report", "task"), test_case.sets, test_case.groups)
+        let resolved = resolve(("report", "asset"), test_case.sets, test_case.groups)
             .expect(test_case.description);
         assert_eq!(
             ends(&resolved),
@@ -85,25 +85,25 @@ fn given_unresolvable_dependencies_when_resolving_then_compile_fails_naming_the_
     let test_cases = [
         FailureTestCase {
             description: "an unknown job",
-            dependant: ("report", "task"),
+            dependant: ("report", "asset"),
             groups: &[],
             sets: &[("job", "weekly", None)],
             expected_fragments: &[
-                "task 'report' depends on job 'weekly', which the project does not declare",
+                "asset 'report' depends on job 'weekly', which the project does not declare",
             ],
         },
         FailureTestCase {
             description: "an unknown tag",
-            dependant: ("report", "task"),
+            dependant: ("report", "asset"),
             groups: &[],
             sets: &[("tag", "marketing", None)],
             expected_fragments: &[
-                "task 'report' depends on tag 'marketing', which no node carries",
+                "asset 'report' depends on tag 'marketing', which no node carries",
             ],
         },
         FailureTestCase {
             description: "a set its exclude empties",
-            dependant: ("report", "task"),
+            dependant: ("report", "asset"),
             groups: &[],
             sets: &[("job", "single", Some("customers"))],
             expected_fragments: &[
@@ -113,7 +113,7 @@ fn given_unresolvable_dependencies_when_resolving_then_compile_fails_naming_the_
         },
         FailureTestCase {
             description: "another location's job",
-            dependant: ("report", "task"),
+            dependant: ("report", "asset"),
             groups: &[],
             sets: &[("job", "billing:nightly", None)],
             expected_fragments: &["a job of another code location"],
@@ -129,27 +129,27 @@ fn given_unresolvable_dependencies_when_resolving_then_compile_fails_naming_the_
         },
         FailureTestCase {
             description: "a job node reading the dependant's output closes a cycle",
-            dependant: ("report", "task"),
+            dependant: ("report", "asset"),
             groups: &[],
             sets: &[("job", "loop", None)],
             expected_fragments: &[
-                "task 'report' depends on job 'loop', but job 'loop''s task 'audit_export' reads task 'report''s output",
+                "asset 'report' depends on job 'loop', but job 'loop''s asset 'audit_export' reads asset 'report''s output",
                 "job(\"loop\", exclude=\"audit_export\")",
             ],
         },
         FailureTestCase {
             description: "a tag the dependant carries includes it",
-            dependant: ("self_tagged", "task"),
+            dependant: ("self_tagged", "asset"),
             groups: &[],
             sets: &[("tag", "finance", None)],
             expected_fragments: &[
-                "task 'self_tagged' depends on tag 'finance', which includes task 'self_tagged' itself",
+                "asset 'self_tagged' depends on tag 'finance', which includes asset 'self_tagged' itself",
                 "tag(\"finance\", exclude=\"self_tagged\")",
             ],
         },
         FailureTestCase {
             description: "a group whose jobs would wait for each other",
-            dependant: ("report", "task"),
+            dependant: ("report", "asset"),
             groups: GROUP,
             sets: &[("job", "nightly_wide", None)],
             expected_fragments: &[

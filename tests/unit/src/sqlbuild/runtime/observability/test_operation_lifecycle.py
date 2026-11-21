@@ -220,7 +220,7 @@ def test_given_pending_future_when_result_owned_then_terminal_follows_result(
         context: Context = copy_context()
         result: list[str] = []
         lifecycle: OperationLifecycle = OperationLifecycle(
-            operation_kind="python_node", operation_name="python_task"
+            operation_kind="python_node", operation_name="python_asset"
         )
         thread: Thread = Thread(
             target=lambda: result.append(cast(str, context.run(lifecycle.result, future)))
@@ -260,7 +260,7 @@ def test_given_cancelled_future_when_result_owned_then_one_failure_is_published(
         dispatcher_scope(dispatcher),
         pytest.raises(CancelledError),
     ):
-        _ = OperationLifecycle(operation_kind="python_node", operation_name="python_task").result(
+        _ = OperationLifecycle(operation_kind="python_node", operation_name="python_asset").result(
             future
         )
 
@@ -352,7 +352,7 @@ def test_given_nested_operations_when_exiting_then_parent_and_siblings_do_not_le
     ):
         with OperationLifecycle(
             operation_kind="python_node",
-            operation_name="python_task",
+            operation_name="python_asset",
             operation_id="child-one",
         ):
             with StatementLifecycle(adapter="duckdb", sql="SELECT 1", intent="execute"):

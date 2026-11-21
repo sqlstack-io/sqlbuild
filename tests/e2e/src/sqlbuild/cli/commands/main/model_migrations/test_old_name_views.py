@@ -41,8 +41,8 @@ from tests.e2e.src.sqlbuild.cli.commands.main.model_migrations.helpers import (
 _ALL_FACTS: tuple[str, ...] = ("required", "origin_archived", "view_created")
 _THREE_ORDERS: tuple[tuple[int, int], ...] = ((1, 101), (2, 102), (3, 103))
 _REPORT_TASK: str = (
-    "from sqlbuild.tasks import task\n\n\n"
-    "@task\n"
+    "from sqlbuild.assets import asset\n\n\n"
+    "@asset\n"
     "def report(ctx):\n"
     f'    """Test task report."""\n    ctx.query("SELECT count(*) FROM {OLD_NAME_SCHEMA}.{OLD_NAME_ORIGIN}").fetchall()\n'
 )
@@ -425,7 +425,7 @@ def test_given_live_compatibility_view_when_new_model_claims_its_name_then_build
             header=OLD_NAME_MIGRATE_FROM,
             command="compile",
             expected_fragment=(
-                "error[P008]: task:report names 'analytics.revenue' in SQL passed to ctx.query(); "
+                "error[P008]: asset:report names 'analytics.revenue' in SQL passed to ctx.query(); "
                 "it is the old name of model:daily_revenue"
             ),
         ),
@@ -434,7 +434,7 @@ def test_given_live_compatibility_view_when_new_model_claims_its_name_then_build
             header="",
             command="build",
             expected_fragment=(
-                "task:report names 'analytics.revenue' in SQL passed to ctx.query(); "
+                "asset:report names 'analytics.revenue' in SQL passed to ctx.query(); "
                 "it is the old name of model:daily_revenue"
             ),
         ),

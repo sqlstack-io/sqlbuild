@@ -7,22 +7,22 @@ use crate::python_rules::tests::test_types::PythonRunTestCase;
 const RUNTIME_FILES: [(&str, &str); 5] = [
     (
         "python/orders/storefront_import/node.py",
-        r#"from sqlbuild.tasks import TaskContext, task
+        r#"from sqlbuild.assets import AssetContext, asset
 
 from python.orders.storefront_import.main import main
 
 
-@task(description="Import storefront orders.")
-def storefront_import(ctx: TaskContext) -> None:
+@asset(description="Import storefront orders.")
+def storefront_import(ctx: AssetContext) -> None:
     return main(ctx)
 "#,
     ),
     (
         "python/orders/storefront_import/main.py",
-        r#"from sqlbuild.tasks import PythonNodeResult, TaskContext
+        r#"from sqlbuild.assets import PythonNodeResult, AssetContext
 
 
-def main(ctx: TaskContext) -> PythonNodeResult:
+def main(ctx: AssetContext) -> PythonNodeResult:
     return PythonNodeResult()
 "#,
     ),

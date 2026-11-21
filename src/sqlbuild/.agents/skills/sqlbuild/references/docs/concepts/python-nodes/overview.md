@@ -2,7 +2,7 @@
 
 # Overview
 
-> Tasks, assets, loaders, and checks as first-class nodes in the SQLBuild graph.
+> Loaders, assets, and checks as first-class nodes in the SQLBuild graph.
 
 Online: https://sqlbuild.com/docs/concepts/python-nodes/overview/
 
@@ -21,20 +21,18 @@ Online: https://sqlbuild.com/docs/concepts/python-nodes/overview/
 
 Python nodes let your project grow beyond warehouse-only SQL while keeping the SQL graph clean. They are ordinary Python functions, decorated to become nodes in the same DAG as your SQL models, and they run as part of `sqb build`.
 
-There are four kinds. The decorator says what each function is, so all of them live under one `python/` folder:
+There are three kinds. The decorator says what each function is, so all of them live under one `python/` folder:
 
 | Kind | Decorator | Purpose |
 |------|-----------|---------|
 | Loader | `@loader` | Load external data into a managed source |
-| Task | `@task` | Run Python computation or side effects |
-| Asset | `@asset` | Produce or observe an external artifact |
-| Check | `@check` | Validate tasks, assets, and loaders |
+| Asset | `@asset` | Run Python computation or side effects, or produce an external artifact |
+| Check | `@check` | Validate assets and loaders |
 
-All four share the same decorator conventions, dependency model, selection syntax, and runtime context helpers. The pages for each kind cover their specifics:
+All three share the same decorator conventions, dependency model, selection syntax, and runtime context helpers. The pages for each kind cover their specifics:
 
 - [Loaders](loaders.md) - load data into managed sources
-- [Tasks](tasks.md) - Python computation and side effects
-- [Assets](assets.md) - external artifacts
+- [Assets](assets.md) - Python computation, side effects and external artifacts
 - [Checks](checks.md) - Python validations
 - [Factories](factories.md) - generate nodes programmatically with `@factory`
 - [SQL references](sql-references.md) - read SQL models and sources from Python
@@ -43,7 +41,7 @@ Nodes can also be generated programmatically with [`@factory`](factories.md) ins
 
 ## The `python/` folder
 
-Anything that runs as part of the pipeline graph goes in `python/`: loaders, tasks, assets, checks, [factories](factories.md), and the helper modules they import. SQLBuild imports every `.py` file under `python/` recursively (except `__init__.py`) and registers each decorated function by its decorator. Undecorated functions and helper-only modules are allowed and never become nodes.
+Anything that runs as part of the pipeline graph goes in `python/`: loaders, assets, checks, [factories](factories.md), and the helper modules they import. SQLBuild imports every `.py` file under `python/` recursively (except `__init__.py`) and registers each decorated function by its decorator. Undecorated functions and helper-only modules are allowed and never become nodes.
 
 How you organize files inside `python/` is up to you. The playgrounds group nodes by kind:
 
@@ -51,13 +49,13 @@ How you organize files inside `python/` is up to you. The playgrounds group node
 python/
   _helpers.py          # shared helpers, not nodes
   loaders/orders.py
-  tasks/orders.py
+  assets/orders_inputs.py
   assets/orders_export.py
   checks/orders_export.py
   factories/regional.py
 ```
 
-Grouping by domain (`python/orders/`, `python/customers/`) works just as well, and a single file may mix kinds. A project that selects the [Python Rules](../rules/python-rules.md#laying-out-python) commits to grouping by domain, with each node in its own [unit folder](../rules/python-rules.md#writing-nodes-as-units) holding `node.py` and `main.py`: `SQBRPYTHON001` reports node-kind folders such as `python/loaders/` and modules directly under `python/`, and `SQBRPYTHON012` reports nodes declared outside a unit's `node.py`. Import other project modules through the `python` package, for example `from python.tasks.orders import export_orders` or `from python._helpers import normalize_status`.
+Grouping by domain (`python/orders/`, `python/customers/`) works just as well, and a single file may mix kinds. A project that selects the [Python Rules](../rules/python-rules.md#laying-out-python) commits to grouping by domain, with each node in its own [unit folder](../rules/python-rules.md#writing-nodes-as-units) holding `node.py` and `main.py`: `SQBRPYTHON001` reports node-kind folders such as `python/loaders/` and modules directly under `python/`, and `SQBRPYTHON012` reports nodes declared outside a unit's `node.py`. Import other project modules through the `python` package, for example `from python.assets.orders_inputs import prepare_raw_orders` or `from python._helpers import normalize_status`.
 
 Code that extends SQLBuild itself keeps its own folder, such as `rules/`, `materializations/`, `adapters/`, `providers/`, `sinks/`, `hooks/python/`, `functions/python/`, and `macros/`. Python outside the supported locations fails compilation with `D016`; see [Project Python](../project-configuration.md#project-python) for the full list.
 
@@ -66,20 +64,20 @@ Code that extends SQLBuild itself keeps its own folder, such as `rules/`, `mater
 The most important rule: **SQL models never depend on Python nodes.** The dependency direction is strictly one way.
 
 - SQL models depend only on other SQL resources (models, sources, seeds, functions).
-- Python nodes may depend on other Python nodes; a loader may depend on any Python node, including tasks and assets.
+- Python nodes may depend on other Python nodes; a loader may depend on any Python node, including assets.
 - Python data reaches SQL only through a **loader filling a source**: `loader -> source -> model`.
-- Tasks, assets, and checks may **read** SQL models, sources, and seeds at runtime through typed references (see [SQL references](sql-references.md)), but reading a model does not make it a SQL dependency.
+- Assets and checks may **read** SQL models, sources, and seeds at runtime through typed references (see [SQL references](sql-references.md)), but reading a model does not make it a SQL dependency.
 
 This keeps the SQL graph fully analyzable and testable on its own, while letting Python participate around the edges.
 
 ```
             depends_on
-  task ----------------> task
+  asset ---------------> asset
    |                       |
    | (read only)           v
    |                     asset
    v                       |
- source <-- loader         | check (validates tasks/assets/loaders/SQL)
+ source <-- loader         | check (validates assets/loaders/SQL)
    |
    v
  model (SQL) ----> model (SQL)
@@ -87,19 +85,19 @@ This keeps the SQL graph fully analyzable and testable on its own, while letting
 
 ### Warehouse round trips
 
-A loader that depends on a task or asset that reads SQL, directly or through other Python nodes,
+A loader that depends on an asset that reads SQL, directly or through other Python nodes,
 makes a warehouse round trip: data leaves the warehouse and comes back through the loader. For
-example, a task reads `orders`, sends them to a partner's scoring service, and a loader loads the
+example, an asset reads `orders`, sends them to a partner's scoring service, and a loader loads the
 scores it returned into the `partner_scores` source that `scored_orders` reads:
 
 ```
- model orders --> task score_orders --> loader partner_scores --> source partner_scores --> model scored_orders
+ model orders --> asset score_orders --> loader partner_scores --> source partner_scores --> model scored_orders
 ```
 
 Round trips are off by default. Turn them on with `allow_warehouse_round_trips` in
 `sqlbuild_project.toml` (see [Settings](../project-configuration.md#settings)); without it,
-a plan or build that includes such a loader stops with an error naming the loader and the task or
-asset that reads SQL. A loader that depends on a task or asset that reads no SQL is ordinary
+a plan or build that includes such a loader stops with an error naming the loader and the asset
+that reads SQL. A loader that depends on an asset that reads no SQL is ordinary
 ingestion and is always allowed.
 
 ```toml
@@ -109,23 +107,23 @@ allow_warehouse_round_trips = true
 
 With the setting on:
 
-- One `sqb build` runs the SQL the task reads, then the task, then the loader, then the models that
-  read the loader's source. The loader follows the usual rule for its upstream tasks and assets: if
+- One `sqb build` runs the SQL the asset reads, then the asset, then the loader, then the models that
+  read the loader's source. The loader follows the usual rule for its upstream assets: if
   one fails or skips with `mode="hard"`, the loader and everything downstream of its source are
   skipped; otherwise it runs when any of them succeeded. When all of them skip softly, only the load
   is skipped: the source keeps its last loaded data, and models reading it still build when another
   of their inputs ran.
 - Lineage and column lineage restart at the source: the source's columns come from the loader, not
-  from the models the task read.
-- Job groups run a member that builds the task before the member that runs the loader, and that one
+  from the models the asset read.
+- Job groups run a member that builds the asset before the member that runs the loader, and that one
   before the members that build models reading its source.
-- `--changed` follows the chain: when the SQL the task reads is rebuilt, the task and loader run and
-  the models reading the source rebuild. When it is not rebuilt, the task does not run and the
+- `--changed` follows the chain: when the SQL the asset reads is rebuilt, the asset and loader run and
+  the models reading the source rebuild. When it is not rebuilt, the asset does not run and the
   loader is skipped softly, so the source keeps its data and models selected for their own changes
   still build.
-- A task that reads anything built from the source its own downstream loader fills is a cycle,
+- An asset that reads anything built from the source its own downstream loader fills is a cycle,
   which stops the plan or build with the path, such as
-  `loader 'partner_scores' -> task 'score_orders' -> model 'scored_orders' -> source 'partner_scores' -> loader 'partner_scores'`.
+  `loader 'partner_scores' -> asset 'score_orders' -> model 'scored_orders' -> source 'partner_scores' -> loader 'partner_scores'`.
 
 ## Decorators
 
@@ -139,7 +137,7 @@ Every decorator accepts the same organizational metadata:
 | `description` | Required human-readable docs; defaults to the function docstring ([Descriptions](../models/configuration.md#descriptions)) |
 | `meta` | Freeform JSON metadata for catalogs and integrations |
 
-`@task` and `@asset` also accept a `retry` policy. `@asset` additionally accepts `columns` and `column_lineage`. Node kind is inferred from the decorator - you never pass `kind=`.
+`@asset` also accepts a `retry` policy, `columns` and `column_lineage`. Node kind is inferred from the decorator - you never pass `kind=`.
 
 ## Identity tracking
 
@@ -149,7 +147,7 @@ Unlike SQL models, Python nodes may depend on external inputs the framework cann
 
 ## Runtime context
 
-Each node receives a context object as its first argument (`TaskContext`, `AssetContext`, `CheckContext`, or `LoaderContext`). They share these helpers:
+Each node receives a context object as its first argument (`AssetContext`, `CheckContext`, or `LoaderContext`). They share these helpers:
 
 | Helper | Description |
 |--------|-------------|
@@ -167,7 +165,7 @@ Each node receives a context object as its first argument (`TaskContext`, `Asset
 | `ctx.results_of(node_fn, limit=N)` | Read the last N successful results of an upstream node, newest first |
 | `ctx.providers` | Access discovered [providers](providers.md) by name |
 
-Task and asset contexts add `ctx.result(...)` and `ctx.skip(...)`. Check contexts add `ctx.pass_(...)`, `ctx.fail(...)`, and `ctx.warn(...)`.
+Asset contexts add `ctx.result(...)` and `ctx.skip(...)`. Check contexts add `ctx.pass_(...)`, `ctx.fail(...)`, and `ctx.warn(...)`.
 
 Providers can also be injected directly as function parameters by name. See [Providers](providers.md) for details.
 
@@ -197,17 +195,17 @@ Connection settings and secrets are not part of `ctx.target_config`.
 
 ## Returns and skips
 
-Tasks and assets return through `ctx.result(...)`:
+Assets return through `ctx.result(...)`:
 
 ```python
-@task
+@asset
 def export_orders(ctx):
     """Export orders."""
     return ctx.result(payload={"rows": 120}, metadata={"rows": 120})
 ```
 
 - A plain value or `None` is also accepted and normalized to a successful result.
-- `ctx.skip(reason, mode=...)` skips the node. `mode` accepts `"soft"` (default, skips only this node) or `"hard"` (also blocks dependents), as a string or the `SkipMode` enum from `sqlbuild.tasks`/`sqlbuild.assets`.
+- `ctx.skip(reason, mode=...)` skips the node. `mode` accepts `"soft"` (default, skips only this node) or `"hard"` (also blocks dependents), as a string or the `SkipMode` enum from `sqlbuild.assets`.
 - Assets may pass `materialized=True`/`False` to record whether an artifact was produced.
 
 Within one run, downstream nodes run only if at least one upstream succeeded. If all upstreams are skipped, the downstream is skipped. A failed or hard-skipped upstream blocks its dependents.
@@ -218,7 +216,7 @@ Node results (payload, metadata, status, errors) are persisted after each execut
 `_sqlbuild_node_results` table. Results persist across runs, so they are available for
 observability, debugging, and downstream consumption through `ctx.result_of`.
 
-Results of loaders, tasks, assets and checks all go to one schema, chosen by the target's `schema`:
+Results of loaders, assets and checks all go to one schema, chosen by the target's `schema`:
 
 | Target `schema` | Results table schema |
 |-----------------|----------------------|
@@ -234,37 +232,36 @@ Python nodes are selected like SQL resources, by bare name or typed selector:
 
 ```bash
 sqb build --select export_orders          # bare name
-sqb build --select task:export_orders      # typed
-sqb build --select asset:orders_export
+sqb build --select asset:orders_export     # typed
 sqb build --select export_orders check:check_orders_exported  # a check with the node it checks
 sqb build --select tag:exports             # by tag
 sqb build --select +orders_export           # with upstreams
 ```
 
-Names are globally unique across models, sources, seeds, functions, loaders, tasks, assets, checks, providers, hooks, unit tests, scenarios, jobs, job groups, sensors, and calendars.
+Names are globally unique across models, sources, seeds, functions, loaders, assets, checks, providers, hooks, unit tests, scenarios, jobs, job groups, sensors, and calendars.
 
 ## Lifecycle: run, build, check
 
 Python nodes run in two phases relative to SQL:
 
-- **Ingress (pre-SQL):** loaders, and tasks/assets that feed sources, run before SQL models are built.
-- **Read-side (post-SQL):** tasks/assets that read SQL run after their SQL dependencies are built.
+- **Ingress (pre-SQL):** loaders, and assets that feed sources, run before SQL models are built.
+- **Read-side (post-SQL):** assets that read SQL run after their SQL dependencies are built.
   A loader in a [warehouse round trip](#warehouse-round-trips) loads after them, and before the
   models that read its source.
 
-Read-side tasks and assets follow the same selection rule as SQL models. A SQL dependency that is
+Read-side assets follow the same selection rule as SQL models. A SQL dependency that is
 part of the run gates the node: it waits for that model, seed, or source load, and is skipped if the
 dependency fails or is skipped. A dependency that is not part of the run (not selected, or an
-unmanaged source) is read as it currently exists, so `sqb build --select task:export_orders` runs
-the task against the relations already in the warehouse.
+unmanaged source) is read as it currently exists, so `sqb build --select asset:export_orders` runs
+the asset against the relations already in the warehouse.
 
-Python dependencies follow the same rule. A task or asset selected without its Python upstream
+Python dependencies follow the same rule. An asset selected without its Python upstream
 reads that upstream's latest successful result through `ctx.result_of`. If the upstream has never
 succeeded for the target, the node fails with an error that names the upstream, for example:
 
 ```text
-Upstream task 'prepare_orders' has no successful result to read. Build it first with
-'sqb build --select task:prepare_orders', or build both with 'sqb build --select +asset:export_orders'.
+Upstream asset 'prepare_orders' has no successful result to read. Build it first with
+'sqb build --select asset:prepare_orders', or build both with 'sqb build --select +asset:export_orders'.
 ```
 
 Jobs, sensors, roles and ad-hoc runs on the server resolve selectors the same way, so a job can
@@ -272,8 +269,8 @@ select one Python node and a job group orders it after the job that builds its u
 
 The commands differ in what they include by default:
 
-| Command | SQL | Loaders / tasks / assets | Checks | Audits |
-|---------|-----|--------------------------|--------|--------|
+| Command | SQL | Loaders / assets | Checks | Audits |
+|---------|-----|-----------------|--------|--------|
 | `sqb build` | Yes | Yes | Yes | Yes |
 | `sqb build --no-tests --no-audits` | Yes | Yes | No | No |
 | `sqb check` | No | No | Selected checks only | No |
@@ -282,11 +279,11 @@ The commands differ in what they include by default:
 - `sqb build --no-tests --no-audits` executes the DAG without validation, for fast iteration.
 - `sqb check` runs Python checks only. See [`sqb check`](../../cli/check.md).
 
-Use `--no-python` on `plan` and `build` to suppress read-side tasks/assets. Loader-side Python required to populate selected sources still runs (use `--no-load` to skip source loading). See the [`sqb build`](../../cli/build.md) reference.
+Use `--no-python` on `plan` and `build` to suppress read-side assets. Loader-side Python required to populate selected sources still runs (use `--no-load` to skip source loading). See the [`sqb build`](../../cli/build.md) reference.
 
 ## Try it
 
-The `python_nodes` playground is a small working project with a task, loader, model, asset, and check:
+The `python_nodes` playground is a small working project with assets, a loader, a model, and a check:
 
 ```bash
 sqb playground --template python_nodes
