@@ -143,7 +143,7 @@ FROM __ref("payments") p,
 - SQLBuild generates the warehouse handler and adds the packages the frame needs: `pandas`, and `polars` and `pyarrow` for polars.
 - The returned frame must have exactly the `returns` columns. Otherwise the call fails with an error naming the missing, extra and repeated columns.
 - Rows arrive in no particular order. Sort inside `main` when order matters.
-- The call's rows don't belong to an input row: in them, the columns of `p` other than the `PARTITION BY` columns are NULL. Select the function's output columns, as `s.*` does above.
+- The call's rows don't belong to an input row: in them, the `PARTITION BY` columns of `p` hold the partition's value and its other columns are NULL. A condition such as `WHERE p.amount > 0` removes every row; select and filter the function's output columns, as `s.*` does above.
 - In a model test, a [`__table_fn__smooth_payments` fixture](testing.md#mocking-table-functions-in-model-tests) stands for the call's whole output: write exactly the rows the call returns, and the model reads each fixture row once.
 
 | Problem | Fix |

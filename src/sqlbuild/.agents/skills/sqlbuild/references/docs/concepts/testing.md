@@ -408,9 +408,16 @@ How often the fixture's rows appear depends on the call:
 - A call with `OVER (PARTITION BY ...)`, such as a [Python table
   function](functions.md#python-table-functions), stands for its whole output: write
   exactly the rows the call returns, and the model reads each fixture row once, however many input
-  rows there are. Those rows don't belong to an input row, so the columns of the relations before
-  the call in its `FROM` clause are NULL in them, the `PARTITION BY` columns included. Read the
-  function's output columns.
+  rows there are. As in a build, those rows don't belong to an input row, so the columns of the
+  relations before the call in its `FROM` clause are NULL in them, except the `PARTITION BY`
+  columns. A build gives those the partition's value; a test gives each one the value of the
+  fixture's column with the same name, for a partition column written as `p.customer_id` and a
+  fixture that names its columns. Otherwise it is NULL too.
+
+  Conditions in `WHERE` or `ON` on the relations before the call therefore remove the fixture rows,
+  unless they test only `PARTITION BY` columns the fixture supplies. With several partitioned calls
+  in one `FROM` clause, a later call's inputs include the earlier calls' rows, so their columns
+  read as NULL in the later call's rows.
 
 ```sql
 -- models/smoothed_payments.sql reads:

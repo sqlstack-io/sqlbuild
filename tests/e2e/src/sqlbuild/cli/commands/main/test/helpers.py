@@ -2503,8 +2503,8 @@ _PARTITIONED_FUNCTION: str = (
 )
 
 
-def partitioned_call_fixture_files(*, call: str, expected_rows: str) -> dict[str, str]:
-    """A DuckDB project whose model test mocks a Python table function `call` with one row."""
+def partitioned_call_fixture_files(*, query: str, expected_rows: str) -> dict[str, str]:
+    """A DuckDB project whose model `query` calls a Python table function, mocked with one row."""
 
     return {
         "sqlbuild_project.toml": (
@@ -2517,9 +2517,7 @@ def partitioned_call_fixture_files(*, call: str, expected_rows: str) -> dict[str
             "SELECT 1 AS customer_id, 10.0::DOUBLE AS amount\n"
         ),
         "models/smoothed_payments.sql": (
-            "MODEL (description 'Smoothed payments.', materialized table);\n"
-            "SELECT s.customer_id, s.amount_smoothed\n"
-            f'FROM __ref("payments") AS p, {call} AS s\n'
+            f"MODEL (description 'Smoothed payments.', materialized table);\n{query}\n"
         ),
         "tests/unit/test_smoothed_payments.sql": (
             'TEST (name "smoothed_payments__fixture");\nWITH\n'

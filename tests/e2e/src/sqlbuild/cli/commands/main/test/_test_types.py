@@ -665,7 +665,7 @@ class PartitionedCallFixtureE2ETestCase:
     """A model test whose `__table_fn__` fixture replaces a call, with the rows it should read."""
 
     description: str
-    call: str
+    query: str
     expected_rows: str
     expected_exit_code: int
     expected_stdout_fragment: str

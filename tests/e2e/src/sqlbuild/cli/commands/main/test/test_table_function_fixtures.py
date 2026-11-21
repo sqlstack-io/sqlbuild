@@ -13,32 +13,41 @@ from tests.e2e.src.sqlbuild.cli.commands.main.test._test_types import (
 from tests.e2e.src.sqlbuild.cli.commands.main.test.helpers import partitioned_call_fixture_files
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
+_INPUT: str = '__ref("payments") AS p'
+_CALL: str = (
+    '__table_fn("smooth_payments")(p.customer_id, p.amount) OVER (PARTITION BY p.customer_id)'
+)
+
 
 @pytest.mark.parametrize(
     "test_case",
     [
         PartitionedCallFixtureE2ETestCase(
             description="three payments of one customer read the one fixture row once",
-            call=(
-                '__table_fn("smooth_payments")(p.customer_id, p.amount) '
-                "OVER (PARTITION BY p.customer_id)"
-            ),
+            query=f"SELECT s.customer_id, s.amount_smoothed FROM {_INPUT}, {_CALL} AS s",
             expected_rows="SELECT 1 AS customer_id, 20.0::DOUBLE AS amount_smoothed",
             expected_exit_code=0,
             expected_stdout_fragment="PASS=1",
         ),
         PartitionedCallFixtureE2ETestCase(
             description="a fixture row repeated per input row fails the partitioned call's test",
-            call=(
-                '__table_fn("smooth_payments")(p.customer_id, p.amount) '
-                "OVER (PARTITION BY p.customer_id)"
-            ),
+            query=f"SELECT s.customer_id, s.amount_smoothed FROM {_INPUT}, {_CALL} AS s",
             expected_rows=(
                 "SELECT 1 AS customer_id, 20.0::DOUBLE AS amount_smoothed "
                 "FROM (VALUES (1), (2), (3)) AS v (n)"
             ),
             expected_exit_code=1,
             expected_stdout_fragment="FAIL=1",
+        ),
+        PartitionedCallFixtureE2ETestCase(
+            description="the partition column reads the fixture's value, so conditions on it hold",
+            query=(
+                f"SELECT p.customer_id, s.amount_smoothed FROM {_INPUT}, {_CALL} AS s "
+                "WHERE p.customer_id = 1"
+            ),
+            expected_rows="SELECT 1 AS customer_id, 20.0::DOUBLE AS amount_smoothed",
+            expected_exit_code=0,
+            expected_stdout_fragment="PASS=1",
         ),
     ],
     ids=lambda case: case.description,
@@ -51,7 +60,7 @@ def test_given_partitioned_call_fixture_when_testing_then_model_reads_each_fixtu
         tmp_path=tmp_path,
         project_name="payments_fixtures",
         repo_files=partitioned_call_fixture_files(
-            call=test_case.call, expected_rows=test_case.expected_rows
+            query=test_case.query, expected_rows=test_case.expected_rows
         ),
     )
 

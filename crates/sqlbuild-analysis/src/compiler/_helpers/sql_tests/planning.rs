@@ -180,6 +180,8 @@ pub(crate) struct TestFixtures {
     pub(crate) mock_seeds: BTreeMap<String, String>,
     pub(crate) mock_dbt_refs: BTreeMap<String, String>,
     pub(crate) mock_table_functions: BTreeMap<String, String>,
+    /// Each table-function fixture's column names, when its SQL names them.
+    pub(crate) mock_table_function_columns: BTreeMap<String, Vec<String>>,
     pub(crate) helpers: Vec<SqlTestCte>,
     pub(crate) scope: ScopeGraph,
     pub(crate) expected: BTreeMap<String, String>,
@@ -775,6 +777,11 @@ fn plan_model_test(
 ) -> Result<PlannedResponse, String> {
     let mut fixtures =
         classify_fixtures(plan.authored_ctes, plan.expected_ctes, plan.assertion_ctes);
+    fixtures.mock_table_function_columns = fixtures
+        .mock_table_functions
+        .iter()
+        .filter_map(|(name, sql)| Some((name.clone(), expected_columns(sql, context.parser)?)))
+        .collect();
     fixtures.scope = ScopeGraph::new(&ScopeRequest {
         fixtures: &fixtures,
         patterns: &context.patterns,
@@ -1332,6 +1339,7 @@ fn classify_fixtures(
         mock_seeds: BTreeMap::new(),
         mock_dbt_refs: BTreeMap::new(),
         mock_table_functions: BTreeMap::new(),
+        mock_table_function_columns: BTreeMap::new(),
         helpers: Vec::new(),
         scope: ScopeGraph::default(),
         expected: BTreeMap::new(),
@@ -1710,7 +1718,13 @@ fn resolve_table_function_fixtures<'a>(
     }
     let collapsed =
         collapse_partition_inputs(sql, &patterns.table_function, &patterns.lexical, |name| {
-            fixtures.mock_table_functions.contains_key(name)
+            fixtures.mock_table_functions.contains_key(name).then(|| {
+                fixtures
+                    .mock_table_function_columns
+                    .get(name)
+                    .cloned()
+                    .unwrap_or_default()
+            })
         })?;
     let (replaced, reached) = replace_callable_markers(
         &collapsed,
