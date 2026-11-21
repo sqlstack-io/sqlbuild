@@ -67,7 +67,7 @@
 			<span class="what">{c.outcome}{#if c.count != null}{` · ${c.count.toLocaleString('en-GB')} ${c.noun} (${SEVERITY[c.outcome]})`}{/if}</span>
 			<span class="acts">
 				{#if c.statementId}<Button variant="link" size="inline" class="text-[12px]" onclick={() => showSql(c)} aria-expanded={openSql.has(c.id)}>SQL {openSql.has(c.id) ? '▾' : '▸'}</Button>{/if}
-				{#if c.outcome !== 'passed' && c.statementId}<Button variant="link" size="inline" class="text-[12px]" onclick={() => showRows(c)} aria-expanded={openRows.has(c.id)}>rows {openRows.has(c.id) ? '▾' : '▸'}</Button>{/if}
+				{#if (c.outcome === 'failed' || c.outcome === 'warned') && c.statementId && app.client.getCheckSample}<Button variant="link" size="inline" class="text-[12px]" onclick={() => showRows(c)} aria-expanded={openRows.has(c.id)}>rows {openRows.has(c.id) ? '▾' : '▸'}</Button>{/if}
 			</span>
 		</div>
 		{#if openSql.has(c.id) && st}
