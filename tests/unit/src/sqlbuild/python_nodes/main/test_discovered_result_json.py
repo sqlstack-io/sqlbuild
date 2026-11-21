@@ -15,7 +15,7 @@ from tests.unit.src.sqlbuild.python_nodes.main._test_types import (
     DiscoveredArgsErrorTestCase,
     DiscoveredResultTestCase,
 )
-from tests.unit.src.sqlbuild.python_nodes.main.helpers import not_discovered, step, orders_plan
+from tests.unit.src.sqlbuild.python_nodes.main.helpers import not_discovered, orders_plan, step
 
 PROVIDERS: frozenset[str] = frozenset({"warehouse"})
 
