@@ -81,7 +81,7 @@ pub(crate) async fn start(
     responses((status = 204), (status = 401, body = AuthenticationDenial)))]
 pub(crate) async fn approve(
     State(store): State<ControlStore>,
-    (Extension(context), Extension(person), service): (
+    (Extension(context), Extension(person), service_account): (
         Extension<AuditContext>,
         Extension<AuthenticatedPerson>,
         Option<Extension<ServiceKeyIdentity>>,
@@ -89,8 +89,7 @@ pub(crate) async fn approve(
     headers: HeaderMap,
     Json(request): Json<CliLoginApprovalRequest>,
 ) -> Result<Response, ApiError> {
-    // A service account has no browser sign-in, so its key can't approve one for the CLI either.
-    if service.is_none()
+    if service_account.is_none()
         && !session_header(&headers)
         && approve_login(
             &store,

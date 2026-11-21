@@ -5,22 +5,20 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::authorization::_helpers::service_accounts::{
-    audit_change, begin_change, insert_key, require_service_account, service_account_summary,
+    audit_change, begin_change, require_service_account, service_account_summary,
 };
-use crate::credentials::_helpers::service_keys::new_service_key;
 use crate::credentials::constants::MAX_KEY_OVERLAP_MINUTES;
+use crate::credentials::main::service_keys::issue_service_key::issue_service_key;
 use crate::credentials::models::{
     Action, AuditContext, IssuedServiceKey, PermissionScope, ServiceAccountAuthority,
-    ServiceKeyOrigin, ServiceKeyRotation,
+    ServiceKeyRotation,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter};
+use crate::store::types::Row;
 
-/// Issues `principal_id` a new key; a person needs `user.manage` everywhere.
-///
-/// A key already in an overlap stops now. The current key stops now too, unless `rotation` gives it an
-/// overlap. A disabled account can be rotated, so a leaked key can be disabled, rotated and enabled.
+/// Issues `principal_id` a new key, keeping the replaced one for the overlap; a person needs `user.manage`.
 pub async fn rotate_service_key(
     store: &ControlStore,
     (context, authority): (&AuditContext, ServiceAccountAuthority),
@@ -38,7 +36,7 @@ pub async fn rotate_service_key(
         &[PermissionScope::action(Action::UserManage, None)],
     )
     .await?;
-    let (transaction, _) = require_service_account(transaction, principal_id).await?;
+    let transaction = require_service_account(transaction, principal_id).await?;
     let now = transaction.now;
     let (transaction, replaced) = query(transaction,
         "UPDATE sqb_service_account_keys SET revoked_at=$1 WHERE principal_id=$2 AND revoked_at IS NULL \
@@ -55,29 +53,29 @@ pub async fn rotate_service_key(
              AND expires_at IS NULL RETURNING prefix",
             vec![Parameter::Time(now), Parameter::Id(principal_id)]).await?,
     };
-    let key = new_service_key()?;
-    let (transaction, prefix) = insert_key(
-        transaction,
-        &authorized,
-        (principal_id, &key, ServiceKeyOrigin::Issued),
-    )
-    .await?;
-    let prefixes = |rows: &[crate::store::types::Row]| -> Vec<String> {
-        rows.iter()
-            .filter_map(|row| row["prefix"].as_str().map(str::to_owned))
-            .collect()
-    };
+    let (transaction, issued) =
+        issue_service_key(transaction, &authorized, (principal_id, None)).await?;
     let transaction = audit_change(
         transaction,
         &authorized,
         (principal_id, "service_account.key_rotated"),
         (
             json!({"key_prefixes": prefixes(&current), "stopped_old_key_prefixes": prefixes(&replaced)}),
-            json!({"key_prefix": prefix, "old_key_expires_at": ends}),
+            json!({"key_prefix": issued.prefix, "old_key_expires_at": ends}),
         ),
     )
     .await?;
     let (transaction, account) = service_account_summary(transaction, principal_id).await?;
     commit(transaction).await?;
-    Ok(IssuedServiceKey { account, key })
+    Ok(IssuedServiceKey {
+        account,
+        key: issued.key,
+    })
+}
+
+/// The prefixes of the keys an update returned.
+fn prefixes(rows: &[Row]) -> Vec<String> {
+    rows.iter()
+        .filter_map(|row| row["prefix"].as_str().map(str::to_owned))
+        .collect()
 }

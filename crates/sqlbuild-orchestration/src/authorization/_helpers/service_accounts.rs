@@ -1,4 +1,4 @@
-//! Service accounts: who may change them, how they read, and the keys a change writes.
+//! Service accounts: who may change them, how they are added, and how they read.
 
 use std::collections::BTreeMap;
 
@@ -9,15 +9,16 @@ use uuid::Uuid;
 
 use crate::authorization::_helpers::adder_scopes::{authorized, holds_all};
 use crate::authorization::_helpers::principal_names::principal_names;
-use crate::credentials::_helpers::service_keys::{key_hash, key_prefix};
 use crate::credentials::main::audit::append_audit::append_audit;
+use crate::credentials::main::identities::insert_principal::insert_principal;
 use crate::credentials::models::{
-    Action, AuditContext, BuiltinRole, PermissionScope, ServiceAccountAuthority,
+    Action, AuditContext, BuiltinRole, PermissionScope, PrincipalKind, ServiceAccountAuthority,
     ServiceAccountSummary, ServiceKeyOrigin, ServiceKeySummary,
 };
 use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, decode_row::decode_row, query::query};
-use crate::store::models::{Change, ControlStore, ControlTransaction, Parameter, TransactionMode};
+use crate::store::main::{begin::begin, commit::commit, decode_row::decode_row, query::query};
+use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
+use crate::store::types::Row;
 
 /// The longest service account name; names are also audit actors and CLI arguments.
 const MAX_NAME_CHARACTERS: usize = 63;
@@ -29,6 +30,42 @@ const ROLE_ORDER: [BuiltinRole; 4] = [
     BuiltinRole::Developer,
     BuiltinRole::Admin,
 ];
+
+type Names = BTreeMap<String, (String, PrincipalKind)>;
+
+#[derive(Deserialize)]
+struct PrincipalRow {
+    principal_id: Uuid,
+}
+
+#[derive(Deserialize)]
+struct RoleRow {
+    principal_id: Uuid,
+    role_key: serde_json::Value,
+}
+
+#[derive(Deserialize)]
+struct AccountRow {
+    principal_id: Uuid,
+    name: String,
+    description: Option<String>,
+    created_at: DateTime<Utc>,
+    created_by: String,
+    disabled_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Deserialize)]
+struct KeyRow {
+    key_id: Uuid,
+    principal_id: Uuid,
+    prefix: String,
+    origin: ServiceKeyOrigin,
+    created_at: DateTime<Utc>,
+    created_by: String,
+    last_used_at: Option<DateTime<Utc>>,
+    expires_at: Option<DateTime<Utc>>,
+    revoked_at: Option<DateTime<Utc>>,
+}
 
 /// A write transaction for a change: authorized for every one of `scopes` for a person, or the owner's.
 pub(crate) async fn begin_change(
@@ -78,23 +115,59 @@ pub(crate) fn check_name(name: &str) -> Result<(), ControlError> {
     }
 }
 
+/// Adds the principal `name` as a service account, refused when any principal has the name in any case.
+pub(crate) async fn add_service_principal(
+    transaction: ControlTransaction,
+    context: &AuditContext,
+    (name, description): (&str, Option<&str>),
+) -> Result<(ControlTransaction, Uuid), ControlError> {
+    let (transaction, taken) = query(
+        transaction,
+        "SELECT principal_id FROM sqb_principals WHERE lower(name)=$1",
+        vec![Parameter::Text(name.into())],
+    )
+    .await?;
+    if !taken.is_empty() {
+        return Err(ControlError::Invalid(format!(
+            "{name} already names a person or service account"
+        )));
+    }
+    let (transaction, principal_id) =
+        insert_principal(transaction, context, (Uuid::now_v7(), name)).await?;
+    let description = description
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .map(str::to_owned);
+    let (transaction, _) = query(
+        transaction,
+        "INSERT INTO sqb_service_accounts (principal_id, description, created_by) VALUES ($1,$2,$3)",
+        vec![
+            Parameter::Id(principal_id),
+            Parameter::OptionalText(description),
+            Parameter::Text(context.actor.clone()),
+        ],
+    )
+    .await?;
+    Ok((transaction, principal_id))
+}
+
 /// The service account `principal_id`, refused as invalid when it is a person or doesn't exist.
 pub(crate) async fn require_service_account(
     transaction: ControlTransaction,
     principal_id: Uuid,
-) -> Result<(ControlTransaction, String), ControlError> {
+) -> Result<ControlTransaction, ControlError> {
     let (transaction, rows) = query(
         transaction,
-        "SELECT p.name FROM sqb_principals p JOIN sqb_service_accounts s ON s.principal_id=p.principal_id \
-         WHERE p.principal_id=$1",
+        "SELECT principal_id FROM sqb_service_accounts WHERE principal_id=$1",
         vec![Parameter::Id(principal_id)],
     )
     .await?;
-    let name = rows
-        .first()
-        .and_then(|row| row["name"].as_str())
-        .ok_or_else(|| ControlError::Invalid(format!("no service account {principal_id}")))?;
-    Ok((transaction, name.to_owned()))
+    if rows.is_empty() {
+        return Err(ControlError::Invalid(format!(
+            "no service account {principal_id}"
+        )));
+    }
+    Ok(transaction)
 }
 
 /// The service account named `name`, for the CLI, which names accounts rather than numbering them.
@@ -109,54 +182,13 @@ pub(crate) async fn service_account_named(
         vec![Parameter::Text(name.into())],
     )
     .await?;
-    crate::store::main::commit::commit(transaction).await?;
-    rows.first()
-        .and_then(|row| row["principal_id"].as_str())
-        .and_then(|id| Uuid::parse_str(id).ok())
-        .ok_or_else(|| ControlError::Invalid(format!("no service account named {name}")))
-}
-
-/// Stores a new key for `principal_id`, by its hash only, and returns its prefix.
-pub(crate) async fn insert_key(
-    transaction: ControlTransaction,
-    context: &AuditContext,
-    (principal_id, key, origin): (Uuid, &str, ServiceKeyOrigin),
-) -> Result<(ControlTransaction, String), ControlError> {
-    let hash = key_hash(key);
-    let (transaction, taken) = query(
-        transaction,
-        "SELECT key_id FROM sqb_service_account_keys WHERE secret_hash=$1",
-        vec![Parameter::Text(hash.clone())],
-    )
-    .await?;
-    if !taken.is_empty() {
-        return Err(ControlError::Invalid(
-            "that key is already in use; choose another".into(),
-        ));
-    }
-    let prefix = key_prefix(key);
-    let now = transaction.now;
-    let origin_text = match origin {
-        ServiceKeyOrigin::Issued => "issued",
-        ServiceKeyOrigin::Imported => "imported",
+    commit(transaction).await?;
+    let Some(row) = rows.into_iter().next() else {
+        return Err(ControlError::Invalid(format!(
+            "no service account named {name}"
+        )));
     };
-    let (mut transaction, _) = query(
-        transaction,
-        "INSERT INTO sqb_service_account_keys (key_id, principal_id, secret_hash, prefix, origin, created_at, created_by) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7)",
-        vec![
-            Parameter::Id(Uuid::now_v7()),
-            Parameter::Id(principal_id),
-            Parameter::Text(hash),
-            Parameter::Text(prefix.clone()),
-            Parameter::Text(origin_text.into()),
-            Parameter::Time(now),
-            Parameter::Text(context.actor.clone()),
-        ],
-    )
-    .await?;
-    transaction.changes.insert(Change::Credentials);
-    Ok((transaction, prefix))
+    Ok(decode_row::<PrincipalRow>(row)?.principal_id)
 }
 
 /// Records a change to service account `principal_id` in the audit log, under the acting principal.
@@ -175,27 +207,79 @@ pub(crate) async fn audit_change(
     .await
 }
 
-#[derive(Deserialize)]
-struct AccountRow {
-    principal_id: Uuid,
-    name: String,
-    description: Option<String>,
-    created_at: DateTime<Utc>,
-    created_by: String,
-    disabled_at: Option<DateTime<Utc>>,
+/// The built-in role a stored `role_key` names; custom roles name none.
+pub(crate) fn builtin_role(role_key: &serde_json::Value) -> Option<BuiltinRole> {
+    ROLE_ORDER.into_iter().find(|role| json!(role) == *role_key)
 }
 
-#[derive(Deserialize)]
-struct KeyRow {
-    key_id: Uuid,
-    principal_id: Uuid,
-    prefix: String,
-    origin: ServiceKeyOrigin,
-    created_at: DateTime<Utc>,
-    created_by: String,
-    last_used_at: Option<DateTime<Utc>>,
-    expires_at: Option<DateTime<Utc>>,
-    revoked_at: Option<DateTime<Utc>>,
+/// Each account's highest built-in role everywhere.
+fn highest_roles(rows: Vec<Row>) -> Result<BTreeMap<Uuid, BuiltinRole>, ControlError> {
+    let mut held: BTreeMap<Uuid, BuiltinRole> = BTreeMap::new();
+    for row in rows {
+        let row: RoleRow = decode_row(row)?;
+        let Some(role) = builtin_role(&row.role_key) else {
+            continue;
+        };
+        let rank = |role: &BuiltinRole| ROLE_ORDER.iter().position(|r| r == role);
+        if held
+            .get(&row.principal_id)
+            .is_none_or(|current| rank(&role) > rank(current))
+        {
+            held.insert(row.principal_id, role);
+        }
+    }
+    Ok(held)
+}
+
+/// Who made something, by name; none when the control-store owner did.
+fn made_by(names: &Names, actor: &str) -> Option<String> {
+    names.get(actor).map(|(name, _)| name.clone())
+}
+
+/// Whether a key works at `now`, or will once its account is enabled.
+fn working(key: &KeyRow, now: DateTime<Utc>) -> bool {
+    key.revoked_at.is_none() && key.expires_at.is_none_or(|end| end > now)
+}
+
+fn key_summary(key: &KeyRow, names: &Names) -> ServiceKeySummary {
+    ServiceKeySummary {
+        key_id: key.key_id,
+        prefix: key.prefix.clone(),
+        origin: key.origin,
+        created_at: key.created_at,
+        created_by: made_by(names, &key.created_by),
+        last_used_at: key.last_used_at,
+        expires_at: key.expires_at,
+    }
+}
+
+/// One account with its working keys, the current one first, and its newest use of any key.
+fn account_summary(
+    account: AccountRow,
+    (keys, roles, names): (&[KeyRow], &BTreeMap<Uuid, BuiltinRole>, &Names),
+    now: DateTime<Utc>,
+) -> ServiceAccountSummary {
+    let mine: Vec<&KeyRow> = keys
+        .iter()
+        .filter(|key| key.principal_id == account.principal_id)
+        .collect();
+    let mut working_keys: Vec<ServiceKeySummary> = mine
+        .iter()
+        .filter(|key| working(key, now))
+        .map(|key| key_summary(key, names))
+        .collect();
+    working_keys.sort_by_key(|key| key.expires_at.is_some());
+    ServiceAccountSummary {
+        principal_id: account.principal_id,
+        role: roles.get(&account.principal_id).copied(),
+        created_by: made_by(names, &account.created_by),
+        name: account.name,
+        description: account.description,
+        created_at: account.created_at,
+        disabled_at: account.disabled_at,
+        last_used_at: mine.iter().filter_map(|key| key.last_used_at).max(),
+        keys: working_keys,
+    }
 }
 
 /// Service accounts by name, or only `principal_id`, with the keys that work at `transaction.now`.
@@ -225,71 +309,23 @@ pub(crate) async fn service_account_summaries(
     )
     .await?;
     let (transaction, names) = principal_names(transaction).await?;
-    let made_by = |actor: &str| names.get(actor).map(|(name, _)| name.clone());
-    let mut held: BTreeMap<Uuid, BuiltinRole> = BTreeMap::new();
-    for row in roles {
-        let (Some(id), Ok(role)) = (
-            row["principal_id"]
-                .as_str()
-                .and_then(|id| Uuid::parse_str(id).ok()),
-            serde_json::from_value::<BuiltinRole>(row["role_key"].clone()),
-        ) else {
-            continue;
-        };
-        let rank = |role: &BuiltinRole| ROLE_ORDER.iter().position(|r| r == role);
-        if held
-            .get(&id)
-            .is_none_or(|current| rank(&role) > rank(current))
-        {
-            held.insert(id, role);
-        }
-    }
-    let keys = keys
+    let roles = highest_roles(roles)?;
+    let keys: Vec<KeyRow> = keys
         .into_iter()
         .map(decode_row::<KeyRow>)
-        .collect::<Result<Vec<_>, _>>()?;
-    let summaries = accounts
+        .collect::<Result<_, _>>()?;
+    let accounts: Vec<AccountRow> = accounts
         .into_iter()
-        .map(|row| {
-            let account: AccountRow = decode_row(row)?;
-            let mine: Vec<&KeyRow> = keys
-                .iter()
-                .filter(|key| key.principal_id == account.principal_id)
-                .collect();
-            let last_used_at = mine.iter().filter_map(|key| key.last_used_at).max();
-            let mut working: Vec<ServiceKeySummary> = mine
-                .iter()
-                .filter(|key| {
-                    key.revoked_at.is_none() && key.expires_at.is_none_or(|end| end > now)
-                })
-                .map(|key| ServiceKeySummary {
-                    key_id: key.key_id,
-                    prefix: key.prefix.clone(),
-                    origin: key.origin,
-                    created_at: key.created_at,
-                    created_by: made_by(&key.created_by),
-                    last_used_at: key.last_used_at,
-                    expires_at: key.expires_at,
-                })
-                .collect();
-            working.sort_by_key(|key| key.expires_at.is_some());
-            Ok(ServiceAccountSummary {
-                principal_id: account.principal_id,
-                role: held.get(&account.principal_id).copied(),
-                created_by: made_by(&account.created_by),
-                name: account.name,
-                description: account.description,
-                created_at: account.created_at,
-                disabled_at: account.disabled_at,
-                last_used_at,
-                keys: working,
-            })
-        })
-        .collect::<Result<Vec<_>, ControlError>>()?;
+        .map(decode_row::<AccountRow>)
+        .collect::<Result<_, _>>()?;
+    let summaries: Vec<ServiceAccountSummary> = accounts
+        .into_iter()
+        .map(|account| account_summary(account, (&keys, &roles, &names), now))
+        .collect();
     Ok((transaction, summaries))
 }
 
-/// The one summary of `principal_id`, read after a change.
+/// The one summary of `principal_id`, read in `transaction` after a change.
 pub(crate) async fn service_account_summary(
     transaction: ControlTransaction,
     principal_id: Uuid,
@@ -300,4 +336,15 @@ pub(crate) async fn service_account_summary(
         .pop()
         .ok_or_else(|| ControlError::Invalid(format!("no service account {principal_id}")))?;
     Ok((transaction, summary))
+}
+
+/// The summary of `principal_id`, read once a change has committed.
+pub(crate) async fn read_service_account(
+    store: &ControlStore,
+    principal_id: Uuid,
+) -> Result<ServiceAccountSummary, ControlError> {
+    let (transaction, account) =
+        service_account_summary(begin(store, TransactionMode::Read).await?, principal_id).await?;
+    commit(transaction).await?;
+    Ok(account)
 }

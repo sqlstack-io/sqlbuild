@@ -1,5 +1,9 @@
 //! Typed HTTP responses shared with the generated OpenAPI contract.
 
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+
 use serde::{Deserialize, Serialize};
 
 use crate::api::_helpers::authentication::password_sessions;
@@ -685,3 +689,7 @@ pub struct ServerRetention {
     pub location_health_days: i64,
     pub sensor_evaluation_days: i64,
 }
+
+/// When each service key's refusal was last audited, kept per router so the throttle stays local.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct KeyRefusals(pub(crate) Arc<Mutex<HashMap<uuid::Uuid, Instant>>>);

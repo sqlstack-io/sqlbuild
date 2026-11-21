@@ -448,6 +448,16 @@ pub enum ServiceKeyOrigin {
     Imported,
 }
 
+impl ServiceKeyOrigin {
+    /// The stored text, as the store's check constraint names it.
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Issued => "issued",
+            Self::Imported => "imported",
+        }
+    }
+}
+
 /// One working key of a service account; never the key itself.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ServiceKeySummary {
@@ -532,6 +542,25 @@ pub(crate) struct ServiceKeyIdentity {
     pub(crate) principal_id: Uuid,
     pub(crate) key_id: Uuid,
     pub(crate) last_used_at: Option<DateTime<Utc>>,
+}
+
+/// A stored key as authentication reads it, with whether its account is disabled.
+#[derive(Debug, Deserialize)]
+pub(crate) struct ServiceKeyState {
+    pub(crate) key_id: Uuid,
+    pub(crate) principal_id: Uuid,
+    pub(crate) expires_at: Option<DateTime<Utc>>,
+    pub(crate) revoked_at: Option<DateTime<Utc>>,
+    pub(crate) last_used_at: Option<DateTime<Utc>>,
+    pub(crate) disabled_at: Option<DateTime<Utc>>,
+}
+
+/// A key made for a service account, returned only once, and its non-secret prefix.
+#[derive(Debug)]
+pub(crate) struct NewServiceKey {
+    pub(crate) key: String,
+    pub(crate) prefix: String,
+    pub(crate) origin: ServiceKeyOrigin,
 }
 
 /// What a presented key turned out to be.

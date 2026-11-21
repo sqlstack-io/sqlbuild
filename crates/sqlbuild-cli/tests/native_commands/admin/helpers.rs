@@ -127,3 +127,19 @@ pub(crate) fn audit_actions(control: &TestControl, bearer: &str) -> Vec<String> 
         .collect::<Result<_, _>>()
         .expect("decode audit")
 }
+
+/// The status of reading the bootstrap with `key` from an address the server doesn't name.
+pub(crate) async fn keyed_bootstrap_status(url: &str, key: &str) -> u16 {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .expect("HTTP client")
+        .get(format!("{url}/api/control/bootstrap"))
+        .header(reqwest::header::HOST, "10.20.30.40:8000")
+        .bearer_auth(key)
+        .send()
+        .await
+        .expect("keyed request")
+        .status()
+        .as_u16()
+}

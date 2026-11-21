@@ -24,7 +24,7 @@ pub(crate) async fn principal_names(
         Vec::new(),
     )
     .await?;
-    let names = rows
+    let names: BTreeMap<String, (String, PrincipalKind)> = rows
         .iter()
         .filter_map(|row| {
             let kind = if row["service"].as_i64() == Some(1) {

@@ -33,7 +33,7 @@ use crate::native_commands::constants::{
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::{
     ControlAdmin, CostOptions, NativeCommand, NativeInvocation, RulesAction, RulesOptions,
-    SkillsOptions,
+    ServiceAccountAdmin, SkillsOptions, TokenAdmin,
 };
 use crate::server_config::models::{ServerConfig, ServerSection};
 use sqlbuild_core::cost_command::constants::DESCENDING_ORDER;
@@ -238,13 +238,13 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                     "token expiry must be in the future".into(),
                 ));
             }
-            Ok(ControlAdmin::IssueToken(
+            Ok(ControlAdmin::Token(TokenAdmin::Issue(
                 CredentialScope::Location { location_id: id },
                 expiry,
-            ))
+            )))
         }
-        Some("revoke-token") => Ok(ControlAdmin::RevokeToken(id)),
-        Some("rotate-token") => Ok(ControlAdmin::RotateToken(id)),
+        Some("revoke-token") => Ok(ControlAdmin::Token(TokenAdmin::Revoke(id))),
+        Some("rotate-token") => Ok(ControlAdmin::Token(TokenAdmin::Rotate(id))),
         Some("set-password") => Ok(ControlAdmin::SetPassword(id, read_password()?)),
         Some("grant-admin") => Ok(ControlAdmin::GrantAdmin(id)),
         _ => Err(ControlError::Invalid(
@@ -444,8 +444,7 @@ pub(crate) fn control_database(
     }
 }
 
-/// The strings of a list attribute, or `None` when it holds anything else.
-/// The service account commands, which name accounts rather than numbering them; none for other commands.
+/// The service account command `action` names, or none for the other admin commands.
 fn service_account_admin(
     namespace: &Namespace,
     action: Option<&str>,
@@ -460,38 +459,16 @@ fn service_account_admin(
             Ok(name.trim().to_owned())
         }
     };
-    Ok(Some(match action {
-        Some("create-service-account") => {
-            let role: BuiltinRole =
-                serde_json::from_value(json!(text(namespace, "admin_role").unwrap_or_default()))
-                    .map_err(|_| {
-                        ControlError::Invalid(
-                            "--role is viewer, operator, developer or admin".into(),
-                        )
-                    })?;
-            let key = match text(namespace, "admin_key_env") {
-                None => None,
-                Some(variable) => Some(
-                    std::env::var(&variable)
-                        .ok()
-                        .filter(|key| !key.is_empty())
-                        .ok_or_else(|| {
-                            ControlError::Invalid(format!(
-                                "--key-from-env names {variable}, which is not set"
-                            ))
-                        })?,
-                ),
-            };
-            ControlAdmin::CreateServiceAccount {
-                request: NewServiceAccount {
-                    name: named()?,
-                    description: text(namespace, "admin_description"),
-                    role,
-                },
-                key,
-            }
-        }
-        Some("rotate-service-account") => ControlAdmin::RotateServiceAccount {
+    let admin = match action {
+        Some("create-service-account") => ServiceAccountAdmin::Create {
+            request: NewServiceAccount {
+                name: named()?,
+                description: text(namespace, "admin_description"),
+                role: service_role(namespace)?,
+            },
+            key: imported_key(namespace)?,
+        },
+        Some("rotate-service-account") => ServiceAccountAdmin::Rotate {
             name: named()?,
             overlap_minutes: match namespace.get("admin_overlap_minutes") {
                 Some(Value::Int(minutes)) => minutes.parse::<i64>().map_err(|_| {
@@ -500,17 +477,43 @@ fn service_account_admin(
                 _ => 0,
             },
         },
-        Some(change @ ("disable-service-account" | "enable-service-account")) => {
-            ControlAdmin::SetServiceAccountDisabled {
-                name: named()?,
-                disabled: change == "disable-service-account",
-            }
-        }
-        Some("list-service-accounts") => ControlAdmin::ListServiceAccounts,
+        Some("disable-service-account") => ServiceAccountAdmin::SetDisabled {
+            name: named()?,
+            disabled: true,
+        },
+        Some("enable-service-account") => ServiceAccountAdmin::SetDisabled {
+            name: named()?,
+            disabled: false,
+        },
+        Some("list-service-accounts") => ServiceAccountAdmin::List,
         _ => return Ok(None),
-    }))
+    };
+    Ok(Some(ControlAdmin::ServiceAccount(admin)))
 }
 
+/// The built-in role `--role` names.
+fn service_role(namespace: &Namespace) -> Result<BuiltinRole, ControlError> {
+    serde_json::from_value(json!(text(namespace, "admin_role").unwrap_or_default()))
+        .map_err(|_| ControlError::Invalid("--role is viewer, operator, developer or admin".into()))
+}
+
+/// The key held in the variable `--key-from-env` names, when it names one.
+fn imported_key(namespace: &Namespace) -> Result<Option<String>, ControlError> {
+    let Some(variable) = text(namespace, "admin_key_env") else {
+        return Ok(None);
+    };
+    match std::env::var(&variable) {
+        Ok(key) if !key.is_empty() => Ok(Some(key)),
+        Ok(_) | Err(std::env::VarError::NotPresent) => Err(ControlError::Invalid(format!(
+            "--key-from-env names {variable}, which is not set"
+        ))),
+        Err(std::env::VarError::NotUnicode(_)) => Err(ControlError::Invalid(format!(
+            "--key-from-env names {variable}, which doesn't hold UTF-8 text"
+        ))),
+    }
+}
+
+/// The strings of a list attribute, or `None` when it holds anything else.
 fn texts(namespace: &Namespace, name: &str) -> Option<Vec<String>> {
     match namespace.get(name) {
         None | Some(Value::None) => Some(Vec::new()),

@@ -25,7 +25,7 @@ pub async fn set_service_account_disabled(
         &[PermissionScope::action(Action::UserManage, None)],
     )
     .await?;
-    let (transaction, _) = require_service_account(transaction, principal_id).await?;
+    let transaction = require_service_account(transaction, principal_id).await?;
     let now = transaction.now;
     let (mut transaction, changed) = if disabled {
         query(transaction,

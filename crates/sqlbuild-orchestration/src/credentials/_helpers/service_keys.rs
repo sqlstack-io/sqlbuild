@@ -54,11 +54,6 @@ pub(crate) fn check_imported_key(key: &str) -> Result<(), ControlError> {
     Ok(())
 }
 
-/// Whether a bearer credential is shaped like a service account key, as opposed to another scheme's token.
-pub(crate) fn is_service_key(credential: &str) -> bool {
-    credential.starts_with(SERVICE_KEY_PREFIX)
-}
-
 /// The non-secret start of a key that identifies it in lists and the audit log.
 pub(crate) fn key_prefix(key: &str) -> String {
     key.chars()

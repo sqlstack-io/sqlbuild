@@ -25,9 +25,7 @@ pub(crate) enum ControlAdmin {
     CreateLocation(String),
     CreatePrincipal(String),
     BootstrapUser(String),
-    IssueToken(CredentialScope, DateTime<Utc>),
-    RevokeToken(Uuid),
-    RotateToken(Uuid),
+    Token(TokenAdmin),
     SetPassword(Uuid, String),
     GrantAdmin(Uuid),
     RequestJobRun(JobRunRequest),
@@ -45,20 +43,34 @@ pub(crate) enum ControlAdmin {
         change: TriggerChange,
         reason: String,
     },
-    /// A new service account, with the key read from `--key-from-env` when one is imported.
-    CreateServiceAccount {
+    ServiceAccount(ServiceAccountAdmin),
+}
+
+/// The location token commands.
+#[derive(Debug)]
+pub(crate) enum TokenAdmin {
+    Issue(CredentialScope, DateTime<Utc>),
+    Revoke(Uuid),
+    Rotate(Uuid),
+}
+
+/// The service account commands, which name accounts rather than numbering them.
+#[derive(Debug)]
+pub(crate) enum ServiceAccountAdmin {
+    /// A new account, with the key read from `--key-from-env` when one is imported.
+    Create {
         request: NewServiceAccount,
         key: Option<String>,
     },
-    RotateServiceAccount {
+    Rotate {
         name: String,
         overlap_minutes: i64,
     },
-    SetServiceAccountDisabled {
+    SetDisabled {
         name: String,
         disabled: bool,
     },
-    ListServiceAccounts,
+    List,
 }
 
 /// Parsing can finish an invocation before package discovery or any Python handoff.

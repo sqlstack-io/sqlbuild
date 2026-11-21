@@ -25,7 +25,7 @@ pub async fn revoke_service_key(
         &[PermissionScope::action(Action::UserManage, None)],
     )
     .await?;
-    let (transaction, _) = require_service_account(transaction, principal_id).await?;
+    let transaction = require_service_account(transaction, principal_id).await?;
     let now = transaction.now;
     let (mut transaction, stopped) = query(
         transaction,

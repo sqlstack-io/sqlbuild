@@ -1,24 +1,12 @@
 //! A presented key is found by its hash; it works while unstopped, unexpired and its account enabled.
 
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
-use uuid::Uuid;
 
 use crate::credentials::_helpers::service_keys::key_hash;
-use crate::credentials::models::{ServiceKeyCheck, ServiceKeyIdentity};
+use crate::credentials::models::{ServiceKeyCheck, ServiceKeyIdentity, ServiceKeyState};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, decode_row::decode_row, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
-
-#[derive(Deserialize)]
-struct KeyState {
-    key_id: Uuid,
-    principal_id: Uuid,
-    expires_at: Option<DateTime<Utc>>,
-    revoked_at: Option<DateTime<Utc>>,
-    last_used_at: Option<DateTime<Utc>>,
-    disabled_at: Option<DateTime<Utc>>,
-}
 
 /// What `key` is at `now`: a working key, a known key refused and why, or no key the store knows.
 pub(crate) async fn authenticate_service_key(
@@ -38,7 +26,7 @@ pub(crate) async fn authenticate_service_key(
     let Some(row) = rows.into_iter().next() else {
         return Ok(ServiceKeyCheck::Unknown);
     };
-    let state: KeyState = decode_row(row)?;
+    let state: ServiceKeyState = decode_row(row)?;
     let refused = |reason| ServiceKeyCheck::Refused {
         principal_id: state.principal_id,
         key_id: state.key_id,

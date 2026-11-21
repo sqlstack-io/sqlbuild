@@ -1,11 +1,6 @@
 //! A service account's key authenticates person routes from any peer, whatever the sign-in mode.
-//!
-//! Keys are recognised by their prefix in `Authorization: Bearer`, so a proxy's own bearer token still
-//! reaches the mode's sign-in. A keyed request never consults the trusted proxy's identity header.
 
-use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
 use axum::Router;
@@ -13,60 +8,63 @@ use axum::extract::{ConnectInfo, Request, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::Response;
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::api::_helpers::authentication::password_transport::{
     deny, private_cache_control, single_header,
 };
 use crate::api::errors::ApiError;
-use crate::credentials::_helpers::service_keys::is_service_key;
-use crate::credentials::constants::KEY_REFUSAL_INTERVAL_SECONDS;
+use crate::api::models::KeyRefusals;
+use crate::credentials::constants::{KEY_REFUSAL_INTERVAL_SECONDS, SERVICE_KEY_PREFIX};
 use crate::credentials::main::service_keys::authenticate_service_key::authenticate_service_key;
 use crate::credentials::main::service_keys::record_refused_key::record_refused_key;
 use crate::credentials::main::service_keys::record_service_key_use::record_service_key_use;
-use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole, ServiceKeyCheck};
+use crate::credentials::models::{
+    AuditContext, AuthenticatedPerson, DefaultRole, ServiceKeyCheck, ServiceKeyIdentity,
+};
 use crate::store::models::ControlStore;
 
-/// Keys whose refusal was audited lately, so a script retrying with a stopped key writes one entry a minute.
-static REFUSALS: LazyLock<Mutex<HashMap<Uuid, Instant>>> = LazyLock::new(Mutex::default);
 /// Forget refusals beyond this many keys; at worst a refusal is audited again sooner.
 const REFUSALS_KEPT: usize = 10_000;
 
-/// The key in a single `Authorization: Bearer sqbk_…` header.
+/// The key in a single `Authorization: Bearer sqbk_…` header; a proxy's own bearer token is no key.
 pub(crate) fn presented_key(headers: &HeaderMap) -> Option<&str> {
     single_header(headers, header::AUTHORIZATION.as_str())?
         .strip_prefix("Bearer ")
-        .filter(|credential| is_service_key(credential))
+        .filter(|credential| credential.starts_with(SERVICE_KEY_PREFIX))
 }
 
 /// `routes`, also open to service keys; a request without one goes on to the mode's own sign-in.
 pub(crate) fn keyed(store: &ControlStore, routes: Router<ControlStore>) -> Router<ControlStore> {
-    routes.route_layer(middleware::from_fn_with_state(store.clone(), optional))
+    let state = (store.clone(), KeyRefusals::default());
+    routes.route_layer(middleware::from_fn_with_state(state, optional))
 }
 
 /// `routes` on a server without people's sign-in: only service keys get in.
 pub(crate) fn key_only(store: &ControlStore, routes: Router<ControlStore>) -> Router<ControlStore> {
-    routes.route_layer(middleware::from_fn_with_state(store.clone(), required))
+    let state = (store.clone(), KeyRefusals::default());
+    routes.route_layer(middleware::from_fn_with_state(state, required))
 }
 
 async fn optional(
-    State(store): State<ControlStore>,
+    State(state): State<(ControlStore, KeyRefusals)>,
     request: Request,
     next: Next,
 ) -> Result<Response, ApiError> {
     match presented_key(request.headers()).map(str::to_owned) {
-        Some(key) => keyed_request(&store, (request, next), &key).await,
+        Some(key) => keyed_request(&state, (request, next), &key).await,
         None => Ok(next.run(request).await),
     }
 }
 
 async fn required(
-    State(store): State<ControlStore>,
+    State(state): State<(ControlStore, KeyRefusals)>,
     request: Request,
     next: Next,
 ) -> Result<Response, ApiError> {
     let mut response = match presented_key(request.headers()).map(str::to_owned) {
-        Some(key) => keyed_request(&store, (request, next), &key).await?,
+        Some(key) => keyed_request(&state, (request, next), &key).await?,
         None => deny(&context_of(&request))?,
     };
     private_cache_control(&mut response);
@@ -77,16 +75,14 @@ async fn required(
     Ok(response)
 }
 
-/// Runs the request as the key's service account, without the installation's default role.
-///
-/// The key's last use moves only when the request wasn't refused; a known key that is refused is audited.
+/// Runs the request as the key's service account, without the default role; a known key refused is audited.
 async fn keyed_request(
-    store: &ControlStore,
+    (store, refusals): &(ControlStore, KeyRefusals),
     (mut request, next): (Request, Next),
     key: &str,
 ) -> Result<Response, ApiError> {
     let mut context = context_of(&request);
-    let now = chrono::Utc::now();
+    let now = Utc::now();
     match authenticate_service_key(store, key, now).await? {
         ServiceKeyCheck::Accepted(identity) => {
             context.actor = format!("principal:{}", identity.principal_id);
@@ -97,13 +93,7 @@ async fn keyed_request(
             extensions.insert(DefaultRole::None);
             extensions.insert(identity);
             let response = next.run(request).await;
-            if !matches!(
-                response.status(),
-                StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN
-            ) {
-                // Last use is a hint for administrators; a failed write must not fail the call it describes.
-                drop(record_service_key_use(store, identity, now).await);
-            }
+            note_use(store, (identity, response.status()), now).await;
             Ok(response)
         }
         ServiceKeyCheck::Refused {
@@ -111,12 +101,23 @@ async fn keyed_request(
             key_id,
             reason,
         } => {
-            if refusal_due(key_id) {
+            if refusal_due(refusals, key_id) {
                 record_refused_key(store, &context, (principal_id, key_id, reason)).await?;
             }
             deny(&context)
         }
         ServiceKeyCheck::Unknown => deny(&context),
+    }
+}
+
+/// Moves the key's last use for a request that wasn't refused; a failed write never fails the call it describes.
+async fn note_use(
+    store: &ControlStore,
+    (identity, status): (ServiceKeyIdentity, StatusCode),
+    now: DateTime<Utc>,
+) {
+    if !matches!(status, StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN) {
+        drop(record_service_key_use(store, identity, now).await);
     }
 }
 
@@ -137,21 +138,22 @@ fn context_of(request: &Request) -> AuditContext {
         })
 }
 
-fn refusal_due(key_id: Uuid) -> bool {
-    let Ok(mut refusals) = REFUSALS.lock() else {
+/// Whether `key_id`'s refusal is audited now: at most once an interval, so a retrying script can't flood the log.
+fn refusal_due(refusals: &KeyRefusals, key_id: Uuid) -> bool {
+    let Ok(mut seen) = refusals.0.lock() else {
         return true;
     };
     let now = Instant::now();
     let interval = Duration::from_secs(KEY_REFUSAL_INTERVAL_SECONDS);
-    if refusals
+    if seen
         .get(&key_id)
         .is_some_and(|last| now.duration_since(*last) < interval)
     {
         return false;
     }
-    if refusals.len() >= REFUSALS_KEPT {
-        refusals.clear();
+    if seen.len() >= REFUSALS_KEPT {
+        seen.clear();
     }
-    refusals.insert(key_id, now);
+    seen.insert(key_id, now);
     true
 }

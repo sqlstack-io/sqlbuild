@@ -55,11 +55,7 @@ pub(crate) async fn guard(
         .get::<std::sync::Arc<ProxySettings>>()
         .filter(|settings| settings.trusted_peers.contains(&peer.ip().to_canonical()))
         .cloned();
-    // A service key is no browser credential: a page can't send one cross-site without CORS, which the
-    // server never grants, so keyed callers skip the browser's host and origin checks on any address.
-    // Sign-in routes take no keys, so they keep those checks whatever a request carries.
-    let keyed = presented_key(request.headers()).is_some()
-        && !request.uri().path().starts_with(SIGN_IN_ROUTES);
+    let keyed = keyed_caller(&request);
     if let Some(settings) = proxy.as_ref().filter(|_| !keyed) {
         let host = single_header(request.headers(), header::HOST.as_str());
         if !settings.host_allowed(host) {
@@ -92,6 +88,11 @@ pub(crate) async fn guard(
         HeaderValue::from_static("nosniff"),
     );
     Ok(response)
+}
+
+/// A keyed script outside sign-in routes; no page sends a key cross-site, as the server never grants CORS.
+fn keyed_caller(request: &Request) -> bool {
+    presented_key(request.headers()).is_some() && !request.uri().path().starts_with(SIGN_IN_ROUTES)
 }
 
 /// A browser request for this origin's host whose write, if any, comes from the origin itself.

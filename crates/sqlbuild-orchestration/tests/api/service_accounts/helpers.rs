@@ -1,7 +1,8 @@
 //! Service accounts made by the control-store owner, and keyed requests from any address.
 
-use reqwest::{Client, StatusCode, header};
-use serde_json::Value;
+use reqwest::header::COOKIE;
+use reqwest::{Client, RequestBuilder, StatusCode, header};
+use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::authorization::main::service_accounts::create_service_account::create_service_account;
@@ -98,4 +99,56 @@ pub(crate) async fn end_overlaps(store: &ControlStore, principal_id: Uuid) {
     .await
     .expect("end overlaps");
     commit(transaction).await.expect("commit");
+}
+
+/// A signed-in person's write: their session cookie and its CSRF token.
+pub(crate) async fn person_post(
+    client: &Client,
+    (url, path): (&str, &str),
+    person: &(String, String),
+    body: &Value,
+) -> (StatusCode, Value) {
+    let response = client
+        .post(format!("{url}{path}"))
+        .header(COOKIE, &person.0)
+        .header("x-sqb-csrf", &person.1)
+        .json(body)
+        .send()
+        .await
+        .expect("write");
+    let status = response.status();
+    (status, response.json().await.unwrap_or(Value::Null))
+}
+
+/// A signed-in person's read.
+pub(crate) async fn person_get(
+    client: &Client,
+    (url, path): (&str, &str),
+    person: &(String, String),
+) -> (StatusCode, Value) {
+    let response = client
+        .get(format!("{url}{path}"))
+        .header(COOKIE, &person.0)
+        .send()
+        .await
+        .expect("read");
+    let status = response.status();
+    (status, response.json().await.unwrap_or(Value::Null))
+}
+
+/// Whether the audit page has an entry by service account `name` with `action`.
+pub(crate) fn audited(audit: &Value, (name, action): (&str, &str)) -> bool {
+    audit.as_array().into_iter().flatten().any(|event| {
+        event["actor_name"] == json!(name)
+            && event["actor_kind"] == json!("service")
+            && event["action"] == json!(action)
+    })
+}
+
+pub(crate) fn with_key(request: RequestBuilder, key: &str) -> RequestBuilder {
+    request.bearer_auth(key)
+}
+
+pub(crate) fn without_key(request: RequestBuilder, _key: &str) -> RequestBuilder {
+    request
 }

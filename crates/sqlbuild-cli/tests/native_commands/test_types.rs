@@ -110,12 +110,27 @@ pub(crate) struct StoreMigrationCommandTestCase {
     pub(crate) expected_store: bool,
 }
 
-pub(crate) struct ServiceAccountCliTestCase {
+pub(crate) struct GeneratedKeyCliTestCase {
     pub(crate) description: &'static str,
     /// The arguments of `sqb admin create-service-account` after the name.
     pub(crate) arguments: &'static [&'static str],
-    /// The key held in `SQB_TEST_IMPORTED_KEY` for `--key-from-env`, if any.
-    pub(crate) imported_key: Option<&'static str>,
-    /// Part of the refusal on stderr, or none when the account is created.
-    pub(crate) expected_error: Option<&'static str>,
+    pub(crate) expected_role: &'static str,
+    /// What the key's bootstrap read answers: when made, in the overlap, once replaced, disabled, enabled.
+    pub(crate) expected_statuses: [u16; 5],
+}
+
+pub(crate) struct ImportedKeyCliTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) key: &'static str,
+    pub(crate) expected_status: u16,
+    /// Whether the JSON result repeats the key.
+    pub(crate) expected_key_printed: bool,
+}
+
+pub(crate) struct RefusedServiceAccountCliTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) arguments: &'static [&'static str],
+    /// The value of `SQB_TEST_IMPORTED_KEY`.
+    pub(crate) imported_key: &'static str,
+    pub(crate) expected_error: &'static str,
 }
