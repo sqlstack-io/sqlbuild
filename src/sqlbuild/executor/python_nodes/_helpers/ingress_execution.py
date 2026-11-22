@@ -45,10 +45,10 @@ from sqlbuild.executor.python_nodes.models import (
     PythonNodeRuntime,
 )
 from sqlbuild.executor.python_nodes.types import ExecutablePythonNode
+from sqlbuild.executor.scheduling.classes.lifecycle_concurrency import LifecycleConcurrency
 from sqlbuild.executor.scheduling.classes.lifecycle_progress import LifecycleProgress
 from sqlbuild.executor.scheduling.main._run_lifecycle import run_lifecycle_scheduler
 from sqlbuild.executor.scheduling.models import (
-    LifecycleConcurrency,
     LifecycleExecutionNode,
     LifecycleNodeResult,
     LifecycleSchedulerResult,

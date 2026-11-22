@@ -31,7 +31,7 @@ from sqlbuild.runtime.execution_limits.main.cancel_running_statements import (
 
 
 class DiscoveredItemPool:
-    """One connection and result store per running item, with each result recorded as it finishes."""
+    """One connection and result store per running item, each result recorded as it finishes."""
 
     def __init__(
         self,
@@ -116,7 +116,7 @@ class DiscoveredItemPool:
         self._idle.append(item.slot)
 
     def _stop(self, *, cancelled: bool) -> None:
-        """Start nothing more; keep what succeeded, and record a cancel's other items as cancelled."""
+        """Start nothing more; keep what succeeded, and report a cancel's other items cancelled."""
 
         while self._running:
             if cancelled:

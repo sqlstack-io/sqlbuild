@@ -7,8 +7,8 @@ from collections.abc import Callable
 from sqlbuild.executor.scheduling._helpers.lifecycle import (
     run_lifecycle_scheduler as _run_lifecycle_scheduler,
 )
+from sqlbuild.executor.scheduling.classes.lifecycle_concurrency import LifecycleConcurrency
 from sqlbuild.executor.scheduling.models import (
-    LifecycleConcurrency,
     LifecycleExecutionNode,
     LifecycleNodeResult,
     LifecycleSchedulerResult,

@@ -6,9 +6,9 @@ from collections.abc import Callable
 
 from sqlbuild.compiler.python_nodes.types import SkipMode
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
+from sqlbuild.executor.scheduling.classes.lifecycle_concurrency import LifecycleConcurrency
 from sqlbuild.executor.scheduling.classes.lifecycle_progress import LifecycleProgress
 from sqlbuild.executor.scheduling.models import (
-    LifecycleConcurrency,
     LifecycleExecutionNode,
     LifecycleNodeResult,
     LifecycleSchedulerResult,
