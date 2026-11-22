@@ -43,13 +43,13 @@ pub(crate) fn marked_lines(text: &str, room: usize) -> Vec<(i64, OutputLevel, St
     marks
 }
 
-/// `line` cut to a mark's limit at a character boundary.
+/// `line` cut to a mark's limit at a character boundary, without NUL, which PostgreSQL text can't hold; the chunk keeps it.
 fn mark_text(line: &str) -> String {
     let end: usize = (0..=line.len().min(MARK_TEXT_BYTES))
         .rev()
         .find(|index| line.is_char_boundary(*index))
         .unwrap_or(0);
-    line[..end].to_owned()
+    line[..end].replace('\0', "")
 }
 
 /// What lines that are the same but for their numbers share: the line with each run of digits replaced by one `#`.
