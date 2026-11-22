@@ -58,7 +58,7 @@ fn node_rows(results: &Bound<'_, PyAny>) -> PyResult<Vec<PythonNodeRow>> {
     for result in results.try_iter()? {
         let result: Bound<'_, PyAny> = result?;
         rows.push(PythonNodeRow {
-            kind: native_field(&result, "kind")?.getattr("value")?.extract()?,
+            kind: native_field(&result, "kind")?.extract()?,
             node_name: native_field(&result, "node_name")?.extract()?,
             status: native_field(&result, "status")?.str()?.extract()?,
             error_message: native_field(&result, "error_message")?.extract()?,
