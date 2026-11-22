@@ -8,7 +8,6 @@ pub mod parsed_header;
 pub mod register_ceremonial_select;
 pub mod register_cursor_intrinsics;
 pub mod register_reference_markers;
-pub mod replace_cursor_markers;
 pub mod reserved_cursor_markers;
 pub mod resolve_cursor_intrinsics;
 pub mod validated_model_cursor_sql;

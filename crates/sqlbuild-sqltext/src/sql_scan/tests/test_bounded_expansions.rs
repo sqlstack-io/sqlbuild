@@ -2,7 +2,7 @@
 
 use crate::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use crate::sql_scan::models::LexicalSyntax;
-use crate::sql_scan::tests::boundary_helpers::{generated_failures, spliced};
+use crate::sql_scan::tests::helpers::{generated_failures, spliced};
 use crate::sql_scan::tests::test_types::{BoundaryTestCase, GeneratedBoundaryTestCase};
 
 #[test]

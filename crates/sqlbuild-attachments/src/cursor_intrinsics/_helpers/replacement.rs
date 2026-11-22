@@ -7,7 +7,7 @@ use crate::cursor_intrinsics::models::IntrinsicSpan;
 use crate::sql_lexing::main::unclosed_message::unclosed_message;
 use sqlbuild_sqltext::sql_scan::main::bounded_expansions::bounded_expansions;
 
-/// `sql` with each cursor intrinsic call replaced and each call's byte span, or the call's error.
+/// `sql` with each cursor intrinsic call replaced and each call's byte span, or the call's error; a bound is a number or quoted literal, so only `--`, which every dialect has, can form beside one.
 pub(crate) fn replaced_with_spans(
     sql: &str,
     context: &str,
@@ -61,7 +61,6 @@ pub(crate) fn replaced_with_spans(
         .zip(&texts)
         .map(|(span, text)| (span.source_start, span.source_end, text.as_str()))
         .collect();
-    // A bound is a number or a quoted literal, so only `--`, which every dialect has, can form.
     for bounded in bounded_expansions(sql, &sites, None) {
         texts[bounded.index] = bounded.text;
     }

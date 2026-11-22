@@ -23,6 +23,7 @@ use crate::sql_macros::_helpers::parsing::parameters::{
 use crate::sql_macros::_helpers::parsing::slots::{SlotRead, check_group_positions, slot_reads};
 use crate::sql_macros::_helpers::rendering::arguments::is_atomic;
 use crate::sql_macros::_helpers::typing::typed_calls::{shifted, spliced};
+use crate::sql_macros::constants::PARAMETER_CLOSINGS;
 use crate::sql_macros::constants::{
     ARGUMENT_CODE, INVALID_DEFINITION_CODE, NAME_CLASH_CODE, SLOT_PLACEHOLDER_PREFIX,
 };
@@ -311,8 +312,7 @@ fn substituted(
     kind: &ParameterKind,
     parameter: &str,
     argument: &RenderedArgument,
-    (sql, scanned, token): (&str, &[Token], usize),
-    syntax: Option<&LexicalSyntax>,
+    ((sql, scanned, token), syntax): ((&str, &[Token], usize), Option<&LexicalSyntax>),
 ) -> String {
     match kind {
         ParameterKind::Relation { .. } => {
@@ -647,10 +647,9 @@ fn check_forwarded_kinds(
 /// `body` with each `@name` replaced by its argument, token by token, and the calls it holds.
 fn substituted_body(
     (definition, outer): (&SqlMacroDefinition, Option<&SqlMacroDefinition>),
-    (body, scanned): (&str, &[Token]),
+    (body, scanned, syntax): (&str, &[Token], Option<&LexicalSyntax>),
     (references, reads): (&[ParameterReference], &[SlotRead]),
     (arguments, body_calls): (&[RenderedArgument], &[TypedCall]),
-    syntax: Option<&LexicalSyntax>,
 ) -> (String, Vec<TypedCall>) {
     let mut expanded: String = String::with_capacity(body.len());
     let mut splices: Vec<TextSplice> = Vec::new();
@@ -674,8 +673,7 @@ fn substituted_body(
             &parameter.kind,
             &parameter.name,
             argument,
-            (body, scanned, reference.token),
-            syntax,
+            ((body, scanned, reference.token), syntax),
         );
         let text: String = match read {
             Some(read) => substituted_read(
@@ -711,7 +709,7 @@ fn substituted_body(
             } else if original
                 .strip_prefix('(')
                 .and_then(|rest| rest.strip_prefix(argument.sql.as_str()))
-                .is_some_and(|rest| rest == ")" || rest == "\n)")
+                .is_some_and(|rest| PARAMETER_CLOSINGS.contains(&rest))
             {
                 Some(1)
             } else {
@@ -790,10 +788,9 @@ pub(crate) fn expand_body(
     check_forwarded_kinds(definition, arguments, outer)?;
     let (expanded, calls) = substituted_body(
         (definition, outer),
-        (body, &scanned),
+        (body, &scanned, syntax),
         (&references, &reads),
         (arguments, body_calls),
-        syntax,
     );
     let kept: (usize, usize) = match definition.form {
         SqlMacroForm::Expression => trimmed_range(&expanded, 0),

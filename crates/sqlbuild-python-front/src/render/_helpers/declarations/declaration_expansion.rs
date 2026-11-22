@@ -117,7 +117,8 @@ pub(crate) fn expand_declarations<'py>(
         return Err(compile_error(request, &DeclarationError::ScanStop(code)));
     }
     let syntax: Option<&LexicalSyntax> = request.sql_macros.and_then(|source| source.syntax);
-    for (index, lead) in bound_splices(request.sql, &mut splices, syntax) {
+    let (splices, leads) = bound_splices(request.sql, splices, syntax);
+    for (index, lead) in leads {
         for (_, calls) in call_splices
             .iter_mut()
             .filter(|(splice, _)| *splice == index)
@@ -142,11 +143,11 @@ pub(crate) fn expand_declarations<'py>(
 /// Bound each character-indexed replacement against comments, returning how far each changed one moved.
 fn bound_splices(
     sql: &str,
-    splices: &mut [DeclarationSplice],
+    mut splices: Vec<DeclarationSplice>,
     syntax: Option<&LexicalSyntax>,
-) -> Vec<(usize, usize)> {
+) -> (Vec<DeclarationSplice>, Vec<(usize, usize)>) {
     if splices.is_empty() {
-        return Vec::new();
+        return (splices, Vec::new());
     }
     let characters: Vec<usize> = if sql.is_ascii() {
         Vec::new()
@@ -168,13 +169,12 @@ fn bound_splices(
         })
         .collect();
     let bounded = bounded_expansions(sql, &expansions, syntax);
-    bounded
-        .into_iter()
-        .map(|expansion| {
-            splices[expansion.index].replacement = expansion.text;
-            (expansion.index, expansion.lead)
-        })
-        .collect()
+    let mut leads: Vec<(usize, usize)> = Vec::with_capacity(bounded.len());
+    for expansion in bounded {
+        splices[expansion.index].replacement = expansion.text;
+        leads.push((expansion.index, expansion.lead));
+    }
+    (splices, leads)
 }
 
 /// Each call text's typed calls moved to where its splice landed in `spliced`, by byte.

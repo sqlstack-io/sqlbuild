@@ -35,9 +35,14 @@ pub(crate) fn text_value(value: &Bound<'_, PyAny>) -> Option<String> {
 }
 
 /// `sql` with the cursor markers replaced by concrete bounds, none joining a neighbour into a comment.
-pub(crate) fn markers_replaced(sql: &str, (start, end): (&str, &str)) -> String {
+#[pyfunction]
+#[pyo3(signature = (*, sql, start_sql, end_sql))]
+pub(crate) fn replace_cursor_markers(sql: &str, start_sql: &str, end_sql: &str) -> String {
     let mut sites: Vec<(usize, usize, &str)> = Vec::new();
-    for (marker, value) in RESERVED_CURSOR_MARKERS.into_iter().zip([start, end]) {
+    for (marker, value) in RESERVED_CURSOR_MARKERS
+        .into_iter()
+        .zip([start_sql, end_sql])
+    {
         sites.extend(
             sql.match_indices(marker)
                 .map(|(position, found)| (position, position + found.len(), value)),

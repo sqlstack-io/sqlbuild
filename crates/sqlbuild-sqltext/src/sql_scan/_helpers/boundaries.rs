@@ -21,7 +21,7 @@ struct Padding {
     after: &'static str,
 }
 
-/// The changed expansions; texts that can't form a comment at a boundary are not scanned.
+/// The changed expansions, found up to the first unclosed quote or comment; texts that can't form a comment at a boundary are not scanned.
 pub(crate) fn bounded(
     sql: &str,
     expansions: &[(usize, usize, &str)],
@@ -38,7 +38,6 @@ pub(crate) fn bounded(
         previous: None,
         open_comment: None,
     };
-    // Past an unclosed quote or comment nothing is code, so what was found up to there stands.
     let _unclosed: Result<(), Unclosed> = walk.over(sql, expansions);
     walk.padding
         .iter()
@@ -108,10 +107,10 @@ struct Walk<'a> {
 }
 
 impl Walk<'_> {
+    /// Walk the spliced text; a site inside a quote or comment is read as part of it.
     fn over(&mut self, sql: &str, expansions: &[(usize, usize, &str)]) -> Result<(), Unclosed> {
         let mut at: usize = 0;
         for (index, (start, end, text)) in expansions.iter().enumerate() {
-            // A site inside a quote or comment is read as part of it.
             if *start < at {
                 continue;
             }
