@@ -446,12 +446,14 @@ A run stays pinned to the snapshot it started on, and a snapshot an earlier rele
 hold job definitions this release no longer reads, which fail with
 `` jobs: unknown field `source`, expected `limit` ``. Upgrade in this order:
 
-1. Pause every schedule and sensor, and start no manual runs. Keep the scheduler running: it
-   launches queued runs and advances group runs.
+1. Pause every schedule and sensor, and start no manual runs. Keep the scheduler running through
+   step 2: it launches queued runs and advances group runs.
 2. Let queued and running runs finish, or cancel them.
-3. Upgrade the server.
-4. Upgrade and restart every location, so each publishes its project again with the new release.
-5. Once every location has published again, resume schedules and sensors.
+3. Stop every server process and every separate `sqb scheduler` on the control database before the
+   new release starts, or migrates the database with `sqb server migrate` or `sqb admin`.
+4. Start the servers and schedulers again on the new release.
+5. Upgrade and restart every location, so each publishes its project again with the new release.
+6. Once every location has published again, resume schedules and sensors.
 
 Until a location has published again, its job pages, group runs and ad hoc runs fail, a group's
 schedule or sensor stops the scheduler, and a job run that fails can't record its failure.
