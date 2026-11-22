@@ -69,7 +69,7 @@ executable = "/usr/local/bin/sqb"
 | --- | --- |
 | `[server]` | `host` (default `127.0.0.1`), `port` (`8000`), `database_env` (`SQLBUILD_CONTROL_DATABASE_URL`), `password_origin`, `default_role` (`none`), `scheduler` (`true`), `attention_snooze` (`"24h"`); see [Acknowledge attention items](#acknowledge-attention-items) |
 | `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`, `state_history_versions`, `run_output_days`; see [Set retention](#set-retention) |
-| `[output]` | `store` (an `output` folder beside a SQLite control database), `max_bytes_per_run`; see [Keep run output](#keep-run-output) |
+| `[output]` | `store` (an `output` folder beside a SQLite control database, or in the working directory with PostgreSQL), `max_bytes_per_run`; see [Keep run output](#keep-run-output) |
 | `[oidc]` | `origin`, `issuer`, `client_id`, `identities`, and optionally `client_secret_env`, `certificate_authority`, `groups_claim` and `group_roles` |
 | `[trusted_proxy]` | `origin`, and optionally `trusted_peers` (`127.0.0.1` and `::1`), `allowed_hosts`, `username_header` (`X-SQB-User`), `display_name_header`, `email_header`, `unknown_users` (`provision_viewer`), `proxy_logout_url` and `identities`; see [Sign in through a reverse proxy](#sign-in-through-a-reverse-proxy) |
 | `[[launchers.docker]]` | `location`, `target`, `server_url`, `max_workers`, `socket`, `location_container`, `executable`, and optional `run` and `pool_caps` tables; see [Limit worker containers](#limit-worker-containers) |
@@ -474,12 +474,16 @@ max_bytes_per_run = "20GB"
 
 - `store` is a local folder, `file:///path`, or an S3 prefix, `s3://bucket/prefix`. By default it
   is an `output` folder beside a SQLite control database, or in the server's working directory with
-  PostgreSQL. [`sqb dev`](dev.md) keeps its output in `.sqlbuild/output`.
-- A local folder must be on a persistent volume, not inside the server's container, or a restart
-  loses every run's output.
-- Use an S3 prefix when several servers share one control database, or when the server's container
-  is replaced. The server reads AWS credentials from the standard AWS environment variables or from
-  the role it runs under.
+  PostgreSQL. The server image's working directory is `/home/sqlbuild`, so with PostgreSQL its
+  default is `/home/sqlbuild/output`. [`sqb dev`](dev.md) keeps its output in
+  `.sqlbuild/output`.
+- A local folder must be on a persistent volume, not inside the server's container, or recreating
+  the container loses every run's output. `compose.yml` and the Podman Quadlet example mount a named
+  volume at `/home/sqlbuild/output`. If you set another folder, mount a volume there that user 10001
+  can write to.
+- Use an S3 prefix when several servers share one control database, or when a replacement server
+  can't mount the same volume. The server reads AWS credentials from the standard AWS environment
+  variables or from the role it runs under.
 - `max_bytes_per_run` is a number of bytes or text such as `"500MB"` or `"2GiB"`. Past it a run
   keeps its first half and its newest half, and the lines in between are counted where they were
   left out. By default a run keeps all of its output.

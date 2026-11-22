@@ -28,8 +28,12 @@ COPY --chown=10001:10001 deploy/project/ /project/
 FROM docker.io/library/debian:bookworm-slim AS server
 RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates curl \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --uid 10001 --create-home sqlbuild
+    && useradd --uid 10001 --create-home sqlbuild \
+    && mkdir -p /home/sqlbuild/output \
+    && chown 10001:10001 /home/sqlbuild/output
 COPY --from=runtime /usr/local/bin/sqb /usr/local/bin/sqb
+# With PostgreSQL, run output defaults to ./output here; a new named volume there copies its owner.
+WORKDIR /home/sqlbuild
 USER 10001:10001
 ENTRYPOINT ["sqb"]
 CMD ["server", "--config", "/etc/sqlbuild/server.toml"]
