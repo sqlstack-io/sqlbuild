@@ -68,6 +68,9 @@ class ItemProbe:
         self.actions: dict[str, Callable[[], object]] = actions or {}
         self.reported: list[PythonNodeExecutionResult] = []
         self.report_threads: set[int] = set()
+        self.started: list[str] = []
+        self.start_threads: set[int] = set()
+        self.started_before: dict[str, frozenset[str]] = {}
         self.cancelled: list[str] = []
         self.seen_before: dict[str, frozenset[str]] = {}
         self.threads: set[int] = set()
@@ -81,12 +84,17 @@ class ItemProbe:
             self._active += 1
             self.most_at_once = max(self.most_at_once, self._active)
             self.threads.add(threading.get_ident())
+            self.started_before[name] = frozenset(self.started)
             self.seen_before[name] = frozenset(result.node_name for result in self.reported)
         try:
             return self.actions.get(name, lambda: None)()
         finally:
             with self._lock:
                 self._active -= 1
+
+    def start(self, name: str) -> None:
+        self.start_threads.add(threading.get_ident())
+        self.started.append(name)
 
     def report(self, result: object) -> None:
         reported: PythonNodeExecutionResult = cast(PythonNodeExecutionResult, result)
@@ -197,6 +205,7 @@ def run_read_side(
         runtime=item_runtime(adapter=adapter, probe=probe),
         identity_recorder=ignore_identity,
         on_node_complete=probe.report,
+        on_asset_start=probe.start,
         on_node_cancelled=probe.cancelled.append,
     )
     tracker.dispatch_ready_python_nodes()
@@ -216,6 +225,7 @@ def run_ingress(
         runtime=item_runtime(adapter=adapter, probe=probe),
         callbacks=IngressCallbacks(
             on_node_complete=probe.report,
+            on_asset_start=probe.start,
             on_node_cancelled=probe.cancelled.append,
             identity_recorder=ignore_identity,
         ),
@@ -358,3 +368,26 @@ def interrupt_after_next_record(monkeypatch: pytest.MonkeyPatch) -> None:
         raise KeyboardInterrupt
 
     monkeypatch.setattr(LifecycleProgress, "complete", record_then_interrupt)
+
+
+def ignoring_probe(release: threading.Event) -> ItemProbe:
+    """`quick` finishes and its report raises an interrupt; `slow` ignores it until released."""
+
+    both_running: threading.Barrier = threading.Barrier(2)
+
+    def quick() -> object:
+        return meet_at(both_running)
+
+    def slow() -> object:
+        _ = both_running.wait(timeout=WAIT_SECONDS)
+        _ = release.wait(timeout=WAIT_SECONDS)
+        return None
+
+    probe: ItemProbe = ItemProbe(actions={"quick": quick, "slow": slow})
+
+    def interrupt(name: str) -> None:
+        probe.after_report = lambda reported: None
+        raise KeyboardInterrupt(name)
+
+    probe.after_report = interrupt
+    return probe

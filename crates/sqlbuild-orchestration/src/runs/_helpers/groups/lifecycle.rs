@@ -14,6 +14,7 @@ use crate::runs::_helpers::groups::context::load_group;
 use crate::runs::_helpers::groups::selection::{failed_upstream, member_dependencies};
 use crate::runs::_helpers::lifecycle::claims::reserve_claims;
 use crate::runs::_helpers::lifecycle::publish_change::publish_change;
+use crate::runs::constants::UNFINISHED_NODE_STATUSES;
 use crate::runs::models::{
     ChangingRun, GroupContext, NodeOutcome, QueueCandidate, RunChange, RunChangeRequest,
     RunNodeRecord, RunOutcome, RunStatus,
@@ -158,8 +159,8 @@ async fn skip_blocked_members(
         let failed_job = failed.request_json.job_key.clone().unwrap_or_default();
         let rows;
         (transaction, rows) = query(transaction,
-            "SELECT n.node_key, n.skipped_because_of FROM sqb_run_nodes n WHERE n.run_id=$1 AND n.kind='node' \
-             AND n.status IN ('failed','skipped','cancelled','not_run') ORDER BY CASE n.status WHEN 'failed' THEN 0 ELSE 1 END, n.node_key LIMIT 1",
+            &format!("SELECT n.node_key, n.skipped_because_of FROM sqb_run_nodes n WHERE n.run_id=$1 AND n.kind='node' \
+             AND n.status IN ({UNFINISHED_NODE_STATUSES}) ORDER BY CASE n.status WHEN 'failed' THEN 0 ELSE 1 END, n.node_key LIMIT 1"),
             vec![Parameter::Id(failed.request_json.run_id)]).await?;
         let cause: Option<String> = rows.first().and_then(|row| {
             row["skipped_because_of"]

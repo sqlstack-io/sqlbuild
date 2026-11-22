@@ -402,3 +402,14 @@ pub(super) struct CheckShutdownTestCase {
     pub(super) expected_within: std::time::Duration,
     pub(super) expected_compiler: bool,
 }
+
+#[cfg(unix)]
+pub(super) struct CheckGraceTestCase {
+    pub(super) description: &'static str,
+    pub(super) script: &'static str,
+    /// How many requests wait while the check runs.
+    pub(super) waiting: usize,
+    pub(super) expected_at_least: std::time::Duration,
+    pub(super) expected_within: std::time::Duration,
+    pub(super) expected_compiler: bool,
+}

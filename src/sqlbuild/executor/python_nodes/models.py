@@ -12,6 +12,7 @@ from sqlbuild._native import TargetSettings
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.node_logger import NodeLogger
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
+from sqlbuild.adapter.contract.models import LifeCycleEvent
 from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
     resolve_qualified_name_parts,
 )
@@ -110,6 +111,7 @@ class PythonNodeExecutionResult:
     skip_reason: str | None = None
     error_message: str | None = None
     warning_messages: tuple[str, ...] = field(default_factory=tuple)
+    lifecycle_events: tuple[LifeCycleEvent, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -159,6 +161,7 @@ class PythonNodeRuntime:
     node_warehouses: Mapping[str, str] = field(default_factory=dict)
     session_warehouses: SessionWarehouses | None = None
     chain_run_id: str | None = None
+    on_start: Callable[[str], None] | None = None
 
     def __post_init__(self) -> None:
         if self.node_warehouses and self.session_warehouses is None:
@@ -184,6 +187,7 @@ class IngressCallbacks:
 
     use_color: bool = False
     on_node_start: NodeStartCallback | None = None
+    on_asset_start: Callable[[str], None] | None = None
     on_node_complete: Callable[[object], None] | None = None
     on_node_cancelled: Callable[[str], None] | None = None
     identity_recorder: PythonIdentityRecorder | None = None
@@ -403,4 +407,5 @@ class DiscoveredItemCallbacks:
     ready: Callable[[], tuple[ExecutablePythonNode, ...]]
     upstream_results: Callable[[str], tuple[PythonNodeExecutionResult, ...]]
     complete: OwnedResultCallback
+    started: Callable[[str], None] | None = None
     cancelled: Callable[[str], None] | None = None

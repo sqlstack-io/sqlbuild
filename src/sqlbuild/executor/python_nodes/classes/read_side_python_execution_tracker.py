@@ -45,6 +45,7 @@ class ReadSidePythonExecutionTracker:
         runtime: PythonNodeRuntime,
         identity_recorder: PythonIdentityRecorder | None = None,
         on_node_complete: Callable[[object], None] | None = None,
+        on_asset_start: Callable[[str], None] | None = None,
         on_node_cancelled: Callable[[str], None] | None = None,
     ) -> None:
         self._python_graph: PythonNodeGraph = python_graph
@@ -53,6 +54,7 @@ class ReadSidePythonExecutionTracker:
         self._runtime: PythonNodeRuntime = runtime
         self._identity_recorder: PythonIdentityRecorder | None = identity_recorder
         self._on_node_complete: Callable[[object], None] | None = on_node_complete
+        self._on_asset_start: Callable[[str], None] | None = on_asset_start
         self._on_node_cancelled: Callable[[str], None] | None = on_node_cancelled
         self._parallel: dict[str, tuple[str, int]] = {}
         name: str
@@ -162,6 +164,7 @@ class ReadSidePythonExecutionTracker:
                 ready=self._ready_items,
                 upstream_results=self._upstream_results,
                 complete=self._complete_item,
+                started=self._on_asset_start,
                 cancelled=self._on_node_cancelled,
             ),
         ).run(thread_limit=sum(dict(self._parallel.values()).values()))
@@ -208,7 +211,9 @@ class ReadSidePythonExecutionTracker:
         return True
 
     def _execute_python_node(self, node: DiscoveredPythonNode) -> None:
-        runtime: PythonNodeRuntime = replace(self._runtime, result_store=self._result_store)
+        runtime: PythonNodeRuntime = replace(
+            self._runtime, result_store=self._result_store, on_start=self._on_asset_start
+        )
         result: PythonNodeExecutionResult = run_ready_python_node(
             node=_to_executable_python_node(node),
             upstream_results=self._upstream_results(node.name),

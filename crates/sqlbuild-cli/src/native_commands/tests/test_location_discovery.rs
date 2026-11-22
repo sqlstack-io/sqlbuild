@@ -8,10 +8,12 @@ use tokio::time::Instant;
 use crate::native_commands::_helpers::location::compiler_discovery::check_discovered;
 use crate::native_commands::_helpers::location::discovery_state::LocationDiscovery;
 #[cfg(unix)]
-use crate::native_commands::tests::helpers::silent_compiler;
+use crate::native_commands::models::{LocationCompileRequest, LocationRuntimeRequest};
 use crate::native_commands::tests::helpers::{PLAN_FILE, discovered_load, failed_load, stamps};
 #[cfg(unix)]
-use crate::native_commands::tests::test_types::CheckShutdownTestCase;
+use crate::native_commands::tests::helpers::{scripted_compiler, silent_compiler};
+#[cfg(unix)]
+use crate::native_commands::tests::test_types::{CheckGraceTestCase, CheckShutdownTestCase};
 use crate::native_commands::tests::test_types::{
     DiscoveryCheckTestCase, DiscoveryReportTestCase, FailedCompileDiscoveryTestCase,
     RediscoverTestCase,
@@ -286,6 +288,90 @@ fn given_a_check_that_never_returns_when_the_location_shuts_down_then_the_check_
 
         assert_eq!(
             kept, test_case.expected_compiler,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn given_a_request_waiting_on_a_check_when_the_grace_passes_then_only_an_unfinished_check_is_abandoned()
+ {
+    let test_cases = [
+        CheckGraceTestCase {
+            description: "a check that never returns is abandoned after 10 seconds",
+            script: "exec sleep 600",
+            waiting: 1,
+            expected_at_least: Duration::from_secs(10),
+            expected_within: Duration::from_secs(15),
+            expected_compiler: false,
+        },
+        CheckGraceTestCase {
+            description: "a check that finishes inside the 10 seconds is kept",
+            script: r#"read request; sleep 2; echo '{"set":null,"changed":false}'; exec sleep 600"#,
+            waiting: 1,
+            expected_at_least: Duration::from_secs(2),
+            expected_within: Duration::from_secs(9),
+            expected_compiler: true,
+        },
+        CheckGraceTestCase {
+            description: "a slower check nothing waits for is kept",
+            script: r#"read request; sleep 11; echo '{"set":null,"changed":false}'; exec sleep 600"#,
+            waiting: 0,
+            expected_at_least: Duration::from_secs(11),
+            expected_within: Duration::from_secs(16),
+            expected_compiler: true,
+        },
+    ];
+
+    for test_case in test_cases {
+        let (kept, elapsed): (bool, Duration) = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime")
+            .block_on(async {
+                let mut load = discovered_load(&["a"]);
+                for set in load.discovered.values_mut() {
+                    set.check_every_seconds = Some(0);
+                }
+                let mut discovery = LocationDiscovery::default();
+                discovery.published(&load, Instant::now());
+                let (republish, _controls) = tokio::sync::watch::channel(Default::default());
+                let (sender, requests) = tokio::sync::mpsc::channel(1);
+                for generation in 0..test_case.waiting {
+                    let (reply, _) = tokio::sync::oneshot::channel();
+                    sender
+                        .send(LocationRuntimeRequest::Publish(LocationCompileRequest {
+                            generation: generation as i64,
+                            python_sources: Vec::new(),
+                            reply,
+                        }))
+                        .await
+                        .expect("a request waits");
+                }
+                let started = Instant::now();
+                let compiler = tokio::time::timeout(
+                    test_case.expected_within,
+                    check_discovered(
+                        Some(scripted_compiler(test_case.script)),
+                        &mut discovery,
+                        ((&republish, ("synthetic", uuid::Uuid::nil())), &requests),
+                    ),
+                )
+                .await
+                .expect("the check ends in time")
+                .expect("the interpreter is usable or stopped");
+                (compiler.is_some(), started.elapsed())
+            });
+
+        assert_eq!(
+            kept, test_case.expected_compiler,
+            "{}",
+            test_case.description
+        );
+        assert!(
+            elapsed >= test_case.expected_at_least,
             "{}",
             test_case.description
         );

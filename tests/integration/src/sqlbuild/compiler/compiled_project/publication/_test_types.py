@@ -688,7 +688,7 @@ class NodeStatusTestCase:
     job_select: str
     job_settings: str
     files: dict[str, str]
-    expected_status_during_second: str
+    expected_statuses_during_second: dict[str, str]
     expected_rerun_selection: frozenset[str]
 
 
@@ -715,3 +715,45 @@ class ParallelItemsTestCase:
     job_select: str
     expected_status: str
     expected_statuses: dict[str, str]
+
+
+@dataclass(frozen=True)
+class ItemLogsTestCase:
+    description: str
+    depends_on: str
+    job_select: str
+    job_settings: str
+    max_parallel: int
+    outcomes: dict[str, str]
+    files: dict[str, str]
+    expected_statuses: dict[str, str]
+
+
+@dataclass(frozen=True)
+class RunningItemsTestCase:
+    description: str
+    depends_on: str
+    job_select: str
+    job_settings: str
+    max_parallel: int
+    files: dict[str, str]
+    expected_running: int
+    expected_pending: int
+
+
+@dataclass(frozen=True)
+class WaitingCheckTestCase:
+    description: str
+    check_seconds: int
+    expected_finished: bool
+    expected_restarts: int
+
+
+@dataclass(frozen=True)
+class CancelledChainTestCase:
+    description: str
+    max_parallel: int
+    expected_first_run: list[str]
+    expected_second_run: list[str]
+    expected_statuses: dict[str, str]
+    expected_torn_down: bool

@@ -204,6 +204,7 @@ def _item_concurrency(
                     name=name, python_graph=python_graph, results=results
                 ),
                 complete=complete_item,
+                started=callbacks.on_asset_start,
                 cancelled=callbacks.on_node_cancelled,
             ),
         ).run(thread_limit=sum(dict(parallel.values()).values()))
@@ -271,7 +272,7 @@ def _execute_ingress_python_node(
     result: PythonNodeExecutionResult = run_ready_python_node(
         node=executable_node,
         upstream_results=upstream_results,
-        runtime=runtime,
+        runtime=replace(runtime, on_start=callbacks.on_asset_start),
         statement_recorder=StatementRecorder(),
         run_state=run_state,
         on_result=partial(

@@ -101,19 +101,34 @@ pub(crate) struct PythonNodeReporter {
 
 #[pymethods]
 impl PythonNodeReporter {
+    /// A worker records an asset as running once it really starts.
+    fn started(&self, py: Python<'_>, name: &str) -> PyResult<()> {
+        self.on_worker(name, |worker, key| worker.start_key(py, key))
+    }
+
     /// A worker records an item that was running when the run was cancelled as cancelled.
     fn cancelled(&self, py: Python<'_>, name: &str) -> PyResult<()> {
-        match &self.worker {
-            Some(worker) => {
-                worker.finish_key(py, &format!("{ASSET_KIND}:{name}"), NodeOutcome::Cancelled)
-            }
-            None => Ok(()),
-        }
+        self.on_worker(name, |worker, key| {
+            worker.finish_key(py, key, NodeOutcome::Cancelled)
+        })
     }
 
     fn __call__(&self, py: Python<'_>, result: Bound<'_, PyAny>) -> PyResult<()> {
         self.on_node_complete.bind(py).call1((&result,))?;
         write_python_node_results(self.stream.bind(py), &tuple(py, &[result])?, self.use_color)
+    }
+}
+
+impl PythonNodeReporter {
+    /// `report` the asset `name` by its key; a build outside a worker reports nothing.
+    fn on_worker(
+        &self,
+        name: &str,
+        report: impl FnOnce(&WorkerBuild, &str) -> PyResult<()>,
+    ) -> PyResult<()> {
+        self.worker.as_ref().map_or(Ok(()), |worker| {
+            report(worker, &format!("{ASSET_KIND}:{name}"))
+        })
     }
 }
 
@@ -568,7 +583,8 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             worker: context.worker.clone(),
         },
     )?;
-    let on_node_cancelled: Bound<'py, PyAny> = reporter.getattr("cancelled")?;
+    let report = |method: &str| reporter.getattr(method);
+    let (on_asset_start, on_node_cancelled) = (report("started")?, report("cancelled")?);
     let mut ingress_python: Bound<'py, PyAny> = tuple(py, &[])?;
     let mut ingress_loads: Bound<'py, PyAny> = tuple(py, &[])?;
     if ingress_names.is_truthy()? {
@@ -581,6 +597,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
                     ("use_color", boolean(py, context.use_color)),
                     ("on_node_start", inputs.on_node_start.clone()),
                     ("on_node_complete", inputs.on_node_complete.clone()),
+                    ("on_asset_start", on_asset_start.clone()),
                     ("on_node_cancelled", on_node_cancelled.clone()),
                 ],
             )?;
@@ -634,6 +651,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
                 ("scheduled_sql_names", names_set(py, &scheduled)?),
                 ("runtime", node_runtime(&parts, &connection)?),
                 ("on_node_complete", reporter.clone().into_any()),
+                ("on_asset_start", on_asset_start.clone()),
                 ("on_node_cancelled", on_node_cancelled.clone()),
             ],
         )?;

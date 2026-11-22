@@ -164,7 +164,7 @@ export type RunRow = {
 	cancelRequestedAt: Iso | null;
 	/** Ad-hoc runs: the selection as typed. */
 	selection: string[];
-	/** Nodes a rerun from failure would run; empty when nothing failed. */
+	/** How many nodes a rerun from failure would run; zero when every node finished. */
 	rerunFromFailureCount: number;
 };
 
@@ -481,7 +481,7 @@ export type RunDetail = {
 	selection: string[];
 	/** Why the run is still queued; empty once claimed. */
 	waits: QueueWait[];
-	/** Nodes a rerun from failure would run: the failed ones plus exactly those skipped. */
+	/** Nodes a rerun from failure would run: exactly the failed, cancelled, skipped and not-run ones. */
 	rerunFromFailureNodes: string[];
 	/** The run this one reruns. */
 	rerunOf: Run | null;

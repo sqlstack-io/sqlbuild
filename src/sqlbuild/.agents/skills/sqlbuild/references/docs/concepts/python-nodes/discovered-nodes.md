@@ -100,10 +100,10 @@ independent of `concurrency`, and every other asset still runs one at a time.
 
 - **Providers used by these steps must be thread-safe.** The steps run on threads of one process and share the provider instances.
 - **A step can't install signal handlers,** as Python allows that only on the main thread.
-- **Each running step has its own warehouse connection.** An in-memory DuckDB or SQLite database belongs to one connection, so its items run one at a time.
+- **Each running step has its own warehouse connection.** An in-memory DuckDB, MotherDuck or SQLite database belongs to one connection, so on those targets items run one at a time, whatever `max_parallel` is. Use a database file to run them in parallel.
 - **Local output can interleave.** A worker still files each line under the node that printed it.
 - **SQL pauses while items run.** New SQL, and steps waiting on SQL, start again once the running items have finished.
-- **A cancel starts no more steps.** It cancels running statements and keeps finished steps succeeded. SQLBuild can't stop other Python code: it waits for those steps before it closes providers, and a worker is ended after a minute. Work a step started on a remote system may outlive the cancel.
+- **A cancel starts no more steps.** It cancels running statements and keeps finished steps succeeded. SQLBuild can't stop other Python code, so it waits 5 seconds for those steps, then records them cancelled and exits. It doesn't tear down providers that such a step may still be using: their `teardown` doesn't run. Work a step started on a remote system may outlive the cancel.
 
 ## When discovery runs
 
@@ -118,6 +118,7 @@ Only a location, including `sqb dev`, calls discover functions. Every other comp
 | `check_every` | The location calls that function without publishing. When the result differs from the saved set, it publishes with the new result |
 
 - `check_every` takes amounts in `d`, `h`, `m` and `s`, largest unit first, such as `15m` or `1h30m`, and at least a minute. Without it, the set is checked only when the location publishes.
+- A check doesn't hold up the location. Once a publish, republish or other request waits for it, the check has 10 seconds to finish. After that the location restarts its interpreter and serves the request, and the set is checked again when it is next due.
 - Runs always execute the nodes of the snapshot they started on. Workers, reruns and the plan page never call discover functions.
 - `sqb dev`'s ready card shows the sets, for example `Discovered  fulfilment_plan 3 items`.
 

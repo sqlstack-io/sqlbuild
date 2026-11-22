@@ -1,4 +1,4 @@
-//! Retry immutable execution inputs, narrowing only to durable failed and skipped outcomes or to named nodes of the source run.
+//! Retry immutable execution inputs, narrowing only to durable unfinished outcomes or to named nodes of the source run.
 
 use std::collections::BTreeSet;
 
@@ -9,6 +9,7 @@ use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::_helpers::requests::permissions::authorize_execution;
+use crate::runs::constants::UNFINISHED_NODE_STATUSES;
 use crate::runs::models::{RerunRequest, RunCommand, RunKind, RunOrigin, RunRequest, RunStatus};
 use crate::snapshots::constants::SOURCE_KEY_PREFIX;
 use crate::snapshots::main::write_sets::job_write_set::job_write_set;
@@ -65,7 +66,9 @@ pub(crate) async fn frozen_rerun(
         let rows;
         (transaction, rows) = query(
             transaction,
-            "SELECT node_key FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' AND status IN ('failed','skipped','not_run')",
+            &format!(
+                "SELECT node_key FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' AND status IN ({UNFINISHED_NODE_STATUSES})"
+            ),
             vec![Parameter::Id(request.source_run_id)],
         )
         .await?;
@@ -118,7 +121,7 @@ pub(crate) async fn frozen_rerun(
     }
     if request.from_failure && frozen.selection.is_empty() {
         return Err(ControlError::Invalid(
-            "source run has no failed or skipped nodes".into(),
+            "source run has no failed, cancelled, skipped or unreached nodes".into(),
         ));
     }
     if frozen.selection.len() != named.len() && !named.is_empty() {

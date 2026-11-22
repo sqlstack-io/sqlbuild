@@ -24,14 +24,24 @@ use crate::native_commands::models::{
 };
 use crate::native_commands::types::DiscoveryControls;
 
-/// How often a running check looks for shutdown.
-const SHUTDOWN_POLL: std::time::Duration = std::time::Duration::from_millis(100);
+/// How often a running check looks for shutdown or a waiting request.
+const REQUEST_POLL: std::time::Duration = std::time::Duration::from_millis(100);
+/// How long a running check may go on once a request waits for the interpreter it holds.
+const CHECK_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// Wait until every sender of `requests` is gone, which only shutdown does, without taking a request.
 async fn shut_down(requests: &mpsc::Receiver<LocationRuntimeRequest>) {
     while !requests.is_closed() {
-        tokio::time::sleep(SHUTDOWN_POLL).await;
+        tokio::time::sleep(REQUEST_POLL).await;
     }
+}
+
+/// Wait until a request has waited out the grace of the check, without taking the request.
+async fn waited_out(requests: &mpsc::Receiver<LocationRuntimeRequest>) {
+    while requests.is_empty() {
+        tokio::time::sleep(REQUEST_POLL).await;
+    }
+    tokio::time::sleep(CHECK_GRACE).await;
 }
 
 /// Wait until `due`, or forever without one.
@@ -42,7 +52,7 @@ pub(crate) async fn sleep_until(due: Option<Instant>) {
     }
 }
 
-/// Call the set due for its `check_every` again; republish when its result changed. Shutdown stops it.
+/// Call the set due for its `check_every` again; republish when its result changed. Shutdown, or a request waiting out its grace, stops it.
 pub(crate) async fn check_discovered(
     compiler: Option<LocationCompiler>,
     discovery: &mut LocationDiscovery,
@@ -56,9 +66,11 @@ pub(crate) async fn check_discovered(
     };
     let request: DiscoveredSetCheck = check;
     let name: String = request.check_discovered.clone();
-    let exchanged: Option<Result<DiscoveredSetChecked, ControlError>> = tokio::select! {
-        reply = exchange_reply(&mut active, &request, "discovered set check") => Some(reply),
+    let exchanged: Option<Option<Result<DiscoveredSetChecked, ControlError>>> = tokio::select! {
+        biased;
+        reply = exchange_reply(&mut active, &request, "discovered set check") => Some(Some(reply)),
         () = shut_down(requests) => None,
+        () = waited_out(requests) => Some(None),
     };
     let Some(reply) = exchanged else {
         drop(write_output(&[(
@@ -69,13 +81,18 @@ pub(crate) async fn check_discovered(
         return Ok(None);
     };
     let reply: DiscoveredSetChecked = match reply {
-        Ok(reply) => reply,
-        Err(_) => {
+        Some(Ok(reply)) => reply,
+        unfinished => {
+            let problem: String = match unfinished {
+                Some(_) => format!("Checking discovered set {name} failed"),
+                None => format!(
+                    "Checking discovered set {name} did not finish within {} seconds of a request waiting for it",
+                    CHECK_GRACE.as_secs()
+                ),
+            };
             drop(write_output(&[(
                 Stream::Stderr,
-                &format!(
-                    "Checking discovered set {name} failed; the location restarts its interpreter.\n"
-                ),
+                &format!("{problem}; the location restarts its interpreter.\n"),
             )]));
             discovery.checked(
                 &name,

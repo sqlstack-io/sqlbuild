@@ -244,7 +244,7 @@ function rowOf(run: Run, wire: Wire['RunRecord']): RunRow {
 		lostContactLimitSeconds: 0,
 		cancelRequestedAt: isActiveRun(run.status) ? (wire.cancel_requested_at ?? null) : null,
 		selection: run.kind === 'adhoc' ? wire.selection_json : [],
-		rerunFromFailureCount: (wire.node_counts_json.failed ?? 0) + c.skipped
+		rerunFromFailureCount: c.failed + c.skipped
 	};
 }
 
@@ -347,7 +347,7 @@ export function toRunNode(wire: Wire['RunNodeRecord'], run: Run): RunNode {
 
 /**
  * A run's detail from the listing and the nodes of the run and its child runs; parts with no server source stay empty.
- * Rerun from failure covers failed, skipped and not-run nodes, as the server does; cancelled nodes need a full rerun.
+ * Rerun from failure covers failed, cancelled, skipped and not-run nodes, as the server does.
  */
 export function runDetailOf(run: Run, wire: Wire['RunRecord'], listed: Run[], nodes: RunNode[]): RunDetail {
 	const byId = new Map(listed.map((r) => [r.id, r]));
@@ -376,7 +376,7 @@ export function runDetailOf(run: Run, wire: Wire['RunRecord'], listed: Run[], no
 				: null,
 		selection: wire.selection_json,
 		waits: [],
-		rerunFromFailureNodes: nodes.filter((n) => n.status === 'failed' || n.status === 'skipped' || n.status === 'not_run').map((n) => n.nodeKey),
+		rerunFromFailureNodes: nodes.filter((n) => n.status === 'failed' || n.status === 'cancelled' || n.status === 'skipped' || n.status === 'not_run').map((n) => n.nodeKey),
 		rerunOf: run.rerunOfRunId ? (byId.get(run.rerunOfRunId) ?? null) : null,
 		reruns: listed.filter((r) => r.rerunOfRunId === run.id)
 	};

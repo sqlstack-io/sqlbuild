@@ -1,0 +1,108 @@
+"""Real CLI coverage for a cancel of discovered steps that ignore it."""
+
+import os
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+import pytest
+
+from tests.integration.src.sqlbuild.cli.commands.main._test_types import IgnoredCancelTestCase
+from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+
+_STEPS: str = '''\
+import time
+from pathlib import Path
+
+from providers.marker import MarkerProvider
+from sqlbuild.assets import AssetContext, asset
+from sqlbuild.discovery import Discovered, Item, discover
+
+DIRECTORY = Path({directory!r})
+
+
+@discover
+def fulfilment_plan() -> Discovered:
+    """Two steps at once."""
+    return Discovered(items=[Item(id="pack"), Item(id="pick")], max_parallel=2)
+
+
+@asset(for_each=fulfilment_plan)
+def fulfil(ctx: AssetContext, marker_provider: MarkerProvider) -> None:
+    """Ignore any cancel."""
+    (DIRECTORY / f"{{ctx.discovered.item}}.running").touch()
+    time.sleep(120)
+'''
+_PROVIDER: str = '''\
+from pathlib import Path
+
+from sqlbuild.providers import Provider
+
+
+class MarkerProvider(Provider):
+    """Say when it was torn down."""
+
+    def teardown(self) -> None:
+        Path({directory!r}, "torn-down").touch()
+'''
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix signals")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        IgnoredCancelTestCase(
+            description="SIGTERM exits after the 5 seconds without provider teardown",
+            sent_signal=signal.SIGTERM,
+            expected_exit_code=143,
+            expected_within_seconds=20,
+        ),
+        IgnoredCancelTestCase(
+            description="Ctrl+C exits after the 5 seconds without provider teardown",
+            sent_signal=signal.SIGINT,
+            expected_exit_code=130,
+            expected_within_seconds=20,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_steps_ignoring_cancel_when_signalled_then_the_command_exits_without_teardown(
+    test_case: IgnoredCancelTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
+            'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
+            '[targets.development]\nschema = "main"\n',
+            "python/steps.py": _STEPS.format(directory=str(tmp_path)),
+            "providers/marker.py": _PROVIDER.format(directory=str(tmp_path)),
+        },
+    )
+    log: Path = tmp_path / "build.log"
+    with log.open("wb") as output:
+        process: subprocess.Popen[bytes] = subprocess.Popen(
+            [str(Path(sys.executable).with_name("sqb")), "--no-color"]
+            + ["--project-dir", str(project), "build", "--discover"],
+            stdout=output,
+            stderr=subprocess.STDOUT,
+            env=os.environ | {"HOME": str(tmp_path)},
+        )
+        try:
+            deadline: float = time.monotonic() + 60
+            while len(list(tmp_path.glob("*.running"))) < 2:
+                assert process.poll() is None, log.read_text()
+                assert time.monotonic() < deadline, log.read_text()
+                time.sleep(0.05)
+            process.send_signal(test_case.sent_signal)
+            exit_code: int = process.wait(timeout=test_case.expected_within_seconds)
+        finally:
+            process.kill()
+            _ = process.wait(timeout=5)
+
+    assert exit_code == test_case.expected_exit_code, log.read_text()
+    assert "Stopped waiting for fulfil[pack], fulfil[pick] after 5 seconds" in log.read_text()
+    assert not (tmp_path / "torn-down").exists()
