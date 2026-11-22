@@ -13,9 +13,16 @@ class ActiveConnections:
     def __init__(self) -> None:
         self._connections: dict[int, tuple[Any, Any, int]] = {}
         self._lock: threading.Lock = threading.Lock()
+        self._used: bool = False
+
+    def activity(self) -> tuple[bool, bool]:
+        """Whether a statement has ever run here, and whether one runs now."""
+
+        return self._used, bool(self._connections)
 
     def add(self, *, adapter: Any, connection: Any) -> None:
         with self._lock:
+            self._used = True
             _, _, count = self._connections.get(id(connection), (adapter, connection, 0))
             self._connections[id(connection)] = (adapter, connection, count + 1)
 

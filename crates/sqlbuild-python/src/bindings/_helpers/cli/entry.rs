@@ -657,7 +657,7 @@ fn observed_dispatch<'py>(
             &invocation.recall,
         ) {
             Ok(_) if terminated() => Err(CommandTerminated::new_err(TERMINATED_MESSAGE)),
-            Ok(_) if interrupted() => Err(PyKeyboardInterrupt::new_err(())),
+            _ if !terminated() && interrupted() => Err(PyKeyboardInterrupt::new_err(())),
             dispatched => dispatched,
         };
         match dispatched {

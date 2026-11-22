@@ -35,6 +35,19 @@ def fulfil(ctx: AssetContext, marker_provider: MarkerProvider) -> None:
     (DIRECTORY / f"{{ctx.discovered.item}}.running").touch()
     time.sleep(120)
 '''
+# One Ctrl+C may force an exit only while no statement has ever run, so this adapter records none.
+_UNRECORDED_ADAPTER: str = '''\
+from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
+
+
+class DuckDbUnrecordedAdapter(DuckDbAdapter):
+    """Run statements without recording them as running."""
+
+    adapter_name = "duckdb_unrecorded"
+
+    def execute(self, *, connection, sql):
+        return self._execute(connection=connection, sql=sql)
+'''
 _PROVIDER: str = '''\
 from pathlib import Path
 
@@ -57,13 +70,23 @@ class MarkerProvider(Provider):
             description="SIGTERM exits after the 5 seconds without provider teardown",
             sent_signal=signal.SIGTERM,
             expected_exit_code=143,
+            expected_line="error: terminated by SIGTERM",
             expected_within_seconds=20,
         ),
         IgnoredCancelTestCase(
             description="Ctrl+C exits after the 5 seconds without provider teardown",
             sent_signal=signal.SIGINT,
             expected_exit_code=130,
+            expected_line="error: interrupted (Ctrl+C)",
             expected_within_seconds=20,
+        ),
+        IgnoredCancelTestCase(
+            description="one Ctrl+C waits the 5 seconds though no statement has ever run",
+            sent_signal=signal.SIGINT,
+            expected_exit_code=130,
+            expected_line="error: interrupted (Ctrl+C)",
+            expected_within_seconds=20,
+            adapter="duckdb_unrecorded",
         ),
     ],
     ids=lambda case: case.description,
@@ -75,11 +98,12 @@ def test_given_steps_ignoring_cancel_when_signalled_then_the_command_exits_witho
     write_files(
         project_dir=project,
         files={
-            "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
+            "sqlbuild_project.toml": f'name = "fulfilment"\nadapter = "{test_case.adapter}"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
             "python/steps.py": _STEPS.format(directory=str(tmp_path)),
             "providers/marker.py": _PROVIDER.format(directory=str(tmp_path)),
+            "adapters/duckdb_unrecorded.py": _UNRECORDED_ADAPTER,
         },
     )
     log: Path = tmp_path / "build.log"
@@ -104,5 +128,6 @@ def test_given_steps_ignoring_cancel_when_signalled_then_the_command_exits_witho
             _ = process.wait(timeout=5)
 
     assert exit_code == test_case.expected_exit_code, log.read_text()
+    assert test_case.expected_line in log.read_text()
     assert "Stopped waiting for fulfil[pack], fulfil[pick] after 5 seconds" in log.read_text()
     assert not (tmp_path / "torn-down").exists()

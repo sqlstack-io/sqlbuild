@@ -2,6 +2,7 @@
 
 use pyo3::prelude::{Bound, PyModule, PyResult};
 
+use crate::bindings::_helpers::cli::interruption;
 use crate::bindings::_helpers::cli::{argv, entry, namespace, observability, termination};
 use crate::bindings::_helpers::{
     audit_command, build_command, build_progress, change_selection, check, clone, command_runtime,
@@ -22,6 +23,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     register_launch_state(module)?;
     namespace::register(module)?;
     observability::register(module)?;
+    interruption::register(module)?;
     termination::register(module)?;
     register_progress(module)?;
     register_progress_reporters(module)?;

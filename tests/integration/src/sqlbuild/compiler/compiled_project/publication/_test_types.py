@@ -957,6 +957,14 @@ class CancelledChainTestCase:
 
 
 @dataclass(frozen=True)
+class InterruptedStepsTestCase:
+    description: str
+    expected_status: str
+    expected_statuses: dict[str, str]
+    expected_notice: str
+
+
+@dataclass(frozen=True)
 class WaitingRepublishTestCase:
     description: str
     check_seconds: int

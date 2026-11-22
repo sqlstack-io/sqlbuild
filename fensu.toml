@@ -793,6 +793,11 @@ symbols = ["audit_evidence_scope"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
+modules = ["sqlbuild.runtime.execution_limits.main.statement_activity"]
+symbols = ["statement_activity"]
+reason = "Native code resolves these through the sqlbuild._native_host name table."
+
+[[targets.python.dead_code.roots]]
 modules = ["sqlbuild.runtime.execution_limits.main.cancel_running_statements"]
 symbols = ["cancel_running_statements"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
