@@ -178,16 +178,14 @@ fn resolve_invocation<'py>(
     let discovered: Bound<'py, PyAny> = match project {
         PlanProject::Held { discovered, .. } => discovered.clone(),
         PlanProject::Compiled => timed(DISCOVERING, || {
-            let mut options: Vec<(&str, Bound<'py, PyAny>)> = vec![
+            let options: [(&str, Bound<'py, PyAny>); 3] = [
                 ("project_dir", project_dir.clone()),
                 ("extract_output_column_locations", flag(py, false)),
-            ];
-            if state.is_some() {
-                options.push((
+                (
                     "secret_policy",
                     PyString::new(py, SecretPolicy::Defer.name()).into_any(),
-                ));
-            }
+                ),
+            ];
             discover_project_inputs(py, Some(keywords(py, &options)?))
         })?,
     };
@@ -550,7 +548,7 @@ pub(crate) fn run_plan_command(request: &Bound<'_, PyAny>) -> PyResult<i32> {
     Ok(plan(request, (PlanProject::Compiled, None))?.0)
 }
 
-/// A location's preview from the synced `state`, without rules, which ran at load; vars or a dbt manifest recompile, deferring secrets.
+/// A location's preview from the synced `state`, without rules, which ran at load; vars or a dbt manifest recompile.
 pub(crate) fn location_plan<'py>(
     request: &Bound<'py, PyAny>,
     (held, state): (PlanProject<'_, 'py>, &Arc<WarehouseState>),

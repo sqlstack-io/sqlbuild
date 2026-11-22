@@ -148,6 +148,16 @@ class ProviderSecretE2ETestCase:
 
 
 @dataclass(frozen=True)
+class StrictPlanE2ETestCase:
+    description: str
+    select: str
+    extra_repo_files: dict[str, str]
+    # The text plan's "Can't run" block, empty when everything selected can run.
+    expected_block: str
+    expected_cant_run: list[dict[str, object]]
+
+
+@dataclass(frozen=True)
 class SharedSinkProviderE2ETestCase:
     description: str
     unused_provider_name: str

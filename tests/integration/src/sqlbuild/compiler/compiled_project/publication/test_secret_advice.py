@@ -28,7 +28,15 @@ _SET_HERE: str = "set WORKER_ENV_REGION_CODE, WORKER_ENV_TOKEN in this shell or 
         SecretAdviceTestCase(
             "a subcommand takes the flag", ("rules", "run", "SQBRMODEL102"), ".env", _SET_HERE, True
         ),
-        SecretAdviceTestCase("plan doesn't", ("plan",), ".env", _SET_HERE, False),
+        SecretAdviceTestCase(
+            "plan lists what can't run instead of failing",
+            ("plan",),
+            ".env",
+            "Can't run: provider region needs WORKER_ENV_REGION_CODE, WORKER_ENV_TOKEN "
+            "(missing from the environment and from ",
+            False,
+            expected_failure=False,
+        ),
         SecretAdviceTestCase("freshness doesn't", ("freshness",), ".env", _SET_HERE, False),
         SecretAdviceTestCase("janitor doesn't", ("janitor",), ".env", _SET_HERE, False),
         SecretAdviceTestCase(
@@ -51,7 +59,7 @@ _SET_HERE: str = "set WORKER_ENV_REGION_CODE, WORKER_ENV_TOKEN in this shell or 
     ],
     ids=lambda case: case.description,
 )
-def test_given_a_missing_secret_when_a_command_fails_then_the_help_fits_that_command(
+def test_given_a_missing_secret_when_a_command_runs_then_the_advice_fits_that_command(
     test_case: SecretAdviceTestCase, tmp_path: Path
 ) -> None:
     write_files(
@@ -77,6 +85,6 @@ def test_given_a_missing_secret_when_a_command_fails_then_the_help_fits_that_com
     result: subprocess.CompletedProcess[str] = run_sqb(tmp_path, "--no-color", *test_case.command)
     shown: str = " ".join((result.stdout + result.stderr).split())
 
-    assert result.returncode != 0, shown
+    assert (result.returncode != 0) is test_case.expected_failure, shown
     assert test_case.expected_help + test_case.env_file_name in shown, shown
     assert ("--allow-missing-secrets" in shown) is test_case.expected_flag_suggested, shown
