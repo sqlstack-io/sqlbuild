@@ -17,6 +17,7 @@ from tests.unit.src.sqlbuild.executor.python_nodes.classes._test_types import (
     ItemPoolCapTestCase,
     ItemPoolFailureTestCase,
     ItemPoolOrderTestCase,
+    ItemPoolRecordedInterruptTestCase,
     ItemPoolSerialTestCase,
     ItemPoolWriteTestCase,
 )
@@ -24,6 +25,7 @@ from tests.unit.src.sqlbuild.executor.python_nodes.classes.helpers import (
     ItemPoolTestAdapter,
     ItemProbe,
     fail_item,
+    interrupt_after_next_record,
     interrupted_probe,
     item_graph,
     meet_at,
@@ -339,3 +341,35 @@ def test_given_concurrent_steps_using_sql_when_they_write_results_then_they_do_n
         }
         adapter.close(connection)
         assert written == set(test_case.steps)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ItemPoolRecordedInterruptTestCase(
+            description="two steps running when the interrupt follows the first's record",
+            items=("bill", "pack"),
+            expected_reported=frozenset({("bill", "success"), ("pack", "success")}),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_interrupt_just_after_a_record_when_running_then_it_still_ends_as_a_cancel(
+    test_case: ItemPoolRecordedInterruptTestCase, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    barrier: threading.Barrier = threading.Barrier(len(test_case.items))
+    probe: ItemProbe = ItemProbe(
+        actions={name: partial(meet_at, barrier) for name in test_case.items}
+    )
+    graph: PythonNodeGraph = item_graph(
+        tuple((name, "plan", len(test_case.items), ()) for name in test_case.items)
+    )
+    interrupt_after_next_record(monkeypatch)
+
+    with pytest.raises(KeyboardInterrupt):
+        _ = run_ingress(graph=graph, adapter=ItemPoolTestAdapter(), probe=probe)
+
+    reported: frozenset[tuple[str, str]] = frozenset(
+        (result.node_name, result.status.value) for result in probe.reported
+    )
+    assert reported == test_case.expected_reported
