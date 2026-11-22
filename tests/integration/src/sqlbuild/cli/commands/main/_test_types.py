@@ -1595,3 +1595,18 @@ class DynamicRefreshWarehouseTestCase:
     description: str
     argv: tuple[str, ...]
     expected_refresh_warehouses: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class InterruptedCommandTestCase:
+    description: str
+    command: tuple[str, ...]
+    # What the adapter's connect runs before it opens the connection.
+    connect: str
+    # What the terminal shows once the command waits.
+    waiting: str
+    expected_line: str
+    settle_seconds: float = 0.3
+    presses: int = 1
+    files: dict[str, str] = field(default_factory=dict)
+    expected_within_seconds: float = 1.0

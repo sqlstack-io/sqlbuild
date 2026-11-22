@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import fcntl
 import json
 import os
+import pty
 import re
 import shutil
 import signal
@@ -9,12 +11,15 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import termios
 import time
 from collections import defaultdict
 from collections.abc import Callable, Iterable
+from contextlib import suppress
 from datetime import datetime, timedelta
 from itertools import accumulate, chain, compress, takewhile
 from pathlib import Path
+from threading import Thread
 from types import ModuleType
 from typing import Any, cast
 
@@ -1343,6 +1348,95 @@ def signalled_scenario_run(
     sent: float = time.monotonic()
     stdout, stderr = process.communicate(timeout=120)
     return process.returncode, started + stdout + stderr, time.monotonic() - sent
+
+
+def write_prompting_project(project_dir: Path, *, connect: str, files: dict[str, str]) -> Path:
+    """A project whose adapter runs `connect` before it opens its connection."""
+
+    adapter: str = (
+        "import getpass\n"
+        "from concurrent.futures import ThreadPoolExecutor\n\n"
+        "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
+        "class DuckDbSignInAdapter(DuckDbAdapter):\n"
+        '    adapter_name = "duckdb_sign_in"\n\n'
+        "    def connect(self, config):\n"
+        f"{connect}"
+        "        return super().connect(config)\n"
+    )
+    project: dict[str, str] = {
+        "sqlbuild_project.toml": (
+            'name = "orders"\nadapter = "duckdb_sign_in"\ndefault_target = "development"\n'
+            '[connections.local]\ndatabase = "warehouse.duckdb"\n'
+            '[targets.development]\nschema = "main"\n'
+            "[rules]\nselect = []\n"
+        ),
+        "adapters/duckdb_sign_in.py": adapter,
+        "models/customers.sql": (
+            "MODEL (description 'Customers.', materialized table);\nSELECT 1 AS customer_id\n"
+        ),
+    } | files
+    for path, text in project.items():
+        (project_dir / path).parent.mkdir(parents=True, exist_ok=True)
+        _ = (project_dir / path).write_text(text, encoding="utf-8")
+    return project_dir
+
+
+def interrupt_on_terminal(
+    project_dir: Path, *, command: tuple[str, ...], waiting: str, settle: float, presses: int
+) -> tuple[int, float, str, bool]:
+    """`sqb` on its own terminal, sent SIGINT once it waits: its exit code, the seconds it then
+    took, what it showed and whether the terminal still echoes."""
+
+    terminal, attached = pty.openpty()
+    environment: dict[str, str] = {**os.environ, "TERM": "xterm"}
+    _ = environment.pop("CI", None)
+    process: subprocess.Popen[bytes] = subprocess.Popen(
+        [str(Path(sys.executable).with_name("sqb")), *command],
+        cwd=project_dir,
+        stdin=attached,
+        stdout=attached,
+        stderr=attached,
+        env=environment,
+        start_new_session=True,
+        preexec_fn=_interruptible_terminal,
+    )
+    written: list[bytes] = []
+    reader: Thread = Thread(target=_read_terminal, args=(terminal, written), daemon=True)
+    reader.start()
+    try:
+        deadline: float = time.monotonic() + 60
+        while waiting.encode() not in b"".join(written):
+            assert process.poll() is None, b"".join(written).decode(errors="replace")
+            assert time.monotonic() < deadline, b"".join(written).decode(errors="replace")
+            time.sleep(0.02)
+        time.sleep(settle)
+        sent: float = time.monotonic()
+        for _ in range(presses):
+            os.killpg(process.pid, signal.SIGINT)
+            time.sleep(0.05)
+        exit_code: int = process.wait(timeout=15)
+        seconds: float = time.monotonic() - sent
+        echoes: bool = bool(termios.tcgetattr(attached)[3] & termios.ECHO)
+    finally:
+        process.kill()
+        _ = process.wait(timeout=5)
+        os.close(attached)
+        reader.join(timeout=5)
+        os.close(terminal)
+    return exit_code, seconds, b"".join(written).decode(errors="replace"), echoes
+
+
+def _interruptible_terminal() -> None:
+    """In the child: default Ctrl-C handling, and the terminal on stdin as the session's own."""
+
+    _default_interrupt_handling()
+    _ = fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+
+def _read_terminal(terminal: int, written: list[bytes]) -> None:
+    with suppress(OSError):
+        while chunk := os.read(terminal, 65536):
+            written.append(chunk)
 
 
 def _default_interrupt_handling() -> None:
