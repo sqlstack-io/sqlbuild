@@ -33,8 +33,8 @@ class InterruptWatch:
     The first Ctrl+C cancels the statements running then, as SIGTERM does, so a driver waiting in
     native code returns and the interrupt unwinds the command, which cleans up. The exit is forced
     after a grace period only where that can't cut warehouse cleanup short: a connect that was
-    waiting when Ctrl+C came still is, no statement has run, or the command has returned and
-    none is running. A second Ctrl+C forces it after the same grace, cancelling statements first.
+    waiting when Ctrl+C came still is, no statement has run, or the command has returned and left
+    threads running. A second Ctrl+C forces it after the same grace, cancelling statements first.
     """
 
     def __init__(self) -> None:
@@ -42,7 +42,6 @@ class InterruptWatch:
         self._presses: int = 0
         self._pressed_at: float = 0.0
         self._connecting: list[FrameType] = []
-        self._returned: bool = False
         self._terminated: bool = False
         self._announced: bool = False
         self._restore_terminal: Callable[[], None] = lambda: None
@@ -78,15 +77,27 @@ class InterruptWatch:
         if code == TERMINATED_EXIT_CODE:
             self._terminated = True
             return code
-        self._returned = True
         return self.finish_interrupted() if self.interrupted() else code
 
     def finish_interrupted(self) -> int:
         """Return 130 for a command Ctrl+C stopped, saying so."""
 
-        self._returned = True
+        with contextlib.suppress(ValueError):
+            _ = signal.signal(signal.SIGINT, _already_stopping)
         self._announce()
+        self._leave_no_thread_waiting()
         return INTERRUPTED_EXIT_CODE
+
+    def _leave_no_thread_waiting(self) -> None:
+        """Exit directly past threads the interpreter would wait for, such as one reading stdin."""
+
+        deadline: float = time.monotonic() + INTERRUPT_GRACE_SECONDS
+        for thread in threading.enumerate():
+            if thread.daemon or thread is threading.current_thread():
+                continue
+            thread.join(max(0.0, deadline - time.monotonic()))
+            if thread.is_alive():
+                self._force()
 
     def _forget_in_child(self) -> None:
         _ = signal.set_wakeup_fd(-1)
@@ -99,7 +110,8 @@ class InterruptWatch:
                 received: bytes = self._signals[0].recv(64)
             except BlockingIOError:
                 return
-            if signal.SIGINT not in received or self._terminated:
+            presses: int = received.count(signal.SIGINT)
+            if not presses or self._terminated:
                 return
             if self._termination_requested():
                 self._terminated = True
@@ -108,7 +120,7 @@ class InterruptWatch:
                 self._connecting = connects_in_progress()
                 if statement_activity()[1]:
                     threading.Thread(target=cancel_running_statements, daemon=True).start()
-            self._presses += 1
+            self._presses += presses
             self._pressed_at = time.monotonic()
 
     def _termination_requested(self) -> bool:
@@ -138,8 +150,8 @@ class InterruptWatch:
             current: list[FrameType] = connects_in_progress()
             if any(frame in current for frame in self._connecting):
                 return True
-        ever_ran, running = statement_activity()
-        return not ever_ran or (self._returned and not running)
+        ever_ran, _ = statement_activity()
+        return not ever_ran
 
     def _force(self) -> None:
         stopping: threading.Thread = threading.Thread(target=self._stop_work, daemon=True)
@@ -163,3 +175,7 @@ class InterruptWatch:
         with contextlib.suppress(OSError):
             lead: str = "\n" if os.isatty(2) else ""
             _ = os.write(2, f"{lead}{INTERRUPTED_LINE}\n".encode())
+
+
+def _already_stopping(_signal: int, _frame: FrameType | None) -> None:
+    """Take a further Ctrl+C without raising; the watch still counts it."""

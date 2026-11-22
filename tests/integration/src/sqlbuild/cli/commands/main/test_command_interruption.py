@@ -58,33 +58,33 @@ _READING_ASSET: str = (
     "test_case",
     [
         InterruptedCommandTestCase(
-            "debug at a sign-in prompt", ("debug",), _INPUT, "Sign-in code: ", _LINE
+            "debug at a sign-in prompt", ("debug",), _INPUT, "Sign-in code:", _LINE
         ),
         InterruptedCommandTestCase(
-            "build at a sign-in prompt", ("build",), _INPUT, "Sign-in code: ", _LINE
+            "build at a sign-in prompt", ("build",), _INPUT, "Sign-in code:", _LINE
         ),
         InterruptedCommandTestCase(
             "sqb dev at a sign-in prompt",
             ("dev", "--port", "0", "--no-scheduler"),
             _INPUT,
-            "Sign-in code: ",
+            "Sign-in code:",
             "sqb dev stopped (interrupted)",
         ),
         InterruptedCommandTestCase(
             "a driver that turns the interrupt into its own error",
             ("debug",),
             _SWALLOWED,
-            "Sign-in code: ",
+            "Sign-in code:",
             _LINE,
         ),
         InterruptedCommandTestCase(
-            "a driver that asks again", ("debug",), _RETRIED, "Sign-in code: ", _LINE
+            "a driver that asks again", ("debug",), _RETRIED, "Sign-in code:", _LINE
         ),
         InterruptedCommandTestCase(
-            "a driver that asks again without echo", ("debug",), _HIDDEN, "Sign-in code: ", _LINE
+            "a driver that asks again without echo", ("debug",), _HIDDEN, "Sign-in code:", _LINE
         ),
         InterruptedCommandTestCase(
-            "a prompt read on another thread", ("build",), _THREADED, "Sign-in code: ", _LINE
+            "a prompt read on another thread", ("build",), _THREADED, "Sign-in code:", _LINE
         ),
         InterruptedCommandTestCase(
             "a running build statement is cancelled",
