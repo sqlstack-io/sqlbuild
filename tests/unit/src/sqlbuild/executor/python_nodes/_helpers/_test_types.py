@@ -275,3 +275,11 @@ class TracebackTailTestCase:
     expected_start: str
     expected_end: str
     expected_elided: bool
+
+
+@dataclass(frozen=True)
+class TracebackRedactionTestCase:
+    description: str
+    message: str
+    expected_kept: str
+    expected_absent: str

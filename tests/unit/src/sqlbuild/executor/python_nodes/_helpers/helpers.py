@@ -704,3 +704,11 @@ def nested_key_error(*, depth: int) -> BaseException:
     with pytest.raises(KeyError) as raised:
         steps[f"step_{depth}"]()
     return raised.value
+
+
+def raised_value_error(*, message: str) -> BaseException:
+    """Return a ValueError with `message`, raised so it has a traceback."""
+
+    with pytest.raises(ValueError) as raised:
+        raise ValueError(message)
+    return raised.value
