@@ -7,6 +7,7 @@ PYTHON_NODE_RELATION_QUALIFIER_SEPARATOR: str = "."
 
 CANCEL_REPEAT_SECONDS: float = 1.0
 CANCEL_GRACE_SECONDS: float = 5.0
+ABANDONABLE_THREAD_PREFIX: str = "sqlbuild-item"
 ABANDONED_STEPS_NOTICE: str = (
     "Stopped waiting for {steps} after {seconds:g} seconds; providers are left without teardown.\n"
 )

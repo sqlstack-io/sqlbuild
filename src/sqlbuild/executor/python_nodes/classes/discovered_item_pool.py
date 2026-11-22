@@ -18,6 +18,7 @@ from sqlbuild.executor.node_results.main._direct_store import build_direct_node_
 from sqlbuild.executor.python_nodes._helpers.discovered_items import parallel_set
 from sqlbuild.executor.python_nodes._helpers.results import evaluate_python_node_fan_in
 from sqlbuild.executor.python_nodes.constants import (
+    ABANDONABLE_THREAD_PREFIX,
     ABANDONED_STEPS_NOTICE,
     CANCEL_GRACE_SECONDS,
     CANCEL_REPEAT_SECONDS,
@@ -33,7 +34,6 @@ from sqlbuild.executor.python_nodes.models import (
     RunningItem,
 )
 from sqlbuild.executor.python_nodes.types import ExecutablePythonNode
-from sqlbuild.runtime.execution_limits.constants import ABANDONABLE_THREAD_PREFIX
 from sqlbuild.runtime.execution_limits.main.cancel_running_statements import (
     cancel_running_statements,
 )

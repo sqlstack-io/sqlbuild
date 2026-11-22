@@ -3,7 +3,6 @@
 import os
 import sys
 
-from sqlbuild.cli.entry._helpers.abandoned_steps import exit_past_abandoned_steps
 from sqlbuild.cli.entry.constants import (
     INTERRUPTED_EXIT_CODE,
     NATIVE_ALLOCATOR_PURGE_DELAY_MILLISECONDS,
@@ -19,6 +18,9 @@ def main() -> int:
         NATIVE_ALLOCATOR_PURGE_DELAY_VARIABLE, NATIVE_ALLOCATOR_PURGE_DELAY_MILLISECONDS
     )
     from sqlbuild._native import LAUNCH_RECORD_OPTION, defer_compile_teardown_to_exit
+    from sqlbuild.executor.python_nodes.main.exit_past_abandoned_steps import (
+        exit_past_abandoned_steps,
+    )
 
     _ = defer_compile_teardown_to_exit()
     arguments: list[str] = sys.argv[1:]
