@@ -2,6 +2,8 @@
 	// The nodes a plan can't run because a provider they use is missing secrets: one problem block per
 	// provider (what it needs, what it stops, how to fix it), then a row per node with why it can't run.
 	import type { PlanCantRun } from '$lib/api';
+	import DataTable from '$lib/components/list/data-table.svelte';
+	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { to } from '$lib/paths';
 	import { cantRunRows, keyName } from './cant-run';
 	import CantRunProblem from './cant-run-problem.svelte';
@@ -21,23 +23,26 @@
 
 	const rows = $derived(cantRunRows(entries, upstreamOf));
 	const href = (key: string) => to(`/catalog/${key}`);
+	const columns: TableColumn[] = [
+		{ id: 'state', label: '', width: '34px' },
+		{ id: 'node', label: 'Node', minWidth: 160 },
+		{ id: 'kind', label: 'Kind', width: '100px' },
+		{ id: 'why', label: "Why it can't run", minWidth: 200, truncate: false }
+	];
 </script>
 
 <div class="cant-run" data-testid="plan-cant-run">
 	{#each entries as e (e.provider)}<CantRunProblem entry={e} {then} />{/each}
-	<table class="nodes">
-		<thead><tr><th class="st"></th><th>Node</th><th>Kind</th><th>Why it can't run</th></tr></thead>
-		<tbody>
-			{#each rows as r (r.key)}
-				<tr class:uses={r.uses}>
-					<td class="st"><span class="state" class:hollow={!r.uses} aria-label={r.uses ? 'uses the provider' : 'reads a node that can’t run'}>{r.uses ? '✕' : '!'}</span></td>
-					<td><a href={href(r.key)} class="mono">{keyName(r.key)}</a></td>
-					<td class="faint">{kindOf(r.key)}</td>
-					<td>{r.why}</td>
-				</tr>
-			{/each}
-		</tbody>
-	</table>
+	<DataTable class="static compact" embedded {columns} {rows} key={(r) => r.key} empty="No nodes.">
+		{#snippet row(r)}
+			<tr class:uses={r.uses}>
+				<td><span class="state" class:hollow={!r.uses} aria-label={r.uses ? 'uses the provider' : 'reads a node that can’t run'}>{r.uses ? '✕' : '!'}</span></td>
+				<td><a href={href(r.key)} class="mono">{keyName(r.key)}</a></td>
+				<td class="faint">{kindOf(r.key)}</td>
+				<td>{r.why}</td>
+			</tr>
+		{/snippet}
+	</DataTable>
 </div>
 
 <style>
@@ -45,24 +50,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
-	}
-	.nodes {
-		width: 100%;
-		border-collapse: collapse;
-	}
-	.nodes th {
-		padding: 4px 8px;
-		border-bottom: 1px solid var(--border);
-		color: var(--muted-foreground);
-		font-weight: 500;
-		text-align: left;
-	}
-	.nodes td {
-		padding: 5px 8px;
-		border-bottom: 1px solid var(--border-subtle, var(--border));
-	}
-	.nodes .st {
-		width: 34px;
 	}
 	.state {
 		display: inline-grid;
