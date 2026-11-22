@@ -6,14 +6,14 @@ pub(crate) mod helpers;
 mod test_cap;
 #[path = "test_large.rs"]
 mod test_large;
+#[path = "test_location.rs"]
+mod test_location;
 #[path = "test_logs.rs"]
 mod test_logs;
 #[path = "test_reads.rs"]
 mod test_reads;
 #[path = "test_retention.rs"]
 mod test_retention;
-#[path = "test_store.rs"]
-mod test_store;
 #[path = "test_types.rs"]
 pub(crate) mod test_types;
 #[path = "test_upload.rs"]
