@@ -22,10 +22,11 @@ async function cardsInside(page: Page): Promise<boolean[]> {
 
 for (const [description, path, expectedNodes] of [
   ["a rerun of a failed run", "/plan/rerun?mock&run=run-a7c1&mode=all", 3],
+  // The deepest chain of the mock project, sources to a Python asset: a build plan whose graph fits whole.
   [
     "a build plan",
-    `/plan?mock&cmd=${encodeURIComponent("sqb build --changed")}`,
-    17,
+    `/plan?mock&cmd=${encodeURIComponent("sqb build --select +export_revenue_csv")}`,
+    10,
   ],
 ] as const) {
   test(`${description}'s graph draws its nodes on a canvas that fills the box`, async ({
