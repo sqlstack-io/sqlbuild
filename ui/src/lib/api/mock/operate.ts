@@ -1180,6 +1180,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 		error: null,
 		abandonedBecause: phase === 'abandoned' ? 'superseded' : null,
 		skippedBy: null,
+		unreadable: null,
 		definitionFingerprint: fingerprint(name),
 		...extra
 	});

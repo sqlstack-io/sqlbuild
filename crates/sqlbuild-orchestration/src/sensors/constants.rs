@@ -31,6 +31,9 @@ pub(crate) const CHECK_EVENT_ROWS: &str = " AND r.kind<>'adhoc' AND (n.kind='che
 pub(crate) const CHECK_KEY_PREFIXES: [&str; 3] = ["audit:", "sql_test:", "check:"];
 /// The `sqb_run_nodes.kind` of a check a run didn't select.
 pub(crate) const CHECK_ROW_KIND: &str = "check";
+/// Why a tick an earlier release recorded shows without its details.
+pub(crate) const UNREADABLE_TICK: &str =
+    "this tick was recorded by an earlier SQLBuild release and can't be read";
 /// The tick phases a failing streak counts: failed, timed out, or abandoned because the location didn't answer.
 pub(crate) const FAILING_TICK_PHASES: &str = "(phase IN ('failed','timed_out') OR (phase='abandoned' AND fact_json -> 'outcome' ->> 'reason'='unanswered'))";
 /// The longest one call of a sensor's function may take: a running sensor holds its location's other sensors, plans and sync until it returns.

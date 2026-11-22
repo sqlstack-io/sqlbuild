@@ -859,7 +859,7 @@ export class MockOperate {
 		const now = new Date().toISOString();
 		const actor = this.#ctx.user();
 		this.#fx.evaluations[def.name] = [
-			{ ...stuck, id: `eval-skip-${++this.#seq}`, outcome: 'skipped', requestedAt: now, finishedAt: now, runIds: [], skippedFor: [], failureCode: null, error: null, abandonedBecause: null, skipReason: reason, skippedBy: actor.displayName },
+			{ ...stuck, id: `eval-skip-${++this.#seq}`, outcome: 'skipped', requestedAt: now, finishedAt: now, runIds: [], skippedFor: [], failureCode: null, error: null, abandonedBecause: null, skipReason: reason, skippedBy: actor.displayName, unreadable: null },
 			...(this.#fx.evaluations[def.name] ?? [])
 		];
 		this.#runtime(scope, def.name).history.unshift(this.#stateEvent('event_skipped', reason, eventId));

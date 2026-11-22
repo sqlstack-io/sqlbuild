@@ -3142,6 +3142,8 @@ export interface components {
             skipped_by?: string | null;
             /** @description For each requested run the job's `skip` overlap dropped, the run that was active. */
             skipped_for: string[];
+            /** @description Why the tick's details are missing: an earlier release recorded them in a form this one can't read. */
+            unreadable?: string | null;
         };
         /** @description A run key is redacted and withheld like the custom cursor it usually derives from: empty without view.evidence. */
         PersonSensorRunRequest: {
