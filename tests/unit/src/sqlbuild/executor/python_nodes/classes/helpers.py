@@ -95,7 +95,7 @@ class ItemProbe:
 def run_item(ctx: AssetContext) -> object:
     """Run one item as its probe says."""
 
-    discovered: Any = ctx.discovered
+    discovered: Any = cast(Any, ctx.discovered)
     probe: ItemProbe = cast(ItemProbe, ctx.vars["probe"])
     outcome: object = probe.step(str(discovered.item))
     skips: dict[object, Callable[[], object]] = {

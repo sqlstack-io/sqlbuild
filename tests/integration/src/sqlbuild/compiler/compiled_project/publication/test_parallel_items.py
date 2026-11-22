@@ -43,8 +43,8 @@ def fulfil(ctx: AssetContext):
     """Write a table and a result while every other step does."""
     step = ctx.discovered.item
     MEET.wait()
-    print(f"printing {{step}}", flush=True)
-    ctx.log.info(f"running {{step}}")
+    for _ in range(STEPS.index(step) + 1):
+        print(f"printing {{step}}", flush=True)
     ctx.execute_sql(f"CREATE OR REPLACE TABLE step_{{step}} AS SELECT '{{step}}' AS step")
     count = ctx.query(f"SELECT count(*) FROM step_{{step}}").fetchall()[0][0]
     MEET.wait()
@@ -136,19 +136,13 @@ def test_given_concurrent_steps_using_sql_when_a_worker_runs_them_then_writes_an
                     (run["run_id"],),
                 ).fetchall()
             )
-            logs: set[tuple[str, str]] = set(
+            printed: dict[str, int] = dict(
                 control.execute(
-                    "SELECT node_key, message FROM sqb_run_node_logs WHERE run_id=?",
+                    "SELECT node_key, line_count FROM sqb_run_output_streams "
+                    "WHERE run_id=? AND stream='stdout' AND node_key LIKE 'asset:%'",
                     (run["run_id"],),
                 ).fetchall()
             )
-            streams: set[str] = {
-                node
-                for (node,) in control.execute(
-                    "SELECT node_key FROM sqb_run_output_streams WHERE run_id=? AND stream='stdout'",
-                    (run["run_id"],),
-                ).fetchall()
-            }
         with duckdb.connect(str(worker.project / "warehouse.duckdb")) as warehouse:
             tables: set[str] = {
                 name
@@ -159,8 +153,7 @@ def test_given_concurrent_steps_using_sql_when_a_worker_runs_them_then_writes_an
 
     assert statuses == test_case.expected_statuses
     steps: dict[str, str] = {key: key[len("asset:fulfil[") : -1] for key in statuses}
-    assert {(key, f"running {step}") for key, step in steps.items()} <= logs
-    assert set(steps) <= streams
+    assert printed == {key: index + 1 for index, key in enumerate(sorted(steps))}
     assert {f"step_{step}" for step in steps.values()} <= tables
 
 
