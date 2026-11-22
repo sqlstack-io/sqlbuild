@@ -18,6 +18,7 @@ from sqlbuild.adapters.sqlserver.classes.sqlserver_adapter import SqlServerAdapt
 from tests.unit.src.sqlbuild.adapters._test_types import (
     BigQueryRowCountEstimateTestCase,
     DuckDbRowCountEstimateTestCase,
+    RebuiltTableRowCountTestCase,
     RelationRowCountEstimateTestCase,
     SchemaRowCountEstimatesTestCase,
 )
@@ -520,3 +521,54 @@ def test_given_pages_of_names_when_estimating_schema_row_counts_then_no_read_is_
     ] == list(test_case.expected_estimates), test_case.description
     assert len(connection.executed) == test_case.expected_reads, connection.executed
     assert test_case.expected_sql_fragment in connection.executed[0], connection.executed
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RebuiltTableRowCountTestCase("plain MergeTree counts exactly", "MergeTree", 42, 42),
+        RebuiltTableRowCountTestCase(
+            "replicated MergeTree counts exactly", "ReplicatedMergeTree", 42, 42
+        ),
+        RebuiltTableRowCountTestCase("shared MergeTree counts exactly", "SharedMergeTree", 42, 42),
+        RebuiltTableRowCountTestCase(
+            "ReplacingMergeTree counts rows before merges", "ReplacingMergeTree", 42, None
+        ),
+        RebuiltTableRowCountTestCase(
+            "SummingMergeTree counts rows before merges", "SummingMergeTree", 42, None
+        ),
+        RebuiltTableRowCountTestCase(
+            "AggregatingMergeTree counts rows before merges", "AggregatingMergeTree", 42, None
+        ),
+        RebuiltTableRowCountTestCase(
+            "CollapsingMergeTree counts rows before merges", "CollapsingMergeTree", 42, None
+        ),
+        RebuiltTableRowCountTestCase(
+            "replicated ReplacingMergeTree counts rows before merges",
+            "ReplicatedReplacingMergeTree",
+            42,
+            None,
+        ),
+        RebuiltTableRowCountTestCase(
+            "shared VersionedCollapsingMergeTree counts rows before merges",
+            "SharedVersionedCollapsingMergeTree",
+            42,
+            None,
+        ),
+        RebuiltTableRowCountTestCase("an engine without a count", "MergeTree", None, None),
+        RebuiltTableRowCountTestCase("a Memory table is not counted", "Memory", 42, None),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_rebuilt_clickhouse_table_when_counting_rows_then_only_exact_engines_report(
+    test_case: RebuiltTableRowCountTestCase, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adapter: ClickHouseAdapter = ClickHouseAdapter()
+    connection: MetadataConnection = MetadataConnection(((test_case.engine, test_case.total_rows),))
+    monkeypatch.setattr(adapter, "execute", execute_through_cursor)
+
+    row_count: int | None = adapter.rebuilt_table_row_count(
+        connection=connection, database=None, schema="dev", name="orders"
+    )
+
+    assert row_count == test_case.expected_row_count

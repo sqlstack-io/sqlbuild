@@ -299,11 +299,11 @@ REWRITE_CHECKOUT: str = (
             rewrites={"sources/raw.yml": SOURCES_YML.format(table="missing_orders")},
         ),
         AdhocVerbTestCase(
-            description="a refused test run leaves its unchecked node skipped",
+            description="a refused test run leaves its unchecked node not run",
             prerequisites=[],
             command=["test", "--select", "customers", "--warehouse", "ANALYST_XS"],
             expected_selection=["model:customers"],
-            expected_run_nodes=[("model:customers", "node", "skipped")],
+            expected_run_nodes=[("model:customers", "node", "not_run")],
             expected_status="failed",
         ),
     ],

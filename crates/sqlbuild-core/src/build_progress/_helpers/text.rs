@@ -135,3 +135,13 @@ pub(crate) fn abbreviated_rows(count: i64) -> String {
     }
     format!("{} {label}", format_thousands(i128::from(count)))
 }
+
+/// `45s`, `2m10s` or `1h02m05s`.
+pub(crate) fn whole_elapsed(seconds: u64) -> String {
+    let (hours, minutes, seconds) = (seconds / 3600, seconds / 60 % 60, seconds % 60);
+    match (hours, minutes) {
+        (0, 0) => format!("{seconds}s"),
+        (0, _) => format!("{minutes}m{seconds:02}s"),
+        _ => format!("{hours}h{minutes:02}m{seconds:02}s"),
+    }
+}

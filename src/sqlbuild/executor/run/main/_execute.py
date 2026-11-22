@@ -30,6 +30,7 @@ from sqlbuild.executor.run._helpers.execution.promotion import promote_relation_
 from sqlbuild.executor.run._helpers.execution.results import (
     build_failed_result,
     build_skipped_result,
+    rebuilt_table_rows,
 )
 from sqlbuild.executor.run._helpers.execution.results import (
     with_waiting_on_empty_inputs_warning as with_waiting_on_empty_inputs_warning,
@@ -381,6 +382,7 @@ def _staged_lifecycle(
         model_name=entry.name,
         status=ExecutionStatus.SUCCESS,
         promoted_relation=target_qualified,
+        table_rows=rebuilt_table_rows(context=context, targets=targets),
         audit_results=tuple(audit_results),
         warning_messages=tuple(warnings) + fingerprint_warnings,
         lifecycle_events=statement_recorder.snapshot(),
@@ -510,6 +512,7 @@ def _immediate_lifecycle(
         model_name=entry.name,
         status=ExecutionStatus.SUCCESS,
         promoted_relation=target_qualified,
+        table_rows=rebuilt_table_rows(context=context, targets=targets),
         audit_results=tuple(audit_results),
         warning_messages=tuple(warnings) + fingerprint_warnings,
         lifecycle_events=statement_recorder.snapshot(),

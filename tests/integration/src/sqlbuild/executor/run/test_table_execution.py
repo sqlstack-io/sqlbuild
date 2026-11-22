@@ -13,16 +13,19 @@ from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.executor.run.models import ModelExecutionResult
 from sqlbuild.executor.run.types import ExecutionPhase
 from tests.integration.src.sqlbuild.executor.run._test_types import (
+    RebuiltRowCountTestCase,
     TableFailureTestCase,
     TableSuccessTestCase,
 )
 from tests.integration.src.sqlbuild.executor.run.helpers import (
     ExtraAuditDefinition,
+    counted_rows,
     create_python_hook_data,
     fail_table_hook,
     insert_table_hook_log,
     run_failure_test,
     run_success_test,
+    unreadable_rows,
     verify_failure_warehouse_state,
     verify_success_warehouse_state,
 )
@@ -574,3 +577,52 @@ def test_given_fingerprint_failure_when_executing_table_then_succeeds_with_warni
     verify_success_warehouse_state(
         result=result, test_case=test_case, adapter=adapter, connection=connection
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RebuiltRowCountTestCase(
+            "a staged rebuild reports the adapter's count",
+            TablePromotionMode.STAGED,
+            counted_rows,
+            7,
+        ),
+        RebuiltRowCountTestCase(
+            "a staged rebuild whose count read fails still succeeds",
+            TablePromotionMode.STAGED,
+            unreadable_rows,
+            None,
+        ),
+        RebuiltRowCountTestCase(
+            "an immediate rebuild whose count read fails still succeeds",
+            TablePromotionMode.IMMEDIATE,
+            unreadable_rows,
+            None,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_rebuilt_table_when_its_row_count_read_fails_then_the_node_succeeds_without_a_count(
+    test_case: RebuiltRowCountTestCase,
+    adapter: DuckDbAdapter,
+    connection: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(adapter, "rebuilt_table_row_count", test_case.row_count)
+
+    result: ModelExecutionResult = run_success_test(
+        test_case=TableSuccessTestCase(
+            description=test_case.description,
+            setup_sql=(),
+            model_sql="SELECT 1 AS id",
+            target_schema="main",
+            target_name="orders",
+            promotion_mode=test_case.promotion_mode,
+            expected_row_count=1,
+        ),
+        adapter=adapter,
+        connection=connection,
+    )
+
+    assert result.table_rows == test_case.expected_table_rows

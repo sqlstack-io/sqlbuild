@@ -249,7 +249,7 @@ class LoaderContext(DependencyResultReader):
 
 @dataclass(frozen=True)
 class LoadExecutionResult:
-    """Execution result for one source loader."""
+    """Execution result for one source loader; `rows_affected` is None unless it wrote rows."""
 
     source_name: str
     loader_name: str
@@ -258,6 +258,7 @@ class LoadExecutionResult:
     resource_kind: ExecutionResourceKind = ExecutionResourceKind.SOURCE
     staging_relation: str | None = None
     rows_loaded: int = 0
+    rows_affected: int | None = None
     duration_ms: int | None = None
     lifecycle_events: tuple[LifeCycleEvent, ...] = field(default_factory=tuple)
     skip_mode: SkipMode | None = None
@@ -302,6 +303,7 @@ class LoadRuntimeParams:
     result_store: Any | None = None
     schema_prepared: bool = False
     project_relations: Mapping[SqlResourceRef, str] | None = None
+    on_rows_written: Callable[[int], None] | None = None
 
 
 @dataclass(frozen=True)

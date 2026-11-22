@@ -245,6 +245,8 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                         node_key: node.into(),
                         outcome,
                         rows_affected: Some(17),
+                        table_rows: None,
+                        no_change_reason: None,
                         error_code: (outcome == NodeOutcome::Failed).then(|| "E100".into()),
                         skipped_because_of: None,
                         error_message: None,

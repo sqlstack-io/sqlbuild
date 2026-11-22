@@ -577,3 +577,27 @@ pub(crate) struct StoredRequestTestCase {
     /// The source's claim, its retry's origin, its person rerun's status and the rerun's cancellation.
     pub(crate) expected_outcomes: (bool, RunOrigin, RunStatus, RunStatus),
 }
+
+/// One run node as the run's node list reads it back.
+pub(crate) type NodeResultRow = (
+    &'static str,
+    &'static str,
+    Option<&'static str>,
+    (Option<i64>, Option<i64>, Option<i64>),
+    Option<&'static str>,
+);
+
+pub(crate) struct NodeResultsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Each node's key, status, materialization, (rows affected, table rows, rows so far) and why it changed nothing.
+    pub(crate) expected_nodes: &'static [NodeResultRow],
+    pub(crate) expected_not_run: i64,
+}
+
+pub(crate) struct LaunchEventTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) container_id: Option<&'static str>,
+    pub(crate) expected_message: &'static str,
+}

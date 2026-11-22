@@ -11,6 +11,7 @@ use crate::build_progress::_helpers::build_callbacks::resource_identity;
 use crate::build_progress::_helpers::build_callbacks::result_kind;
 use crate::build_progress::_helpers::build_callbacks::scheduler_state;
 use crate::build_progress::_helpers::build_callbacks::statement;
+use crate::build_progress::_helpers::heartbeat;
 use crate::build_progress::_helpers::nested_progress::ITEM_OPTIONS;
 use crate::build_progress::_helpers::nested_progress::MIN_NAME_WIDTH;
 use crate::build_progress::_helpers::nested_progress::child_rows;
@@ -707,6 +708,9 @@ impl BuildProgressCallbacks {
         if let Some(worker) = &callbacks.worker {
             worker.start(py, &name, resource_kind)?;
         }
+        if !callbacks.is_tty {
+            heartbeat::node_started(slf, &name);
+        }
         if let Some(projector) = &callbacks.projector {
             let options: Bound<'_, PyDict> = PyDict::new(py);
             options.set_item("resource_name", name)?;
@@ -750,13 +754,32 @@ impl BuildProgressCallbacks {
         Ok(())
     }
 
-    /// Keep a line per completed microbatch when no live spinner row shows batch progress.
+    /// Keep a line per completed microbatch when no live spinner row shows batch progress; a worker reports the rows so far.
     pub(crate) fn on_batch_complete(
         &self,
         py: Python<'_>,
         progress: &Bound<'_, PyAny>,
     ) -> PyResult<()> {
+        let name: String = text(progress, "model_name")?;
+        let rows: Option<i64> = native_field(progress, "rows_affected")?.extract()?;
+        if let Some(worker) = &self.worker {
+            worker.batch_rows(py, &format!("model:{name}"), rows)?;
+        }
+        heartbeat::batch_rows(self, &name, rows);
         self.write_batch_complete(py, progress)
+    }
+
+    /// A worker reports the rows a running loader has written so far.
+    pub(crate) fn on_rows_written(&self, py: Python<'_>, key: &str, rows: i64) -> PyResult<()> {
+        heartbeat::rows_written(
+            self,
+            key.split_once(':').map_or(key, |(_, name)| name),
+            rows,
+        );
+        match &self.worker {
+            Some(worker) => worker.rows_written(py, key, rows),
+            None => Ok(()),
+        }
     }
 
     /// Report one deduplicated concurrent scheduler state transition.
@@ -817,10 +840,14 @@ impl BuildProgressCallbacks {
     ) -> PyResult<()> {
         let py: Python<'_> = slf.py();
         let callbacks: &Self = slf.get();
+        let identity: Option<(String, String)> = resource_identity(node_result)?;
+        if let Some((name, _)) = &identity {
+            callbacks.state().heartbeat.running.remove(name);
+        }
         if let Some(worker) = &callbacks.worker
-            && let Some((_, key)) = resource_identity(node_result)?
+            && let Some((_, key)) = &identity
         {
-            worker.completed(node_result, &key)?;
+            worker.completed(node_result, key)?;
         }
         let kind: ResultKind = result_kind(node_result)?;
         let mut result: Bound<'_, PyAny> = node_result.clone();
@@ -872,8 +899,9 @@ impl BuildProgressCallbacks {
         self.write_event(py, result)
     }
 
-    /// Close the optional structured execution event stream.
-    pub(crate) fn close(&self, py: Python<'_>) -> PyResult<()> {
+    /// Stop the heartbeat and close the optional structured execution event stream.
+    pub fn close(&self, py: Python<'_>) -> PyResult<()> {
+        heartbeat::stop(py, self);
         let (scheduler, query) = {
             let state = self.state();
             (

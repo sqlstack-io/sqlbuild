@@ -248,6 +248,8 @@ fn given_attached_checks_when_a_claim_reports_observations_then_frozen_membershi
                     node_key: "orders".into(),
                     outcome: NodeOutcome::Success,
                     rows_affected: Some(1),
+                    table_rows: None,
+                    no_change_reason: None,
                     error_code: None,
                     skipped_because_of: None,
                     error_message: None,

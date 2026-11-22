@@ -133,6 +133,15 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
     def create_table_as_replaces(self) -> bool:
         return True
 
+    def rebuilt_table_row_count(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> int | None:
+        """DuckDB's catalog size is exact right after a table is created; deletes leave it stale."""
+
+        return self.estimate_relation_row_count(
+            connection=connection, database=database, schema=schema, name=name, metadata_only=True
+        ).row_count
+
     def create_sql_test_output(self, *, connection: Any, sql: str, name: str) -> str | None:
         """Store a unit test's output in a temporary table; compare inline on an engine bug."""
 

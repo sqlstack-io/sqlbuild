@@ -3,6 +3,9 @@
 use std::collections::HashMap;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
+use pyo3::types::{PyCFunction, PyDict, PyTuple};
+
+use crate::build_progress::models::BuildProgressCallbacks;
 use sqlbuild_core::build_progress::models::{SchedulerStateText, StatementText, TestResultText};
 
 use crate::build_progress::_helpers::result_text::optional;
@@ -107,6 +110,8 @@ pub(crate) struct CallbackState {
     pub(crate) query_counts: HashMap<String, usize>,
     pub(crate) query_omitted: usize,
     pub(crate) last_query: Option<StatementText>,
+    /// Long-running nodes for the heartbeat line of captured output.
+    pub(crate) heartbeat: crate::build_progress::_helpers::heartbeat::HeartbeatState,
 }
 
 pub(crate) fn scheduler_state(state: &Bound<'_, PyAny>) -> PyResult<SchedulerStateText> {
@@ -128,4 +133,22 @@ pub(crate) fn statement(telemetry: &Bound<'_, PyAny>) -> PyResult<StatementText>
         resource_name: text(telemetry, "resource_name")?,
         phase: text(telemetry, "phase")?,
     })
+}
+
+/// What a relay does with its owner and the arguments it was called with.
+pub(crate) type Forward = fn(&BuildProgressCallbacks, &Bound<'_, PyTuple>) -> PyResult<()>;
+
+/// A callable that calls `forward` on `callbacks`, built without a Python lookup.
+pub(crate) fn relay<'py>(
+    callbacks: &Bound<'py, PyAny>,
+    forward: Forward,
+) -> PyResult<Bound<'py, PyAny>> {
+    let owned: Py<BuildProgressCallbacks> = callbacks
+        .downcast::<BuildProgressCallbacks>()?
+        .clone()
+        .unbind();
+    let call = move |arguments: &Bound<'_, PyTuple>,
+                     _keywords: Option<&Bound<'_, PyDict>>|
+          -> PyResult<()> { forward(owned.get(), arguments) };
+    Ok(PyCFunction::new_closure(callbacks.py(), None, None, call)?.into_any())
 }

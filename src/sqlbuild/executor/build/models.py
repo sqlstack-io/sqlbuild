@@ -119,6 +119,7 @@ class BuildCallbacks:
     on_progress: Callable[[str], None] | None = None
     on_sub_progress: Callable[[str], None] | None = None
     on_batch_complete: Callable[[MicrobatchBatchProgress], None] | None = None
+    on_rows_written: Callable[[str, int], None] | None = None
     on_node_start: NodeStartCallback | None = None
     on_node_complete: Callable[[object], None] | None = None
     before_node_write: BeforeNodeWriteCallback | None = None

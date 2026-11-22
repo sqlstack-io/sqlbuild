@@ -53,12 +53,13 @@ pub(crate) async fn list_runs_in(
     Ok((transaction, runs))
 }
 
+/// The run's nodes, each with the materialization its snapshot gave it when the run was queued.
 pub(crate) async fn run_nodes_in(
     transaction: ControlTransaction,
     run_id: Uuid,
 ) -> Result<(ControlTransaction, Vec<RunNodeRecord>), ControlError> {
     query_records(transaction,
-        "SELECT node_key, status, started_at, ended_at, rows_affected, error_code, skipped_because_of \
-         FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' ORDER BY node_key",
+        "SELECT node_key, status, started_at, ended_at, rows_affected, table_rows, rows_so_far, no_change_reason, \
+         materialization, error_code, skipped_because_of FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' ORDER BY node_key",
         vec![Parameter::Id(run_id)]).await
 }

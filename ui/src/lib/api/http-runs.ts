@@ -137,7 +137,7 @@ function countsOf(wire: Wire['RunRecord']): NodeCounts {
 		success: n('success'),
 		warn: n('warn'),
 		failed: n('failed') + n('cancelled'),
-		skipped: n('skipped'),
+		skipped: n('skipped') + n('not_run'),
 		running: n('running'),
 		pending: n('pending')
 	};
@@ -348,7 +348,7 @@ export function toRunNode(wire: Wire['RunNodeRecord'], run: Run): RunNode {
 
 /**
  * A run's detail from the listing and the nodes of the run and its child runs; parts with no server source stay empty.
- * Rerun from failure covers failed and skipped nodes only, as the server does; cancelled nodes need a full rerun.
+ * Rerun from failure covers failed, skipped and not-run nodes, as the server does; cancelled nodes need a full rerun.
  */
 export function runDetailOf(run: Run, wire: Wire['RunRecord'], listed: Run[], nodes: RunNode[]): RunDetail {
 	const byId = new Map(listed.map((r) => [r.id, r]));
@@ -377,7 +377,7 @@ export function runDetailOf(run: Run, wire: Wire['RunRecord'], listed: Run[], no
 				: null,
 		selection: wire.selection_json,
 		waits: [],
-		rerunFromFailureNodes: nodes.filter((n) => n.status === 'failed' || n.status === 'skipped').map((n) => n.nodeKey),
+		rerunFromFailureNodes: nodes.filter((n) => n.status === 'failed' || n.status === 'skipped' || n.status === 'not_run').map((n) => n.nodeKey),
 		rerunOf: run.rerunOfRunId ? (byId.get(run.rerunOfRunId) ?? null) : null,
 		reruns: listed.filter((r) => r.rerunOfRunId === run.id)
 	};

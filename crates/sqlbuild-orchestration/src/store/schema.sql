@@ -178,7 +178,7 @@ CREATE INDEX sqb_runs_active ON sqb_runs(location_id, target, job_key) WHERE sta
 CREATE TABLE sqb_run_nodes (
     run_id {uuid} NOT NULL REFERENCES sqb_runs(run_id),
     node_key TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'success', 'warn', 'failed', 'skipped', 'cancelled')),
+    status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'success', 'warn', 'failed', 'skipped', 'cancelled', 'not_run')),
     writes BOOLEAN NOT NULL,
     started_at {time},
     ended_at {time},
@@ -187,6 +187,10 @@ CREATE TABLE sqb_run_nodes (
     skipped_because_of TEXT,
     kind TEXT NOT NULL DEFAULT 'node' CHECK (kind IN ('node', 'check')),
     finished_storage_id BIGINT,
+    table_rows BIGINT,
+    rows_so_far BIGINT,
+    no_change_reason TEXT,
+    materialization TEXT,
     PRIMARY KEY (run_id, node_key)
 );
 CREATE INDEX sqb_run_nodes_node ON sqb_run_nodes(node_key, run_id);

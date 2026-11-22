@@ -133,6 +133,8 @@ fn given_a_pinned_group_when_redeployed_and_cancelled_then_children_keep_scope_a
                     node_key: "customers".into(),
                     outcome: NodeOutcome::Success,
                     rows_affected: Some(11),
+                    table_rows: None,
+                    no_change_reason: None,
                     error_code: None,
                     skipped_because_of: None,
                     error_message: None,

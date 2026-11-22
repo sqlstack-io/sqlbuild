@@ -713,7 +713,7 @@ delay_seconds = 600
 | --- | --- | --- | --- |
 | `owner` | Any non-blank text | None | Shown on the job's page and in the job list |
 | `overlap` | `queue` or `skip` | `queue` | With `skip`, a schedule tick or sensor request that arrives while a run of the job is queued or running starts no run |
-| `retry` | `attempts` from 2 to 11, `delay_seconds` from 0 to 86400 | None | A failed or partial run reruns its failed and skipped nodes after the delay, until it succeeds or has run `attempts` times in all |
+| `retry` | `attempts` from 2 to 11, `delay_seconds` from 0 to 86400 | None | A failed or partial run reruns its failed and skipped nodes, and those it never reached, after the delay, until it succeeds or has run `attempts` times in all |
 
 A skipped tick shows as **skipped** in the trigger's tick log, with the run it yielded to, and
 creates no run. A sensor tick lists the requests it skipped the same way.
@@ -735,7 +735,7 @@ Details:
   again after `delay_seconds`, inside the same group run, and the jobs that depend on it wait
   instead of skipping. The group keeps its pool slots meanwhile.
 - A group's own `[retry]` is a final sweep: after the group run ends `failed` or `partial`, it
-  queues one new linked rerun of the group's failed and skipped nodes.
+  queues one new linked rerun of the group's failed and skipped nodes, and those it never reached.
 - So a retry of a whole run, a job's or a group's, is a new linked run, and a retry of a member
   stays inside its group run.
 - Sensors and alerts see a member's final attempt only. The group run's timeline shows each retry,

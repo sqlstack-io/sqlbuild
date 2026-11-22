@@ -40,6 +40,12 @@ pub(crate) const MIGRATIONS: &[StoreMigration] = &[
         postgres: include_str!("../sql/0005_sensor_functions.postgres.sql"),
         step: Some(drop_old_form_sensors),
     },
+    StoreMigration {
+        name: "node_results",
+        sqlite: include_str!("../sql/0006_node_results.sqlite.sql"),
+        postgres: include_str!("../sql/0006_node_results.postgres.sql"),
+        step: None,
+    },
 ];
 
 /// The schema version a store created by this build has.

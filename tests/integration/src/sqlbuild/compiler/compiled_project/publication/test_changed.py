@@ -1,5 +1,6 @@
 """Scheduled jobs with `changed` run only models whose consumed inputs changed, on DuckDB and SQLite."""
 
+import sqlite3
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -19,10 +20,23 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     sqlite_rows,
 )
 
-EXPECTED_CHANGED_RUNS: tuple[tuple[str, frozenset[str], dict[str, int]], ...] = (
-    ("first run", frozenset({"stg_orders", "stg_customers", "customer_orders"}), {"success": 3}),
-    ("nothing changed", frozenset(), {"success": 3}),
-    ("a new order", frozenset({"stg_orders", "customer_orders"}), {"success": 3}),
+ALL_MODELS: frozenset[str] = frozenset(
+    {"model:stg_orders", "model:stg_customers", "model:customer_orders"}
+)
+EXPECTED_CHANGED_RUNS: tuple[tuple[str, frozenset[str], dict[str, int], frozenset[str]], ...] = (
+    (
+        "first run",
+        frozenset({"stg_orders", "stg_customers", "customer_orders"}),
+        {"success": 3},
+        frozenset(),
+    ),
+    ("nothing changed", frozenset(), {"success": 3}, ALL_MODELS),
+    (
+        "a new order",
+        frozenset({"stg_orders", "customer_orders"}),
+        {"success": 3},
+        frozenset({"model:stg_customers"}),
+    ),
 )
 
 
@@ -83,7 +97,7 @@ def test_given_a_changed_job_when_inputs_change_between_runs_then_only_their_con
     test_case = replace(
         test_case, files=changed_job_files(test_case.project_toml), default_job_files={}
     )
-    observed: list[tuple[str, frozenset[str], dict[str, int]]] = []
+    observed: list[tuple[str, frozenset[str], dict[str, int], frozenset[str]]] = []
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         warehouse: Path = worker.project / test_case.warehouse_file
         for sql in test_case.raw_tables_sql:
@@ -106,11 +120,21 @@ def test_given_a_changed_job_when_inputs_change_between_runs_then_only_their_con
                     "WHERE phase = 'started'",
                 )
             )
+            with sqlite3.connect(worker.control_store) as control:
+                unchanged: frozenset[str] = frozenset(
+                    key
+                    for (key,) in control.execute(
+                        "SELECT node_key FROM sqb_run_nodes WHERE run_id=? AND kind='node' "
+                        "AND no_change_reason='unchanged since its last build'",
+                        (run["run_id"],),
+                    )
+                )
             observed.append(
                 (
                     description,
                     frozenset(row[1] for row in started - recorded),
                     run["node_counts_json"],
+                    unchanged,
                 )
             )
             recorded |= started

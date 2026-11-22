@@ -2574,7 +2574,7 @@ export interface components {
         /** @enum {string} */
         NodeEventKind: "success" | "failed" | "recovered";
         /** @enum {string} */
-        NodeOutcome: "success" | "warn" | "failed" | "skipped" | "cancelled";
+        NodeOutcome: "success" | "warn" | "failed" | "skipped" | "cancelled" | "not_run";
         /** @description One build attempt of a node by a run in this target; the same metadata as the run's node list. */
         NodeRunRecord: {
             /** Format: date-time */
@@ -3395,16 +3395,29 @@ export interface components {
             kind: "node_started";
             node_key: string;
         } | {
+            /** @enum {string} */
+            kind: "node_progress";
+            node_key: string;
+            /** Format: int64 */
+            rows_so_far: number;
+        } | {
             error_code?: string | null;
             /** @description Redacted and bounded on the way in, whoever sends it; absent from older workers. */
             error_message?: string | null;
             /** @enum {string} */
             kind: "node_finished";
+            /** @description Why a node that ran changed nothing. */
+            no_change_reason?: string | null;
             node_key: string;
             outcome: components["schemas"]["NodeOutcome"];
             /** Format: int64 */
             rows_affected?: number | null;
             skipped_because_of?: string | null;
+            /**
+             * Format: int64
+             * @description The rows a fully rebuilt table holds, where the warehouse's metadata count is exact.
+             */
+            table_rows?: number | null;
         } | {
             /** @enum {string} */
             kind: "check_started";
@@ -3551,13 +3564,30 @@ export interface components {
             /** Format: date-time */
             ended_at?: string | null;
             error_code?: string | null;
+            /** @description The node's materialization in the run's snapshot, such as `table`, `incremental` or `view`. */
+            materialization?: string | null;
+            /** @description Why a node that ran changed nothing, such as `unchanged since its last build`. */
+            no_change_reason?: string | null;
             node_key: string;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Rows a statement inserted, merged or deleted, as the warehouse reported them.
+             */
             rows_affected?: number | null;
+            /**
+             * Format: int64
+             * @description Rows written so far while the node runs, from microbatch batches or a loader's progress.
+             */
+            rows_so_far?: number | null;
             skipped_because_of?: string | null;
             /** Format: date-time */
             started_at?: string | null;
             status: string;
+            /**
+             * Format: int64
+             * @description The rows a fully rebuilt table holds, read from the warehouse's metadata where that count is exact.
+             */
+            table_rows?: number | null;
         };
         /** @enum {string} */
         RunOrigin: "manual" | "schedule" | "sensor" | "rerun" | "backfill";

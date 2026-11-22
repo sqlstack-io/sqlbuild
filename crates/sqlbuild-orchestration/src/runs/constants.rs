@@ -52,6 +52,8 @@ pub(crate) const VARS_SETTING: &str = "vars";
 pub(crate) const SUPERSEDED_CHILD: &str = "EXISTS(SELECT 1 FROM sqb_runs s WHERE s.parent_run_id=r.parent_run_id AND s.rerun_of_run_id=r.run_id)";
 /// The group run event recorded when a failed member is queued to run again.
 pub(crate) const MEMBER_RETRYING_EVENT: &str = "run_member_retrying";
+/// The scheduler's launch fact, which names the container a worker started in, if any.
+pub(crate) const RUN_LAUNCHED_EVENT: &str = "run_launched";
 /// The group run event recorded when a retried member succeeds.
 pub(crate) const MEMBER_RECOVERED_EVENT: &str = "run_member_recovered";
 

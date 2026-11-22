@@ -38,7 +38,7 @@ pub(crate) async fn queue_retry(
     let (transaction, rows) = query(
         transaction,
         "SELECT r.request_json, r.cancel_requested_at, \
-         (SELECT COUNT(*) FROM sqb_run_nodes n WHERE n.run_id=r.run_id AND n.kind='node' AND n.status IN ('failed','skipped')) AS retryable \
+         (SELECT COUNT(*) FROM sqb_run_nodes n WHERE n.run_id=r.run_id AND n.kind='node' AND n.status IN ('failed','skipped','not_run')) AS retryable \
          FROM sqb_runs r WHERE r.run_id=$1",
         vec![Parameter::Id(run_id)],
     )
@@ -162,7 +162,7 @@ async fn queue_member_retry(
     let (transaction, rows) = query(
         transaction,
         "SELECT node_key, status, skipped_because_of FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' \
-         AND status IN ('failed','skipped')",
+         AND status IN ('failed','skipped','not_run')",
         vec![Parameter::Id(source.run_id)],
     )
     .await?;

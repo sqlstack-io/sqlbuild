@@ -216,3 +216,11 @@ class SchemaRowCountEstimatesTestCase:
     expected_reads: int
     expected_sql_fragment: str
     metadata_columns: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class RebuiltTableRowCountTestCase:
+    description: str
+    engine: str
+    total_rows: int | None
+    expected_row_count: int | None
