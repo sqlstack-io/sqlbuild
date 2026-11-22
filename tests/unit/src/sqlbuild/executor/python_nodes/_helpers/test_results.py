@@ -404,6 +404,12 @@ def test_given_a_python_failure_when_its_traceback_is_kept_then_its_end_fits_the
             expected_absent="example-value",
         ),
         TracebackRedactionTestCase(
+            description="a secret whose key holds NUL, which is dropped before redacting",
+            message="pass\0word=example-value",
+            expected_kept="ValueError: password=",
+            expected_absent="example-value",
+        ),
+        TracebackRedactionTestCase(
             description="a message of many lines keeps the line naming the exception",
             message="order rows refused" + "\n  refused row" * 400,
             expected_kept="ValueError: order rows refused",

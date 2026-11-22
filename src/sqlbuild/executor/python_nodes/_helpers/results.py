@@ -98,12 +98,17 @@ def build_python_node_failure_result(
 
 
 def traceback_tail(*, error: BaseException) -> str:
-    """Return the error's redacted traceback, cut to its exception and last frames if too long."""
+    """Return the error's redacted traceback, cut to its exception and last frames if too long.
 
-    text: str = redact_diagnostic_text("".join(traceback.format_exception(error)))
+    NUL, which PostgreSQL refuses, is dropped before redacting so that it can't hide a secret's key.
+    """
+
+    text: str = redact_diagnostic_text("".join(traceback.format_exception(error)).replace("\0", ""))
     if len(text) <= ERROR_DETAIL_CHARS:
         return text
-    raised: str = redact_diagnostic_text("".join(traceback.format_exception_only(error)))
+    raised: str = redact_diagnostic_text(
+        "".join(traceback.format_exception_only(error)).replace("\0", "")
+    )
     frames: list[str] = text.removesuffix(raised).splitlines(keepends=True)
     if len(raised) > ERROR_SUMMARY_CHARS:
         raised = raised[: ERROR_SUMMARY_CHARS - len(ERROR_SUMMARY_CUT)] + ERROR_SUMMARY_CUT

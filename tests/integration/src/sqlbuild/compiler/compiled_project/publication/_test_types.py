@@ -191,6 +191,13 @@ class NulLogTestCase(WorkerExecutionTestCase):
     expected_logs: list[tuple[str, str]] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class NulFailureTestCase(WorkerExecutionTestCase):
+    description: str
+    backend: Literal["sqlite", "postgres"] = "sqlite"
+    expected_error_end: str = ""
+
+
 @dataclass(frozen=True, kw_only=True)
 class PersonJourneyTestCase(WorkerExecutionTestCase):
     description: str

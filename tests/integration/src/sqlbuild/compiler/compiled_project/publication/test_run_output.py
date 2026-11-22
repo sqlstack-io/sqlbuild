@@ -1,5 +1,6 @@
 """A worker files what each node prints under that node in the output store, with its ctx.log lines."""
 
+import json
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -7,6 +8,7 @@ from typing import Any
 import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    NulFailureTestCase,
     NulLogTestCase,
     PythonFailureTestCase,
     RunOutputTestCase,
@@ -262,3 +264,75 @@ def test_given_a_nul_in_a_ctx_log_message_when_a_worker_reports_it_then_the_log_
             [("success", True)],
             test_case.expected_logs,
         ), worker.log.read_text()[-4000:]
+
+
+NUL_FAILURE_FILES: dict[str, str] = {
+    "python/assets/score_orders.py": (
+        "from sqlbuild.assets import asset\n\n\n"
+        "@asset(description='Scores orders.')\n"
+        "def score_orders(ctx):\n"
+        "    raise ValueError('refused ' + chr(0) + 'order 17')\n"
+    ),
+    "orchestration/jobs/annual_orders_job.toml": (
+        'name = "annual_orders_job"\n'
+        'description = "Build orders and score them."\n'
+        'select = "orders score_orders"\n'
+        'schedule = { cron = "0 0 * * *", timezone = "UTC", '
+        'starts_at = "2000-01-01T00:00:00Z" }\n'
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        NulFailureTestCase(
+            "SQLite",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM orders",
+            "partial",
+            [(17,)],
+            backend="sqlite",
+            files=NUL_FAILURE_FILES,
+            expected_error_end="ValueError: refused order 17\n",
+        ),
+        NulFailureTestCase(
+            "PostgreSQL",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM orders",
+            "partial",
+            [(17,)],
+            backend="postgres",
+            files=NUL_FAILURE_FILES,
+            expected_error_end="ValueError: refused order 17\n",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_nul_in_an_exception_when_its_traceback_is_reported_then_the_failed_finish_is_kept(
+    test_case: NulFailureTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with (
+        control_database(test_case.backend) as url,
+        scheduled_worker(tmp_path, monkeypatch, test_case, database_url=url) as worker,
+    ):
+        run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
+        finishes: list[tuple[str, str]] = [
+            (status, json.loads(payload)["change"]["change"].get("error_message", ""))
+            for status, payload in control_query(
+                url or f"sqlite://{worker.control_store}",
+                "SELECT n.status, CAST(e.payload AS TEXT) FROM sqb_run_nodes n "
+                "JOIN recall_events e ON e.storage_id=n.finished_storage_id "
+                "WHERE n.node_key='asset:score_orders'",
+            )
+        ]
+        assert (
+            run["status"],
+            [
+                (status, error.endswith(test_case.expected_error_end), chr(0) in error)
+                for status, error in finishes
+            ],
+        ) == (test_case.expected_status, [("failed", True, False)]), (
+            finishes,
+            worker.log.read_text()[-4000:],
+        )
