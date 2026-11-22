@@ -87,14 +87,29 @@ fn names_set<'py>(py: Python<'py>, names: &[String]) -> PyResult<Bound<'py, PyAn
     frozenset(py, &values)
 }
 
+/// Reports one read-side Python node to progress, and so to a worker's server, and writes its row.
+#[pyclass(module = "sqlbuild._native", frozen)]
+pub(crate) struct PythonNodeReporter {
+    on_node_complete: Py<PyAny>,
+    stream: Py<PyAny>,
+    use_color: bool,
+}
+
+#[pymethods]
+impl PythonNodeReporter {
+    fn __call__(&self, py: Python<'_>, result: Bound<'_, PyAny>) -> PyResult<()> {
+        self.on_node_complete.bind(py).call1((&result,))?;
+        write_python_node_results(self.stream.bind(py), &tuple(py, &[result])?, self.use_color)
+    }
+}
+
 /// Mutable state of direct-mode Python lifecycle execution.
 #[pyclass(module = "sqlbuild._native", frozen)]
 pub(crate) struct DirectPythonLifecycle {
     plan: Py<PyAny>,
     discovered: Py<PyAny>,
     adapter: Py<PyAny>,
-    stream: Py<PyAny>,
-    use_color: bool,
+    reporter: Py<PythonNodeReporter>,
     base_on_node_complete: Py<PyAny>,
     read_side_connection: Mutex<Option<Py<PyAny>>>,
     read_side_tracker: Option<Py<PyAny>>,
@@ -111,38 +126,20 @@ pub(crate) struct DirectPythonLifecycle {
 
 #[pymethods]
 impl DirectPythonLifecycle {
-    /// Record a finished SQL node, then dispatch and report newly ready Python nodes.
+    /// Record a finished SQL node, then dispatch newly ready Python nodes, each reported as it finishes.
     fn on_node_complete(&self, py: Python<'_>, node_result: Bound<'_, PyAny>) -> PyResult<()> {
-        let base: &Bound<'_, PyAny> = self.base_on_node_complete.bind(py);
-        base.call1((&node_result,))?;
+        self.base_on_node_complete.bind(py).call1((&node_result,))?;
         let Some(tracker) = &self.read_side_tracker else {
             return Ok(());
         };
-        let tracker: &Bound<'_, PyAny> = tracker.bind(py);
-        let previous: HashSet<String> = result_names(&native_field(tracker, "results")?)?;
-        tracker.call_method1("record_sql_result", (node_result,))?;
-        let mut new_results: Vec<Bound<'_, PyAny>> = Vec::new();
-        for result in native_field(tracker, "results")?.try_iter()? {
-            let result: Bound<'_, PyAny> = result?;
-            if !previous.contains(&native_field(&result, "node_name")?.extract::<String>()?) {
-                new_results.push(result);
-            }
-        }
-        self.report(py, &new_results)
+        tracker
+            .bind(py)
+            .call_method1("record_sql_result", (node_result,))?;
+        Ok(())
     }
 }
 
 impl DirectPythonLifecycle {
-    fn report(&self, py: Python<'_>, results: &[Bound<'_, PyAny>]) -> PyResult<()> {
-        if results.is_empty() {
-            return Ok(());
-        }
-        for result in results {
-            self.base_on_node_complete.bind(py).call1((result,))?;
-        }
-        write_python_node_results(self.stream.bind(py), &tuple(py, results)?, self.use_color)
-    }
-
     /// Ingress results, then read-side results.
     pub(crate) fn python_results<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let mut results: Vec<Bound<'py, PyAny>> = self
@@ -310,12 +307,13 @@ impl DirectPythonLifecycle {
         let Some(tracker) = &self.read_side_tracker else {
             return Ok(());
         };
-        let finalized: Vec<Bound<'_, PyAny>> = tracker
+        let finalized: Bound<'_, PyAny> = tracker
             .bind(py)
-            .call_method0("finalize_unrun_python_nodes")?
-            .try_iter()?
-            .collect::<PyResult<_>>()?;
-        self.report(py, &finalized)
+            .call_method0("finalize_unrun_python_nodes")?;
+        for result in finalized.try_iter()? {
+            self.reporter.bind(py).call1((result?,))?;
+        }
+        Ok(())
     }
 }
 
@@ -591,7 +589,14 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
         .collect();
     let mut read_side_connection: Option<Py<PyAny>> = None;
     let mut read_side_tracker: Option<Py<PyAny>> = None;
-    let mut initial: Vec<Bound<'py, PyAny>> = Vec::new();
+    let reporter: Bound<'py, PythonNodeReporter> = Bound::new(
+        py,
+        PythonNodeReporter {
+            on_node_complete: inputs.on_node_complete.clone().unbind(),
+            stream: context.stream.clone().unbind(),
+            use_color: context.use_color,
+        },
+    )?;
     if !read_side.is_empty() {
         let connection: Bound<'py, PyAny> =
             adapter.call_method1("connect", (connection_config.clone(),))?;
@@ -608,15 +613,13 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
                 ("selected_python_names", names_set(py, &read_side)?),
                 ("scheduled_sql_names", names_set(py, &scheduled)?),
                 ("runtime", node_runtime(&parts, &connection)?),
+                ("on_node_complete", reporter.clone().into_any()),
             ],
         )?;
         for result in ingress_loads.try_iter()? {
             tracker.call_method1("record_sql_result", (result?,))?;
         }
         tracker.call_method0("dispatch_ready_python_nodes")?;
-        for result in native_field(&tracker, "results")?.try_iter()? {
-            initial.push(result?);
-        }
         read_side_tracker = Some(tracker.unbind());
     }
     let (round_trip_gates, round_trip_waits) = round_trip_ordering(&lifecycle, &plan_output)?;
@@ -626,8 +629,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             plan: plan_output.unbind(),
             discovered: discovered.unbind(),
             adapter: adapter.clone().unbind(),
-            stream: context.stream.clone().unbind(),
-            use_color: context.use_color,
+            reporter: reporter.unbind(),
             base_on_node_complete: inputs.on_node_complete.clone().unbind(),
             read_side_connection: Mutex::new(read_side_connection),
             read_side_tracker,
@@ -639,7 +641,6 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             include_python,
         },
     )?;
-    prepared.get().report(py, &initial)?;
     Ok(prepared)
 }
 

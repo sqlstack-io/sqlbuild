@@ -56,6 +56,30 @@ def run_step(ctx: AssetContext, step: str) -> None:
             expected_runs=(),
         ),
         DiscoveredNodesE2ETestCase(
+            description="a build that selects the placeholder refuses it",
+            command=("build", "--select", "+run_step"),
+            expected_exit_code=1,
+            expected_output_patterns=(
+                r"run_step is discovered at publish; run it from a location or `sqb dev`, "
+                r"or pass --discover",
+            ),
+            expected_runs=(),
+        ),
+        DiscoveredNodesE2ETestCase(
+            description="a plain plan shows the placeholder",
+            command=("plan",),
+            expected_exit_code=0,
+            expected_output_patterns=(r"Plan ready", r"run_step\[\*\]"),
+            expected_runs=(),
+        ),
+        DiscoveredNodesE2ETestCase(
+            description="a plan that selects the asset shows the placeholder",
+            command=("plan", "--select", "+run_step"),
+            expected_exit_code=0,
+            expected_output_patterns=(r"Plan ready", r"run_step\[\*\]"),
+            expected_runs=(),
+        ),
+        DiscoveredNodesE2ETestCase(
             description="--discover runs each item in order with its args and the set's tags",
             command=("build", "--discover"),
             expected_exit_code=0,
@@ -79,7 +103,7 @@ def run_step(ctx: AssetContext, step: str) -> None:
     ],
     ids=lambda case: case.description,
 )
-def test_given_a_for_each_asset_when_building_outside_a_location_then_only_discover_runs_its_items(
+def test_given_a_for_each_asset_when_planning_or_building_outside_a_location_then_only_discover_runs_its_items(
     tmp_path: Path, test_case: DiscoveredNodesE2ETestCase
 ) -> None:
     project_dir: Path = prepare_inline_project(

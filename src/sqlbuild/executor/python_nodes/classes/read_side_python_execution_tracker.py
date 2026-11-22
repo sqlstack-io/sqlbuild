@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
 
@@ -40,12 +41,14 @@ class ReadSidePythonExecutionTracker:
         scheduled_sql_names: frozenset[str],
         runtime: PythonNodeRuntime,
         identity_recorder: PythonIdentityRecorder | None = None,
+        on_node_complete: Callable[[object], None] | None = None,
     ) -> None:
         self._python_graph: PythonNodeGraph = python_graph
         self._selected_python_names: frozenset[str] = selected_python_names
         self._scheduled_sql_names: frozenset[str] = scheduled_sql_names
         self._runtime: PythonNodeRuntime = runtime
         self._identity_recorder: PythonIdentityRecorder | None = identity_recorder
+        self._on_node_complete: Callable[[object], None] | None = on_node_complete
         self._result_store: Any | None = (
             runtime.result_store
             if runtime.result_store is not None
@@ -111,7 +114,7 @@ class ReadSidePythonExecutionTracker:
         self.dispatch_ready_python_nodes()
 
     def dispatch_ready_python_nodes(self) -> None:
-        """Run all currently-ready selected Python nodes."""
+        """Run all currently-ready selected Python nodes, reporting each before the next starts."""
 
         progressed: bool = True
         while progressed:
@@ -152,7 +155,7 @@ class ReadSidePythonExecutionTracker:
 
     def _execute_python_node(self, node: DiscoveredPythonNode) -> None:
         runtime: PythonNodeRuntime = replace(self._runtime, result_store=self._result_store)
-        _ = run_ready_python_node(
+        result: PythonNodeExecutionResult = run_ready_python_node(
             node=_to_executable_python_node(node),
             upstream_results=tuple(
                 self._results_by_name[upstream_name]
@@ -164,6 +167,8 @@ class ReadSidePythonExecutionTracker:
             run_state=self._run_state,
             on_result=self._finalize_owned_result,
         )
+        if self._on_node_complete is not None:
+            self._on_node_complete(result)
 
     def _finalize_owned_result(
         self, *, node: ExecutablePythonNode, result: PythonNodeExecutionResult

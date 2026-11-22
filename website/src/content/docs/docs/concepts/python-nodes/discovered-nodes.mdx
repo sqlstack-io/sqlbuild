@@ -29,7 +29,7 @@ def fulfilment_plan(warehouse_api) -> Discovered:
 @asset(for_each=fulfilment_plan, depends_on=model("orders"))
 def fulfil(ctx: AssetContext, region: str) -> None:
     """Run one step of the plan."""
-    ctx.log(f"step {ctx.discovered.item} for {region}, plan {ctx.discovered.tags['plan_version']}")
+    ctx.log.info(f"step {ctx.discovered.item} for {region}, plan {ctx.discovered.tags['plan_version']}")
 ```
 
 With steps `pick`, `pack` and `ship`, where each waits on the one before, the graph is

@@ -271,3 +271,21 @@ pub(super) fn failed_load(discovered: bool) -> crate::native_commands::models::L
     load.discovered.retain(|_, _| discovered);
     load
 }
+
+/// An interpreter that reads nothing and never replies.
+#[cfg(unix)]
+pub(super) fn silent_compiler() -> crate::native_commands::models::LocationCompiler {
+    let mut child = tokio::process::Command::new("sleep")
+        .arg("600")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()
+        .expect("silent interpreter");
+    crate::native_commands::models::LocationCompiler {
+        stdin: child.stdin.take().expect("interpreter input"),
+        stdout: tokio::io::BufReader::new(child.stdout.take().expect("interpreter output")),
+        child,
+        python_sources: Vec::new(),
+    }
+}

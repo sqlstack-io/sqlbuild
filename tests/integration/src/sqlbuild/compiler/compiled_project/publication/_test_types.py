@@ -656,3 +656,22 @@ class CheckSensorsTestCase:
     # The run event's failed checks and failed nodes.
     expected_failed_checks: list[str]
     expected_failed_nodes: list[str]
+
+
+@dataclass(frozen=True)
+class NodeStatusTestCase:
+    description: str
+    first_depends_on: str
+    job_select: str
+    job_settings: str
+    files: dict[str, str]
+    expected_status_during_second: str
+    expected_rerun_selection: frozenset[str]
+
+
+@dataclass(frozen=True)
+class HungCheckTestCase:
+    description: str
+    check_every: str
+    check_starts_within_seconds: float
+    expected_message: str

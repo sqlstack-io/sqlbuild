@@ -9,6 +9,7 @@ use sqlbuild_orchestration::discovered_sets::models::{
 };
 use sqlbuild_orchestration::platform::models::LocationHealth;
 use sqlbuild_orchestration::store::errors::ControlError;
+use tokio::sync::mpsc;
 use tokio::time::Instant;
 use uuid::Uuid;
 
@@ -18,8 +19,20 @@ use crate::native_commands::_helpers::location::discovery_state::LocationDiscove
 use crate::native_commands::_helpers::location::execution::{
     exchange_reply, report_location_health, request_republish, stop_location_runtime,
 };
-use crate::native_commands::models::{LocationCompiler, LocationLoad, LocationServe};
+use crate::native_commands::models::{
+    LocationCompiler, LocationLoad, LocationRuntimeRequest, LocationServe,
+};
 use crate::native_commands::types::DiscoveryControls;
+
+/// How often a running check looks for shutdown.
+const SHUTDOWN_POLL: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// Wait until every sender of `requests` is gone, which only shutdown does, without taking a request.
+async fn shut_down(requests: &mpsc::Receiver<LocationRuntimeRequest>) {
+    while !requests.is_closed() {
+        tokio::time::sleep(SHUTDOWN_POLL).await;
+    }
+}
 
 /// Wait until `due`, or forever without one.
 pub(crate) async fn sleep_until(due: Option<Instant>) {
@@ -29,19 +42,32 @@ pub(crate) async fn sleep_until(due: Option<Instant>) {
     }
 }
 
-/// Call the set due for its `check_every` again; republish when its result changed.
+/// Call the set due for its `check_every` again; republish when its result changed. Shutdown stops it.
 pub(crate) async fn check_discovered(
     compiler: Option<LocationCompiler>,
     discovery: &mut LocationDiscovery,
-    (republish, _): DiscoveryControls<'_>,
+    ((republish, _), requests): (
+        DiscoveryControls<'_>,
+        &mpsc::Receiver<LocationRuntimeRequest>,
+    ),
 ) -> Result<Option<LocationCompiler>, ControlError> {
     let (Some(mut active), Some(check)) = (compiler, discovery.due_check(Instant::now())) else {
         return Ok(None);
     };
     let request: DiscoveredSetCheck = check;
     let name: String = request.check_discovered.clone();
-    let reply: Result<DiscoveredSetChecked, ControlError> =
-        exchange_reply(&mut active, &request, "discovered set check").await;
+    let exchanged: Option<Result<DiscoveredSetChecked, ControlError>> = tokio::select! {
+        reply = exchange_reply(&mut active, &request, "discovered set check") => Some(reply),
+        () = shut_down(requests) => None,
+    };
+    let Some(reply) = exchanged else {
+        drop(write_output(&[(
+            Stream::Stderr,
+            &format!("Stopped checking discovered set {name}; the location is shutting down.\n"),
+        )]));
+        stop_location_runtime(Some(active)).await?;
+        return Ok(None);
+    };
     let reply: DiscoveredSetChecked = match reply {
         Ok(reply) => reply,
         Err(_) => {

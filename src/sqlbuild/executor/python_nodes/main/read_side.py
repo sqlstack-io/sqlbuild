@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from sqlbuild._native import PythonNodeGraph
 from sqlbuild.executor.python_nodes.classes.read_side_python_execution_tracker import (
     ReadSidePythonExecutionTracker,
@@ -17,6 +19,7 @@ def create_read_side_python_execution_tracker(
     scheduled_sql_names: frozenset[str],
     runtime: PythonNodeRuntime,
     identity_recorder: PythonIdentityRecorder | None = None,
+    on_node_complete: Callable[[object], None] | None = None,
 ) -> ReadSidePythonExecutionTracker:
     """Create a read-side Python execution tracker."""
 
@@ -26,4 +29,5 @@ def create_read_side_python_execution_tracker(
         scheduled_sql_names=scheduled_sql_names,
         runtime=runtime,
         identity_recorder=identity_recorder,
+        on_node_complete=on_node_complete,
     )

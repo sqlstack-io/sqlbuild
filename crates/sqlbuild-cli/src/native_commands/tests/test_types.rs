@@ -393,3 +393,12 @@ pub(super) struct DiscoveryReportTestCase {
     pub(super) has_sets: bool,
     pub(super) expected_report: bool,
 }
+
+/// A `check_every` check that never answers, and when shutdown closes the compiler's requests.
+#[cfg(unix)]
+pub(super) struct CheckShutdownTestCase {
+    pub(super) description: &'static str,
+    pub(super) closes_after: std::time::Duration,
+    pub(super) expected_within: std::time::Duration,
+    pub(super) expected_compiler: bool,
+}

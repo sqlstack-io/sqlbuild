@@ -12,6 +12,7 @@ use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 use sqlbuild_rules::rule_results::main::default_rules_notice::default_rules_notice;
 use sqlbuild_rules::rule_results::main::format_skipped_models::format_skipped_models;
 
+use crate::bindings::_helpers::compile_driver::plan_result::PlanUse;
 use crate::bindings::_helpers::compile_driver::plan_result::PlanningInputs;
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
 use crate::bindings::_helpers::compile_driver::plan_result::pipeline_result;
@@ -67,7 +68,7 @@ pub(crate) fn run_compile_pipeline<'py>(
             &arguments.value("adapter")?,
         ),
         (&arguments.value("options")?, arguments.value("hooks")?),
-        (None, None),
+        (None, None, PlanUse::Run),
     )
 }
 
@@ -75,7 +76,11 @@ pub(crate) fn run_compile_pipeline<'py>(
 pub(crate) fn planned_project<'py>(
     (discovered, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (options, hooks): (&Bound<'py, PyAny>, Bound<'py, PyAny>),
-    (held, planned_through): (Option<&Bound<'py, PyAny>>, Option<&Bound<'py, PyAny>>),
+    (held, planned_through, plan_use): (
+        Option<&Bound<'py, PyAny>>,
+        Option<&Bound<'py, PyAny>>,
+        PlanUse,
+    ),
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = discovered.py();
     let options: Bound<'py, PyAny> = apply_unit_test_selectors(options, discovered)?;
@@ -127,7 +132,7 @@ pub(crate) fn planned_project<'py>(
     planned(
         (discovered, adapter),
         (&options, &hooks),
-        (&compiled, planned_through),
+        (&compiled, planned_through, plan_use),
     )
 }
 
@@ -271,7 +276,11 @@ pub(crate) fn configured_rule_failures<'py>(
 fn planned<'py>(
     (discovered, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (options, hooks): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-    (compiled, planned_through): (&Bound<'py, PyAny>, Option<&Bound<'py, PyAny>>),
+    (compiled, planned_through, plan_use): (
+        &Bound<'py, PyAny>,
+        Option<&Bound<'py, PyAny>>,
+        PlanUse,
+    ),
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = discovered.py();
     let tracker: Bound<'py, PyAny> = timing_tracker(py)?;
@@ -316,6 +325,7 @@ fn planned<'py>(
                 adapter,
                 connection: &opened,
                 reads: &reads,
+                plan_use,
                 node_results_location,
             },
             &project,
