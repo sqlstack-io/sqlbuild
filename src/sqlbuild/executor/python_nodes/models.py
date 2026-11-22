@@ -28,7 +28,11 @@ from sqlbuild.executor.python_nodes.classes.runtime_relation_guard import Runtim
 from sqlbuild.executor.python_nodes.constants import (
     PYTHON_NODE_RELATION_QUALIFIER_SEPARATOR,
 )
-from sqlbuild.executor.python_nodes.types import PythonIdentityRecorder
+from sqlbuild.executor.python_nodes.types import (
+    ExecutablePythonNode,
+    OwnedResultCallback,
+    PythonIdentityRecorder,
+)
 from sqlbuild.executor.scheduling.classes.session_warehouses import (
     SessionWarehouses,
     configured_warehouse,
@@ -181,6 +185,7 @@ class IngressCallbacks:
     use_color: bool = False
     on_node_start: NodeStartCallback | None = None
     on_node_complete: Callable[[object], None] | None = None
+    on_node_cancelled: Callable[[str], None] | None = None
     identity_recorder: PythonIdentityRecorder | None = None
 
 
@@ -372,3 +377,30 @@ class PythonCheckCallbacks:
     identity_recorder: PythonIdentityRecorder | None = None
     on_check_complete: Callable[[PythonCheckExecutionResult], None] | None = None
     on_check_start: Callable[[str], None] | None = None
+
+
+@dataclass(frozen=True)
+class ItemSlot:
+    """The warehouse connection and result store of one slot of a discovered item pool."""
+
+    connection: Any
+    result_store: Any | None
+
+
+@dataclass(frozen=True)
+class RunningItem:
+    """A discovered item on a thread, with its set and the slot it holds."""
+
+    node: ExecutablePythonNode
+    set_name: str
+    slot: ItemSlot
+
+
+@dataclass(frozen=True)
+class DiscoveredItemCallbacks:
+    """What a serial path gives its item pool; each is called only on the calling thread."""
+
+    ready: Callable[[], tuple[ExecutablePythonNode, ...]]
+    upstream_results: Callable[[str], tuple[PythonNodeExecutionResult, ...]]
+    complete: OwnedResultCallback
+    cancelled: Callable[[str], None] | None = None

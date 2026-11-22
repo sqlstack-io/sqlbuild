@@ -683,3 +683,12 @@ class EmptyDiscoveryTestCase:
     first_items: tuple[str, ...]
     expected_nodes: frozenset[str]
     expected_kept_items: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ParallelItemsTestCase:
+    description: str
+    first_depends_on: str
+    job_select: str
+    expected_status: str
+    expected_statuses: dict[str, str]
