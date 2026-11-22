@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from threading import Barrier, Event, Thread
 from typing import ClassVar
 
@@ -567,9 +568,16 @@ def test_given_teardown_failure_when_execution_already_failed_then_original_erro
     [
         ProviderSessionLeftOpenTestCase(
             description="a setup still running when providers are left open and closed",
+            closes=(ProviderSession.close,),
             within_seconds=1,
             expected_events=("setup:gateway",),
-        )
+        ),
+        ProviderSessionLeftOpenTestCase(
+            description="a sink's hold released and its forced close, as a sink closes",
+            closes=(ProviderSession.release, partial(ProviderSession.close, force=True)),
+            within_seconds=1,
+            expected_events=("setup:gateway",),
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -602,7 +610,8 @@ def test_given_a_running_setup_when_left_open_and_closed_then_neither_waits_and_
 
     began: float = time.monotonic()
     session.providers.leave_open()
-    session.close()
+    for close in test_case.closes:
+        close(session)
     took: float = time.monotonic() - began
     HeldSetupProvider.release.set()
     setting_up.join(timeout=5)

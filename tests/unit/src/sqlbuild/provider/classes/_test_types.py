@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlbuild.provider.classes.session import ProviderSession
 
 
 @dataclass(frozen=True)
@@ -39,5 +44,6 @@ class ProviderSessionErrorTestCase:
 @dataclass(frozen=True)
 class ProviderSessionLeftOpenTestCase:
     description: str
+    closes: tuple[Callable[[ProviderSession], None], ...]
     within_seconds: float
     expected_events: tuple[str, ...]

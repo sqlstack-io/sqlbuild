@@ -90,13 +90,15 @@ class ProviderSession:
             self._close_holds += 1
 
     def leave_open(self) -> None:
-        """Skip teardown for a step that may still use the providers; waits for no running setup."""
+        """Skip any teardown, even forced, while a step may use the providers; waits on no setup."""
 
         self._left_open = True
 
     def release(self) -> None:
         """Release an outer ownership hold and honor any deferred close request."""
 
+        if self._left_open:
+            return
         should_close = False
         with self._lifecycle_lock:
             if self._close_holds < 1:
@@ -107,7 +109,7 @@ class ProviderSession:
             self.close()
 
     def close(self, *, force: bool = False) -> None:
-        if self._left_open and not force:
+        if self._left_open:
             self._is_closed = True
             return
         with self._lifecycle_lock:
