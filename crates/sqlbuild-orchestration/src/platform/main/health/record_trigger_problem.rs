@@ -1,18 +1,18 @@
-//! The scheduler and publication record a trigger's health problem as one event per payload.
+//! The scheduler and publication record a trigger's health problem as one event per episode.
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::platform::_helpers::health::observations::observe;
+use crate::platform::_helpers::health::observations::observe_episode;
 use crate::platform::models::PlatformEvent;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::ControlTransaction;
 
-/// Record `event`, a trigger's problem such as `PlatformEvent::TriggerSkipped`; the same payload and `incident` again add nothing.
+/// Record `event`, a trigger's problem; the same `episode`, or payload when none, and `incident` again add nothing, so the first payload stays.
 pub(crate) async fn record_trigger_problem(
     transaction: ControlTransaction,
-    (event, incident): (PlatformEvent, Option<DateTime<Utc>>),
+    (event, episode, incident): (PlatformEvent, Option<PlatformEvent>, Option<DateTime<Utc>>),
 ) -> Result<ControlTransaction, ControlError> {
     let (transaction, rows) = query(
         transaction,
@@ -25,5 +25,5 @@ pub(crate) async fn record_trigger_problem(
     };
     let installation_id = serde_json::from_value::<Uuid>(row["installation_id"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
-    observe(transaction, installation_id, (event, incident)).await
+    observe_episode(transaction, installation_id, (event, episode, incident)).await
 }

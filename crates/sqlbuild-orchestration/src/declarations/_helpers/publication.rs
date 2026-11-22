@@ -79,6 +79,7 @@ pub(crate) async fn publish_projections(
                         times: dropped,
                     },
                     None,
+                    None,
                 ),
             )
             .await?;

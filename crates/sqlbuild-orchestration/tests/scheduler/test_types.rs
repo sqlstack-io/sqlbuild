@@ -168,12 +168,18 @@ pub(crate) struct UnreadableSkipTestCase {
     pub(crate) expected_refusal: &'static str,
 }
 
-/// A sensor whose check fails twice, with a different ID each time.
+/// A sensor whose check fails three times: twice denied with a different decision, then with other text.
 pub(crate) struct FailedAttemptsTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
-    /// `trigger_skipped` events recorded for the two attempts.
+    /// Characters of padding after the first denial's reason.
+    pub(crate) padding: usize,
+    /// `trigger_skipped` events recorded for the attempts.
     pub(crate) expected_events: i64,
-    /// The triggers the live problems list as skipped, as `name: reason`.
-    pub(crate) expected_skipped: &'static [&'static str],
+    /// How the one live problem, as `name: reason`, starts.
+    pub(crate) expected_start: &'static str,
+    /// How it ends.
+    pub(crate) expected_end: &'static str,
+    /// The characters it holds after the sensor's name and the fixed wording.
+    pub(crate) expected_error_chars: usize,
 }
