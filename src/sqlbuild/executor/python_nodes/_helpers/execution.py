@@ -241,6 +241,8 @@ def _execute_ready_node_in_cost_scope(
         )
         _persist_python_node_result(result_store=result_store, result=result, run_id=run_id)
         return result, None
+    if runtime.on_start is not None:
+        runtime.on_start(node.name)
     try:
         result: PythonNodeExecutionResult = _call_node_with_retry(
             node=node,

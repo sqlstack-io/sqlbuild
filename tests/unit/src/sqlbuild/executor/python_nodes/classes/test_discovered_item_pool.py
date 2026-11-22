@@ -114,6 +114,7 @@ def test_given_ready_items_when_running_then_the_cap_is_reached_and_never_exceed
         )
         assert adapter.closed == adapter.connections
         assert probe.report_threads == {threading.get_ident()}
+        assert probe.start_threads == {threading.get_ident()}
 
 
 @pytest.mark.parametrize(
@@ -166,6 +167,9 @@ def test_given_dependencies_when_running_then_an_item_starts_after_its_parents_a
         _ = run_path(graph=graph, adapter=ItemPoolTestAdapter(), probe=probe)
 
         assert probe.seen_before == test_case.expected_seen_before
+        assert {name: name in before for name, before in probe.started_before.items()} == (
+            dict.fromkeys(test_case.expected_seen_before, True)
+        )
 
 
 @pytest.mark.parametrize(

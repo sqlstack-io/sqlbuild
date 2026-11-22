@@ -1,4 +1,4 @@
-"""A worker reports each Python node as it finishes, so an interrupted chain keeps its finished steps."""
+"""A worker reports each Python node as it starts and finishes, so a chain keeps finished steps."""
 
 import json
 import os
@@ -62,7 +62,11 @@ _STEPS: frozenset[str] = frozenset({"asset:pick", "asset:pack", "asset:ship"})
             job_select="pick pack ship",
             job_settings="",
             files={},
-            expected_status_during_second="success",
+            expected_statuses_during_second={
+                "asset:pick": "success",
+                "asset:pack": "running",
+                "asset:ship": "pending",
+            },
             expected_rerun_selection=frozenset({"asset:pack", "asset:ship"}),
         ),
         NodeStatusTestCase(
@@ -71,7 +75,11 @@ _STEPS: frozenset[str] = frozenset({"asset:pick", "asset:pack", "asset:ship"})
             job_select="orders pick pack ship",
             job_settings="",
             files={},
-            expected_status_during_second="success",
+            expected_statuses_during_second={
+                "asset:pick": "success",
+                "asset:pack": "running",
+                "asset:ship": "pending",
+            },
             expected_rerun_selection=frozenset({"asset:pack", "asset:ship"}),
         ),
         NodeStatusTestCase(
@@ -98,7 +106,11 @@ _STEPS: frozenset[str] = frozenset({"asset:pick", "asset:pack", "asset:ship"})
                     "    managed: true\n    write_strategy: table\n"
                 ),
             },
-            expected_status_during_second="success",
+            expected_statuses_during_second={
+                "asset:pick": "success",
+                "asset:pack": "running",
+                "asset:ship": "pending",
+            },
             expected_rerun_selection=frozenset({"asset:pack", "asset:ship"}),
         ),
     ],
@@ -139,7 +151,7 @@ def test_given_a_chain_of_three_when_the_second_is_interrupted_then_the_first_st
                 ).fetchall()
             )
         os.kill(int(pidfile.read_text()), signal.SIGKILL)
-        assert during["asset:pick"] == test_case.expected_status_during_second, str(during)
+        assert {key: during[key] for key in _STEPS} == test_case.expected_statuses_during_second
 
         run: dict[str, Any] = wait_for_run(
             worker.api, worker.process, worker.log, job_key="annual_orders_job"

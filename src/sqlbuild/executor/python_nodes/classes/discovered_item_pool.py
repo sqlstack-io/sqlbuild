@@ -11,15 +11,17 @@ from typing import Any, cast
 
 from sqlbuild._native import CommandTerminated, termination_requested
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
-from sqlbuild.compiler.python_nodes.types import PythonNodeStatus
+from sqlbuild.compiler.python_nodes.types import PythonNodeFanInAction, PythonNodeStatus
 from sqlbuild.executor.node_results.main._direct_store import build_direct_node_result_store
 from sqlbuild.executor.python_nodes._helpers.discovered_items import parallel_set
+from sqlbuild.executor.python_nodes._helpers.results import evaluate_python_node_fan_in
 from sqlbuild.executor.python_nodes.constants import CANCEL_REPEAT_SECONDS
 from sqlbuild.executor.python_nodes.main._ready import run_ready_python_node
 from sqlbuild.executor.python_nodes.models import (
     DiscoveredItemCallbacks,
     ItemSlot,
     PythonNodeExecutionResult,
+    PythonNodeFanInDecision,
     PythonNodeRunState,
     PythonNodeRuntime,
     RunningItem,
@@ -87,14 +89,18 @@ class DiscoveredItemPool:
             )
             if limited is None or running_by_set[limited[0]] >= limited[1]:
                 continue
+            upstream: tuple[PythonNodeExecutionResult, ...] = self._callbacks.upstream_results(
+                node.name
+            )
             slot: ItemSlot = self._take_slot()
+            self._report_start(node=node, upstream=upstream)
             future: Future[PythonNodeExecutionResult] = cast(
                 Future[PythonNodeExecutionResult],
                 threads.submit(
                     copy_context().run,
                     run_ready_python_node,
                     node=node,
-                    upstream_results=self._callbacks.upstream_results(node.name),
+                    upstream_results=upstream,
                     runtime=replace(
                         self._runtime, connection=slot.connection, result_store=slot.result_store
                     ),
@@ -105,6 +111,20 @@ class DiscoveredItemPool:
             self._running[future] = RunningItem(node=node, set_name=limited[0], slot=slot)
             started.add(node.name)
             running_by_set[limited[0]] += 1
+
+    def _report_start(
+        self,
+        *,
+        node: ExecutablePythonNode,
+        upstream: tuple[PythonNodeExecutionResult, ...],
+    ) -> None:
+        """Report that `node` has its slot, unless its upstream results keep it from running."""
+
+        if self._callbacks.started is None:
+            return
+        decision: PythonNodeFanInDecision = evaluate_python_node_fan_in(upstream_results=upstream)
+        if decision.action == PythonNodeFanInAction.RUN:
+            self._callbacks.started(node.name)
 
     def _settle(
         self, *, future: Future[PythonNodeExecutionResult], result: PythonNodeExecutionResult

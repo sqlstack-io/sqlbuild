@@ -101,6 +101,14 @@ pub(crate) struct PythonNodeReporter {
 
 #[pymethods]
 impl PythonNodeReporter {
+    /// A worker records an asset as running once it really starts.
+    fn started(&self, py: Python<'_>, name: &str) -> PyResult<()> {
+        match &self.worker {
+            Some(worker) => worker.start_key(py, &format!("{ASSET_KIND}:{name}")),
+            None => Ok(()),
+        }
+    }
+
     /// A worker records an item that was running when the run was cancelled as cancelled.
     fn cancelled(&self, py: Python<'_>, name: &str) -> PyResult<()> {
         match &self.worker {
@@ -568,7 +576,8 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             worker: context.worker.clone(),
         },
     )?;
-    let on_node_cancelled: Bound<'py, PyAny> = reporter.getattr("cancelled")?;
+    let report = |method: &str| reporter.getattr(method);
+    let (on_asset_start, on_node_cancelled) = (report("started")?, report("cancelled")?);
     let mut ingress_python: Bound<'py, PyAny> = tuple(py, &[])?;
     let mut ingress_loads: Bound<'py, PyAny> = tuple(py, &[])?;
     if ingress_names.is_truthy()? {
@@ -581,6 +590,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
                     ("use_color", boolean(py, context.use_color)),
                     ("on_node_start", inputs.on_node_start.clone()),
                     ("on_node_complete", inputs.on_node_complete.clone()),
+                    ("on_asset_start", on_asset_start.clone()),
                     ("on_node_cancelled", on_node_cancelled.clone()),
                 ],
             )?;
@@ -634,6 +644,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
                 ("scheduled_sql_names", names_set(py, &scheduled)?),
                 ("runtime", node_runtime(&parts, &connection)?),
                 ("on_node_complete", reporter.clone().into_any()),
+                ("on_asset_start", on_asset_start.clone()),
                 ("on_node_cancelled", on_node_cancelled.clone()),
             ],
         )?;
