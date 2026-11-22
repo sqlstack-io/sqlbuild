@@ -860,6 +860,7 @@ class SecretAdviceTestCase:
     env_file_name: str
     expected_help: str
     expected_flag_suggested: bool
+    expected_failure: bool = True
 
 
 @dataclass(frozen=True)

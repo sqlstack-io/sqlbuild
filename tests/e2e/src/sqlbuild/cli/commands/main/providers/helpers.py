@@ -18,3 +18,8 @@ def linked_project(project_dir: Path) -> Path:
 def relative_project(project_dir: Path) -> Path:
     """The project relative to the directory sqb runs in."""
     return Path(os.path.relpath(project_dir, REPO_ROOT))
+
+
+def blocked(entry: dict[str, object]) -> dict[str, object]:
+    """What a `cant_run` entry says can't run and why, without the file and env-file fields."""
+    return {field: entry[field] for field in ("provider", "variables", "nodes", "readers", "sinks")}
