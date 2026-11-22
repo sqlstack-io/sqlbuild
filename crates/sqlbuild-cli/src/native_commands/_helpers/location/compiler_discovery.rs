@@ -92,9 +92,6 @@ pub(crate) async fn discovered(
     (bearer, session_id): (&str, Uuid),
     (generation, load): (i64, &LocationLoad),
 ) {
-    if load.discovered.is_empty() || load.published.is_none() {
-        return;
-    }
     if options.dev_events
         && let Some(summary) = discovery_summary(&load.discovered)
     {

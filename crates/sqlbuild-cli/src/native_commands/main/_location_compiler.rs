@@ -116,7 +116,9 @@ async fn publish(
         result = exchange_reply::<LocationLoad>(&mut active, &publication, "publication record") => result,
     };
     if let Ok(load) = &result {
-        discovered(options, (bearer, session_id), (request.generation, load)).await;
+        if discovery.reports(load) {
+            discovered(options, (bearer, session_id), (request.generation, load)).await;
+        }
         discovery.published(load, Instant::now());
     }
     let failed = result.is_err();

@@ -21,8 +21,12 @@ pub(crate) struct LocationDiscovery {
     due: BTreeMap<String, Instant>,
     /// Whether this location has published since it started; its first publication discovers everything.
     published: bool,
-    /// The `rediscovers` count of the last publication that called every function.
+    /// The `rediscovers` count the last publication satisfied.
     rediscovers: u64,
+    /// The `rediscovers` count the newest request asked for.
+    requested: u64,
+    /// The functions edited since the last publication.
+    edited: BTreeSet<String>,
 }
 
 impl LocationDiscovery {
@@ -34,15 +38,14 @@ impl LocationDiscovery {
         rediscovers: u64,
     ) -> DiscoveryPublishRequest {
         let everything: bool = !self.published || rediscovers != self.rediscovers;
-        self.rediscovers = rediscovers;
-        let rediscover: Option<BTreeSet<String>> = (!everything).then(|| {
-            let changed: BTreeSet<&str> = changed_paths(before, after);
-            self.files
-                .iter()
-                .filter(|(_, file)| changed.contains(file.as_str()))
-                .map(|(name, _)| name.clone())
-                .collect()
-        });
+        self.requested = rediscovers;
+        let changed: BTreeSet<&str> = changed_paths(before, after);
+        for (name, file) in &self.files {
+            if changed.contains(file.as_str()) {
+                self.edited.insert(name.clone());
+            }
+        }
+        let rediscover: Option<BTreeSet<String>> = (!everything).then(|| self.edited.clone());
         DiscoveryPublishRequest {
             generation,
             rediscover,
@@ -55,6 +58,9 @@ impl LocationDiscovery {
     pub(crate) fn published(&mut self, load: &LocationLoad, now: Instant) {
         if load.published.is_some() {
             self.published = true;
+            self.rediscovers = self.requested;
+            self.edited.clear();
+            self.files.clone_from(&load.discover_files);
         }
         if load.discovered.is_empty() && load.published.is_none() {
             return;
@@ -67,7 +73,6 @@ impl LocationDiscovery {
             }
         }
         self.sets.clone_from(&load.discovered);
-        self.files.clone_from(&load.discover_files);
         let mut due: BTreeMap<String, Instant> = BTreeMap::new();
         for (name, set) in &self.sets {
             let Some(seconds) = set.check_every_seconds else {
@@ -80,6 +85,12 @@ impl LocationDiscovery {
             due.insert(name.clone(), next);
         }
         self.due = due;
+    }
+
+    /// Whether to report `load`'s sets: on the first publication, with sets, or when the last one went.
+    pub(crate) fn reports(&self, load: &LocationLoad) -> bool {
+        load.published.is_some()
+            && (!self.published || !load.discovered.is_empty() || !self.sets.is_empty())
     }
 
     /// When the next check is due; `None` when no set is checked.

@@ -262,3 +262,12 @@ pub(super) fn discovered_load(ids: &[&str]) -> crate::native_commands::models::L
         discover_files: [("orders_plan".to_owned(), PLAN_FILE.to_owned())].into(),
     }
 }
+
+/// The reply of a compile that failed, with the sets it had discovered by then, if any.
+pub(super) fn failed_load(discovered: bool) -> crate::native_commands::models::LocationLoad {
+    let mut load = discovered_load(&["a"]);
+    load.published = None;
+    load.discover_files.clear();
+    load.discovered.retain(|_, _| discovered);
+    load
+}
