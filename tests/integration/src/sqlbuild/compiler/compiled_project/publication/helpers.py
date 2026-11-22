@@ -29,7 +29,7 @@ from datetime import UTC, datetime, timedelta
 from functools import partial
 from io import StringIO
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal, LiteralString, cast
 from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -775,7 +775,9 @@ def api_address(process: subprocess.Popen[bytes], log: Path) -> str:
     return "http://" + log.read_text().partition("Control API ready: ")[2].splitlines()[0]
 
 
-def control_query(database: str, statement: str, *parameters: object) -> list[tuple[Any, ...]]:
+def control_query(
+    database: str, statement: LiteralString, *parameters: object
+) -> list[tuple[Any, ...]]:
     """One committed statement's rows, with `?` placeholders, from either kind of control store."""
 
     def on_sqlite() -> list[tuple[Any, ...]]:
