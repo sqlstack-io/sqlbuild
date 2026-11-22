@@ -233,6 +233,12 @@ seconds, stops delivery and retries the same event. Deduplicate by `event_id`, w
 Each condition is sent once when it starts, not on every 30-second scan. Monitor heartbeats from
 outside the server too: a stopped server can't report its own outage.
 
+For a sensor whose check failed, the `reason` of `trigger_skipped` ends with the error's text, with
+credentials redacted, cut to 2,000 characters. It is the first error since the sensor's last
+completed check in that snapshot: a later attempt that fails differently sends no new event and
+doesn't replace it. Everyone who can view the target sees the reason, and it can quote stored
+values.
+
 `run_failed` lists at most 20 failed nodes, ordered by node key; `failed_node_count` is the full
 number. A `partial` run is included because some of its nodes failed. `job_key` is `null` for
 ad-hoc runs. Each `message` is the node's error text with credentials redacted, cut to 2,000

@@ -36,9 +36,14 @@ const EARLIER_JOB: &str =
 const HEALTHY_CHECKS: &str = "SELECT COUNT(*) AS count FROM sqb_sensor_evaluation_events e \
      JOIN sqb_triggers t ON t.trigger_id=e.trigger_id WHERE t.name='watch_overdue' AND e.phase='completed'";
 /// The health problem a sensor shows when its location work is gone.
-const FAILED: &str = "health_orders: this sensor's check failed and was skipped; it is checked again in a minute: control-plane data this release can't read or accept";
-/// A denied check's problem, which names no decision.
-const DENIED: &str = "health_orders: this sensor's check failed and was skipped; it is checked again in a minute: a control-plane operation was denied";
+const FAILED: &str = "health_orders: this sensor's check failed and was skipped; it is checked again in a minute: invalid control-plane data: sensor has no location work";
+/// What a failed check's problem says before the error's own text.
+const FAILED_PREFIX: &str =
+    "health_orders: this sensor's check failed and was skipped; it is checked again in a minute: ";
+/// The first denial's problem up to its padding: the error's text, with the secret redacted.
+const DENIED: &str = "health_orders: this sensor's check failed and was skipped; it is checked again in a minute: control-plane operation denied: password=[REDACTED] can't queue job orders";
+/// How an unpadded first denial ends: its own decision, not a later attempt's.
+const FIRST_DECISION: &str = "; decision 00000000-0000-0000-0000-000000000001";
 /// The `trigger_skipped` events recorded so far.
 const SKIPPED_EVENTS: &str =
     "SELECT COUNT(*) AS count FROM recall_events WHERE event_type='platform_trigger_skipped'";
@@ -412,20 +417,35 @@ fn given_a_sensor_whose_newest_tick_is_unreadable_when_an_operator_skips_its_eve
 }
 
 #[test]
-fn given_a_sensor_failing_with_a_different_id_each_attempt_when_it_is_skipped_then_one_problem_names_the_kind()
+fn given_a_sensor_failing_with_different_text_each_attempt_when_it_is_skipped_then_one_problem_keeps_the_first_error()
  {
     let test_cases = [
         FailedAttemptsTestCase {
             description: "SQLite store",
             backend: Backend::Sqlite,
+            padding: 0,
             expected_events: 1,
-            expected_skipped: &[DENIED],
+            expected_start: DENIED,
+            expected_end: FIRST_DECISION,
+            expected_error_chars: 121,
         },
         FailedAttemptsTestCase {
             description: "PostgreSQL store",
             backend: Backend::Postgres,
+            padding: 0,
             expected_events: 1,
-            expected_skipped: &[DENIED],
+            expected_start: DENIED,
+            expected_end: FIRST_DECISION,
+            expected_error_chars: 121,
+        },
+        FailedAttemptsTestCase {
+            description: "PostgreSQL store, an error longer than error text may be",
+            backend: Backend::Postgres,
+            padding: 3_000,
+            expected_events: 1,
+            expected_start: DENIED,
+            expected_end: "…",
+            expected_error_chars: 2_000,
         },
     ];
     for test_case in test_cases {
@@ -438,34 +458,47 @@ fn given_a_sensor_failing_with_a_different_id_each_attempt_when_it_is_skipped_th
             let roles = role_fixture(store).await;
             let (state, trigger_id) = sensor_due_again(store, roles.location_id, NOTHING).await;
             let lease = state.lease.clone().expect("leader");
-            let denied = || ControlError::Denied {
-                reason: "the sensor's role can't queue job orders".into(),
-                decision_id: uuid::Uuid::now_v7(),
-            };
+            let attempts = [
+                ControlError::Denied {
+                    reason: format!(
+                        "password=example-value can't queue job orders{}",
+                        ".".repeat(test_case.padding)
+                    ),
+                    decision_id: uuid::Uuid::from_u128(1),
+                },
+                ControlError::Denied {
+                    reason: "password=example-value can't queue job orders".into(),
+                    decision_id: uuid::Uuid::from_u128(2),
+                },
+                ControlError::Invalid("sensor has no location work".into()),
+            ];
 
-            skip_failed_sensor(store, &lease, trigger_id, &denied())
+            for error in &attempts {
+                skip_failed_sensor(store, &lease, trigger_id, error)
+                    .await
+                    .expect("skip");
+            }
+            let problems = trigger_problems(store, credentials(&roles.administrator))
                 .await
-                .expect("first skip");
-            skip_failed_sensor(store, &lease, trigger_id, &denied())
-                .await
-                .expect("second skip");
+                .0;
 
             assert_eq!(
                 (
                     rows(store, SKIPPED_EVENTS, vec![]).await[0]["count"].as_i64(),
-                    trigger_problems(store, credentials(&roles.administrator))
-                        .await
-                        .0,
+                    problems
+                        .iter()
+                        .map(|problem| (
+                            problem.starts_with(test_case.expected_start),
+                            problem.ends_with(test_case.expected_end),
+                            problem.trim_start_matches(FAILED_PREFIX).chars().count(),
+                        ))
+                        .collect::<Vec<_>>(),
                 ),
                 (
                     Some(test_case.expected_events),
-                    test_case
-                        .expected_skipped
-                        .iter()
-                        .map(|line| (*line).to_owned())
-                        .collect::<Vec<_>>(),
+                    vec![(true, true, test_case.expected_error_chars)],
                 ),
-                "{}: attempts that differ only in their IDs are one problem, which names the error's kind",
+                "{}: one episode is one problem with the first attempt's error, redacted and bounded: {problems:?}",
                 test_case.description
             );
             close_test_store(fixture).await;

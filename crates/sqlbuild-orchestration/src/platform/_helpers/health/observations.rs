@@ -17,6 +17,15 @@ pub(crate) async fn observe(
     installation_id: Uuid,
     (event, incident): (PlatformEvent, Option<DateTime<Utc>>),
 ) -> Result<ControlTransaction, ControlError> {
+    observe_episode(transaction, installation_id, (event, None, incident)).await
+}
+
+/// `observe`, with `episode` in place of the payload as the alert's identity, so the episode's first payload stays.
+pub(crate) async fn observe_episode(
+    transaction: ControlTransaction,
+    installation_id: Uuid,
+    (event, episode, incident): (PlatformEvent, Option<PlatformEvent>, Option<DateTime<Utc>>),
+) -> Result<ControlTransaction, ControlError> {
     let occurred_at = transaction
         .now
         .duration_trunc(TimeDelta::seconds(OBSERVATION_WINDOW_SECONDS))
@@ -26,7 +35,7 @@ pub(crate) async fn observe(
         _ => incident,
     };
     let payload = json!({"platform": event});
-    let identity = serde_json::to_vec(&(occurrence, &event))
+    let identity = serde_json::to_vec(&(occurrence, episode.as_ref().unwrap_or(&event)))
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let event_id = Uuid::new_v5(&installation_id, &identity);
     let (transaction, previous) = query(
