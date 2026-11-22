@@ -35,6 +35,7 @@ sqb location health --server https://control.example.com --location-id "$LOCATIO
 | `healthy` | An instance checked in within 90 seconds and its last load published | `0` |
 | `degraded` | The warehouse connection check after the last load failed | `0` |
 | `missing_secrets` | A provider [secret](../concepts/python-nodes/providers.md#secrets) is unset in the location's environment, so runs that use it fail | `1` |
+| `discovery_failed` | A [discover function](../concepts/python-nodes/discovered-nodes.md) failed at the last publication, so its set serves its last good items, or none | `0` |
 | `falling_back` | The last load failed, so runs use the previous snapshot | `1` |
 | `broken` | No instance has checked in for 90 seconds | `1` |
 
