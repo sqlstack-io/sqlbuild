@@ -83,3 +83,17 @@ class ItemPoolIgnoredCancelTestCase:
     expected_cancelled: tuple[str, ...]
     expected_left_open: int
     expected_within_seconds: float
+
+
+@dataclass(frozen=True)
+class ItemPoolRepeatedCancelTestCase:
+    description: str
+    items: tuple[str, ...]
+    expected_reported: frozenset[tuple[str, str]]
+
+
+@dataclass(frozen=True)
+class ItemPoolResultWriteTestCase:
+    description: str
+    write_seconds: float
+    expected_reported: frozenset[tuple[str, str]]

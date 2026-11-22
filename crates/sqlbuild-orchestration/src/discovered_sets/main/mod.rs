@@ -8,3 +8,4 @@ pub mod parse_check_every;
 pub mod record_attempt;
 pub mod remote_discovered_sets;
 pub mod result_changed;
+pub mod unknown_dependency;

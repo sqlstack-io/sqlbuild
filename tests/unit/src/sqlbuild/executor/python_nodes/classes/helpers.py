@@ -10,6 +10,7 @@ from typing import Any, ClassVar, cast
 import pytest
 
 from sqlbuild._native import (
+    CommandTerminated,
     DiscoveredAssetFunction,
     DiscoveredProjectInputs,
     LocalConfig,
@@ -18,6 +19,7 @@ from sqlbuild._native import (
     build_python_node_graph,
 )
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
+from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.assets import AssetContext
 from sqlbuild.compiler.python_nodes.types import SkipMode
 from sqlbuild.executor.python_nodes._helpers.ingress_execution import (
@@ -387,6 +389,103 @@ def ignoring_probe(release: threading.Event) -> ItemProbe:
 
     def interrupt(name: str) -> None:
         probe.after_report = lambda reported: None
+        raise KeyboardInterrupt(name)
+
+    probe.after_report = interrupt
+    return probe
+
+
+def twice_cancelled_probe(items: tuple[str, ...]) -> ItemProbe:
+    """Items finish together; the cancel lands at the first report and its signal at the next."""
+
+    barrier: threading.Barrier = threading.Barrier(len(items))
+    probe: ItemProbe = ItemProbe(actions={name: lambda: meet_at(barrier) for name in items})
+
+    def signalled(name: str) -> None:
+        probe.after_report = lambda reported: None
+        raise CommandTerminated(name)
+
+    def cancelled(name: str) -> None:
+        probe.after_report = signalled
+        raise KeyboardInterrupt(name)
+
+    probe.after_report = cancelled
+    return probe
+
+
+class SlowResultAdapter(DuckDbAdapter):
+    """Writes `slow`'s result slowly, and fails that write when it is cancelled."""
+
+    def __init__(self, *, write_seconds: float) -> None:
+        super().__init__()
+        self.write_seconds: float = write_seconds
+        self.writing: threading.Event = threading.Event()
+        self.killed: threading.Event = threading.Event()
+
+    def _execute(self, connection: Any, sql: str) -> object:
+        writes: dict[bool, Callable[[], None]] = {True: self._write_slowly, False: lambda: None}
+        writes["INSERT" in sql and "node_results" in sql and "'slow'" in sql]()
+        return super()._execute(connection=connection, sql=sql)
+
+    def _write_slowly(self) -> None:
+        self.writing.set()
+        killed: bool = self.killed.wait(timeout=self.write_seconds)
+        self.writing.clear()
+        outcomes: dict[bool, Callable[[], object]] = {True: fail_item, False: lambda: None}
+        _ = outcomes[killed]()
+
+    def interrupt_connection(self, connection: Any) -> bool:
+        del connection
+        marks: dict[bool, Callable[[], None]] = {True: self.killed.set, False: lambda: None}
+        marks[self.writing.is_set()]()
+        return True
+
+
+def run_persisting_read_side(
+    *, graph: PythonNodeGraph, adapter: DuckDbAdapter, probe: ItemProbe, database: Path
+) -> None:
+    """Every node through the read-side tracker, each result written to `database`."""
+
+    config: dict[str, object] = {"database": str(database)}
+    ReadSidePythonExecutionTracker(
+        python_graph=graph,
+        selected_python_names=frozenset(graph.nodes_by_name),
+        scheduled_sql_names=frozenset(),
+        runtime=PythonNodeRuntime(
+            adapter=adapter,
+            connection_config=config,
+            connection=adapter.connect(config),
+            run_id="test_run",
+            target="dev",
+            vars={"probe": probe},
+            is_reload=False,
+            default_schema="main",
+        ),
+        identity_recorder=ignore_identity,
+        on_node_complete=probe.report,
+        on_node_cancelled=probe.cancelled.append,
+    ).dispatch_ready_python_nodes()
+
+
+def finishing_probe() -> ItemProbe:
+    """`quick` finishes and its report raises an interrupt; `slow` finishes only after it."""
+
+    both_running: threading.Barrier = threading.Barrier(2)
+    interrupted: threading.Event = threading.Event()
+
+    def quick() -> object:
+        return meet_at(both_running)
+
+    def slow() -> object:
+        _ = both_running.wait(timeout=WAIT_SECONDS)
+        _ = interrupted.wait(timeout=WAIT_SECONDS)
+        return None
+
+    probe: ItemProbe = ItemProbe(actions={"quick": quick, "slow": slow})
+
+    def interrupt(name: str) -> None:
+        probe.after_report = lambda reported: None
+        interrupted.set()
         raise KeyboardInterrupt(name)
 
     probe.after_report = interrupt

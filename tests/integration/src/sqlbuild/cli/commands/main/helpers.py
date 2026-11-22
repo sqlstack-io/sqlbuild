@@ -39,6 +39,7 @@ from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     RepeatedJsonParseTestCase,
 )
+from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 from tests.unit.src.sqlbuild.rule_engine._helpers.run.helpers import rebuild_identity
 
 STAGE_CAPTURE_SUFFIX: str = ".json"
@@ -1856,3 +1857,101 @@ def dynamic_refresh_warehouses(executed_sql: list[str]) -> tuple[str, ...]:
     return tuple(
         re.findall(r"CREATE OR REPLACE DYNAMIC TABLE .*?WAREHOUSE = (\S+)", statements, re.S)
     )
+
+
+_SINK_STEPS: str = """\
+import time
+from pathlib import Path
+
+from providers.gateway import GatewayProvider
+from providers.journal import JournalProvider
+from sqlbuild.assets import AssetContext, asset
+from sqlbuild.discovery import Discovered, Item, discover
+
+DIRECTORY = Path({directory!r})
+
+
+@discover
+def fulfilment_plan() -> Discovered:
+    \"\"\"Two steps at once.\"\"\"
+    return Discovered(items=[Item(id="pack"), Item(id="pick")], max_parallel=2)
+
+
+@asset(for_each=fulfilment_plan)
+def fulfil(ctx: AssetContext, journal_provider: JournalProvider, {parameters}) -> None:
+    \"\"\"Run one step.\"\"\"
+    {body}
+"""
+_SINK_JOURNAL: str = """\
+from pathlib import Path
+
+from sqlbuild.providers import Provider
+
+
+class JournalProvider(Provider):
+    \"\"\"Appends lines to a journal.\"\"\"
+
+    def write(self, line: str) -> None:
+        with Path({directory!r}, "journal.txt").open("a") as journal:
+            journal.write(line + "\\n")
+
+    def teardown(self) -> None:
+        self.write("torn down")
+"""
+_SINK_GATEWAY: str = """\
+import time
+from pathlib import Path
+
+from sqlbuild.providers import Provider
+
+
+class GatewayProvider(Provider):
+    \"\"\"A gateway whose first connection never completes.\"\"\"
+
+    def setup(self, ctx) -> None:
+        Path({directory!r}, "setup-started").touch()
+        time.sleep(3600)
+"""
+_SINK_FUNCTION: str = """\
+from providers.journal import JournalProvider
+from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink
+
+
+@lifecycle_event_sink
+def journal_events(event: LifecycleEvent, journal_provider: JournalProvider) -> None:
+    journal_provider.write(f"event {event.event_type}")
+"""
+_SINK_PROJECT_TOML: str = (
+    'name = "fulfilment"\nadapter = "duckdb"\ndefault_target = "development"\n\n'
+    '[connection]\ndatabase = "warehouse.duckdb"\n\n[targets.development]\nschema = "main"\n'
+)
+
+
+def sink_project(tmp_path: Path, *, parameters: str, body: str) -> Path:
+    """A project whose steps and lifecycle sink share a journal provider."""
+
+    project: Path = tmp_path / "project"
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": _SINK_PROJECT_TOML,
+            "python/steps.py": _SINK_STEPS.format(
+                directory=str(tmp_path), parameters=parameters, body=body
+            ),
+            "providers/journal.py": _SINK_JOURNAL.format(directory=str(tmp_path)),
+            "providers/gateway.py": _SINK_GATEWAY.format(directory=str(tmp_path)),
+            "sinks/journal.py": _SINK_FUNCTION,
+        },
+    )
+    return project
+
+
+def build_arguments(project: Path) -> list[str]:
+    """`sqb build --discover` of `project`."""
+
+    return [str(Path(sys.executable).with_name("sqb")), "--no-color"] + [
+        "--project-dir",
+        str(project),
+        "build",
+        "--discover",
+    ]

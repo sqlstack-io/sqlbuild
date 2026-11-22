@@ -1603,3 +1603,27 @@ class IgnoredCancelTestCase:
     sent_signal: signal.Signals
     expected_exit_code: int
     expected_within_seconds: float
+
+
+@dataclass(frozen=True)
+class HungSetupCancelTestCase:
+    description: str
+    sent_signal: signal.Signals
+    expected_exit_code: int
+    expected_within_seconds: float
+
+
+@dataclass(frozen=True)
+class SinkAbandonedStepTestCase:
+    description: str
+    parameters: str
+    step_body: str
+    started_marker: str
+    sent_signal: signal.Signals
+    expected_exit_code: int
+
+
+@dataclass(frozen=True)
+class SinkNormalRunTestCase:
+    description: str
+    expected_last_line: str
