@@ -147,3 +147,33 @@ pub(crate) struct RefusedServiceAccountCliTestCase {
     pub(crate) imported_key: &'static str,
     pub(crate) expected_error: &'static str,
 }
+
+/// An admin command without `--json`, run after one location, person, token and service account exist.
+pub(crate) struct AdminOutputTestCase {
+    pub(crate) description: &'static str,
+    /// Arguments, with `{location}`, `{person}` and `{token}` filled in.
+    pub(crate) arguments: &'static [&'static str],
+    /// How stdout starts, and how many lines it has.
+    pub(crate) expected_stdout: (&'static str, usize),
+    /// How the one stderr line starts; empty for none.
+    pub(crate) expected_line: &'static str,
+}
+
+/// A store that opens verbosely or slowly.
+#[cfg(unix)]
+pub(crate) struct AdminOpeningTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) arguments: &'static [&'static str],
+    /// How long another writer holds the new store.
+    pub(crate) held_milliseconds: u64,
+    pub(crate) expected_stdout_empty: bool,
+    pub(crate) expected_stderr_prefix: &'static str,
+}
+
+/// A committed secret that stdout couldn't take.
+#[cfg(unix)]
+pub(crate) struct SecretDeliveryTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) expected_exit: i32,
+    pub(crate) expected_stderr: &'static str,
+}

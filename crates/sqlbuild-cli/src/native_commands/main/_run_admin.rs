@@ -1,137 +1,87 @@
 //! Direct database ownership authorizes bootstrap, not an untrusted HTTP request or supplied role.
 
-use crate::adhoc::main::adhoc_planner::adhoc_planner;
-use serde_json::{Value, json};
 use sqlbuild_orchestration::authorization::main::people::bootstrap_user::bootstrap_user;
-use sqlbuild_orchestration::authorization::main::roles::grant_admin::grant_admin;
 use sqlbuild_orchestration::credentials::main::identities::create_principal::create_principal;
 use sqlbuild_orchestration::credentials::main::locations::create_location::create_location;
-use sqlbuild_orchestration::credentials::main::sessions::set_password::set_password;
-use sqlbuild_orchestration::credentials::models::{AuditContext, PasswordAuthority};
-use sqlbuild_orchestration::declarations::main::change_trigger::change_trigger;
+use sqlbuild_orchestration::credentials::models::AuditContext;
 use sqlbuild_orchestration::declarations::models::TriggerChangeRequest;
-use sqlbuild_orchestration::platform::main::work::location_work::location_work;
-use sqlbuild_orchestration::platform::main::work::request_location_work::request_location_work;
-use sqlbuild_orchestration::runs::main::execution::change_run::change_run;
-use sqlbuild_orchestration::runs::main::requests::request_job_run::request_job_run;
-use sqlbuild_orchestration::runs::main::requests::request_rerun::request_rerun;
-use sqlbuild_orchestration::runs::models::JobRunRequest;
-use sqlbuild_orchestration::runs::models::{RunAuthority, RunChange, RunChangeRequest};
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
+use crate::native_commands::_helpers::admin::people::{provide_password, restore_admin};
+use crate::native_commands::_helpers::admin::requests::{
+    override_trigger, queue_job_run, queue_rerun, read_request, request_cancellation, request_check,
+};
+use crate::native_commands::_helpers::admin::store::open_admin_store;
 use crate::native_commands::_helpers::command::admin_actions::{
     run_service_account_admin, run_token_admin,
 };
 use crate::native_commands::_helpers::command::decision::control_admin;
-use crate::native_commands::_helpers::location::execution::open_control_store;
-use crate::native_commands::models::ControlAdmin;
+use crate::native_commands::models::{AdminDone, ControlAdmin};
 
-pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlError> {
-    let action = control_admin(namespace)?;
-    let store = open_control_store(namespace, None).await?;
+pub(crate) async fn run_admin(namespace: &Namespace) -> Result<AdminDone, ControlError> {
+    let action: ControlAdmin = control_admin(namespace)?;
+    let store: ControlStore = open_admin_store(namespace).await?;
     let context = AuditContext {
         actor: "local-control-store-owner".into(),
         granting_role: "control-store-owner".into(),
         request_id: Uuid::now_v7(),
         ip_address: None,
     };
+    perform(&store, &context, action).await
+}
+
+async fn perform(
+    store: &ControlStore,
+    context: &AuditContext,
+    action: ControlAdmin,
+) -> Result<AdminDone, ControlError> {
     match action {
-        ControlAdmin::BootstrapUser(name) => {
-            let id = bootstrap_user(&store, &context, &name).await?;
-            Ok(json!({"principal_id":id,"name":name,"kind":"person","role":"admin"}))
+        ControlAdmin::BootstrapUser(name) => Ok(AdminDone::Bootstrapped {
+            id: bootstrap_user(store, context, &name).await?,
+            name,
+        }),
+        ControlAdmin::CreateLocation(name) => Ok(AdminDone::LocationCreated {
+            id: create_location(store, &name, context).await?,
+            name,
+        }),
+        ControlAdmin::CreatePrincipal(name) => Ok(AdminDone::PrincipalCreated {
+            id: create_principal(store, context, &name).await?,
+            name,
+        }),
+        ControlAdmin::Token(action) => run_token_admin(store, context, action).await,
+        ControlAdmin::SetPassword(id, password) => {
+            provide_password(store, context, (id, password)).await
         }
-        ControlAdmin::CreateLocation(name) => {
-            let id = create_location(&store, &name, &context).await?;
-            Ok(json!({"location_id": id, "name": name}))
-        }
-        ControlAdmin::CreatePrincipal(name) => {
-            let id = create_principal(&store, &context, &name).await?;
-            Ok(json!({"principal_id": id, "name": name}))
-        }
-        ControlAdmin::Token(action) => run_token_admin(&store, &context, action).await,
-        ControlAdmin::SetPassword(principal_id, password) => {
-            set_password(
-                &store,
-                &context,
-                PasswordAuthority::Operator(principal_id),
-                &password,
-            )
-            .await?;
-            Ok(json!({"principal_id": principal_id, "password_set": true}))
-        }
-        ControlAdmin::GrantAdmin(principal_id) => {
-            grant_admin(&store, &context, principal_id).await?;
-            Ok(json!({"principal_id": principal_id, "role": "admin"}))
-        }
-        ControlAdmin::RequestJobRun(request) => queue_job_run(&store, &context, &request).await,
-        ControlAdmin::Rerun(request) => {
-            let applied = request_rerun(&store, (&context, None), &request).await?;
-            Ok(json!({"run_id": request.run_id, "applied": applied}))
-        }
-        ControlAdmin::RequestLocationWork(request) => {
-            let applied = request_location_work(&store, (&context, None), &request).await?;
-            Ok(json!({"request_id": request.request_id, "applied": applied}))
-        }
-        ControlAdmin::LocationWork(request_id) => {
-            Ok(json!(location_work(&store, request_id).await?))
-        }
+        ControlAdmin::GrantAdmin(id) => restore_admin(store, context, id).await,
+        ControlAdmin::RequestJobRun(request) => queue_job_run(store, context, request).await,
+        ControlAdmin::Rerun(request) => queue_rerun(store, context, request).await,
+        ControlAdmin::RequestLocationWork(request) => request_check(store, context, request).await,
+        ControlAdmin::LocationWork(request_id) => read_request(store, request_id).await,
         ControlAdmin::CancelRun {
             event_id,
             run_id,
             reason,
-        } => {
-            let applied = change_run(
-                &store,
-                RunAuthority::Operator(&context),
-                &RunChangeRequest {
-                    event_id,
-                    run_id,
-                    claim_id: None,
-                    change: RunChange::CancelRequested {
-                        actor: context.actor.clone(),
-                        reason,
-                    },
-                },
-            )
-            .await?;
-            Ok(json!({"event_id": event_id, "run_id": run_id, "applied": applied}))
-        }
+        } => request_cancellation(store, context, (event_id, run_id, reason)).await,
         ControlAdmin::ChangeTrigger {
             event_id,
             trigger_id,
             change,
             reason,
         } => {
-            let applied = change_trigger(
-                &store,
-                &context,
-                &TriggerChangeRequest {
-                    event_id,
-                    trigger_id,
-                    actor: context.actor.clone(),
-                    reason,
-                    change,
-                },
-            )
-            .await?;
-            Ok(json!({"event_id": event_id, "trigger_id": trigger_id, "applied": applied}))
+            let request = TriggerChangeRequest {
+                event_id,
+                trigger_id,
+                actor: context.actor.clone(),
+                reason,
+                change,
+            };
+            override_trigger(store, context, request).await
         }
         ControlAdmin::ServiceAccount(action) => {
-            run_service_account_admin(&store, &context, action).await
+            run_service_account_admin(store, context, action).await
         }
     }
-}
-
-/// A trusted job run, narrowed with the same planner the server resolves ad-hoc commands with.
-async fn queue_job_run(
-    store: &ControlStore,
-    context: &AuditContext,
-    request: &JobRunRequest,
-) -> Result<Value, ControlError> {
-    let planner = adhoc_planner();
-    let applied = request_job_run(store, (context, Some(planner.as_ref())), request).await?;
-    Ok(json!({"run_id": request.run_id, "applied": applied}))
 }

@@ -15,7 +15,7 @@ test("generated client preserves native scopes, replay, path encoding, SSE and b
   const env = { ...process.env };
   delete env.SQLBUILD_CONTROL_DATABASE_URL;
   delete env.SQLBUILD_PLATFORM_WEBHOOK_URL;
-  const admin = (...args: string[]) => JSON.parse(execFileSync(executable, ["admin", ...args], {
+  const admin = (...args: string[]) => JSON.parse(execFileSync(executable, ["admin", ...args, "--json"], {
     cwd: directory, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
   }));
   let baseUrl: string;

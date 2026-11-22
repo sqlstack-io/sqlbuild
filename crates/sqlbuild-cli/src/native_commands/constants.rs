@@ -79,6 +79,18 @@ pub(crate) const SCHEDULER_COMMAND: &str = "scheduler";
 
 pub(crate) const ADMIN_COMMAND: &str = "admin";
 
+/// How long `sqb admin` opens its store in silence; a migration or a busy store takes longer.
+pub(crate) const ADMIN_OPEN_NOTICE: std::time::Duration = std::time::Duration::from_secs(1);
+/// Printed when opening the control store starts.
+pub(crate) const OPENING_STORE: &str = "Opening control store...\n";
+/// Printed when the control store is open.
+pub(crate) const STORE_READY: &str = "Control store ready\n";
+/// An admin command committed, and its result didn't reach stdout.
+pub(crate) const ADMIN_DELIVERY_FAILED: &str =
+    "Control administration result delivery failed; changes may already be committed\n";
+/// How a table shows a value that is absent.
+pub(crate) const NO_VALUE: &str = "-";
+
 pub(crate) const RULES_COMMAND: &str = "rules";
 
 pub(crate) const RULES_LIST_ACTION: &str = "list";
