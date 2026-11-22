@@ -1075,6 +1075,8 @@ export type SensorEvaluation = {
 	abandonedBecause: AbandonReason | null;
 	/** The operator who skipped the tick's event, so the function wasn't called; `skipReason` is theirs. */
 	skippedBy: string | null;
+	/** Why the tick's details are missing, when an earlier release recorded them in a form this one can't read. */
+	unreadable: string | null;
 	definitionFingerprint: string;
 };
 

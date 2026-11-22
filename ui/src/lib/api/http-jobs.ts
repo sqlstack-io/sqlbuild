@@ -129,6 +129,7 @@ function toEvaluation(wire: Wire['PersonSensorEvaluation']): SensorEvaluation {
 		error: wire.error ?? null,
 		abandonedBecause: wire.abandoned_because ?? null,
 		skippedBy: wire.skipped_by ?? null,
+		unreadable: wire.unreadable ?? null,
 		definitionFingerprint: wire.definition_fingerprint
 	};
 }
