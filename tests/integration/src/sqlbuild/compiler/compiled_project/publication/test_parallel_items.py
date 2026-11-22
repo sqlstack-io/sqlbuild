@@ -257,4 +257,6 @@ def test_given_steps_in_flight_when_cancelled_then_finished_steps_stay_and_are_n
                     "SELECT selection_json FROM sqb_runs WHERE run_id=?", (rerun_id,)
                 ).fetchone()[0]
             )
-    assert "asset:fulfil[done]" not in selection
+    assert set(selection).intersection(test_case.expected_statuses) == (
+        set(test_case.expected_statuses) - {"asset:fulfil[done]"}
+    )

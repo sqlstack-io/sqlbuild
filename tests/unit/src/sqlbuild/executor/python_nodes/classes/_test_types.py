@@ -74,3 +74,12 @@ class ItemPoolRecordedInterruptTestCase:
     description: str
     items: tuple[str, ...]
     expected_reported: frozenset[tuple[str, str]]
+
+
+@dataclass(frozen=True)
+class ItemPoolIgnoredCancelTestCase:
+    description: str
+    expected_reported: frozenset[tuple[str, str]]
+    expected_cancelled: tuple[str, ...]
+    expected_left_open: int
+    expected_within_seconds: float

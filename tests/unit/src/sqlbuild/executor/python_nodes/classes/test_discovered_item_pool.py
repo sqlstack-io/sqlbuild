@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Callable
 from functools import partial
 from pathlib import Path
@@ -16,6 +17,7 @@ from tests.unit.src.sqlbuild.executor.python_nodes.classes._test_types import (
     ItemPoolCancelTestCase,
     ItemPoolCapTestCase,
     ItemPoolFailureTestCase,
+    ItemPoolIgnoredCancelTestCase,
     ItemPoolOrderTestCase,
     ItemPoolRecordedInterruptTestCase,
     ItemPoolSerialTestCase,
@@ -25,6 +27,7 @@ from tests.unit.src.sqlbuild.executor.python_nodes.classes.helpers import (
     ItemPoolTestAdapter,
     ItemProbe,
     fail_item,
+    ignoring_probe,
     interrupt_after_next_record,
     interrupted_probe,
     item_graph,
@@ -377,3 +380,42 @@ def test_given_an_interrupt_just_after_a_record_when_running_then_it_still_ends_
         (result.node_name, result.status.value) for result in probe.reported
     )
     assert reported == test_case.expected_reported
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ItemPoolIgnoredCancelTestCase(
+            description="one step ignores the cancel",
+            expected_reported=frozenset({("quick", "success")}),
+            expected_cancelled=("slow",),
+            expected_left_open=1,
+            expected_within_seconds=9,
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_step_ignoring_cancel_when_interrupted_then_it_is_reported_cancelled_and_not_joined(
+    test_case: ItemPoolIgnoredCancelTestCase,
+) -> None:
+    for run_path in _PATHS:
+        release: threading.Event = threading.Event()
+        probe: ItemProbe = ignoring_probe(release)
+        adapter: ItemPoolTestAdapter = ItemPoolTestAdapter()
+        graph: PythonNodeGraph = item_graph((("quick", "plan", 2, ()), ("slow", "plan", 2, ())))
+
+        interrupted: float = time.monotonic()
+        with pytest.raises(KeyboardInterrupt):
+            _ = run_path(graph=graph, adapter=adapter, probe=probe)
+        waited: float = time.monotonic() - interrupted
+        release.set()
+
+        reported: frozenset[tuple[str, str]] = frozenset(
+            (result.node_name, result.status.value) for result in probe.reported
+        )
+        assert (reported, tuple(probe.cancelled)) == (
+            test_case.expected_reported,
+            test_case.expected_cancelled,
+        )
+        assert waited < test_case.expected_within_seconds
+        assert adapter.connections - adapter.closed == test_case.expected_left_open

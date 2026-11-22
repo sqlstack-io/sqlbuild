@@ -1595,3 +1595,11 @@ class DynamicRefreshWarehouseTestCase:
     description: str
     argv: tuple[str, ...]
     expected_refresh_warehouses: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class IgnoredCancelTestCase:
+    description: str
+    sent_signal: signal.Signals
+    expected_exit_code: int
+    expected_within_seconds: float

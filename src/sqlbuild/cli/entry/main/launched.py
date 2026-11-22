@@ -3,7 +3,9 @@
 import os
 import sys
 
+from sqlbuild.cli.entry._helpers.abandoned_steps import exit_past_abandoned_steps
 from sqlbuild.cli.entry.constants import (
+    INTERRUPTED_EXIT_CODE,
     NATIVE_ALLOCATOR_PURGE_DELAY_MILLISECONDS,
     NATIVE_ALLOCATOR_PURGE_DELAY_VARIABLE,
 )
@@ -22,4 +24,10 @@ def main() -> int:
     arguments: list[str] = sys.argv[1:]
     offered: bool = bool(arguments) and arguments[0].startswith(LAUNCH_RECORD_OPTION)
     sys.argv = [sys.argv[0], *arguments[int(offered) :]]
-    return run_cli(arguments)
+    try:
+        exit_code: int = run_cli(arguments)
+    except KeyboardInterrupt:
+        _ = exit_past_abandoned_steps(exit_code=INTERRUPTED_EXIT_CODE)
+        raise
+    _ = exit_past_abandoned_steps(exit_code=exit_code)
+    return exit_code

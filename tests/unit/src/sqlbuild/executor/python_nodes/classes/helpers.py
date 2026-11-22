@@ -368,3 +368,26 @@ def interrupt_after_next_record(monkeypatch: pytest.MonkeyPatch) -> None:
         raise KeyboardInterrupt
 
     monkeypatch.setattr(LifecycleProgress, "complete", record_then_interrupt)
+
+
+def ignoring_probe(release: threading.Event) -> ItemProbe:
+    """`quick` finishes and its report raises an interrupt; `slow` ignores it until released."""
+
+    both_running: threading.Barrier = threading.Barrier(2)
+
+    def quick() -> object:
+        return meet_at(both_running)
+
+    def slow() -> object:
+        _ = both_running.wait(timeout=WAIT_SECONDS)
+        _ = release.wait(timeout=WAIT_SECONDS)
+        return None
+
+    probe: ItemProbe = ItemProbe(actions={"quick": quick, "slow": slow})
+
+    def interrupt(name: str) -> None:
+        probe.after_report = lambda reported: None
+        raise KeyboardInterrupt(name)
+
+    probe.after_report = interrupt
+    return probe
