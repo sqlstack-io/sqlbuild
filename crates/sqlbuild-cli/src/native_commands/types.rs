@@ -28,8 +28,7 @@ pub(crate) type NextGeneration = (
 );
 
 /// A published generation's refresh deadline and state locations, or the rule findings that failed it.
-/// A publication's refresh deadline, warehouse state locations and snapshot; or why the load failed:
-/// the configured rules' findings, if they failed it, and the error to report.
+/// A publication's refresh, state locations and snapshot; or any rule findings and the error.
 pub(crate) type LoadOutcome = Result<
     (
         Option<tokio::time::Instant>,

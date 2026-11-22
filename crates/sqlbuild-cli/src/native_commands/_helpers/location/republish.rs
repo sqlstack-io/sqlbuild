@@ -14,6 +14,9 @@ use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::models::PendingRepublish;
 use crate::native_commands::types::LoadOutcome;
 
+/// How long one result is retried while the watcher waits.
+const REPORT_RETRY_WINDOW: Duration = Duration::from_secs(30);
+
 /// The outcome a compile gives the republish that asked for it.
 pub(crate) fn republish_outcome(load: &LoadOutcome, generation: i64) -> LocationWorkOutcome {
     match load {
@@ -28,7 +31,7 @@ pub(crate) fn republish_outcome(load: &LoadOutcome, generation: i64) -> Location
     }
 }
 
-/// Send the result, retrying a refused or lost send each second until the claim ends.
+/// Send the result, retrying a lost send briefly so an unreachable server cannot stall the watcher.
 pub(crate) async fn report_republish(
     (client, session_id): (&LocationWorkClient, Uuid),
     pending: PendingRepublish,
@@ -39,8 +42,14 @@ pub(crate) async fn report_republish(
         session_id,
         outcome,
     };
-    while Instant::now() < pending.deadline {
-        match client.complete(pending.request_id, &result).await {
+    let retry_until: Instant = pending.deadline.min(Instant::now() + REPORT_RETRY_WINDOW);
+    while Instant::now() < retry_until {
+        let sent =
+            tokio::time::timeout_at(retry_until, client.complete(pending.request_id, &result));
+        let Ok(sent) = sent.await else {
+            break;
+        };
+        match sent {
             Ok(_) => {
                 drop(write_output(&[(
                     Stream::Stderr,
@@ -62,6 +71,6 @@ pub(crate) async fn report_republish(
     }
     drop(write_output(&[(
         Stream::Stderr,
-        "The republish's claim ended before its result was reported.\n",
+        "The republish's result could not be reported to the server.\n",
     )]));
 }

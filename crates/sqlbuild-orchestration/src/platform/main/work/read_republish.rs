@@ -15,8 +15,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
 
-/// The republish `request_id` of `target`, read again until it finishes or `wait` seconds pass,
-/// at most `MAX_REPUBLISH_WAIT_SECONDS`; `None` when the target has no such republish.
+/// The target's republish, read again until it finishes or `wait` (capped) seconds pass.
 pub async fn read_republish(
     store: &ControlStore,
     (context, credentials): (&AuditContext, Option<Uuid>),

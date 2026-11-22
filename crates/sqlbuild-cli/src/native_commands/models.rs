@@ -58,8 +58,7 @@ pub(crate) enum NativeParse {
     },
 }
 
-/// One turn of named work: the files it wrote, whether metadata should sync, whether it claimed work,
-/// and a republish the location now owes a result.
+/// One turn of named work: its files, whether to sync, whether it claimed, and any republish owed.
 #[derive(Debug, Default)]
 pub(crate) struct LocationWorkTurn {
     pub(crate) files: Vec<std::path::PathBuf>,

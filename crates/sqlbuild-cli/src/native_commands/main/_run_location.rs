@@ -157,12 +157,14 @@ async fn watch_location(
             continue;
         };
         if let Some(claimed) = owed.take() {
-            report_republish(
-                (client, poll.session_id),
-                claimed,
-                republish_outcome(&load, generation),
-            )
-            .await;
+            tokio::select! {
+                result = &mut stopped => return result,
+                () = report_republish(
+                    (client, poll.session_id),
+                    claimed,
+                    republish_outcome(&load, generation),
+                ) => {},
+            }
         }
         published_generation = match &load {
             Ok(_) => Some(generation),
@@ -194,11 +196,19 @@ async fn poll_location(
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<(LocationWatch, Instant, Option<LocationMetadataSync>)>, ControlError> {
     tokio::pin!(stopped);
-    if generation.is_some() && watch.attempted.as_ref() == Some(&watch.observed) {
+    let current: bool = watch.attempted.as_ref() == Some(&watch.observed);
+    if current {
         if Instant::now() >= work_at {
+            let poll = LocationWorkPoll {
+                scope: match generation {
+                    Some(_) => LocationWorkScope::WithRepublish,
+                    None => LocationWorkScope::RepublishOnly,
+                },
+                ..poll.clone()
+            };
             let Some(turn) = run_location_work(
                 (options, script, (runtime, connected)),
-                (client, poll, &watch),
+                (client, &poll, &watch),
                 generation,
                 stopped.as_mut(),
             )
@@ -215,7 +225,9 @@ async fn poll_location(
                 state.request_sync();
             }
         }
-        if let Some(state) = metadata.take() {
+        if generation.is_some()
+            && let Some(state) = metadata.take()
+        {
             let syncing = !state.idle;
             metadata = sync_location_metadata(
                 state,
