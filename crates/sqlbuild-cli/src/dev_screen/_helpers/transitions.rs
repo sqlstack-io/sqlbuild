@@ -17,7 +17,7 @@ use crate::dev_screen::_helpers::labels::elapsed_since;
 use crate::dev_screen::_helpers::lines::lasting_step;
 use crate::dev_screen::_helpers::rows::step_line;
 use crate::dev_screen::_helpers::secrets::secrets_reported;
-use crate::dev_screen::constants::{LOG_RING_LINES, SIGN_IN_DETAIL, SNAPSHOT_ID_CHARS};
+use crate::dev_screen::constants::{LOG_RING_LINES, NO_SIGN_IN, SIGN_IN_DETAIL, SNAPSHOT_ID_CHARS};
 use crate::dev_screen::models::{DevScreen, DevStep, Prompt, ScreenAction, StepRow};
 
 /// The screen after a message, and the lines it prints for good.
@@ -534,6 +534,20 @@ pub(crate) fn logged(mut screen: DevScreen, line: String) -> Printed {
     };
     screen.log.push_back(line);
     (screen, shown)
+}
+
+/// The session is open beyond this machine: the warning printed for good, kept for the ready box and the log.
+pub(crate) fn exposed(mut screen: DevScreen, who: String) -> Printed {
+    let line: StepLine = StepLine {
+        state: PhaseState::Warn,
+        label: NO_SIGN_IN.to_owned(),
+        elapsed: None,
+        detail: who.clone(),
+    };
+    let lines: Vec<String> = lasting_step(&screen, &line);
+    screen.log.push_back(format!("{NO_SIGN_IN}: {who}"));
+    screen.exposure = who;
+    (screen, lines)
 }
 
 /// What a key asks for; `l` toggles the log and opens it with the lines kept so far.

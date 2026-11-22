@@ -14,6 +14,7 @@ pub(crate) fn new_dev_screen(setup: ScreenSetup) -> DevScreen {
         header: setup.header,
         header_printed: false,
         ui_url: String::new(),
+        exposure: String::new(),
         location: String::new(),
         env_file: setup.env_file,
         missing_secrets: Vec::new(),

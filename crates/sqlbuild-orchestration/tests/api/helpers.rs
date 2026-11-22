@@ -22,10 +22,20 @@ pub(crate) async fn start_api_with_facts(
     authentication: ApiAuthentication,
     facts: crate::api::models::ServerFacts,
 ) -> TestApi {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+    start_api_on(store, "127.0.0.1:0", (authentication, facts)).await
+}
+
+/// An API bound to `bind`, reached over IPv4 loopback.
+pub(crate) async fn start_api_on(
+    store: &ControlStore,
+    bind: &str,
+    (authentication, facts): (ApiAuthentication, crate::api::models::ServerFacts),
+) -> TestApi {
+    let listener = tokio::net::TcpListener::bind(bind)
         .await
         .expect("isolated API socket");
-    let url = format!("http://{}", listener.local_addr().expect("API address"));
+    let port = listener.local_addr().expect("API address").port();
+    let url = format!("http://127.0.0.1:{port}");
     let (shutdown, signal) = tokio::sync::oneshot::channel();
     let store = store.clone();
     let task = tokio::spawn(serve_api(
