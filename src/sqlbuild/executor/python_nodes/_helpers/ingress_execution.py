@@ -177,6 +177,8 @@ def _item_concurrency(
 
     def run(progress: LifecycleProgress) -> None:
         def complete_item(*, node: ExecutablePythonNode, result: PythonNodeExecutionResult) -> None:
+            if callbacks.on_node_complete is not None:
+                callbacks.on_node_complete(result)
             _finalize_ingress_python_result(
                 node=node,
                 result=result,
@@ -186,8 +188,6 @@ def _item_concurrency(
                 run_state=run_state,
                 results=results,
             )
-            if callbacks.on_node_complete is not None:
-                callbacks.on_node_complete(result)
             progress.complete(
                 node=by_name[node.name], result=_python_result_to_lifecycle_result(result)
             )

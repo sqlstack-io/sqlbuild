@@ -176,9 +176,9 @@ class ReadSidePythonExecutionTracker:
     def _complete_item(
         self, *, node: ExecutablePythonNode, result: PythonNodeExecutionResult
     ) -> None:
-        self._finalize_owned_result(node=node, result=result)
         if self._on_node_complete is not None:
             self._on_node_complete(result)
+        self._finalize_owned_result(node=node, result=result)
 
     def _upstream_results(self, node_name: str) -> tuple[PythonNodeExecutionResult, ...]:
         return tuple(
