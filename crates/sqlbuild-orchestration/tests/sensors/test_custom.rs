@@ -336,7 +336,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                 CustomSensorResultCase {
                     outcome: SensorFunctionOutcome::Failed {
                         error:
-                            "Traceback (most recent call last):\nValueError: orders feed is down"
+                            "Traceback (most recent call last):\nValueError: orders \0feed is down"
                                 .into(),
                     },
                     expected_phase: "failed",
@@ -392,6 +392,11 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                 let outcome = &facts.last().expect("terminal evaluation phase").outcome;
                 assert_eq!(outcome.phase(), result_case.expected_phase);
                 let payload = serde_json::to_value(outcome).expect("outcome payload");
+                assert!(
+                    !payload.to_string().contains("\\u0000"),
+                    "{}: a traceback is stored without NUL",
+                    test_case.description
+                );
                 assert_eq!(
                     payload["cursor"]["custom"].as_str(),
                     result_case.expected_cursor

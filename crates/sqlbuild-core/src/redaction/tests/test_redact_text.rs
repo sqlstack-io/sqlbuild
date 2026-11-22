@@ -1,6 +1,12 @@
+use crate::redaction::_helpers::patterns::{error_redacted, named_redacted};
 use crate::redaction::main::redact_error_text::redact_error_text;
+use crate::redaction::main::redact_masked_text::redact_masked_text;
 use crate::redaction::main::redact_text::redact_text;
-use crate::redaction::tests::test_types::RedactTestCase;
+use crate::redaction::main::secret_field_name::secret_field_name;
+use crate::redaction::tests::helpers::{
+    ERROR_SHAPES, NAMED_SHAPES, SHAPE_LEADS, nul_positions, shows_value,
+};
+use crate::redaction::tests::test_types::{FieldNameTestCase, NulPositionTestCase, RedactTestCase};
 
 #[test]
 fn given_diagnostic_text_when_redacting_then_matches_python_substitutions() {
@@ -121,6 +127,159 @@ fn given_error_text_with_cut_uris_when_redacting_then_position_tells_a_port_from
         assert_eq!(
             redact_error_text(test_case.text),
             test_case.expected_text,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_error_text_with_nul_when_redacting_then_both_readings_apply() {
+    let test_cases = [
+        RedactTestCase {
+            description: "a match only without NUL",
+            text: "pass\0word=example-fake-value refused",
+            expected_text: "[REDACTED]",
+        },
+        RedactTestCase {
+            description: "a match only as it is",
+            text: "refused x\0Bearer example-fake-value",
+            expected_text: "[REDACTED]",
+        },
+        RedactTestCase {
+            description: "a cut URI only as it is",
+            text: "refused 17\0postgres://orders:example-fake-value",
+            expected_text: "[REDACTED]",
+        },
+        RedactTestCase {
+            description: "no match either way",
+            text: "refused \0order 17",
+            expected_text: "refused order 17",
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            redact_error_text(test_case.text),
+            test_case.expected_text,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_masked_text_with_nul_when_redacting_then_the_mask_applies_to_both_readings() {
+    let test_cases = [
+        RedactTestCase {
+            description: "a masked value only without NUL",
+            text: "refused zebra\0quokka",
+            expected_text: "[REDACTED]",
+        },
+        RedactTestCase {
+            description: "a masked value beside NUL",
+            text: "refused \0zebraquokka",
+            expected_text: "[REDACTED]",
+        },
+        RedactTestCase {
+            description: "nothing to mask",
+            text: "refused \0order 17",
+            expected_text: "refused order 17",
+        },
+        RedactTestCase {
+            description: "text without NUL is only masked",
+            text: "refused zebraquokka",
+            expected_text: "refused ****",
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            redact_masked_text(test_case.text, |reading| reading
+                .replace("zebraquokka", "****")),
+            test_case.expected_text,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_field_name_with_nul_when_classified_then_nul_is_ignored() {
+    let test_cases = [
+        FieldNameTestCase {
+            description: "NUL inside the part",
+            name: "db_pass\0word",
+            expected_secret: true,
+        },
+        FieldNameTestCase {
+            description: "NUL beside the separator",
+            name: "api\0-key",
+            expected_secret: true,
+        },
+        FieldNameTestCase {
+            description: "an ordinary name",
+            name: "order\0_id",
+            expected_secret: false,
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            secret_field_name(test_case.name),
+            test_case.expected_secret,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_shape_with_nul_at_any_position_when_redacting_then_it_matches_the_stricter_reading() {
+    let test_cases = [
+        NulPositionTestCase {
+            description: "diagnostic text",
+            redact: redact_text,
+            reading: named_redacted,
+            shapes: &NAMED_SHAPES,
+            expected_exposed: 0,
+        },
+        NulPositionTestCase {
+            description: "error text",
+            redact: redact_error_text,
+            reading: error_redacted,
+            shapes: &ERROR_SHAPES,
+            expected_exposed: 0,
+        },
+    ];
+
+    for test_case in test_cases {
+        let (redact, reading) = (test_case.redact, test_case.reading);
+        let mut exposed: usize = 0;
+        for shape in test_case.shapes {
+            assert!(
+                !shows_value(&reading(shape)),
+                "a shape must redact: {shape}"
+            );
+            assert_eq!(
+                redact(shape),
+                reading(shape),
+                "text without NUL is unchanged"
+            );
+            for lead in SHAPE_LEADS {
+                let whole: String = format!("{lead}{shape}");
+                exposed += nul_positions(&whole)
+                    .filter(|text| {
+                        let hidden: bool =
+                            !shows_value(&reading(text)) || !shows_value(&reading(&whole));
+                        let redacted: String = redact(text);
+                        (hidden && shows_value(&redacted)) || redacted.contains('\0')
+                    })
+                    .count();
+            }
+        }
+        assert_eq!(
+            exposed, test_case.expected_exposed,
             "{}",
             test_case.description
         );

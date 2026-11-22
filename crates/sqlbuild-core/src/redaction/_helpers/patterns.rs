@@ -5,8 +5,9 @@ use std::sync::LazyLock;
 use regex::{Captures, Regex, RegexBuilder};
 
 use crate::redaction::constants::{
-    AUTHORIZATION_PATTERN, BARE_USERINFO_PATTERN, BEARER_PATTERN, DDL_PASSWORD_PATTERN,
-    PATTERN_SIZE_LIMIT, SECRET_VALUE_PATTERN, URI_CREDENTIAL_PATTERN,
+    AUTHORIZATION_PATTERN, BARE_USERINFO_PATTERN, BEARER_PATTERN, BEARER_REPLACEMENT,
+    DDL_PASSWORD_PATTERN, DDL_REPLACEMENT, PAIR_REPLACEMENT, PATTERN_SIZE_LIMIT,
+    SECRET_VALUE_PATTERN, URI_CREDENTIAL_PATTERN, URI_REPLACEMENT,
 };
 
 pub(crate) static AUTHORIZATION: LazyLock<Result<Regex, regex::Error>> =
@@ -38,6 +39,20 @@ pub(crate) fn substituted(
         Ok(regex) => regex.replace_all(text, replacement).into_owned(),
         Err(_) => text.to_owned(),
     }
+}
+
+/// One reading's named secrets and URI passwords redacted.
+pub(crate) fn named_redacted(text: &str) -> String {
+    let authorization: String = substituted(&AUTHORIZATION, text, PAIR_REPLACEMENT);
+    let bearer: String = substituted(&BEARER, &authorization, BEARER_REPLACEMENT);
+    let named: String = substituted(&SECRET_VALUE, &bearer, PAIR_REPLACEMENT);
+    let statement: String = substituted(&DDL_PASSWORD, &named, DDL_REPLACEMENT);
+    substituted(&URI_CREDENTIAL, &statement, URI_REPLACEMENT)
+}
+
+/// One reading of error text, which may also hold a URI cut before its host.
+pub(crate) fn error_redacted(text: &str) -> String {
+    bare_userinfo_redacted(&named_redacted(text))
 }
 
 /// A port is all digits and the authority ends after it (`/`, `?`, `#`); anything else may be a password.

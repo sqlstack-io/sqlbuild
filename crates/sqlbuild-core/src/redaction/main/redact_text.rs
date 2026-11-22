@@ -1,18 +1,10 @@
 //! `redact_text`: obvious named secrets and URI passwords removed from diagnostic text.
 
-use crate::redaction::_helpers::patterns::{
-    AUTHORIZATION, BEARER, DDL_PASSWORD, SECRET_VALUE, URI_CREDENTIAL, substituted,
-};
-use crate::redaction::constants::{
-    BEARER_REPLACEMENT, DDL_REPLACEMENT, PAIR_REPLACEMENT, URI_REPLACEMENT,
-};
+use crate::redaction::_helpers::patterns::named_redacted;
+use crate::redaction::_helpers::readings::redacted_readings;
 
-/// Authorization headers, bearer tokens, `name=value` secrets, SQL passwords, then URI passwords redacted.
+/// Authorization headers, bearer tokens, `name=value` secrets, SQL passwords, then URI passwords redacted, in both readings of text with NUL.
 #[must_use]
 pub fn redact_text(value: &str) -> String {
-    let authorization: String = substituted(&AUTHORIZATION, value, PAIR_REPLACEMENT);
-    let bearer: String = substituted(&BEARER, &authorization, BEARER_REPLACEMENT);
-    let named: String = substituted(&SECRET_VALUE, &bearer, PAIR_REPLACEMENT);
-    let statement: String = substituted(&DDL_PASSWORD, &named, DDL_REPLACEMENT);
-    substituted(&URI_CREDENTIAL, &statement, URI_REPLACEMENT)
+    redacted_readings(value, named_redacted)
 }
