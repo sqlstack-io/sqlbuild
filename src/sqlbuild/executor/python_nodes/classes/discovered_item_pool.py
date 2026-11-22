@@ -21,7 +21,6 @@ from sqlbuild.executor.python_nodes.constants import (
     ABANDONABLE_THREAD_PREFIX,
     ABANDONED_STEPS_NOTICE,
     CANCEL_GRACE_SECONDS,
-    CANCEL_POLL_SECONDS,
     CANCEL_REPEAT_SECONDS,
 )
 from sqlbuild.executor.python_nodes.main._ready import run_ready_python_node
@@ -183,15 +182,12 @@ class DiscoveredItemPool:
     def _report_until(self, deadline: float) -> None:
         """Report each item as it ends, those already done at `deadline` too, then the rest."""
 
-        cancel_at: float = monotonic()
         while self._running:
-            if monotonic() >= cancel_at and self._cancel_statements():
-                cancel_at = monotonic() + CANCEL_REPEAT_SECONDS
-            pause: float = max(CANCEL_POLL_SECONDS, cancel_at - monotonic())
+            cancel_running_statements()
             done: set[Future[PythonNodeExecutionResult]]
             done, _ = wait(
                 self._running,
-                timeout=max(0.0, min(pause, deadline - monotonic())),
+                timeout=max(0.0, min(CANCEL_REPEAT_SECONDS, deadline - monotonic())),
                 return_when=FIRST_COMPLETED,
             )
             if not done and monotonic() >= deadline:
@@ -206,17 +202,6 @@ class DiscoveredItemPool:
         )
         for item in self._running.values():
             self._report_cancelled(item)
-
-    def _cancel_statements(self) -> bool:
-        """Cancel running statements, unless one is a step writing the result it finished with."""
-
-        if not self._write_lock.acquire(blocking=False):
-            return False
-        try:
-            cancel_running_statements()
-        finally:
-            self._write_lock.release()
-        return True
 
     def _report_ended(self, future: Future[PythonNodeExecutionResult]) -> None:
         """Report an ended item, its identity write neither blocking steps nor able to stop this."""
