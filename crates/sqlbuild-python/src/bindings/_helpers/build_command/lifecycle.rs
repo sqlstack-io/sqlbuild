@@ -13,7 +13,6 @@ use sqlbuild_core::build_command::main::render_python_node_rows::render_python_n
 use sqlbuild_core::build_command::models::PythonNodeRow;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
-use sqlbuild_orchestration::runs::models::NodeOutcome;
 
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
@@ -39,7 +38,6 @@ use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::pytho
 use sqlbuild_python_project::planner_scope::main::build_intermediate_source_map::build_intermediate_source_map;
 use sqlbuild_python_project::project_snapshot::models::WorkerBuild;
 
-const ASSET_KIND: &str = "asset";
 const SUCCESS_STATUS: &str = "success";
 const SKIPPED_STATUS: &str = "skipped";
 const HARD_SKIP: &str = "hard";
@@ -103,32 +101,21 @@ pub(crate) struct PythonNodeReporter {
 impl PythonNodeReporter {
     /// A worker records an asset as running once it really starts.
     fn started(&self, py: Python<'_>, name: &str) -> PyResult<()> {
-        self.on_worker(name, |worker, key| worker.start_key(py, key))
+        self.worker
+            .as_ref()
+            .map_or(Ok(()), |worker| worker.start_asset(py, name))
     }
 
     /// A worker records an item that was running when the run was cancelled as cancelled.
     fn cancelled(&self, py: Python<'_>, name: &str) -> PyResult<()> {
-        self.on_worker(name, |worker, key| {
-            worker.finish_key(py, key, NodeOutcome::Cancelled)
-        })
+        self.worker
+            .as_ref()
+            .map_or(Ok(()), |worker| worker.cancel_asset(py, name))
     }
 
     fn __call__(&self, py: Python<'_>, result: Bound<'_, PyAny>) -> PyResult<()> {
         self.on_node_complete.bind(py).call1((&result,))?;
         write_python_node_results(self.stream.bind(py), &tuple(py, &[result])?, self.use_color)
-    }
-}
-
-impl PythonNodeReporter {
-    /// `report` the asset `name` by its key; a build outside a worker reports nothing.
-    fn on_worker(
-        &self,
-        name: &str,
-        report: impl FnOnce(&WorkerBuild, &str) -> PyResult<()>,
-    ) -> PyResult<()> {
-        self.worker.as_ref().map_or(Ok(()), |worker| {
-            report(worker, &format!("{ASSET_KIND}:{name}"))
-        })
     }
 }
 
