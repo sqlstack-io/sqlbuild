@@ -1,4 +1,4 @@
-//! A trigger override needs its permission on every node the trigger's current job or group writes.
+//! A trigger override needs its permission on every node of the trigger's scope.
 
 use serde_json::json;
 use uuid::Uuid;
