@@ -10,6 +10,7 @@ from typing import Any
 
 from sqlbuild._native import TargetSettings
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
+from sqlbuild.adapter.contract.classes.node_logger import NodeLogger
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
     resolve_qualified_name_parts,
@@ -222,9 +223,11 @@ class BasePythonNodeContext(DependencyResultReader):
         self.statement_recorder.record(sql)
         return self.adapter.execute(connection=self.connection, sql=sql)
 
-    def log(self, message: str) -> None:
-        self.statement_recorder.log(message)
-        self.logger.info(message)
+    @property
+    def log(self) -> NodeLogger:
+        """`ctx.log.info(...)`, `.warning(...)` or `.error(...)`, kept with the run's events."""
+
+        return NodeLogger(recorder=self.statement_recorder, logger=self.logger)
 
     def qualify_name(
         self,

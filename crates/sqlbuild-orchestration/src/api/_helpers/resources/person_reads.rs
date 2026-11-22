@@ -1,13 +1,14 @@
 //! Person reads of run nodes and their errors, node run history, catalog nodes, jobs and one job's declaration, triggers, ticks and publications; refusal precedes every lookup, so unknown objects look forbidden.
 
 use axum::extract::{Path, Query, State};
-use axum::http::{HeaderMap, StatusCode};
-use axum::response::Response;
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
+use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
 use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::api::_helpers::resources::cached_json::cached_json;
+use crate::api::_helpers::resources::runs::no_output_store;
 use crate::api::errors::ApiError;
 use crate::api::models::BrowserOrigin;
 use crate::api::models::{
@@ -31,6 +32,14 @@ use crate::platform::main::person_reads::list_person_platform_events::list_perso
 use crate::platform::main::person_reads::read_person_problems::read_person_problems;
 use crate::platform::models::{
     LocationHealthObservation, PersonPlatformEventPage, PlatformProblems,
+};
+use crate::run_output::main::download_person_output::download_person_output;
+use crate::run_output::main::read_person_output_index::read_person_output_index;
+use crate::run_output::main::read_person_output_page::read_person_output_page;
+use crate::run_output::main::search_person_output::search_person_output;
+use crate::run_output::models::{
+    OutputDownloadQuery, OutputIndexQuery, OutputPage, OutputPageQuery, OutputSearch,
+    OutputSearchQuery, OutputStream, RunOutputIndex,
 };
 use crate::runs::main::listings::list_person_run_nodes::list_person_run_nodes;
 use crate::runs::models::{
@@ -57,6 +66,7 @@ use crate::warehouse_history::main::read_person_run_statement_sql::read_person_r
 use crate::warehouse_history::main::read_person_run_statements::read_person_run_statements;
 use crate::warehouse_history::models::{CostSummaryRecord, NodeCostRecord};
 use crate::warehouse_metadata::models::{CatalogNodeRecord, WarehouseResourceCostRecord};
+use futures_util::StreamExt;
 
 /// Default and largest cost window, in days.
 const COST_DAYS: (u32, u32) = (7, 90);
@@ -390,6 +400,163 @@ pub(crate) async fn run_output(
     .await?
     .map(Json)
     .ok_or_else(|| not_found("run not found"))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index", operation_id = "readPersonRunOutputIndex",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("run_id" = Uuid, Path), OutputIndexQuery),
+    responses((status = 200, body = RunOutputIndex), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody, description = "Needs view.evidence on every node the run selected"),
+        (status = 404, description = "Run not found for a person who may view the whole target")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn run_output_index(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target, run_id)), Query(query)): (
+        Path<(Uuid, String, Uuid)>,
+        Query<OutputIndexQuery>,
+    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<RunOutputIndex>, ApiError> {
+    read_person_output_index(
+        &store,
+        (
+            (&context, principal),
+            (location_id, &target, run_id),
+            default_role,
+        ),
+        query.node.as_deref(),
+    )
+    .await?
+    .map(Json)
+    .ok_or_else(|| not_found("run not found"))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/lines", operation_id = "readPersonRunOutputLines",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("run_id" = Uuid, Path), OutputPageQuery),
+    responses((status = 200, body = OutputPage), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody, description = "Needs view.evidence on every node the run selected"),
+        (status = 404, description = "Run not found for a person who may view the whole target"),
+        (status = 503, body = crate::api::models::ApiErrorBody, description = "The server keeps no run output")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn run_output_lines(
+    (State(store), Extension(context), Extension(facts)): (
+        State<ControlStore>,
+        Extension<AuditContext>,
+        Extension<ServerFacts>,
+    ),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target, run_id)), Query(query)): (
+        Path<(Uuid, String, Uuid)>,
+        Query<OutputPageQuery>,
+    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<OutputPage>, ApiError> {
+    let output = facts.output.ok_or_else(no_output_store)?;
+    read_person_output_page(
+        &store,
+        &output,
+        (
+            (&context, principal),
+            (location_id, &target, run_id),
+            default_role,
+        ),
+        &query,
+    )
+    .await?
+    .map(Json)
+    .ok_or_else(|| not_found("run not found"))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/search", operation_id = "searchPersonRunOutput",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("run_id" = Uuid, Path), OutputSearchQuery),
+    responses((status = 200, body = OutputSearch), (status = 400, body = crate::api::models::ApiErrorBody, description = "Empty search text"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody, description = "Needs view.evidence on every node the run selected"),
+        (status = 404, description = "Run not found for a person who may view the whole target"),
+        (status = 503, body = crate::api::models::ApiErrorBody, description = "The server keeps no run output")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn run_output_search(
+    (State(store), Extension(context), Extension(facts)): (
+        State<ControlStore>,
+        Extension<AuditContext>,
+        Extension<ServerFacts>,
+    ),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target, run_id)), Query(query)): (
+        Path<(Uuid, String, Uuid)>,
+        Query<OutputSearchQuery>,
+    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<OutputSearch>, ApiError> {
+    let output = facts.output.ok_or_else(no_output_store)?;
+    search_person_output(
+        &store,
+        &output,
+        (
+            (&context, principal),
+            (location_id, &target, run_id),
+            default_role,
+        ),
+        &query,
+    )
+    .await?
+    .map(Json)
+    .ok_or_else(|| not_found("run not found"))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/download", operation_id = "downloadPersonRunOutput",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("run_id" = Uuid, Path), OutputDownloadQuery),
+    responses((status = 200, content_type = "text/plain", body = String, description = "The node's whole stream"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody, description = "Needs view.evidence on every node the run selected"),
+        (status = 404, description = "Run not found for a person who may view the whole target"),
+        (status = 503, body = crate::api::models::ApiErrorBody, description = "The server keeps no run output")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn run_output_download(
+    (State(store), Extension(context), Extension(facts)): (
+        State<ControlStore>,
+        Extension<AuditContext>,
+        Extension<ServerFacts>,
+    ),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target, run_id)), Query(query)): (
+        Path<(Uuid, String, Uuid)>,
+        Query<OutputDownloadQuery>,
+    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Response, ApiError> {
+    let output = facts.output.ok_or_else(no_output_store)?;
+    let text = download_person_output(
+        &store,
+        &output,
+        (
+            (&context, principal),
+            (location_id, &target, run_id),
+            default_role,
+        ),
+        &query,
+    )
+    .await?
+    .ok_or_else(|| not_found("run not found"))?;
+    let file = format!(
+        "attachment; filename=\"{run_id}-{}-{}.txt\"",
+        query
+            .node
+            .replace(|character: char| !character.is_ascii_alphanumeric(), "_"),
+        query.stream.map_or("output", OutputStream::as_str)
+    );
+    let mut response =
+        axum::body::Body::from_stream(text.map(|chunk| chunk.map_err(std::io::Error::other)))
+            .into_response();
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/plain; charset=utf-8"),
+    );
+    response.headers_mut().insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&file).map_err(|_| not_found("run not found"))?,
+    );
+    Ok(response)
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/jobs/{job_key}", operation_id = "readPersonJob",

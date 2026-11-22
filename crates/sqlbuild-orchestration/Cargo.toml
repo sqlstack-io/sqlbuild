@@ -19,6 +19,7 @@ croner.workspace = true
 flate2.workspace = true
 futures-util.workspace = true
 getrandom.workspace = true
+object_store.workspace = true
 openidconnect.workspace = true
 reqwest.workspace = true
 rusqlite.workspace = true
@@ -41,6 +42,7 @@ toml.workspace = true
 tower-http.workspace = true
 utoipa.workspace = true
 uuid.workspace = true
+zstd.workspace = true
 
 [dev-dependencies]
 axum-server.workspace = true

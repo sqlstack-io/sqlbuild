@@ -177,6 +177,21 @@ class CheckExecutionTestCase(WorkerExecutionTestCase):
     expected_check_outcome: str = "success"
 
 
+@dataclass(frozen=True)
+class RunOutputTestCase(WorkerExecutionTestCase):
+    description: str
+    expected_lines: int = 0
+    expected_error_lines: list[int] = field(default_factory=list)
+    expected_logs: list[tuple[str, str, str]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class NulLogTestCase(WorkerExecutionTestCase):
+    description: str
+    backend: Literal["sqlite", "postgres"] = "sqlite"
+    expected_logs: list[tuple[str, str]] = field(default_factory=list)
+
+
 @dataclass(frozen=True, kw_only=True)
 class PersonJourneyTestCase(WorkerExecutionTestCase):
     description: str

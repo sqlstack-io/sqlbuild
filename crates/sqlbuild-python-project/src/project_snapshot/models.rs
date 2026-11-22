@@ -8,11 +8,13 @@ use crate::compiled_project::constants::SKIP_ACTION;
 use crate::compiled_project::constants::SQL_TEST_KEY_PREFIX;
 use crate::compiled_project::constants::STORE_BUSY_STATUS;
 use crate::compiled_project::constants::UNCHANGED_REASON;
+use crate::native_host::main::write_stderr_line::write_stderr_line;
 use crate::native_host::models::DeferredCost;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::is_function;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::planned_key;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::poisoned;
 use crate::project_snapshot::_helpers::snapshot::snapshot_execution::severity;
+use crate::project_snapshot::_helpers::snapshot::snapshot_logs::{node_log_changes, upload_loss};
 use crate::project_snapshot::_helpers::snapshot::snapshot_worker::WorkerOwner;
 use crate::project_snapshot::_helpers::snapshot::snapshot_worker::unavailable;
 use crate::project_snapshot::types::NodeKeys;
@@ -33,9 +35,13 @@ use pyo3::types::PyDictMethods;
 use pyo3::types::PyStringMethods;
 use sqlbuild_core::models::ResourceKind;
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
+use sqlbuild_host::models::LifeCycleEvent;
 use sqlbuild_host::models::SqlTestOutcome;
 use sqlbuild_host::types::ResultEnum;
 use sqlbuild_orchestration::api::errors::ClientError;
+use sqlbuild_orchestration::run_output::constants::UPLOAD_CLOSE_BUDGET;
+use sqlbuild_orchestration::run_output::main::finish_output_upload::finish_output_upload;
+use sqlbuild_orchestration::run_output::main::start_output_upload::start_output_upload;
 use sqlbuild_orchestration::runs::models::NodeOutcome;
 use sqlbuild_orchestration::runs::models::RunChange;
 use sqlbuild_orchestration::runs::models::RunCommand;
@@ -48,6 +54,7 @@ use sqlbuild_orchestration::snapshots::models::SnapshotRecord;
 use sqlbuild_orchestration::worker::errors::WorkerError;
 use sqlbuild_orchestration::worker::main::connect_worker::connect_worker;
 use sqlbuild_orchestration::worker::main::start_worker::start_worker;
+use sqlbuild_python_base::native_host::types::ReadResult;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_state::runs::constants::FIRST_ATTEMPT;
 use sqlbuild_state::runs::constants::SYSTEM_RETRY_USER;
@@ -232,6 +239,11 @@ impl WorkerBuild {
             deferred_cost: DeferredCost::default(),
             progress: Mutex::default(),
         });
+        worker.get().with_owner(worker.py(), |owner| {
+            start_output_upload(&owner.client)
+                .map(drop)
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))
+        })?;
         for key in state.execution.skipped_nodes.keys() {
             state.complete(worker.py(), key, Completion::of(NodeOutcome::Skipped))?;
         }
@@ -846,6 +858,16 @@ impl WorkerBuild {
                 Some(value) => value.extract()?,
                 None => None,
             };
+            let events: Vec<LifeCycleEvent> = match result.getattr_opt("lifecycle_events")? {
+                Some(value) => Vec::<LifeCycleEvent>::read(&value)?,
+                None => Vec::new(),
+            };
+            for (event_key, change) in node_log_changes(key, &events) {
+                self.worker
+                    .bind(result.py())
+                    .get()
+                    .change(result.py(), &event_key, change)?;
+            }
             self.complete_or_hold(
                 result.py(),
                 key,
@@ -1024,6 +1046,16 @@ impl WorkerBuild {
             .map_err(|_| poisoned())?
             .clone()
             .unwrap_or_else(|| "worker executor completed and closed its connections".into());
+        let summary = py.detach(|| finish_output_upload(UPLOAD_CLOSE_BUDGET));
+        if let Some((message, change)) = summary.as_ref().and_then(upload_loss) {
+            write_stderr_line(py, &format!("Run output: {message}\n"))?;
+            drop(
+                self.worker
+                    .bind(py)
+                    .get()
+                    .change(py, "worker-output-loss", change),
+            );
+        }
         let ignored: u32 = self.ignored_audit_failures.load(Ordering::SeqCst);
         if ignored > 0 {
             self.worker.bind(py).get().change(

@@ -1957,6 +1957,12 @@ reason = "Locations, workers and remote publication share this client; it warns 
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSH011"
+path = "crates/sqlbuild-orchestration/src/run_output/_helpers/prune.rs"
+symbols = ["report_retention_failure"]
+reason = "Output retention runs in the server's maintenance role, which has no caller to return a failure to without stopping the other retention policies; the operator reads on stderr which run's output could not be removed, and it is retried on the next pass."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSH011"
 path = "crates/sqlbuild-orchestration/src/api/_helpers/authentication/proxy_warnings.rs"
 symbols = ["warn_plain_http_origin", "warn_untrusted_source", "warn_untrusted_overflow", "warn_taken_username", "warn_refused_host"]
 reason = "The server's operator reads trusted-proxy misconfiguration on stderr: a plain-HTTP origin at start-up, and once each the untrusted peers that send the username header, the usernames refused because another principal holds the name, and the escaped Host values a trusted peer was refused under, so they can be added to allowed_hosts. Untrusted peers' header values are never printed."
@@ -4060,3 +4066,37 @@ reason = "One reads the active location with a name, the other the development l
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-python-compile/src/rules/_helpers/sql/sql_test_objects.rs", "crates/sqlbuild-python-front/src/discovery/_helpers/project/project_facts.rs"]
 reason = "Each parses one closed string set into its own enum: SQL test modes, directly tested resource kinds, and Python node kinds. Only the match-or-ValueError shape is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-orchestration/src/declarations/main/published_job.rs", "crates/sqlbuild-orchestration/src/run_output/_helpers/index.rs", "crates/sqlbuild-orchestration/src/snapshots/main/reads/read_current_record.rs"]
+reason = "Each reads at most one row of its own table by its own key: a published job, one stream of a run's output, the current snapshot record. Only the query-then-take-the-first shape is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-orchestration/src/run_output/_helpers/index.rs", "crates/sqlbuild-orchestration/src/warehouse_history/_helpers/checks.rs", "crates/sqlbuild-orchestration/src/warehouse_history/_helpers/node_runs.rs"]
+reason = "Each lists its own rows for one run: the output segments holding a line range, check results, node runs. Only the keyed query_records call is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python-base/src/compile_context/_helpers/input_reads.rs", "crates/sqlbuild-python-base/src/event_exporting/_helpers/scope.rs", "crates/sqlbuild-python-output/src/output_capture/main/register_context.rs"]
+reason = "Each registers its own module's Python classes and functions; only the add-class and add-function calls are alike."
+
+[[dupes.allowlist]]
+paths = ["src/sqlbuild/executor/python_nodes/_helpers/ingress_execution.py", "src/sqlbuild/executor/python_nodes/classes/read_side_python_execution_tracker.py"]
+reason = "Each finalizes a successful Python node for its own executor, ingress callbacks or the read-side tracker, which own different result stores and identity recorders. Only the scope-and-fingerprint shape is alike."
+
+[[dupes.allowlist]]
+paths = ["scripts/compiler_differential/classes/discovery_features.py"]
+reason = "Each method writes one discovery feature's own fixture files for the compiler differential; only the write-files shape is alike."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS130"
+path = "crates/sqlbuild-orchestration/src/run_output/_helpers/upload.rs"
+symbols = ["attached"]
+reason = "A worker process runs one run, and the bytes it prints reach the uploader through the process-wide output capture, which has no handle to the worker; the uploader is attached once when the run starts and taken once when it finishes."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-analysis/src/sql_tokens/main/normalized_query_text.rs", "crates/sqlbuild-cache/src/digest/_helpers/distributions.rs", "crates/sqlbuild-cli/src/argv/_helpers/text_wrap.rs", "crates/sqlbuild-orchestration/src/run_output/_helpers/chunks.rs"]
+reason = "Each collapses runs of one character class into a single marker for its own purpose: whitespace in query text, distribution keys and wrapped help text, digits in printed lines so similar lines fold. They live in crates that do not depend on each other; only the run-collapsing loop is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-orchestration/src/declarations/_helpers/reads.rs", "crates/sqlbuild-orchestration/src/run_output/_helpers/views.rs", "crates/sqlbuild-orchestration/src/warehouse_history/_helpers/checks.rs"]
+reason = "Each lists its own rows by its own key: triggers, latest ticks, a node's output marks and latest check results. Only the keyed query_records call is alike."

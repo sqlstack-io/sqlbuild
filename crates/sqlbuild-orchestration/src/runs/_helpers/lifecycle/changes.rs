@@ -72,6 +72,7 @@ pub(crate) fn validate_authority(
                 | RunChange::Started
                 | RunChange::NodeStarted { .. }
                 | RunChange::NodeProgress { .. }
+                | RunChange::NodeLog { .. }
                 | RunChange::NodeFinished { .. }
                 | RunChange::CheckStarted { .. }
                 | RunChange::CheckFinished { .. }
@@ -85,6 +86,7 @@ pub(crate) fn validate_authority(
                     RunChange::Started
                         | RunChange::NodeStarted { .. }
                         | RunChange::NodeProgress { .. }
+                        | RunChange::NodeLog { .. }
                         | RunChange::NodeFinished { .. }
                         | RunChange::CheckStarted { .. }
                         | RunChange::CheckFinished { .. }
@@ -138,6 +140,7 @@ pub(crate) fn validate_change(
         }
         RunChange::NodeStarted { .. }
         | RunChange::NodeProgress { .. }
+        | RunChange::NodeLog { .. }
         | RunChange::NodeFinished { .. }
         | RunChange::CheckStarted { .. }
         | RunChange::CheckFinished { .. }

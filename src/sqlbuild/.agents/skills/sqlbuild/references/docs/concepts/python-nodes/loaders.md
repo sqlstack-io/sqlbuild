@@ -271,7 +271,7 @@ Every loader function receives a `LoaderContext` as its first argument. It provi
 |--------|-------------|
 | `execute_sql(sql)` | Execute a SQL statement against the connection |
 | `query(sql)` | Execute a SQL query and return the cursor |
-| `log(message)` | Log a message to the execution lifecycle output |
+| `log.info(message)`, `log.warning(message)`, `log.error(message)` | Log a line at that level; it shows with the run's events, while anything the loader prints stays its output |
 | `qualify_name(name)` | Return a fully-qualified relation name in the destination database/schema |
 | `skip(reason, mode=...)` | Skip this loader. `mode` is `"soft"` (default, skip only this loader) or `"hard"` (also block dependents) |
 | `result(payload=, metadata=, materialized=)` | Return a structured result for a self-managed loader |

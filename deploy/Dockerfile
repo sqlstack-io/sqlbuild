@@ -28,7 +28,12 @@ COPY --chown=10001:10001 deploy/project/ /project/
 FROM docker.io/library/debian:bookworm-slim AS server
 RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates curl \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --uid 10001 --create-home sqlbuild
+    && useradd --uid 10001 --create-home sqlbuild \
+    && install --directory --owner=10001 --group=10001 \
+        /home/sqlbuild/.local \
+        /home/sqlbuild/.local/state \
+        /home/sqlbuild/.local/state/sqlbuild \
+        /home/sqlbuild/.local/state/sqlbuild/output
 COPY --from=runtime /usr/local/bin/sqb /usr/local/bin/sqb
 USER 10001:10001
 ENTRYPOINT ["sqb"]

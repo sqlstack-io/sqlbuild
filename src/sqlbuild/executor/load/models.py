@@ -11,6 +11,7 @@ from typing import Any
 
 from sqlbuild._native import DiscoveredLoaderFunction, SourceEntry, TargetSettings
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
+from sqlbuild.adapter.contract.classes.node_logger import NodeLogger
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.models import ColumnInfo, LifeCycleEvent
 from sqlbuild.adapter.contract.types import LoaderLogicalType
@@ -163,8 +164,11 @@ class LoaderContext(DependencyResultReader):
         self.statement_recorder.record(sql)
         return self.adapter.execute(connection=self.connection, sql=sql)
 
-    def log(self, message: str) -> None:
-        self.statement_recorder.log(message)
+    @property
+    def log(self) -> NodeLogger:
+        """`ctx.log.info(...)`, `.warning(...)` or `.error(...)`, kept with the run's events."""
+
+        return NodeLogger(recorder=self.statement_recorder, logger=self.logger)
 
     def progress(self, message: str) -> None:
         if self.on_progress is not None:

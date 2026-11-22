@@ -88,7 +88,7 @@ def _execute_scenario_cleanup(
                         statement_recorder=statement_recorder,
                     )
     except Exception as exc:
-        statement_recorder.log(f"scenario cleanup {scenario_plan.name} failed error={exc}")
+        statement_recorder.log(message=f"scenario cleanup {scenario_plan.name} failed error={exc}")
         return ScenarioCleanupExecutionResult(
             scenario_name=scenario_plan.name,
             status=ExecutionStatus.FAILED,

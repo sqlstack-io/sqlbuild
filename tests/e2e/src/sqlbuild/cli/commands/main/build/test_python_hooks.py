@@ -828,7 +828,7 @@ def test_given_long_python_hook_name_when_building_then_cli_truncates_label_at_c
                 "@hook\n"
                 "def publish_customer_metadata_to_external_catalog_after_successful_"
                 "materialization(ctx):\n"
-                '    """Test hook publish_customer_metadata_to_external_catalog_after_successful_materialization."""\n    ctx.log("long hook ran")\n'
+                '    """Test hook publish_customer_metadata_to_external_catalog_after_successful_materialization."""\n    ctx.log.info("long hook ran")\n'
             ),
             "models/orders.sql": (
                 "MODEL (description 'Test model orders.',\n"

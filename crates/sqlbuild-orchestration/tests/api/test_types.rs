@@ -352,6 +352,51 @@ pub(crate) struct OlderNodeFinished {
     skipped_because_of: Option<String>,
 }
 
+/// The run report shape a server had before run nodes recorded rows, progress and `not_run`.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+pub(crate) struct PreviousRunReport {
+    event_id: uuid::Uuid,
+    run_id: uuid::Uuid,
+    claim_id: Option<uuid::Uuid>,
+    change: PreviousRunChange,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[allow(dead_code)]
+pub(crate) enum PreviousRunChange {
+    NodeStarted {
+        node_key: String,
+    },
+    NodeFinished {
+        node_key: String,
+        outcome: PreviousNodeOutcome,
+        rows_affected: Option<i64>,
+        error_code: Option<String>,
+        skipped_because_of: Option<String>,
+        error_message: Option<String>,
+    },
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+pub(crate) enum PreviousNodeOutcome {
+    Success,
+    Warn,
+    Failed,
+    Skipped,
+    Cancelled,
+}
+
+pub(crate) struct PreviousServerTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) change: crate::runs::models::RunChange,
+    pub(crate) expected_upgrade_refusal: bool,
+}
+
 pub(crate) struct PlanTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

@@ -429,6 +429,28 @@ pub struct BuildExecutionTimings {
 pub struct LifeCycleEvent {
     pub kind: LifeCycleEventKind,
     pub content: String,
+    /// The level of a `ctx.log` line; SQL events have none.
+    pub level: Option<LogLevel>,
+}
+
+/// The level of a line a node logs with `ctx.log`. Mirrors `sqlbuild.adapter.contract.types.LogLevel`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LogLevel {
+    Info,
+    Warning,
+    Error,
+}
+
+impl ResultEnum for LogLevel {
+    const ALL: &'static [Self] = &[Self::Info, Self::Warning, Self::Error];
+
+    fn value(self) -> &'static str {
+        match self {
+            Self::Info => "info",
+            Self::Warning => "warning",
+            Self::Error => "error",
+        }
+    }
 }
 
 /// One pre- or post-hook of a model. Mirrors `sqlbuild.executor.run.models.HookExecutionResult`.

@@ -43,6 +43,10 @@ use crate::api::_helpers::resources::{
     person_reads::node_costs,
     person_reads::run_statement_sql,
     person_reads::run_output,
+    person_reads::run_output_index,
+    person_reads::run_output_lines,
+    person_reads::run_output_search,
+    person_reads::run_output_download,
     person_reads::run_node_error,
     person_reads::jobs,
     person_reads::job,
@@ -103,6 +107,7 @@ use crate::api::_helpers::resources::{
     runs::report,
     runs::heartbeat,
     runs::output,
+    runs::output_batch,
     runs::recall,
     run_reads::recent,
     run_reads::nodes,
@@ -664,6 +669,8 @@ pub struct ServerFacts {
     pub attention_snooze: crate::acknowledgements::models::AttentionSnooze,
     /// The address people reach the server at, which sensor events link runs under; `None` without a sign-in origin.
     pub origin: Option<String>,
+    /// Where run output is kept; `None` on a server that keeps none, which refuses output reads and batches.
+    pub output: Option<crate::run_output::models::OutputStore>,
 }
 
 /// The server's version, storage, sign-in and retention, for administrators.

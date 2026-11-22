@@ -9,6 +9,7 @@ from typing import Any
 
 from sqlbuild._native import SchemaFinding
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
+from sqlbuild.adapter.contract.classes.node_logger import NodeLogger
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo
 from sqlbuild.executor.auditing.models import AuditExecutionResult
@@ -55,9 +56,11 @@ class MaterializationContext:
             statement_recorder=self.statement_recorder,
         )
 
-    def log(self, message: str) -> None:
-        """Record a log message for verbose output."""
-        self.statement_recorder.log(message)
+    @property
+    def log(self) -> NodeLogger:
+        """`ctx.log.info(...)`, `.warning(...)` or `.error(...)`, kept with the run's events."""
+
+        return NodeLogger(recorder=self.statement_recorder, logger=self.logger)
 
     def qualify_name(
         self,

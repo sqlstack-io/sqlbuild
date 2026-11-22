@@ -179,7 +179,7 @@ class DiscoveryFeatureWriter:
             "@hook\n"
             'def note_refresh(ctx, channel="#builds"):\n'
             '    """Log one refresh."""\n'
-            '    ctx.log(f"{channel}: {ctx.model_name} refreshed during {ctx.phase}")\n'
+            '    ctx.log.info(f"{channel}: {ctx.model_name} refreshed during {ctx.phase}")\n'
         )
         _ = self._model(
             name=f"hooked_{base.name}",

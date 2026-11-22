@@ -22,7 +22,7 @@ use sqlbuild_core::test_command::models::TestParameter;
 use sqlbuild_host::models::{
     AuditEvaluationMode, AuditExecutionResult, BuildExecutionResult, ExecutionStatus,
     FunctionExecutionResult, HookExecutionResult, HookPhase, LifeCycleEvent, LifeCycleEventKind,
-    LoadExecutionResult, MeasuredValue, ModelExecutionResult, SeedExecutionResult,
+    LoadExecutionResult, LogLevel, MeasuredValue, ModelExecutionResult, SeedExecutionResult,
     SqlTestExecutionResult, StepResult,
 };
 use sqlbuild_host::types::ResultEnum;
@@ -67,7 +67,12 @@ fn events(value: &[LifeCycleEvent]) -> Vec<LifecycleEventText> {
         .iter()
         .map(|event| match event.kind {
             LifeCycleEventKind::Sql => LifecycleEventText::Sql(event.content.clone()),
-            LifeCycleEventKind::Log => LifecycleEventText::Log(event.content.clone()),
+            LifeCycleEventKind::Log => LifecycleEventText::Log(match event.level {
+                Some(level @ (LogLevel::Warning | LogLevel::Error)) => {
+                    format!("{}: {}", level.value(), event.content)
+                }
+                _ => event.content.clone(),
+            }),
         })
         .collect()
 }

@@ -36,11 +36,11 @@ def materialize(ctx: MaterializationContext) -> MaterializationResult:
     )
 
     if ctx.is_full_refresh:
-        ctx.log("clearing partition tracking state")
+        ctx.log.info("clearing partition tracking state")
         ctx.execute_sql(f"DELETE FROM {tracking_table}")
 
     all_partitions: list[str] = _generate_date_range(date_start, date_end)
-    ctx.log("checking for stale partitions")
+    ctx.log.info("checking for stale partitions")
     stale: list[str] = _find_stale_partitions(ctx, tracking_table, all_partitions)
 
     if not stale:
@@ -68,7 +68,7 @@ def materialize(ctx: MaterializationContext) -> MaterializationResult:
 
         if ctx.on_progress is not None:
             ctx.on_progress(f"partition {i + 1}/{len(stale)}: {partition_value}")
-        ctx.log(f"building partition {partition_value}")
+        ctx.log.info(f"building partition {partition_value}")
 
         ctx.adapter.drop(
             connection=ctx.connection,
@@ -95,7 +95,7 @@ def materialize(ctx: MaterializationContext) -> MaterializationResult:
             )
 
         if not target_exists:
-            ctx.log("promoting first partition into target")
+            ctx.log.info("promoting first partition into target")
             ctx.adapter.rename(
                 connection=ctx.connection,
                 origin=staging,
@@ -104,7 +104,7 @@ def materialize(ctx: MaterializationContext) -> MaterializationResult:
             )
             target_exists = True
         else:
-            ctx.log("promoting partition into target")
+            ctx.log.info("promoting partition into target")
             ctx.execute_sql(
                 f"DELETE FROM {ctx.destination} "
                 f"WHERE CAST({partition_col} AS DATE) >= CAST('{partition_value}' AS DATE) "
