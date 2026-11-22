@@ -715,6 +715,11 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Executor,
     },
     HostEntry {
+        name: "statement_activity",
+        kind: HostKind::Function,
+        edge: HostEdge::Executor,
+    },
+    HostEntry {
         name: "EventDispatcher",
         kind: HostKind::Class,
         edge: HostEdge::Executor,

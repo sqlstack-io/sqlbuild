@@ -348,6 +348,7 @@ pub enum ExecutorHost {
     ExecutionDeadlinesSuspended,
     AuditEvidenceScope,
     CancelRunningStatements,
+    StatementActivity,
     EventDispatcher,
     OperationLifecycle,
     StatementLifecycle,

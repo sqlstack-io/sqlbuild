@@ -595,8 +595,12 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "audit_evidence_scope",
     ),
     "cancel_running_statements": (
-        "sqlbuild.runtime.execution_limits.main._cancel_running_statements",
+        "sqlbuild.runtime.execution_limits.main.cancel_running_statements",
         "cancel_running_statements",
+    ),
+    "statement_activity": (
+        "sqlbuild.runtime.execution_limits.main.statement_activity",
+        "statement_activity",
     ),
     "EventDispatcher": (
         "sqlbuild.runtime.observability.classes.event_dispatcher",
