@@ -278,8 +278,19 @@ pub struct DevelopmentScope {
     pub location_id: uuid::Uuid,
     pub target: String,
     pub triggers: bool,
-    /// The local person every loopback request acts as.
+    /// The local person every accepted request acts as.
     pub principal_id: uuid::Uuid,
+    /// Names taken in `Host` and `Origin` besides the local ones, each `name` or `name:port`.
+    pub allowed_hosts: Vec<String>,
+    /// An explicit opt-in to serve without sign-in beyond loopback.
+    pub listens_beyond_loopback: bool,
+}
+
+/// What a development request's `Host` and `Origin` may say, in lower case.
+#[derive(Clone, Debug)]
+pub(crate) struct DevelopmentAuthorities {
+    pub(crate) hosts: Vec<String>,
+    pub(crate) origins: Vec<String>,
 }
 
 /// The one way people sign in to this server, if any.

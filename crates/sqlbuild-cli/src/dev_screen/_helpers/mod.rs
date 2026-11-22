@@ -1,6 +1,7 @@
 pub(crate) mod apply_screen_message;
 pub(crate) mod capture;
 pub(crate) mod drawing;
+pub(crate) mod exposure;
 pub(crate) mod keys;
 pub(crate) mod labels;
 pub(crate) mod lines;

@@ -19,8 +19,11 @@ use crate::dev_stop::main::stop_switch::stop_switch;
 use crate::dev_stop::models::{DevEnd, StopReason};
 use crate::native_commands::_helpers::command::decision::flag;
 use crate::native_commands::_helpers::command::project_facts::development_config;
+use crate::native_commands::_helpers::location::dev_exposure::{
+    allowed_hosts, development_address,
+};
 use crate::native_commands::_helpers::location::execution::{
-    announced_store, loopback_address, run_development_roles,
+    announced_store, run_development_roles,
 };
 
 /// Open the store and the port, each a step that can fail, then run every role; a stop before then ends it cleanly.
@@ -82,13 +85,15 @@ async fn open_services(
             next: Vec::new(),
         }
     };
-    let address: SocketAddr = match loopback_address(namespace) {
+    let checked: Result<SocketAddr, ControlError> =
+        allowed_hosts(namespace).and_then(|_| development_address(namespace));
+    let address: SocketAddr = match checked {
         Ok(address) => address,
         Err(error) => {
             return Err(not_started(
                 DevStep::Api,
                 "UI server address",
-                (message(error), "pass --port with a free port on 127.0.0.1"),
+                (message(error), "check --host, --port and --allow-host"),
             ));
         }
     };
@@ -123,7 +128,7 @@ async fn open_services(
                 "UI server",
                 (
                     format!("could not listen on {address}: {error}"),
-                    "stop whatever uses the port, or pick another with --port (0 picks a free one)",
+                    "stop whatever uses the port, or pick another with --port (0 picks a free one); a --host must be an address of this machine",
                 ),
             ));
         }

@@ -2,6 +2,7 @@ pub(crate) mod bearer;
 pub(crate) mod cli_login;
 pub(crate) mod configure;
 pub(crate) mod development;
+pub(crate) mod development_hosts;
 pub(crate) mod oidc;
 pub(crate) mod oidc_provider;
 pub(crate) mod origins;

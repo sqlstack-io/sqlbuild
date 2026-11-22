@@ -25,7 +25,9 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     duckshop_orchestration,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    DevelopmentAllowHostRefusalTestCase,
     DevelopmentDiscoveryTestCase,
+    DevelopmentExposureTestCase,
     DevelopmentInvalidEnvFileTestCase,
     DevelopmentSecretReloadTestCase,
     DevelopmentTestCase,
@@ -457,3 +459,83 @@ def test_given_an_unparsable_env_file_when_a_run_starts_then_its_reason_names_th
     assert run["status"] == test_case.expected_status, log.read_text()
     assert run["status_reason"] == test_case.expected_reason, log.read_text()
     assert test_case.secret_text not in log.read_text()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DevelopmentExposureTestCase(
+            "every interface and an allowed name",
+            ("--host", "0.0.0.0", "--allow-host", "control.example.com"),
+            200,
+            ("No sign-in", "  access     anyone who can reach 0.0.0.0:"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_opened_development_server_when_started_then_it_publishes_takes_the_name_and_warns(
+    test_case: DevelopmentExposureTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(
+        project_dir=project,
+        files=TYPE_PROOF_FILES
+        | {
+            "sqlbuild_project.toml": 'default_target = "development"\n'
+            + TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
+            + '[targets.development]\nschema = "main"\n',
+        },
+    )
+    executable: str = str(Path(sys.executable).with_name("sqb"))
+    arguments: list[str] = [executable, "dev", "--project-dir", str(project), "--port", "0"]
+    log: Path = tmp_path / "development.log"
+    output: Path = tmp_path / "publications.jsonl"
+    with location_process(arguments + list(test_case.arguments), log, output) as process:
+        url, identity = wait_for_development_ready(process, log)
+        api: SnapshotApi = SnapshotApi(url, identity, "local-development")
+        _ = wait_for_generation(api, "development", 1, process, log)
+        request: Request = Request(
+            f"{url}/api/control/bootstrap",
+            headers={"Host": "control.example.com", "Origin": "https://control.example.com"},
+        )
+        with urlopen(request, timeout=5) as response:
+            assert response.status == test_case.expected_status
+        assert all(line in log.read_text() for line in test_case.expected_lines), log.read_text()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DevelopmentAllowHostRefusalTestCase("an origin", "https://control.example.com", 2),
+        DevelopmentAllowHostRefusalTestCase("a wildcard", "*", 2),
+        DevelopmentAllowHostRefusalTestCase("a port out of range", "control.example.com:70000", 2),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_unusable_allowed_host_when_development_starts_then_it_is_refused_by_name(
+    test_case: DevelopmentAllowHostRefusalTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(
+        project_dir=project,
+        files=TYPE_PROOF_FILES
+        | {
+            "sqlbuild_project.toml": 'default_target = "development"\n'
+            + TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
+            + '[targets.development]\nschema = "main"\n',
+        },
+    )
+    executable: str = str(Path(sys.executable).with_name("sqb"))
+    arguments: list[str] = [executable, "dev", "--project-dir", str(project), "--port", "0"]
+    started: subprocess.CompletedProcess[str] = subprocess.run(
+        [*arguments, "--allow-host", test_case.value],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert started.returncode == test_case.expected_exit_code, started.stderr
+    assert "--allow-host" in started.stderr

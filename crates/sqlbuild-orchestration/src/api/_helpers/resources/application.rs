@@ -7,6 +7,7 @@ use tokio::sync::{broadcast, watch};
 use tower_http::compression::CompressionLayer;
 
 use crate::api::_helpers::authentication::bearer::local_request;
+use crate::api::_helpers::authentication::development_hosts::development_authorities;
 use crate::api::_helpers::resources::compression::compress_reads_only;
 use crate::api::_helpers::resources::router::router;
 use crate::api::_helpers::resources::server_errors::generic_server_errors;
@@ -34,7 +35,7 @@ pub(crate) fn application_router(
         .with_state(store.clone())
 }
 
-/// The development UI, the local-only guard of a development scope, and the response layers.
+/// The development UI, the Host and Origin guard of a development scope, and the response layers.
 pub(crate) fn development_application(
     application: Router,
     scope: Option<DevelopmentScope>,
@@ -42,9 +43,12 @@ pub(crate) fn development_application(
 ) -> Router {
     let application = serve_ui(application, UI_ASSETS);
     let application = match scope {
-        Some(scope) => application
-            .layer(Extension(scope))
-            .layer(middleware::from_fn_with_state(address, local_request)),
+        Some(scope) => {
+            let accepted = Arc::new(development_authorities(address, &scope.allowed_hosts));
+            application
+                .layer(Extension(scope))
+                .layer(middleware::from_fn_with_state(accepted, local_request))
+        }
         None => application,
     };
     application

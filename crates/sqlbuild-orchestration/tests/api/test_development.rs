@@ -126,6 +126,8 @@ fn given_development_when_defaults_publish_then_identity_audit_and_trigger_pause
                         target: "development".into(),
                         triggers: false,
                         principal_id: person,
+                        allowed_hosts: Vec::new(),
+                        listens_beyond_loopback: false,
                     }),
                     ..ApiAuthentication::default()
                 },
