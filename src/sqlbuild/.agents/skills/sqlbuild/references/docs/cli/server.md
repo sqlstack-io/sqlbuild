@@ -443,8 +443,7 @@ afterwards, so back it up before you upgrade (see
 runs recorded since the upgrade are lost.
 
 A run stays pinned to the snapshot it started on, and a snapshot an earlier release published can
-hold job definitions this release no longer reads, which fail with
-`` jobs: unknown field `source`, expected `limit` ``. Upgrade in this order:
+hold job definitions this release no longer reads. Upgrade in this order:
 
 1. Pause every schedule and sensor, and start no manual runs. Keep the scheduler running through
    step 2: it launches queued runs and advances group runs.
