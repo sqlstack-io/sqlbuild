@@ -44,12 +44,51 @@ and how to fix it.
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| `--port` | `8000` | Port to listen on, on `127.0.0.1`. `0` picks a free port |
+| `--port` | `8000` | Port to listen on. `0` picks a free port |
+| `--host` | `127.0.0.1` | IP address to listen on; see [Open it to a proxy or a network](#open-it-to-a-proxy-or-a-network) |
+| `--allow-host` | None | Also accept this name in `Host` and `Origin`; repeat it for more names |
 | `--target` | The configured target | Target to compile and run |
 | `--control-store-url` | `.sqlbuild/control.sqlite3` in the project | Control store URL or path |
 | `--no-scheduler` | Off | Serve and reload without running scheduled work |
 | `--triggers` | Off | Keep each trigger's default status and your changes to it, instead of pausing every trigger at start-up |
 | `--plain` | Off, unless stdout or stderr is not a terminal | Print appended lines instead of redrawing the screen; see [Plain output](#plain-output) |
+
+## Open it to a proxy or a network
+
+By default `sqb dev` listens on `127.0.0.1` and answers only requests whose `Host`, and `Origin`
+when there is one, are local. That stops other websites in your browser from using the session,
+which has no sign-in.
+
+:::danger
+With `--host` beyond loopback or with `--allow-host`, anyone who can reach that address or name has
+full access without signing in and with your credentials: they can change and run what the project
+can, against your warehouse. These options don't identify callers. A client other than a browser
+can send any `Host` it likes, so only the network or the proxy limits who gets in.
+:::
+
+Use them only for your own session, or for one shared on purpose with people you would hand your
+credentials to, on a trusted network. Use [`sqb server`](/docs/cli/server/) for anything else: when
+people need their own accounts or roles, or the address is reachable by anyone you don't trust.
+
+Behind a reverse proxy on the same machine, allow the name people browse to:
+
+```bash
+sqb dev --allow-host control.example.com
+```
+
+On a trusted network without a proxy, listen on the network and allow each name or IP address that
+people browse to:
+
+```bash
+sqb dev --host 0.0.0.0 --allow-host buildbox.example.com --allow-host 192.0.2.10
+```
+
+An allowed name works over HTTP and HTTPS on the default ports and on `sqb dev`'s own port. For a
+proxy on another port, include it: `--allow-host control.example.com:8443`. A name given with a
+port works only on that port. Write names without a scheme or path; there are no wildcards. Every
+other name stays refused, including when listening on `0.0.0.0`, so other websites and DNS
+rebinding are still blocked. When either option opens the session, a **No sign-in** warning at
+start-up and the ready box's **Access** row say who gets in.
 
 ## Set provider secrets
 
@@ -190,8 +229,9 @@ timed reads but not the read after each publication or run.
 
 ## Details
 
-- `sqb dev` listens only on loopback and needs no sign-in. Use [`sqb server`](/docs/cli/server/)
-  for a server other people or machines connect to.
+- `sqb dev` needs no sign-in and listens only on loopback unless you
+  [open it up](#open-it-to-a-proxy-or-a-network). Use [`sqb server`](/docs/cli/server/) for a
+  server other people or machines connect to.
 - The control store keeps runs, trigger changes and history between sessions. Delete
   `.sqlbuild/control.sqlite3` to start again from nothing.
 - The location is named after the project, the `name` in `sqlbuild_project.toml`. When the

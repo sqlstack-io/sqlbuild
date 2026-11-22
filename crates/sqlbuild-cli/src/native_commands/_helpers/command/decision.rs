@@ -533,7 +533,7 @@ fn imported_key(namespace: &Namespace) -> Result<Option<String>, ControlError> {
 }
 
 /// The strings of a list attribute, or `None` when it holds anything else.
-fn texts(namespace: &Namespace, name: &str) -> Option<Vec<String>> {
+pub(crate) fn texts(namespace: &Namespace, name: &str) -> Option<Vec<String>> {
     match namespace.get(name) {
         None | Some(Value::None) => Some(Vec::new()),
         Some(Value::List(items)) => items

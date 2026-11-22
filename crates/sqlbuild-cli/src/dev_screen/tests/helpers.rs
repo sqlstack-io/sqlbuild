@@ -327,3 +327,17 @@ pub(super) fn layout_problems((columns, rows): (usize, usize)) -> Vec<String> {
         })
         .collect()
 }
+
+/// Start-up through the ready box on a session opened to every interface and one allowed name.
+pub(super) fn opened() -> Vec<ScreenMessage> {
+    let mut messages: Vec<ScreenMessage> = ready();
+    messages.insert(
+        4,
+        ScreenMessage::Exposed(
+            "anyone who can reach 0.0.0.0:8640 or control.example.com has full, sign-in-free \
+             access with your credentials"
+                .to_owned(),
+        ),
+    );
+    messages
+}

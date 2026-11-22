@@ -663,3 +663,20 @@ pub(crate) struct LoginModeTestCase {
     pub(crate) expected_status: reqwest::StatusCode,
     pub(crate) expected_mode: &'static str,
 }
+
+/// One request to a development listener, with `{port}` standing for the listener's port.
+pub(crate) struct DevelopmentHostTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) bind: &'static str,
+    pub(crate) allowed: &'static [&'static str],
+    pub(crate) host: &'static str,
+    pub(crate) origin: Option<&'static str>,
+    pub(crate) expected_status: reqwest::StatusCode,
+}
+
+/// A development listener beyond loopback without the opt-in.
+pub(crate) struct DevelopmentListenerTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) bind: &'static str,
+    pub(crate) expected_refusal: &'static str,
+}

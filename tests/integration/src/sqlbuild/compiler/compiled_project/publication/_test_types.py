@@ -336,6 +336,21 @@ class DevelopmentTestCase:
 
 
 @dataclass(frozen=True)
+class DevelopmentExposureTestCase:
+    description: str
+    arguments: tuple[str, ...]
+    expected_status: int
+    expected_lines: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DevelopmentAllowHostRefusalTestCase:
+    description: str
+    value: str
+    expected_exit_code: int
+
+
+@dataclass(frozen=True)
 class DevelopmentDiscoveryTestCase:
     description: str
     expected_imports: int

@@ -17,7 +17,7 @@ use crate::dev_session::models::{DevProject, LocationPipes};
 use crate::dev_stop::main::stop_switch::stop_switch;
 use crate::dev_stop::models::DevEnd;
 use crate::native_commands::_helpers::command::decision::{
-    control_address, control_database, control_database_variable, flag, text,
+    control_database, control_database_variable, flag, text,
 };
 use crate::native_commands::_helpers::command::init::run_init;
 use crate::native_commands::_helpers::command::package::installed_package;
@@ -35,6 +35,9 @@ use crate::native_commands::_helpers::command::terminal::{
 };
 use crate::native_commands::_helpers::command::terminal::{live_screen, screen_colour};
 use crate::native_commands::_helpers::location::dev_cancel::DevRuns;
+use crate::native_commands::_helpers::location::dev_exposure::{
+    allowed_hosts, connect_address, exposure, listens_beyond_loopback,
+};
 use crate::native_commands::_helpers::location::dev_supervision::{
     DevRoles, supervise_development_roles,
 };
@@ -158,8 +161,10 @@ pub(crate) async fn run_development_roles(
     listener: tokio::net::TcpListener,
     (scheduler, (messages, actions, keys)): (bool, DevScreenParts),
 ) -> Result<DevEnd, ControlError> {
-    let address = listener.local_addr()?;
+    let listening = listener.local_addr()?;
+    let address = connect_address(listening);
     let url = format!("http://{address}");
+    let opened_to: Option<String> = exposure(listening, &scope);
     let location_id = scope.location_id;
     let target = scope.target.clone();
     let workers = open_development_workers(
@@ -199,6 +204,9 @@ pub(crate) async fn run_development_roles(
                         step: DevStep::Api,
                         detail: address.to_string(),
                     }));
+                    if let Some(opened_to) = opened_to {
+                        drop(api_ready.send(ScreenMessage::Exposed(opened_to)));
+                    }
                 },
                 development_stopped(shutdown.clone()),
             ),
@@ -1762,18 +1770,6 @@ pub(crate) async fn apply_dev_controls(
     Ok(settled.map(|settled| (control.recompiles, settled)))
 }
 
-/// The loopback address `sqb dev` listens on.
-pub(crate) fn loopback_address(namespace: &Namespace) -> Result<SocketAddr, ControlError> {
-    let address = control_address(namespace, false, &ServerSection::default())?
-        .ok_or_else(|| ControlError::Invalid("development address is required".into()))?;
-    if !address.ip().is_loopback() {
-        return Err(ControlError::Invalid(
-            "sqb dev only listens on loopback".into(),
-        ));
-    }
-    Ok(address)
-}
-
 /// Open the development store, with its checklist row and the location it names on the screen.
 pub(crate) async fn announced_store(
     namespace: &Namespace,
@@ -1861,6 +1857,8 @@ pub(crate) async fn development_store(
         target: target.into(),
         triggers: flag(namespace, "development_triggers"),
         principal_id: development_person(&store, &context).await?,
+        allowed_hosts: allowed_hosts(namespace)?,
+        listens_beyond_loopback: listens_beyond_loopback(namespace),
     };
     if !scope.triggers {
         pause_development_triggers(&store, (location_id, target)).await?;

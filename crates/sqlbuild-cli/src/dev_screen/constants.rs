@@ -45,6 +45,8 @@ pub(crate) const SUSPEND_BYTE: u8 = 0x1a;
 pub(crate) const SUSPEND_UNSUPPORTED: &str =
     "Ctrl+Z does not suspend sqb dev; press q to stop it, or Ctrl+C";
 
+/// The start-up warning's label when the session is open beyond this machine.
+pub(crate) const NO_SIGN_IN: &str = "No sign-in";
 /// The warning row's label while providers miss secrets.
 pub(crate) const SECRETS_MISSING: &str = "Secrets missing";
 /// What the warning row says to do about the missing secrets.

@@ -55,7 +55,7 @@ pub(crate) async fn configure(
                 .route("/api/auth/login-mode", get(service_keys::keys_only_mode)),
         ),
         HumanLogin::Development(scope) => {
-            if !address.ip().is_loopback() {
+            if !address.ip().is_loopback() && !scope.listens_beyond_loopback {
                 return Err(ControlError::Invalid(
                     "disabled authentication requires a loopback listener".into(),
                 ));

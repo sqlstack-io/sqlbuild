@@ -72,6 +72,8 @@ mod test_custom_roles;
 mod test_denials;
 #[path = "test_development.rs"]
 mod test_development;
+#[path = "test_development_hosts.rs"]
+mod test_development_hosts;
 #[path = "test_external_sessions.rs"]
 mod test_external_sessions;
 #[path = "test_ingestion_turns.rs"]
