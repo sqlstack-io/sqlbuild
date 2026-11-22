@@ -6,6 +6,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 from urllib.request import urlopen
@@ -15,6 +16,7 @@ import pytest
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     DevelopmentRepublishTestCase,
     SessionRepublishTestCase,
+    WaitingRepublishTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     wait_for_development_ready,
@@ -49,6 +51,35 @@ PLAN = Path({plan!r})
 def fulfilment_plan() -> Discovered:
     """Steps of the fulfilment plan."""
     plan = json.loads(PLAN.read_text())
+    return Discovered(
+        items=[Item(id=step) for step in plan["steps"]], tags={{"release": plan["release"]}}
+    )
+
+
+@asset(for_each=fulfilment_plan)
+def fulfil(ctx: AssetContext) -> None:
+    """Run one step."""
+'''
+_CHECKED: str = '''\
+import json
+import time
+from pathlib import Path
+
+from sqlbuild.assets import AssetContext, asset
+from sqlbuild.discovery import Discovered, Item, discover
+
+DIRECTORY = Path({directory!r})
+
+
+@discover(check_every="60s")
+def fulfilment_plan() -> Discovered:
+    """Steps of the fulfilment plan; only the first check is slow."""
+    plan = json.loads((DIRECTORY / "plan.json").read_text())
+    if (DIRECTORY / "discovered").exists() and not (DIRECTORY / "check.started").exists():
+        (DIRECTORY / "check.started").touch()
+        time.sleep({check_seconds})
+        (DIRECTORY / "check.done").touch()
+    (DIRECTORY / "discovered").touch()
     return Discovered(
         items=[Item(id=step) for step in plan["steps"]], tags={{"release": plan["release"]}}
     )
@@ -218,3 +249,81 @@ def test_given_a_saved_login_session_when_republishing_then_the_request_names_th
             status: dict[str, Any] = json.loads(republished.stdout)
             assert status["requested_by"] == person["name"]
             assert status["state"] == test_case.expected_state
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WaitingRepublishTestCase(
+            description="a check that never returns gives way to the republish",
+            check_seconds=3600,
+            release="0.59.0",
+            expected_exit_code=0,
+            expected_check_finished=False,
+        ),
+        WaitingRepublishTestCase(
+            description="a check that finishes inside the 10 seconds is not abandoned",
+            check_seconds=3,
+            release="0.59.0",
+            expected_exit_code=0,
+            expected_check_finished=True,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_republish_waiting_on_a_check_when_the_grace_passes_then_the_republish_completes(
+    test_case: WaitingRepublishTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    plan: Path = tmp_path / "plan.json"
+    log: Path = tmp_path / "dev.log"
+    plan.write_text(json.dumps({"steps": ["pick"], "release": "0.58.0"}))
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
+            'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
+            '[targets.development]\nschema = "main"\n',
+            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            "python/plan/nodes.py": _CHECKED.format(
+                directory=str(tmp_path), check_seconds=test_case.check_seconds
+            ),
+        },
+    )
+    executable: str = str(Path(sys.executable).with_name("sqb"))
+    with log.open("wb") as output:
+        process: subprocess.Popen[bytes] = subprocess.Popen(
+            [executable, "dev", "--project-dir", str(project), "--port", "0"],
+            stdin=subprocess.DEVNULL,
+            stdout=output,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    try:
+        url, location = wait_for_development_ready(process, log)
+        deadline: float = time.monotonic() + 120
+        while not (tmp_path / "check.started").exists():
+            assert process.poll() is None, log.read_text()
+            assert time.monotonic() < deadline, log.read_text()
+            time.sleep(0.2)
+        plan.write_text(json.dumps({"steps": ["pick", "pack"], "release": test_case.release}))
+        republished: subprocess.CompletedProcess[str] = subprocess.run(
+            [executable, "location", "republish", "--server", url, "--location-id", location]
+            + ["--target", "development", "--reason", "deploy", "--wait", "--timeout", "45"],
+            env=os.environ | {"SQLBUILD_API_KEY": "synthetic-development-key"},
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        assert republished.returncode == test_case.expected_exit_code, republished.stderr
+        with urlopen(
+            f"{url}/api/control/locations/{location}/targets/development/discovered", timeout=5
+        ) as response:
+            readback: dict[str, Any] = json.load(response)
+        assert readback["sets"][0]["tags"] == {"release": test_case.release}
+        assert (tmp_path / "check.done").exists() == test_case.expected_check_finished
+    finally:
+        process.send_signal(signal.SIGINT)
+        process.wait(timeout=30)
