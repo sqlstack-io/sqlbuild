@@ -78,7 +78,10 @@ The location watches and compiles its baked project, publishes a successful snap
 its warehouse connection. The example schedule runs every minute. The server resolves the
 running container's actual Docker image ID at publication; no `--image-id` or Docker socket is
 needed in the location. Workers recompile in that pinned image and verify environment and node
-hashes before writing. The warehouse persists in its named volume.
+hashes before writing. The warehouse persists in its named volume, and so does run output: the
+`output` volume is mounted at `/home/sqlbuild/.local/state/sqlbuild/output`, the server's default output
+folder with PostgreSQL in this image, so recreating the server keeps it. `docker compose down
+--volumes` deletes both.
 
 Check the location the way a container health check would; it exits 1 when the location is down
 or its last load failed:
@@ -219,6 +222,7 @@ Network=sqlbuild.network
 PublishPort=127.0.0.1:8000:8000
 Volume=/etc/sqlbuild/server.toml:/etc/sqlbuild/server.toml:ro
 Volume=/run/podman/podman.sock:/var/run/docker.sock
+Volume=sqlbuild-output:/home/sqlbuild/.local/state/sqlbuild/output
 GroupAdd=993
 SecurityLabelDisable=true
 Secret=sqlbuild-control-database-url,type=env,target=SQLBUILD_CONTROL_DATABASE_URL
@@ -279,6 +283,8 @@ sudo podman healthcheck run orders-location
   so a server restart leaves it running; it checks in again when the server is back.
 - The server resolves launcher locations when it starts. To add a location, create it, add its
   launcher and container unit, then restart the server: `sudo systemctl restart sqlbuild-server`.
+- The `sqlbuild-output` volume keeps run output when the server's container is recreated. Podman
+  creates it on first use, owned by the image's user (10001).
 - `SecurityLabelDisable=true` lets the server use the socket on SELinux hosts.
 
 ## Credentials, identity, and platform events

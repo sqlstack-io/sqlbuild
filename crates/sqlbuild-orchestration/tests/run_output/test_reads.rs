@@ -10,15 +10,16 @@ use crate::run_output::main::read_person_output_index::read_person_output_index;
 use crate::run_output::main::read_person_output_page::read_person_output_page;
 use crate::run_output::main::search_person_output::search_person_output;
 use crate::run_output::models::{
-    OutputDownloadQuery, OutputLevel, OutputMark, OutputSearch, OutputSearchQuery, OutputStream,
-    SearchDirection,
+    OutputDownloadQuery, OutputLevel, OutputMark, OutputRow, OutputSearch, OutputSearchQuery,
+    OutputStream, SearchDirection,
 };
 use crate::run_output::tests::helpers::{
     batch, claimed_run, line, line_row, output_store, page_query, reader, segment, similar_row,
     timeless,
 };
 use crate::run_output::tests::test_types::{
-    OutputFoldTestCase, OutputReadTestCase, OutputSearchTestCase, PageRead, PageStart, SearchRead,
+    OutputFoldTestCase, OutputNulTestCase, OutputReadTestCase, OutputSearchTestCase, PageRead,
+    PageStart, SearchRead,
 };
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
@@ -296,6 +297,87 @@ fn given_worker_batches_when_a_person_reads_a_node_or_the_run_then_pages_streams
             assert_eq!(
                 (downloads[0].as_str(), downloads[1].as_str()),
                 test_case.expected_downloads,
+                "{}",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_marked_line_with_a_nul_when_published_then_its_batch_and_the_lines_after_it_read_back() {
+    let out = OutputStream::Stdout;
+    let printed = [
+        "loading\nerror: bad\0amount\nloaded the rest\n",
+        "next batch\n",
+    ];
+    let expected_mark = "error: badamount";
+    let expected_lines = [
+        "loading",
+        "error: bad\0amount",
+        "loaded the rest",
+        "next batch",
+    ];
+    let test_cases = [
+        OutputNulTestCase {
+            description: "SQLite",
+            backend: Backend::Sqlite,
+            printed,
+            expected_mark,
+            expected_lines,
+        },
+        OutputNulTestCase {
+            description: "PostgreSQL",
+            backend: Backend::Postgres,
+            printed,
+            expected_mark,
+            expected_lines,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            let folder = tempfile::tempdir().expect("output folder");
+            let output = output_store(store, folder.path(), None);
+            let (location, claim) = claimed_run(store).await;
+            let worker = (claim.request.run_id, claim.claim_id);
+            for (number, text) in (0_u64..).zip(test_case.printed) {
+                let sent = batch(number, vec![segment(Some(ORDERS), out, text)]);
+                publish_output_batch(store, &output, worker, sent)
+                    .await
+                    .expect("batch");
+            }
+            let (context, admin) = reader(store).await;
+            let person = (
+                (&context, admin),
+                (location, "development", claim.request.run_id),
+                DefaultRole::None,
+            );
+            let index = read_person_output_index(store, person, Some(ORDERS))
+                .await
+                .expect("index")
+                .expect("run");
+            let start = PageStart {
+                from: Some(1),
+                ..PageStart::default()
+            };
+            let query = page_query((Some(ORDERS), None), start, (10, false, None));
+            let page = read_person_output_page(store, &output, person, &query)
+                .await
+                .expect("page")
+                .expect("run");
+            let marks: Vec<&str> = index.marks.iter().map(|mark| mark.text.as_str()).collect();
+            let expected_rows: Vec<OutputRow> = (1_i64..)
+                .zip(test_case.expected_lines)
+                .map(|(number, text)| line_row(number, ORDERS, out, text))
+                .collect();
+            assert_eq!(
+                (marks, timeless(&page.rows)),
+                (vec![test_case.expected_mark], timeless(&expected_rows)),
                 "{}",
                 test_case.description
             );

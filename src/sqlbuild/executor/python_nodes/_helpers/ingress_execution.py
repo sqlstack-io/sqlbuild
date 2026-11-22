@@ -27,14 +27,17 @@ from sqlbuild.executor.load.main._resource_kind import load_resource_kind
 from sqlbuild.executor.load.main._skipped_result import skipped_load_result
 from sqlbuild.executor.load.models import LoadExecutionResult, LoadRuntimeParams
 from sqlbuild.executor.node_results.main._direct_store import build_direct_node_result_store
+from sqlbuild.executor.python_nodes._helpers.discovered_items import parallel_set
 from sqlbuild.executor.python_nodes._helpers.fingerprinting import (
     try_write_python_node_identity_fingerprint,
 )
 from sqlbuild.executor.python_nodes._helpers.lifecycle_nodes import build_ingress_lifecycle_nodes
 from sqlbuild.executor.python_nodes._helpers.node_warehouse import node_runtime
+from sqlbuild.executor.python_nodes.classes.discovered_item_pool import DiscoveredItemPool
 from sqlbuild.executor.python_nodes.classes.ingress_results import IngressResultAccumulator
 from sqlbuild.executor.python_nodes.main._ready import run_ready_python_node
 from sqlbuild.executor.python_nodes.models import (
+    DiscoveredItemCallbacks,
     IngressCallbacks,
     PythonIngressLoaderExecutorResult,
     PythonNodeExecutionResult,
@@ -42,6 +45,8 @@ from sqlbuild.executor.python_nodes.models import (
     PythonNodeRuntime,
 )
 from sqlbuild.executor.python_nodes.types import ExecutablePythonNode
+from sqlbuild.executor.scheduling.classes.lifecycle_concurrency import LifecycleConcurrency
+from sqlbuild.executor.scheduling.classes.lifecycle_progress import LifecycleProgress
 from sqlbuild.executor.scheduling.main._run_lifecycle import run_lifecycle_scheduler
 from sqlbuild.executor.scheduling.models import (
     LifecycleExecutionNode,
@@ -121,6 +126,14 @@ def execute_ingress_python_loader_nodes(
             run_state=run_state,
             results=results,
         ),
+        concurrency=_item_concurrency(
+            nodes=lifecycle_nodes,
+            python_graph=python_graph,
+            runtime=runtime,
+            callbacks=resolved_callbacks,
+            run_state=run_state,
+            results=results,
+        ),
     )
     _record_scheduler_skips(
         scheduler_result=scheduler_result,
@@ -134,6 +147,77 @@ def execute_ingress_python_loader_nodes(
         python_results=tuple(results.python_results_by_name.values()),
         load_results=tuple(results.load_results_by_name.values()),
         run_state=run_state,
+    )
+
+
+def _item_concurrency(
+    *,
+    nodes: tuple[LifecycleExecutionNode, ...],
+    python_graph: PythonNodeGraph,
+    runtime: PythonNodeRuntime,
+    callbacks: IngressCallbacks,
+    run_state: PythonNodeRunState,
+    results: IngressResultAccumulator,
+) -> LifecycleConcurrency | None:
+    """How ingress runs discovered items beside each other; `None` when none may."""
+
+    parallel: dict[str, tuple[str, int]] = {}
+    lifecycle_node: LifecycleExecutionNode
+    for lifecycle_node in nodes:
+        discovered_node: DiscoveredPythonNode = python_graph.nodes_by_name[lifecycle_node.name]
+        limited: tuple[str, int] | None = parallel_set(
+            discovered=None if discovered_node.asset is None else discovered_node.asset.discovered,
+            runtime=runtime,
+        )
+        if limited is not None:
+            parallel[lifecycle_node.name] = limited
+    if not parallel:
+        return None
+    by_name: dict[str, LifecycleExecutionNode] = {node.name: node for node in nodes}
+
+    def run(progress: LifecycleProgress) -> None:
+        def complete_item(*, node: ExecutablePythonNode, result: PythonNodeExecutionResult) -> None:
+            if callbacks.on_node_complete is not None:
+                callbacks.on_node_complete(result)
+            _finalize_ingress_python_result(
+                node=node,
+                result=result,
+                discovered_node=python_graph.nodes_by_name[node.name],
+                runtime=runtime,
+                callbacks=callbacks,
+                run_state=run_state,
+                results=results,
+            )
+            progress.complete(
+                node=by_name[node.name], result=_python_result_to_lifecycle_result(result)
+            )
+
+        DiscoveredItemPool(
+            runtime=runtime,
+            run_state=run_state,
+            callbacks=DiscoveredItemCallbacks(
+                ready=lambda: tuple(
+                    _to_executable_python_node(python_graph.nodes_by_name[node.name])
+                    for node in progress.startable(eligible=lambda node: node.name in parallel)
+                ),
+                upstream_results=lambda name: _python_upstream_results(
+                    name=name, python_graph=python_graph, results=results
+                ),
+                complete=complete_item,
+                cancelled=callbacks.on_node_cancelled,
+            ),
+        ).run(thread_limit=sum(dict(parallel.values()).values()))
+
+    return LifecycleConcurrency(eligible=lambda node: node.name in parallel, run=run)
+
+
+def _python_upstream_results(
+    *, name: str, python_graph: PythonNodeGraph, results: IngressResultAccumulator
+) -> tuple[PythonNodeExecutionResult, ...]:
+    return tuple(
+        results.python_results_by_name[upstream_name]
+        for upstream_name in python_graph.upstream_deps.get(name, ())
+        if upstream_name in results.python_results_by_name
     )
 
 
@@ -180,10 +264,8 @@ def _execute_ingress_python_node(
     results: IngressResultAccumulator,
 ) -> LifecycleNodeResult:
     executable_node: ExecutablePythonNode = _to_executable_python_node(node)
-    upstream_results: tuple[PythonNodeExecutionResult, ...] = tuple(
-        results.python_results_by_name[upstream_name]
-        for upstream_name in python_graph.upstream_deps.get(node.name, ())
-        if upstream_name in results.python_results_by_name
+    upstream_results: tuple[PythonNodeExecutionResult, ...] = _python_upstream_results(
+        name=node.name, python_graph=python_graph, results=results
     )
 
     result: PythonNodeExecutionResult = run_ready_python_node(
@@ -216,7 +298,7 @@ def _finalize_ingress_python_result(
     run_state: PythonNodeRunState,
     results: IngressResultAccumulator,
 ) -> None:
-    run_state.record_result(node_function=node.function, result=result)
+    run_state.record_result(result=result)
     results.record_python_result(name=discovered_node.name, result=result)
     if result.status != PythonNodeStatus.SUCCESS:
         return

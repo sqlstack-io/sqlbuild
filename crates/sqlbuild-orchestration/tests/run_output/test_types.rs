@@ -31,6 +31,16 @@ pub(crate) struct OutputReadTestCase {
     pub(crate) expected_downloads: (&'static str, &'static str),
 }
 
+/// A marked line holding a NUL, in a batch with another line after it and a batch after that.
+pub(crate) struct OutputNulTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) printed: [&'static str; 2],
+    pub(crate) expected_mark: &'static str,
+    /// Every line as printed, NUL included.
+    pub(crate) expected_lines: [&'static str; 4],
+}
+
 pub(crate) struct OutputFoldTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
@@ -120,4 +130,14 @@ pub(crate) struct OutputLocationTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) expected_folder: &'static str,
+}
+
+/// A control store and the user's folders: where output goes with no setting.
+pub(crate) struct OutputDefaultTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) state_home: Option<&'static str>,
+    pub(crate) home: Option<&'static str>,
+    /// Absolute, or within the SQLite store's folder; `None` when there is no default.
+    pub(crate) expected_folder: Option<&'static str>,
 }

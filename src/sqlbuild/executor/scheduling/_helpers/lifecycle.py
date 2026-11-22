@@ -6,6 +6,8 @@ from collections.abc import Callable
 
 from sqlbuild.compiler.python_nodes.types import SkipMode
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
+from sqlbuild.executor.scheduling.classes.lifecycle_concurrency import LifecycleConcurrency
+from sqlbuild.executor.scheduling.classes.lifecycle_progress import LifecycleProgress
 from sqlbuild.executor.scheduling.models import (
     LifecycleExecutionNode,
     LifecycleNodeResult,
@@ -18,8 +20,9 @@ def run_lifecycle_scheduler(
     *,
     nodes: tuple[LifecycleExecutionNode, ...],
     handler: Callable[[LifecycleExecutionNode], LifecycleNodeResult],
+    concurrency: LifecycleConcurrency | None = None,
 ) -> LifecycleSchedulerResult:
-    """Run lifecycle nodes serially in topological order."""
+    """Run lifecycle nodes serially in topological order, except those `concurrency` runs."""
 
     node_by_name: dict[str, LifecycleExecutionNode] = {node.name: node for node in nodes}
     if len(node_by_name) != len(nodes):
@@ -32,53 +35,54 @@ def run_lifecycle_scheduler(
         node_names=tuple(node.name for node in nodes),
         upstream_names=upstream_names,
     )
-    in_degree: dict[str, int] = {
-        node_name: len(upstreams) for node_name, upstreams in upstream_names.items()
-    }
-    ready: list[str] = sorted(name for name, degree in in_degree.items() if degree == 0)
-    results_by_name: dict[str, LifecycleNodeResult] = {}
-    ordered_results: list[LifecycleNodeResult] = []
-
-    while ready:
-        node_name: str = ready.pop(0)
-        node: LifecycleExecutionNode = node_by_name[node_name]
-        dependency_result: LifecycleNodeResult | None = _blocking_dependency_result(
-            upstream_names=upstream_names[node_name],
-            results_by_name=results_by_name,
-        )
-        if dependency_result is not None:
-            result: LifecycleNodeResult = LifecycleNodeResult(
-                name=node.name,
-                kind=node.kind,
-                status=LifecycleNodeStatus.SKIPPED,
-                skip_reason=_dependency_skip_reason(dependency_result),
-                skip_mode=SkipMode.HARD,
-            )
-        elif _should_soft_skip_due_to_all_skipped_dependencies(
-            upstream_names=upstream_names[node_name],
-            results_by_name=results_by_name,
-        ):
-            result = LifecycleNodeResult(
-                name=node.name,
-                kind=node.kind,
-                status=LifecycleNodeStatus.SKIPPED,
-                skip_reason="All upstream nodes were skipped",
-                skip_mode=SkipMode.SOFT,
-            )
+    progress: LifecycleProgress = LifecycleProgress(
+        node_by_name=node_by_name,
+        upstream_names=upstream_names,
+        downstream_names=downstream_names,
+        skip_result=_skip_result,
+    )
+    while progress.ready:
+        node: LifecycleExecutionNode = node_by_name[progress.ready[0]]
+        skipped: LifecycleNodeResult | None = progress.skip(node)
+        if skipped is not None:
+            progress.complete(node=node, result=skipped)
+        elif concurrency is not None and concurrency.eligible(node):
+            concurrency.run(progress)
         else:
-            result = handler(node)
-        results_by_name[node.name] = result
-        ordered_results.append(result)
-        downstream_name: str
-        for downstream_name in downstream_names[node.name]:
-            in_degree[downstream_name] -= 1
-            if in_degree[downstream_name] == 0:
-                ready.append(downstream_name)
-                ready.sort()
+            progress.complete(node=node, result=handler(node))
 
-    if len(ordered_results) != len(nodes):
+    if len(progress.results) != len(nodes):
         raise ExecutorInputError("Lifecycle scheduler could not resolve all dependencies")
-    return LifecycleSchedulerResult(results=tuple(ordered_results))
+    return LifecycleSchedulerResult(results=tuple(progress.results))
+
+
+def _skip_result(
+    *, node: LifecycleExecutionNode, results_by_name: dict[str, LifecycleNodeResult]
+) -> LifecycleNodeResult | None:
+    """The result of a node its upstream results skip, or `None` when it runs."""
+
+    blocking: LifecycleNodeResult | None = _blocking_dependency_result(
+        upstream_names=node.upstream_names, results_by_name=results_by_name
+    )
+    if blocking is not None:
+        return LifecycleNodeResult(
+            name=node.name,
+            kind=node.kind,
+            status=LifecycleNodeStatus.SKIPPED,
+            skip_reason=_dependency_skip_reason(blocking),
+            skip_mode=SkipMode.HARD,
+        )
+    if _should_soft_skip_due_to_all_skipped_dependencies(
+        upstream_names=node.upstream_names, results_by_name=results_by_name
+    ):
+        return LifecycleNodeResult(
+            name=node.name,
+            kind=node.kind,
+            status=LifecycleNodeStatus.SKIPPED,
+            skip_reason="All upstream nodes were skipped",
+            skip_mode=SkipMode.SOFT,
+        )
+    return None
 
 
 def _build_upstream_names(

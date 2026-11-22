@@ -1,4 +1,4 @@
-//! Open the output store `server.toml` names, or a folder beside a SQLite control store.
+//! Open the output store `server.toml` names, or the default folder for the control store.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -8,7 +8,8 @@ use object_store::aws::AmazonS3Builder;
 use object_store::local::LocalFileSystem;
 use object_store::path::Path;
 
-use crate::run_output::constants::{DEFAULT_OUTPUT_FOLDER, FILE_SCHEME, S3_SCHEME};
+use crate::run_output::_helpers::folders::{default_folder, user_folders};
+use crate::run_output::constants::{FILE_SCHEME, S3_SCHEME};
 use crate::run_output::models::{OutputSettings, OutputStore};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
@@ -20,7 +21,10 @@ pub fn open_output_store(
 ) -> Result<OutputStore, ControlError> {
     let mut location: String = match &settings.store {
         Some(location) => location.clone(),
-        None => format!("{FILE_SCHEME}{}", default_folder(control).display()),
+        None => format!(
+            "{FILE_SCHEME}{}",
+            default_folder(control, user_folders())?.display()
+        ),
     };
     let (objects, prefix): (Arc<dyn ObjectStore>, Path) =
         if let Some(folder) = location.strip_prefix(FILE_SCHEME) {
@@ -57,15 +61,4 @@ pub fn open_output_store(
         location,
         max_bytes_per_run: settings.max_bytes_per_run,
     })
-}
-
-/// `output` beside a SQLite control store; in the working directory for PostgreSQL.
-fn default_folder(control: &ControlStore) -> PathBuf {
-    match control {
-        ControlStore::Sqlite(sqlite) => sqlite.path.parent().map_or_else(
-            || PathBuf::from(DEFAULT_OUTPUT_FOLDER),
-            |folder| folder.join(DEFAULT_OUTPUT_FOLDER),
-        ),
-        ControlStore::Postgres(_) => PathBuf::from(DEFAULT_OUTPUT_FOLDER),
-    }
 }

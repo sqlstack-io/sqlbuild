@@ -184,6 +184,13 @@ class RunOutputTestCase(WorkerExecutionTestCase):
     expected_logs: list[tuple[str, str, str]] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class NulLogTestCase(WorkerExecutionTestCase):
+    description: str
+    backend: Literal["sqlite", "postgres"] = "sqlite"
+    expected_logs: list[tuple[str, str]] = field(default_factory=list)
+
+
 @dataclass(frozen=True, kw_only=True)
 class PersonJourneyTestCase(WorkerExecutionTestCase):
     description: str
@@ -672,3 +679,39 @@ class SessionRepublishTestCase:
     reason: str
     expected_exit_code: int
     expected_state: str
+
+
+@dataclass(frozen=True)
+class NodeStatusTestCase:
+    description: str
+    first_depends_on: str
+    job_select: str
+    job_settings: str
+    files: dict[str, str]
+    expected_status_during_second: str
+    expected_rerun_selection: frozenset[str]
+
+
+@dataclass(frozen=True)
+class HungCheckTestCase:
+    description: str
+    check_every: str
+    check_starts_within_seconds: float
+    expected_message: str
+
+
+@dataclass(frozen=True)
+class EmptyDiscoveryTestCase:
+    description: str
+    first_items: tuple[str, ...]
+    expected_nodes: frozenset[str]
+    expected_kept_items: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ParallelItemsTestCase:
+    description: str
+    first_depends_on: str
+    job_select: str
+    expected_status: str
+    expected_statuses: dict[str, str]

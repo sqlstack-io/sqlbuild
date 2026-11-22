@@ -603,7 +603,7 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "audit_evidence_scope",
     ),
     "cancel_running_statements": (
-        "sqlbuild.runtime.execution_limits.main._cancel_running_statements",
+        "sqlbuild.runtime.execution_limits.main.cancel_running_statements",
         "cancel_running_statements",
     ),
     "EventDispatcher": (

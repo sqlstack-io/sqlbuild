@@ -56,6 +56,30 @@ def run_step(ctx: AssetContext, step: str) -> None:
             expected_runs=(),
         ),
         DiscoveredNodesE2ETestCase(
+            description="a build that selects the placeholder refuses it",
+            command=("build", "--select", "+run_step"),
+            expected_exit_code=1,
+            expected_output_patterns=(
+                r"run_step is discovered at publish; run it from a location or `sqb dev`, "
+                r"or pass --discover",
+            ),
+            expected_runs=(),
+        ),
+        DiscoveredNodesE2ETestCase(
+            description="a plain plan shows the placeholder",
+            command=("plan",),
+            expected_exit_code=0,
+            expected_output_patterns=(r"Plan ready", r"run_step\[\*\]"),
+            expected_runs=(),
+        ),
+        DiscoveredNodesE2ETestCase(
+            description="a plan that selects the asset shows the placeholder",
+            command=("plan", "--select", "+run_step"),
+            expected_exit_code=0,
+            expected_output_patterns=(r"Plan ready", r"run_step\[\*\]"),
+            expected_runs=(),
+        ),
+        DiscoveredNodesE2ETestCase(
             description="--discover runs each item in order with its args and the set's tags",
             command=("build", "--discover"),
             expected_exit_code=0,
@@ -79,7 +103,7 @@ def run_step(ctx: AssetContext, step: str) -> None:
     ],
     ids=lambda case: case.description,
 )
-def test_given_a_for_each_asset_when_building_outside_a_location_then_only_discover_runs_its_items(
+def test_given_a_for_each_asset_when_planning_or_building_outside_a_location_then_only_discover_runs_its_items(
     tmp_path: Path, test_case: DiscoveredNodesE2ETestCase
 ) -> None:
     project_dir: Path = prepare_inline_project(
@@ -146,6 +170,46 @@ def test_given_a_for_each_asset_when_compiling_then_the_dag_shows_the_placeholde
         assert not re.search(pattern, discovered_dag), discovered_dag
     for node in test_case.expected_runs:
         assert node in discovered_dag, discovered_dag
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DiscoveredNodesE2ETestCase(
+            description=f"{command} --discover stops on a set without items",
+            command=(command, "--discover"),
+            expected_exit_code=1,
+            expected_output_patterns=(
+                r"Discover function 'plan' failed: the discover function returned no items",
+            ),
+            expected_runs=(),
+        )
+        for command in ("compile", "plan", "build")
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_set_without_items_when_discovering_for_a_command_then_it_stops_with_the_error(
+    tmp_path: Path, test_case: DiscoveredNodesE2ETestCase
+) -> None:
+    nodes: str = re.sub(r"items=\[.*\],", "items=[],", _NODES)
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="discovered",
+        repo_files={
+            "sqlbuild_project.toml": _PROJECT,
+            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            "python/plan/nodes.py": nodes,
+        },
+    )
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", *test_case.command), project_dir=project_dir
+    )
+    output: str = result.stdout + result.stderr
+
+    assert result.returncode == test_case.expected_exit_code, output
+    for pattern in test_case.expected_output_patterns:
+        assert re.search(pattern, output), output
+    assert not (project_dir / "runs.txt").exists(), test_case.expected_runs
 
 
 if __name__ == "__main__":

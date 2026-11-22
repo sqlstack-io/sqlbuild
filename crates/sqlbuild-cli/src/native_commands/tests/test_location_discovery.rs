@@ -4,8 +4,14 @@ use sqlbuild_cache::project_snapshot::models::PathStamp;
 use sqlbuild_orchestration::discovered_sets::models::DiscoveredSetChecked;
 use tokio::time::Instant;
 
+#[cfg(unix)]
+use crate::native_commands::_helpers::location::compiler_discovery::check_discovered;
 use crate::native_commands::_helpers::location::discovery_state::LocationDiscovery;
+#[cfg(unix)]
+use crate::native_commands::tests::helpers::silent_compiler;
 use crate::native_commands::tests::helpers::{PLAN_FILE, discovered_load, failed_load, stamps};
+#[cfg(unix)]
+use crate::native_commands::tests::test_types::CheckShutdownTestCase;
 use crate::native_commands::tests::test_types::{
     DiscoveryCheckTestCase, DiscoveryReportTestCase, FailedCompileDiscoveryTestCase,
     RediscoverTestCase,
@@ -222,6 +228,64 @@ fn given_a_second_publication_when_reporting_sets_then_removing_the_last_one_cle
         assert_eq!(
             discovery.reports(&second),
             test_case.expected_report,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn given_a_check_that_never_returns_when_the_location_shuts_down_then_the_check_ends_promptly() {
+    let test_cases = [
+        CheckShutdownTestCase {
+            description: "shutdown before the check starts",
+            closes_after: Duration::ZERO,
+            expected_within: Duration::from_secs(5),
+            expected_compiler: false,
+        },
+        CheckShutdownTestCase {
+            description: "shutdown during the check",
+            closes_after: Duration::from_millis(300),
+            expected_within: Duration::from_secs(5),
+            expected_compiler: false,
+        },
+    ];
+
+    for test_case in test_cases {
+        let kept: bool = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime")
+            .block_on(async {
+                let mut load = discovered_load(&["a"]);
+                for set in load.discovered.values_mut() {
+                    set.check_every_seconds = Some(0);
+                }
+                let mut discovery = LocationDiscovery::default();
+                discovery.published(&load, Instant::now());
+                let (republish, _controls) = tokio::sync::watch::channel(Default::default());
+                let (sender, requests) = tokio::sync::mpsc::channel(1);
+                let check = check_discovered(
+                    Some(silent_compiler()),
+                    &mut discovery,
+                    ((&republish, ("synthetic", uuid::Uuid::nil())), &requests),
+                );
+                let shutdown = async {
+                    tokio::time::sleep(test_case.closes_after).await;
+                    drop(sender);
+                };
+                tokio::time::timeout(test_case.expected_within, async {
+                    tokio::join!(check, shutdown).0
+                })
+                .await
+                .expect("the check ends promptly")
+                .expect("the interpreter stops")
+                .is_some()
+            });
+
+        assert_eq!(
+            kept, test_case.expected_compiler,
             "{}",
             test_case.description
         );

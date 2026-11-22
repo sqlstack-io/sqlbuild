@@ -1,4 +1,4 @@
-//! Why a discover function's result cannot be a set: bad or repeated IDs, unknown items or a cycle.
+//! Why a discover function's result cannot be a set: no items, bad or repeated IDs, unknown items or a cycle.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -8,6 +8,9 @@ use crate::discovered_sets::models::DiscoveredResult;
 
 /// The first problem with `result`, or `None` when its items form a set.
 pub(crate) fn discovered_problem(result: &DiscoveredResult) -> Option<String> {
+    if result.items.is_empty() {
+        return Some("the discover function returned no items".to_owned());
+    }
     let mut seen: BTreeSet<&str> = BTreeSet::new();
     for item in &result.items {
         if let Some(problem) = id_problem(&item.id) {

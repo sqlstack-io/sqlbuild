@@ -45,7 +45,11 @@ pub(crate) async fn run_location_compiler(
                 () = sleep_until(due) => None,
             };
             let Some(request) = request else {
-                compiler = check_discovered(compiler.take(), &mut discovery, controls).await?;
+                compiler = check_discovered(compiler.take(), &mut discovery, (controls, &requests))
+                    .await?;
+                if requests.is_closed() {
+                    break;
+                }
                 continue;
             };
             let carried_on;

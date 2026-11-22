@@ -45,6 +45,15 @@ const SINGLE_CONNECTION: i64 = 1;
 /// The deferred relation locations and the warehouse relations behind them, when deferring.
 type Deferral<'py> = (Bound<'py, PyAny>, Bound<'py, PyAny>);
 
+/// What the caller does with the plan it asks for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PlanUse {
+    /// Show it, placeholders included.
+    Show,
+    /// Run it, which refuses a selected placeholder.
+    Run,
+}
+
 /// The planning inputs: the discovered project, the adapter and its open connection.
 pub(crate) struct PlanningInputs<'a, 'py> {
     pub(crate) discovered_inputs: &'a Bound<'py, PyAny>,
@@ -52,6 +61,7 @@ pub(crate) struct PlanningInputs<'a, 'py> {
     /// The live planning connection, `None` when the plan reads a synced state.
     pub(crate) connection: &'a Bound<'py, PyAny>,
     pub(crate) reads: &'a Bound<'py, PlannerReads>,
+    pub(crate) plan_use: PlanUse,
     /// Python nodes' `(database, schema)` under the active target.
     pub(crate) node_results_location: Option<(Option<String>, Option<String>)>,
 }
@@ -155,7 +165,9 @@ pub(crate) fn pipeline_result<'py>(
             ),
             (options, discovered, project),
         )?;
-        refuse_placeholders(discovered, &selected_python_node_names)?;
+        if inputs.plan_use == PlanUse::Run {
+            refuse_placeholders(discovered, &selected_python_node_names)?;
+        }
         python_read_source_names = python_read_source_names_for(
             py,
             Some(keywords(

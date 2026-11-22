@@ -90,7 +90,7 @@ def execute_ordered_test_nodes(
             sleep=sleep,
             monotonic=monotonic,
         )
-        run_state.record_result(node_function=node.function, result=result)
+        run_state.record_result(result=result)
         results[node.function] = result
     return tuple(results.values())
 

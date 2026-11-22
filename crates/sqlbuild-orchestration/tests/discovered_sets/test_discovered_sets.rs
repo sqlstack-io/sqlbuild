@@ -27,6 +27,11 @@ fn given_a_discover_result_when_checking_it_then_only_a_valid_set_passes() {
             expected_problem: None,
         },
         ProblemTestCase {
+            description: "no items",
+            result: set(&[]),
+            expected_problem: Some("the discover function returned no items".to_owned()),
+        },
+        ProblemTestCase {
             description: "an ID with a bracket",
             result: set(&[("a[1]", &[])]),
             expected_problem: Some(
@@ -130,6 +135,13 @@ fn given_check_every_text_when_parsing_it_then_units_add_up_from_a_minute() {
 #[test]
 fn given_a_set_that_succeeded_when_an_attempt_follows_then_a_failure_keeps_the_last_good_items() {
     let test_cases = [
+        AttemptTestCase {
+            description: "a success without items keeps the last good ones",
+            attempt: Ok(set(&[])),
+            expected_ids: vec!["a", "b"],
+            expected_status: DiscoveredSetStatus::Failed,
+            expected_error: Some("the discover function returned no items"),
+        },
         AttemptTestCase {
             description: "a success replaces the items",
             attempt: Ok(set(&[("c", &[])])),

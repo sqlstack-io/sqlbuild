@@ -540,7 +540,7 @@ from sqlbuild.runtime.execution_history.types import RunStatus as RunStatus
 from sqlbuild.runtime.execution_limits.exceptions import (
     ExecutionDurationLimitError as ExecutionDurationLimitError,
 )
-from sqlbuild.runtime.execution_limits.main._cancel_running_statements import (
+from sqlbuild.runtime.execution_limits.main.cancel_running_statements import (
     cancel_running_statements as cancel_running_statements,
 )
 from sqlbuild.runtime.execution_limits.main.execution_deadline_scope import (
