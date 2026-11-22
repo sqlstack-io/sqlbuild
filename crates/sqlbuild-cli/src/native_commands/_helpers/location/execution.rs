@@ -117,7 +117,7 @@ use sqlbuild_orchestration::platform::models::{
     WarehouseSyncFailure,
 };
 use sqlbuild_orchestration::run_output::main::open_output_store::open_output_store;
-use sqlbuild_orchestration::run_output::models::{OutputSettings, OutputStore};
+use sqlbuild_orchestration::run_output::models::OutputSettings;
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
@@ -142,7 +142,6 @@ use sqlbuild_orchestration::webhooks::models::{Webhook, WebhookSource};
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
 use std::io;
-use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, SystemTime};
@@ -1112,57 +1111,6 @@ pub(crate) fn location_child(options: &LocationServe, script: &Path) -> Command 
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
     command
-}
-
-/// Resolve once `shutdown` turns true or its sender is gone.
-pub(crate) async fn stopped(mut shutdown: watch::Receiver<bool>) {
-    while !*shutdown.borrow_and_update() {
-        if shutdown.changed().await.is_err() {
-            break;
-        }
-    }
-}
-
-/// Start the control API and the platform roles beside it, with the retention `facts` and `run_output` set.
-pub(crate) async fn start_api(
-    mut tasks: JoinSet<Result<(), ControlError>>,
-    (address, store, shutdown): (SocketAddr, &ControlStore, &watch::Receiver<bool>),
-    (authentication, handoff, facts): (ApiAuthentication, RunHandoff, &ServerFacts),
-    run_output: Option<(OutputStore, u16)>,
-) -> Result<JoinSet<Result<(), ControlError>>, ControlError> {
-    drop(write_output(&[(
-        Stream::Stderr,
-        "Starting control API...\n",
-    )]));
-    let listener = tokio::net::TcpListener::bind(address).await?;
-    let address = listener.local_addr()?;
-    tasks.spawn(serve_api(
-        store.clone(),
-        listener,
-        (authentication, handoff, facts.clone()),
-        (
-            move || {
-                drop(write_output(&[(
-                    Stream::Stderr,
-                    &format!("Control API ready: {address}\n"),
-                )]));
-            },
-            stopped(shutdown.clone()),
-        ),
-    ));
-    start_platform_roles(
-        &mut tasks,
-        (store, shutdown),
-        RetentionPolicies {
-            audit: facts.audit,
-            statistics: facts.statistics,
-            snapshots: facts.snapshots,
-            run_logs: facts.run_logs,
-            state_history: facts.state_history,
-            run_output,
-        },
-    )?;
-    Ok(tasks)
 }
 
 /// Health production and delivery remain native and independent of scheduler leadership.
