@@ -548,6 +548,16 @@ impl WorkerBuild {
         self.record_start(py, key)
     }
 
+    /// `start_key` of the asset `name`.
+    pub fn start_asset(&self, py: Python<'_>, name: &str) -> PyResult<()> {
+        self.start_key(py, &format!("asset:{name}"))
+    }
+
+    /// The asset `name` was running when the run was cancelled.
+    pub fn cancel_asset(&self, py: Python<'_>, name: &str) -> PyResult<()> {
+        self.finish_key(py, &format!("asset:{name}"), NodeOutcome::Cancelled)
+    }
+
     /// `start_key` without the cancellation check.
     fn record_start(&self, py: Python<'_>, key: &str) -> PyResult<()> {
         if self.execution.claim.request.selection.contains(key)

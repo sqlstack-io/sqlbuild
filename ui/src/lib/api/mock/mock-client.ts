@@ -45,7 +45,7 @@ import type {
 	NodeBuildCost,
 	NodeState,
 	NodeStates,
-	Scope,
+	RepublishResult, Scope,
 	Snapshot,
 	SnapshotNode,
 	Timeline,
@@ -505,6 +505,12 @@ export class MockApiClient implements ApiClient {
 			this.changes.emit(`warehouse_sync:${scope.locationId}`);
 		}, 1500);
 		return this.#reply(undefined);
+	}
+
+	async republish(scope: Scope): Promise<RepublishResult> {
+		this.#require('location.republish');
+		this.#location(scope);
+		return this.#reply({ state: 'published', generation: null, error: null });
 	}
 
 	// ---- platform and admin: delegated to MockPlatformApi (mock/platform.ts) ----

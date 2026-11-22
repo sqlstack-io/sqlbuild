@@ -7,7 +7,7 @@ use reqwest::header::{AUTHORIZATION, HeaderValue};
 use sqlbuild_orchestration::api::main::parse_origin::parse_origin;
 use sqlbuild_orchestration::api::models::{ApiErrorBody, MutationResponse};
 use sqlbuild_orchestration::credentials::models::SessionIdentity;
-use sqlbuild_orchestration::platform::models::PersonWorkRequest;
+use sqlbuild_orchestration::platform::models::{PersonWorkRequest, RepublishCall, RepublishStatus};
 use sqlbuild_orchestration::sensors::models::{SensorEventChoice, SensorTrialEvents};
 use sqlbuild_orchestration::snapshots::models::NodeSql;
 use uuid::Uuid;
@@ -157,6 +157,28 @@ pub(crate) async fn warehouse_sync(
     )
     .await
     .map(|response| response.applied)
+}
+
+/// The republish after `call`; `None` when there is no such request.
+pub(crate) async fn republish(
+    client: &PersonClient,
+    credential: &PersonCredential,
+    scope: (Uuid, &str),
+    call: RepublishCall<'_>,
+) -> Result<Option<RepublishStatus>, std::io::Error> {
+    let (request, action) = match call {
+        RepublishCall::Request(request) => {
+            let path = target_path(client, scope, &["republish"])?;
+            let posted = authorized(client, reqwest::Method::POST, &path, credential)?;
+            (posted.json(request), "request a republish from")
+        }
+        RepublishCall::Read { request_id, wait } => {
+            let path = target_path(client, scope, &["republish", &request_id.to_string()])?;
+            let read = authorized(client, reqwest::Method::GET, &path, credential)?;
+            (read.query(&[("wait", wait)]), "read the republish from")
+        }
+    };
+    send_json(request, (action, "Republish request", "republish status")).await
 }
 
 /// The published sensor and the events `choice` picks; a refusal carries the server's reason.

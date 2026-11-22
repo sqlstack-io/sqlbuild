@@ -299,6 +299,11 @@ pub enum LocationWork {
         #[serde(default, skip_serializing_if = "std::collections::BTreeSet::is_empty")]
         given: std::collections::BTreeSet<String>,
     },
+    /// Compile and publish again, calling every discover function, as `r` does in `sqb dev`.
+    Republish {
+        /// The name of whoever asked, which the location prints with the request's reason.
+        requested_by: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -334,6 +339,29 @@ pub struct PersonWorkRequest {
 pub struct LocationWorkPoll {
     pub session_id: Uuid,
     pub target: String,
+    /// Which work this poll takes.
+    pub scope: LocationWorkScope,
+}
+
+/// Which work a location takes in one poll.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LocationWorkScope {
+    /// Every kind of work, while the location serves a publication of its current files.
+    All,
+    /// Only republishes, while the location has no publication of its current files.
+    RepublishOnly,
+}
+
+impl LocationWorkScope {
+    /// The scope's name as the claim query compares it.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::RepublishOnly => "republish_only",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -365,6 +393,16 @@ pub enum LocationWorkOutcome {
     },
     /// The location took the request; its next metadata sync reads the warehouse.
     SyncStarted {},
+    /// The republish published this snapshot.
+    Published {
+        snapshot_id: Uuid,
+        generation: i64,
+    },
+    /// The republish compiled nothing to publish; the last good snapshot keeps serving.
+    PublishFailed {
+        generation: i64,
+        error: String,
+    },
     Superseded {},
 }
 
@@ -965,4 +1003,74 @@ pub struct PlanTimings {
 pub struct PlanTimingStep {
     pub name: String,
     pub seconds: f64,
+}
+
+/// Where a republish request stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RepublishState {
+    /// Waiting for the location to take it, or to finish publishing.
+    Pending,
+    Published,
+    Failed,
+    /// No location took it before it expired.
+    Expired,
+}
+
+/// A republish request and its result once the location has one.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RepublishStatus {
+    pub request_id: Uuid,
+    pub location_id: Uuid,
+    pub target: String,
+    pub state: RepublishState,
+    pub requested_by: String,
+    pub reason: String,
+    pub requested_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completed_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generation: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// One discovered set of the current snapshot, as a deploy reads it back.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct DiscoveredSetReadback {
+    pub name: String,
+    pub status: DiscoveredSetStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fetched_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_good_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
+    /// The tags of the result the set serves: its newest, or its last good one after a failure.
+    #[schema(value_type = Object)]
+    pub tags: std::collections::BTreeMap<String, serde_json::Value>,
+    pub items: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_every_seconds: Option<u64>,
+}
+
+/// The discovered sets of a target's current snapshot; empty when it saved none.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct DiscoveredReadback {
+    pub snapshot_id: Uuid,
+    pub generation: i64,
+    pub published_at: DateTime<Utc>,
+    pub sets: Vec<DiscoveredSetReadback>,
+}
+
+/// What a republish client sends: a new request, or a read of one that holds open while it is pending.
+#[derive(Clone, Copy, Debug)]
+pub enum RepublishCall<'a> {
+    Request(&'a PersonWorkRequest),
+    Read { request_id: Uuid, wait: u64 },
 }

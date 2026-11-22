@@ -44,6 +44,7 @@ function allowedSummary(action: string, after: Record<string, unknown>): string 
 		const work = fieldsOf(after.work);
 		const kind = textOf(work.kind) ?? '';
 		if (kind === 'plan' && Array.isArray(work.command)) return `Plan sqb ${work.command.join(' ')}`;
+		if (kind === 'republish') return `Republish requested by ${textOf(work.requested_by) ?? 'unknown'}: ${textOf(after.reason) ?? ''}`;
 		return WORK[kind] ?? kind;
 	}
 	const run = textOf(after.run_id);

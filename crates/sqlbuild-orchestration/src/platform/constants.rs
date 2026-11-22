@@ -60,3 +60,14 @@ pub const PLAN_ROWS_LIMIT: usize = 1000;
 pub(crate) const OBSERVATION_WINDOW_SECONDS: i64 = 30;
 /// The newest `trigger_skipped` events the live problems read; each trigger counts once.
 pub(crate) const SKIPPED_TRIGGER_EVENTS: i64 = 200;
+
+/// How long a republish request waits for a location to take it and publish.
+pub(crate) const REPUBLISH_EXPIRY_SECONDS: i64 = 900;
+/// A republish claim covers a full compile and publication.
+pub(crate) const REPUBLISH_LEASE_SECONDS: i64 = 900;
+/// The longest a republish request or read holds its response open with `wait`.
+pub const MAX_REPUBLISH_WAIT_SECONDS: u64 = 60;
+/// How often a waiting request reads the republish's result again.
+pub(crate) const REPUBLISH_POLL_MILLISECONDS: u64 = 250;
+/// The longest publish error the server keeps.
+pub(crate) const MAX_PUBLISH_ERROR_CHARS: usize = 4000;

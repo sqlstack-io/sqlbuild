@@ -6,6 +6,12 @@
 
 Online: https://sqlbuild.com/docs/cli/location/
 
+## Contents
+
+- Check a location's health
+- Provide settings and secrets
+- Republish
+
 Run a code location: it compiles the project in its own Python environment, publishes it to the
 server, and publishes again when the project changes:
 
@@ -92,3 +98,55 @@ The location stops at start-up with an error naming the file when it doesn't exi
 set in the container or service environment win over the file. After changing the file, restart
 the location so its compiles and plan previews use the new values. Each
 [worker](server.md) reads the file when its run starts.
+
+## Republish
+
+Ask a served location to compile and publish again, for example after a deploy of a system its
+[discover functions](../concepts/python-nodes/discovered-nodes.md) read from. Every discover
+function runs, as with `r` in `sqb dev`.
+
+With an API key, from the environment and never an argument, the server may be `http://` or
+`https://`, so a server on a private network needs no TLS:
+
+```bash
+export SQLBUILD_API_KEY=...
+sqb location republish --server http://control.internal.example.com:8000 --location-id "$LOCATION_ID" \
+  --target production --reason "fulfilment 0.58.0 deployed" --wait
+```
+
+A key sent over plain HTTP to another host prints one warning, because anyone on the network path
+can read it. Without `SQLBUILD_API_KEY` the command uses your [`sqb login`](login.md) session,
+which needs `https://`; `--ca-cert` trusts a private CA for it.
+
+| Outcome | Exit code |
+| --- | --- |
+| Accepted, without `--wait`; or published | `0` |
+| The publish failed, or no location took the request within 15 minutes | `1` |
+| The request was refused or got no answer, or `--wait` ended after `--timeout` seconds (default 600) | `2` |
+
+The JSON result has `requested_by`, `requested_at` and `state` (`pending`, `published`, `failed` or
+`expired`), with `snapshot_id` after a publish or `error` after a failed one.
+
+The same request with `curl`:
+
+```bash
+BASE="http://control.internal.example.com:8000/api/control/locations/$LOCATION_ID/targets/production"
+REQUEST_ID=$(uuidgen)
+
+curl --fail -X POST "$BASE/republish?wait=10" \
+  -H "Authorization: Bearer $SQLBUILD_API_KEY" -H "Content-Type: application/json" \
+  -d "{\"request_id\": \"$REQUEST_ID\", \"reason\": \"fulfilment 0.58.0 deployed\"}"
+
+# While the state is pending, ask again
+curl --fail "$BASE/republish/$REQUEST_ID?wait=10" -H "Authorization: Bearer $SQLBUILD_API_KEY"
+
+# Each discovered set's status, fetch time, digest and tags in the current snapshot
+curl --fail "$BASE/discovered" -H "Authorization: Bearer $SQLBUILD_API_KEY"
+```
+
+- `wait` holds a response open for at most 60 seconds. Reusing a `request_id` queues nothing new.
+- Republishing needs `location.republish`, which the operator, developer and admin roles have.
+  Reading `discovered` needs `view`.
+- A failed discover function doesn't fail the publish, as its set keeps its last good items. Check
+  the set's `status` and `tags` in `discovered` to confirm a deploy.
+- The audit log records who asked and why, and the location prints both.

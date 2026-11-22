@@ -44,6 +44,7 @@ use crate::native_commands::_helpers::location::dev_supervision::{
 use crate::native_commands::_helpers::location::dynamic_resume::resume_expired_holds;
 use crate::native_commands::_helpers::location::env_reload::env_file_summary;
 use crate::native_commands::_helpers::location::provider_secrets::report_provider_secrets;
+use crate::native_commands::_helpers::location::republish::settle_republish;
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_timeout_seconds, rows_text, scan_line,
 };
@@ -66,6 +67,7 @@ use crate::native_commands::models::{
     LocationMetadataPage, LocationMetadataSync, LocationServe, LocationWatch, LostStdout,
     MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
 };
+use crate::native_commands::models::{LoadedGeneration, PendingRepublish};
 use crate::native_commands::models::{
     LocationLoad, LocationRuntimeRequest, ReadFailure, SyncProgress,
 };
@@ -403,12 +405,13 @@ pub(crate) async fn compile_generation(
                     "Location compiler failed; generation {generation} may already be published: {error}\n"
                 ),
             )]));
-            dev_failure(dev_events, generation, error);
+            dev_failure(dev_events, generation, error.clone());
             LocationLoad {
                 published: None,
                 rules: None,
                 discovered: Default::default(),
                 discover_files: Default::default(),
+                error: Some(error),
             }
         }
     };
@@ -420,10 +423,14 @@ pub(crate) async fn compile_generation(
         secrets_needed_by,
     }) = load.published
     else {
-        if let Some(rules) = &load.rules {
-            dev_failure(dev_events, generation, rule_failure_text(rules));
+        let rules_text: Option<String> = load.rules.as_ref().map(rule_failure_text);
+        if let Some(text) = &rules_text {
+            dev_failure(dev_events, generation, text.clone());
         }
-        return Ok(Some(Err(load.rules)));
+        let error: String = rules_text.or(load.error).unwrap_or_else(|| {
+            "the compile failed; the location's output has the error".to_owned()
+        });
+        return Ok(Some(Err((load.rules, error))));
     };
     let refresh_at = refresh
         .map(|deadline| Instant::now() + (deadline - Utc::now()).to_std().unwrap_or_default());
@@ -446,11 +453,12 @@ pub(crate) async fn compile_generation(
             record.snapshot_id
         )));
     }
-    Ok(Some(Ok((
+    Ok(Some(Ok(LoadedGeneration {
         refresh_at,
-        locations,
-        (missing_secrets, secrets_needed_by),
-    ))))
+        state_locations: locations,
+        secrets: (missing_secrets, secrets_needed_by),
+        snapshot_id: record.snapshot_id,
+    })))
 }
 
 /// Under `sqb dev`, tell the screen a generation failed; the last good generation keeps serving.
@@ -1835,7 +1843,11 @@ pub(crate) async fn development_store(
 
 /// After a compile: a publication waits for the `sqb dev` warehouse verdict and settles; a failure keeps the last good snapshot.
 pub(crate) async fn finish_compile(
-    (options, script, session): (&LocationServe, &Path, (&str, Uuid)),
+    (options, script, (session, client)): (
+        &LocationServe,
+        &Path,
+        ((&str, Uuid), &LocationWorkClient),
+    ),
     (load, generation): (LoadOutcome, i64),
     (mut watch, metadata, deferred): Settled,
     (controls, stopped): (
@@ -1844,9 +1856,22 @@ pub(crate) async fn finish_compile(
     ),
 ) -> Result<Option<Settled>, ControlError> {
     tokio::pin!(stopped);
-    let (refresh_at, locations, missing_secrets) = match load {
+    let owed: Option<PendingRepublish> = watch.republish.take();
+    let compiled = (&load, generation);
+    if let Some(result) =
+        settle_republish((client, session.1), owed, compiled, stopped.as_mut()).await
+    {
+        result?;
+        return Ok(None);
+    }
+    let LoadedGeneration {
+        refresh_at,
+        state_locations: locations,
+        secrets: missing_secrets,
+        ..
+    } = match load {
         Ok(published) => published,
-        Err(rules) => {
+        Err((rules, _)) => {
             watch.retry_at = Some(Instant::now() + Duration::from_secs(30));
             tokio::select! {
                 result = &mut stopped => { result?; return Ok(None); },

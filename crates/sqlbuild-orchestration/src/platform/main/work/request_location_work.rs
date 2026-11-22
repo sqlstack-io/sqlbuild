@@ -30,6 +30,11 @@ pub async fn request_location_work(
                 "plans must be requested by a person on the current publication".into(),
             ));
         }
+        LocationWork::Republish { .. } => {
+            return Err(ControlError::Invalid(
+                "a republish is requested with its own permission".into(),
+            ));
+        }
         LocationWork::CheckConnection {} | LocationWork::SyncWarehouse {} => {}
     }
     if request.target.trim().is_empty()

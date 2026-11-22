@@ -863,6 +863,22 @@ class SecretAdviceTestCase:
 
 
 @dataclass(frozen=True)
+class DevelopmentRepublishTestCase:
+    description: str
+    release: str
+    expected_exit_code: int
+    expected_items: int
+
+
+@dataclass(frozen=True)
+class SessionRepublishTestCase:
+    description: str
+    reason: str
+    expected_exit_code: int
+    expected_state: str
+
+
+@dataclass(frozen=True)
 class NodeStatusTestCase:
     description: str
     first_depends_on: str
@@ -938,3 +954,12 @@ class CancelledChainTestCase:
     expected_second_run: list[str]
     expected_statuses: dict[str, str]
     expected_torn_down: bool
+
+
+@dataclass(frozen=True)
+class WaitingRepublishTestCase:
+    description: str
+    check_seconds: int
+    release: str
+    expected_exit_code: int
+    expected_check_finished: bool

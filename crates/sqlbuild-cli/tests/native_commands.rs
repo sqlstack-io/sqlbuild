@@ -2,6 +2,8 @@
 mod admin_helpers;
 #[path = "native_commands/helpers.rs"]
 mod helpers;
+#[path = "native_commands/republish/helpers.rs"]
+mod republish_helpers;
 #[path = "native_commands/admin/test_admin.rs"]
 mod test_admin;
 #[path = "native_commands/test_control.rs"]
@@ -14,6 +16,8 @@ mod test_output;
 mod test_passwords;
 #[path = "native_commands/test_proxy.rs"]
 mod test_proxy;
+#[path = "native_commands/test_republish.rs"]
+mod test_republish;
 #[path = "native_commands/admin/test_service_accounts.rs"]
 mod test_service_accounts;
 #[path = "native_commands/test_types.rs"]

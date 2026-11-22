@@ -262,3 +262,10 @@ pub(crate) const SENSOR_COMMAND: &str = "sensor";
 pub(crate) const SENSOR_USAGE_EXIT: i32 = 2;
 /// Exit status when the function failed, timed out, or there was nothing to call it with.
 pub(crate) const SENSOR_FAILED_EXIT: i32 = 1;
+
+/// The environment variable `sqb location republish` reads an API key from; never an argument.
+pub(crate) const API_KEY_VARIABLE: &str = "SQLBUILD_API_KEY";
+/// How long one `--wait` poll holds its response open, inside both clients' request timeouts.
+pub(crate) const REPUBLISH_POLL_SECONDS: u64 = 10;
+/// How long `sqb location republish --wait` waits unless told otherwise.
+pub(crate) const REPUBLISH_TIMEOUT_SECONDS: u64 = 600;

@@ -170,12 +170,21 @@ pub(crate) enum NativeParse {
     },
 }
 
-/// One turn of named work: the files it wrote, whether metadata should sync, and whether it claimed work.
+/// One turn of named work: its files, whether to sync, whether it claimed, and any republish owed.
 #[derive(Debug, Default)]
 pub(crate) struct LocationWorkTurn {
     pub(crate) files: Vec<std::path::PathBuf>,
     pub(crate) sync: bool,
     pub(crate) claimed: bool,
+    pub(crate) republish: Option<PendingRepublish>,
+}
+
+/// A claimed republish: its result is reported after the next compile, before its lease ends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PendingRepublish {
+    pub(crate) request_id: uuid::Uuid,
+    pub(crate) claim_id: uuid::Uuid,
+    pub(crate) deadline: tokio::time::Instant,
 }
 
 /// What `sqb skills` installs.
@@ -302,6 +311,18 @@ pub(crate) struct LocationWatch {
     pub(crate) commit_checked_at: tokio::time::Instant,
     /// Whether a generation has published, so the next publication's connection check is not the startup check.
     pub(crate) checked: bool,
+    /// A claimed republish, owed the result of the next compile to finish.
+    pub(crate) republish: Option<PendingRepublish>,
+}
+
+/// What one compile published, for the watcher and any republish it owes.
+#[derive(Debug)]
+pub(crate) struct LoadedGeneration {
+    pub(crate) refresh_at: Option<tokio::time::Instant>,
+    pub(crate) state_locations:
+        Vec<sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation>,
+    pub(crate) secrets: crate::native_commands::types::GenerationSecrets,
+    pub(crate) snapshot_id: uuid::Uuid,
 }
 
 /// A bounded supervisor request; dropping the reply cancels and reaps an active compiler.
@@ -321,6 +342,8 @@ pub(crate) struct LocationLoad {
     pub(crate) discovered: sqlbuild_orchestration::discovered_sets::types::DiscoveredSets,
     /// Each discover function's file, relative to the project.
     pub(crate) discover_files: std::collections::BTreeMap<String, String>,
+    /// Why nothing was published, redacted; null after a publication or a rules failure.
+    pub(crate) error: Option<String>,
 }
 
 /// A `{"plan": {"argv", "copy"}}` request for the runtime interpreter, answered with its reply.
@@ -797,6 +820,28 @@ impl std::fmt::Debug for ServiceAccountAdmin {
                 .field("disabled", disabled)
                 .finish(),
             Self::List => formatter.write_str("List"),
+        }
+    }
+}
+
+/// Who a republish is requested as; the key never appears in diagnostics.
+pub(crate) enum RepublishCaller {
+    Key { server: String, key: String },
+    Session { server: String, ca: Option<PathBuf> },
+}
+
+impl std::fmt::Debug for RepublishCaller {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Key { server, .. } => formatter
+                .debug_struct("Key")
+                .field("server", server)
+                .finish_non_exhaustive(),
+            Self::Session { server, ca } => formatter
+                .debug_struct("Session")
+                .field("server", server)
+                .field("ca", ca)
+                .finish(),
         }
     }
 }

@@ -120,6 +120,15 @@ pub(crate) struct LocationHealthTestCase {
     pub(crate) expected_observations: usize,
 }
 
+pub(crate) struct RepublishTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) publishes: bool,
+    pub(crate) outcome: fn(uuid::Uuid) -> crate::platform::models::LocationWorkOutcome,
+    pub(crate) expected_state: crate::platform::models::RepublishState,
+    pub(crate) expected_error: Option<&'static str>,
+}
+
 pub(crate) struct LocationWorkTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
@@ -679,4 +688,20 @@ pub(crate) struct DevelopmentListenerTestCase {
     pub(crate) description: &'static str,
     pub(crate) bind: &'static str,
     pub(crate) expected_refusal: &'static str,
+}
+
+pub(crate) fn republish_published(
+    snapshot_id: uuid::Uuid,
+) -> crate::platform::models::LocationWorkOutcome {
+    crate::platform::models::LocationWorkOutcome::Published {
+        snapshot_id,
+        generation: 2,
+    }
+}
+
+pub(crate) fn republish_failed(_: uuid::Uuid) -> crate::platform::models::LocationWorkOutcome {
+    crate::platform::models::LocationWorkOutcome::PublishFailed {
+        generation: 2,
+        error: "orders does not parse".into(),
+    }
 }

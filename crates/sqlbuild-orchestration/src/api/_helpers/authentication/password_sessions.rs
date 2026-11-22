@@ -139,6 +139,18 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             post(crate::api::_helpers::resources::person_location_work::request_sync),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/republish",
+            post(crate::api::_helpers::resources::person_republish::request),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/republish/{request_id}",
+            get(crate::api::_helpers::resources::person_republish::read),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/discovered",
+            get(crate::api::_helpers::resources::person_republish::discovered),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/connection-tests/{request_id}",
             get(crate::api::_helpers::resources::person_location_work::result),
         )

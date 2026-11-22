@@ -186,6 +186,8 @@ pub enum Action {
     RunAdhoc,
     #[serde(rename = "connection.test")]
     ConnectionTest,
+    #[serde(rename = "location.republish")]
+    LocationRepublish,
     #[serde(rename = "user.manage")]
     UserManage,
     #[serde(rename = "role.assign")]

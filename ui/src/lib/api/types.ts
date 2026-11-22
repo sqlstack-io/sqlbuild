@@ -26,6 +26,7 @@ export const CAPABILITIES = [
 	'sensor.reset_cursor',
 	'run.adhoc',
 	'connection.test',
+	'location.republish',
 	'plan.preview',
 	'location.manage',
 	'user.manage',
@@ -33,6 +34,9 @@ export const CAPABILITIES = [
 	'audit.view'
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
+
+/** Where a republish got to: the new version once published, or why nothing was. */
+export type RepublishResult = { state: 'pending' | 'published' | 'failed' | 'expired'; generation: number | null; error: string | null };
 
 export type PrincipalKind = 'user' | 'service' | 'scheduler' | 'sensor' | 'system';
 export type Principal = {

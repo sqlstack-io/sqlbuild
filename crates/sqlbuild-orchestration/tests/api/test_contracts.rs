@@ -118,6 +118,8 @@ mod test_proxy_provisioning;
 mod test_publish_encoding;
 #[path = "test_reads.rs"]
 mod test_reads;
+#[path = "test_republish.rs"]
+mod test_republish;
 #[path = "test_resource_costs.rs"]
 mod test_resource_costs;
 #[path = "test_run_ids.rs"]

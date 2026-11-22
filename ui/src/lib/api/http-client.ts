@@ -22,7 +22,7 @@ import { timelineOf } from './http-timeline';
 import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements, toIgnoredAuditFailures, toRunCostRows, toCostSummary, toNodeBuildCosts } from './http-runs';
 import { toSelectionEvaluation, toSelectionVocabulary } from './http-selection';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
-import type { AuthMode, Bootstrap, BuiltInRole, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
+import type { AuthMode, Bootstrap, BuiltInRole, Capability, Location, NavCounts, PlatformEvent, RepublishResult, Scope, Snapshot, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, IssuedToken, KeyRotation, LocationDetail, NewPasswordAccount, NewServiceAccount, ServiceAccount, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape, AutomaticWithdrawal } from './types/build';
 import type { NodeOutputIndex, NodeOutputPage, NodeOutputSearch, RunNode, RunOutputFollow, AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
@@ -102,6 +102,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getLatestSnapshot',
 	'getWarehouseSync',
 	'requestWarehouseSync',
+	'republish',
 	'maintenanceHistory',
 	'testConnection',
 	'listWarehouseConnections',
@@ -119,6 +120,8 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 
 /** How often a connection test asks for the location's answer, and the longest it waits. */
 const CONNECTION_TEST_POLL_MS = 1000;
+/** How long one republish poll holds open; the server ends the wait once the request expires. */
+const REPUBLISH_WAIT_SECONDS = 20;
 const CONNECTION_TEST_WAIT_MS = 60_000;
 
 /** How often the plan page asks for the location's plan; the server expires a plan after ten minutes. */
@@ -756,6 +759,28 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			});
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+		},
+		/** Asks the location to publish again, then long-polls until it has or the request expires. */
+		async republish(scope: Scope): Promise<RepublishResult> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const path = { location_id: locationId, target };
+			const requestId = newRequestId();
+			const asked = await http.POST('/api/control/locations/{location_id}/targets/{target}/republish', {
+				body: { request_id: requestId, reason: 'Requested from the web UI' },
+				params: { path, query: { wait: REPUBLISH_WAIT_SECONDS }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (asked.response.status === 401) onUnauthorized();
+			if (!asked.data) throw new ApiError(errorText(asked.error, asked.response), asked.response.status);
+			let status = asked.data;
+			while (status.state === 'pending') {
+				const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/republish/{request_id}', {
+					params: { path: { ...path, request_id: requestId }, query: { wait: REPUBLISH_WAIT_SECONDS } }
+				});
+				if (response.status === 401) onUnauthorized();
+				if (!data) throw new ApiError(errorText(error, response), response.status);
+				status = data;
+			}
+			return { state: status.state, generation: status.generation ?? null, error: status.error ?? null };
 		},
 		/** Asks the location to connect, then waits for its answer until the request expires. */
 		async testConnection(scope: Scope): Promise<ConnectionTest> {

@@ -100,6 +100,7 @@ Only a location, including `sqb dev`, calls discover functions. Every other comp
 |---------|--------------|
 | The location starts (every deploy or restart) | Every discover function runs |
 | `r` in `sqb dev` | Every discover function runs, and the location publishes |
+| A [republish](/docs/cli/location#republish), from the UI, the CLI or the API | Every discover function runs, and the location publishes |
 | A saved project file | The location publishes and reuses the saved sets; a discover function runs again only when its own module changed |
 | `check_every` | The location calls that function without publishing. When the result differs from the saved set, it publishes with the new result |
 
