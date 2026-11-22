@@ -656,3 +656,11 @@ class CheckSensorsTestCase:
     # The run event's failed checks and failed nodes.
     expected_failed_checks: list[str]
     expected_failed_nodes: list[str]
+
+
+@dataclass(frozen=True)
+class DevelopmentRepublishTestCase:
+    description: str
+    release: str
+    expected_exit_code: int
+    expected_items: int

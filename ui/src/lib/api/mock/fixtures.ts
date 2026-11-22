@@ -6,7 +6,7 @@ import { CAPABILITIES } from '../types';
 
 const MIN = 60_000;
 
-const OPERATE: Capability[] = ['view', 'view.sql', 'job.run', 'run.cancel', 'run.rerun', 'trigger.toggle', 'sensor.reset_cursor'];
+const OPERATE: Capability[] = ['view', 'view.sql', 'job.run', 'run.cancel', 'run.rerun', 'trigger.toggle', 'sensor.reset_cursor', 'location.republish'];
 const DEVELOP: Capability[] = [...OPERATE, 'view.evidence', 'run.rewrite_history', 'run.adhoc', 'connection.test', 'plan.preview'];
 
 /** Mock-only approximation of the built-in roles; the server owns the real grants. */

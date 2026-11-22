@@ -185,6 +185,9 @@ export interface ApiClient extends PlatformApi {
 	/** Asks the location to read SQLBuild's state back from the warehouse now. `connection.test` */
 	requestWarehouseSync(scope: Scope): Promise<void>;
 
+	/** Asks the location to compile and publish again, and waits for the result. `location.republish` */
+	republish(scope: Scope): Promise<RepublishResult>;
+
 	/** Live "changed" signals (SSE in the server client); consumers refetch or apply their payload. */
 	changes: ChangeSubscription;
 }

@@ -16,6 +16,7 @@
 	import LocationTokens from '$lib/components/platform/location-tokens.svelte';
 	import Panel from '$lib/components/platform/panel.svelte';
 	import ProblemList from '$lib/components/platform/problem-list.svelte';
+	import RepublishNow from '$lib/components/platform/republish-now.svelte';
 	import type { LocationInstance } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { brokenDeployPolicyHelp, brokenDeployPolicyLabel, healthHelp, healthLabel, healthTone, shortImage, targetWords } from '$lib/platform/labels';
@@ -100,6 +101,7 @@
 				<span class="right">
 					<ConnectionTest compact scope={{ locationId: detail.id }} connection={detail.warehouseConnection ?? 'warehouse'} last={detail.connectionTest} />
 					<WarehouseSyncNow scope={{ locationId: detail.id }} />
+					{#if app.client.supports('republish')}<RepublishNow scope={{ locationId: detail.id }} ondone={() => location.refresh()} />{/if}
 				</span>
 			</div>
 

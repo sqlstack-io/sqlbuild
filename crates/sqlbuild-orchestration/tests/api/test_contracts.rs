@@ -88,6 +88,8 @@ mod test_person_live;
 mod test_person_location_work;
 #[path = "test_person_plans.rs"]
 mod test_person_plans;
+#[path = "test_republish.rs"]
+mod test_republish;
 #[path = "test_person_sessions.rs"]
 mod test_person_sessions;
 #[path = "test_providers.rs"]

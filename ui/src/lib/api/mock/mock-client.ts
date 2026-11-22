@@ -473,6 +473,12 @@ export class MockApiClient implements ApiClient {
 		return this.#reply(undefined);
 	}
 
+	async republish(scope: Scope): Promise<RepublishResult> {
+		this.#require('location.republish');
+		this.#location(scope);
+		return this.#reply({ state: 'published', generation: null, error: null });
+	}
+
 	// ---- platform and admin: delegated to MockPlatformApi (mock/platform.ts) ----
 
 	platformHealth(...args: Parameters<PlatformApi['platformHealth']>) {

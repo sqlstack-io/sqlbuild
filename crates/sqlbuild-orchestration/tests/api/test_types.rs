@@ -99,6 +99,14 @@ pub(crate) struct LocationHealthTestCase {
     pub(crate) expected_observations: usize,
 }
 
+pub(crate) struct RepublishTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) publishes: bool,
+    pub(crate) expected_state: crate::platform::models::RepublishState,
+    pub(crate) expected_error: Option<&'static str>,
+}
+
 pub(crate) struct LocationWorkTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

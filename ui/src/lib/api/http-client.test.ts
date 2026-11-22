@@ -647,6 +647,26 @@ describe('administration writes', () => {
 	});
 });
 
+describe('republish', () => {
+	it('asks once with CSRF, then waits until the location published', async () => {
+		const states = ['pending', 'pending', 'published'];
+		const calls: Request[] = [];
+		vi.stubGlobal('document', { cookie: '__Host-sqb-csrf=token-1' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				calls.push(request);
+				return Response.json({ state: states[calls.length - 1], generation: 7 });
+			})
+		);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		expect(await client.republish(ORDERS)).toEqual({ state: 'published', generation: 7, error: null });
+		expect(calls.map((c) => c.method)).toEqual(['POST', 'GET', 'GET']);
+		expect(calls[0].headers.get('x-sqb-csrf')).toBe('token-1');
+		expect(new URL(calls[0].url).pathname).toBe('/api/control/locations/0191f0aa-orders/targets/development/republish');
+	});
+});
+
 describe('requestWarehouseSync', () => {
 	function server(status: number) {
 		const calls: Request[] = [];
