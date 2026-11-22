@@ -1,5 +1,6 @@
 """A missing secret's advice names the env file in use, and the flag only where a command takes it."""
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
-_SET_HERE: str = "set WORKER_ENV_TOKEN, WORKER_ENV_REGION_CODE in this shell or in "
+_SET_HERE: str = "set WORKER_ENV_REGION_CODE, WORKER_ENV_TOKEN in this shell or in "
 
 
 @pytest.mark.parametrize(
@@ -25,7 +26,7 @@ _SET_HERE: str = "set WORKER_ENV_TOKEN, WORKER_ENV_REGION_CODE in this shell or 
             "lineage takes the flag", ("lineage", "orders"), ".env", _SET_HERE, True
         ),
         SecretAdviceTestCase(
-            "a subcommand takes the flag", ("rules", "run", "all"), ".env", _SET_HERE, True
+            "a subcommand takes the flag", ("rules", "run", "SQBRMODEL102"), ".env", _SET_HERE, True
         ),
         SecretAdviceTestCase("plan doesn't", ("plan",), ".env", _SET_HERE, False),
         SecretAdviceTestCase("freshness doesn't", ("freshness",), ".env", _SET_HERE, False),
@@ -73,7 +74,7 @@ def test_given_a_missing_secret_when_a_command_fails_then_the_help_fits_that_com
     _ = env_file.write_text("UNRELATED_SETTING=1\n")
     env_file.chmod(0o600)
 
-    result = run_sqb(tmp_path, "--no-color", *test_case.command)
+    result: subprocess.CompletedProcess[str] = run_sqb(tmp_path, "--no-color", *test_case.command)
     shown: str = " ".join((result.stdout + result.stderr).split())
 
     assert result.returncode != 0, shown
