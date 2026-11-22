@@ -544,8 +544,10 @@ Environment=XDG_STATE_HOME=/var/lib/sqlbuild
 
 The server prints `Run output store: ...` when it starts, with a local folder as an absolute path.
 
-Reading a run's output needs `view.evidence` on every node the run selected, and each read is
-recorded in the security audit. People read a node's output with its stdout and stderr lines in the
+Reading a run's output needs `view.evidence` on every node the run selected. The security audit
+records each search and download. The run page reads a run's lines and index every few seconds while
+it follows the run, so each server records those reads once in 10 minutes for each person, run and
+kind of read. People read a node's output with its stdout and stderr lines in the
 order printed, or one stream of it, or the whole run's output with each line's node. They page
 forwards and backwards, read the last lines, fold runs of similar lines, search in either direction,
 jump to error and warning lines, or download a node's output whole. No read loads a whole log at

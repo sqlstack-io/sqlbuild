@@ -192,6 +192,13 @@ class NulLogTestCase(WorkerExecutionTestCase):
     expected_logs: list[tuple[str, str]] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class NulFailureTestCase(WorkerExecutionTestCase):
+    description: str
+    backend: Literal["sqlite", "postgres"] = "sqlite"
+    expected_error_end: str = ""
+
+
 @dataclass(frozen=True, kw_only=True)
 class PersonJourneyTestCase(WorkerExecutionTestCase):
     description: str
@@ -818,3 +825,11 @@ class CheckSensorsTestCase:
     # The run event's failed checks and failed nodes.
     expected_failed_checks: list[str]
     expected_failed_nodes: list[str]
+
+
+@dataclass(frozen=True)
+class PythonFailureTestCase(WorkerExecutionTestCase):
+    description: str
+    expected_error_start: str = ""
+    expected_error_end: str = ""
+    expected_error_below: int = 0

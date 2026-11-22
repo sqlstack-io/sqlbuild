@@ -1,102 +1,100 @@
 <script lang="ts">
-	import { plural } from '$lib/format/plural';
-	import DisclosureButton from '$lib/components/disclosure-button.svelte';
+	import CircleXIcon from '@lucide/svelte/icons/circle-x';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
-	import { untrack } from 'svelte';
-	import { app } from '$lib/state/app.svelte';
 	import CopyButton from '$lib/components/copy-button.svelte';
-	import type { RunNode, RunNodeError } from '$lib/api';
+	import type { RunNode } from '$lib/api';
 	import { shortRunId } from '$lib/operate/labels';
-	import { errorMessage } from '$lib/platform/labels';
+	import { errorHeadline, errorTextOf, tracebackOf } from './utils';
 	import type { RunDetailState } from './state.svelte';
+	import QueryPanel from './query-panel.svelte';
+	import TracebackPanel from './traceback-panel.svelte';
 
 	let { view }: { view: RunDetailState } = $props();
 
 	const failed = $derived(view.nodes.filter((n) => n.status === 'failed'));
 	const skipped = $derived(view.nodes.filter((n) => n.status === 'skipped').length);
-	// Error text is an audited evidence read, so it is fetched once per node and only when asked for.
-	const readable = $derived(app.client.supports('getRunNodeError') && app.can('view.evidence'));
 	let open = $state<Set<string>>(new Set());
-	let collapsed = $state(false);
-	let errors = $state<Record<string, RunNodeError | { failure: string } | undefined>>({});
+	let listOpen = $state(false);
 
-	async function toggle(n: RunNode) {
+	function toggle(n: RunNode) {
 		const key = `${n.runId}/${n.nodeKey}`;
 		const next = new Set(open);
 		if (next.has(key)) next.delete(key);
 		else next.add(key);
 		open = next;
-		if (!next.has(key) || n.errorDetail || errors[key] || !app.scope) return;
-		try {
-			errors[key] = await app.client.getRunNodeError(app.scope, n.runId, n.nodeKey);
-		} catch (error) {
-			errors[key] = { failure: errorMessage(error) };
-		}
+		if (next.has(key)) void view.loadNodeError(n);
 	}
 
-	// The first failure opens on its own, so the error is on screen without a click: one audited read per visit.
-	let opened = false;
-	$effect(() => {
-		const first = failed[0];
-		if (opened || !first || !(first.errorDetail || readable)) return;
-		opened = true;
-		untrack(() => void toggle(first));
-	});
+	// Collapsed by default: one line per failure, opening to where it points and its text.
+	const single = $derived(failed.length === 1);
 
-	function read(key: string): RunNodeError | null {
-		const found = errors[key];
-		return found && 'nodeKey' in found ? found : null;
-	}
-
-	function place(n: RunNode, key: string): string | null {
+	function place(n: RunNode): string | null {
 		if (n.errorLocation) return n.errorLocation.line === null ? n.errorLocation.file : `${n.errorLocation.file}:${n.errorLocation.line}`;
-		return read(key)?.file ?? null;
+		return view.nodeError(n)?.file ?? null;
 	}
 </script>
 
+{#snippet line(n: RunNode)}
+	{@const key = `${n.runId}/${n.nodeKey}`}
+	{@const loaded = view.nodeError(n)}
+	{@const where = place(n)}
+	{@const detail = errorTextOf(n, loaded)}
+	{@const traceback = tracebackOf(detail)}
+	<li>
+		<!-- raw-button: the failure's one line, opening its location and text -->
+		<button class="row" onclick={() => toggle(n)} aria-expanded={open.has(key)} title={open.has(key) ? 'Hide the error' : 'Show where it failed and the error'}>
+			<CircleXIcon class="x" size={14} aria-hidden="true" />
+			<span class="node mono">{n.nodeKey}</span>
+			{#if n.runId !== view.run?.id}<span class="faint">in {n.jobKey ?? shortRunId(n.runId)}</span>{/if}
+			<span class="msg">{n.errorMessage ?? errorHeadline(loaded?.message) ?? (n.errorCode ? `Failed with ${n.errorCode}` : 'Failed')}</span>
+			<ChevronRightIcon class={open.has(key) ? 'caret open' : 'caret'} size={14} aria-hidden="true" />
+		</button>
+		{#if open.has(key)}
+			{@const failure = view.nodeErrorFailure(n)}
+			{@const failedQueries = view.statements.filter((q) => q.nodeKey === n.nodeKey && q.runId === n.runId && q.status === 'failed')}
+			<div class="more">
+				{#if where}
+					<div class="where"><span class="loc mono" title="Where the failure points in the project">{where}</span><CopyButton value={where} label="Copy file" />
+						{#if n.runId !== view.run?.id}<a class="faint" href={to(`/runs/${n.runId}`)}>Open its job run</a>{/if}
+					</div>
+				{/if}
+				<!-- The failure in place: a Python exception's traceback, or the failed query and its error. -->
+				{#if traceback}
+					<TracebackPanel detail={traceback} file={n.errorLocation?.file ?? null} runId={n.runId} nodeKey={n.nodeKey} onframe={(line) => view.openCode(n.nodeKey, line)} />
+				{:else if failedQueries.length}
+					{#each failedQueries as q (q.id)}<QueryPanel statement={q} onstatements={() => view.showStatement(q.id, n.nodeKey)} />{/each}
+				{:else if detail}
+					<pre>{detail}</pre>
+				{:else if failure}
+					<p class="faint">{failure}</p>
+				{:else if loaded}
+					<p class="faint">No error text was recorded for this node.</p>
+				{:else if view.errorsReadable}
+					<p class="faint">Loading the error…</p>
+				{/if}
+			</div>
+		{/if}
+	</li>
+{/snippet}
+
 {#if failed.length}
 	<section class="failures" aria-label="Failures">
-		<DisclosureButton tone="default" open={!collapsed} onclick={() => (collapsed = !collapsed)} class="w-full px-6 pt-2 pb-1">
-			<b>{plural(failed.length, 'node')} failed</b>
-			{#if skipped}<span class="faint">· {skipped} skipped because of {failed.length === 1 ? 'it' : 'them'}</span>{/if}
-		</DisclosureButton>
-		{#if !collapsed}
-			<ul>
-				{#each failed as n (`${n.runId}/${n.nodeKey}`)}
-					{@const key = `${n.runId}/${n.nodeKey}`}
-					{@const loaded = read(key)}
-					{@const where = place(n, key)}
-					{@const detail = n.errorDetail ?? loaded?.message ?? null}
-					<li>
-						<div class="row">
-							{#if app.client.supports('listRunStatements')}<Button variant="link" size="inline" class="font-mono font-medium text-(--sb-error)" onclick={() => view.focusNode(n.nodeKey, 'statements')} title="Show this node's queries below">{n.nodeKey}</Button>{:else}<span class="node mono">{n.nodeKey}</span>{/if}
-							{#if n.runId !== view.run?.id}<a class="faint" href={to(`/runs/${n.runId}`)}>in {n.jobKey ?? shortRunId(n.runId)}</a>{/if}
-							<span class="msg">{n.errorMessage ?? loaded?.message?.split('\n')[0] ?? (n.errorCode ? `Failed with ${n.errorCode}` : 'Failed')}</span>
-							{#if where}
-								<span class="loc mono" title="Where the failure points in the project">{where}</span>
-								<CopyButton value={where} label="Copy file" />
-							{/if}
-							{#if n.errorDetail || readable}
-								<Button variant="link" size="inline" class="text-[12px]" onclick={() => toggle(n)} aria-expanded={open.has(key)}>{open.has(key) ? 'Hide details' : 'Details'}</Button>
-							{/if}
-						</div>
-						{#if open.has(key)}
-							{@const got = errors[key]}
-							{#if detail}
-								<pre>{detail}</pre>
-							{:else if got && 'failure' in got}
-								<p class="faint">{got.failure}</p>
-							{:else if got}
-								<p class="faint">No error text was recorded for this node.</p>
-							{:else if !n.errorDetail}
-								<p class="faint">Loading the error…</p>
-							{/if}
-							{#if n.errorCode && detail}<p class="faint">Error code <code>{n.errorCode}</code></p>{/if}
-						{/if}
-					</li>
-				{/each}
-			</ul>
+		{#if single}
+			<ul>{@render line(failed[0])}</ul>
+		{:else}
+			<!-- raw-button: the failures' one line, opening the list -->
+			<button class="row head" onclick={() => (listOpen = !listOpen)} aria-expanded={listOpen}>
+				<CircleXIcon class="x" size={14} aria-hidden="true" /><b>{failed.length} failed</b>
+				{#if skipped}<span class="faint">· {skipped} skipped because of them</span>{/if}
+				<ChevronRightIcon class={listOpen ? 'caret open' : 'caret'} size={14} aria-hidden="true" />
+			</button>
+			{#if listOpen}
+				<ul class="nested">
+					{#each failed as n (`${n.runId}/${n.nodeKey}`)}{@render line(n)}{/each}
+				</ul>
+			{/if}
 		{/if}
 	</section>
 {/if}
@@ -104,32 +102,56 @@
 <style>
 	.failures {
 		flex: 0 0 auto;
-		border-bottom: 1px solid color-mix(in srgb, var(--sb-error) 30%, var(--border));
-		background: color-mix(in srgb, var(--sb-error) 4%, var(--background));
+		border-bottom: 1px solid var(--border-subtle);
+		background: color-mix(in srgb, var(--sb-error) 2.5%, var(--background));
 		font-size: 12.5px;
-	}
-	.failures :global(.disclosure b) {
-		color: var(--sb-error);
-		font-weight: 600;
 	}
 	ul {
 		display: flex;
 		flex-direction: column;
-		padding: 0 24px 8px 42px;
-		max-height: 220px;
+		max-height: 260px;
 		overflow: auto;
 	}
-	li {
-		padding: 3px 0;
+	ul.nested {
+		padding-left: 18px;
 	}
 	.row {
 		display: flex;
+		width: 100%;
 		min-width: 0;
 		align-items: center;
 		gap: 8px;
+		padding: 5px 24px;
+		text-align: left;
 	}
-	.mono,
-	code {
+	.row:hover {
+		background: color-mix(in srgb, var(--sb-error) 6%, transparent);
+	}
+	.head b {
+		color: var(--sb-error);
+		font-weight: 600;
+	}
+	.row :global(.x) {
+		flex: none;
+		color: var(--sb-error);
+	}
+	.row :global(.caret) {
+		flex: none;
+		color: var(--sb-text-faint);
+		transition: transform 0.12s;
+	}
+	.row :global(.caret.open) {
+		transform: rotate(90deg);
+	}
+	.more {
+		padding: 0 24px 8px 44px;
+	}
+	.where {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.mono {
 		font-family: var(--font-mono);
 		font-size: 12px;
 	}
@@ -140,7 +162,7 @@
 	.msg {
 		overflow: hidden;
 		min-width: 0;
-		flex: 1;
+		flex: 0 1 auto;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}

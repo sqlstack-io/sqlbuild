@@ -5,6 +5,7 @@ import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, isUnsupported, type ApiClient } from './client';
 import { applyNodeStates } from './node-states';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
+import { LIVE_OUTPUT_ROWS, SEARCH_PARTS, followedOutput, outputLive, pageQuery, toNodeOutputIndex, toNodeOutputPage, toRunOutputLines, type NodeOutputAt } from './http-output';
 import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage, toNodeStates, toNodeStatusDelta } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
@@ -23,7 +24,7 @@ import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, NewPasswordAccount, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape, AutomaticWithdrawal } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
+import type { NodeOutputIndex, NodeOutputPage, NodeOutputSearch, RunNode, RunOutputFollow, AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 import { newRequestId } from '$lib/browser/request-id';
 
 type Wire = components['schemas'];
@@ -416,9 +417,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		},
 		async listRunEvents(scope: Scope, runId: string, query: { after?: number; limit?: number } = {}): Promise<RunEventPage> {
 			const limit = query.limit ?? 1000;
-			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events', {
-				params: { path: runPath(scope, runId), query: { after: query.after, limit } }
-			});
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events', { params: { path: runPath(scope, runId), query: { after: query.after, limit } } });
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return { events: data.flatMap((e) => toRunEvent(e, runId) ?? []), nextCursor: data.length === limit ? (data.at(-1)?.storage_id ?? null) : null };
@@ -471,12 +470,79 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		async listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]> {
 			const refusal = `${scope.locationId}|${runId}`;
 			if (!evidenceLocations.has(scope.locationId) || outputRefused.has(refusal)) return [];
+			// The output store's newest lines, each with its node; a server that keeps no output store answers from Recall.
+			const [lines, index] = await Promise.all([
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/lines', { params: { path: runPath(scope, runId), query: { tail: true, limit: LIVE_OUTPUT_ROWS } } }),
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index', { params: { path: runPath(scope, runId) } })
+			]);
+			if (lines.response.status === 401) onUnauthorized();
+			if (lines.response.status === 403) outputRefused.add(refusal);
+			if (lines.response.status === 403) return [];
+			if (lines.data && index.data) return toRunOutputLines(lines.data, index.data);
 			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output', { params: { path: runPath(scope, runId) } });
 			if (response.status === 401) onUnauthorized();
-			if (response.status === 403) outputRefused.add(refusal);
 			if (response.status === 403) return [];
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toRunOutput(data);
+		},
+		async followRunOutput(scope: Scope, runId: string, after: number | null): Promise<RunOutputFollow | null> {
+			const refusal = `${scope.locationId}|${runId}`;
+			if (!evidenceLocations.has(scope.locationId) || outputRefused.has(refusal)) return { lines: [], logs: [], last: 0, replaced: true };
+			const lines = (query: { from?: number; tail?: boolean }) =>
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/lines', { params: { path: runPath(scope, runId), query: { ...query, limit: LIVE_OUTPUT_ROWS } } });
+			// The index (each node's totals and its `ctx.log` lines) once, beside the lines since the last read.
+			const [index, page] = await Promise.all([
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index', { params: { path: runPath(scope, runId) } }),
+				lines(after == null ? { tail: true } : { from: after + 1 })
+			]);
+			if (page.response.status === 401) onUnauthorized();
+			if (page.response.status === 403) outputRefused.add(refusal);
+			if (page.response.status === 403) return { lines: [], logs: [], last: 0, replaced: true };
+			// A server that keeps no output store: the caller reads Recall's output instead.
+			if (!page.data || !index.data) return null;
+			// Too many new lines to read on from the last: start again from the newest.
+			const fresh = after != null && page.data.next != null ? (await lines({ tail: true })).data : null;
+			return followedOutput(fresh ?? page.data, index.data, runId, after == null || fresh != null);
+		},
+		async getNodeOutputIndex(scope: Scope, runId: string, nodeKey: string): Promise<NodeOutputIndex | null> {
+			if (!evidenceLocations.has(scope.locationId)) return null;
+			const [{ data, error, response }, nodes] = await Promise.all([
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index', { params: { path: runPath(scope, runId), query: { node: nodeKey } } }),
+				runNodes(scope, runId)
+			]);
+			if (response.status === 401) onUnauthorized();
+			if (response.status === 403 || response.status === 503) return null;
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toNodeOutputIndex(data, nodeKey, outputLive(nodes.map((n) => ({ nodeKey: n.node_key, status: n.status as RunNode['status'] })), nodeKey));
+		},
+		async getNodeOutputPage(scope: Scope, runId: string, nodeKey: string, at: NodeOutputAt): Promise<NodeOutputPage> {
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/lines', {
+				params: { path: runPath(scope, runId), query: pageQuery(nodeKey, at) }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toNodeOutputPage(data);
+		},
+		async searchNodeOutput(scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward', signal?: AbortSignal): Promise<NodeOutputSearch> {
+			// A large output is searched a bounded part at a time: carry on from where each part stopped,
+			// for a few parts, then hand back where to search on. A newer search aborts this one.
+			const searchFrom = async (start: number): Promise<Wire['OutputSearch']> => {
+				const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/search', {
+					params: { path: runPath(scope, runId), query: { node: nodeKey, text: query, from: start, direction } },
+					signal
+				});
+				if (response.status === 401) onUnauthorized();
+				if (!data) throw new ApiError(errorText(error, response), response.status);
+				return data;
+			};
+			let found: Wire['OutputSearch'] = await searchFrom(from);
+			for (let part = 1; part < SEARCH_PARTS && found.line == null && found.continue_from != null; part++) found = await searchFrom(found.continue_from);
+			return { line: found.line ?? null, count: found.count ?? null, rank: found.rank ?? null, continueFrom: found.line == null ? (found.continue_from ?? null) : null };
+		},
+		nodeOutputDownloadUrl(scope: Scope, runId: string, nodeKey: string): string {
+			const { location_id, target, run_id } = runPath(scope, runId);
+			const path = `/api/control/locations/${encodeURIComponent(location_id)}/targets/${encodeURIComponent(target)}/runs/${encodeURIComponent(run_id)}/output/download`;
+			return `${baseUrl}${path}?node=${encodeURIComponent(nodeKey)}`;
 		},
 		async getRunNodeError(scope: Scope, runId: string, nodeKey: string): Promise<RunNodeError> {
 			const refusal = `${scope.locationId}|${runId}|${nodeKey}`;

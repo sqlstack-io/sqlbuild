@@ -1,4 +1,6 @@
-//! A run read that needs an evidence permission, authorized and audited in one transaction, for other domains' run reads.
+//! A run read that needs an evidence permission, authorized and audited in one transaction (once per `repeat` window when given), for other domains.
+
+use std::time::Duration;
 
 use serde_json::Value;
 use uuid::Uuid;
@@ -14,12 +16,15 @@ pub(crate) async fn read_run_evidence<T>(
     credentials: (&AuditContext, Uuid),
     run: ((Uuid, &str, Uuid), DefaultRole, Action),
     read: (
-        &str,
-        impl AsyncFnOnce(
-            ControlTransaction,
-            &RunRecallScope,
-        ) -> Result<(ControlTransaction, T), ControlError>,
-        impl FnOnce(&T) -> Value,
+        (
+            &str,
+            impl AsyncFnOnce(
+                ControlTransaction,
+                &RunRecallScope,
+            ) -> Result<(ControlTransaction, T), ControlError>,
+            impl FnOnce(&T) -> Value,
+        ),
+        Option<Duration>,
     ),
 ) -> Result<Option<T>, ControlError> {
     sensitive_run_read(store, credentials, run, read).await

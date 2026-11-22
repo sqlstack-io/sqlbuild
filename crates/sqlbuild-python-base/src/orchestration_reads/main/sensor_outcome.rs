@@ -20,7 +20,7 @@ pub fn sensor_outcome(
     let authoring = py.import(SENSOR_AUTHORING_MODULE)?;
     if result.is_instance(&authoring.getattr("SkipReason")?)? {
         let reason: String = result.getattr("reason")?.extract()?;
-        if reason.trim().is_empty() {
+        if reason.replace('\0', "").trim().is_empty() {
             return Err(PyValueError::new_err("SkipReason needs a nonempty reason"));
         }
         return Ok(SensorFunctionOutcome::Skipped { cursor, reason });

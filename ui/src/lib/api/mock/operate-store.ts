@@ -2,6 +2,7 @@
 // its claims, jobs, triggers and sensors. A small loop advances live runs so
 // cancels, launches and claims behave like they do on the server.
 
+import { bigAvailable, bigDownloadUrl, bigIndex, bigPage, bigSearch } from './big-output';
 import { parseCommand } from '$lib/run/command';
 import { flagSpec, VERBS } from '$lib/run/command-table';
 import { ApiError } from '../client';
@@ -39,6 +40,10 @@ import type {
 	RunListQuery,
 	RunNode,
 	RunOutputLine,
+	NodeOutputIndex,
+	NodeOutputPage,
+	NodeOutputSearch,
+	CheckSample,
 	RunRow,
 	RunRowPage,
 	RunRowQuery,
@@ -97,6 +102,8 @@ import {
 	isTerminal,
 	liveness,
 	sqlFor,
+	auditSample,
+	auditSql,
 	statusReason,
 	type RunRecord
 } from './run-detail';
@@ -490,7 +497,41 @@ export class MockOperate {
 		const now = Date.now();
 		const statement = execution(rec, this.#nodesOf(rec, now), now).statements.find((st) => st.id === statementId);
 		if (!statement) throw new ApiError(`Unknown statement ${statementId}`, 404);
-		return this.#ctx.reply({ statementId, sql: statement.sqlRecorded ? sqlFor(statement.nodeKey, statement.kind, this.#ctx.target(scope)) : null });
+		const target = this.#ctx.target(scope);
+		const sql = statement.kind === 'audit' ? auditSql(statement.nodeKey, statementId, target) : sqlFor(statement.nodeKey, statement.kind, target);
+		return this.#ctx.reply({ statementId, sql: statement.sqlRecorded ? sql : null });
+	}
+
+	getCheckSample(_scope: Scope, runId: string, statementId: string): Promise<CheckSample | null> {
+		const rec = this.#require(runId);
+		const now = Date.now();
+		const statement = execution(rec, this.#nodesOf(rec, now), now).statements.find((st) => st.id === statementId);
+		return this.#ctx.reply(statement?.kind === 'audit' && statement.rowsAffected ? auditSample(statement.nodeKey, statementId, statement.rowsAffected) : null);
+	}
+
+	/** How much of a node's bulk output exists now (CHI-1597): only the notebook runner prints enough to page. */
+	#bigOutput(runId: string, nodeKey: string): { available: number; live: boolean } | null {
+		const rec = this.#require(runId);
+		const now = Date.now();
+		const n = this.#nodesOf(rec, now).find((x) => x.nodeKey === nodeKey);
+		return n ? bigAvailable(n, now) : null;
+	}
+	getNodeOutputIndex(_scope: Scope, runId: string, nodeKey: string): Promise<NodeOutputIndex | null> {
+		const big = this.#bigOutput(runId, nodeKey);
+		return this.#ctx.reply(big ? bigIndex(nodeKey, big.available, big.live) : null);
+	}
+	getNodeOutputPage(_scope: Scope, runId: string, nodeKey: string, at: { from: number; rows: number; direction: 'forward' | 'backward'; collapse: boolean; stream?: 'all' | 'stdout' | 'stderr'; around?: number }): Promise<NodeOutputPage> {
+		const big = this.#bigOutput(runId, nodeKey);
+		return this.#ctx.reply(big ? bigPage(nodeKey, big.available, at) : { total: 0, from: at.from, to: at.from, rows: [] });
+	}
+	searchNodeOutput(_scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward'): Promise<NodeOutputSearch> {
+		const big = this.#bigOutput(runId, nodeKey);
+		return this.#ctx.reply(big ? bigSearch(nodeKey, big.available, query, from, direction) : { count: 0, line: null, rank: null });
+	}
+	/** The mock has no file server: the link opens a short note where the server would stream the file. */
+	nodeOutputDownloadUrl(_scope: Scope, runId: string, nodeKey: string): string {
+		const big = this.#bigOutput(runId, nodeKey);
+		return bigDownloadUrl(runId, nodeKey, big?.available ?? 0);
 	}
 
 	listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]> {

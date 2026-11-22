@@ -4,6 +4,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::credentials::models::{Action, AuditContext, DefaultRole};
+use crate::runs::constants::REPEATED_READ_AUDIT;
 use crate::runs::models::RunOutput;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
@@ -20,11 +21,11 @@ pub async fn read_person_run_output(
         store,
         credentials,
         (run, default_role, Action::ViewEvidence),
-        (
+        ((
             "output.read",
             run_output_in,
             |output: &RunOutput| json!({"lines": output.lines.len(), "errors": output.errors.len()}),
-        ),
+        ), Some(REPEATED_READ_AUDIT)),
     )
     .await
 }

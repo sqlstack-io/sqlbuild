@@ -39,10 +39,3 @@ export function rerunChoices(detail: RunDetail, selected: readonly string[], can
 	});
 	return choices;
 }
-
-/** The split button's main action: from failure after a failure, otherwise all. */
-export function primaryChoice(detail: RunDetail, choices: RerunChoice[]): RerunChoice {
-	const failedLike = detail.run.status === 'failed' || detail.run.status === 'partial' || detail.run.status === 'presumed_failed';
-	const wanted = failedLike && detail.rerunFromFailureNodes.length ? 'from_failure' : 'all';
-	return choices.find((c) => c.mode === wanted)!;
-}

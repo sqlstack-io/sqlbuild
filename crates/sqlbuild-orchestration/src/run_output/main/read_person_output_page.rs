@@ -8,6 +8,7 @@ use crate::run_output::_helpers::views::view_line_count;
 use crate::run_output::constants::{DEFAULT_PAGE_ROWS, MAX_PAGE_ROWS};
 use crate::run_output::models::{OutputPage, OutputPageQuery, OutputStore, OutputView, ViewReader};
 use crate::run_output::types::PersonRunRead;
+use crate::runs::constants::REPEATED_READ_AUDIT;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 use crate::warehouse_history::main::read_run_evidence::read_run_evidence;
@@ -35,11 +36,11 @@ pub async fn read_person_output_page(
         store,
         credentials,
         (run, default_role, Action::ViewEvidence),
-        (
+        ((
             "output.page",
             async |transaction, _| view_line_count(transaction, &view).await,
             |_: &i64| json!({"node": query.node, "stream": query.stream, "from": query.from, "before": query.before, "tail": query.tail}),
-        ),
+        ), Some(REPEATED_READ_AUDIT)),
     )
     .await?
     else {

@@ -30,9 +30,12 @@ pub async fn download_person_output(
         credentials,
         (run, default_role, Action::ViewEvidence),
         (
-            "output.download",
-            async |transaction, _| view_line_count(transaction, &view).await,
-            |lines: &i64| json!({"node": query.node, "stream": query.stream, "lines": lines}),
+            (
+                "output.download",
+                async |transaction, _| view_line_count(transaction, &view).await,
+                |lines: &i64| json!({"node": query.node, "stream": query.stream, "lines": lines}),
+            ),
+            None,
         ),
     )
     .await?

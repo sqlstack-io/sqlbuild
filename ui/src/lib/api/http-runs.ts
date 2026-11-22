@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { isActiveRun } from '$lib/status';
 import type { Capability, Principal } from './types';
-import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanChanged, PlanDocument, PlanPage, PlanPageSection, PlanResult, PlanWarning, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostGroup, CostSummary, NodeBuildCost } from './types/operate';
+import type { AdhocRunCheck, LaunchVerb, NodeCounts, NodeKind, PlanChanged, PlanDocument, PlanPage, PlanPageSection, PlanResult, PlanWarning, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventCheck, RunEventLevel, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostGroup, CostSummary, NodeBuildCost } from './types/operate';
 import { RECALL_EVENT_TYPES, SCHEDULER_FACTS } from './types/operate';
 
 type Wire = components['schemas'];
@@ -138,6 +138,7 @@ function countsOf(wire: Wire['RunRecord']): NodeCounts {
 		warn: n('warn'),
 		failed: n('failed') + n('cancelled'),
 		skipped: n('skipped') + n('not_run'),
+		notRun: n('not_run'),
 		running: n('running'),
 		pending: n('pending')
 	};
@@ -326,10 +327,20 @@ function nodeStatus(status: string): RunNodeStatus {
 	return (['pending', 'running', 'success', 'warn', 'failed', 'skipped', 'cancelled'] as const).find((s) => s === status) ?? 'not_run';
 }
 
+const MODEL_KINDS = ['view', 'table', 'incremental'] as const;
+const OTHER_KINDS = ['source', 'loader', 'seed', 'asset', 'udf', 'table_fn'] as const;
+
+/** A run node's kind: a model's by its materialization in the run's snapshot, anything else's by its key. */
+export function nodeKindOf(nodeKey: string, materialization: string | null | undefined): NodeKind | null {
+	const prefix = nodeKey.slice(0, nodeKey.indexOf(':'));
+	if (prefix === 'model') return MODEL_KINDS.find((k) => k === materialization) ?? null;
+	return OTHER_KINDS.find((k) => k === prefix) ?? null;
+}
+
 export function toRunNode(wire: Wire['RunNodeRecord'], run: Run): RunNode {
 	return {
 		nodeKey: wire.node_key,
-		kind: null,
+		kind: nodeKindOf(wire.node_key, wire.materialization),
 		runId: run.id,
 		jobKey: run.jobKey,
 		status: nodeStatus(wire.status),
@@ -337,6 +348,9 @@ export function toRunNode(wire: Wire['RunNodeRecord'], run: Run): RunNode {
 		startedAt: wire.started_at ?? null,
 		endedAt: wire.ended_at ?? null,
 		rowsAffected: wire.rows_affected ?? null,
+		tableRows: wire.table_rows ?? null,
+		rowsSoFar: wire.rows_so_far ?? null,
+		noChangeReason: wire.no_change_reason ?? null,
 		errorCode: wire.error_code ?? null,
 		errorMessage: null,
 		errorLocation: null,
@@ -452,7 +466,21 @@ export function toRunEvent(wire: Wire['RunEventRecord'], runId: string): RunEven
 		nodeKey: recallNodeKey(wire),
 		statementId: wire.statement_id ?? null,
 		attempt: null,
-		message
+		message,
+		check: type === 'audit_completed' ? checkOf(wire) : null
+	};
+}
+
+const CHECK_OUTCOMES: Record<string, RunEventCheck['outcome']> = { pass: 'passed', warn: 'warned', error: 'failed' };
+
+/** A check result's name, outcome and rows from its event; a result with no name recorded is named by its outcome. */
+export function checkOf(wire: Wire['RunEventRecord']): RunEventCheck {
+	return {
+		name: wire.check_name ?? wire.outcome ?? 'check',
+		outcome: CHECK_OUTCOMES[wire.outcome ?? ''] ?? 'skipped',
+		rows: wire.check_rows ?? null,
+		bindingKey: wire.check_binding_key ?? null,
+		resultId: wire.check_result_id ?? null
 	};
 }
 

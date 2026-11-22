@@ -5,9 +5,9 @@ test.use({ viewport: { width: 1600, height: 1000 } });
 
 test('a running run’s nodes that haven’t started read as waiting', async ({ page }) => {
 	await page.goto('/runs/run-9d21?mock');
-	const panel = page.getByLabel('Nodes by outcome');
-	await expect(panel.locator('.group[data-group="waiting"]')).toContainText('Waiting', { timeout: 20_000 });
-	await expect(panel.locator('.group[data-group="not_run"]')).toHaveCount(0);
+	const summary = page.getByTestId('run-summary');
+	await expect(summary).toContainText(/\d+ waiting/, { timeout: 20_000 });
+	await expect(summary).not.toContainText('not run');
 	await expect(page.locator('.gantt .note', { hasText: 'Waiting' }).first()).toBeVisible();
 	await expect(page.locator('.gantt .note', { hasText: /Pending|Not run/ })).toHaveCount(0);
 });

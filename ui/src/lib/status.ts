@@ -18,6 +18,11 @@ export const runStatusTone: Record<RunStatus, string> = {
 /** A finished run that let error-severity audit failures through instead of failing: it reads as a success with a warning. */
 export const ignoresAuditFailures = (status: RunStatus, ignored: number) => (status === 'success' || status === 'warn') && ignored > 0;
 
+/** A group member's run, as its card says it: one that never started is "Not started", never "Skipped". */
+export function memberRunLabel(r: { status: RunStatus; startedAt: string | null }): string {
+	return r.status === 'skipped' && !r.startedAt ? 'Not started' : runStatusLabel[r.status];
+}
+
 export const runStatusLabel: Record<RunStatus, string> = {
 	queued: 'Queued',
 	launched: 'Starting',

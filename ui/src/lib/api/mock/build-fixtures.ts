@@ -44,6 +44,26 @@ export type NodeSpec = {
 const c = (name: string, type: string, description: string, audits: string[] = [], expr?: string): ColumnSpec => ({ name, type, description, audits, expr });
 
 export const NODE_SPECS: Record<string, NodeSpec> = {
+	// Prototype (CHI-1591) nodes.
+	stg_sessions: { materialization: 'view', description: 'Storefront sessions, one row each.', schema: 'ANALYTICS', columns: [c('session_id', 'bigint', 'Session', ['not_null', 'unique']), c('customer_id', 'bigint', 'Customer', ['not_null']), c('channel', 'varchar', 'Channel', ['accepted_values']), c('started_at', 'timestamp', 'Started', ['not_null'])] },
+	fct_payment_daily: { materialization: 'table', description: 'Payments by day and method.', schema: 'ANALYTICS', columns: [c('payment_id', 'bigint', 'Payment', ['not_null']), c('payment_day', 'date', 'Day', ['unique']), c('amount_cents', 'bigint', 'Amount', ['not_null']), c('status', 'varchar', 'Status', ['accepted_values']), c('method', 'varchar', 'Method', ['not_null'])] },
+	fct_order_lines: { materialization: 'table', description: 'One row per order line, with its payment.', schema: 'ANALYTICS', columns: [c('payment_id', 'bigint', 'Payment', ['not_null']), c('order_id', 'bigint', 'Order', ['unique']), c('order_line_id', 'bigint', 'Order line', ['not_null']), c('product_id', 'bigint', 'Product', ['not_null']), c('status', 'varchar', 'Status', ['accepted_values'])] },
+	fct_refunds: { materialization: 'table', description: 'Refunds, one row per refunded order.', schema: 'ANALYTICS', columns: [c('order_id', 'bigint', 'Order', ['unique']), c('payment_id', 'bigint', 'Payment', ['not_null']), c('status', 'varchar', 'Status', ['accepted_values']), c('reason', 'varchar', 'Reason', ['not_null']), c('refund_id', 'bigint', 'Refund', ['not_null', 'unique']), c('amount_cents', 'bigint', 'Amount', ['not_null']), c('refunded_at', 'timestamp', 'Refunded', ['not_null']), c('customer_id', 'bigint', 'Customer', ['not_null']), c('currency', 'varchar', 'Currency', ['accepted_values'])] },
+	stg_cost_prices: { materialization: 'view', description: 'Unit cost of each product, by day.', schema: 'ANALYTICS', columns: [c('product_id', 'bigint', 'Product', ['not_null']), c('cost_cents', 'bigint', 'Unit cost in cents', ['not_null'])] },
+	fct_order_margin: { materialization: 'table', description: 'Margin of each order line: revenue less unit cost.', schema: 'ANALYTICS', columns: [c('order_line_id', 'bigint', 'Order line', ['not_null', 'unique']), c('margin_cents', 'bigint', 'Margin in cents'), c('margin_pct', 'double', 'Margin as a share of revenue', ['not_null'])] },
+	agg_margin_daily: { materialization: 'incremental', description: 'Margin by day.', schema: 'ANALYTICS', columns: [c('day', 'date', 'Day', ['not_null', 'unique']), c('margin_cents', 'bigint', 'Margin in cents')] },
+	rpt_margin_weekly: { materialization: 'table', description: 'Margin by week, for the finance review.', schema: 'ANALYTICS', columns: [c('week', 'date', 'Week', ['not_null', 'unique'])] },
+	rpt_margin_by_category: { materialization: 'table', description: 'Margin by product category.', schema: 'ANALYTICS', columns: [c('category', 'varchar', 'Category', ['not_null'])] },
+	stg_inventory: { materialization: 'view', description: 'Stock counts from the warehouse system.', schema: 'ANALYTICS', columns: [c('product_id', 'bigint', 'Product', ['not_null']), c('on_hand', 'bigint', 'Units on hand', ['not_null'])] },
+	stg_products: { materialization: 'view', description: 'Products from the catalogue.', schema: 'ANALYTICS', columns: [c('product_id', 'bigint', 'Product', ['not_null', 'unique'])] },
+	dim_products: { materialization: 'table', description: 'One row per product.', schema: 'ANALYTICS', columns: [c('product_id', 'bigint', 'Product', ['not_null', 'unique']), c('category', 'varchar', 'Category', ['not_null'])] },
+	fct_stock_levels: { materialization: 'incremental', description: 'Stock level of each product, by hour.', schema: 'ANALYTICS', columns: [c('product_id', 'bigint', 'Product', ['not_null']), c('on_hand', 'bigint', 'Units on hand')] },
+	agg_stock_by_day: { materialization: 'table', description: 'Stock by day.', schema: 'ANALYTICS', columns: [c('day', 'date', 'Day', ['not_null'])] },
+	rpt_low_stock: { materialization: 'table', description: 'Products below their reorder point.', schema: 'ANALYTICS', columns: [c('product_id', 'bigint', 'Product', ['not_null'])] },
+	stg_shipping: { materialization: 'view', description: 'Shipments from the carrier feed.', schema: 'ANALYTICS', columns: [c('shipment_id', 'bigint', 'Shipment', ['not_null', 'unique'])] },
+	fct_shipments: { materialization: 'incremental', description: 'One row per shipment, with its order.', schema: 'ANALYTICS', columns: [c('shipment_id', 'bigint', 'Shipment', ['not_null', 'unique']), c('order_id', 'bigint', 'Order', ['not_null'])] },
+	agg_delivery_times: { materialization: 'table', description: 'Delivery times by carrier and day.', schema: 'ANALYTICS', columns: [c('day', 'date', 'Day', ['not_null'])] },
+	rpt_late_deliveries: { materialization: 'table', description: 'Orders delivered after their promised date.', schema: 'ANALYTICS', columns: [c('order_id', 'bigint', 'Order', ['not_null'])] },
 	raw__customers: {
 		materialization: null,
 		description: 'Customer records replicated from the shop database.',
@@ -175,6 +195,106 @@ export const NODE_SPECS: Record<string, NodeSpec> = {
 };
 
 export const PYTHON_SOURCE: Record<string, { file: string; source: string }> = {
+	score_customers_v2: {
+		file: 'models/ml/score_customers_v2.py',
+		source: `import numpy as np
+import pandas as pd
+from sqlbuild.tasks import task
+
+from shop.models import churn_model
+
+SEGMENT_WEIGHTS = {
+    "loyal": 0.6,
+    "regular": 1.0,
+    "lapsing": 1.4,
+    "new": 1.1,
+}
+
+
+def build_features(customers: pd.DataFrame, segments: pd.DataFrame) -> pd.DataFrame:
+    \"\"\"Joins each customer to their segment and derives the model's features.\"\"\"
+    joined = customers.merge(
+        segments,
+        how="left",
+        left_on="customer_id",
+        right_on="customer_id",
+        suffixes=("", "_seg"),
+    )
+    # The segments table renamed customer_segment to segment in rev 14.
+    joined["orders_per_month"] = joined["orders"] / joined["tenure_months"].clip(lower=1)
+    joined["segment_weight"] = joined["customer_segment"].map(SEGMENT_WEIGHTS)
+    return joined[["customer_id", "orders_per_month", "lifetime_value", "segment_weight"]]
+
+
+@task(upstream=["dim_customers"])
+def score_customers_v2(ctx):
+    \"\"\"Scores churn risk with model churn_v2, weighting by customer segment.\"\"\"
+    customers = ctx.query('SELECT * FROM __ref("dim_customers")').to_pandas()
+    print(f"Loaded {len(customers):,} customers, {len(customers.columns)} columns")
+    segments = ctx.query("SELECT * FROM analytics.customer_segments").to_pandas()
+    model = churn_model("churn_v2")
+    for i, batch in enumerate(batches(customers, size=16)):
+        print(f"  scoring batch {i}")
+        model.score(batch)
+
+    features = build_features(customers, segments)
+    ctx.write("customer_scores_v2", model.predict(features))`
+	},
+	notebook_runner: {
+		file: 'models/ml/notebook_runner.py',
+		source: `from sqlbuild.tasks import task
+
+from shop.notebooks import run_notebook
+
+
+@task(upstream=["fact_orders"])
+def notebook_runner(ctx):
+    \"\"\"Runs the churn features notebook, cell by cell. It prints every batch.\"\"\"
+    ctx.log.info("Running notebook churn_features.ipynb (48 cells)")
+    result = run_notebook("notebooks/churn_features.ipynb", on_retry=lambda cell: ctx.log.warning(f"cell {cell} retried after worker loss"))
+    ctx.log.info(f"Notebook finished: {result.cells} cells, {result.rows_written:,} rows written")`
+	},
+	raw_events: {
+		file: 'models/ingest/raw_events.py',
+		source: `import logging
+
+from sqlbuild.loaders import loader
+from sqlbuild.executor.load.models import LoaderContext
+
+from shop.events_api import fetch_page
+
+log = logging.getLogger("shop.events")
+
+
+@loader(cursor="occurred_at", strategy="append")
+def raw_events(ctx: LoaderContext):
+    """Storefront events from the events API, paged since the last cursor."""
+    page = 1
+    while True:
+        rows = fetch_page(since=ctx.current_cursor_value, page=page)
+        if not rows:
+            return
+        print(f"Page {page}: {len(rows):,} events")
+        yield rows
+        page += 1`
+	},
+	score_customers: {
+		file: 'models/ml/score_customers.py',
+		source: `import pandas as pd
+from sqlbuild.tasks import task
+
+
+@task(upstream=["dim_customers"])
+def score_customers(ctx):
+    """Scores each customer's churn risk and writes it back."""
+    customers = ctx.query('SELECT * FROM __ref("dim_customers")').to_pandas()
+    print(f"Loaded {len(customers):,} customers")
+    features = customers[["orders", "lifetime_value"]]
+    features = features.fillna(method="ffill")
+    customers["churn_risk"] = model().predict_proba(features)[:, 1]
+    ctx.write("customer_scores", customers[["customer_id", "churn_risk"]])
+    print(f"Scored {len(customers):,} customers")`
+	},
 	raw__orders: {
 		file: 'python/raw__orders.py',
 		source: `from sqlbuild.loaders import loader

@@ -4,7 +4,7 @@
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
 	import { to } from '$lib/paths';
 	import { formatAgo } from '$lib/format/time';
-	import { runStatusLabel, runStatusTone } from '$lib/status';
+	import { memberRunLabel, runStatusTone } from '$lib/status';
 	import { app } from '$lib/state/app.svelte';
 	import type { MemberCardData } from './member-graph';
 	import { clickGuard } from './click-guard';
@@ -32,8 +32,8 @@
 			{#if d.nodeCount !== null}<span class="faint">· {plural(d.nodeCount, 'node')}</span>{/if}
 		</button>
 		{#if d.lastRun}
-			<span class="last" title="Last run: {runStatusLabel[d.lastRun.status]}">
-				<i style:background={runStatusTone[d.lastRun.status]}></i>{d.lastRun.startedAt ? formatAgo(d.lastRun.startedAt, app.now) : runStatusLabel[d.lastRun.status]}
+			<span class="last" title="Last run: {memberRunLabel(d.lastRun)}">
+				<i style:background={runStatusTone[d.lastRun.status]}></i>{d.lastRun.startedAt ? formatAgo(d.lastRun.startedAt, app.now) : memberRunLabel(d.lastRun)}
 			</span>
 		{/if}
 		<a class="open nodrag" href={to(`/jobs/${d.jobKey}`)} title="Open the page of {d.jobKey}">Open job ↗</a>

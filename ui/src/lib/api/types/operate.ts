@@ -38,6 +38,8 @@ export type NodeCounts = {
 	skipped: number;
 	running: number;
 	pending: number;
+	/** Of `skipped`, the nodes that never ran because the run stopped first: "not run", not "skipped". */
+	notRun?: number;
 };
 
 /** Compute estimate for a finished run; null where the adapter reports no cost. */
@@ -218,6 +220,12 @@ export type RunNode = {
 	startedAt: Iso | null;
 	endedAt: Iso | null;
 	rowsAffected: number | null;
+	/** Rows a table rebuilt in full holds, read from warehouse metadata where that is exact and free. */
+	tableRows?: number | null;
+	/** Rows a running node has written so far, where its warehouse reports them. */
+	rowsSoFar?: number | null;
+	/** Why a node that ran changed nothing, such as `unchanged since its last build`. */
+	noChangeReason?: string | null;
 	errorCode: string | null;
 	errorMessage: string | null;
 	/** Where in the project the failure points: the model file, and the line when it is known. */
@@ -242,6 +250,8 @@ export type RunNodeError = {
 export type RunEdge = { from: string; to: string };
 
 export const RECALL_EVENT_TYPES = [
+	// A Python node's `ctx.log` line: few, deliberate, kept as events.
+	'node_log',
 	'invocation_started',
 	'invocation_completed',
 	'invocation_failed',
@@ -286,6 +296,28 @@ export type RunEvent = {
 	statementId: string | null;
 	attempt: number | null;
 	message: string;
+	/** For `audit_completed`: which check ran, how it came out and how many rows it found. */
+	check?: RunEventCheck | null;
+};
+
+/** A check's result in a run: its name as declared, its outcome, the rows it found, and its identity for its evidence. */
+export type RunEventCheck = {
+	name: string;
+	outcome: 'passed' | 'warned' | 'failed' | 'skipped';
+	rows: number | null;
+	/** The check's ID on the Checks page and this result's, to read the rows it found once they are synced. */
+	bindingKey: string | null;
+	resultId: string | null;
+};
+
+/** A read of a run's output that carries on from the last: lines, the run's `ctx.log` lines and the run's last line. */
+export type RunOutputFollow = {
+	lines: RunOutputLine[];
+	logs: RunEvent[];
+	/** The last line read, to carry on from. */
+	last: number;
+	/** Whether `lines` are the newest lines, replacing earlier reads, rather than those after `after`. */
+	replaced: boolean;
 };
 
 export type RunEventPage = {
@@ -412,7 +444,44 @@ export type RunOutputLine = {
 	text: string;
 	/** The error the invocation recorded when it failed, rather than a line it printed. */
 	error: boolean;
+	/** The node the line is about, when sqb printed it for one. */
+	nodeKey?: string | null;
+	/** A marker in a capped live view: this many earlier lines of the node's output are in the viewer, not here. */
+	omitted?: number;
 };
+
+// ---- a node's bulk output, paged from the output store ----
+
+export type NodeOutputLevel = 'info' | 'warn' | 'error';
+/** What the output store's index knows about a node's output, without reading it. */
+export type NodeOutputIndex = {
+	total: number;
+	stdout: number;
+	stderr: number;
+	bytes: number;
+	/** Error and warning lines, by line number, from the index. */
+	marks: { line: number; level: Exclude<NodeOutputLevel, 'info'>; text: string }[];
+	/** Still being written: the node is running. */
+	live: boolean;
+};
+export type NodeOutputLine = { n: number; stream: 'stdout' | 'stderr'; text: string; level: NodeOutputLevel };
+/** A line, or a run of similar lines (the same but for their numbers) folded into one row. */
+export type NodeOutputRow = { kind: 'line'; line: NodeOutputLine } | { kind: 'similar'; from: number; count: number; sample: NodeOutputLine };
+/** Rows covering lines `from` to `to` (exclusive, 1-based). */
+export type NodeOutputPage = { total: number; from: number; to: number; rows: NodeOutputRow[] };
+/**
+ * A search of a node's output: the next match, and, where the output was small enough to search whole,
+ * how many lines match and this one's place among them (1-based); null for a large output.
+ */
+export type NodeOutputSearch = {
+	count: number | null;
+	line: number | null;
+	rank: number | null;
+	/** Where to search on, when this search stopped part-way through a large output without a match. */
+	continueFrom?: number | null;
+};
+/** The rows a failing check found: a sample, and how many there were in all. */
+export type CheckSample = { columns: string[]; rows: (string | number | null)[][]; total: number };
 
 export type RunInvocation = {
 	invocationId: string;

@@ -106,6 +106,7 @@ class PythonNodeExecutionResult:
     skip_reason: str | None = None
     error_message: str | None = None
     warning_messages: tuple[str, ...] = field(default_factory=tuple)
+    error_detail: str | None = None
 
 
 @dataclass(frozen=True)

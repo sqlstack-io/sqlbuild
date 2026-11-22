@@ -132,6 +132,13 @@ pub(crate) struct OutputLocationTestCase {
     pub(crate) expected_folder: &'static str,
 }
 
+pub(crate) struct OutputAuditTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Audit rows after two of each read, by action.
+    pub(crate) expected_audits: Vec<(&'static str, usize)>,
+}
+
 /// A control store and the user's folders: where output goes with no setting.
 pub(crate) struct OutputDefaultTestCase {
     pub(crate) description: &'static str,

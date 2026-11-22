@@ -854,9 +854,16 @@ impl WorkerBuild {
                 Some(value) => value.extract()?,
                 None => None,
             };
-            let message = match result.getattr_opt("error_message")? {
+            let detail: Option<String> = match result.getattr_opt("error_detail")? {
                 Some(value) => value.extract()?,
                 None => None,
+            };
+            let message: Option<String> = match detail {
+                Some(detail) => Some(detail),
+                None => match result.getattr_opt("error_message")? {
+                    Some(value) => value.extract()?,
+                    None => None,
+                },
             };
             let events: Vec<LifeCycleEvent> = match result.getattr_opt("lifecycle_events")? {
                 Some(value) => Vec::<LifeCycleEvent>::read(&value)?,

@@ -1,8 +1,10 @@
 //! A run's Recall rows: the scheduler invocation and its claimed worker's invocations, with fixed column lists.
 
 use std::collections::BTreeSet;
+use std::time::Duration;
 
 use serde_json::{Value, json};
+use sqlbuild_recall::records::constants::AUDIT_COMPLETED_EVENT;
 use uuid::Uuid;
 
 use crate::authorization::main::decisions::authorize_listing::authorize_listing;
@@ -23,6 +25,7 @@ use crate::store::main::query::query;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 use crate::store::types::Row;
+use crate::warehouse_history::_helpers::audit_repeats::{audit_due, record_audit};
 
 /// Events whose node may be named only in their payload: older node and check events, and audit results.
 const NODE_EVENTS: &str = "'run_node_started','run_node_finished','run_check_started','run_check_finished','audit_completed'";
@@ -107,18 +110,21 @@ pub(crate) async fn run_read<T>(
     Ok(Some(result))
 }
 
-/// A sensitive run read, authorized for `action` and audited as `audit_action` in the same transaction.
+/// A sensitive run read, authorized for `action` each time and audited as `audit_action` in the same transaction, once per `repeat` window when given.
 pub(crate) async fn sensitive_run_read<T>(
     store: &ControlStore,
     credentials: (&AuditContext, Uuid),
     (run, default_role, action): ((Uuid, &str, Uuid), DefaultRole, Action),
-    (audit_action, read, details): (
-        &str,
-        impl AsyncFnOnce(
-            ControlTransaction,
-            &RunRecallScope,
-        ) -> Result<(ControlTransaction, T), ControlError>,
-        impl FnOnce(&T) -> Value,
+    ((audit_action, read, details), repeat): (
+        (
+            &str,
+            impl AsyncFnOnce(
+                ControlTransaction,
+                &RunRecallScope,
+            ) -> Result<(ControlTransaction, T), ControlError>,
+            impl FnOnce(&T) -> Value,
+        ),
+        Option<Duration>,
     ),
 ) -> Result<Option<T>, ControlError> {
     let Some((transaction, scope, Some((context, permission)))) =
@@ -127,18 +133,27 @@ pub(crate) async fn sensitive_run_read<T>(
         return Ok(None);
     };
     let (transaction, result) = read(transaction, &scope).await?;
-    let transaction = append_audit(
-        transaction,
-        &context,
-        (Uuid::now_v7(), audit_action),
-        (
-            json!(permission),
-            json!(null),
-            json!({"run_id": run.2, "read": details(&result)}),
-        ),
-    )
-    .await?;
+    let key = (context.actor.as_str(), audit_action, run.2);
+    let audited: bool = repeat.is_none_or(|window| audit_due(key, window));
+    let transaction = if audited {
+        append_audit(
+            transaction,
+            &context,
+            (Uuid::now_v7(), audit_action),
+            (
+                json!(permission),
+                json!(null),
+                json!({"run_id": run.2, "read": details(&result)}),
+            ),
+        )
+        .await?
+    } else {
+        transaction
+    };
     commit(transaction).await?;
+    if audited && repeat.is_some() {
+        record_audit(key);
+    }
     Ok(Some(result))
 }
 
@@ -236,7 +251,12 @@ pub(crate) async fn run_events_in(
                 format!("SELECT storage_id, event_id, invocation_id, occurred_at, event_type, severity, producer, resource_id, \
                  resource_kind, resource_name, resource_attempt_id, statement_id, error_type, error_code, duration_ms, outcome, \
                  row_count, affected_rows, CASE WHEN event_type IN ('{MEMBER_RETRYING_EVENT}','{MEMBER_RECOVERED_EVENT}','{RUN_LAUNCHED_EVENT}') \
-                 THEN payload END AS member_payload, {} FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", node_columns(), next + 1)
+                 THEN payload END AS member_payload, \
+                 CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN payload->>'audit_name' END AS check_name, \
+                 CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN payload->>'binding_key' END AS check_binding_key, \
+                 CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN payload->>'result_id' END AS check_result_id, \
+                 CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN CAST(payload->>'violation_count' AS BIGINT) END AS check_rows, \
+                 {} FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", node_columns(), next + 1)
             },
             vec![
                 Parameter::Integer(after),

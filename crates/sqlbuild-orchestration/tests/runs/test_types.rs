@@ -561,7 +561,12 @@ pub(crate) struct NodeEventResourcesTestCase {
     pub(crate) backend: Backend,
     /// Each node and check event's type, resource kind and resource name, in the order they happened.
     pub(crate) expected_named: [(&'static str, &'static str, &'static str); 4],
+    /// The check result's name, check ID, result ID and rows found, as the run's events report them.
+    pub(crate) expected_check: CheckFields,
 }
+
+/// A check result's name, check ID, result ID and rows found.
+pub(crate) type CheckFields = (Option<String>, Option<String>, Option<String>, Option<i64>);
 
 pub(crate) struct NodeOfTestCase {
     pub(crate) description: &'static str,
