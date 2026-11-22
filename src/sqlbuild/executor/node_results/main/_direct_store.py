@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from typing import Any
 
 from sqlbuild._native import TargetSettings
@@ -17,8 +18,12 @@ def build_direct_node_result_store(
     database: str | None,
     schema: str | None,
     target_config: TargetSettings | None = None,
+    write_lock: AbstractContextManager[Any] | None = None,
 ) -> DirectNodeResultStore:
-    """Build a direct-mode node result store that, for one release, also reads older locations."""
+    """Build a direct-mode node result store that, for one release, also reads older locations.
+
+    Stores on connections that write at the same time share a `write_lock`.
+    """
 
     earlier: list[tuple[str | None, str | None]] = [
         (adapter.default_database(), adapter.default_schema())
@@ -30,6 +35,7 @@ def build_direct_node_result_store(
         connection=connection,
         database=database,
         schema=schema,
+        write_lock=write_lock,
         previous_locations=tuple(
             location for location in earlier if location != (database, schema)
         ),

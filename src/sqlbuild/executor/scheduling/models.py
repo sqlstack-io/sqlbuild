@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -36,3 +37,21 @@ class LifecycleSchedulerResult:
     """Result bundle for one serial lifecycle scheduler run."""
 
     results: tuple[LifecycleNodeResult, ...]
+
+
+@dataclass(frozen=True)
+class LifecycleConcurrency:
+    """Which ready nodes may run beside each other, and what runs them until none is ready.
+
+    `run` takes a reader of the ready nodes and a recorder of each result, and calls both only on
+    the scheduler's thread.
+    """
+
+    eligible: Callable[[LifecycleExecutionNode], bool]
+    run: Callable[
+        [
+            Callable[[], tuple[LifecycleExecutionNode, ...]],
+            Callable[[LifecycleExecutionNode, LifecycleNodeResult], None],
+        ],
+        None,
+    ]

@@ -20,6 +20,7 @@ def create_read_side_python_execution_tracker(
     runtime: PythonNodeRuntime,
     identity_recorder: PythonIdentityRecorder | None = None,
     on_node_complete: Callable[[object], None] | None = None,
+    on_node_cancelled: Callable[[str], None] | None = None,
 ) -> ReadSidePythonExecutionTracker:
     """Create a read-side Python execution tracker."""
 
@@ -30,4 +31,5 @@ def create_read_side_python_execution_tracker(
         runtime=runtime,
         identity_recorder=identity_recorder,
         on_node_complete=on_node_complete,
+        on_node_cancelled=on_node_cancelled,
     )

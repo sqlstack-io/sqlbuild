@@ -1,7 +1,7 @@
 //! Ingress Python before the build and read-side assets dispatched as SQL completes.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
@@ -37,6 +37,7 @@ use sqlbuild_python_project::graph::main::python_nodes::native_run_lifecycle::na
 use sqlbuild_python_project::graph::main::python_nodes::python_node_graph::python_node_graph;
 use sqlbuild_python_project::planner_scope::main::build_intermediate_source_map::build_intermediate_source_map;
 
+const ASSET_KIND: &str = "asset";
 const SUCCESS_STATUS: &str = "success";
 const SKIPPED_STATUS: &str = "skipped";
 const HARD_SKIP: &str = "hard";
@@ -93,10 +94,21 @@ pub(crate) struct PythonNodeReporter {
     on_node_complete: Py<PyAny>,
     stream: Py<PyAny>,
     use_color: bool,
+    worker: Option<Arc<WorkerBuild>>,
 }
 
 #[pymethods]
 impl PythonNodeReporter {
+    /// A worker records an item that was running when the run was cancelled as cancelled.
+    fn cancelled(&self, py: Python<'_>, name: &str) -> PyResult<()> {
+        match &self.worker {
+            Some(worker) => {
+                worker.finish_key(py, &format!("{ASSET_KIND}:{name}"), NodeOutcome::Cancelled)
+            }
+            None => Ok(()),
+        }
+    }
+
     fn __call__(&self, py: Python<'_>, result: Bound<'_, PyAny>) -> PyResult<()> {
         self.on_node_complete.bind(py).call1((&result,))?;
         write_python_node_results(self.stream.bind(py), &tuple(py, &[result])?, self.use_color)
@@ -545,6 +557,16 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             .as_ref()
             .map(|worker| worker.root_run_id().to_string()),
     };
+    let reporter: Bound<'py, PythonNodeReporter> = Bound::new(
+        py,
+        PythonNodeReporter {
+            on_node_complete: inputs.on_node_complete.clone().unbind(),
+            stream: context.stream.clone().unbind(),
+            use_color: context.use_color,
+            worker: context.worker.clone(),
+        },
+    )?;
+    let on_node_cancelled: Bound<'py, PyAny> = native_field(&reporter, "cancelled")?;
     let mut ingress_python: Bound<'py, PyAny> = tuple(py, &[])?;
     let mut ingress_loads: Bound<'py, PyAny> = tuple(py, &[])?;
     if ingress_names.is_truthy()? {
@@ -557,6 +579,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
                     ("use_color", boolean(py, context.use_color)),
                     ("on_node_start", inputs.on_node_start.clone()),
                     ("on_node_complete", inputs.on_node_complete.clone()),
+                    ("on_node_cancelled", on_node_cancelled.clone()),
                 ],
             )?;
             call_with(
@@ -592,14 +615,6 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
         .collect();
     let mut read_side_connection: Option<Py<PyAny>> = None;
     let mut read_side_tracker: Option<Py<PyAny>> = None;
-    let reporter: Bound<'py, PythonNodeReporter> = Bound::new(
-        py,
-        PythonNodeReporter {
-            on_node_complete: inputs.on_node_complete.clone().unbind(),
-            stream: context.stream.clone().unbind(),
-            use_color: context.use_color,
-        },
-    )?;
     if !read_side.is_empty() {
         let connection: Bound<'py, PyAny> =
             adapter.call_method1("connect", (connection_config.clone(),))?;
@@ -617,6 +632,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
                 ("scheduled_sql_names", names_set(py, &scheduled)?),
                 ("runtime", node_runtime(&parts, &connection)?),
                 ("on_node_complete", reporter.clone().into_any()),
+                ("on_node_cancelled", on_node_cancelled.clone()),
             ],
         )?;
         for result in ingress_loads.try_iter()? {
