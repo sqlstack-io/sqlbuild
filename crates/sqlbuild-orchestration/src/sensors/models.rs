@@ -526,6 +526,9 @@ pub struct PersonSensorEvaluation {
     pub abandoned_because: Option<AbandonReason>,
     /// The operator who skipped the tick's event, so the function wasn't called.
     pub skipped_by: Option<String>,
+    /// Why the tick's details are missing: an earlier release recorded them in a form this one can't read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unreadable: Option<String>,
     pub definition_fingerprint: String,
 }
 
@@ -591,11 +594,14 @@ pub(crate) struct StoredSensor {
     pub(crate) cursor_json: Option<SensorCursor>,
 }
 
-/// One recorded phase of a sensor check.
+/// One recorded phase of a sensor check; its columns always read, its fact may be in an earlier release's form.
 #[derive(Debug, Deserialize)]
 pub(crate) struct StoredEvaluationEvent {
+    pub(crate) evaluation_id: Uuid,
+    pub(crate) phase: String,
     pub(crate) occurred_at: DateTime<Utc>,
-    pub(crate) fact_json: SensorEvaluationFact,
+    pub(crate) subject_event_id: Option<String>,
+    pub(crate) fact_json: serde_json::Value,
 }
 
 /// A run key the sensor requested and the run it made.

@@ -9,11 +9,12 @@ use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::authorization::main::decisions::person_holds_target::person_holds_target;
 use crate::credentials::models::{Action, AuditContext, DefaultRole};
 use crate::sensors::_helpers::ticks::facts::definition_fingerprint;
+use crate::sensors::_helpers::ticks::unreadable::{with_requested_runs, with_unreadable};
 use crate::sensors::main::sensor_failing::sensor_failing;
 use crate::sensors::models::{
     PersonSensorCursor, PersonSensorEvaluation, PersonSensorRunRequest, PersonSensorState,
-    SensorCursor, SensorEvaluationOutcome, SensorEvent, StoredEvaluationEvent, StoredRunRequest,
-    StoredSensor,
+    SensorCursor, SensorEvaluationFact, SensorEvaluationOutcome, SensorEvent,
+    StoredEvaluationEvent, StoredRunRequest, StoredSensor,
 };
 
 use crate::sensors::constants::{TICK_HANDLED, TICK_RUNNING, TICK_SKIPPED, TICK_STARTED};
@@ -71,6 +72,20 @@ pub async fn read_person_sensor(
     .await?;
     let (transaction, failing) = sensor_failing(transaction, trigger_id).await?;
     commit(transaction).await?;
+    let run_requests: Vec<PersonSensorRunRequest> = requests
+        .into_iter()
+        .map(|request| PersonSensorRunRequest {
+            run_key: if evidence {
+                redact_text(&request.run_key)
+            } else {
+                String::new()
+            },
+            run_id: request.run_id,
+            evaluation_id: request.evaluation_id,
+            queued_at: request.queued_at,
+            status: request.status,
+        })
+        .collect();
     Ok(Some(PersonSensorState {
         failing,
         cursor: sensor
@@ -78,25 +93,12 @@ pub async fn read_person_sensor(
             .as_ref()
             .map(|cursor| shown_cursor(cursor, evidence)),
         definition_fingerprint: definition_fingerprint(&sensor.definition_json)?,
-        evaluations,
-        run_requests: requests
-            .into_iter()
-            .map(|request| PersonSensorRunRequest {
-                run_key: if evidence {
-                    redact_text(&request.run_key)
-                } else {
-                    String::new()
-                },
-                run_id: request.run_id,
-                evaluation_id: request.evaluation_id,
-                queued_at: request.queued_at,
-                status: request.status,
-            })
-            .collect(),
+        evaluations: with_requested_runs(evaluations, &run_requests),
+        run_requests,
     }))
 }
 
-/// The newest `limit` ticks, each projected from its recorded phases.
+/// The newest `limit` ticks, each projected from its recorded phases; one that no longer decodes loses only its own details.
 async fn evaluations(
     transaction: ControlTransaction,
     (trigger_id, limit): (Uuid, Parameter),
@@ -104,15 +106,21 @@ async fn evaluations(
 ) -> Result<(ControlTransaction, Vec<PersonSensorEvaluation>), ControlError> {
     let (transaction, events): (_, Vec<StoredEvaluationEvent>) = query_records(
         transaction,
-        "SELECT occurred_at, fact_json FROM sqb_sensor_evaluation_events WHERE trigger_id=$1 \
+        "SELECT evaluation_id, phase, occurred_at, subject_event_id, fact_json FROM sqb_sensor_evaluation_events WHERE trigger_id=$1 \
          AND evaluation_id IN (SELECT evaluation_id FROM sqb_sensor_evaluation_events \
          WHERE trigger_id=$1 AND phase='requested' ORDER BY occurred_at DESC LIMIT $2)",
         vec![Parameter::Id(trigger_id), limit],
     )
     .await?;
     let mut checks: BTreeMap<Uuid, PersonSensorEvaluation> = BTreeMap::new();
+    let mut unreadable: Vec<StoredEvaluationEvent> = Vec::new();
     for event in events {
-        let request = &event.fact_json.request;
+        let Ok(fact) = serde_json::from_value::<SensorEvaluationFact>(event.fact_json.clone())
+        else {
+            unreadable.push(event);
+            continue;
+        };
+        let request = &fact.request;
         let check = checks
             .entry(request.evaluation_id)
             .or_insert_with(|| PersonSensorEvaluation {
@@ -132,9 +140,10 @@ async fn evaluations(
                 skipped_for: Vec::new(),
                 abandoned_because: None,
                 skipped_by: None,
+                unreadable: None,
                 definition_fingerprint: request.definition_fingerprint.clone(),
             });
-        let outcome = event.fact_json.outcome;
+        let outcome = fact.outcome;
         if outcome == SensorEvaluationOutcome::Requested {
             continue;
         }
@@ -175,7 +184,8 @@ async fn evaluations(
             _ => {}
         }
     }
-    let mut checks: Vec<PersonSensorEvaluation> = checks.into_values().collect();
+    let mut checks: Vec<PersonSensorEvaluation> =
+        with_unreadable(checks, unreadable).into_values().collect();
     checks.sort_by(|left, right| {
         (right.requested_at, right.evaluation_id).cmp(&(left.requested_at, left.evaluation_id))
     });
