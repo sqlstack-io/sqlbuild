@@ -233,6 +233,11 @@ class SlackAlerts(Provider):
     slack_webhook_url: SecretStr  # reads SLACK_WEBHOOK_URL
 ```
 
+Declare every secret a provider needs as a required field. Don't declare it as optional, such as
+`api_key: SecretStr | None = None`, and fail in `setup` or in a method when it is empty: SQLBuild
+can't know that such a field is required, so none of the checks below see it, and a run fails only
+when its node first uses the provider, after connecting and planning.
+
 SQLBuild looks for each variable in the environment and then in the project's
 [env file](../project-configuration.md#env-file).
 
@@ -248,8 +253,11 @@ SQLBuild looks for each variable in the environment and then in the project's
 ```text
 $ sqb compile
 error[D012]: provider 'slack_alerts' (providers/slack_alerts/provider.py) is missing secret SLACK_WEBHOOK_URL
-  = help: set SLACK_WEBHOOK_URL, or pass --allow-missing-secrets where secrets aren't available
+  = help: set SLACK_WEBHOOK_URL in this shell or in .env, or pass --allow-missing-secrets where secrets aren't available
 ```
+
+The help names the env file the selected target loads, and suggests the flag only on the commands
+that take it.
 
 A run names each variable, the nodes that use the provider and the selected nodes that read them,
 and where it looked:
@@ -259,7 +267,7 @@ $ sqb build --select +partner_orders_report
 error[D012]: selected nodes need secrets that are missing from the environment and from .env:
   partner_api  PARTNER_API_TOKEN  (raw_partner_orders; read by partner_orders_report)
 nothing was run
-  = help: set each variable in this shell or the project's env file, or narrow the selection
+  = help: set each variable in this shell or in .env, or narrow the selection
 ```
 
 Run [`sqb debug`](../../cli/debug.md) to see which secrets this machine has.
@@ -314,7 +322,9 @@ In `--json`, `cant_run` names the sink under `sinks`.
 Nobody looks at a plan for a schedule or sensor, so its run checks the same thing on the worker,
 before compiling a plan or connecting. Each node that uses the provider fails with `D012`, the nodes
 that read it are skipped, and the run page shows **Couldn't run** with the provider, its variables
-and the fix: set them in the location's environment or its env file, and restart the location.
+and the fix: set them in the location's env file, or in the environment the location was started
+with, then restart the location. Under `sqb dev`, `r` is enough after editing the env file; a
+change to the environment needs `sqb dev` to be started again.
 
 The location reports the providers missing secrets each time it publishes. Its page lists them with
 their variables, fields and the nodes that can't run, and the Overview lists the problem for that

@@ -70,8 +70,8 @@ A `missing_secrets` location publishes and runs jobs whose nodes have their secr
 publishes it reports the providers missing secrets, with their variables and the nodes that use
 them, and prints them in its output. Its page in the UI lists them, and the Overview shows the
 problem. A run that needs one fails those nodes with `D012` before connecting to the warehouse and
-skips the nodes that read them. Set the missing variables in its environment or env file and
-restart it; `sqb debug` in the location lists them too. A provider the target allows to miss its
+skips the nodes that read them. Set the missing variables in its env file or in the environment it
+was started with, then restart it (under `sqb dev`, `r` is enough after editing the env file); `sqb debug` in the location lists them too. A provider the target allows to miss its
 secrets shows as a note on the location's page instead.
 
 ## Provide settings and secrets

@@ -425,7 +425,9 @@ class DevelopmentMissingSecretsTestCase:
     description: str
     first_env_file: str
     second_env_file: str
-    # What the warning row shows while the secrets are missing.
+    # The target's env file, relative to the project.
+    env_file_name: str
+    # What the printed warning says while the secrets are missing.
     expected_warning: tuple[str, ...]
 
 
@@ -794,3 +796,13 @@ class CheckSensorsTestCase:
     # The run event's failed checks and failed nodes.
     expected_failed_checks: list[str]
     expected_failed_nodes: list[str]
+
+
+@dataclass(frozen=True)
+class SecretAdviceTestCase:
+    description: str
+    command: tuple[str, ...]
+    # The target's env file, relative to the project.
+    env_file_name: str
+    expected_help: str
+    expected_flag_suggested: bool

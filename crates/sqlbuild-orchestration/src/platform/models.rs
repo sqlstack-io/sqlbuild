@@ -12,6 +12,7 @@ use crate::warehouse_metadata::models::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use uuid::Uuid;
 
 /// Every retention horizon one server's maintenance role enforces.
@@ -104,6 +105,8 @@ pub struct PublishedGeneration {
     pub state_locations: Vec<WarehouseStateLocation>,
     /// The providers whose required secrets the location's environment leaves unset.
     pub missing_secrets: Vec<MissingProviderSecrets>,
+    /// For each provider missing secrets, the node keys that use it and then those that read them.
+    pub secrets_needed_by: BTreeMap<String, Vec<String>>,
 }
 
 /// A provider whose required secrets are unset: what is missing and which nodes need it, never a value.

@@ -60,8 +60,12 @@ describe('location health', () => {
 			occurredAt: at(10),
 			members: ['ORDERS_API_KEY'],
 			locationId: 'loc-1:prod',
-			message: "orders_api is missing ORDERS_API_KEY in the location's environment, so runs of the node that uses it stop before the warehouse."
+			message: "orders_api is missing ORDERS_API_KEY in the location's environment, so runs of raw_orders stop before the warehouse."
 		});
+		const many = { ...orders, nodes: ['source:a', 'model:b', 'model:c', 'model:d', 'asset:e'] };
+		expect(missingSecretsEventOf('loc-1:prod', [seen(4, { kind: 'provider_secrets', generation: 4, missing: 1, providers: [many] })])?.message).toBe(
+			"orders_api is missing ORDERS_API_KEY in the location's environment, so runs of a, b, c and 2 more stop before the warehouse."
+		);
 		const allowedOnly = seen(5, { kind: 'provider_secrets', generation: 3, missing: 0, providers: [bucket] });
 		expect(missingSecretsEventOf('loc-1:prod', [allowedOnly, newest])).toBeNull();
 		expect(healthOf([allowedOnly], now).health).toBe('healthy');

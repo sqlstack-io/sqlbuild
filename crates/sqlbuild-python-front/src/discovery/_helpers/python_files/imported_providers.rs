@@ -14,9 +14,12 @@ use sqlbuild_host::entries::models::UserCodeHost;
 use crate::discovery::_helpers::python_files::imported_modules::{
     ProjectDir, discovered, discovery_error, discovery_error_from, module_functions, shim, tuple_of,
 };
+use crate::discovery::_helpers::sources::provider_secrets::INVOCATION_TAKES_ALLOW_FLAG;
 use crate::discovery::_helpers::sources::provider_secrets::TARGET_ALLOWED_MISSING_SECRETS;
 use crate::discovery::constants::ALLOW_MISSING_SECRETS_FLAG;
 use crate::discovery::models::SecretPolicy;
+use sqlbuild_core::process_environment::main::env_file_shown::env_file_shown;
+use sqlbuild_core::process_environment::main::shell_secret_fix::shell_secret_fix;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::compile_context::main::input_reads::record_settings_class_read::record_settings_class_read;
@@ -155,10 +158,13 @@ fn provider_instance<'py>(
                 relative_path.str()?
             ),
         );
-        error.value(py).setattr(
-            "help",
-            format!("set {variables}, or pass {ALLOW_MISSING_SECRETS_FLAG} where secrets aren't available"),
-        )?;
+        let mut help: String = shell_secret_fix(&variables, env_file_shown().as_deref());
+        if INVOCATION_TAKES_ALLOW_FLAG.get() {
+            help.push_str(&format!(
+                ", or pass {ALLOW_MISSING_SECRETS_FLAG} where secrets aren't available"
+            ));
+        }
+        error.value(py).setattr("help", help)?;
         return Err(error);
     }
     Ok((provider_class.call_method0("model_construct")?, missing))

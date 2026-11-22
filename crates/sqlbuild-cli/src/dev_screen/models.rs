@@ -141,6 +141,8 @@ pub(crate) struct DevScreen {
     pub(crate) env_file: Option<String>,
     /// Providers the latest health read shows missing secrets; drawn as a warning row until a read shows none.
     pub(crate) missing_secrets: Vec<UnsetProviderSecrets>,
+    /// The env file that health read looked in.
+    pub(crate) secrets_env_file: Option<String>,
     pub(crate) triggers: String,
     pub(crate) steps: Vec<StepRow>,
     pub(crate) ready: bool,
