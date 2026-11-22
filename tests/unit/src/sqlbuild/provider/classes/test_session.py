@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
-from threading import Barrier
+from functools import partial
+from threading import Barrier, Event, Thread
 from typing import ClassVar
 
 import pytest
@@ -18,6 +20,7 @@ from tests.unit.src.sqlbuild.provider.classes._test_types import (
     ProviderContainerLookupTestCase,
     ProviderContainerMissingTestCase,
     ProviderSessionErrorTestCase,
+    ProviderSessionLeftOpenTestCase,
     ProviderSessionLifecycleTestCase,
 )
 
@@ -75,6 +78,22 @@ class ConcurrentRecordingProvider(Provider):
 
     def teardown(self) -> None:
         self.__class__.teardown_calls += 1
+
+
+class HeldSetupProvider(Provider):
+    provider_name: ClassVar[str] = "held_setup"
+    started: ClassVar[Event] = Event()
+    release: ClassVar[Event] = Event()
+    events: ClassVar[list[str]] = []
+    label: str
+
+    def setup(self, ctx: object) -> None:
+        self.events.append(f"setup:{self.label}")
+        self.started.set()
+        _ = self.release.wait(timeout=30)
+
+    def teardown(self) -> None:
+        self.events.append(f"teardown:{self.label}")
 
 
 @pytest.mark.parametrize(
@@ -542,3 +561,62 @@ def test_given_teardown_failure_when_execution_already_failed_then_original_erro
 
     assert session.teardown_error is not None
     assert test_case.expected_error_fragment in str(session.teardown_error)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ProviderSessionLeftOpenTestCase(
+            description="a setup still running when providers are left open and closed",
+            closes=(ProviderSession.close,),
+            within_seconds=1,
+            expected_events=("setup:gateway",),
+        ),
+        ProviderSessionLeftOpenTestCase(
+            description="a sink's hold released and its forced close, as a sink closes",
+            closes=(ProviderSession.release, partial(ProviderSession.close, force=True)),
+            within_seconds=1,
+            expected_events=("setup:gateway",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_running_setup_when_left_open_and_closed_then_neither_waits_and_no_setup_follows(
+    test_case: ProviderSessionLeftOpenTestCase,
+) -> None:
+    HeldSetupProvider.started = Event()
+    HeldSetupProvider.release = Event()
+    HeldSetupProvider.events = []
+    session: ProviderSession = ProviderSession(
+        {
+            "gateway": HeldSetupProvider(label="gateway"),
+            "archive": HeldSetupProvider(label="archive"),
+        }
+    )
+    lookups: list[str] = []
+
+    def look_up(name: str) -> None:
+        try:
+            _ = session.providers[name]
+            lookups.append(f"{name}:found")
+        except ProviderLookupError:
+            lookups.append(f"{name}:closed")
+
+    setting_up: Thread = Thread(target=look_up, args=("gateway",), daemon=True)
+    setting_up.start()
+    assert HeldSetupProvider.started.wait(timeout=5)
+    waiting: Thread = Thread(target=look_up, args=("archive",), daemon=True)
+    waiting.start()
+
+    began: float = time.monotonic()
+    session.providers.leave_open()
+    for close in test_case.closes:
+        close(session)
+    took: float = time.monotonic() - began
+    HeldSetupProvider.release.set()
+    setting_up.join(timeout=5)
+    waiting.join(timeout=5)
+
+    assert took < test_case.within_seconds
+    assert tuple(HeldSetupProvider.events) == test_case.expected_events
+    assert sorted(lookups) == ["archive:closed", "gateway:found"]

@@ -20,23 +20,29 @@ from tests.unit.src.sqlbuild.executor.python_nodes.classes._test_types import (
     ItemPoolIgnoredCancelTestCase,
     ItemPoolOrderTestCase,
     ItemPoolRecordedInterruptTestCase,
+    ItemPoolRepeatedCancelTestCase,
+    ItemPoolResultWriteTestCase,
     ItemPoolSerialTestCase,
     ItemPoolWriteTestCase,
 )
 from tests.unit.src.sqlbuild.executor.python_nodes.classes.helpers import (
     ItemPoolTestAdapter,
     ItemProbe,
+    SlowResultAdapter,
     fail_item,
+    finishing_probe,
     ignoring_probe,
     interrupt_after_next_record,
     interrupted_probe,
     item_graph,
     meet_at,
     run_ingress,
+    run_persisting_read_side,
     run_read_side,
     run_shape,
     run_writing_ingress,
     run_writing_read_side,
+    twice_cancelled_probe,
     writing_graph,
 )
 
@@ -419,3 +425,63 @@ def test_given_a_step_ignoring_cancel_when_interrupted_then_it_is_reported_cance
         )
         assert waited < test_case.expected_within_seconds
         assert adapter.connections - adapter.closed == test_case.expected_left_open
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ItemPoolRepeatedCancelTestCase(
+            description="the cancel's signal arrives while finished steps are reported",
+            items=("bill", "pack", "pick"),
+            expected_reported=frozenset(
+                {("bill", "success"), ("pack", "success"), ("pick", "success")}
+            ),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_cancel_arriving_again_when_reporting_then_every_finished_step_is_still_reported(
+    test_case: ItemPoolRepeatedCancelTestCase,
+) -> None:
+    for run_path in _PATHS:
+        probe: ItemProbe = twice_cancelled_probe(test_case.items)
+        graph: PythonNodeGraph = item_graph(
+            tuple((name, "plan", len(test_case.items), ()) for name in test_case.items)
+        )
+
+        with pytest.raises(KeyboardInterrupt):
+            _ = run_path(graph=graph, adapter=ItemPoolTestAdapter(), probe=probe)
+
+        reported: frozenset[tuple[str, str]] = frozenset(
+            (result.node_name, result.status.value) for result in probe.reported
+        )
+        assert (reported, probe.cancelled) == (test_case.expected_reported, [])
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ItemPoolResultWriteTestCase(
+            description="a finished step's result write spans a cancel round",
+            write_seconds=2.5,
+            expected_reported=frozenset({("quick", "success"), ("slow", "success")}),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_step_writing_its_result_when_a_cancel_round_passes_then_the_write_is_not_cancelled(
+    test_case: ItemPoolResultWriteTestCase, tmp_path: Path
+) -> None:
+    probe: ItemProbe = finishing_probe()
+    graph: PythonNodeGraph = item_graph((("quick", "plan", 2, ()), ("slow", "plan", 2, ())))
+    adapter: SlowResultAdapter = SlowResultAdapter(write_seconds=test_case.write_seconds)
+
+    with pytest.raises(KeyboardInterrupt):
+        run_persisting_read_side(
+            graph=graph, adapter=adapter, probe=probe, database=tmp_path / "plan.duckdb"
+        )
+
+    reported: frozenset[tuple[str, str]] = frozenset(
+        (result.node_name, result.status.value) for result in probe.reported
+    )
+    assert (reported, probe.cancelled) == (test_case.expected_reported, [])

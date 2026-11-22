@@ -21,6 +21,7 @@ from sqlbuild.executor.python_nodes.constants import (
     ABANDONABLE_THREAD_PREFIX,
     ABANDONED_STEPS_NOTICE,
     CANCEL_GRACE_SECONDS,
+    CANCEL_POLL_SECONDS,
     CANCEL_REPEAT_SECONDS,
 )
 from sqlbuild.executor.python_nodes.main._ready import run_ready_python_node
@@ -142,17 +143,12 @@ class DiscoveredItemPool:
         *,
         future: Future[PythonNodeExecutionResult],
         result: PythonNodeExecutionResult,
-        lock_seconds: float = -1,
     ) -> None:
-        """Record and report `result`; a cancel does not wait past its grace for a step's write."""
+        """Record and report `result` while no item writes its own."""
 
         item: RunningItem = self._running[future]
-        locked: bool = self._write_lock.acquire(timeout=lock_seconds)
-        try:
+        with self._write_lock:
             self._callbacks.complete(node=item.node, result=result)
-        finally:
-            if locked:
-                self._write_lock.release()
         del self._running[future]
         self._idle.append(item.slot)
 
@@ -173,29 +169,35 @@ class DiscoveredItemPool:
             raise
 
     def _cancel(self) -> None:
-        """Keep what succeeded; report the rest cancelled, waiting only the grace for them."""
+        """Keep successes and report the rest cancelled, even if the cancel arrives again here."""
 
         self._cancelled = True
         deadline: float = monotonic() + CANCEL_GRACE_SECONDS
-        while self._running and monotonic() < deadline:
-            cancel_running_statements()
+        while True:
+            try:
+                self._report_until(deadline)
+                return
+            except CommandTerminated:
+                continue
+
+    def _report_until(self, deadline: float) -> None:
+        """Report each item as it ends, those already done at `deadline` too, then the rest."""
+
+        cancel_at: float = monotonic()
+        while self._running:
+            if monotonic() >= cancel_at and self._cancel_statements():
+                cancel_at = monotonic() + CANCEL_REPEAT_SECONDS
+            pause: float = max(CANCEL_POLL_SECONDS, cancel_at - monotonic())
             done: set[Future[PythonNodeExecutionResult]]
             done, _ = wait(
                 self._running,
-                timeout=max(0.0, min(CANCEL_REPEAT_SECONDS, deadline - monotonic())),
+                timeout=max(0.0, min(pause, deadline - monotonic())),
                 return_when=FIRST_COMPLETED,
             )
+            if not done and monotonic() >= deadline:
+                break
             for future in [future for future in self._running if future in done]:
-                if future.exception() is None and future.result().status == (
-                    PythonNodeStatus.SUCCESS
-                ):
-                    self._settle(
-                        future=future,
-                        result=future.result(),
-                        lock_seconds=max(0.0, deadline - monotonic()),
-                    )
-                    continue
-                self._report_cancelled(self._running.pop(future))
+                self._report_ended(future)
         if not self._running:
             return
         steps: str = ", ".join(sorted(item.node.name for item in self._running.values()))
@@ -204,6 +206,31 @@ class DiscoveredItemPool:
         )
         for item in self._running.values():
             self._report_cancelled(item)
+
+    def _cancel_statements(self) -> bool:
+        """Cancel running statements, unless one is a step writing the result it finished with."""
+
+        if not self._write_lock.acquire(blocking=False):
+            return False
+        try:
+            cancel_running_statements()
+        finally:
+            self._write_lock.release()
+        return True
+
+    def _report_ended(self, future: Future[PythonNodeExecutionResult]) -> None:
+        """Report an ended item, its identity write neither blocking steps nor able to stop this."""
+
+        item: RunningItem = self._running[future]
+        if future.exception() is not None or future.result().status != PythonNodeStatus.SUCCESS:
+            self._report_cancelled(item)
+        elif item.node.name not in self._run_state.results_by_name:
+            try:
+                self._callbacks.complete(node=item.node, result=future.result())
+            except (Exception, KeyboardInterrupt):
+                if item.node.name not in self._run_state.results_by_name:
+                    raise
+        _ = self._running.pop(future, None)
 
     def _report_cancelled(self, item: RunningItem) -> None:
         if self._callbacks.cancelled is not None:

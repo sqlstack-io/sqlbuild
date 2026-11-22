@@ -983,3 +983,30 @@ class KeyedRepublishTestCase:
     expected_stderr: str
     expected_generation: int
     expected_release: str
+
+
+@dataclass(frozen=True)
+class CancelledWriteTestCase:
+    description: str
+    job_select: str
+    job_settings: str
+    files: dict[str, str]
+    expected_statuses: dict[str, str]
+    expected_rerun: list[str]
+
+
+@dataclass(frozen=True)
+class UnknownDependencyTestCase:
+    description: str
+    first: str
+    then: str
+    removed: tuple[str, ...]
+    missing: str
+    expected_nodes: frozenset[str]
+
+
+@dataclass(frozen=True)
+class UnknownDependencyDiscoverTestCase:
+    description: str
+    dependency: str
+    expected_error: str
