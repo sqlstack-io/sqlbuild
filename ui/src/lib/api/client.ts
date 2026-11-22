@@ -40,7 +40,7 @@ import type {
 	NodeStates,
 	Snapshot,
 	RunTabCounts,
-	Scope,
+	RepublishResult, Scope,
 	SnapshotChange,
 	SelectionEvaluation,
 	SelectionRequest,

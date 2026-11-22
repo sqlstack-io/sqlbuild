@@ -15,7 +15,6 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     DevelopmentRepublishTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
-    stop_location,
     wait_for_development_ready,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
@@ -106,4 +105,5 @@ def test_given_a_changed_external_plan_when_republishing_then_the_readback_shows
         assert readback["sets"][0]["tags"] == {"release": test_case.release}
         assert readback["sets"][0]["items"] == test_case.expected_items
     finally:
-        stop_location(process, log, signal.SIGINT)
+        process.send_signal(signal.SIGINT)
+        process.wait(timeout=30)

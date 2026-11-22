@@ -23,13 +23,16 @@ use crate::platform::models::{
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, commit::commit, migrate_store::migrate_store, query::query};
+use crate::store::main::{
+    begin::begin, commit::commit, migrate_store::migrate_store, query::query,
+};
 use crate::store::models::TransactionMode;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
 #[test]
-fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_audited_and_read_back() {
+fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_audited_and_read_back()
+ {
     let test_cases = [
         RepublishTestCase {
             description: "SQLite republish that published",
@@ -71,12 +74,28 @@ fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_
                 request_id: Uuid::now_v7(),
                 ip_address: None,
             };
-            let admin = bootstrap_user(store, &context, "orders-admin").await.expect("admin");
-            let location = create_location(store, "orders", "test-owner").await.expect("location");
+            let admin = bootstrap_user(store, &context, "orders-admin")
+                .await
+                .expect("admin");
+            let location = create_location(store, "orders", "test-owner")
+                .await
+                .expect("location");
             let mut input = snapshot(location);
             publish_snapshot(store, &input).await.expect("publish");
-            let viewer = person(store, (&context, admin), ("orders-viewer", location), &[BuiltinRole::Viewer]).await;
-            let operator = person(store, (&context, admin), ("orders-deploy", location), &[BuiltinRole::Operator]).await;
+            let viewer = person(
+                store,
+                (&context, admin),
+                ("orders-viewer", location),
+                &[BuiltinRole::Viewer],
+            )
+            .await;
+            let operator = person(
+                store,
+                (&context, admin),
+                ("orders-deploy", location),
+                &[BuiltinRole::Operator],
+            )
+            .await;
             let asked = PersonWorkRequest {
                 request_id: Uuid::now_v7(),
                 reason: "deploy 0.58.0".into(),
@@ -85,7 +104,13 @@ fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_
 
             assert!(
                 matches!(
-                    request_republish(store, (&context, Some(viewer)), (location, "development"), &asked).await,
+                    request_republish(
+                        store,
+                        (&context, Some(viewer)),
+                        (location, "development"),
+                        &asked
+                    )
+                    .await,
                     Err(ControlError::Denied { .. })
                 ),
                 "{}: a viewer may not republish",
@@ -98,38 +123,67 @@ fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_
                 reason: "Check orders connectivity".into(),
                 work: LocationWork::CheckConnection {},
             };
-            request_location_work(store, (&context, None), &connection).await.expect("older work");
+            request_location_work(store, (&context, None), &connection)
+                .await
+                .expect("older work");
             assert!(
-                request_republish(store, (&context, Some(operator)), (location, "development"), &asked).await.expect("request"),
+                request_republish(
+                    store,
+                    (&context, Some(operator)),
+                    (location, "development"),
+                    &asked
+                )
+                .await
+                .expect("request"),
                 "{}: an operator may republish",
                 test_case.description
             );
             assert!(
-                !request_republish(store, (&context, Some(operator)), (location, "development"), &asked).await.expect("retry"),
+                !request_republish(
+                    store,
+                    (&context, Some(operator)),
+                    (location, "development"),
+                    &asked
+                )
+                .await
+                .expect("retry"),
                 "{}: a retried request queues nothing",
                 test_case.description
             );
             assert!(
-                matches!(read_republish(store, (&context, Some(viewer)), ids, 0).await, Err(ControlError::Denied { .. })),
+                matches!(
+                    read_republish(store, (&context, Some(viewer)), ids, 0).await,
+                    Err(ControlError::Denied { .. })
+                ),
                 "{}: a viewer may not read a republish",
                 test_case.description
             );
             let mut poll = register_instance(store, location).await;
             poll.scope = LocationWorkScope::RepublishOnly;
-            let claim = claim_location_work(store, location, &poll).await.expect("poll").expect("claim");
+            let claim = claim_location_work(store, location, &poll)
+                .await
+                .expect("poll")
+                .expect("claim");
             assert_eq!(
                 claim.request.work,
-                LocationWork::Republish { requested_by: "orders-deploy".into() },
+                LocationWork::Republish {
+                    requested_by: "orders-deploy".into()
+                },
                 "{}: a failing location takes the republish ahead of older work, naming the caller",
                 test_case.description
             );
             let foreign = LocationWorkResult {
                 claim_id: claim.claim_id,
                 session_id: poll.session_id,
-                outcome: LocationWorkOutcome::Published { snapshot_id: Uuid::now_v7(), generation: 2 },
+                outcome: LocationWorkOutcome::Published {
+                    snapshot_id: Uuid::now_v7(),
+                    generation: 2,
+                },
             };
             assert!(
-                complete_location_work(store, (location, asked.request_id), &foreign).await.is_err(),
+                complete_location_work(store, (location, asked.request_id), &foreign)
+                    .await
+                    .is_err(),
                 "{}: only this target's snapshot counts as published",
                 test_case.description
             );
@@ -141,26 +195,57 @@ fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_
             );
             let published = publish_snapshot(store, &input).await.expect("republish");
             let outcome = match test_case.publishes {
-                true => LocationWorkOutcome::Published { snapshot_id: published.snapshot_id, generation: 2 },
-                false => LocationWorkOutcome::PublishFailed { generation: 2, error: "orders does not parse".into() },
+                true => LocationWorkOutcome::Published {
+                    snapshot_id: published.snapshot_id,
+                    generation: 2,
+                },
+                false => LocationWorkOutcome::PublishFailed {
+                    generation: 2,
+                    error: "orders does not parse".into(),
+                },
             };
-            complete_location_work(store, (location, asked.request_id), &LocationWorkResult { outcome, ..foreign })
+            complete_location_work(
+                store,
+                (location, asked.request_id),
+                &LocationWorkResult { outcome, ..foreign },
+            )
+            .await
+            .expect("complete");
+            let status = read_republish(store, (&context, Some(operator)), ids, 5)
                 .await
-                .expect("complete");
-            let status = read_republish(store, (&context, Some(operator)), ids, 5).await.expect("read").expect("status");
+                .expect("read")
+                .expect("status");
             assert_eq!(
-                (status.state, status.error.as_deref(), status.snapshot_id.is_some()),
-                (test_case.expected_state, test_case.expected_error, test_case.publishes),
+                (
+                    status.state,
+                    status.error.as_deref(),
+                    status.snapshot_id.is_some()
+                ),
+                (
+                    test_case.expected_state,
+                    test_case.expected_error,
+                    test_case.publishes
+                ),
                 "{}",
                 test_case.description
             );
-            let readback = read_person_discovered(store, (&context, viewer), (location, "development"), DefaultRole::None)
-                .await
-                .expect("a viewer reads the sets back")
-                .expect("published");
-            let expected_tags: BTreeMap<String, serde_json::Value> = [("release".to_owned(), json!("0.58.0"))].into();
+            let readback = read_person_discovered(
+                store,
+                (&context, viewer),
+                (location, "development"),
+                DefaultRole::None,
+            )
+            .await
+            .expect("a viewer reads the sets back")
+            .expect("published");
+            let expected_tags: BTreeMap<String, serde_json::Value> =
+                [("release".to_owned(), json!("0.58.0"))].into();
             assert_eq!(
-                (readback.generation, readback.sets[0].items, &readback.sets[0].tags),
+                (
+                    readback.generation,
+                    readback.sets[0].items,
+                    &readback.sets[0].tags
+                ),
                 (2, 1, &expected_tags),
                 "{}: the readback shows the new tags",
                 test_case.description
@@ -174,8 +259,16 @@ fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_
             .expect("audit");
             commit(transaction).await.expect("commit");
             assert_eq!(
-                (&audit[0]["actor"], &audit[0]["after_json"]["work"]["requested_by"], &audit[0]["after_json"]["reason"]),
-                (&json!(format!("principal:{operator}")), &json!("orders-deploy"), &json!("deploy 0.58.0")),
+                (
+                    &audit[0]["actor"],
+                    &audit[0]["after_json"]["work"]["requested_by"],
+                    &audit[0]["after_json"]["reason"]
+                ),
+                (
+                    &json!(format!("principal:{operator}")),
+                    &json!("orders-deploy"),
+                    &json!("deploy 0.58.0")
+                ),
                 "{}: the event names the caller and the reason",
                 test_case.description
             );

@@ -40,7 +40,7 @@ import type {
 	NodeBuildCost,
 	NodeState,
 	NodeStates,
-	Scope,
+	RepublishResult, Scope,
 	Snapshot,
 	SnapshotNode,
 	Timeline,
