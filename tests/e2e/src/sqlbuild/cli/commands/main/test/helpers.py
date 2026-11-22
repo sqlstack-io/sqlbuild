@@ -2487,3 +2487,46 @@ def statement_summary_test_file(name: str, doubled: int) -> str:
         "__source__raw_orders AS (\n  SELECT 1 AS order_id, 5 AS amount\n),\n"
         f"__expected__orders AS (\n  SELECT 1 AS order_id, {doubled} AS doubled\n)\nSELECT 1\n"
     )
+
+
+_PARTITIONED_FUNCTION: str = (
+    "import polars as pl\n"
+    "from sqlbuild.functions import table_fn\n\n\n"
+    "@table_fn(\n"
+    '    arguments={"customer_id": "INTEGER", "amount": "DOUBLE"},\n'
+    '    returns={"customer_id": "INTEGER", "amount_smoothed": "DOUBLE"},\n'
+    '    runtime_version="3.12",\n'
+    ")\n"
+    "def main(payments: pl.DataFrame) -> pl.DataFrame:\n"
+    '    """Each customer\'s payment amounts, smoothed."""\n'
+    '    return payments.rename({"amount": "amount_smoothed"})\n'
+)
+
+
+def partitioned_call_fixture_files(*, query: str, expected_rows: str) -> dict[str, str]:
+    """A DuckDB project whose model `query` calls a Python table function, mocked with one row."""
+
+    return {
+        "sqlbuild_project.toml": (
+            'name = "payments_fixtures"\nadapter = "duckdb"\n'
+            '[connection]\ndatabase = "payments.duckdb"\n'
+        ),
+        "functions/python/smooth_payments.py": _PARTITIONED_FUNCTION,
+        "models/payments.sql": (
+            "MODEL (description 'Payments.', materialized table);\n"
+            "SELECT 1 AS customer_id, 10.0::DOUBLE AS amount\n"
+        ),
+        "models/smoothed_payments.sql": (
+            f"MODEL (description 'Smoothed payments.', materialized table);\n{query}\n"
+        ),
+        "tests/unit/test_smoothed_payments.sql": (
+            'TEST (name "smoothed_payments__fixture");\nWITH\n'
+            "__ref__payments AS (\n"
+            "  SELECT * FROM (VALUES (1, 10.0::DOUBLE), (1, 20.0::DOUBLE), (1, 30.0::DOUBLE))\n"
+            "    AS v (customer_id, amount)\n),\n"
+            "__table_fn__smooth_payments AS (\n"
+            "  SELECT 1 AS customer_id, 20.0::DOUBLE AS amount_smoothed\n),\n"
+            f"__expected__smoothed_payments AS (\n  {expected_rows}\n)\n"
+            "SELECT 1\n"
+        ),
+    }

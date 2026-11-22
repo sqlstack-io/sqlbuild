@@ -85,10 +85,40 @@ pub(super) fn one_location() -> Vec<WarehouseStateLocation> {
     }]
 }
 
+/// A location in `directory` served by an unreachable server.
+pub(super) fn location_options(directory: &Path) -> LocationServe {
+    LocationServe {
+        project_dir: directory.to_path_buf(),
+        server_url: "http://127.0.0.1:1".into(),
+        location_id: Uuid::nil(),
+        target: "development".into(),
+        image_id: None,
+        metadata_reconcile_seconds: 3600,
+        safety_sync_seconds: 1800,
+        dev_events: false,
+    }
+}
+
 /// A location in `directory` whose `sqb debug` reports `wakes_compute` and whose every history read fails, published to an unreachable server: its options, script, work channel and the sync the publication starts.
 pub(super) fn published_location(
     directory: &Path,
     wakes_compute: bool,
+) -> (
+    (LocationServe, std::path::PathBuf),
+    (LocationWorkClient, LocationWorkPoll),
+    LocationMetadataSync,
+) {
+    let (location, work, mut state) = republished_location(directory, wakes_compute, None);
+    state.begin_sync(chrono::Utc::now());
+    state.idle = false;
+    (location, work, state)
+}
+
+/// A location in `directory` published again over the sync `previous` left, and the new sync.
+pub(super) fn republished_location(
+    directory: &Path,
+    wakes_compute: bool,
+    previous: Option<LocationMetadataSync>,
 ) -> (
     (LocationServe, std::path::PathBuf),
     (LocationWorkClient, LocationWorkPoll),
@@ -107,16 +137,7 @@ pub(super) fn published_location(
     let mut permissions = std::fs::metadata(&script).expect("metadata").permissions();
     std::os::unix::fs::PermissionsExt::set_mode(&mut permissions, 0o755);
     std::fs::set_permissions(&script, permissions).expect("executable");
-    let options = LocationServe {
-        project_dir: directory.to_path_buf(),
-        server_url: "http://127.0.0.1:1".into(),
-        location_id: Uuid::nil(),
-        target: "development".into(),
-        image_id: None,
-        metadata_reconcile_seconds: 3600,
-        safety_sync_seconds: 1800,
-        dev_events: false,
-    };
+    let options = location_options(directory);
     let client = connect_location_work((&options.server_url, "token"), options.location_id)
         .expect("work client");
     let poll = LocationWorkPoll {
@@ -130,14 +151,12 @@ pub(super) fn published_location(
         .block_on(settle_publication(
             (&options, &script, ("token", Uuid::nil())),
             ((one_location(), 1), true, ConnectionCheckTrigger::Publish),
-            (location_watch(directory), None),
+            (location_watch(directory), previous),
             std::future::pending(),
         ))
         .expect("no control error")
         .expect("not stopped");
-    let mut state = metadata.expect("a connected publication starts a sync");
-    state.begin_sync(chrono::Utc::now());
-    state.idle = false;
+    let state = metadata.expect("a connected publication starts a sync");
     ((options, script), (client, poll), state)
 }
 
@@ -147,6 +166,8 @@ pub(super) fn reuse_key(select: &[&str]) -> PlanKey {
         argv: vec!["plan".into(), "--json".into(), "--changed".into()],
         select: select.iter().map(|name| (*name).to_owned()).collect(),
         consumption: true,
+        jobs: Default::default(),
+        given: Default::default(),
     }
 }
 

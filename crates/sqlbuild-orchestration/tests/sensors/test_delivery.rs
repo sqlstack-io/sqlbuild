@@ -14,9 +14,9 @@ use crate::runs::main::requests::request_job_run::request_job_run;
 use crate::runs::models::JobRunRequest;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
-use crate::sensors::main::complete_builtin_sensor::complete_builtin_sensor;
 use crate::sensors::models::SensorEvaluationOutcome;
 use crate::sensors::tests::helpers::{append_events, change, evaluations, snapshot};
+use crate::sensors::tests::helpers::{complete_starting_job, drain_sensor};
 use crate::sensors::tests::test_types::SensorTestCase;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
@@ -64,13 +64,13 @@ fn given_paged_platform_events_when_sensor_publication_fails_then_retry_is_atomi
                 .expect("leader");
             let now = Utc::now();
             append_events(store, 0..105, now).await;
-            let requested = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+            let requested = begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                 .await
                 .expect("request")
                 .expect("due");
             let replica = second_store(store).await;
             assert_eq!(
-                begin_sensor_evaluation(&replica, &lease, trigger.trigger_id)
+                begin_sensor_evaluation(&replica, &lease, (trigger.trigger_id, None))
                     .await
                     .expect("recover pending"),
                 Some(requested.clone())
@@ -90,7 +90,7 @@ fn given_paged_platform_events_when_sensor_publication_fails_then_retry_is_atomi
                 };
                 install_fault(store, &point).await;
                 assert!(
-                    complete_builtin_sensor(store, &lease, &requested)
+                    complete_starting_job(store, &lease, &requested)
                         .await
                         .is_err(),
                     "{table}"
@@ -110,55 +110,46 @@ fn given_paged_platform_events_when_sensor_publication_fails_then_retry_is_atomi
                 );
             }
             assert_eq!(
-                complete_builtin_sensor(&replica, &lease, &requested)
+                complete_starting_job(&replica, &lease, &requested)
                     .await
-                    .expect("retry first page"),
-                50
+                    .expect("retry first event"),
+                1
             );
             assert_eq!(
-                complete_builtin_sensor(store, &lease, &requested)
+                complete_starting_job(store, &lease, &requested)
                     .await
                     .expect("retry completion"),
                 0
             );
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            let second = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                .await
-                .expect("next page")
-                .expect("due");
-            assert!(second.cursor.event_storage_id > 0);
             assert_eq!(
-                complete_builtin_sensor(store, &lease, &second)
-                    .await
-                    .expect("remaining page"),
-                3
+                drain_sensor(store, &lease, trigger.trigger_id).await,
+                52,
+                "each remaining event is its own tick, due at once while events wait"
             );
-            // Committed later, but its occurrence precedes the entire first page.
+            // Committed later, but its occurrence precedes every earlier event.
             append_events(store, 106..107, now - TimeDelta::days(1)).await;
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            let late = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                .await
-                .expect("late request")
-                .expect("due");
-            assert!(late.cursor.event_storage_id > second.cursor.event_storage_id);
             assert_eq!(
-                complete_builtin_sensor(store, &lease, &late)
-                    .await
-                    .expect("late arrival"),
-                1
+                drain_sensor(store, &lease, trigger.trigger_id).await,
+                1,
+                "a late arrival is delivered in storage order"
             );
             change(store, trigger.trigger_id, TriggerChange::ResetCursor).await;
             tokio::time::sleep(Duration::from_secs(1)).await;
-            let replay = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+            let replay = begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                 .await
                 .expect("replay")
                 .expect("due");
             assert_eq!(replay.cursor.event_storage_id, 0);
             assert_eq!(
-                complete_builtin_sensor(store, &lease, &replay)
+                complete_starting_job(store, &lease, &replay)
                     .await
-                    .expect("replay retained first page"),
-                50
+                    .expect("replay the first event"),
+                1
+            );
+            assert_eq!(
+                drain_sensor(store, &lease, trigger.trigger_id).await,
+                53,
+                "a reset delivers every event again"
             );
             let runs = list_runs(store, (location, "development"), 1000)
                 .await
@@ -174,7 +165,11 @@ fn given_paged_platform_events_when_sensor_publication_fails_then_retry_is_atomi
                     .all(|run| run.selection_json == BTreeSet::from(["orders".into()]))
             );
             let facts = evaluations(store).await;
-            assert_eq!(facts.len(), 8);
+            assert_eq!(
+                facts.len(),
+                2 * (1 + 52 + 1 + 1 + 53),
+                "each tick records its request and its completion"
+            );
             assert!(facts.iter().all(|fact| matches!(
                 fact.outcome,
                 SensorEvaluationOutcome::Requested | SensorEvaluationOutcome::Completed { .. }
@@ -255,12 +250,12 @@ fn given_a_skip_overlap_job_with_an_active_run_when_a_sensor_matches_then_it_rec
                 .expect("leader");
             // The first fixture event is a tick-overdue event, which the sensor matches.
             append_events(store, 0..1, Utc::now()).await;
-            let requested = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+            let requested = begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                 .await
                 .expect("request")
                 .expect("due");
             assert_eq!(
-                complete_builtin_sensor(store, &lease, &requested)
+                complete_starting_job(store, &lease, &requested)
                     .await
                     .expect("complete"),
                 0,

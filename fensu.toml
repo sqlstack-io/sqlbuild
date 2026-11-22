@@ -468,6 +468,11 @@ symbols = ["LoadCallbacks", "LoadExecutionResult", "LoadRuntimeParams"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
+modules = ["sqlbuild.executor.dynamic_pauses.main.resume_expired_holds"]
+symbols = ["resume_expired_holds"]
+reason = "Native code resolves these through the sqlbuild._native_host name table."
+
+[[targets.python.dead_code.roots]]
 modules = ["sqlbuild.executor.old_name_views._helpers.janitor"]
 symbols = ["is_compatibility_view"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
@@ -1347,6 +1352,14 @@ path = "src/sqlbuild/adapters/sqlserver/classes/sqlserver_adapter.py"
 reason = "The SQL Server adapter intentionally keeps overrideable backend behavior on one class."
 
 [[dupes.allowlist]]
+paths = ["crates/sqlbuild-orchestration/src/declarations/main/published_job.rs", "crates/sqlbuild-orchestration/src/scheduler/main/active_job_run.rs"]
+reason = "Each reads one row by location, target and job key: the published job, decoded with its snapshot named when it no longer decodes, and the run a skip overlap yields to. Only the keyed one-row query shape is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-orchestration/src/platform/models.rs", "crates/sqlbuild-orchestration/src/runs/models.rs"]
+reason = "PlatformEvent::event_type and RunChange::event_type each name their own enum's stored event types, one arm per variant; only the variant-to-string match shape is alike."
+
+[[dupes.allowlist]]
 paths = ["scripts/native_layering/_helpers/layering.py", "src/sqlbuild/executor/dynamic_pauses/_helpers/scope.py"]
 reason = "A ten-line depth-first walk in two packages that must not import each other: the dependency-layering tool walks Cargo.lock packages, the build's dynamic-model hold walks plan edges between models."
 
@@ -1367,7 +1380,7 @@ paths = ["crates/sqlbuild-orchestration/src/api/_helpers/resources/administrator
 reason = "Each function is one utoipa-annotated axum route: OpenAPI needs one annotated handler per operation, and each body only checks the caller's scope and calls one store operation. Scope checks and store work live in their shared owners."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-orchestration/src/authorization/main/roles/list_role_definitions.rs", "crates/sqlbuild-orchestration/src/authorization/main/decisions/read_security_audit.rs", "crates/sqlbuild-orchestration/src/credentials/_helpers/active_session.rs", "crates/sqlbuild-orchestration/src/declarations/_helpers/reads.rs", "crates/sqlbuild-orchestration/src/declarations/main/published_job.rs", "crates/sqlbuild-orchestration/src/declarations/main/list_person_jobs.rs", "crates/sqlbuild-orchestration/src/declarations/main/list_person_trigger_changes.rs", "crates/sqlbuild-orchestration/src/declarations/main/list_person_triggers.rs", "crates/sqlbuild-orchestration/src/declarations/main/list_triggers.rs", "crates/sqlbuild-orchestration/src/platform/main/work/read_location_work.rs", "crates/sqlbuild-orchestration/src/platform/main/health/read_person_location_health.rs", "crates/sqlbuild-orchestration/src/platform/main/health/location_health.rs", "crates/sqlbuild-orchestration/src/snapshots/main/reads/current_snapshot_record.rs", "crates/sqlbuild-orchestration/src/runs/main/listings/list_person_runs.rs", "crates/sqlbuild-orchestration/src/runs/main/listings/list_person_run_nodes.rs", "crates/sqlbuild-orchestration/src/runs/main/listings/list_run_nodes.rs", "crates/sqlbuild-orchestration/src/runs/main/listings/list_runs.rs", "crates/sqlbuild-orchestration/src/runs/_helpers/lifecycle/reads.rs", "crates/sqlbuild-orchestration/src/warehouse_history/_helpers/checks.rs", "crates/sqlbuild-orchestration/src/scheduler/main/list_person_ticks.rs", "crates/sqlbuild-orchestration/src/store/main/read_records.rs", "crates/sqlbuild-orchestration/src/platform/main/work/location_work.rs", "crates/sqlbuild-orchestration/src/scheduler/main/list_ticks.rs", "crates/sqlbuild-orchestration/src/sensors/_helpers/attempts.rs", "crates/sqlbuild-orchestration/src/sensors/_helpers/facts.rs", "crates/sqlbuild-orchestration/src/snapshots/main/reads/read_current_record.rs", "crates/sqlbuild-orchestration/src/snapshots/main/reads/read_snapshot_documents.rs", "crates/sqlbuild-orchestration/src/snapshots/main/reads/read_snapshot_nodes.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/person_reads/read_person_catalog.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_check.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_checks.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_maintenance.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_microbatch_coverage.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/person_reads/read_person_statistics.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_node_runs.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_run_events.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_run_ignored_audits.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_run_statements.rs", "crates/sqlbuild-orchestration/src/warehouse_history/_helpers/node_runs.rs"]
+paths = ["crates/sqlbuild-orchestration/src/authorization/main/roles/list_role_definitions.rs", "crates/sqlbuild-orchestration/src/authorization/main/decisions/read_security_audit.rs", "crates/sqlbuild-orchestration/src/credentials/_helpers/active_session.rs", "crates/sqlbuild-orchestration/src/declarations/_helpers/reads.rs", "crates/sqlbuild-orchestration/src/declarations/main/published_job.rs", "crates/sqlbuild-orchestration/src/declarations/main/list_person_jobs.rs", "crates/sqlbuild-orchestration/src/declarations/main/list_person_trigger_changes.rs", "crates/sqlbuild-orchestration/src/declarations/main/list_person_triggers.rs", "crates/sqlbuild-orchestration/src/declarations/main/list_triggers.rs", "crates/sqlbuild-orchestration/src/platform/main/work/read_location_work.rs", "crates/sqlbuild-orchestration/src/platform/main/health/read_person_location_health.rs", "crates/sqlbuild-orchestration/src/platform/main/health/location_health.rs", "crates/sqlbuild-orchestration/src/snapshots/main/reads/current_snapshot_record.rs", "crates/sqlbuild-orchestration/src/runs/main/listings/list_person_runs.rs", "crates/sqlbuild-orchestration/src/runs/main/listings/list_person_run_nodes.rs", "crates/sqlbuild-orchestration/src/runs/main/listings/list_run_nodes.rs", "crates/sqlbuild-orchestration/src/runs/main/listings/list_runs.rs", "crates/sqlbuild-orchestration/src/runs/_helpers/lifecycle/reads.rs", "crates/sqlbuild-orchestration/src/warehouse_history/_helpers/checks.rs", "crates/sqlbuild-orchestration/src/scheduler/main/list_person_ticks.rs", "crates/sqlbuild-orchestration/src/store/main/read_records.rs", "crates/sqlbuild-orchestration/src/platform/main/work/location_work.rs", "crates/sqlbuild-orchestration/src/scheduler/main/list_ticks.rs", "crates/sqlbuild-orchestration/src/sensors/_helpers/ticks/attempts.rs", "crates/sqlbuild-orchestration/src/sensors/_helpers/ticks/facts.rs", "crates/sqlbuild-orchestration/src/sensors/main/read_person_sensor_events.rs", "crates/sqlbuild-orchestration/src/sensors/main/read_sensor_events.rs", "crates/sqlbuild-orchestration/src/snapshots/main/reads/read_current_record.rs", "crates/sqlbuild-orchestration/src/snapshots/main/reads/read_snapshot_documents.rs", "crates/sqlbuild-orchestration/src/snapshots/main/reads/read_snapshot_nodes.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/person_reads/read_person_catalog.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_check.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_checks.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_maintenance.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_microbatch_coverage.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/person_reads/read_person_statistics.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_node_runs.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_run_events.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_run_ignored_audits.rs", "crates/sqlbuild-orchestration/src/warehouse_history/main/read_person_run_statements.rs", "crates/sqlbuild-orchestration/src/warehouse_history/_helpers/node_runs.rs"]
 reason = "Each is one control-store read with its own SQL and record type. Transactions, person authorization and decoding go through the shared begin_authorized, row_in_target, query_records, read_records and query_bodies helpers; what remains alike is the call shape."
 
 [[dupes.allowlist]]
@@ -1375,8 +1388,20 @@ paths = ["crates/sqlbuild-orchestration/src/warehouse_metadata/_helpers/catalog.
 reason = "Catalog pages read a namespace and statistics pages an exact relation within its retention horizon, each decoding its own record; database scope, keyset cursor and page size share page_tail."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-orchestration/src/sensors/_helpers/nodes.rs"]
-reason = "The new-data sensor keys runs on a source's version streak and the stale-source sensor on timestamp age; paging, scoping and queueing share source_page, source_scope and queue_sensor_run."
+paths = ["crates/sqlbuild-orchestration/src/sensors/_helpers/events/sources.rs"]
+reason = "The new-data sensor keys events on a source's version streak and the stale-source sensor on timestamp age; paging, scoping, decoding and event IDs share source_page, source_scope, freshness_record and version_id."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-orchestration/src/sensors/_helpers/events/nodes.rs"]
+reason = "Node events read each row's previous outcome to tell a recovery from a success, which needs the transaction per row; check events map each row on its own. Paging and event construction are shared; only the page loop is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-orchestration/src/scheduler/_helpers/drain_due_triggers.rs", "crates/sqlbuild-orchestration/src/scheduler/_helpers/drain_sensors.rs"]
+reason = "One drains due schedules and the other due sensors, each from its own query and tick operation; only the read-due-rows-then-renew-the-lease-per-item loop is alike."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-analysis/src/sql_test_attachment/_helpers/attachment_checks.rs", "crates/sqlbuild-orchestration/src/sensors/_helpers/ticks/work.rs", "crates/sqlbuild-python-compile/src/input_loops/_helpers/resources/sql_test_loop.rs"]
+reason = "Three crates that don't depend on each other each keep the first of every key of their own record type, in order; only the five-line seen-set filter is alike."
 
 [[dupes.allowlist]]
 paths = ["crates/sqlbuild-orchestration/src/credentials/_helpers/locations.rs", "crates/sqlbuild-orchestration/src/credentials/main/identities/insert_principal.rs"]
@@ -1646,12 +1671,12 @@ select = [
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/Cargo.toml"]
-thresholds = { max_crate_code_lines = 51200 }
-reason = "The Python bindings crate is above the code-line limit; this caps it near its current size until it is split into crates by area. The location and plan bindings of the large-project server work and #1560 grew it to 51,122; moving them out would need new cross-crate imports or a policy exception. Lower the cap as code moves out."
+thresholds = { max_crate_code_lines = 51300 }
+reason = "The Python bindings crate is above the code-line limit; this caps it near its current size until it is split into crates by area. The location and plan bindings of the large-project server work and #1560 grew it to 51,122; moving them out would need new cross-crate imports or a policy exception. The dbt event stream moved to sqlbuild-python-output, and the location sync's dynamic-model resume came in (50,945). The CHI-1589 stop handling and dev error fields plus the CHI-1595/CHI-1593 env-file merge took it to 51,210 when combined. The cap stays near its current size; lower it as code moves out."
 
 [[targets.rust.threshold_overrides]]
 paths = ["crates/sqlbuild-python/src/bindings/_helpers"]
-thresholds = { max_helpers_container_buckets = 93 }
+thresholds = { max_helpers_container_buckets = 92 }
 reason = "The bindings helpers container is above the bucket limit; this caps it at its current bucket count until cohesive groups move into their own modules or crates. Lower the cap as buckets move out."
 
 [targets.rust.rule_options.XSB076]
@@ -1915,7 +1940,7 @@ reason = "Issued credentials and handoffs implement Debug manually to redact bea
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
 path = "crates/sqlbuild-orchestration/src/api/models.rs"
-symbols = ["PasswordLoginRequest", "PasswordChangeRequest", "PasswordSessionResponse", "ExternalIdentityResponse", "CliLoginApprovalRequest", "CliLoginClaimRequest", "CliLoginSessionResponse"]
+symbols = ["PasswordLoginRequest", "PasswordChangeRequest", "PasswordPersonRequest", "PasswordSessionResponse", "ExternalIdentityResponse", "CliLoginApprovalRequest", "CliLoginClaimRequest", "CliLoginSessionResponse"]
 reason = "Browser transport models implement Debug manually to redact passwords and CSRF secrets; other models derive Debug."
 
 [[targets.rust.rule_exceptions]]
@@ -1957,6 +1982,12 @@ rule = "FPRSH003"
 path = "crates/sqlbuild-rules/src/build_identity/main/native_build_identity.rs"
 symbols = ["native_build_identity"]
 reason = "Every native entry point installs the build identity before anything reads it, so a missing identity is a programming error in a binary. Caches and rule fingerprints must never key on a substitute, and threading a Result through every infallible cache key and catalogue reader would only re-raise the same failure; a test covers the panic in a fresh process."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS130"
+path = "crates/sqlbuild-core/src/process_environment/_helpers/overlay.rs"
+symbols = ["replace"]
+reason = "The environment overlay stands in for the process environment, which is process-wide by definition: the launcher installs the project's env file once before anything reads the environment, and sqb dev replaces it on reload. It replaces an unsafe std::env::set_var, so every reader and every child sees one environment."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS130"
@@ -2010,6 +2041,16 @@ reason = "The workspace allows unsafe code only in sqlbuild-process-ownership, f
 rule = "FPRSH012"
 path = "crates/sqlbuild-process-ownership/src/lib.rs"
 reason = "The workspace allows unsafe code only in sqlbuild-process-ownership, for the platform calls that prove which process owns a worker claim; each call has an item-level allow and a SAFETY comment."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSH013"
+path = "crates/sqlbuild-process-ownership/src/terminal/_helpers/session.rs"
+reason = "The workspace allows unsafe code only in sqlbuild-process-ownership; giving a prompting child its controlling terminal needs a pre-exec hook, with an item-level allow and a SAFETY comment."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSH002"
+path = "crates/sqlbuild-process-ownership/src/terminal/_helpers/session.rs"
+reason = "The workspace allows unsafe code only in sqlbuild-process-ownership; giving a prompting child its controlling terminal needs a pre-exec hook, with an item-level allow and a SAFETY comment."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSH013"
@@ -2748,7 +2789,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_command/init.rs=7",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_command/init_project.rs=26",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_command/support.rs=6",
-    "crates/sqlbuild-python/src/bindings/_helpers/dbt_events/stream.rs=0",
+    "crates/sqlbuild-python-output/src/dbt_events/models.rs=0",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/cli.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/event_stream.rs=14",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/execution.rs=1",
@@ -3055,7 +3096,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/dagster_invocation/arguments.rs=1",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_command/command.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_command/init_project.rs=2",
-    "crates/sqlbuild-python/src/bindings/_helpers/dbt_events/stream.rs=2",
+    "crates/sqlbuild-python-output/src/dbt_events/models.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/event_stream.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/graph.rs=1",
     "crates/sqlbuild-python/src/bindings/_helpers/dbt_interop/manifest.rs=4",
@@ -3128,7 +3169,6 @@ module_layers = [
     "dag_artifact=registry",
     "dagster_invocation=commands",
     "dbt_command=commands",
-    "dbt_events=commands",
     "dbt_interop=commands",
     "debug_command=commands",
     "diagnostics=registry",
@@ -3554,7 +3594,7 @@ paths = ["crates/sqlbuild-python-base/src/boundary/_helpers/python_calls.rs", "c
 reason = "Each passes its own keyword set to its own Python callable; only building the keyword dict is alike."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-base/src/compile_context/_helpers/input_reads.rs", "crates/sqlbuild-python-front/src/discovery/main/project/register_project_files.rs", "crates/sqlbuild-python-front/src/discovery/main/snapshots/register_snapshot.rs", "crates/sqlbuild-python/src/bindings/_helpers/dbt_events/stream.rs"]
+paths = ["crates/sqlbuild-python-base/src/compile_context/_helpers/input_reads.rs", "crates/sqlbuild-python-front/src/discovery/main/project/register_project_files.rs", "crates/sqlbuild-python-front/src/discovery/main/snapshots/register_snapshot.rs", "crates/sqlbuild-python-output/src/dbt_events/main/register_dbt_events.rs"]
 reason = "Each registers its own module's Python functions; only the add-function calls are alike."
 
 [[dupes.allowlist]]
@@ -3966,7 +4006,7 @@ paths = ["crates/sqlbuild-python-compile/src/rules/_helpers/lint/lint_sql_bodies
 reason = "Each reads its own record's fields from its own Python object; only the field-read shape is alike."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-python-output/src/build_progress/models.rs", "crates/sqlbuild-python/src/bindings/_helpers/dbt_events/stream.rs"]
+paths = ["crates/sqlbuild-python-output/src/build_progress/models.rs", "crates/sqlbuild-python-output/src/dbt_events/models.rs"]
 reason = "Each Python constructor reads its own keyword set into its own fields; only the keyword parsing is alike."
 
 [[dupes.allowlist]]

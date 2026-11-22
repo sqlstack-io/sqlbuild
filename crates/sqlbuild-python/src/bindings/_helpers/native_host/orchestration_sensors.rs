@@ -2,14 +2,11 @@
 
 use std::path::Path;
 
-use pyo3::IntoPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyString};
 use sqlbuild_host::entries::models::UserCodeHost;
-use sqlbuild_orchestration::sensors::models::{
-    CustomSensorOutcome, SensorCondition, SensorEvaluationRequest,
-};
+use sqlbuild_orchestration::sensors::models::{SensorEvent, SensorFunctionOutcome};
 
 use crate::bindings::_helpers::native_host::setup_context::project_setup_context;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
@@ -18,70 +15,98 @@ use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::native_host::constants::SENSOR_CONTEXT_PARAMETER;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry as entry;
 use sqlbuild_python_base::orchestration_reads::main::callback_code_hash::callback_code_hash;
+use sqlbuild_python_base::orchestration_reads::main::mask_sensor_outcome::mask_sensor_outcome;
 use sqlbuild_python_base::orchestration_reads::main::orchestration_code_hash::orchestration_code_hash;
+use sqlbuild_python_base::orchestration_reads::main::provider_secret_values::provider_secret_values;
+use sqlbuild_python_base::orchestration_reads::main::sensor_event_record::sensor_event_record;
+use sqlbuild_python_base::orchestration_reads::main::sensor_outcome::sensor_outcome;
+use sqlbuild_python_base::orchestration_reads::main::sensor_traceback::sensor_traceback;
 use sqlbuild_python_front::discovery::main::python_files::discover_provider_classes::discover_provider_classes;
 use sqlbuild_python_front::discovery::main::python_files::provider_by_name::provider_by_name;
 use sqlbuild_python_front::discovery::main::python_files::provider_usages::provider_usages;
-use sqlbuild_python_front::discovery::main::sources::orchestration_declarations::orchestration_declarations;
 use sqlbuild_python_front::discovery::models::SecretPolicy;
-use sqlbuild_python_project::project_snapshot::main::python_declarations::python_declarations;
+use sqlbuild_python_project::native_host::main::sensor_declaration::sensor_declaration;
 
+/// One call of a sensor's function: which sensor, for which target and event, and the published code it must match.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SensorCall<'a> {
+    pub(crate) sensor: &'a str,
+    pub(crate) target: &'a str,
+    pub(crate) evaluation_id: &'a str,
+    pub(crate) event: Option<&'a SensorEvent>,
+    pub(crate) cursor: Option<&'a str>,
+    /// The published code's hash; `None` for `sqb sensor try`, which runs the local code as it is.
+    pub(crate) code_hash: Option<&'a str>,
+}
+
+/// What the function returned; its exception or a return value it may not give is a failed call with the reason.
 pub(crate) fn evaluate_sensor(
     py: Python<'_>,
     project_dir: &Path,
-    evaluation: &SensorEvaluationRequest,
-) -> PyResult<CustomSensorOutcome> {
-    let SensorCondition::Custom {
-        function: name,
-        code_hash,
-    } = &evaluation.definition.when
-    else {
-        return Err(PyValueError::new_err("custom sensor work required"));
-    };
-    let authoring = py.import("sqlbuild.orchestration_declarations.models.authoring")?;
-    let sensor_class = authoring.getattr("Sensor")?;
-    let mut matches: Vec<Bound<'_, PyAny>> = Vec::new();
-    let inventory = orchestration_declarations(project_dir.into_pyobject(py)?.as_any())?;
-    for declaration in python_declarations(py, project_dir, &inventory)? {
-        if declaration.is_instance(&sensor_class)?
-            && declaration.getattr("name")?.extract::<String>()? == *name
-        {
-            matches.push(declaration);
+    call: SensorCall<'_>,
+) -> SensorFunctionOutcome {
+    called(py, project_dir, call).unwrap_or_else(|error| {
+        let failed = SensorFunctionOutcome::Failed {
+            error: sensor_traceback(py, &error),
+        };
+        mask_sensor_outcome(failed.clone(), (&[], &[])).unwrap_or(failed)
+    })
+}
+
+fn called(
+    py: Python<'_>,
+    project_dir: &Path,
+    call: SensorCall<'_>,
+) -> PyResult<SensorFunctionOutcome> {
+    let sensor = sensor_declaration(py, project_dir, (call.sensor, call.target))?;
+    let function = sensor.getattr("function")?;
+    if let Some(published) = call.code_hash {
+        let sources = py.detach(|| orchestration_code_hash(project_dir))?;
+        if callback_code_hash(&function, &sources)? != published {
+            return Err(PyValueError::new_err(
+                "the sensor's code changed since the location published it; the next publication runs the new code",
+            ));
         }
     }
-    let [sensor] = matches.as_slice() else {
-        return Err(PyValueError::new_err(
-            "custom sensor declaration must resolve uniquely",
-        ));
-    };
-    let targets: Vec<String> = sensor.getattr("targets")?.extract()?;
-    if !sensor.getattr("when")?.is_none()
-        || (!targets.is_empty() && !targets.contains(&evaluation.target))
-        || sensor.getattr("run")?.extract::<String>()? != evaluation.definition.job_key
-    {
-        return Err(PyValueError::new_err("custom sensor definition changed"));
-    }
-    let function = sensor.getattr("function")?;
-    let sources = py.detach(|| orchestration_code_hash(project_dir))?;
-    if callback_code_hash(&function, &sources)? != *code_hash {
-        return Err(PyValueError::new_err("custom sensor code changed"));
-    }
     let fields = PyDict::new(py);
-    fields.set_item("cursor", &evaluation.cursor.custom)?;
-    fields.set_item("target", &evaluation.target)?;
-    fields.set_item("evaluation_id", evaluation.evaluation_id.to_string())?;
+    fields.set_item("event", sensor_event_record(py, call.event)?)?;
+    fields.set_item("cursor", call.cursor)?;
+    fields.set_item("target", call.target)?;
+    fields.set_item("evaluation_id", call.evaluation_id)?;
     let context = py
         .import("sqlbuild.orchestration")?
         .getattr("SensorContext")?
         .call((), Some(&fields))?;
     let project_path = imported(py, "pathlib", "Path")?.call1((project_dir,))?;
     let providers = discover_provider_classes(project_path.clone(), SecretPolicy::Defer.name())?;
+    let secrets: Vec<String> = provider_secret_values(&providers)?;
+    match with_providers(
+        py,
+        (&function, &context, call),
+        (&project_path, providers, &secrets),
+    ) {
+        Ok(outcome) => Ok(outcome),
+        Err(error) => mask_sensor_outcome(
+            SensorFunctionOutcome::Failed {
+                error: sensor_traceback(py, &error),
+            },
+            (&secrets, &[]),
+        ),
+    }
+}
+
+/// The function called with the target's providers, its context the sensor's; its outcome masks `secrets` and the secret settings of the providers it was given.
+fn with_providers<'py>(
+    py: Python<'py>,
+    (function, context, call): (&Bound<'py, PyAny>, &Bound<'py, PyAny>, SensorCall<'_>),
+    (project_path, providers, secrets): (&Bound<'py, PyAny>, Bound<'py, PyAny>, &[String]),
+) -> PyResult<SensorFunctionOutcome> {
     let by_name = provider_by_name(&providers)?;
     let target = (
-        &PyString::new(py, &evaluation.target).into_any(),
+        &PyString::new(py, call.target).into_any(),
         &py.None().into_bound(py),
     );
-    let setup_context = project_setup_context((&project_path, &providers), target, true)?;
+    let setup_context = project_setup_context((project_path, &providers), target, true)?;
     let session = call_with(
         &entry(py, UserCodeHost::BuildProviderSession)?,
         &[
@@ -92,53 +117,27 @@ pub(crate) fn evaluate_sensor(
     )?;
     within(&session, |_| {
         let arguments = PyDict::new(py);
-        arguments.set_item("ctx", &context)?;
-        for usage in provider_usages(&function, &by_name)?.try_iter()? {
+        arguments.set_item(SENSOR_CONTEXT_PARAMETER, context)?;
+        let mut instances: Vec<Bound<'py, PyAny>> = Vec::new();
+        for usage in provider_usages(function, &by_name)?.try_iter()? {
             let usage = usage?;
             if usage.getattr("parameter_name")?.extract::<String>()? != SENSOR_CONTEXT_PARAMETER {
-                arguments.set_item(
-                    usage.getattr("parameter_name")?,
-                    session.call_method1("get", (usage.getattr("provider_name")?,))?,
-                )?;
+                let instance = session.call_method1("get", (usage.getattr("provider_name")?,))?;
+                arguments.set_item(usage.getattr("parameter_name")?, &instance)?;
+                instances.push(instance);
             }
         }
-        let result = function.call((), Some(&arguments))?;
-        if result.is_instance(&authoring.getattr("SkipReason")?)? {
-            let reason: String = result.getattr("reason")?.extract()?;
-            if reason.trim().is_empty() {
-                return Err(PyValueError::new_err("SkipReason needs a nonempty reason"));
-            }
-            return Ok(CustomSensorOutcome::Skipped {
-                cursor: context.getattr("cursor")?.extract()?,
-                reason,
-            });
-        }
-        let request_class = authoring.getattr("RunRequest")?;
-        let mut run_keys: Vec<String> = Vec::new();
-        for request in result
-            .try_iter()?
-            .take(sqlbuild_orchestration::sensors::constants::MAX_SENSOR_RUN_REQUESTS + 1)
-        {
-            let request = request?;
-            if !request.is_instance(&request_class)? {
-                return Err(PyValueError::new_err(
-                    "custom sensors return RunRequest records or SkipReason",
-                ));
-            }
-            let key: String = request.getattr("run_key")?.extract()?;
-            if key.trim().is_empty() {
-                return Err(PyValueError::new_err("RunRequest needs a nonempty run_key"));
-            }
-            run_keys.push(key);
-        }
-        if run_keys.len() > sqlbuild_orchestration::sensors::constants::MAX_SENSOR_RUN_REQUESTS {
-            return Err(PyValueError::new_err(
-                "custom sensor exceeds the bounded run-request page",
-            ));
-        }
-        Ok(CustomSensorOutcome::Completed {
-            cursor: context.getattr("cursor")?.extract()?,
-            run_keys,
-        })
+        let called = function.call((), Some(&arguments)).and_then(|result| {
+            let cursor: Option<String> = context.getattr("cursor")?.extract()?;
+            sensor_outcome(
+                py,
+                &result,
+                (call.event, cursor.filter(|_| call.event.is_none())),
+            )
+        });
+        let outcome = called.unwrap_or_else(|error| SensorFunctionOutcome::Failed {
+            error: sensor_traceback(py, &error),
+        });
+        mask_sensor_outcome(outcome, (secrets, &instances))
     })
 }

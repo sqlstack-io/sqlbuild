@@ -18,11 +18,9 @@ use crate::runs::models::{
     JobRunRequest, NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome,
 };
 use crate::scheduler::tests::contracts::helpers::{acquire_lease, hold_lease};
-use crate::sensors::main::{
-    begin_sensor_evaluation::begin_sensor_evaluation,
-    complete_builtin_sensor::complete_builtin_sensor,
-};
+use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
 use crate::sensors::tests::helpers::{change, finish_run, snapshot};
+use crate::sensors::tests::helpers::{complete_starting_job, drain_sensor};
 use crate::sensors::tests::test_types::SensorTestCase;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
@@ -70,7 +68,7 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                 "daily_orders": {"description": "Source group", "selection": ["orders", "customers"], "jobs": {"orders": []}}
             }));
             input.documents.insert("triggers".into(), json!({
-                "rebuilt_orders": {"description": "Each genuine rebuild", "job_key": "inventory",
+                "rebuilt_orders": {"description": "Each genuine rebuild", "function": "start_inventory", "code_hash": "v1", "timeout_seconds": 60,
                     "when": {"kind": "node_event", "selection": ["orders", "customers"], "kinds": ["success"]},
                     "minimum_interval_seconds": 1}
             }));
@@ -236,7 +234,7 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                         .expect("duplicate worker fact")
                 );
             }
-            let pending = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+            let pending = begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                 .await
                 .expect("request evaluation")
                 .expect("due");
@@ -251,7 +249,7 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
             };
             install_fault(store, &fault).await;
             assert!(
-                complete_builtin_sensor(store, &lease, &pending)
+                complete_starting_job(store, &lease, &pending)
                     .await
                     .is_err()
             );
@@ -264,7 +262,7 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                     .all(|run| run.job_key.as_deref() != Some("inventory"))
             );
             assert_eq!(
-                begin_sensor_evaluation(&replica, &lease, trigger.trigger_id)
+                begin_sensor_evaluation(&replica, &lease, (trigger.trigger_id, None))
                     .await
                     .expect("recover pending"),
                 Some(pending.clone())
@@ -272,31 +270,23 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
             assert_eq!(
                 tokio::time::timeout(
                     Duration::from_secs(5),
-                    complete_builtin_sensor(&replica, &lease, &pending),
+                    complete_starting_job(&replica, &lease, &pending),
                 )
                 .await
-                .expect("bounded 100-row page")
-                .expect("first page"),
-                7
+                .expect("bounded tick")
+                .expect("first event"),
+                1
             );
             assert_eq!(
-                complete_builtin_sensor(store, &lease, &pending)
+                complete_starting_job(store, &lease, &pending)
                     .await
                     .expect("duplicate completion"),
                 0
             );
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            let next = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                .await
-                .expect("second evaluation")
-                .expect("due");
-            assert!(next.cursor.event_storage_id > 0);
             assert_eq!(
-                complete_builtin_sensor(store, &lease, &next)
-                    .await
-                    .expect("second page"),
-                0,
-                "unstarted finishes never fill a page"
+                drain_sensor(store, &lease, trigger.trigger_id).await,
+                6,
+                "the other genuine rebuilds each get a tick; unstarted finishes never match"
             );
             for change in [
                 RunChange::NodeStarted {
@@ -324,15 +314,8 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                 .await
                 .expect("later node in the same run");
             }
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            let later = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                .await
-                .expect("later evaluation")
-                .expect("due");
             assert_eq!(
-                complete_builtin_sensor(store, &lease, &later)
-                    .await
-                    .expect("later finish"),
+                drain_sensor(store, &lease, trigger.trigger_id).await,
                 1,
                 "distinct successful finishes in the same run must not collapse"
             );
@@ -355,16 +338,8 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                 crate::runs::models::RunStatus::Running
             );
             change(store, trigger.trigger_id, TriggerChange::ResetCursor).await;
-            for _ in 0..2 {
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                let replay = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                    .await
-                    .expect("replay")
-                    .expect("due");
-                complete_builtin_sensor(store, &lease, &replay)
-                    .await
-                    .expect("deduplicated replay");
-            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            drain_sensor(store, &lease, trigger.trigger_id).await;
             assert_eq!(
                 list_runs(store, (location, "development"), 1000)
                     .await

@@ -13,6 +13,8 @@
 	import { migrationSteps } from './plan-steps';
 	import { WARNINGS_SHOWN, diffPreview, planGroups, selectedGroup, withoutRows, type PlanGroupKey, type PlanRow, type WarningGroup } from './plan-index';
 	import PlanRenames from './plan-renames.svelte';
+	import PlanCantRun from './plan-cant-run.svelte';
+	import { cantRunKeys, sinkBlocks, willRunCount } from './cant-run';
 
 	/**
 	 * `section` is the group shown, kept in the address by the page; `more` adds the next page of a
@@ -29,16 +31,29 @@
 		more,
 		load,
 		diff,
-		refresh = (job: string) => `job ${job}`
+		refresh = (job: string) => `job ${job}`,
+		kindOf,
+		upstreamOf
 	}: {
 		plan: PlanDocument;
 		section?: string | null;
-		onselect: (key: PlanGroupKey) => void;
+		onselect: (key: PlanGroupKey | typeof CANT_RUN) => void;
 		more?: (section: PlanPageSection, limit: number) => Promise<void>;
 		load?: (section: PlanPageSection, offset: number, limit: number, name: string) => Promise<PlanPage>;
 		diff?: (model: string) => Promise<PlanDiff | null>;
 		refresh?: (job: string) => string;
+		/** A node's kind and its upstream keys, from the catalog, for the Can't run pane. */
+		kindOf?: (key: string) => string;
+		upstreamOf?: (key: string) => string[];
 	} = $props();
+
+	/** The pane of nodes a provider's missing secrets stop; shown first when the plan has any. */
+	const CANT_RUN = 'cant_run';
+	const cantRun = $derived(plan.cant_run ?? []);
+	const blocked = $derived(cantRunKeys(cantRun));
+	/** How many nodes can't run: all of them when a sink's provider is missing a secret. */
+	const cantCount = $derived(sinkBlocks(cantRun) ? 'all' : blocked.length.toLocaleString());
+	const cantRunShown = $derived(cantRun.length > 0 && (section === null || section === CANT_RUN));
 
 	/** Rows a group shows at first, and each "Show more" adds. */
 	const PAGE = 50;
@@ -278,12 +293,20 @@
 <div class="plan-browser">
 	<nav class="index" aria-label="Plan sections">
 		{#if runGroups.length}
-			<div class="heading" data-testid="index-will-run"><span>Will run</span><b>{totals.run.toLocaleString()}</b></div>
+			<div class="heading" data-testid="index-will-run"><span>Will run</span><b>{willRunCount(totals.run, cantRun).toLocaleString()}</b></div>
 			{#each runGroups as g (g.key)}{@render entry(g)}{/each}
 		{/if}
 		{#if wontGroups.length}
 			<div class="heading wont" data-testid="index-wont-run"><span>Won’t run</span><b>{totals.wont.toLocaleString()}</b></div>
 			{#each wontGroups as g (g.key)}{@render entry(g)}{/each}
+		{/if}
+		{#if cantRun.length}
+			<div class="heading cant" data-testid="index-cant-run"><span>Can’t run</span><b>{cantCount}</b></div>
+			<!-- raw-button: a table-of-contents entry with its count, highlighted while its section is shown -->
+			<button class="entry" class:selected={cantRunShown} aria-current={cantRunShown ? 'true' : undefined} data-section={CANT_RUN} onclick={() => onselect(CANT_RUN)}>
+				<span class="title">Missing secret</span>
+				<span class="count">{cantCount}</span>
+			</button>
 		{/if}
 		{#if warningGroup}
 			{#if runGroups.length || wontGroups.length}<hr />{/if}
@@ -291,7 +314,12 @@
 		{/if}
 	</nav>
 
-	{#if group}
+	{#if cantRunShown}
+		<section class="pane" data-section={CANT_RUN}>
+			<header><h3>Can’t run <span class="count">{sinkBlocks(cantRun) ? 'every node' : blocked.length === 1 ? '1 node' : `${blocked.length.toLocaleString()} nodes`}</span></h3></header>
+			<PlanCantRun entries={cantRun} {kindOf} {upstreamOf} />
+		</section>
+	{:else if group}
 		<section class="pane" data-section={group.key}>
 			{#if renamesPane}
 				<PlanRenames {plan} {counts} {more} {load} />
@@ -415,6 +443,13 @@
 	}
 	.heading.wont b {
 		color: var(--muted-foreground);
+	}
+	.heading.cant {
+		margin-top: 14px;
+		color: var(--sb-error);
+	}
+	.heading.cant b {
+		color: var(--sb-error);
 	}
 	.index hr {
 		margin: 6px 0;

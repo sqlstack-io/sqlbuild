@@ -2,12 +2,16 @@
 
 #[path = "changes/helpers.rs"]
 mod changes_helpers;
+#[path = "check_lists/helpers.rs"]
+mod check_list_helpers;
 #[path = "denials/helpers.rs"]
 mod denials_helpers;
 #[path = "fingerprint_reads/helpers.rs"]
 mod fingerprint_reads_helpers;
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
+#[path = "newer_server/helpers.rs"]
+mod newer_server_helpers;
 #[path = "node_sql/helpers.rs"]
 mod node_sql_helpers;
 #[path = "node_states/helpers.rs"]
@@ -20,6 +24,8 @@ mod oidc_helpers;
 mod oidc_test_types;
 #[path = "output/helpers.rs"]
 mod output_helpers;
+#[path = "password_people/helpers.rs"]
+mod password_people_helpers;
 #[path = "person_sessions/helpers.rs"]
 mod person_sessions_helpers;
 #[path = "person_sessions/test_types.rs"]
@@ -46,6 +52,8 @@ mod test_attention_acknowledgements;
 mod test_catalog_reads;
 #[path = "test_changes.rs"]
 mod test_changes;
+#[path = "test_check_list_cache.rs"]
+mod test_check_list_cache;
 #[path = "test_checks.rs"]
 mod test_checks;
 #[path = "test_cli_login.rs"]
@@ -74,12 +82,16 @@ mod test_location_work;
 mod test_maintenance;
 #[path = "test_microbatch_coverage.rs"]
 mod test_microbatch_coverage;
+#[path = "test_newer_server.rs"]
+mod test_newer_server;
 #[path = "test_node_states.rs"]
 mod test_node_states;
 #[path = "test_oidc.rs"]
 mod test_oidc;
 #[path = "test_oidc_groups.rs"]
 mod test_oidc_groups;
+#[path = "test_password_people.rs"]
+mod test_password_people;
 #[path = "test_passwords.rs"]
 mod test_passwords;
 #[path = "test_person_live.rs"]

@@ -46,7 +46,18 @@ pub(crate) fn named_job_build_settings(
     (directory, selected_target): (&Path, Option<String>),
 ) -> PyResult<BTreeMap<String, Value>> {
     let scope = (directory.to_path_buf(), selected_target);
-    let Some(declared) = with_job_scope(scope, || job_declarations(py))? else {
+    with_job_scope(scope, || {
+        scoped_job_build_settings(py, (selectors, given), directory)
+    })
+}
+
+/// [`named_job_build_settings`] of the jobs the running command's job scope declares.
+pub(crate) fn scoped_job_build_settings(
+    py: Python<'_>,
+    (selectors, given): (&[String], &BTreeSet<String>),
+    directory: &Path,
+) -> PyResult<BTreeMap<String, Value>> {
+    let Some(declared) = job_declarations(py)? else {
         return Ok(BTreeMap::new());
     };
     let resolved: ResolvedJobSettings =

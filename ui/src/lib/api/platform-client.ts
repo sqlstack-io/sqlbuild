@@ -12,6 +12,7 @@ import type {
 	LocationSummary,
 	LocationToken,
 	MaintenanceHistory,
+	NewPasswordAccount,
 	PlatformEventQuery,
 	PlatformEventRecord,
 	PlatformHealth,
@@ -72,6 +73,8 @@ export interface PlatformApi {
 	disableAccount(name: string): Promise<Account>;
 	/** Lets a disabled account sign in again. Sessions revoked on disable stay revoked. `user.manage` */
 	enableAccount(name: string): Promise<Account>;
+	/** Adds a person who signs in with a password, only under password sign-in. `user.manage`, and `role.assign` to give a role. */
+	createPasswordAccount(request: NewPasswordAccount): Promise<Account>;
 
 	// ---- roles ----
 	/** Roles available in a location: built-in, server config and the location's project roles. `role.assign` */

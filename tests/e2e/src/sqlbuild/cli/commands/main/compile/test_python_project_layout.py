@@ -57,8 +57,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                 "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
                 "orchestration/sensors/orders_sensor.py": (
                     "from sqlbuild.orchestration import job, sensor\n"
-                    "orders = sensor('orders_sensor', description='Orders.', "
-                    "run=job('nightly', description='Orders.', select='orders'))\n"
+                    "@sensor(description='Orders.', when=job('nightly', description='Orders.', select='orders'))\n"
+                    "def orders_sensor(ctx):\n    return None\n"
                 ),
             },
             expected_exit_code=1,
@@ -586,69 +586,6 @@ def test_given_unrelated_python_package_on_path_when_building_then_project_pytho
     output: str = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert all(fragment in output for fragment in test_case.expected_build_fragments)
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    (
-        PythonProjectLayoutCompileTestCase(
-            description="a node module importing the removed task decorator",
-            repo_files={
-                "sqlbuild_project.toml": 'name = "task_layout"\nadapter = "duckdb"\n',
-                "python/fulfillment/refresh_carriers/node.py": (
-                    "from sqlbuild.tasks import task\n\n\n"
-                    "@task\n"
-                    "def refresh_carriers() -> None:\n"
-                    '    """Refresh carrier rates."""\n'
-                ),
-            },
-            expected_exit_code=1,
-            expected_stderr_fragments=(
-                "python/fulfillment/refresh_carriers/node.py",
-                "`sqlbuild.tasks` was removed",
-                "use `@asset` from `sqlbuild.assets`",
-            ),
-        ),
-        PythonProjectLayoutCompileTestCase(
-            description="a node module importing the removed task context",
-            repo_files={
-                "sqlbuild_project.toml": 'name = "task_layout"\nadapter = "duckdb"\n',
-                "python/fulfillment/refresh_carriers/node.py": (
-                    "from sqlbuild import tasks\n\n\n"
-                    "@tasks.task\n"
-                    "def refresh_carriers(context: tasks.TaskContext) -> None:\n"
-                    '    """Refresh carrier rates."""\n'
-                ),
-            },
-            expected_exit_code=1,
-            expected_stderr_fragments=(
-                "python/fulfillment/refresh_carriers/node.py",
-                "`sqlbuild.tasks` was removed",
-                "use `@asset` from `sqlbuild.assets`",
-            ),
-        ),
-    ),
-    ids=lambda case: case.description,
-)
-def test_given_a_node_using_the_removed_task_decorator_when_compiling_then_command_says_to_use_asset(
-    test_case: PythonProjectLayoutCompileTestCase,
-    tmp_path: Path,
-) -> None:
-    project_dir: Path = prepare_inline_project(
-        tmp_path=tmp_path,
-        project_name="task_layout",
-        repo_files=test_case.repo_files,
-    )
-
-    result: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "compile"),
-        project_dir=project_dir,
-    )
-
-    assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
-    assert all(fragment in result.stderr for fragment in test_case.expected_stderr_fragments), (
-        result.stderr
-    )
 
 
 if __name__ == "__main__":

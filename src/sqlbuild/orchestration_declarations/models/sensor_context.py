@@ -1,12 +1,13 @@
-"""Invocation-local context; native fenced completion alone commits a proposed cursor."""
+"""Invocation-local context; only the fenced scheduler commits a tick's result."""
 
 from dataclasses import dataclass
 
 
 @dataclass(kw_only=True)
-class SensorContext:
-    """Cursor assignment proposes progress; failure or timeout retains the committed cursor."""
+class SensorContext[EventT]:
+    """The call's event, or `None` when polling, where assigning `cursor` proposes progress."""
 
-    cursor: str | None
+    event: EventT
     target: str
     evaluation_id: str
+    cursor: str | None = None

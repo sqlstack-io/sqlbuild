@@ -19,6 +19,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
+	import { useChecks } from '$lib/state/checks.svelte';
 	import { untrack } from 'svelte';
 	import { formatAgo } from '$lib/format/time';
 	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
@@ -37,8 +38,21 @@
 	const COST_DAYS = 30;
 
 	const catalog = useCatalogNodes();
+	const checks = useChecks();
 	// The shared listing, when held, saves the detail read from listing every node again; it is not a dependency.
-	const res = createResource((client, scope) => client.getCatalogNode(scope, name, untrack(() => catalog.data)), ['runs', 'checks', 'snapshot', 'node_status', 'warehouse_sync']);
+	// The detail reloads once for each read of the shared checks, which follow the signals that change it (runs,
+	// node states, snapshots, warehouse syncs and reconnects), so a burst of signals reloads it once, with its
+	// checks. A checks read in flight, such as of a list that went stale while no page showed it, is waited for
+	// rather than read around; after a failure the detail reads the checks itself. Derived, so the store's
+	// other changes do not reload the detail.
+	const checkList = $derived(checks.data);
+	const checksRead = $derived(checks.revision);
+	const checksSettled = $derived(!checks.loading);
+	const res = createResource((client, scope) => {
+		void checksRead;
+		if (!checksSettled) return new Promise<never>(() => {});
+		return client.getCatalogNode(scope, name, untrack(() => catalog.data), checkList);
+	});
 	const n = $derived(res.data ?? null);
 	// Checks and migrations link nodes by bare name; settle on the node key so the graph and links agree.
 	$effect(() => {
@@ -97,7 +111,7 @@
 	];
 </script>
 
-<AppTopbar title="Catalog">
+<AppTopbar title="Catalog" subject="{name} · Catalog">
 	<RefreshButton onclick={() => res.refresh()} />
 	{#if n && n.kind !== 'source' && canRun}
 		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => execute([name])}><PlayIcon class="size-3.5 fill-current stroke-none" />Build</GatedButton>

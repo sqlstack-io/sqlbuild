@@ -182,7 +182,7 @@ Triggers start paused before scheduling can begin. Publication pauses newly intr
 triggers in the same transaction as the snapshot, using ordinary audited operator facts rather
 than rewriting code definitions. Reload preserves explicit operator changes to retained triggers.
 `--triggers` skips these automatic pauses; it does not undo an operator's persisted pause.
-SIGINT or SIGTERM shuts down the scheduler, API streams and location interpreter together.
+SIGINT, SIGTERM or SIGHUP shuts down the scheduler, API streams and location interpreter together.
 
 ## Warehouse event identity
 

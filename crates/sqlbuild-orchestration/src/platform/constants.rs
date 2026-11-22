@@ -35,6 +35,8 @@ pub(crate) const PLAN_TIMINGS_KEY: &str = "timings";
 
 /// How long a location may hold a plan before another instance may claim it.
 pub(crate) const PLAN_LEASE_SECONDS: i64 = 300;
+/// How long a location holds other work; a sensor's holds twice its function's timeout, leaving half to report.
+pub(crate) const WORK_LEASE_SECONDS: i64 = 60;
 
 /// A plan nobody claims or finishes by then is reported as expired.
 pub(crate) const PLAN_EXPIRY_SECONDS: i64 = 600;
@@ -53,3 +55,8 @@ pub const MAX_REPORTED_RULE_FINDINGS: usize = 50;
 pub const MAX_RULE_FINDING_CHARS: usize = 500;
 /// The most rows one page of a plan section returns.
 pub const PLAN_ROWS_LIMIT: usize = 1000;
+
+/// A platform observation's time is rounded down to this window; a heartbeat is one fact per window.
+pub(crate) const OBSERVATION_WINDOW_SECONDS: i64 = 30;
+/// The newest `trigger_skipped` events the live problems read; each trigger counts once.
+pub(crate) const SKIPPED_TRIGGER_EVENTS: i64 = 200;

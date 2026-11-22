@@ -14,9 +14,9 @@ use crate::credentials::tests::role_helpers::{
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
-use crate::sensors::main::complete_builtin_sensor::complete_builtin_sensor;
 use crate::sensors::main::read_person_sensor::read_person_sensor;
 use crate::sensors::models::PersonSensorCursor;
+use crate::sensors::tests::helpers::complete_starting_job;
 use crate::sensors::tests::helpers::{append_events, snapshot};
 use crate::sensors::tests::test_types::SensorTestCase;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
@@ -34,12 +34,12 @@ fn given_a_checked_sensor_when_people_read_its_state_then_listing_view_gates_it_
         SensorTestCase {
             description: "SQLite",
             backend: Backend::Sqlite,
-            expected_runs: 50,
+            expected_runs: 1,
         },
         SensorTestCase {
             description: "PostgreSQL",
             backend: Backend::Postgres,
-            expected_runs: 50,
+            expected_runs: 1,
         },
     ];
     for test_case in test_cases {
@@ -69,19 +69,19 @@ fn given_a_checked_sensor_when_people_read_its_state_then_listing_view_gates_it_
                 .expect("elect")
                 .expect("leader");
             append_events(store, 0..105, Utc::now()).await;
-            let first = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+            let first = begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                 .await
                 .expect("request")
                 .expect("due");
-            let first_runs = complete_builtin_sensor(store, &lease, &first)
+            let first_runs = complete_starting_job(store, &lease, &first)
                 .await
                 .expect("first page");
             tokio::time::sleep(Duration::from_secs(1)).await;
-            let second = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+            let second = begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                 .await
                 .expect("next page")
                 .expect("due");
-            let second_runs = complete_builtin_sensor(store, &lease, &second)
+            let second_runs = complete_starting_job(store, &lease, &second)
                 .await
                 .expect("second page");
             let administrator = (&roles.context, credentials(&roles.administrator));
@@ -103,7 +103,11 @@ fn given_a_checked_sensor_when_people_read_its_state_then_listing_view_gates_it_
                 (
                     checks
                         .iter()
-                        .map(|check| (check.evaluation_id, check.phase.as_str(), check.run_count))
+                        .map(|check| (
+                            check.evaluation_id,
+                            check.phase.as_str(),
+                            check.run_ids.len()
+                        ))
                         .collect::<Vec<_>>(),
                     checks[0].cursor_before.event_storage_id,
                     checks[1].cursor_after.clone(),

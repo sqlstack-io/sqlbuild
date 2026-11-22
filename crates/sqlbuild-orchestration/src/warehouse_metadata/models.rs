@@ -725,6 +725,41 @@ pub struct WarehouseHistoryFailure {
     pub page_size: bool,
 }
 
+/// A dynamic model a completed sync resumed: the run whose hold expired, and its dotted relation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResumedHold {
+    pub run_id: String,
+    pub relation: String,
+}
+
+/// One state location a completed sync resumes holds in, and its pause table's token when the last pass left no hold open.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DynamicResumeLocation {
+    pub location: WarehouseStateLocation,
+    /// A pause table whose change token still equals this is not read, so a quiet sync wakes no compute.
+    pub quiet_token: Option<String>,
+}
+
+/// The holds a pass closed, each location it resumed in with its new quiet token, and its failures.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DynamicResumed {
+    pub holds: Vec<ResumedHold>,
+    pub quiet_tokens: Vec<DynamicResumeLocation>,
+    /// Each hold or location the pass could not resume, with the warehouse's error.
+    pub failures: Vec<String>,
+}
+
+/// A location runtime's reply to a dynamic resume: what it closed, or its redacted error.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DynamicResumeReply {
+    Resumed(DynamicResumed),
+    Failed(String),
+}
+
 /// Typed import columns are selected by code, never from location-supplied field names.
 #[derive(Debug)]
 pub(crate) struct StateEventImport {

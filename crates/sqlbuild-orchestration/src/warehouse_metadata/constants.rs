@@ -59,3 +59,7 @@ pub(crate) const SYNCED_CATALOG_SQL: &str = "SELECT record_json, observed_at, sc
 /// The development locations of one target, by project path.
 pub(crate) const DEVELOPMENT_LOCATIONS_SQL: &str =
     "SELECT project_path, location_id FROM sqb_development_locations WHERE target=$1";
+/// The runtime request key a completed sync sends with the state locations it read and their quiet tokens: `{"dynamic_resume": [...]}`.
+pub const DYNAMIC_RESUME_REQUEST: &str = "dynamic_resume";
+/// Prefix of the `recorded_by` a location sync writes on the holds it resumes, before the location ID.
+pub const DYNAMIC_RESUME_RECORDER: &str = "location-sync:";

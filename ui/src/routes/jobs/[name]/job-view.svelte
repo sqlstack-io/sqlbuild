@@ -130,7 +130,7 @@
 	]);
 </script>
 
-<AppTopbar title="Jobs">
+<AppTopbar title="Jobs" subject="{name} · Job">
 	{#if picked.length && def?.kind === 'job'}
 		<Button variant="ghost" onclick={clearSelection}>Clear selection</Button>
 		<GatedButton size="bar" requires="job.run" variant="outline" onclick={() => goto(to(planHref([], 'build', { job: name, exclude: picked })))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run all but {picked.length}</GatedButton>

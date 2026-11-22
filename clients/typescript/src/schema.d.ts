@@ -210,6 +210,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/password/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPasswordPerson"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/session": {
         parameters: {
             query?: never;
@@ -914,6 +930,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/sensors/{name}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonSensorEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/snapshots": {
         parameters: {
             query?: never;
@@ -1542,6 +1574,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description Why a tick ended before its function's answer was committed.
+         * @enum {string}
+         */
+        AbandonReason: "unanswered" | "superseded" | "republished" | "paused" | "cursor_reset" | "leader_changed" | "skipped";
         /** @description Marks a run as handled for everyone who can see it, or withdraws the mark; retried with the same event ID it applies once. */
         AcknowledgementRequest: {
             acknowledged: boolean;
@@ -1800,6 +1837,11 @@ export interface components {
             /** Format: uuid */
             session_id: string;
         };
+        /**
+         * @description How a check, audit or SQL test that ran inside a run fell short.
+         * @enum {string}
+         */
+        CheckEventKind: "failed" | "warn";
         /** @description One result's stored evidence rows; `view.evidence` reads them, audited. */
         CheckEvidence: {
             binding_key: string;
@@ -1986,24 +2028,6 @@ export interface components {
             };
             record: components["schemas"]["SnapshotRecord"];
         };
-        /** @description Location-owned Python returns data; only the fenced scheduler may apply it. */
-        CustomSensorOutcome: {
-            cursor?: string | null;
-            run_keys: string[];
-            /** @enum {string} */
-            status: "completed";
-        } | {
-            cursor?: string | null;
-            reason: string;
-            /** @enum {string} */
-            status: "skipped";
-        } | {
-            /** @enum {string} */
-            status: "failed";
-        } | {
-            /** @enum {string} */
-            status: "timed_out";
-        };
         /** @description Where a declaration was written, relative to the project root. */
         DeclaredAt: {
             /** Format: int32 */
@@ -2025,6 +2049,20 @@ export interface components {
             reason: string;
             /** @enum {string} */
             status: "unavailable";
+        };
+        /** @description A calendar whose pending past-due times a republish dropped, because its previous definition can't be read; it clears at its next successful tick. */
+        DroppedCalendarTimes: {
+            /** Format: date-time */
+            dropped_at: string;
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            name: string;
+            target: string;
+            /** @description The times that were due by the republish but never ticked, oldest first. */
+            times: string[];
+            /** Format: uuid */
+            trigger_id: string;
         };
         ExternalIdentityResponse: {
             csrf_token: string;
@@ -2224,8 +2262,13 @@ export interface components {
             generation: number;
             /** @enum {string} */
             kind: "provider_secrets";
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Unset secrets of providers the target doesn't allow to miss them; above zero is a health problem.
+             */
             missing: number;
+            /** @description Every provider missing a secret, including those the target allows; names only, never values. */
+            providers: components["schemas"]["MissingProviderSecrets"][];
         } | {
             /** Format: int64 */
             generation: number;
@@ -2308,6 +2351,12 @@ export interface components {
             command: string[];
             /** @description Plan again even when the location kept a plan for the same request. */
             fresh: boolean;
+            /** @description The settings the command gives, `warehouse` included though a plan never takes it; they replace the pinned jobs' own. */
+            given?: string[];
+            /** @description The jobs the command names, pinned as an ad-hoc build of it pins them. */
+            jobs?: {
+                [key: string]: components["schemas"]["PinnedJob"];
+            };
             /** @enum {string} */
             kind: "plan";
             selection: string[];
@@ -2331,7 +2380,7 @@ export interface components {
         } | {
             /** @enum {string} */
             kind: "sensor_evaluation";
-            outcome: components["schemas"]["CustomSensorOutcome"];
+            outcome: components["schemas"]["SensorFunctionOutcome"];
         } | {
             /** @description Model diff text, which the document never carries; stored apart, never read back here. */
             diffs?: {
@@ -2483,6 +2532,24 @@ export interface components {
             model: string;
             physical_generation_id: string;
             target_name: string;
+        };
+        /** @description A provider whose required secrets are unset: what is missing and which nodes need it, never a value. */
+        MissingProviderSecrets: {
+            /** @description The target's `allow_missing_secrets` lists the provider, so its location shows a note, not a problem. */
+            allowed: boolean;
+            /** @description Snapshot node keys that run the provider, such as `source:raw_payments`. */
+            nodes: string[];
+            /** @description The provider's file, relative to the project directory. */
+            path: string;
+            provider: string;
+            settings: components["schemas"]["MissingProviderSetting"][];
+        };
+        /** @description One unset required setting: the field, the variable it reads and the field's line in the provider file. */
+        MissingProviderSetting: {
+            field: string;
+            /** Format: int64 */
+            line?: number | null;
+            variable: string;
         };
         MutationResponse: {
             applied: boolean;
@@ -2642,6 +2709,12 @@ export interface components {
             password: string;
             username: string;
         };
+        /** @description A person to add who signs in with a password: their sign-in name, first password and built-in role everywhere, if any. */
+        PasswordPersonRequest: {
+            name: string;
+            password: string;
+            role?: null | components["schemas"]["BuiltinRole"];
+        };
         PasswordSessionResponse: {
             csrf_token: string;
             identity: components["schemas"]["SessionIdentity"];
@@ -2651,6 +2724,11 @@ export interface components {
             actions: components["schemas"]["Action"][];
             locations: components["schemas"]["LocationAccess"][];
             name: string;
+            /** Format: uuid */
+            principal_id: string;
+        };
+        /** @description The person just added. */
+        PersonCreated: {
             /** Format: uuid */
             principal_id: string;
         };
@@ -2688,28 +2766,41 @@ export interface components {
             role_key: string;
             target?: string | null;
         };
-        /** @description The control event position built-in conditions read from, and a custom sensor's own value after secret redaction; the value needs view.evidence. */
+        /** @description The event position a condition reads from, and a polling sensor's own value after secret redaction; the value needs view.evidence. */
         PersonSensorCursor: {
             custom?: string | null;
             /** Format: int64 */
             event_storage_id: number;
         };
         PersonSensorEvaluation: {
+            abandoned_because?: null | components["schemas"]["AbandonReason"];
             cursor_after?: null | components["schemas"]["PersonSensorCursor"];
             cursor_before: components["schemas"]["PersonSensorCursor"];
             definition_fingerprint: string;
+            /** @description The traceback or refusal of a failed tick, redacted; needs view.evidence. */
+            error?: string | null;
             /** Format: uuid */
             evaluation_id: string;
-            /** @description The failure code of a failed check. */
+            /** @description The event the function was called with; absent for a polling sensor. */
+            event_id?: string | null;
+            event_summary?: string | null;
+            /** @description The failure code of a failed tick. */
             failure_code?: string | null;
             /** Format: date-time */
             finished_at?: string | null;
-            /** @description The latest phase: `requested` alone means the check is in flight; otherwise `completed`, `failed`, `timed_out` or `abandoned`. */
+            /** @description What the function did: `handled`, `skipped`, `started`, `failed`, `timed_out`, `abandoned`, or `running` while in flight. */
+            outcome: string;
+            /** @description The latest phase: `requested` alone means the tick is in flight; otherwise `completed`, `failed`, `timed_out` or `abandoned`. */
             phase: string;
             /** Format: date-time */
             requested_at: string;
-            run_count: number;
-            /** @description For each matched request the job's `skip` overlap dropped, the run that was active. */
+            /** @description The runs the tick started. */
+            run_ids: string[];
+            /** @description Why the function skipped, redacted; needs view.evidence. */
+            skip_reason?: string | null;
+            /** @description The operator who skipped the tick's event, so the function wasn't called. */
+            skipped_by?: string | null;
+            /** @description For each requested run the job's `skip` overlap dropped, the run that was active. */
             skipped_for: string[];
         };
         /** @description A run key is redacted and withheld like the custom cursor it usually derives from: empty without view.evidence. */
@@ -2730,6 +2821,7 @@ export interface components {
             definition_fingerprint: string;
             /** @description Newest first. */
             evaluations: components["schemas"]["PersonSensorEvaluation"][];
+            failing?: null | components["schemas"]["SensorFailing"];
             /** @description Runs the sensor requested, by run key, newest first. */
             run_requests: components["schemas"]["PersonSensorRunRequest"][];
         };
@@ -2778,6 +2870,7 @@ export interface components {
         /** @description A trigger as people list it, with its newest tick so a list needs no read per trigger. */
         PersonTriggerRecord: components["schemas"]["TriggerRecord"] & {
             latest_tick?: null | components["schemas"]["TickRecord"];
+            sensor_failing?: null | components["schemas"]["SensorFailing"];
             /** @description A running schedule's next due times from `next_due_at` on, at most five; empty otherwise. */
             upcoming: string[];
         };
@@ -2796,6 +2889,13 @@ export interface components {
             reason: string;
             /** @enum {string} */
             status: "unavailable";
+        };
+        /** @description A job an ad-hoc selection names: the frozen nodes it gives its settings to, and those settings. */
+        PinnedJob: {
+            selection: string[];
+            settings: {
+                [key: string]: unknown;
+            };
         };
         /** @description A planned model's diff text, stored beside its plan document. */
         PlanDiffRead: components["schemas"]["PlanModelDiff"] & {
@@ -2914,21 +3014,52 @@ export interface components {
             run_id: string;
             run_kind: components["schemas"]["RunKind"];
             target: string;
+        } | {
+            /** @enum {string} */
+            kind: "trigger_skipped";
+            reason: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            /** Format: uuid */
+            trigger_id: string;
+        } | {
+            /** Format: uuid */
+            evaluation_id: string;
+            /** @enum {string} */
+            kind: "sensor_rechecked";
+            /** Format: uuid */
+            snapshot_id: string;
+            /** Format: uuid */
+            trigger_id: string;
+        } | {
+            /** @enum {string} */
+            kind: "calendar_times_dropped";
+            /** Format: uuid */
+            snapshot_id: string;
+            times: string[];
+            /** Format: uuid */
+            trigger_id: string;
         };
         /** @enum {string} */
-        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed" | "run_failed";
+        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed" | "run_failed" | "trigger_skipped" | "sensor_rechecked" | "calendar_times_dropped";
         /** @description Problems derived from live state when read; nothing here is stored. */
         PlatformProblems: {
             broken_locations: components["schemas"]["BrokenLocation"][];
+            /** @description Calendars whose pending times a republish dropped, until their next successful tick. */
+            dropped_calendar_times?: components["schemas"]["DroppedCalendarTimes"][];
             /** @description Running calendar schedules whose dates run out within a day. */
             low_calendars?: components["schemas"]["LowCalendar"][];
             overdue_ticks: components["schemas"]["OverdueTick"][];
+            /** @description Sensors checked again from scratch because their last check can't be read, until a check completes. */
+            rechecked_sensors?: components["schemas"]["RecheckedSensor"][];
             scheduler_leader: boolean;
             /**
              * Format: date-time
              * @description When the last scheduler lease ran out, or will run out; absent until a server first leads.
              */
             scheduler_lease_expires_at?: string | null;
+            /** @description Triggers skipped because their stored job or pinned snapshot can't be read, until their location publishes again. */
+            skipped_triggers?: components["schemas"]["SkippedTrigger"][];
         };
         /** @description A job or group asking for more of a pool than this server's cap, so it runs alone in that pool. */
         PoolCapWarning: {
@@ -3161,6 +3292,23 @@ export interface components {
             /** @enum {string} */
             kind: "blob";
             value: number[];
+        };
+        /** @description A sensor whose last check, recorded by an earlier release, can't be read, so it is checked again from scratch; it clears once a check completes. */
+        RecheckedSensor: {
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            name: string;
+            /** Format: date-time */
+            rechecked_at: string;
+            target: string;
+            /** Format: uuid */
+            trigger_id: string;
+        };
+        /** @description A run a sensor's function asked for; the key defaults to the event ID and the job. */
+        RequestedRun: {
+            job: string;
+            run_key: string;
         };
         /** @description A retry derives its execution scope from a terminal run, never from caller selectors. */
         RerunRequest: {
@@ -3520,6 +3668,14 @@ export interface components {
             command?: components["schemas"]["RunCommand"];
             image_id?: string | null;
             job_key?: string | null;
+            /** @description The build-wide settings those jobs give where `settings` is silent; they decide its gates and write set. */
+            job_settings?: {
+                [key: string]: unknown;
+            };
+            /** @description The jobs an ad-hoc build's selection names, each pinned to its frozen nodes and settings. */
+            jobs?: {
+                [key: string]: components["schemas"]["PinnedJob"];
+            };
             kind: components["schemas"]["RunKind"];
             /** Format: uuid */
             location_id: string;
@@ -3728,6 +3884,7 @@ export interface components {
             /** @description `tag:` values: the SQL resources and Python nodes with each tag. */
             tags: components["schemas"]["VocabularyEntry"][];
         };
+        /** @description What wakes a sensor; a sensor without one polls every `minimum_interval_seconds`. */
         SensorCondition: {
             /** @enum {string} */
             kind: "platform_event";
@@ -3745,6 +3902,11 @@ export interface components {
             selection: string[];
         } | {
             /** @enum {string} */
+            kind: "check_event";
+            kinds: components["schemas"]["CheckEventKind"][];
+            selection: string[];
+        } | {
+            /** @enum {string} */
             kind: "source_new_data";
             selection: string[];
         } | {
@@ -3753,22 +3915,142 @@ export interface components {
             /** @enum {string} */
             kind: "source_stale";
             selection: string[];
-        } | {
-            code_hash: string;
-            function: string;
-            /** @enum {string} */
-            kind: "custom";
         };
+        /** @description A sensor: the function the location runs, and the condition that wakes it. */
         SensorDefinition: {
+            code_hash: string;
             declared_at?: null | components["schemas"]["DeclaredAt"];
             default_status?: components["schemas"]["TriggerStatus"];
             description: string;
-            job_key: string;
+            /** @description The decorated function's name, such as `orders_failed`. */
+            function: string;
             /** Format: int32 */
             minimum_interval_seconds: number;
             /** @description The targets the declaration is limited to; empty for every target. */
             targets?: string[];
-            when: components["schemas"]["SensorCondition"];
+            /**
+             * Format: int32
+             * @description How long one call of the function may take before its tick fails.
+             */
+            timeout_seconds: number;
+            when?: null | components["schemas"]["SensorCondition"];
+        };
+        /** @description One event a sensor's function is called with; `id` is stable across redeliveries. */
+        SensorEvent: {
+            error?: string | null;
+            failed_checks: string[];
+            failed_nodes: string[];
+            id: string;
+            job: string;
+            /** @enum {string} */
+            kind: "run";
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: uuid */
+            run_id: string;
+            status: components["schemas"]["RunOutcome"];
+            target: string;
+            url?: string | null;
+        } | {
+            event: components["schemas"]["NodeEventKind"];
+            id: string;
+            job?: string | null;
+            /** @enum {string} */
+            kind: "node";
+            node: string;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: uuid */
+            run_id: string;
+            target: string;
+            url?: string | null;
+        } | {
+            check: string;
+            id: string;
+            job?: string | null;
+            /** @enum {string} */
+            kind: "check";
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: uuid */
+            run_id: string;
+            status: components["schemas"]["CheckEventKind"];
+            target: string;
+            url?: string | null;
+        } | {
+            data_version?: string | null;
+            id: string;
+            /** @enum {string} */
+            kind: "source_new_data";
+            /** Format: date-time */
+            occurred_at: string;
+            source: string;
+            target: string;
+        } | {
+            /** Format: int32 */
+            after_seconds: number;
+            data_version?: string | null;
+            id: string;
+            /** @enum {string} */
+            kind: "source_stale";
+            /** Format: date-time */
+            occurred_at: string;
+            source: string;
+            target: string;
+        } | {
+            details: Record<string, never>;
+            event: components["schemas"]["PlatformEventKind"];
+            id: string;
+            /** @enum {string} */
+            kind: "platform";
+            /** Format: date-time */
+            occurred_at: string;
+        };
+        /** @description A sensor whose latest ticks failed: since when, and the event it is stuck on. */
+        SensorFailing: {
+            /** @description The event the failed ticks were called with; absent for a polling sensor. */
+            event_id?: string | null;
+            event_summary?: string | null;
+            failed_ticks: number;
+            /** @description Why the newest failing tick failed, when the function gave no error, as for a location that didn't answer. */
+            reason?: string | null;
+            /**
+             * Format: date-time
+             * @description When the first of the failed ticks since the last good one started.
+             */
+            since: string;
+        };
+        /** @description What one call of a sensor's function returned; only the fenced scheduler applies it. */
+        SensorFunctionOutcome: {
+            cursor?: string | null;
+            /** @enum {string} */
+            status: "handled";
+        } | {
+            cursor?: string | null;
+            reason: string;
+            /** @enum {string} */
+            status: "skipped";
+        } | {
+            cursor?: string | null;
+            runs: components["schemas"]["RequestedRun"][];
+            /** @enum {string} */
+            status: "requested";
+        } | {
+            error: string;
+            /** @enum {string} */
+            status: "failed";
+        } | {
+            /** @enum {string} */
+            status: "timed_out";
+        };
+        /** @description A published sensor and the events a trial chose for it, newest first. */
+        SensorTrialEvents: {
+            events: components["schemas"]["SensorEvent"][];
+            function: string;
+            sensor: string;
+            /** Format: int32 */
+            timeout_seconds: number;
+            when?: null | components["schemas"]["SensorCondition"];
         };
         /** @description How long the server keeps each kind of record. */
         ServerRetention: {
@@ -3821,6 +4103,22 @@ export interface components {
             principal_id: string;
             /** Format: uuid */
             session_id: string;
+        };
+        /** @description A trigger the scheduler skips because its stored job or pinned snapshot can't be read, or a sensor whose check failed; it clears once its location publishes again or, for a sensor, a later check completes. */
+        SkippedTrigger: {
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            name: string;
+            reason: string;
+            /**
+             * Format: date-time
+             * @description When it was first skipped for this snapshot.
+             */
+            skipped_at: string;
+            target: string;
+            /** Format: uuid */
+            trigger_id: string;
         };
         /** @description Node-level changes do not duplicate unchanged definitions or source text. */
         SnapshotChange: {
@@ -3956,6 +4254,10 @@ export interface components {
         } | {
             /** @enum {string} */
             kind: "reset_cursor";
+        } | {
+            event: string;
+            /** @enum {string} */
+            kind: "skip_event";
         };
         TriggerChangeRecord: {
             /** Format: date-time */
@@ -3988,7 +4290,8 @@ export interface components {
         };
         TriggerRecord: {
             definition_json: components["schemas"]["TriggerDeclaration"];
-            job_key: string;
+            /** @description The job or group a schedule starts; `None` for a sensor, whose function chooses. */
+            job_key?: string | null;
             /** Format: date-time */
             last_tick_for?: string | null;
             name: string;
@@ -4753,6 +5056,56 @@ export interface operations {
             };
         };
     };
+    createPasswordPerson: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordPersonRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonCreated"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     currentSession: {
         parameters: {
             query?: never;
@@ -5125,7 +5478,10 @@ export interface operations {
     listPersonChecks: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description An ETag from an earlier response; 304 while every check's newest result is unchanged */
+                "If-None-Match"?: string | null;
+            };
             path: {
                 location_id: string;
                 target: string;
@@ -5137,11 +5493,21 @@ export interface operations {
             /** @description The newest result of every check */
             200: {
                 headers: {
+                    /** @description "<snapshot_id>:<digest of the body>", or "<digest>" before the first publication */
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["CheckResult"][];
                 };
+            };
+            /** @description Unchanged since the If-None-Match ETag */
+            304: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Session rejected */
             401: {
@@ -6742,6 +7108,67 @@ export interface operations {
                 content?: never;
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonSensorEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                name: string;
+                limit: number | null;
+                latest: boolean | null;
+                event: string | null;
+                run: string | null;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The published sensor and the chosen events, newest first; reading them changes nothing */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SensorTrialEvents"];
+                };
+            };
+            /** @description More than one of latest, event and run */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description No such sensor, event or matching run, and why */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

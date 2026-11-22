@@ -10,8 +10,8 @@ use crate::platform::_helpers::maintenance::retention::retain;
 use crate::runs::main::listings::list_runs::list_runs;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
-use crate::sensors::main::complete_builtin_sensor::complete_builtin_sensor;
-use crate::sensors::models::SensorEvaluationOutcome;
+use crate::sensors::models::{AbandonReason, SensorEvaluationOutcome};
+use crate::sensors::tests::helpers::complete_starting_job;
 use crate::sensors::tests::helpers::{append_events, change, evaluations, snapshot};
 use crate::sensors::tests::test_types::SensorTestCase;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
@@ -63,7 +63,7 @@ fn given_a_crashed_sensor_when_leadership_or_snapshot_changes_then_stale_results
                 .await
                 .expect("elect")
                 .expect("leader");
-            let pending = begin_sensor_evaluation(store, &first, trigger.trigger_id)
+            let pending = begin_sensor_evaluation(store, &first, (trigger.trigger_id, None))
                 .await
                 .expect("request")
                 .expect("due");
@@ -74,11 +74,11 @@ fn given_a_crashed_sensor_when_leadership_or_snapshot_changes_then_stale_results
                 .expect("takeover")
                 .expect("new leader");
             assert!(matches!(
-                complete_builtin_sensor(store, &first, &pending).await,
+                complete_starting_job(store, &first, &pending).await,
                 Err(ControlError::Fenced)
             ));
             assert!(
-                begin_sensor_evaluation(&replica, &successor, trigger.trigger_id)
+                begin_sensor_evaluation(&replica, &successor, (trigger.trigger_id, None))
                     .await
                     .expect("recover abandoned attempt")
                     .is_none(),
@@ -90,10 +90,12 @@ fn given_a_crashed_sensor_when_leadership_or_snapshot_changes_then_stale_results
                     .last()
                     .expect("abandoned fact")
                     .outcome,
-                SensorEvaluationOutcome::Abandoned
+                SensorEvaluationOutcome::Abandoned {
+                    reason: AbandonReason::LeaderChanged
+                }
             ));
             tokio::time::sleep(Duration::from_secs(1)).await;
-            let requested = begin_sensor_evaluation(store, &successor, trigger.trigger_id)
+            let requested = begin_sensor_evaluation(store, &successor, (trigger.trigger_id, None))
                 .await
                 .expect("new request")
                 .expect("due");
@@ -101,13 +103,13 @@ fn given_a_crashed_sensor_when_leadership_or_snapshot_changes_then_stale_results
             let mut forged = requested.clone();
             forged.cursor.event_storage_id = 999;
             assert!(matches!(
-                complete_builtin_sensor(store, &successor, &forged).await,
+                complete_starting_job(store, &successor, &forged).await,
                 Err(ControlError::Fenced)
             ));
             input.generation += 1;
             publish_snapshot(store, &input).await.expect("redeploy");
             assert_eq!(
-                complete_builtin_sensor(store, &successor, &requested)
+                complete_starting_job(store, &successor, &requested)
                     .await
                     .expect("abandon stale snapshot"),
                 0
@@ -131,33 +133,34 @@ fn given_a_crashed_sensor_when_leadership_or_snapshot_changes_then_stale_results
                 TriggerStatus::Paused
             );
             assert!(
-                begin_sensor_evaluation(store, &successor, trigger.trigger_id)
+                begin_sensor_evaluation(store, &successor, (trigger.trigger_id, None))
                     .await
                     .expect("paused")
                     .is_none()
             );
             change(store, trigger.trigger_id, TriggerChange::ResetDefault).await;
             tokio::time::sleep(Duration::from_secs(1)).await;
-            let current = begin_sensor_evaluation(store, &successor, trigger.trigger_id)
+            let current = begin_sensor_evaluation(store, &successor, (trigger.trigger_id, None))
                 .await
                 .expect("code default")
                 .expect("running");
             assert_eq!(
-                complete_builtin_sensor(store, &successor, &current)
+                complete_starting_job(store, &successor, &current)
                     .await
                     .expect("catch up retained health"),
                 test_case.expected_runs,
                 "{}",
                 test_case.description
             );
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            let before_reset = begin_sensor_evaluation(store, &successor, trigger.trigger_id)
-                .await
-                .expect("request before reset")
-                .expect("due");
+            append_events(store, 2..3, chrono::Utc::now()).await;
+            let before_reset =
+                begin_sensor_evaluation(store, &successor, (trigger.trigger_id, None))
+                    .await
+                    .expect("request before reset")
+                    .expect("a new event is due at once after a delivered one");
             change(store, trigger.trigger_id, TriggerChange::ResetCursor).await;
             assert_eq!(
-                complete_builtin_sensor(store, &successor, &before_reset)
+                complete_starting_job(store, &successor, &before_reset)
                     .await
                     .expect("reset fences old cursor"),
                 0
@@ -168,16 +171,19 @@ fn given_a_crashed_sensor_when_leadership_or_snapshot_changes_then_stale_results
                     .last()
                     .expect("reset abandonment")
                     .outcome,
-                SensorEvaluationOutcome::Abandoned
+                SensorEvaluationOutcome::Abandoned {
+                    reason: AbandonReason::CursorReset
+                }
             ));
             tokio::time::sleep(Duration::from_secs(1)).await;
-            let before_pause = begin_sensor_evaluation(store, &successor, trigger.trigger_id)
-                .await
-                .expect("request before pause")
-                .expect("due");
+            let before_pause =
+                begin_sensor_evaluation(store, &successor, (trigger.trigger_id, None))
+                    .await
+                    .expect("request before pause")
+                    .expect("due");
             change(store, trigger.trigger_id, TriggerChange::Pause).await;
             assert_eq!(
-                complete_builtin_sensor(store, &successor, &before_pause)
+                complete_starting_job(store, &successor, &before_pause)
                     .await
                     .expect("pause fences pending result"),
                 0
@@ -188,33 +194,35 @@ fn given_a_crashed_sensor_when_leadership_or_snapshot_changes_then_stale_results
                     .last()
                     .expect("pause abandonment")
                     .outcome,
-                SensorEvaluationOutcome::Abandoned
+                SensorEvaluationOutcome::Abandoned {
+                    reason: AbandonReason::Paused
+                }
             ));
             change(store, trigger.trigger_id, TriggerChange::ResetDefault).await;
             tokio::time::sleep(Duration::from_secs(1)).await;
-            let delayed = begin_sensor_evaluation(store, &successor, trigger.trigger_id)
+            let delayed = begin_sensor_evaluation(store, &successor, (trigger.trigger_id, None))
                 .await
                 .expect("request delayed evaluation")
                 .expect("due");
             tokio::time::sleep(Duration::from_secs(1)).await;
-            complete_builtin_sensor(store, &successor, &delayed)
+            complete_starting_job(store, &successor, &delayed)
                 .await
-                .expect("complete delayed evaluation");
-            let immediate = begin_sensor_evaluation(store, &successor, trigger.trigger_id)
+                .expect("complete the replayed first event");
+            let immediate = begin_sensor_evaluation(store, &successor, (trigger.trigger_id, None))
                 .await
-                .expect("interval measured from start, not completion")
+                .expect("the next event is due at once")
                 .expect("already due");
             assert_ne!(immediate.evaluation_id, delayed.evaluation_id);
-            complete_builtin_sensor(store, &successor, &immediate)
+            complete_starting_job(store, &successor, &immediate)
                 .await
-                .expect("complete next attempt");
+                .expect("complete the second event");
             assert_eq!(
                 list_runs(store, (location, "development"), 100)
                     .await
                     .expect("deduplicated runs")
                     .len(),
-                test_case.expected_runs,
-                "{}",
+                test_case.expected_runs + 1,
+                "{}: the replayed first event reuses its run; the second starts one",
                 test_case.description
             );
             let transaction = begin(store, TransactionMode::Write).await.expect("age");

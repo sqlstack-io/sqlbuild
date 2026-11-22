@@ -4,6 +4,7 @@ use chrono::{DateTime, DurationRound, TimeDelta, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::platform::constants::OBSERVATION_WINDOW_SECONDS;
 use crate::platform::models::PlatformEvent;
 use crate::store::errors::ControlError;
 use crate::store::main::append_control_event::append_control_event;
@@ -16,16 +17,25 @@ pub(crate) async fn observe(
     installation_id: Uuid,
     (event, incident): (PlatformEvent, Option<DateTime<Utc>>),
 ) -> Result<ControlTransaction, ControlError> {
+    observe_episode(transaction, installation_id, (event, None, incident)).await
+}
+
+/// `observe`, with `episode` in place of the payload as the alert's identity, so the episode's first payload stays.
+pub(crate) async fn observe_episode(
+    transaction: ControlTransaction,
+    installation_id: Uuid,
+    (event, episode, incident): (PlatformEvent, Option<PlatformEvent>, Option<DateTime<Utc>>),
+) -> Result<ControlTransaction, ControlError> {
     let occurred_at = transaction
         .now
-        .duration_trunc(TimeDelta::seconds(30))
+        .duration_trunc(TimeDelta::seconds(OBSERVATION_WINDOW_SECONDS))
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let occurrence = match event {
         PlatformEvent::Heartbeat { .. } => Some(occurred_at),
         _ => incident,
     };
     let payload = json!({"platform": event});
-    let identity = serde_json::to_vec(&(occurrence, &event))
+    let identity = serde_json::to_vec(&(occurrence, episode.as_ref().unwrap_or(&event)))
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let event_id = Uuid::new_v5(&installation_id, &identity);
     let (transaction, previous) = query(

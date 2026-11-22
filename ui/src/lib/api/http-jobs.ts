@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { ApiError } from './client';
 import type { Iso } from './types';
-import type { CursorWindow, Job, JobDetail, JobGroupMember, Run, RunRef, SensorEvaluation, SensorEvaluationOutcome, Tick, Trigger, TriggerDetail, TriggerKind, TriggerStateEvent, TriggerStateEventKind } from './types/operate';
+import type { CursorWindow, Job, JobDetail, JobGroupMember, Run, RunRef, SensorEvaluation, SensorEvaluationOutcome, SensorFailing, Tick, Trigger, TriggerDetail, TriggerKind, TriggerStateEvent, TriggerStateEventKind } from './types/operate';
 import { plural } from '$lib/format/plural';
 
 type Wire = components['schemas'];
@@ -20,10 +20,11 @@ function isSchedule(declaration: Wire['TriggerDeclaration']): declaration is Wir
 
 export function triggerKindOf(declaration: Wire['TriggerDeclaration']): TriggerKind {
 	if (isSchedule(declaration)) return declaration.schedule.kind === 'cron' ? 'cron_schedule' : 'calendar_schedule';
-	const kind = declaration.when.kind;
+	const kind = declaration.when?.kind;
+	if (!kind) return 'polling_sensor';
 	if (kind === 'run_event') return 'job_sensor';
 	if (kind === 'platform_event') return 'platform_sensor';
-	if (kind === 'custom') return 'custom_sensor';
+	if (kind === 'check_event') return 'check_sensor';
 	return 'node_sensor';
 }
 
@@ -34,12 +35,13 @@ export function cadenceOf(declaration: Wire['TriggerDeclaration']): string {
 		return s.kind === 'cron' ? `${s.expression} (${s.timezone})` : `${plural(s.times.length, 'calendar time')}`;
 	}
 	const w = declaration.when;
+	if (!w) return `every ${declaration.minimum_interval_seconds}s`;
 	if (w.kind === 'run_event') return `when ${w.job_key} ${w.kinds.join(' or ')}`;
 	if (w.kind === 'node_event') return `when ${w.selection.join(', ')} ${w.kinds.join(' or ')}`;
+	if (w.kind === 'check_event') return `when a check on ${w.selection.join(', ')} is ${w.kinds.join(' or ')}`;
 	if (w.kind === 'source_new_data') return `when ${w.selection.join(', ')} has new data`;
 	if (w.kind === 'source_stale') return `when ${w.selection.join(', ')} is stale for ${w.after_seconds}s`;
-	if (w.kind === 'platform_event') return `on platform events: ${w.kinds.join(', ')}`;
-	return `custom check ${w.function}`;
+	return `on platform events: ${w.kinds.join(', ')}`;
 }
 
 export function toTick(wire: Wire['TickRecord']): Tick {
@@ -66,7 +68,7 @@ export function toTrigger(wire: Wire['TriggerRecord'], runs: Run[], lastTick: Ti
 		type: schedule ? 'schedule' : 'sensor',
 		kind: triggerKindOf(d),
 		description: d.description,
-		jobKey: wire.job_key,
+		jobKey: wire.job_key ?? null,
 		cadence: cadenceOf(d),
 		cron: schedule?.kind === 'cron' ? schedule.expression : null,
 		timezone: schedule?.kind === 'cron' ? schedule.timezone : null,
@@ -88,7 +90,8 @@ const CHANGE_KINDS: Record<Wire['TriggerChange']['kind'], TriggerStateEventKind>
 	pause: 'paused',
 	reset_default: 'reset_to_default',
 	set_cursor: 'cursor_set',
-	reset_cursor: 'cursor_reset'
+	reset_cursor: 'cursor_reset',
+	skip_event: 'event_skipped'
 };
 
 /** One operator change, newest first as the server lists them; a person shows by name. */
@@ -100,27 +103,39 @@ export function toTriggerStateEvent(wire: Wire['PersonTriggerChange']): TriggerS
 		kind: CHANGE_KINDS[wire.change.kind],
 		actor: { kind: wire.actor_name ? 'user' : 'system', name, displayName: name },
 		reason: wire.reason.trim() || null,
-		value: wire.change.kind === 'set_cursor' ? wire.change.time : null
+		value: wire.change.kind === 'set_cursor' ? wire.change.time : wire.change.kind === 'skip_event' ? wire.change.event : null
 	};
 }
 
 /** A built-in sensor's cursor is a control event position; a custom sensor's is its own value. */
 const shownCursor = (cursor: Wire['PersonSensorCursor']): string | null => cursor.custom ?? (cursor.event_storage_id > 0 ? `event ${cursor.event_storage_id}` : null);
 
+const OUTCOMES: readonly SensorEvaluationOutcome[] = ['running', 'handled', 'skipped', 'started', 'failed', 'timed_out', 'abandoned'];
+
 function toEvaluation(wire: Wire['PersonSensorEvaluation']): SensorEvaluation {
 	return {
 		id: wire.evaluation_id,
-		outcome: wire.phase as SensorEvaluationOutcome,
+		outcome: OUTCOMES.find((o) => o === wire.outcome) ?? 'running',
 		requestedAt: wire.requested_at,
 		finishedAt: wire.finished_at ?? null,
 		cursorBefore: shownCursor(wire.cursor_before),
 		cursorAfter: wire.cursor_after ? shownCursor(wire.cursor_after) : null,
-		runRequests: wire.run_count,
-		skipReason: null,
+		eventId: wire.event_id ?? null,
+		eventSummary: wire.event_summary ?? null,
+		runIds: wire.run_ids,
+		skipReason: wire.skip_reason ?? null,
 		skippedFor: wire.skipped_for,
-		error: wire.failure_code ?? null,
+		failureCode: wire.failure_code ?? null,
+		error: wire.error ?? null,
+		abandonedBecause: wire.abandoned_because ?? null,
+		skippedBy: wire.skipped_by ?? null,
 		definitionFingerprint: wire.definition_fingerprint
 	};
+}
+
+/** A sensor whose latest ticks failed, as the trigger list and Overview show it. */
+export function toSensorFailing(wire: Wire['SensorFailing'] | null | undefined): SensorFailing | null {
+	return wire ? { reason: wire.reason ?? null, since: wire.since, failedTicks: wire.failed_ticks, eventId: wire.event_id ?? null, eventSummary: wire.event_summary ?? null } : null;
 }
 
 /** The cursor last moved when a check completed or an operator set or reset it, whichever is newer. */
@@ -170,9 +185,11 @@ export function triggerDetailOf(
 			? null
 			: {
 					condition: trigger.cadence,
+					action: `${d.function}()`,
 					nodeConditions: [],
 					minimumIntervalSeconds: d.minimum_interval_seconds,
-					timeoutSeconds: null,
+					timeoutSeconds: d.timeout_seconds,
+					failing: toSensorFailing(state?.failing),
 					cursor: state?.cursor ? shownCursor(state.cursor) : null,
 					cursorUpdatedAt: state ? cursorMovedAt(state, history) : null,
 					cursorKnown: !!state,

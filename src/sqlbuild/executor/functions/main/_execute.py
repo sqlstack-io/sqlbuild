@@ -78,6 +78,8 @@ def execute_function(
             connection=connection,
             definition=FunctionDefinition(
                 destination=function_entry.destination.qualified_name,
+                database=function_entry.destination.database,
+                schema=function_entry.destination.schema,
                 arguments=function_entry.arguments,
                 returns=function_entry.returns,
                 body_sql=function_entry.body_sql,

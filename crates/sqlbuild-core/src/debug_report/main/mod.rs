@@ -6,3 +6,4 @@ pub mod debug_provider_lines;
 pub mod debug_runtime_lines;
 pub mod format_debug_json;
 pub mod format_debug_text;
+pub mod write_report_file;

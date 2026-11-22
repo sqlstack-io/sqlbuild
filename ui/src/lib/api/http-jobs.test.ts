@@ -7,16 +7,18 @@ type W = components['schemas'];
 
 const SNAPSHOT = '0191f0dd-0000-7000-8000-000000000000';
 
-function trigger(id: string, name: string, jobKey: string, definition: W['TriggerDeclaration'], status: W['TriggerStatus'] = 'running'): W['PersonTriggerRecord'] {
+function trigger(id: string, name: string, jobKey: string | null, definition: W['TriggerDeclaration'], status: W['TriggerStatus'] = 'running'): W['PersonTriggerRecord'] {
 	const upcoming = 'schedule' in definition ? ['2026-11-07T06:00:00Z', '2026-11-08T06:00:00Z'] : [];
 	return { trigger_id: id, name, job_key: jobKey, definition_json: definition, status, last_tick_for: null, next_due_at: '2026-11-07T06:00:00Z', upcoming };
 }
 
 const daily = trigger('t-daily', 'orders_daily', 'orders', { description: 'Daily orders', job_key: 'orders', schedule: { kind: 'cron', expression: '0 6 * * *', timezone: 'UTC' }, default_status: 'paused' });
-const onInventory = trigger('t-inv', 'inventory_landed', 'inventory', {
+const onInventory = trigger('t-inv', 'inventory_landed', null, {
 	description: 'New stock feed',
-	job_key: 'inventory',
+	function: 'inventory_landed',
+	code_hash: 'c1',
 	minimum_interval_seconds: 60,
+	timeout_seconds: 45,
 	when: { kind: 'source_new_data', selection: ['source:stock_feed'] }
 });
 
@@ -31,6 +33,10 @@ describe('trigger mapping', () => {
 		expect(triggerKindOf({ ...onInventory.definition_json, when: { kind: 'run_event', job_key: 'orders', kinds: ['succeeded' as never] } } as W['SensorDefinition'])).toBe('job_sensor');
 		expect(cadenceOf(daily.definition_json)).toBe('0 6 * * * (UTC)');
 		expect(cadenceOf(onInventory.definition_json)).toBe('when source:stock_feed has new data');
+		const polling = { ...onInventory.definition_json, when: null } as W['SensorDefinition'];
+		expect([triggerKindOf(polling), cadenceOf(polling)]).toEqual(['polling_sensor', 'every 60s']);
+		const checks = { ...onInventory.definition_json, when: { kind: 'check_event', selection: ['check:stock_valid'], kinds: ['failed'] } } as W['SensorDefinition'];
+		expect([triggerKindOf(checks), cadenceOf(checks)]).toEqual(['check_sensor', 'when a check on check:stock_valid is failed']);
 	});
 
 	it('keeps the code default apart from the effective state and links the newest run it started', () => {
@@ -75,13 +81,18 @@ describe('trigger mapping', () => {
 		const check = (id: string, at: string, before: W['PersonSensorCursor'], after: W['PersonSensorCursor'] | null, fingerprint: string): W['PersonSensorEvaluation'] => ({
 			evaluation_id: id,
 			phase: after ? 'completed' : 'failed',
+			outcome: after ? 'started' : 'failed',
 			requested_at: at,
 			finished_at: at.replace(':00Z', ':05Z'),
 			cursor_before: before,
 			cursor_after: after,
-			run_count: after ? 2 : 0,
-			failure_code: after ? null : 'location_unreachable',
+			event_id: after ? 'source:abc' : 'source:def',
+			event_summary: after ? 'source:stock_feed has a new version' : 'source:stock_feed has another version',
+			run_ids: after ? ['r-7'] : [],
+			failure_code: after ? null : 'sensor_function_failed',
+			error: after ? null : 'Traceback (most recent call last):\nValueError: feed down',
 			skipped_for: after ? ['r-busy', 'r-busy'] : [],
+			abandoned_because: null,
 			definition_fingerprint: fingerprint
 		});
 		const state: W['PersonSensorState'] = {
@@ -91,19 +102,29 @@ describe('trigger mapping', () => {
 				check('e-new', '2026-11-07T06:10:00Z', { event_storage_id: 40, custom: null }, null, 'v1'),
 				check('e-old', '2026-11-07T06:00:00Z', { event_storage_id: 0, custom: null }, { event_storage_id: 40, custom: null }, 'v1')
 			],
-			run_requests: [{ run_key: 'stock-7', run_id: 'r-7', evaluation_id: 'e-old', queued_at: '2026-11-07T06:00:05Z', status: 'success' }]
+			run_requests: [{ run_key: 'stock-7', run_id: 'r-7', evaluation_id: 'e-old', queued_at: '2026-11-07T06:00:05Z', status: 'success' }],
+			failing: { since: '2026-11-07T06:10:00Z', failed_ticks: 1, event_id: 'source:def', event_summary: 'source:stock_feed has another version' }
 		};
 		const reset = { id: 'c1', at: '2026-11-07T05:00:00Z', kind: 'cursor_reset', actor: { kind: 'user', name: 'ada', displayName: 'ada' }, reason: null, value: null } as const;
 		const detail = triggerDetailOf(toTrigger(onInventory, [], null), onInventory, [], [reset], state);
-		expect(detail.sensor).toMatchObject({ cursor: 'feed/page-[REDACTED]', cursorKnown: true, cursorUpdatedAt: '2026-11-07T06:00:05Z', currentFingerprint: 'v2', lastEvaluatedFingerprint: 'v1' });
+		expect(detail.sensor).toMatchObject({
+			cursor: 'feed/page-[REDACTED]',
+			cursorKnown: true,
+			cursorUpdatedAt: '2026-11-07T06:00:05Z',
+			currentFingerprint: 'v2',
+			lastEvaluatedFingerprint: 'v1',
+			action: 'inventory_landed()',
+			timeoutSeconds: 45,
+			failing: { reason: null, since: '2026-11-07T06:10:00Z', failedTicks: 1, eventId: 'source:def', eventSummary: 'source:stock_feed has another version' }
+		});
 		expect(detail.definitionChanged).toBe(true);
-		expect(detail.evaluations?.map((e) => [e.id, e.outcome, e.cursorBefore, e.cursorAfter, e.error, e.skippedFor])).toEqual([
-			['e-new', 'failed', 'event 40', null, 'location_unreachable', []],
-			['e-old', 'completed', null, 'event 40', null, ['r-busy', 'r-busy']]
+		expect(detail.evaluations?.map((e) => [e.id, e.outcome, e.cursorBefore, e.cursorAfter, e.eventId, e.runIds, e.failureCode, e.error, e.skippedFor])).toEqual([
+			['e-new', 'failed', 'event 40', null, 'source:def', [], 'sensor_function_failed', 'Traceback (most recent call last):\nValueError: feed down', []],
+			['e-old', 'started', null, 'event 40', 'source:abc', ['r-7'], null, null, ['r-busy', 'r-busy']]
 		]);
 		expect(detail.runRequests).toEqual([{ runKey: 'stock-7', runId: 'r-7', evaluationId: 'e-old', requestedAt: '2026-11-07T06:00:05Z', runStatus: 'success' }]);
-		const fresh = triggerDetailOf(toTrigger(onInventory, [], null), onInventory, [], [], { ...state, cursor: null, evaluations: [] });
-		expect([fresh.sensor?.cursor, fresh.sensor?.cursorKnown, fresh.definitionChanged, fresh.sensor?.cursorUpdatedAt]).toEqual([null, true, false, null]);
+		const fresh = triggerDetailOf(toTrigger(onInventory, [], null), onInventory, [], [], { ...state, cursor: null, evaluations: [], failing: null });
+		expect([fresh.sensor?.cursor, fresh.sensor?.cursorKnown, fresh.definitionChanged, fresh.sensor?.cursorUpdatedAt, fresh.sensor?.failing, fresh.jobKey]).toEqual([null, true, false, null, null, null]);
 	});
 });
 
@@ -242,5 +263,7 @@ describe('trigger on/off history', () => {
 		});
 		const cursor = toTriggerStateEvent(change({ change: { kind: 'set_cursor', time: '2026-11-01T00:00:00Z' }, actor: 'local-operator', actor_name: null, reason: '  ' }));
 		expect([cursor.kind, cursor.value, cursor.actor.kind, cursor.actor.name, cursor.reason]).toEqual(['cursor_set', '2026-11-01T00:00:00Z', 'system', 'local-operator', null]);
+		const skipped = toTriggerStateEvent(change({ change: { kind: 'skip_event', event: 'run:r-9' }, reason: 'The partner re-sent it by hand' }));
+		expect([skipped.kind, skipped.value, skipped.actor.name, skipped.reason]).toEqual(['event_skipped', 'run:r-9', 'ada-admin', 'The partner re-sent it by hand']);
 	});
 });

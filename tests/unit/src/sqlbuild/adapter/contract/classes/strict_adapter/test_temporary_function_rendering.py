@@ -73,16 +73,16 @@ from tests.unit.src.sqlbuild.adapter.contract.classes.strict_adapter._test_types
             ),
         ),
         TemporaryFunctionRenderingTestCase(
-            description="snowflake creates a prefixed temporary function in the current schema",
+            description="snowflake creates a prefixed temporary function in the function's schema",
             adapter=SnowflakeAdapter(),
             language=FunctionLanguage.SQL,
             argument_type="TEXT",
             return_columns=(),
             expected_temporary_function=TemporaryFunction(
-                target='"__SQB_TEST__IS_COMPLETED_ORDER"',
+                target='warehouse.analytics."__SQB_TEST__IS_COMPLETED_ORDER"',
                 statements=(
                     "CREATE OR REPLACE TEMPORARY FUNCTION "
-                    '"__SQB_TEST__IS_COMPLETED_ORDER"(order_status TEXT)\n'
+                    'warehouse.analytics."__SQB_TEST__IS_COMPLETED_ORDER"(order_status TEXT)\n'
                     "RETURNS BOOLEAN\n"
                     "LANGUAGE SQL\n"
                     "AS $$\n"
@@ -140,7 +140,9 @@ def test_given_project_function_when_rendering_temporary_copy_then_adapter_retur
     temporary: TemporaryFunction | None = test_case.adapter.render_create_temporary_function(
         name="is_completed_order",
         definition=FunctionDefinition(
-            destination="analytics.is_completed_order",
+            destination="warehouse.analytics.is_completed_order",
+            database="warehouse",
+            schema="analytics",
             arguments=(FunctionArgument(name="order_status", type=test_case.argument_type),),
             returns="BOOLEAN",
             body_sql="order_status = 'completed'",

@@ -7,7 +7,8 @@ pub(super) struct SensorFairnessTestCase {
     pub(super) backend: Backend,
     pub(super) pending: usize,
     pub(super) builtin_status: &'static str,
-    pub(super) expected_completed: usize,
+    /// Whether the other location's sensor gets its tick in the second cycle.
+    pub(super) expected_reached: usize,
 }
 
 #[derive(Debug)]

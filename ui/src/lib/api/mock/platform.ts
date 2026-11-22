@@ -13,6 +13,7 @@ import type {
 	Account,
 	AuditEntry,
 	AuditQuery,
+	AuthMode,
 	BuiltInRole,
 	Capability,
 	ConnectionDetails,
@@ -26,6 +27,7 @@ import type {
 	LocationToken,
 	MaintenanceHistory,
 	MigrationEvent,
+	NewPasswordAccount,
 	OldNameView,
 	PlatformEvent,
 	PlatformEventLink,
@@ -94,7 +96,7 @@ import {
 } from './access';
 import { LOCATION_MARKETING, LOCATION_SHOP, LOCATION_SHOP_DEV, LOCATION_SHOP_STAGING, ROLE_CAPABILITIES, SHOP_LOCATIONS } from './fixtures';
 import { poolCapWarnings, triggerId } from './operate';
-import { ALEX, CI_ACCOUNT, DEMO_USER, JORDAN, OPS_USER, REPORTING, RILEY, SAM, SYSTEM } from './principals';
+import { ALEX, CI_ACCOUNT, DEMO_USER, JORDAN, OPS_USER, REPORTING, RILEY, SAM, SYSTEM, MORGAN } from './principals';
 
 const MIN = 60_000;
 const DAY = 24 * 60 * MIN;
@@ -104,6 +106,8 @@ export type MockPlatformContext = {
 	role: BuiltInRole;
 	events: 'default' | 'none' | 'all';
 	serverVersion: string;
+	/** How people sign in; only password sign-in can add people. */
+	authMode: AuthMode;
 	user: Principal;
 	locations: Location[];
 	changes: LocalChangeBus;
@@ -135,7 +139,8 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 		{ ...OPS_USER, kind: 'user', email: 'ops-oncall@example.com', source: 'oidc', ssoGroups: ['data-platform'], createdAt: ago(days(150)), lastSeenAt: ago(1.5), disabled: false, activeSessions: 3 },
 		{ ...RILEY, kind: 'user', email: 'riley@example.com', source: 'oidc', ssoGroups: ['support-ops'], createdAt: ago(days(300)), lastSeenAt: ago(days(61)), disabled: true, activeSessions: 0 },
 		{ ...CI_ACCOUNT, kind: 'user', email: 'ci@example.com', source: 'password', ssoGroups: [], createdAt: ago(days(200)), lastSeenAt: ago(42), disabled: false, activeSessions: 0 },
-		{ ...REPORTING, kind: 'user', email: 'reporting@example.com', source: 'password', ssoGroups: [], createdAt: ago(days(120)), lastSeenAt: ago(300), disabled: false, activeSessions: 0 }
+		{ ...REPORTING, kind: 'user', email: 'reporting@example.com', source: 'password', ssoGroups: [], createdAt: ago(days(120)), lastSeenAt: ago(300), disabled: false, activeSessions: 0 },
+		{ ...MORGAN, kind: 'user', email: 'morgan@example.com', source: 'password', ssoGroups: [], createdAt: ago(days(12)), lastSeenAt: ago(days(2)), disabled: false, activeSessions: 0 }
 	];
 
 	const locationTokens: LocationToken[] = [
@@ -221,7 +226,8 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 		manual('asg-9', REPORTING, 'viewer', LOCATION_MARKETING, days(120)),
 		manual('asg-11', OPS_USER, 'operator', null, days(150)),
 		sso('asg-13', OPS_USER, 'platform_on_call', null, 'data-platform', days(150)),
-		sso('asg-10', RILEY, 'support_viewer', null, 'support-ops', days(300))
+		sso('asg-10', RILEY, 'support_viewer', null, 'support-ops', days(300)),
+		{ id: 'asg-default-morgan', principal: MORGAN, role: 'viewer', scope: { locationId: null }, source: 'built_in', ssoGroup: null, definedIn: 'sqb-server.toml:24', assignedBy: null, assignedAt: ago(days(12)), stale: false }
 	];
 
 	const ssoMappings: SsoMapping[] = [
@@ -270,7 +276,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 	});
 	const loadError =
 		"ImportError: cannot import name 'campaign_touches' from 'models.attribution' (orchestration/jobs.py, line 12)";
-	type LocationExtras = Pick<LocationDetail, 'createdAt' | 'brokenDeployPolicy' | 'failedDeploy' | 'lastLoadError' | 'instances' | 'imageId' | 'warehouseConnection' | 'connectionTest' | 'poolCapWarnings'>;
+	type LocationExtras = Pick<LocationDetail, 'createdAt' | 'brokenDeployPolicy' | 'failedDeploy' | 'lastLoadError' | 'instances' | 'imageId' | 'warehouseConnection' | 'connectionTest' | 'poolCapWarnings' | 'missingSecrets'>;
 	const locationExtras: Record<string, LocationExtras> = {
 		[LOCATION_SHOP]: {
 			createdAt: ago(days(210)),
@@ -281,6 +287,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			warehouseConnection: 'prod',
 			// This mock server caps a pool below what a group asks for.
 			poolCapWarnings: poolCapWarnings(),
+			missingSecrets: [],
 			connectionTest: publishTest(190, 820, 'Connected as TRANSFORMER to WAFFLE_SHOP; warehouse TRANSFORMING_WH available'),
 			instances: [
 				{ id: 'location-waffle-shop-7c2d', imageId: 'sha256:4be1c07d9a52', gitRevision: '7d2e41a', startedAt: ago(192), lastSeenAt: ago(0.2), state: 'live' },
@@ -296,6 +303,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			imageId: 'sha256:9f02b6e4c1a8',
 			warehouseConnection: 'staging',
 			poolCapWarnings: [],
+			missingSecrets: [],
 			connectionTest: publishTest(35, 760, 'Connected as TRANSFORMER to WAFFLE_SHOP_STAGING'),
 			instances: [
 				{ id: 'location-waffle-shop-staging-c7e3', imageId: 'sha256:61d0a4f7b2e9', gitRevision: 'e09a6c3', startedAt: ago(1), lastSeenAt: ago(0.1), state: 'live' },
@@ -310,6 +318,16 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			imageId: null,
 			warehouseConnection: 'dev',
 			poolCapWarnings: [],
+			// The dev target lists export_bucket in allow_missing_secrets: nobody exports from a laptop.
+			missingSecrets: [
+				{
+					provider: 'export_bucket',
+					path: 'providers/storage.py',
+					settings: [{ field: 'secret_access_key', variable: 'EXPORT_BUCKET_SECRET_ACCESS_KEY', line: 14 }],
+					nodes: ['export_revenue_csv'],
+					allowed: true
+				}
+			],
 			connectionTest: publishTest(2, 12, 'Opened warehouse.duckdb'),
 			instances: [{ id: 'location-waffle-shop-dev-local', imageId: 'local', gitRevision: 'b81c09e', startedAt: ago(30), lastSeenAt: ago(0.3), state: 'live' }]
 		},
@@ -321,6 +339,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			imageId: 'sha256:3e5f7aa20c19',
 			warehouseConnection: 'prod',
 			poolCapWarnings: [],
+			missingSecrets: [],
 			connectionTest: publishTest(1440, 140, 'Connected to analytics as sqb_builder'),
 			instances: [
 				{ id: 'location-marketing-analytics-03f6', imageId: 'sha256:3e5f7aa20c19', gitRevision: '3e5f7aa', startedAt: ago(days(1) + 30), lastSeenAt: ago(0.5), state: 'live' },
@@ -806,6 +825,32 @@ export class MockPlatformApi implements PlatformApi {
 		return this.#ctx.reply(structuredClone(account));
 	}
 
+	async createPasswordAccount(request: NewPasswordAccount): Promise<Account> {
+		if (this.#ctx.authMode !== 'password') throw new ApiError('Not found', 404);
+		this.#require('user.manage');
+		if (request.role) this.#require('role.assign');
+		const name = request.name.trim();
+		if (!name) throw new ApiError('principal name is required', 400);
+		if (this.#data.accounts.some((a) => a.name === name)) throw new ApiError(`a person named ${name} already exists`, 400);
+		if ([...request.password].length < 12) throw new ApiError('password must contain at least 12 characters and at most 1024 UTF-8 bytes', 400);
+		const account: Account = {
+			kind: 'user',
+			name,
+			displayName: name,
+			email: null,
+			source: 'password',
+			ssoGroups: [],
+			createdAt: new Date().toISOString(),
+			lastSeenAt: null,
+			disabled: false,
+			activeSessions: 0
+		};
+		this.#data.accounts.push(account);
+		this.#audit('user.manage', { locationId: null, subject: name }, `Added ${name}, who signs in with a password`, null, 'active');
+		if (request.role) await this.createRoleAssignment({ principal: name, role: request.role, scope: { locationId: null } });
+		return this.#ctx.reply(structuredClone(account));
+	}
+
 	// ---- roles ----
 
 	async listRoles(locationId: string): Promise<RoleDefinition[]> {
@@ -881,6 +926,12 @@ export class MockPlatformApi implements PlatformApi {
 		if (assignment.source === 'sso') throw new ApiError(`This comes from the SSO group ${assignment.ssoGroup}; change the group mapping in the server config`, 409);
 		if (assignment.source === 'policy') throw new ApiError(`This is set in ${assignment.definedIn}; change it there`, 409);
 		if (assignment.source === 'built_in') throw new ApiError('Everyone who signs in gets this default role; change default_role in the server config', 409);
+		// As the server does, the last enabled admin can't be demoted.
+		const enabled = new Set(this.#data.accounts.filter((a) => !a.disabled).map((a) => a.name));
+		const admins = new Set(this.#data.assignments.filter((a) => a.role === 'admin' && a.scope.locationId === null && !a.stale && enabled.has(a.principal.name)).map((a) => a.principal.name));
+		if (assignment.role === 'admin' && assignment.scope.locationId === null && admins.size === 1 && admins.has(assignment.principal.name)) {
+			throw new ApiError("The last admin can't be demoted; make someone else an admin first", 409);
+		}
 		const ownAdmin = this.#data.assignments.filter((a) => a.principal.name === this.#ctx.user.name && a.role === 'admin' && !a.stale);
 		if (assignment.principal.name === this.#ctx.user.name && assignment.role === 'admin' && ownAdmin.length <= 1) {
 			const scope = { ...assignment.scope, subject: assignment.principal.name };
@@ -958,7 +1009,7 @@ export class MockPlatformApi implements PlatformApi {
 			schemaChecksum: '6f1c2a9e4b7d0c3f8a5e2b1d9c4f7a0e3b6d8c1f5a2e9b4d7c0f3a6e1b8d5c2f',
 			schemaAppliedAt: new Date(this.#ctx.now - 5 * DAY).toISOString(),
 			storeBytes: 1_288_490_189,
-			authMode: 'oidc',
+			authMode: this.#ctx.authMode,
 			schedulerEnabled: true,
 			retention: [
 				{ name: 'Run history', value: '90 days', description: 'Runs, schedule history and their events.' },

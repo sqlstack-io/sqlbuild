@@ -307,11 +307,12 @@ from missing_package import missing_provider
             description="provider settings failure identifies provider",
             repo_files={
                 "providers/slack.py": """
+from pydantic import Field
 from sqlbuild.providers import Provider
 
 
 class SlackProvider(Provider):
-    webhook_url: str
+    retries: int = Field("not a number", validate_default=True)
 """.strip()
                 + "\n",
             },

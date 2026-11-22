@@ -4,4 +4,5 @@ pub(crate) mod prune_snapshots;
 pub(crate) mod publish_development_snapshot;
 pub mod publish_remote_snapshot;
 pub mod publish_snapshot;
+pub(crate) mod stored_document;
 pub mod verify_execution;

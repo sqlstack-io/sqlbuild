@@ -243,3 +243,9 @@ pub(crate) struct SimpleTemplateCorpusOutcome {
     pub(crate) recognized: usize,
     pub(crate) mismatches: Vec<String>,
 }
+
+pub(crate) struct PartitionInputsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) sql: &'static str,
+    pub(crate) expected_outcome: Result<&'static str, &'static str>,
+}

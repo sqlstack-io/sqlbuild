@@ -10,4 +10,6 @@ export const SAM: Principal = { kind: 'user', name: 'sam', displayName: 'Sam Oka
 export const JORDAN: Principal = { kind: 'user', name: 'jordan', displayName: 'Jordan Lee' };
 export const RILEY: Principal = { kind: 'user', name: 'riley', displayName: 'Riley Chen' };
 export const REPORTING: Principal = { kind: 'user', name: 'reporting', displayName: 'Reporting dashboards' };
+/** Holds only the default role, so the People list can change it inline. */
+export const MORGAN: Principal = { kind: 'user', name: 'morgan', displayName: 'Morgan Diaz' };
 export const SYSTEM: Principal = { kind: 'system', name: 'system', displayName: 'System' };

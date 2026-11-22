@@ -431,6 +431,7 @@ def provider_settings(*, provider_class: type) -> dict[str, object]:
 
     config: dict[str, object] = dict(getattr(provider_class, "model_config", {}))
     fields: dict[str, FieldInfo] = getattr(provider_class, "model_fields", {})
+    lines: dict[str, int] = _field_lines(provider_class)
     rows: list[dict[str, object]] = []
     for name, info in fields.items():
         rows.append(
@@ -440,6 +441,7 @@ def provider_settings(*, provider_class: type) -> dict[str, object]:
                 "required": info.is_required(),
                 "alias": _environment_alias(info),
                 "description": info.description,
+                "line": lines.get(name),
             }
         )
     return {
@@ -450,6 +452,30 @@ def provider_settings(*, provider_class: type) -> dict[str, object]:
         "env_prefix_target": config.get("env_prefix_target"),
         "fields": rows,
     }
+
+
+def _field_lines(provider_class: type) -> dict[str, int]:
+    """The source line of each field the class annotates; empty when the source is unreadable."""
+
+    import ast
+    import textwrap
+
+    try:
+        source_lines: list[str]
+        first: int
+        source_lines, first = inspect.getsourcelines(provider_class)
+        tree: ast.Module = ast.parse(textwrap.dedent("".join(source_lines)))
+    except (OSError, TypeError, SyntaxError):
+        return {}
+    definition: ast.stmt | None = tree.body[0] if tree.body else None
+    if not isinstance(definition, ast.ClassDef):
+        return {}
+    lines: dict[str, int] = {}
+    statement: ast.stmt
+    for statement in definition.body:
+        if isinstance(statement, ast.AnnAssign) and isinstance(statement.target, ast.Name):
+            lines[statement.target.id] = first + statement.lineno - 1
+    return lines
 
 
 def _environment_alias(info: FieldInfo) -> str | None:

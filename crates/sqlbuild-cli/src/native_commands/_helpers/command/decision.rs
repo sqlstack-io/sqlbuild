@@ -208,11 +208,20 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
             if let Some(cursor) = &cursor {
                 change["time"] = json!(cursor);
             }
+            let event = text(namespace, "admin_sensor_event");
+            if let Some(event) = &event {
+                change["event"] = json!(event);
+            }
             let change: TriggerChange = serde_json::from_value(change)
                 .map_err(|error| ControlError::Invalid(format!("trigger change: {error}")))?;
             if cursor.is_some() && !matches!(change, TriggerChange::SetCursor { .. }) {
                 return Err(ControlError::Invalid(
                     "--cursor is only valid for set-cursor".into(),
+                ));
+            }
+            if event.is_some() && !matches!(change, TriggerChange::SkipEvent { .. }) {
+                return Err(ControlError::Invalid(
+                    "--event is only valid for skip-event".into(),
                 ));
             }
             Ok(ControlAdmin::ChangeTrigger {
@@ -325,9 +334,12 @@ pub(crate) fn control_api_settings(
         )?
         .unwrap_or(defaults.count()),
     )?;
+    let authentication = control_authentication(namespace, config)?;
+    let origin = authentication.login.origin().map(str::to_owned);
     Ok((
-        control_authentication(namespace, config)?,
+        authentication,
         ServerFacts {
+            origin,
             version: env!("CARGO_PKG_VERSION").into(),
             scheduler: scheduler_enabled(namespace, standalone, &config.server),
             audit,

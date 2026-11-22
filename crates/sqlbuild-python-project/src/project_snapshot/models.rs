@@ -59,6 +59,8 @@ use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
 use uuid::Uuid;
 
+use crate::project_snapshot::constants::MISSING_SECRET_CODE;
+
 /// A data-only publication; this object never contains adapters, connections or user callables.
 #[pyclass(frozen, module = "sqlbuild._native")]
 #[derive(Debug)]
@@ -256,6 +258,27 @@ impl WorkerBuild {
         Ok(())
     }
 
+    /// Fail the selected nodes whose providers are missing secrets, each with its `D012` message, before anything runs; the terminal report carries `reason`.
+    pub fn fail_missing_secrets(
+        &self,
+        py: Python<'_>,
+        failures: &[(String, String)],
+        reason: &str,
+    ) -> PyResult<()> {
+        for (key, message) in failures {
+            self.complete(
+                py,
+                key,
+                (
+                    NodeOutcome::Failed,
+                    None,
+                    (Some(MISSING_SECRET_CODE.to_owned()), Some(message.clone())),
+                ),
+            )?;
+        }
+        self.refuse(reason)
+    }
+
     pub fn check_cancelled(&self, py: Python<'_>) -> PyResult<()> {
         if self.worker.bind(py).get().cancel_requested(py) {
             return Err(PyKeyboardInterrupt::new_err("run cancellation requested"));
@@ -431,6 +454,11 @@ impl WorkerBuild {
     /// Report a selected node as started unless its outcome is final, such as a planner skip.
     pub fn start_key(&self, py: Python<'_>, key: &str) -> PyResult<()> {
         self.check_cancelled(py)?;
+        self.record_start(py, key)
+    }
+
+    /// `start_key` without the cancellation check.
+    fn record_start(&self, py: Python<'_>, key: &str) -> PyResult<()> {
         if self.execution.claim.request.selection.contains(key)
             && !self
                 .completed
@@ -457,11 +485,16 @@ impl WorkerBuild {
     /// A test or audit the snapshot records has started; a selected SQL test reports as a node.
     pub fn start_attached(&self, py: Python<'_>, key: &str) -> PyResult<()> {
         self.check_cancelled(py)?;
+        self.record_attached_start(py, key)
+    }
+
+    /// `start_attached` without the cancellation check.
+    fn record_attached_start(&self, py: Python<'_>, key: &str) -> PyResult<()> {
         let Some(nodes) = self.attached.get(key) else {
             return Ok(());
         };
         if self.execution.claim.request.selection.contains(key) {
-            return self.start_key(py, key);
+            return self.record_start(py, key);
         }
         if self
             .checks
@@ -484,7 +517,7 @@ impl WorkerBuild {
             .insert(key.into(), None);
         if self.checks_only() {
             for node in nodes {
-                self.start_key(py, node)?;
+                self.record_start(py, node)?;
             }
         }
         Ok(())
@@ -492,11 +525,19 @@ impl WorkerBuild {
 
     /// A test or audit finished; a check the snapshot does not record is not reported.
     pub fn finish_attached(&self, py: Python<'_>, key: &str, outcome: NodeOutcome) -> PyResult<()> {
+        if outcome != NodeOutcome::Skipped && self.attached.contains_key(key) {
+            self.check_cancelled(py)?;
+        }
+        self.report_attached(py, key, outcome)
+    }
+
+    /// `finish_attached` without the cancellation check, for a build reporting its checks as it finishes, which a late cancel must not interrupt.
+    pub fn report_attached(&self, py: Python<'_>, key: &str, outcome: NodeOutcome) -> PyResult<()> {
         let Some(nodes) = self.attached.get(key) else {
             return Ok(());
         };
         if outcome != NodeOutcome::Skipped {
-            self.start_attached(py, key)?;
+            self.record_attached_start(py, key)?;
         }
         let outcome = if outcome == NodeOutcome::Failed
             && self.worker.bind(py).get().refresh_cancellation(py)?
@@ -1041,4 +1082,13 @@ impl Drop for NativeOrchestrationWorker {
             owner.close();
         }
     }
+}
+
+/// How a consumer's code runs inside other snapshot nodes, besides its own node.
+#[derive(Clone, Copy)]
+pub(crate) enum RunsIn {
+    Itself,
+    ModelHooks,
+    ModelMaterialization,
+    SourceLoader,
 }

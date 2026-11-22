@@ -4,6 +4,7 @@ use crate::workspace::_helpers::playground::write_template;
 use crate::workspace::constants::PLAYGROUND_TEMPLATES;
 use crate::workspace::errors::WorkspaceError;
 use crate::workspace::models::PlaygroundRequest;
+use sqlbuild_core::init_command::main::ignore_env_file::ignore_env_file;
 
 /// `create_playground_project`: refuse an existing target or unknown template, then copy.
 pub fn create_playground(request: &PlaygroundRequest) -> Result<(), WorkspaceError> {
@@ -31,5 +32,6 @@ pub fn create_playground(request: &PlaygroundRequest) -> Result<(), WorkspaceErr
         &request.templates_root,
         &request.target_dir,
         &request.template,
-    )
+    )?;
+    Ok(ignore_env_file(&request.target_dir)?)
 }

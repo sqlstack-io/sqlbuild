@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.rules_benchmark._helpers.custom_rules import write_custom_rules
-from sqlbuild._native import rules_bulk_cache_path
+from sqlbuild._native import MAX_FUNCTION_CALL_DEPTH, rules_bulk_cache_path
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import replace_project_text
 
 __all__ = ("write_custom_rules",)
@@ -29,6 +29,7 @@ def write_unevaluated_rules_project(
         "MODEL (description 'Test model orders.', {options});\nSELECT {expression} AS order_id"
     ),
     extra_files: tuple[tuple[str, str], ...] = (),
+    call_depth: int = MAX_FUNCTION_CALL_DEPTH + 1,
 ) -> None:
     (project_dir / "sqlbuild_project.toml").write_text(
         f'name = "orders"\nadapter = "{adapter}"\n[rules]\nselect = {json.dumps(selected_rules)}\n'
@@ -48,7 +49,9 @@ def write_unevaluated_rules_project(
     resource: Path = project_dir / resource_path
     resource.parent.mkdir(parents=True, exist_ok=True)
     resource.write_text(
-        resource_template.format(options=model_options, expression="ABS(" * 130 + "1" + ")" * 130)
+        resource_template.format(
+            options=model_options, expression="ABS(" * call_depth + "1" + ")" * call_depth
+        )
     )
 
 
@@ -728,3 +731,12 @@ def duckdb_rules_project_toml(*, project_dir: Path, rules_toml: str) -> str:
         '[targets.dev]\nschema = "dev"\n\n'
         f"[rules]\n{rules_toml}"
     )
+
+
+def rules_unevaluated(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The items that report a resource the selected Rules could not evaluate."""
+    return list(filter(_reports_rules_unevaluated, items))
+
+
+def _reports_rules_unevaluated(item: dict[str, Any]) -> bool:
+    return item["code"] == "rules-unevaluated"

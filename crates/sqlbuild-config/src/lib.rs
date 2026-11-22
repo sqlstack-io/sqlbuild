@@ -7,6 +7,7 @@ pub(crate) mod constants;
 pub mod dbt_manifest;
 pub mod dbt_profile;
 pub mod effective;
+pub mod env_file;
 pub mod errors;
 pub mod models;
 pub mod project;

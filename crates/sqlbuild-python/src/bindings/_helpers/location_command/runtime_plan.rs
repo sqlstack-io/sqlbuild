@@ -21,6 +21,8 @@ use crate::bindings::_helpers::plan_command::plan::location_plan;
 use crate::bindings::_helpers::review_command::support::attribute;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
+use sqlbuild_python_project::job_settings::main::pinned_plan::pinned_plan;
+use sqlbuild_python_project::job_settings::main::within_pinned_build::within_pinned_build;
 
 /// The synced state the runtime plans previews from, and the mirror version it was read at.
 struct HeldState {
@@ -66,11 +68,13 @@ pub(super) fn runtime_plan<'py>(
     held: Option<&HeldProject<'py>>,
     request: &Value,
 ) -> PyResult<Value> {
-    let argv: Vec<String> = serde_json::from_value(request["argv"].clone())
+    let mut argv: Vec<String> = serde_json::from_value(request["argv"].clone())
         .map_err(|error| PyValueError::new_err(error.to_string()))?;
     let select: Vec<String> = serde_json::from_value(request["select"].clone()).unwrap_or_default();
     let state: Arc<WarehouseState> = requested_state(&HELD_STATE, request)?;
-    let planned = (|| -> PyResult<(i32, Option<String>)> {
+    let pinned = pinned_plan(py, request)?;
+    argv.extend(pinned.flags.clone());
+    let planned = || -> PyResult<(i32, Option<String>)> {
         let argv: Vec<Bound<'_, PyString>> =
             argv.iter().map(|part| PyString::new(py, part)).collect();
         let args = field(&parse_cli_invocation(py, argv, false)?, "args")?;
@@ -88,7 +92,8 @@ pub(super) fn runtime_plan<'py>(
             None => PlanProject::Compiled,
         };
         with_routed_request(&args, |request| location_plan(request, (project, &state)))
-    })();
+    };
+    let planned = within_pinned_build(&pinned, planned);
     Ok(match planned {
         Ok((exit_code, Some(output))) => json!({"exit_code": exit_code, "output": output}),
         Ok((_, None)) => {

@@ -6,13 +6,17 @@
 	import type { ConnectionState, PlatformEvent } from '$lib/api';
 	import { theme, toggleTheme } from '$lib/theme.svelte';
 	import { formatAgo } from '$lib/format/time';
+	import { pageTitle } from '$lib/format/page-title';
 	import { app } from '$lib/state/app.svelte';
 	import PlatformEventBanner from './shell/platform-event-banner.svelte';
 	import WarehouseSyncStatus from './shell/warehouse-sync-status.svelte';
 
-	/** `events` picks the platform problems the banner shows on this page; by default, all of them. */
-	type Props = { title: string; children?: Snippet; events?: (event: PlatformEvent) => boolean };
-	let { title, children, events }: Props = $props();
+	/**
+	 * `events` picks the platform problems the banner shows on this page; by default, all of them.
+	 * `subject` names what a detail page shows in the browser tab, such as `Run 1a2b3c4d · orders_job`.
+	 */
+	type Props = { title: string; subject?: string | null; children?: Snippet; events?: (event: PlatformEvent) => boolean };
+	let { title, subject, children, events }: Props = $props();
 
 	const connectionTone: Record<ConnectionState, string> = {
 		live: 'var(--sb-success)',
@@ -36,6 +40,8 @@
 	const snapshot = $derived(app.snapshot);
 	const where = $derived(app.location ? `${app.location.name} · ${app.location.target.name}` : '—');
 </script>
+
+<svelte:head><title>{pageTitle(title, subject)}</title></svelte:head>
 
 <div class="app-topbar flex h-[52px] shrink-0 items-center gap-3 border-b border-border px-5">
 	<h1 class="text-[15px] font-semibold">{title}</h1>

@@ -1,0 +1,113 @@
+//! Public records of the dbt event stream: one output line in, the progress and row it adds out.
+
+use std::sync::Mutex;
+
+use pyo3::exceptions::PyRuntimeError;
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
+use pyo3::types::PyDict;
+use pyo3::{pyclass, pymethods};
+use sqlbuild_core::cli_text::models::CliStyle;
+use sqlbuild_core::dbt_events::main::consume_dbt_event::consume_dbt_event;
+use sqlbuild_core::dbt_events::main::render_dbt_node_row::render_dbt_node_row;
+use sqlbuild_core::dbt_events::models::{DbtRowPosition, DbtStreamState, DbtStreamUpdate};
+
+use crate::dbt_events::_helpers::event::dbt_event;
+use crate::dbt_events::_helpers::results::python_result;
+use crate::dbt_events::constants::STREAM_OPTIONS;
+use sqlbuild_python_base::boundary::models::KeywordArguments;
+use sqlbuild_python_base::records::main::fields::mapping_get_or::mapping_get_or;
+
+/// What one dbt output line adds: a progress message, a node row, or both.
+#[derive(Debug)]
+#[pyclass(module = "sqlbuild._native", frozen, get_all)]
+pub struct DbtEventStreamUpdate {
+    /// The node-started progress message.
+    pub(crate) status_message: Option<String>,
+    /// The started or finished node.
+    pub(crate) result: Option<Py<PyAny>>,
+    /// The rendered row and its messages.
+    pub(crate) row: Option<String>,
+    /// Whether `result` is a final result rather than a start.
+    pub(crate) finished: bool,
+}
+
+/// Read dbt's JSON log lines into node progress, rows and results.
+#[derive(Debug)]
+#[pyclass(module = "sqlbuild._native", frozen)]
+pub struct DbtEventStream {
+    state: Mutex<DbtStreamState>,
+    display_total: Option<i64>,
+    detail_by_unique_id: Py<PyAny>,
+    style: CliStyle,
+}
+
+impl DbtEventStream {
+    fn detail(&self, py: Python<'_>, unique_id: &str) -> PyResult<String> {
+        let details: &Bound<'_, PyAny> = self.detail_by_unique_id.bind(py);
+        if details.is_none() {
+            return Ok(String::new());
+        }
+        mapping_get_or(details, unique_id, "")?.extract()
+    }
+
+    fn update(&self, py: Python<'_>, update: DbtStreamUpdate) -> PyResult<DbtEventStreamUpdate> {
+        let Some(row) = update.row else {
+            return Ok(DbtEventStreamUpdate {
+                status_message: update.status_message,
+                result: None,
+                row: None,
+                finished: false,
+            });
+        };
+        let position: DbtRowPosition = DbtRowPosition {
+            display_index: Some(row.display_index),
+            display_total: self.display_total,
+        };
+        let detail: String = self.detail(py, &row.result.unique_id)?;
+        Ok(DbtEventStreamUpdate {
+            status_message: update.status_message,
+            result: Some(python_result(py, &row.result)?.unbind()),
+            row: Some(render_dbt_node_row(
+                &row.result,
+                position,
+                &detail,
+                self.style,
+            )),
+            finished: row.finished,
+        })
+    }
+}
+
+#[pymethods]
+impl DbtEventStream {
+    #[new]
+    #[pyo3(signature = (**options))]
+    pub fn new(py: Python<'_>, options: Option<Bound<'_, PyDict>>) -> PyResult<Self> {
+        let arguments: KeywordArguments<'_> =
+            KeywordArguments::read(py, "DbtEventStream", options, STREAM_OPTIONS)?;
+        Ok(Self {
+            state: Mutex::new(DbtStreamState::default()),
+            display_total: arguments.value("display_total")?.extract()?,
+            detail_by_unique_id: arguments.value("detail_by_unique_id")?.unbind(),
+            style: CliStyle {
+                use_color: arguments.flag("use_color")?,
+            },
+        })
+    }
+
+    /// The update one output line makes, or `None` when it changes nothing.
+    fn consume(&self, py: Python<'_>, line: &str) -> PyResult<Option<DbtEventStreamUpdate>> {
+        let Some(event) = dbt_event(line)? else {
+            return Ok(None);
+        };
+        let update: Option<DbtStreamUpdate> = {
+            let mut state = self.state.lock().map_err(|_| {
+                PyErr::new::<PyRuntimeError, _>("dbt event stream state is poisoned")
+            })?;
+            let (next, update) = consume_dbt_event(std::mem::take(&mut *state), &event);
+            *state = next;
+            update
+        };
+        update.map(|update| self.update(py, update)).transpose()
+    }
+}

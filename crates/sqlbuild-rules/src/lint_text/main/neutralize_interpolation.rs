@@ -2,6 +2,8 @@
 
 use regex::Regex;
 use sqlbuild_core::text::main::python_isspace::python_isspace;
+use sqlbuild_sqltext::resolution::main::over_clause_open::over_clause_open;
+use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use sqlbuild_sqltext::sql_scan::main::follows_table_wrapper::follows_table_wrapper;
 use sqlbuild_sqltext::sql_scan::main::matching_paren::matching_paren;
 use sqlbuild_sqltext::sql_scan::models::QuotePolicy;
@@ -47,7 +49,7 @@ pub fn neutralize_interpolation(
     Ok(assemble(body, byte_sites))
 }
 
-/// The end of a `__table_fn(..)` call with its arguments, outside `TABLE( )` and `LATERAL`.
+/// The end of a `__table_fn(..)` call with its arguments and `OVER`, outside `TABLE( )`/`LATERAL`.
 fn unwrapped_table_call_end(
     body: &str,
     start: usize,
@@ -65,8 +67,16 @@ fn unwrapped_table_call_end(
     if body.as_bytes().get(open) != Some(&b'(') {
         return None;
     }
-    match matching_paren(body.as_bytes(), open, policy) {
-        Ok(close) => Some(close + 1),
+    let close: usize = match matching_paren(body.as_bytes(), open, policy) {
+        Ok(close) => close,
+        Err(_) => return None,
+    };
+    let syntax = dialect_lexical_syntax(SNOWFLAKE_DIALECT);
+    let Some(over) = over_clause_open(body, close + 1, &syntax.line_comment_prefixes) else {
+        return Some(close + 1);
+    };
+    match matching_paren(body.as_bytes(), over, policy) {
+        Ok(over_close) => Some(over_close + 1),
         Err(_) => None,
     }
 }

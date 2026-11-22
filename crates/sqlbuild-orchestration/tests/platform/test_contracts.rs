@@ -8,6 +8,8 @@ mod test_compile_failure;
 mod test_installation;
 #[path = "test_problems.rs"]
 mod test_problems;
+#[path = "test_provider_secrets.rs"]
+mod test_provider_secrets;
 #[path = "test_types.rs"]
 mod test_types;
 #[path = "test_watchdog.rs"]

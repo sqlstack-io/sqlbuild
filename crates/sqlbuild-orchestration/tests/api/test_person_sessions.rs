@@ -91,8 +91,10 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                 .await
                 .expect("location");
             let mut input = snapshot(location);
-            input.documents.get_mut("triggers").expect("triggers")["health_orders"]["when"] =
-                json!({"kind":"custom", "function":"orders_ready", "code_hash":"orders_v1"});
+            let sensor =
+                &mut input.documents.get_mut("triggers").expect("triggers")["health_orders"];
+            sensor.as_object_mut().expect("sensor").remove("when");
+            sensor["function"] = json!("orders_ready");
             input.documents.get_mut("jobs").expect("jobs")["orders"]["pools"] =
                 json!({"warehouse_heavy": {"amount": 2, "limit": 3}});
             input.documents.insert(
@@ -158,7 +160,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                 .await
                 .expect("triggers")
                 .remove(0);
-            let evaluation = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+            let evaluation = begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                 .await
                 .expect("fenced sensor request")
                 .expect("requested");

@@ -117,12 +117,14 @@ pub(in crate::runs) async fn request_plan_in(
         work: LocationWork::Plan {
             command: request.command.clone(),
             selection: frozen.selection,
+            given: frozen.settings.keys().cloned().collect(),
             settings: frozen
                 .settings
                 .into_iter()
                 .filter(|(name, _)| name != PLAN_IGNORED_SETTING)
                 .collect(),
             fresh: request.fresh,
+            jobs: frozen.jobs,
         },
     };
     let transaction = enqueue_location_work(

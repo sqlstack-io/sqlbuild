@@ -1,5 +1,7 @@
 //! Search path, environment, provider settings and module identity of a compile.
 
+use sqlbuild_core::process_environment::main::environment_var_os::environment_var_os;
+use sqlbuild_core::process_environment::main::environment_vars_os::environment_vars_os;
 use std::collections::HashSet;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -77,7 +79,8 @@ pub(crate) fn tracked_environment_names(
     template_names: &[String],
     rules: &ReuseRules,
 ) -> Vec<String> {
-    let mut names: Vec<String> = std::env::vars_os()
+    let mut names: Vec<String> = environment_vars_os()
+        .into_iter()
         .filter_map(|(name, _)| unicode_name(name))
         .filter(|name| tracked(name, rules))
         .chain(template_names.iter().cloned())
@@ -115,7 +118,7 @@ pub(crate) fn environment_digest(names: &[String], rules: &ReuseRules) -> String
     for name in names {
         let _ = hasher.update(name.as_bytes());
         let _ = hasher.update(b"\0");
-        let value: Vec<u8> = std::env::var_os(name).map_or_else(
+        let value: Vec<u8> = environment_var_os(name).map_or_else(
             || rules.missing_environment_value.as_bytes().to_vec(),
             |value| os_bytes(&value),
         );
@@ -151,7 +154,8 @@ pub(crate) fn settings_inputs_digest(inputs: &[SettingsInputs], rules: &ReuseRul
 }
 
 fn settings_environment(inputs: &SettingsInputs) -> Vec<(Vec<u8>, Vec<u8>)> {
-    let mut matched: Vec<(Vec<u8>, Vec<u8>)> = std::env::vars_os()
+    let mut matched: Vec<(Vec<u8>, Vec<u8>)> = environment_vars_os()
+        .into_iter()
         .filter(|(name, _)| {
             let name: String = name.to_string_lossy().into_owned();
             let key: String = if inputs.case_sensitive {

@@ -190,20 +190,62 @@ fn given_layout_and_reference_errors_when_inventorying_then_names_file_line_and_
             expected_help: None,
         },
         InventoryErrorTestCase {
-            description: "non-literal sensor job",
+            description: "non-literal watched job",
             files: with_file(
                 "orchestration/sensors/inventory/stock.py",
-                "from sqlbuild.orchestration import sensor\nJOB = \"orders_export_job\"\nstale = sensor(name=\"stock_stale_sensor\", description=\"d\", run=JOB)\n",
+                "from sqlbuild.orchestration import run_event, sensor\nJOB = \"orders_export_job\"\n\n@sensor(description=\"d\", when=run_event(job=JOB, kinds=[]))\ndef stock_stale_sensor(ctx):\n    return None\n",
             ),
-            expected_message: "orchestration/sensors/inventory/stock.py:3:64: sensor run job must be a string literal",
+            expected_message: "orchestration/sensors/inventory/stock.py:4:45: sensor run_event job must be a string literal",
             expected_help: Some(
-                "write the sensor run job as a quoted string, such as \"orders_job\", so the compiler can check it without running the module",
+                "write the sensor run_event job as a quoted string, such as \"orders_job\", so the compiler can check it without running the module",
             ),
+        },
+        InventoryErrorTestCase {
+            description: "a sensor call that decorates no function",
+            files: with_file(
+                "orchestration/sensors/inventory/stock.py",
+                "from sqlbuild.orchestration import sensor\n\nstale = sensor(description=\"d\")\n",
+            ),
+            expected_message: "orchestration/sensors/inventory/stock.py:3:9: sensor(...) must decorate a function",
+            expected_help: Some(
+                "write @sensor(description=\"...\", when=...) above the def of the function it runs",
+            ),
+        },
+        InventoryErrorTestCase {
+            description: "a bare sensor decorator",
+            files: with_file(
+                "orchestration/sensors/inventory/stock.py",
+                "from sqlbuild.orchestration import sensor\n\n@sensor\ndef stock_stale_sensor(ctx):\n    return None\n",
+            ),
+            expected_message: "orchestration/sensors/inventory/stock.py:3:2: @sensor needs its arguments",
+            expected_help: Some(
+                "write @sensor(description=\"...\", when=...) above the def of the function it runs",
+            ),
+        },
+        InventoryErrorTestCase {
+            description: "a positional sensor name",
+            files: with_file(
+                "orchestration/sensors/inventory/stock.py",
+                "from sqlbuild.orchestration import sensor\n\n@sensor(\"stock_stale_sensor\", description=\"d\")\ndef stale(ctx):\n    return None\n",
+            ),
+            expected_message: "orchestration/sensors/inventory/stock.py:3:9: sensor takes keyword arguments only",
+            expected_help: Some(
+                "the sensor's name is its function's name, such as def orders_failed_sensor(...); pass name=\"...\" to choose another",
+            ),
+        },
+        InventoryErrorTestCase {
+            description: "an unknown requested job",
+            files: with_file(
+                "orchestration/sensors/inventory/stock.py",
+                "from sqlbuild.orchestration import RunRequest, sensor\n\n@sensor(description=\"d\")\ndef stock_stale_sensor(ctx):\n    return RunRequest(job=\"orders_missing_job\", run_key=\"k\")\n",
+            ),
+            expected_message: "orchestration/sensors/inventory/stock.py:5:27: sensor 'stock_stale_sensor' names 'orders_missing_job', which is not a declared job or job group",
+            expected_help: None,
         },
         InventoryErrorTestCase {
             description: "sensor in calendars",
             files: with_file("orchestration/calendars/stock.py", SENSOR),
-            expected_message: "orchestration/calendars/stock.py:3:9: declares a sensor, which belongs in orchestration/sensors/",
+            expected_message: "orchestration/calendars/stock.py:3:2: declares a sensor, which belongs in orchestration/sensors/",
             expected_help: None,
         },
         InventoryErrorTestCase {
@@ -220,7 +262,7 @@ fn given_layout_and_reference_errors_when_inventorying_then_names_file_line_and_
         InventoryErrorTestCase {
             description: "a sensor declared inside a private folder",
             files: with_file("orchestration/sensors/inventory/_helpers/stock.py", SENSOR),
-            expected_message: "orchestration/sensors/inventory/_helpers/stock.py:3:9: declares a sensor inside the private folder _helpers/; declarations can't live in a private folder",
+            expected_message: "orchestration/sensors/inventory/_helpers/stock.py:3:2: declares a sensor inside the private folder _helpers/; declarations can't live in a private folder",
             expected_help: Some(
                 "move the module out of _helpers/ into its domain folder, or move the sensor into a module there",
             ),

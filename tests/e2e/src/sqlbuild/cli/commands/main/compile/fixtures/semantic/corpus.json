@@ -1010,6 +1010,18 @@
       }
     },
     {
+      "description": "J05: ON references later table",
+      "category": "join",
+      "expected_exit_code": 1,
+      "expected_codes": [
+        "B004"
+      ],
+      "pending_native": false,
+      "repo_files": {
+        "models/probe.sql": "MODEL (description \"Test model probe.\", materialized table);\n\nSELECT o.id FROM __source(\"raw__orders\") o JOIN __source(\"raw__customers\") c ON c.id = p.order_id JOIN __source(\"raw__payments\") p ON p.order_id = o.id\n"
+      }
+    },
+    {
       "description": "S04: UNION BY NAME unknown column in outer",
       "category": "set operation",
       "expected_exit_code": 1,
@@ -2342,16 +2354,6 @@
       "pending_native": true,
       "repo_files": {
         "models/probe.sql": "MODEL (description \"Test model probe.\", materialized table);\n\nSELECT id FROM __source(\"raw__orders\") JOIN __source(\"raw__orders\") ON id = id\n"
-      }
-    },
-    {
-      "description": "J05: ON references later table",
-      "category": "join",
-      "expected_exit_code": 1,
-      "expected_codes": [],
-      "pending_native": true,
-      "repo_files": {
-        "models/probe.sql": "MODEL (description \"Test model probe.\", materialized table);\n\nSELECT o.id FROM __source(\"raw__orders\") o JOIN __source(\"raw__customers\") c ON c.id = p.order_id JOIN __source(\"raw__payments\") p ON p.order_id = o.id\n"
       }
     },
     {

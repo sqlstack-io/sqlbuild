@@ -1,19 +1,21 @@
 //! The calendars and sensors a module declares, and the job names they use, without importing it.
 
 use ruff_python_ast::Expr;
-use ruff_text_size::TextSize;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::cpython_tree::main::parse_cpython_module::parse_cpython_module;
 use crate::cpython_tree::main::walk_breadth_first::walk_breadth_first;
 use crate::cpython_tree::models::{CpythonNode, ParsedSource};
 use crate::orchestration_modules::_helpers::calls::{authoring_call, imported_names, position};
-use crate::orchestration_modules::_helpers::declarations::{call_declaration, module_scope};
+use crate::orchestration_modules::_helpers::declarations::{
+    call_declaration, decorated_functions, module_scope,
+};
 use crate::orchestration_modules::constants::{CALENDAR_CALL, REMOVED_NAMES, SENSOR_CALL};
 use crate::orchestration_modules::models::{
-    ModuleDeclarations, ModuleScope, PythonDeclaration, PythonDeclarationKind, SourcePosition,
+    ModuleDeclarations, ModuleScope, PythonDeclarationKind, SourcePosition,
 };
 
-/// Every `calendar(...)` and `sensor(...)` call with its name and job references, in source order; `None` when unparsable.
+/// Every `calendar(...)` call and `sensor` decorator with its name and job references, in source order; `None` when unparsable.
 #[must_use]
 pub fn orchestration_module_declarations(
     contents: &str,
@@ -27,8 +29,10 @@ pub fn orchestration_module_declarations(
         .map(|(_, name, start)| (name.clone(), position(&parsed.lines, *start)))
         .collect();
     let scope: ModuleScope<'_> = module_scope(&parsed, contents, &imports);
-    let mut declarations: Vec<PythonDeclaration> = Vec::new();
-    for node in walk_breadth_first(parsed.module.body.iter().map(CpythonNode::Stmt).collect()) {
+    let nodes: Vec<CpythonNode<'_>> =
+        walk_breadth_first(parsed.module.body.iter().map(CpythonNode::Stmt).collect());
+    let (decorated, mut declarations) = decorated_functions(&nodes, &scope);
+    for node in nodes {
         let CpythonNode::Expr(Expr::Call(call)) = node else {
             continue;
         };
@@ -37,7 +41,8 @@ pub fn orchestration_module_declarations(
             Some(SENSOR_CALL) => PythonDeclarationKind::Sensor,
             _ => continue,
         };
-        declarations.push(call_declaration(call, kind, &scope));
+        let function = decorated.get(&call.range().start()).copied();
+        declarations.push(call_declaration(call, kind, (&scope, function)));
     }
     declarations
         .sort_by_key(|declaration| (declaration.position.line, declaration.position.column));
