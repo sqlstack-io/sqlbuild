@@ -72,6 +72,19 @@ pub(crate) struct ProxyRemotePeerTestCase {
     pub(crate) expected_warnings: usize,
 }
 
+/// A trusted-proxy server over plain HTTP, open to the network and reached by a peer that isn't the proxy.
+#[cfg(unix)]
+pub(crate) struct NetworkKeyTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) configuration: &'static str,
+    /// The Host the peer sends, neither the origin's nor an allowed one.
+    pub(crate) host: &'static str,
+    /// A keyed read and write, then the username header without a key under that Host and the origin's.
+    pub(crate) expected_statuses: [reqwest::StatusCode; 4],
+    /// Whom the keyed read authenticated as.
+    pub(crate) expected_name: &'static str,
+}
+
 pub(crate) struct ServerConfigurationTestCase {
     pub(crate) description: &'static str,
     pub(crate) configuration: &'static str,
