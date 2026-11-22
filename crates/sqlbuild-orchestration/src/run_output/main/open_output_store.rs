@@ -1,4 +1,4 @@
-//! Open the output store `server.toml` names, or a folder beside a SQLite control store; PostgreSQL needs a named store.
+//! Open the output store `server.toml` names, or a folder beside a SQLite control store.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -18,15 +18,17 @@ pub fn open_output_store(
     settings: &OutputSettings,
     control: &ControlStore,
 ) -> Result<OutputStore, ControlError> {
-    let location: String = match &settings.store {
+    let mut location: String = match &settings.store {
         Some(location) => location.clone(),
-        None => format!("{FILE_SCHEME}{}", default_folder(control)?.display()),
+        None => format!("{FILE_SCHEME}{}", default_folder(control).display()),
     };
     let (objects, prefix): (Arc<dyn ObjectStore>, Path) =
         if let Some(folder) = location.strip_prefix(FILE_SCHEME) {
             std::fs::create_dir_all(folder)?;
+            let resolved: PathBuf = std::path::absolute(folder)?;
+            location = format!("{FILE_SCHEME}{}", resolved.display());
             (
-                Arc::new(LocalFileSystem::new_with_prefix(folder)?),
+                Arc::new(LocalFileSystem::new_with_prefix(resolved)?),
                 Path::default(),
             )
         } else if let Some(rest) = location.strip_prefix(S3_SCHEME) {
@@ -57,15 +59,13 @@ pub fn open_output_store(
     })
 }
 
-/// `output` beside a SQLite control store; a PostgreSQL one has no folder of its own.
-fn default_folder(control: &ControlStore) -> Result<PathBuf, ControlError> {
+/// `output` beside a SQLite control store; in the working directory for PostgreSQL.
+fn default_folder(control: &ControlStore) -> PathBuf {
     match control {
-        ControlStore::Sqlite(sqlite) => Ok(sqlite.path.parent().map_or_else(
+        ControlStore::Sqlite(sqlite) => sqlite.path.parent().map_or_else(
             || PathBuf::from(DEFAULT_OUTPUT_FOLDER),
             |folder| folder.join(DEFAULT_OUTPUT_FOLDER),
-        )),
-        ControlStore::Postgres(_) => Err(ControlError::Invalid(
-            "a PostgreSQL control store needs [output] store in server.toml: an s3:// bucket, or a file:// folder every server replica shares".into(),
-        )),
+        ),
+        ControlStore::Postgres(_) => PathBuf::from(DEFAULT_OUTPUT_FOLDER),
     }
 }
