@@ -297,11 +297,7 @@ class AssetContext(BasePythonNodeContext):
 
     @property
     def root_run_id(self) -> str:
-        """The server's run ID of the first run in the rerun chain, stable across reruns.
-
-        It is not the same as `run_id`, the worker's own ID. Outside a worker there is no server
-        run, so it is the local run's ID.
-        """
+        """The server run ID of the rerun chain's first run, or the local run's outside a worker."""
 
         return self.chain_run_id or self.run_id
 
