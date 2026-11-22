@@ -118,6 +118,16 @@ def meet_at(barrier: threading.Barrier) -> object:
     return None
 
 
+def item_refs(parents: tuple[str, ...]) -> Any:
+    """An item's dependencies on the items named `parents`."""
+
+    return tuple(map(_item_ref, parents))
+
+
+def _item_ref(name: str) -> DiscoveredItemRef:
+    return DiscoveredItemRef(name=name)
+
+
 def item_graph(
     items: tuple[tuple[str, str, int | None, tuple[str, ...]], ...],
 ) -> PythonNodeGraph:
@@ -133,7 +143,7 @@ def item_graph(
                     relative_path=Path("python/plan.py"),
                     name=name,
                     function=run_item,
-                    depends_on=cast(Any, tuple(DiscoveredItemRef(name=up) for up in parents)),
+                    depends_on=item_refs(parents),
                     discovered={
                         "asset": "fulfil",
                         "set": set_name,
@@ -289,3 +299,21 @@ def run_writing_ingress(
         source_map={},
         runtime=runtime,
     ).python_results
+
+
+def run_shape(
+    *,
+    run_path: Callable[..., tuple[PythonNodeExecutionResult, ...]],
+    shape: tuple[tuple[str, tuple[str, ...]], ...],
+    limit: int | None,
+    action: Callable[[], object],
+) -> frozenset[tuple[str, str, str | None, str | None]]:
+    """How `shape`'s nodes end at `limit` when its first node takes `action`."""
+
+    return result_summary(
+        run_path(
+            graph=item_graph(tuple((name, "plan", limit, up) for name, up in shape)),
+            adapter=ItemPoolTestAdapter(),
+            probe=ItemProbe(actions={"a": action}),
+        )
+    )

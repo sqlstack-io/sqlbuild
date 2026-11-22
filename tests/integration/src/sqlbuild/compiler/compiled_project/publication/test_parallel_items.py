@@ -211,14 +211,15 @@ def test_given_steps_in_flight_when_cancelled_then_finished_steps_stay_and_are_n
     with scheduled_worker(tmp_path, monkeypatch, execution) as worker:
         deadline: float = time.monotonic() + 40
         with sqlite3.connect(worker.control_store) as control:
-            while True:
-                settled: int = control.execute(
-                    "SELECT count(*) FROM sqb_run_nodes WHERE kind='node' "
-                    "AND node_key IN ('asset:fulfil[done]', 'asset:fulfil[broken]') "
-                    "AND status IN ('success', 'failed')"
-                ).fetchone()[0]
-                if settled == 2 and len(list(tmp_path.glob("long_*.started"))) == 2:
-                    break
+            progress: str = (
+                "SELECT count(*) FROM sqb_run_nodes WHERE kind='node' "
+                "AND node_key IN ('asset:fulfil[done]', 'asset:fulfil[broken]') "
+                "AND status IN ('success', 'failed')"
+            )
+            while (
+                control.execute(progress).fetchone()[0],
+                len(list(tmp_path.glob("long_*.started"))),
+            ) != (2, 2):
                 assert time.monotonic() < deadline, worker.log.read_text()
                 time.sleep(0.05)
             run_id: str = control.execute("SELECT run_id FROM sqb_runs").fetchone()[0]

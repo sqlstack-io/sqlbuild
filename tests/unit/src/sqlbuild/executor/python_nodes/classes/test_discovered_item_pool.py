@@ -27,9 +27,9 @@ from tests.unit.src.sqlbuild.executor.python_nodes.classes.helpers import (
     fail_item,
     item_graph,
     meet_at,
-    result_summary,
     run_ingress,
     run_read_side,
+    run_shape,
     run_writing_ingress,
     run_writing_read_side,
     writing_graph,
@@ -41,7 +41,6 @@ _PATHS: tuple[Callable[..., tuple[PythonNodeExecutionResult, ...]], ...] = (
 )
 
 
-@pytest.mark.parametrize("run_path", _PATHS, ids=("read side", "ingress"))
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -61,10 +60,13 @@ _PATHS: tuple[Callable[..., tuple[PythonNodeExecutionResult, ...]], ...] = (
         ),
         ItemPoolCapTestCase(
             description="two assets on one set share the cap",
-            items=tuple(
-                (f"{asset}[{index}]", "plan", 2)
-                for asset in ("bill", "fulfil")
-                for index in range(3)
+            items=(
+                ("bill[0]", "plan", 2),
+                ("bill[1]", "plan", 2),
+                ("bill[2]", "plan", 2),
+                ("fulfil[0]", "plan", 2),
+                ("fulfil[1]", "plan", 2),
+                ("fulfil[2]", "plan", 2),
             ),
             meet=2,
             expected_connections=2,
@@ -88,31 +90,30 @@ _PATHS: tuple[Callable[..., tuple[PythonNodeExecutionResult, ...]], ...] = (
 )
 def test_given_ready_items_when_running_then_the_cap_is_reached_and_never_exceeded(
     test_case: ItemPoolCapTestCase,
-    run_path: Callable[..., tuple[PythonNodeExecutionResult, ...]],
 ) -> None:
-    barrier: threading.Barrier = threading.Barrier(test_case.meet)
-    probe: ItemProbe = ItemProbe(
-        actions={name: partial(meet_at, barrier) for name, _, _ in test_case.items}
-    )
-    adapter: ItemPoolTestAdapter = ItemPoolTestAdapter()
-    graph: PythonNodeGraph = item_graph(
-        tuple((name, set_name, limit, ()) for name, set_name, limit in test_case.items)
-    )
+    for run_path in _PATHS:
+        barrier: threading.Barrier = threading.Barrier(test_case.meet)
+        probe: ItemProbe = ItemProbe(
+            actions={name: partial(meet_at, barrier) for name, _, _ in test_case.items}
+        )
+        adapter: ItemPoolTestAdapter = ItemPoolTestAdapter()
+        graph: PythonNodeGraph = item_graph(
+            tuple((name, set_name, limit, ()) for name, set_name, limit in test_case.items)
+        )
 
-    results: tuple[PythonNodeExecutionResult, ...] = run_path(
-        graph=graph, adapter=adapter, probe=probe
-    )
+        results: tuple[PythonNodeExecutionResult, ...] = run_path(
+            graph=graph, adapter=adapter, probe=probe
+        )
 
-    assert [result.error_message for result in results] == [None] * len(test_case.items)
-    assert (adapter.connections, probe.most_at_once) == (
-        test_case.expected_connections,
-        test_case.expected_most_at_once,
-    )
-    assert adapter.closed == adapter.connections
-    assert probe.report_threads == {threading.get_ident()}
+        assert [result.error_message for result in results] == [None] * len(test_case.items)
+        assert (adapter.connections, probe.most_at_once) == (
+            test_case.expected_connections,
+            test_case.expected_most_at_once,
+        )
+        assert adapter.closed == adapter.connections
+        assert probe.report_threads == {threading.get_ident()}
 
 
-@pytest.mark.parametrize("run_path", _PATHS, ids=("read side", "ingress"))
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -148,22 +149,23 @@ def test_given_ready_items_when_running_then_the_cap_is_reached_and_never_exceed
 )
 def test_given_dependencies_when_running_then_an_item_starts_after_its_parents_are_reported(
     test_case: ItemPoolOrderTestCase,
-    run_path: Callable[..., tuple[PythonNodeExecutionResult, ...]],
 ) -> None:
-    barrier: threading.Barrier = threading.Barrier(len(test_case.meeting))
-    probe: ItemProbe = ItemProbe(
-        actions={name: partial(meet_at, barrier) for name in test_case.meeting}
-    )
-    graph: PythonNodeGraph = item_graph(
-        tuple((name, f"set-{limit}", limit, parents) for name, limit, parents in test_case.items)
-    )
+    for run_path in _PATHS:
+        barrier: threading.Barrier = threading.Barrier(len(test_case.meeting))
+        probe: ItemProbe = ItemProbe(
+            actions={name: partial(meet_at, barrier) for name in test_case.meeting}
+        )
+        graph: PythonNodeGraph = item_graph(
+            tuple(
+                (name, f"set-{limit}", limit, parents) for name, limit, parents in test_case.items
+            )
+        )
 
-    _ = run_path(graph=graph, adapter=ItemPoolTestAdapter(), probe=probe)
+        _ = run_path(graph=graph, adapter=ItemPoolTestAdapter(), probe=probe)
 
-    assert probe.seen_before == test_case.expected_seen_before
+        assert probe.seen_before == test_case.expected_seen_before
 
 
-@pytest.mark.parametrize("run_path", _PATHS, ids=("read side", "ingress"))
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -193,26 +195,25 @@ def test_given_dependencies_when_running_then_an_item_starts_after_its_parents_a
 )
 def test_given_no_parallelism_when_running_then_items_run_one_by_one_on_the_calling_thread(
     test_case: ItemPoolSerialTestCase,
-    run_path: Callable[..., tuple[PythonNodeExecutionResult, ...]],
 ) -> None:
-    probe: ItemProbe = ItemProbe()
-    adapter: ItemPoolTestAdapter = ItemPoolTestAdapter(adapter_name=test_case.adapter_name)
-    graph: PythonNodeGraph = item_graph(
-        tuple((name, "plan", test_case.max_parallel, ()) for name in ("a", "b", "c"))
-    )
+    for run_path in _PATHS:
+        probe: ItemProbe = ItemProbe()
+        adapter: ItemPoolTestAdapter = ItemPoolTestAdapter(adapter_name=test_case.adapter_name)
+        graph: PythonNodeGraph = item_graph(
+            tuple((name, "plan", test_case.max_parallel, ()) for name in ("a", "b", "c"))
+        )
 
-    _ = run_path(graph=graph, adapter=adapter, probe=probe)
+        _ = run_path(graph=graph, adapter=adapter, probe=probe)
 
-    assert probe.threads == {threading.get_ident()}
-    assert (len(probe.threads), adapter.connections, probe.most_at_once) == (
-        test_case.expected_threads,
-        test_case.expected_connections,
-        1,
-    )
-    assert probe.seen_before["c"] == frozenset({"a", "b"})
+        assert probe.threads == {threading.get_ident()}
+        assert (len(probe.threads), adapter.connections, probe.most_at_once) == (
+            test_case.expected_threads,
+            test_case.expected_connections,
+            1,
+        )
+        assert probe.seen_before["c"] == frozenset({"a", "b"})
 
 
-@pytest.mark.parametrize("run_path", _PATHS, ids=("read side", "ingress"))
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -224,36 +225,32 @@ def test_given_no_parallelism_when_running_then_items_run_one_by_one_on_the_call
 )
 def test_given_an_item_that_does_not_succeed_when_running_then_dependants_end_as_in_serial(
     test_case: ItemPoolFailureTestCase,
-    run_path: Callable[..., tuple[PythonNodeExecutionResult, ...]],
 ) -> None:
-    outcomes: dict[str, Callable[[], object]] = {
-        "fail": fail_item,
-        "hard": lambda: "hard",
-        "soft": lambda: "soft",
-    }
-    shape: tuple[tuple[str, tuple[str, ...]], ...] = (
-        ("a", ()),
-        ("b", ("a",)),
-        ("c", ("b",)),
-        ("d", ()),
-        ("e", ("a", "d")),
-    )
-    serial, parallel = (
-        result_summary(
-            run_path(
-                graph=item_graph(tuple((name, "plan", limit, up) for name, up in shape)),
-                adapter=ItemPoolTestAdapter(),
-                probe=ItemProbe(actions={"a": outcomes[test_case.outcome]}),
-            )
+    for run_path in _PATHS:
+        outcomes: dict[str, Callable[[], object]] = {
+            "fail": fail_item,
+            "hard": lambda: "hard",
+            "soft": lambda: "soft",
+        }
+        shape: tuple[tuple[str, tuple[str, ...]], ...] = (
+            ("a", ()),
+            ("b", ("a",)),
+            ("c", ("b",)),
+            ("d", ()),
+            ("e", ("a", "d")),
         )
-        for limit in (None, 3)
-    )
+        action: Callable[[], object] = outcomes[test_case.outcome]
+        serial: frozenset[tuple[str, str, str | None, str | None]] = run_shape(
+            run_path=run_path, shape=shape, limit=None, action=action
+        )
+        parallel: frozenset[tuple[str, str, str | None, str | None]] = run_shape(
+            run_path=run_path, shape=shape, limit=3, action=action
+        )
 
-    assert parallel == serial
-    assert {row[1] for row in parallel if row[0] == "a"} == {test_case.expected_first_status}
+        assert parallel == serial
+        assert {row[0]: row[1] for row in parallel}["a"] == test_case.expected_first_status
 
 
-@pytest.mark.parametrize("run_path", _PATHS, ids=("read side", "ingress"))
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -268,45 +265,44 @@ def test_given_an_item_that_does_not_succeed_when_running_then_dependants_end_as
 )
 def test_given_steps_in_flight_when_interrupted_then_finished_stay_succeeded_and_nothing_starts(
     test_case: ItemPoolCancelTestCase,
-    run_path: Callable[..., tuple[PythonNodeExecutionResult, ...]],
 ) -> None:
-    both_running: threading.Barrier = threading.Barrier(2)
-    interrupted: threading.Event = threading.Event()
+    for run_path in _PATHS:
+        both_running: threading.Barrier = threading.Barrier(2)
+        interrupted: threading.Event = threading.Event()
 
-    def slow() -> object:
-        _ = both_running.wait(timeout=WAIT_SECONDS)
-        assert interrupted.wait(timeout=WAIT_SECONDS)
-        return fail_item()
+        def slow() -> object:
+            _ = both_running.wait(timeout=WAIT_SECONDS)
+            assert interrupted.wait(timeout=WAIT_SECONDS)
+            return fail_item()
 
-    def interrupt(name: str) -> None:
-        probe.after_report = lambda reported: None
-        interrupted.set()
-        raise KeyboardInterrupt(name)
+        def interrupt(name: str) -> None:
+            probe.after_report = lambda reported: None
+            interrupted.set()
+            raise KeyboardInterrupt(name)
 
-    probe: ItemProbe = ItemProbe(actions={"quick": partial(meet_at, both_running), "slow": slow})
-    probe.after_report = interrupt
-    adapter: ItemPoolTestAdapter = ItemPoolTestAdapter()
-    graph: PythonNodeGraph = item_graph(
-        (("quick", "plan", 2, ()), ("slow", "plan", 2, ()), ("waiting", "plan", 2, ("quick",)))
-    )
+        probe: ItemProbe = ItemProbe(
+            actions={"quick": partial(meet_at, both_running), "slow": slow}
+        )
+        probe.after_report = interrupt
+        adapter: ItemPoolTestAdapter = ItemPoolTestAdapter()
+        graph: PythonNodeGraph = item_graph(
+            (("quick", "plan", 2, ()), ("slow", "plan", 2, ()), ("waiting", "plan", 2, ("quick",)))
+        )
 
-    with pytest.raises(KeyboardInterrupt):
-        _ = run_path(graph=graph, adapter=adapter, probe=probe)
+        with pytest.raises(KeyboardInterrupt):
+            _ = run_path(graph=graph, adapter=adapter, probe=probe)
 
-    reported: frozenset[tuple[str, str]] = frozenset(
-        (result.node_name, result.status.value) for result in probe.reported
-    )
-    assert (reported, tuple(probe.cancelled)) == (
-        test_case.expected_reported,
-        test_case.expected_cancelled,
-    )
-    assert test_case.expected_never_started not in probe.seen_before
-    assert adapter.closed == adapter.connections
+        reported: frozenset[tuple[str, str]] = frozenset(
+            (result.node_name, result.status.value) for result in probe.reported
+        )
+        assert (reported, tuple(probe.cancelled)) == (
+            test_case.expected_reported,
+            test_case.expected_cancelled,
+        )
+        assert test_case.expected_never_started not in probe.seen_before
+        assert adapter.closed == adapter.connections
 
 
-@pytest.mark.parametrize(
-    "run_path", (run_writing_read_side, run_writing_ingress), ids=("read side", "ingress")
-)
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -320,41 +316,42 @@ def test_given_steps_in_flight_when_interrupted_then_finished_stay_succeeded_and
 )
 def test_given_concurrent_steps_using_sql_when_they_write_results_then_they_do_not_collide(
     test_case: ItemPoolWriteTestCase,
-    run_path: Callable[..., tuple[PythonNodeExecutionResult, ...]],
     tmp_path: Path,
 ) -> None:
-    adapter: DuckDbAdapter = DuckDbAdapter()
-    config: dict[str, object] = {"database": str(tmp_path / "warehouse.duckdb")}
-    connection: object = adapter.connect(config)
-    runtime: PythonNodeRuntime = PythonNodeRuntime(
-        adapter=adapter,
-        connection_config=config,
-        connection=connection,
-        run_id="test_run",
-        target="dev",
-        vars={"barrier": threading.Barrier(len(test_case.steps))},
-        is_reload=False,
-        default_schema="plan_state",
-    )
+    for run_path in (run_writing_read_side, run_writing_ingress):
+        adapter: DuckDbAdapter = DuckDbAdapter()
+        config: dict[str, object] = {"database": str(tmp_path / f"{run_path.__name__}.duckdb")}
+        connection: object = adapter.connect(config)
+        runtime: PythonNodeRuntime = PythonNodeRuntime(
+            adapter=adapter,
+            connection_config=config,
+            connection=connection,
+            run_id="test_run",
+            target="dev",
+            vars={"barrier": threading.Barrier(len(test_case.steps))},
+            is_reload=False,
+            default_schema="plan_state",
+        )
 
-    results: tuple[PythonNodeExecutionResult, ...] = run_path(
-        graph=writing_graph(test_case.steps), runtime=runtime
-    )
+        results: tuple[PythonNodeExecutionResult, ...] = run_path(
+            graph=writing_graph(test_case.steps), runtime=runtime
+        )
 
-    assert {
-        (result.node_name, result.status.value, result.error_message) for result in results
-    } == {(step, test_case.expected_status, None) for step in test_case.steps}
-    table: str = adapter.query(
-        connection=connection,
-        sql="SELECT table_name FROM information_schema.columns "
-        "WHERE table_schema = 'plan_state' AND column_name = 'payload_json_b64'",
-        limit=None,
-    ).rows[0][0]
-    written: set[object] = {
-        row[0]
-        for row in adapter.query(
-            connection=connection, sql=f"SELECT node_name FROM plan_state.{table}", limit=None
-        ).rows
-    }
-    adapter.close(connection)
-    assert written == set(test_case.steps)
+        assert {
+            (result.node_name, result.status.value, result.error_message) for result in results
+        } == {(step, test_case.expected_status, None) for step in test_case.steps}
+        found: object = adapter.query(
+            connection=connection,
+            sql="SELECT table_name FROM information_schema.columns "
+            "WHERE table_schema = 'plan_state' AND column_name = 'payload_json_b64'",
+            limit=None,
+        ).rows[0][0]
+        table: str = str(found)
+        written: set[object] = {
+            row[0]
+            for row in adapter.query(
+                connection=connection, sql=f"SELECT node_name FROM plan_state.{table}", limit=None
+            ).rows
+        }
+        adapter.close(connection)
+        assert written == set(test_case.steps)
