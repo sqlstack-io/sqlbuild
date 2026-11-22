@@ -218,3 +218,74 @@ def result_summary(
         (result.node_name, result.status.value, result.error_message, result.skip_reason)
         for result in results
     )
+
+
+def write_step(ctx: AssetContext) -> object:
+    """Write a table and a result while every other step does."""
+
+    discovered: Any = cast(Any, ctx.discovered)
+    step: str = str(discovered.item)
+    barrier: threading.Barrier = cast(threading.Barrier, ctx.vars["barrier"])
+    _ = barrier.wait(timeout=WAIT_SECONDS)
+    ctx.execute_sql(f"CREATE OR REPLACE TABLE main.step_{step} AS SELECT 1 AS written")
+    _ = barrier.wait(timeout=WAIT_SECONDS)
+    return ctx.result(payload={"step": step})
+
+
+def writing_graph(steps: tuple[str, ...]) -> PythonNodeGraph:
+    """Every step at once on one set."""
+
+    return build_python_node_graph(
+        discovered_inputs=DiscoveredProjectInputs(
+            project_config=ProjectConfig(name="demo", adapter="duckdb"),
+            local_config=LocalConfig(),
+            asset_functions=tuple(
+                DiscoveredAssetFunction(
+                    file_path=Path("/project/python/plan.py"),
+                    relative_path=Path("python/plan.py"),
+                    name=step,
+                    function=write_step,
+                    discovered={
+                        "asset": "fulfil",
+                        "set": "plan",
+                        "item": step,
+                        "args": {},
+                        "tags": {},
+                        "max_parallel": len(steps),
+                        "placeholder": False,
+                        "error": None,
+                    },
+                )
+                for step in steps
+            ),
+        )
+    )
+
+
+def run_writing_read_side(
+    *, graph: PythonNodeGraph, runtime: PythonNodeRuntime
+) -> tuple[PythonNodeExecutionResult, ...]:
+    """Every writing step through the read-side tracker."""
+
+    tracker: ReadSidePythonExecutionTracker = ReadSidePythonExecutionTracker(
+        python_graph=graph,
+        selected_python_names=frozenset(graph.nodes_by_name),
+        scheduled_sql_names=frozenset(),
+        runtime=runtime,
+    )
+    tracker.dispatch_ready_python_nodes()
+    return tracker.results
+
+
+def run_writing_ingress(
+    *, graph: PythonNodeGraph, runtime: PythonNodeRuntime
+) -> tuple[PythonNodeExecutionResult, ...]:
+    """Every writing step through the ingress lifecycle scheduler."""
+
+    return execute_ingress_python_loader_nodes(
+        python_graph=graph,
+        selected_python_names=frozenset(graph.nodes_by_name),
+        loader_functions=(),
+        source_map={},
+        runtime=runtime,
+    ).python_results

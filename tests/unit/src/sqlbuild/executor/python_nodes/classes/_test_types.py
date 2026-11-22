@@ -60,3 +60,10 @@ class ItemPoolCancelTestCase:
     expected_reported: frozenset[tuple[str, str]]
     expected_cancelled: tuple[str, ...]
     expected_never_started: str
+
+
+@dataclass(frozen=True)
+class ItemPoolWriteTestCase:
+    description: str
+    steps: tuple[str, ...]
+    expected_status: str

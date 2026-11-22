@@ -12,6 +12,7 @@ Online: https://sqlbuild.com/docs/concepts/python-nodes/discovered-nodes/
 - Dependencies
 - In a node
 - Selecting discovered nodes
+- Running items in parallel
 - When discovery runs
 - When discovery fails
 - Outside a location
@@ -89,7 +90,20 @@ A set fails as a whole, and keeps its last good items, when:
 | `+fulfil[ship]` | Item `ship` and every item and node before it |
 | `fulfil` or `asset:fulfil` | Every node of the asset, whatever the items are |
 
-Jobs select the asset by name, so job files don't change when the items do. `max_parallel` caps how many of the set's nodes run at once within a run.
+Jobs select the asset by name, so job files don't change when the items do.
+
+## Running items in parallel
+
+`max_parallel` caps how many of the set's nodes run at once within one run. Assets fed by the same
+discover function share the cap. Without it, or with `1`, the items run one at a time. It is
+independent of `concurrency`, and every other asset still runs one at a time.
+
+- **Providers used by these steps must be thread-safe.** The steps run on threads of one process and share the provider instances.
+- **A step can't install signal handlers,** as Python allows that only on the main thread.
+- **Each running step has its own warehouse connection.** An in-memory DuckDB or SQLite database belongs to one connection, so its items run one at a time.
+- **Local output can interleave.** A worker still files each line under the node that printed it.
+- **SQL pauses while items run.** New SQL, and steps waiting on SQL, start again once the running items have finished.
+- **A cancel starts no more steps.** It cancels running statements and keeps finished steps succeeded. SQLBuild can't stop other Python code: it waits for those steps before it closes providers, and a worker is ended after a minute. Work a step started on a remote system may outlive the cancel.
 
 ## When discovery runs
 

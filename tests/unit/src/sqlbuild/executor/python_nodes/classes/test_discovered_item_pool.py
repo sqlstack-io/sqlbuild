@@ -5,17 +5,20 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable
 from functools import partial
+from pathlib import Path
 
 import pytest
 
 from sqlbuild._native import PythonNodeGraph
-from sqlbuild.executor.python_nodes.models import PythonNodeExecutionResult
+from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
+from sqlbuild.executor.python_nodes.models import PythonNodeExecutionResult, PythonNodeRuntime
 from tests.unit.src.sqlbuild.executor.python_nodes.classes._test_types import (
     ItemPoolCancelTestCase,
     ItemPoolCapTestCase,
     ItemPoolFailureTestCase,
     ItemPoolOrderTestCase,
     ItemPoolSerialTestCase,
+    ItemPoolWriteTestCase,
 )
 from tests.unit.src.sqlbuild.executor.python_nodes.classes.helpers import (
     WAIT_SECONDS,
@@ -27,6 +30,9 @@ from tests.unit.src.sqlbuild.executor.python_nodes.classes.helpers import (
     result_summary,
     run_ingress,
     run_read_side,
+    run_writing_ingress,
+    run_writing_read_side,
+    writing_graph,
 )
 
 _PATHS: tuple[Callable[..., tuple[PythonNodeExecutionResult, ...]], ...] = (
@@ -296,3 +302,59 @@ def test_given_steps_in_flight_when_interrupted_then_finished_stay_succeeded_and
     )
     assert test_case.expected_never_started not in probe.seen_before
     assert adapter.closed == adapter.connections
+
+
+@pytest.mark.parametrize(
+    "run_path", (run_writing_read_side, run_writing_ingress), ids=("read side", "ingress")
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ItemPoolWriteTestCase(
+            description="four steps create the result table and write at once",
+            steps=("label", "pack", "pick", "ship"),
+            expected_status="success",
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_concurrent_steps_using_sql_when_they_write_results_then_they_do_not_collide(
+    test_case: ItemPoolWriteTestCase,
+    run_path: Callable[..., tuple[PythonNodeExecutionResult, ...]],
+    tmp_path: Path,
+) -> None:
+    adapter: DuckDbAdapter = DuckDbAdapter()
+    config: dict[str, object] = {"database": str(tmp_path / "warehouse.duckdb")}
+    connection: object = adapter.connect(config)
+    runtime: PythonNodeRuntime = PythonNodeRuntime(
+        adapter=adapter,
+        connection_config=config,
+        connection=connection,
+        run_id="test_run",
+        target="dev",
+        vars={"barrier": threading.Barrier(len(test_case.steps))},
+        is_reload=False,
+        default_schema="plan_state",
+    )
+
+    results: tuple[PythonNodeExecutionResult, ...] = run_path(
+        graph=writing_graph(test_case.steps), runtime=runtime
+    )
+
+    assert {
+        (result.node_name, result.status.value, result.error_message) for result in results
+    } == {(step, test_case.expected_status, None) for step in test_case.steps}
+    table: str = adapter.query(
+        connection=connection,
+        sql="SELECT table_name FROM information_schema.columns "
+        "WHERE table_schema = 'plan_state' AND column_name = 'payload_json_b64'",
+        limit=None,
+    ).rows[0][0]
+    written: set[object] = {
+        row[0]
+        for row in adapter.query(
+            connection=connection, sql=f"SELECT node_name FROM plan_state.{table}", limit=None
+        ).rows
+    }
+    adapter.close(connection)
+    assert written == set(test_case.steps)
