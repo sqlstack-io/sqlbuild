@@ -20,22 +20,16 @@ from sqlbuild.cli.entry.constants import (
     INTERRUPTED_EXIT_CODE,
     INTERRUPTED_LINE,
     TERMINATED_EXIT_CODE,
+    WINDOWS_PLATFORM,
 )
-from sqlbuild.runtime.execution_limits.main._cancel_running_statements import (
+from sqlbuild.runtime.execution_limits.main.cancel_running_statements import (
     cancel_running_statements,
 )
 from sqlbuild.runtime.execution_limits.main.statement_activity import statement_activity
 
 
 class InterruptWatch:
-    """Follow SIGINT through Python's wakeup descriptor, leaving its handlers as they are.
-
-    The first Ctrl+C cancels the statements running then, as SIGTERM does, so a driver waiting in
-    native code returns and the interrupt unwinds the command, which cleans up. The exit is forced
-    after a grace period only where that can't cut warehouse cleanup short: a connect that was
-    waiting when Ctrl+C came still is, no statement has run, or the command has returned and left
-    threads running. A second Ctrl+C forces it after the same grace, cancelling statements first.
-    """
+    """Follow SIGINT through the wakeup descriptor; force exits only where no cleanup is cut."""
 
     def __init__(self) -> None:
         self._lock: threading.Lock = threading.Lock()
@@ -61,7 +55,7 @@ class InterruptWatch:
         sender.setblocking(False)
         self._signals = (receiver, sender)
         _ = signal.set_wakeup_fd(sender.fileno(), warn_on_full_buffer=False)
-        if sys.platform != "win32":
+        if sys.platform != WINDOWS_PLATFORM:
             os.register_at_fork(after_in_child=self._forget_in_child)
         threading.Thread(target=self._watch, name="sqlbuild-interrupt", daemon=True).start()
 
@@ -92,12 +86,10 @@ class InterruptWatch:
         """Exit directly past threads the interpreter would wait for, such as one reading stdin."""
 
         deadline: float = time.monotonic() + INTERRUPT_GRACE_SECONDS
-        for thread in threading.enumerate():
-            if thread.daemon or thread is threading.current_thread():
-                continue
-            thread.join(max(0.0, deadline - time.monotonic()))
-            if thread.is_alive():
+        while _threads_left_running():
+            if time.monotonic() >= deadline:
                 self._force()
+            time.sleep(INTERRUPT_POLL_SECONDS)
 
     def _forget_in_child(self) -> None:
         _ = signal.set_wakeup_fd(-1)
@@ -129,7 +121,8 @@ class InterruptWatch:
         return requested is not None and requested()
 
     def _watch(self) -> None:
-        assert self._signals is not None
+        if self._signals is None:
+            return
         while True:
             _ = select.select([self._signals[0]], [], [], self._poll_seconds())
             self._receive()
@@ -177,5 +170,16 @@ class InterruptWatch:
             _ = os.write(2, f"{lead}{INTERRUPTED_LINE}\n".encode())
 
 
-def _already_stopping(_signal: int, _frame: FrameType | None) -> None:
+def _already_stopping(*_signal_args: object) -> None:
     """Take a further Ctrl+C without raising; the watch still counts it."""
+
+
+def _threads_left_running() -> bool:
+    """Whether a thread has a frame left; `is_alive` is wrong after an interrupted join."""
+
+    running: dict[int, FrameType] = sys._current_frames()
+    return any(
+        thread.ident in running
+        for thread in threading.enumerate()
+        if not thread.daemon and thread is not threading.current_thread()
+    )

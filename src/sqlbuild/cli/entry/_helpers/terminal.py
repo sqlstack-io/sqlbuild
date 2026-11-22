@@ -4,11 +4,13 @@ import os
 import sys
 from collections.abc import Callable
 
+from sqlbuild.cli.entry.constants import WINDOWS_PLATFORM
+
 
 def terminal_restorer() -> Callable[[], None]:
     """Return what restores the settings the terminal has now; nothing without a terminal."""
 
-    if sys.platform == "win32":
+    if sys.platform == WINDOWS_PLATFORM:
         return lambda: None
     import termios
 

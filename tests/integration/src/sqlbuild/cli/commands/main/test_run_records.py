@@ -17,7 +17,7 @@ import pytest
 
 from sqlbuild._native import run_cli as main
 from sqlbuild.adapter.contract.classes.runs_table import RunsTableMixin
-from sqlbuild.runtime.execution_limits.main._cancel_running_statements import (
+from sqlbuild.runtime.execution_limits.main.cancel_running_statements import (
     cancel_running_statements,
 )
 from tests.integration.src.sqlbuild.cli.commands.main._test_types import (

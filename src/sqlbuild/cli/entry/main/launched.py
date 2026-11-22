@@ -17,7 +17,7 @@ def main() -> int:
     watch: InterruptWatch = InterruptWatch()
     watch.start()
     try:
-        code: int = run_launched_command()
+        code: int = _run_launched_command()
     except KeyboardInterrupt:
         return watch.finish_interrupted()
     except BaseException:
@@ -27,7 +27,7 @@ def main() -> int:
     return watch.finish(code)
 
 
-def run_launched_command() -> int:
+def _run_launched_command() -> int:
     """Run the CLI with the arguments the native launcher handed over."""
 
     os.environ.setdefault(
