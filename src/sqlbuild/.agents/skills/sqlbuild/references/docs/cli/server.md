@@ -473,8 +473,8 @@ max_bytes_per_run = "20GB"
 ```
 
 - `store` is a local folder, `file:///path`, or an S3 prefix, `s3://bucket/prefix`. By default it
-  is an `output` folder beside a SQLite control database. A PostgreSQL control store requires it,
-  since its replicas must share one store. [`sqb dev`](dev.md) keeps its output in `.sqlbuild/output`.
+  is an `output` folder beside a SQLite control database, or in the server's working directory with
+  PostgreSQL. [`sqb dev`](dev.md) keeps its output in `.sqlbuild/output`.
 - A local folder must be on a persistent volume, not inside the server's container, or a restart
   loses every run's output.
 - Use an S3 prefix when several servers share one control database, or when the server's container
@@ -484,7 +484,7 @@ max_bytes_per_run = "20GB"
   keeps its first half and its newest half, and the lines in between are counted where they were
   left out. By default a run keeps all of its output.
 
-The server prints `Run output store: ...` when it starts.
+The server prints `Run output store: ...` when it starts, with a local folder as an absolute path.
 
 Reading a run's output needs `view.evidence` on every node the run selected, and each read is
 recorded in the security audit. People read a node's output with its stdout and stderr lines in the

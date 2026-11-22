@@ -116,10 +116,8 @@ pub(crate) struct OutputUploadTestCase {
     pub(crate) expected_queued: (usize, usize, usize),
 }
 
-pub(crate) struct OutputStoreSettingTestCase {
+pub(crate) struct OutputLocationTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
-    pub(crate) store: Option<String>,
-    /// The error opening it gives, or none when it opens.
-    pub(crate) expected_error: Option<&'static str>,
+    pub(crate) expected_folder: &'static str,
 }
