@@ -556,3 +556,26 @@ pub(crate) struct KeyOnlyTestCase {
     pub(crate) expected_status: reqwest::StatusCode,
     pub(crate) expected_cache_control: &'static str,
 }
+
+pub(crate) struct KeyedManagementTestCase {
+    pub(crate) description: &'static str,
+    /// The route, with `{target}`, `{key}` and `{person}` filled in.
+    pub(crate) path: &'static str,
+    pub(crate) body: &'static str,
+    pub(crate) expected_status: reqwest::StatusCode,
+}
+
+pub(crate) struct ServiceAccountRoleTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) from: crate::credentials::models::BuiltinRole,
+    pub(crate) to: &'static str,
+    pub(crate) expected_roles: &'static [&'static str],
+}
+
+pub(crate) struct LoginModeTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) login: fn() -> crate::api::models::HumanLogin,
+    pub(crate) expected_status: reqwest::StatusCode,
+    pub(crate) expected_mode: &'static str,
+}

@@ -48,7 +48,7 @@ export type CurrentUser = Principal & {
 	role?: BuiltInRole;
 };
 
-export type AuthMode = 'oidc' | 'trusted_proxy' | 'password' | 'disabled';
+export type AuthMode = 'oidc' | 'trusted_proxy' | 'password' | 'disabled' | 'keys';
 
 // ---- locations, targets and snapshots ----
 

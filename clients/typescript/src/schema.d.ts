@@ -214,6 +214,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/login-mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Answered only by a server without sign-in for people, so a browser or sqb login can say so instead of offering a password. */
+        get: operations["readLoginMode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/logout": {
         parameters: {
             query?: never;
@@ -2493,7 +2510,11 @@ export interface components {
          * @description How people sign in to this server.
          * @enum {string}
          */
-        LoginMode: "password" | "trusted_proxy" | "oidc" | "disabled";
+        LoginMode: "password" | "trusted_proxy" | "oidc" | "disabled" | "keys";
+        /** @description How a server without a session is signed in to, answered before sign-in only where people can't. */
+        LoginModeAnswer: {
+            login_mode: components["schemas"]["LoginMode"];
+        };
         /** @description A running calendar schedule whose last date is at most a day away, or which has none left. */
         LowCalendar: {
             /**
@@ -5066,6 +5087,32 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AuthenticationDenial"];
                 };
+            };
+        };
+    };
+    readLoginMode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginModeAnswer"];
+                };
+            };
+            /** @description People sign in on this server */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

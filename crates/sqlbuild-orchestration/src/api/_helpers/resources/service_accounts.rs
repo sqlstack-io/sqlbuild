@@ -7,23 +7,41 @@ use uuid::Uuid;
 use crate::api::errors::ApiError;
 use crate::authorization::main::service_accounts::{
     create_service_account::create_service_account, list_service_accounts::list_service_accounts,
-    revoke_service_key::revoke_service_key, rotate_service_key::rotate_service_key,
+    refuse_service_key::refuse_service_key, revoke_service_key::revoke_service_key,
+    rotate_service_key::rotate_service_key,
     set_service_account_disabled::set_service_account_disabled,
     set_service_account_role::set_service_account_role,
 };
 use crate::credentials::models::{
     AuditContext, AuthenticatedPerson, IssuedServiceKey, NewServiceAccount,
     ServiceAccountAuthority, ServiceAccountRole, ServiceAccountState, ServiceAccountSummary,
-    ServiceKeyRotation,
+    ServiceKeyIdentity, ServiceKeyRotation,
 };
 use crate::store::models::ControlStore;
 
-type Caller = (Extension<AuditContext>, Extension<AuthenticatedPerson>);
+type Keyed = Option<Extension<ServiceKeyIdentity>>;
+type Caller = (
+    Extension<AuditContext>,
+    Extension<AuthenticatedPerson>,
+    Keyed,
+);
+
+/// Refuses a change when a service key, not a person, makes it.
+pub(crate) async fn refuse_keyed(
+    store: &ControlStore,
+    (context, keyed): (&AuditContext, &Keyed),
+    action: &str,
+) -> Result<(), ApiError> {
+    if keyed.is_some() {
+        refuse_service_key(store, context, action).await?;
+    }
+    Ok(())
+}
 
 fn authority(
-    (Extension(context), Extension(AuthenticatedPerson(principal, _))): Caller,
-) -> (AuditContext, ServiceAccountAuthority) {
-    (context, ServiceAccountAuthority::Person(principal))
+    (Extension(context), Extension(AuthenticatedPerson(principal, _)), keyed): Caller,
+) -> (AuditContext, ServiceAccountAuthority, Keyed) {
+    (context, ServiceAccountAuthority::Person(principal), keyed)
 }
 
 #[utoipa::path(get, path = "/api/admin/service-accounts", operation_id = "listServiceAccounts",
@@ -35,7 +53,7 @@ pub(crate) async fn list(
     State(store): State<ControlStore>,
     caller: Caller,
 ) -> Result<Json<Vec<ServiceAccountSummary>>, ApiError> {
-    let (context, authority) = authority(caller);
+    let (context, authority, _) = authority(caller);
     Ok(Json(
         list_service_accounts(&store, (&context, authority)).await?,
     ))
@@ -52,7 +70,8 @@ pub(crate) async fn create(
     caller: Caller,
     Json(request): Json<NewServiceAccount>,
 ) -> Result<Json<IssuedServiceKey>, ApiError> {
-    let (context, authority) = authority(caller);
+    let (context, authority, keyed) = authority(caller);
+    refuse_keyed(&store, (&context, &keyed), "service_account.create").await?;
     Ok(Json(
         create_service_account(&store, (&context, authority), (&request, None)).await?,
     ))
@@ -71,7 +90,8 @@ pub(crate) async fn rotate(
     caller: Caller,
     Json(rotation): Json<ServiceKeyRotation>,
 ) -> Result<Json<IssuedServiceKey>, ApiError> {
-    let (context, authority) = authority(caller);
+    let (context, authority, keyed) = authority(caller);
+    refuse_keyed(&store, (&context, &keyed), "service_account.rotate").await?;
     Ok(Json(
         rotate_service_key(&store, (&context, authority), (principal_id, rotation)).await?,
     ))
@@ -88,7 +108,8 @@ pub(crate) async fn revoke(
     Path((principal_id, key_id)): Path<(Uuid, Uuid)>,
     caller: Caller,
 ) -> Result<Json<ServiceAccountSummary>, ApiError> {
-    let (context, authority) = authority(caller);
+    let (context, authority, keyed) = authority(caller);
+    refuse_keyed(&store, (&context, &keyed), "service_account.revoke_key").await?;
     Ok(Json(
         revoke_service_key(&store, (&context, authority), (principal_id, key_id)).await?,
     ))
@@ -107,7 +128,8 @@ pub(crate) async fn disable(
     caller: Caller,
     Json(state): Json<ServiceAccountState>,
 ) -> Result<Json<ServiceAccountSummary>, ApiError> {
-    let (context, authority) = authority(caller);
+    let (context, authority, keyed) = authority(caller);
+    refuse_keyed(&store, (&context, &keyed), "service_account.disable").await?;
     Ok(Json(
         set_service_account_disabled(
             &store,
@@ -131,7 +153,8 @@ pub(crate) async fn role(
     caller: Caller,
     Json(request): Json<ServiceAccountRole>,
 ) -> Result<Json<ServiceAccountSummary>, ApiError> {
-    let (context, authority) = authority(caller);
+    let (context, authority, keyed) = authority(caller);
+    refuse_keyed(&store, (&context, &keyed), "service_account.role").await?;
     Ok(Json(
         set_service_account_role(&store, (&context, authority), (principal_id, request.role))
             .await?,

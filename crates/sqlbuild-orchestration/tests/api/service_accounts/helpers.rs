@@ -152,3 +152,13 @@ pub(crate) fn with_key(request: RequestBuilder, key: &str) -> RequestBuilder {
 pub(crate) fn without_key(request: RequestBuilder, _key: &str) -> RequestBuilder {
     request
 }
+
+pub(crate) fn no_sign_in() -> crate::api::models::HumanLogin {
+    crate::api::models::HumanLogin::None
+}
+
+pub(crate) fn password_sign_in() -> crate::api::models::HumanLogin {
+    crate::api::models::HumanLogin::Password(
+        crate::api::tests::password_people_helpers::ORIGIN_URL.into(),
+    )
+}

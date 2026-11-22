@@ -23,6 +23,7 @@ use crate::api::_helpers::resources::{
     administrators::holdings,
     administrators::definitions,
     administrators::server,
+    crate::api::_helpers::authentication::service_keys::keys_only_mode,
     service_accounts::list,
     service_accounts::create,
     service_accounts::rotate,
@@ -247,6 +248,14 @@ pub enum LoginMode {
     Oidc,
     /// `sqb dev` on loopback: no sign-in, every request acts as the local development person.
     Disabled,
+    /// No sign-in for people: only service account keys call the server.
+    Keys,
+}
+
+/// How a server without a session is signed in to, answered before sign-in only where people can't.
+#[derive(Clone, Copy, Debug, Serialize, utoipa::ToSchema)]
+pub struct LoginModeAnswer {
+    pub login_mode: LoginMode,
 }
 
 /// What the UI needs first: how people sign in, and what this person may see and do.

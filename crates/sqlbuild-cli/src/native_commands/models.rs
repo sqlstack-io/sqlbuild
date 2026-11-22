@@ -55,7 +55,6 @@ pub(crate) enum TokenAdmin {
 }
 
 /// The service account commands, which name accounts rather than numbering them.
-#[derive(Debug)]
 pub(crate) enum ServiceAccountAdmin {
     /// A new account, with the key read from `--key-from-env` when one is imported.
     Create {
@@ -638,4 +637,31 @@ pub(crate) struct HeldCopy {
     pub(crate) version: String,
     pub(crate) consumption: bool,
     pub(crate) path: PathBuf,
+}
+
+/// Never prints an imported key, so a debug log can't leak it.
+impl std::fmt::Debug for ServiceAccountAdmin {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Create { request, key } => formatter
+                .debug_struct("Create")
+                .field("request", request)
+                .field("key", &key.as_ref().map(|_| "[redacted]"))
+                .finish(),
+            Self::Rotate {
+                name,
+                overlap_minutes,
+            } => formatter
+                .debug_struct("Rotate")
+                .field("name", name)
+                .field("overlap_minutes", overlap_minutes)
+                .finish(),
+            Self::SetDisabled { name, disabled } => formatter
+                .debug_struct("SetDisabled")
+                .field("name", name)
+                .field("disabled", disabled)
+                .finish(),
+            Self::List => formatter.write_str("List"),
+        }
+    }
 }

@@ -493,7 +493,7 @@ pub struct ServiceAccountSummary {
 }
 
 /// A service account with a key that is returned only this once; the store keeps only its hash.
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct IssuedServiceKey {
     pub account: ServiceAccountSummary,
     pub key: String,
@@ -556,7 +556,6 @@ pub(crate) struct ServiceKeyState {
 }
 
 /// A key made for a service account, returned only once, and its non-secret prefix.
-#[derive(Debug)]
 pub(crate) struct NewServiceKey {
     pub(crate) key: String,
     pub(crate) prefix: String,
@@ -574,4 +573,27 @@ pub(crate) enum ServiceKeyCheck {
         reason: &'static str,
     },
     Unknown,
+}
+
+/// Never prints the key, so a debug log can't leak it.
+impl std::fmt::Debug for IssuedServiceKey {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("IssuedServiceKey")
+            .field("account", &self.account)
+            .field("key", &"[redacted]")
+            .finish()
+    }
+}
+
+/// Never prints the key, so a debug log can't leak it.
+impl std::fmt::Debug for NewServiceKey {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("NewServiceKey")
+            .field("key", &"[redacted]")
+            .field("prefix", &self.prefix)
+            .field("origin", &self.origin)
+            .finish()
+    }
 }

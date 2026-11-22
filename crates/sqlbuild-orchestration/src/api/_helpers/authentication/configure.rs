@@ -2,8 +2,10 @@
 
 use std::net::SocketAddr;
 
+use axum::routing::get;
 use axum::{Extension, Router, middleware};
 
+use crate::api::_helpers::authentication::proxy_warnings::warn_plain_http_keys;
 use crate::api::_helpers::authentication::{
     development, oidc, password_sessions, service_keys, trusted_proxy,
 };
@@ -30,16 +32,27 @@ pub(crate) async fn configure(
         HumanLogin::Oidc(settings) => settings.group_roles.clone(),
         _ => Vec::new(),
     };
+    let origin = match &login {
+        HumanLogin::Password(origin) => Some(origin.as_str()),
+        HumanLogin::TrustedProxy(settings) => Some(settings.origin.as_str()),
+        HumanLogin::Oidc(settings) => Some(settings.origin.as_str()),
+        HumanLogin::None | HumanLogin::Development(_) => None,
+    };
+    if !matches!(login, HumanLogin::Development(_)) {
+        warn_plain_http_keys(address, origin);
+    }
     let login_mode = match &login {
         HumanLogin::Oidc(_) => LoginMode::Oidc,
         HumanLogin::TrustedProxy(_) => LoginMode::TrustedProxy,
         HumanLogin::Development(_) => LoginMode::Disabled,
-        _ => LoginMode::Password,
+        HumanLogin::None => LoginMode::Keys,
+        HumanLogin::Password(_) => LoginMode::Password,
     };
     let (development, routes) = match login {
         HumanLogin::None => (
             None,
-            service_keys::key_only(store, password_sessions::person_routes()),
+            service_keys::key_only(store, password_sessions::person_routes())
+                .route("/api/auth/login-mode", get(service_keys::keys_only_mode)),
         ),
         HumanLogin::Development(scope) => {
             if !address.ip().is_loopback() {

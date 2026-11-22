@@ -14,13 +14,13 @@ use crate::api::tests::password_people_helpers::{
     ORIGIN_URL, PASSWORD, browser, password_administrator, password_person, session,
 };
 use crate::api::tests::service_accounts_helpers::{
-    NETWORK_HOST, audited, end_overlaps, keyed_bootstrap, owner, person_get, person_post, rows,
-    script, service_account, with_key, without_key,
+    NETWORK_HOST, audited, end_overlaps, keyed_bootstrap, no_sign_in, owner, password_sign_in,
+    person_get, person_post, rows, script, service_account, with_key, without_key,
 };
 use crate::api::tests::test_types::{
-    ImportedKeyAcceptedTestCase, ImportedKeyTestCase, KeyOnlyTestCase, PersonImportTestCase,
-    ProxyBindingTestCase, ProxyKeyTestCase, ServiceAccountLifecycleTestCase,
-    ServiceAccountPermissionTestCase,
+    ImportedKeyAcceptedTestCase, ImportedKeyTestCase, KeyOnlyTestCase, KeyedManagementTestCase,
+    LoginModeTestCase, PersonImportTestCase, ProxyBindingTestCase, ProxyKeyTestCase,
+    ServiceAccountLifecycleTestCase, ServiceAccountPermissionTestCase, ServiceAccountRoleTestCase,
 };
 use crate::authorization::_helpers::administrator_roles::assign_role_in;
 use crate::authorization::main::service_accounts::create_service_account::create_service_account;
@@ -166,14 +166,15 @@ fn given_a_service_account_when_its_key_is_used_rotated_and_disabled_then_only_w
             );
 
             let ops = service_account(store, "ops-bot", BuiltinRole::Admin).await;
+            let sam = password_person(store, "sam").await;
             let added = keyed
-                .post(format!("{url}/api/admin/service-accounts"))
+                .post(format!("{url}/api/admin/people/{sam}"))
                 .header(HOST, NETWORK_HOST)
                 .bearer_auth(&ops.key)
-                .json(&json!({"name": "report-export", "role": "viewer"}))
+                .json(&json!("disable"))
                 .send()
                 .await
-                .expect("keyed create");
+                .expect("keyed change");
             let refused = keyed
                 .get(format!("{url}/api/admin/service-accounts"))
                 .header(HOST, NETWORK_HOST)
@@ -189,7 +190,7 @@ fn given_a_service_account_when_its_key_is_used_rotated_and_disabled_then_only_w
             );
             let (_, audit) = person_get(&client, (url, "/api/control/audit?limit=100"), &ada).await;
             assert!(
-                audited(&audit, ("ops-bot", "service_account.created"))
+                audited(&audit, ("ops-bot", "principal.disabled"))
                     && audited(&audit, ("orders-deploy", "authorization.denied")),
                 "{}: its actions and refusals are audited under its name",
                 test_case.description
@@ -694,6 +695,235 @@ fn given_a_server_without_sign_in_when_person_routes_are_called_then_only_servic
                     test_case.expected_status,
                     Some(test_case.expected_cache_control)
                 ),
+                "{}",
+                test_case.description
+            );
+            stop_api(api).await;
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_service_account_with_the_admin_role_when_its_key_manages_accounts_or_roles_then_it_is_refused_and_audited()
+ {
+    let test_cases = [
+        KeyedManagementTestCase {
+            description: "adding a service account",
+            path: "/api/admin/service-accounts",
+            body: r#"{"name": "planted", "role": "admin"}"#,
+            expected_status: StatusCode::FORBIDDEN,
+        },
+        KeyedManagementTestCase {
+            description: "rotating a service account's key",
+            path: "/api/admin/service-accounts/{target}/keys",
+            body: r#"{"overlap_minutes": 60}"#,
+            expected_status: StatusCode::FORBIDDEN,
+        },
+        KeyedManagementTestCase {
+            description: "enabling or disabling a service account",
+            path: "/api/admin/service-accounts/{target}/disabled",
+            body: r#"{"disabled": true}"#,
+            expected_status: StatusCode::FORBIDDEN,
+        },
+        KeyedManagementTestCase {
+            description: "changing a service account's role",
+            path: "/api/admin/service-accounts/{target}/role",
+            body: r#"{"role": "admin"}"#,
+            expected_status: StatusCode::FORBIDDEN,
+        },
+        KeyedManagementTestCase {
+            description: "stopping a service account's key",
+            path: "/api/admin/service-accounts/{target}/keys/{key}/revoke",
+            body: "null",
+            expected_status: StatusCode::FORBIDDEN,
+        },
+        KeyedManagementTestCase {
+            description: "giving a person a role",
+            path: "/api/admin/roles",
+            body: r#"{"principal_id": "{person}", "role": "developer", "location_id": null, "target": null, "revoke": false}"#,
+            expected_status: StatusCode::FORBIDDEN,
+        },
+        KeyedManagementTestCase {
+            description: "making a person an admin",
+            path: "/api/admin/people/{person}",
+            body: r#""grant""#,
+            expected_status: StatusCode::FORBIDDEN,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(Backend::Sqlite).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let person = password_person(store, "sam").await;
+            let ops = service_account(store, "ops-bot", BuiltinRole::Admin).await;
+            let target = service_account(store, "orders-deploy", BuiltinRole::Viewer).await;
+            let fill = |text: &str| {
+                text.replace("{target}", &target.account.principal_id.to_string())
+                    .replace("{key}", &target.account.keys[0].key_id.to_string())
+                    .replace("{person}", &person.to_string())
+            };
+            let api = start_api_with_authentication(store, ApiAuthentication::default()).await;
+            let body: Value = serde_json::from_str(&fill(test_case.body)).expect("body");
+            let response = script()
+                .post(format!("{}{}", api.url, fill(test_case.path)))
+                .header(HOST, NETWORK_HOST)
+                .bearer_auth(&ops.key)
+                .json(&body)
+                .send()
+                .await
+                .expect("keyed change");
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            let denials = rows(store, "sqb_security_audit")
+                .await
+                .into_iter()
+                .filter(|row| row["action"] == json!("authorization.denied"))
+                .count();
+            assert_eq!(
+                (
+                    status,
+                    text.contains("a person must make this change"),
+                    denials
+                ),
+                (test_case.expected_status, true, 1),
+                "{}: {text}",
+                test_case.description
+            );
+            stop_api(api).await;
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_service_account_role_change_when_it_applies_then_the_new_role_replaces_the_old_in_one_change()
+ {
+    let test_cases = [
+        ServiceAccountRoleTestCase {
+            description: "admin to viewer on SQLite",
+            backend: Backend::Sqlite,
+            from: BuiltinRole::Admin,
+            to: "viewer",
+            expected_roles: &["viewer"],
+        },
+        ServiceAccountRoleTestCase {
+            description: "admin to viewer on PostgreSQL",
+            backend: Backend::Postgres,
+            from: BuiltinRole::Admin,
+            to: "viewer",
+            expected_roles: &["viewer"],
+        },
+        ServiceAccountRoleTestCase {
+            description: "viewer to admin on PostgreSQL",
+            backend: Backend::Postgres,
+            from: BuiltinRole::Viewer,
+            to: "admin",
+            expected_roles: &["admin"],
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            password_administrator(store, "ada").await;
+            let deploy = service_account(store, "orders-deploy", test_case.from).await;
+            let api = start_api_with_authentication(
+                store,
+                ApiAuthentication {
+                    login: HumanLogin::Password(ORIGIN_URL.into()),
+                    ..ApiAuthentication::default()
+                },
+            )
+            .await;
+            let client = browser();
+            let ada = session(&client, &api.url, "ada").await;
+            let path = format!(
+                "/api/admin/service-accounts/{}/role",
+                deploy.account.principal_id
+            );
+            let (status, account) = person_post(
+                &client,
+                (&api.url, &path),
+                &ada,
+                &json!({"role": test_case.to}),
+            )
+            .await;
+            let mut held: Vec<String> = rows(store, "sqb_role_assignments")
+                .await
+                .into_iter()
+                .filter(|row| row["principal_id"] == json!(deploy.account.principal_id.to_string()))
+                .filter_map(|row| row["role_key"].as_str().map(str::to_owned))
+                .collect();
+            held.sort();
+            assert_eq!(
+                (status, account["role"].clone(), held),
+                (
+                    StatusCode::OK,
+                    json!(test_case.to),
+                    test_case
+                        .expected_roles
+                        .iter()
+                        .map(|r| (*r).to_owned())
+                        .collect::<Vec<_>>()
+                ),
+                "{}",
+                test_case.description
+            );
+            stop_api(api).await;
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_server_without_sign_in_when_asked_how_people_sign_in_then_it_answers_keys_only() {
+    let test_cases = [
+        LoginModeTestCase {
+            description: "a server without sign-in for people",
+            login: no_sign_in,
+            expected_status: StatusCode::OK,
+            expected_mode: "keys",
+        },
+        LoginModeTestCase {
+            description: "a server with password sign-in",
+            login: password_sign_in,
+            expected_status: StatusCode::NOT_FOUND,
+            expected_mode: "",
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(Backend::Sqlite).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let api = start_api_with_authentication(
+                store,
+                ApiAuthentication {
+                    login: (test_case.login)(),
+                    ..ApiAuthentication::default()
+                },
+            )
+            .await;
+            let response = script()
+                .get(format!("{}/api/auth/login-mode", api.url))
+                .header(HOST, "control.example.com")
+                .send()
+                .await
+                .expect("login mode");
+            let status = response.status();
+            let body: Value = response.json().await.unwrap_or(Value::Null);
+            assert_eq!(
+                (status, body["login_mode"].as_str().unwrap_or_default()),
+                (test_case.expected_status, test_case.expected_mode),
                 "{}",
                 test_case.description
             );

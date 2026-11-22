@@ -1415,6 +1415,13 @@ export async function loginWithPassword(username: string, password: string, base
 	return response.status === 401 ? 'rejected' : 'unavailable';
 }
 
+/** Whether the server takes only service account keys, so the sign-in page offers no password. */
+export async function keysOnly(baseUrl = ''): Promise<boolean> {
+	const http = createFetch<paths>({ baseUrl, credentials: 'same-origin' });
+	const { data } = await http.GET('/api/auth/login-mode');
+	return data?.login_mode === 'keys';
+}
+
 export async function logout(baseUrl = ''): Promise<void> {
 	const http = createFetch<paths>({ baseUrl, credentials: 'same-origin' });
 	await http.POST('/api/auth/logout', { params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });

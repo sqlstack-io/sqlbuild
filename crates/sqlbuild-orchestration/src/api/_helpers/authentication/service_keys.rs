@@ -3,6 +3,7 @@
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
+use axum::Json;
 use axum::Router;
 use axum::extract::{ConnectInfo, Request, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
@@ -15,7 +16,7 @@ use crate::api::_helpers::authentication::password_transport::{
     deny, private_cache_control, single_header,
 };
 use crate::api::errors::ApiError;
-use crate::api::models::KeyRefusals;
+use crate::api::models::{KeyRefusals, LoginMode, LoginModeAnswer};
 use crate::credentials::constants::{KEY_REFUSAL_INTERVAL_SECONDS, SERVICE_KEY_PREFIX};
 use crate::credentials::main::service_keys::authenticate_service_key::authenticate_service_key;
 use crate::credentials::main::service_keys::record_refused_key::record_refused_key;
@@ -156,4 +157,13 @@ fn refusal_due(refusals: &KeyRefusals, key_id: Uuid) -> bool {
     }
     seen.insert(key_id, now);
     true
+}
+
+#[utoipa::path(get, path = "/api/auth/login-mode", operation_id = "readLoginMode",
+    description = "Answered only by a server without sign-in for people, so a browser or sqb login can say so instead of offering a password.",
+    responses((status = 200, body = LoginModeAnswer), (status = 404, description = "People sign in on this server")))]
+pub(crate) async fn keys_only_mode() -> Json<LoginModeAnswer> {
+    Json(LoginModeAnswer {
+        login_mode: LoginMode::Keys,
+    })
 }

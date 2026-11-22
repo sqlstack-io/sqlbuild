@@ -17,7 +17,7 @@ use crate::credentials::models::{
 };
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, decode_row::decode_row, query::query};
-use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
+use crate::store::models::{Change, ControlStore, ControlTransaction, Parameter, TransactionMode};
 use crate::store::types::Row;
 
 /// The longest service account name; names are also audit actors and CLI arguments.
@@ -52,6 +52,12 @@ struct AccountRow {
     created_at: DateTime<Utc>,
     created_by: String,
     disabled_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Deserialize)]
+struct HeldRole {
+    assignment_id: Uuid,
+    role_key: serde_json::Value,
 }
 
 #[derive(Deserialize)]
@@ -371,4 +377,45 @@ pub(crate) async fn read_service_account(
         service_account_summary(begin(store, TransactionMode::Read).await?, principal_id).await?;
     commit(transaction).await?;
     Ok(account)
+}
+
+/// Removes and audits every built-in role everywhere of `principal_id` other than `role`.
+pub(crate) async fn revoke_other_roles(
+    transaction: ControlTransaction,
+    context: &AuditContext,
+    (principal_id, role): (Uuid, BuiltinRole),
+) -> Result<ControlTransaction, ControlError> {
+    let (mut transaction, rows) = query(
+        transaction,
+        "SELECT assignment_id, role_key FROM sqb_role_assignments \
+         WHERE principal_id=$1 AND location_id IS NULL AND target IS NULL",
+        vec![Parameter::Id(principal_id)],
+    )
+    .await?;
+    for row in rows {
+        let held_row: HeldRole = decode_row(row)?;
+        let Some(held) = builtin_role(&held_row.role_key).filter(|held| *held != role) else {
+            continue;
+        };
+        let removed;
+        (transaction, removed) = query(
+            transaction,
+            "DELETE FROM sqb_role_assignments WHERE assignment_id=$1 RETURNING assignment_id",
+            vec![Parameter::Id(held_row.assignment_id)],
+        )
+        .await?;
+        transaction = append_audit(
+            transaction,
+            context,
+            (Uuid::now_v7(), "role.revoked"),
+            (
+                json!({"principal_id": principal_id, "role": held, "location_id": null, "target": null}),
+                json!(null),
+                json!({"assignments": removed}),
+            ),
+        )
+        .await?;
+        transaction.changes.insert(Change::Credentials);
+    }
+    Ok(transaction)
 }

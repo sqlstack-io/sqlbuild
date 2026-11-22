@@ -142,14 +142,25 @@ curl -H "Authorization: Bearer $SQB_SERVICE_KEY" https://control.example.com/api
   account then has no working key until you rotate.
 - **Importing a key.** To recreate a control store with the same key, pass
   `--key-from-env VAR` to `create-service-account`, with the key in the environment variable `VAR`.
-  It must start with `sqbk_` and have at least 32 more characters, without spaces. The result then
-  leaves the key out. Only the CLI imports keys; the UI always makes a new one.
+  It must start with `sqbk_` and have at least 32 more characters, without spaces. Generate it
+  randomly, for example `sqbk_` and 40 random letters and digits: SQLBuild can't tell a guessable key
+  from a strong one, so an imported key is only as strong as you make it. The result then leaves the
+  key out. Only the CLI imports keys; the UI always makes a new one.
 - **Any address.** A keyed request is accepted on whatever address the server listens on, with any
   `Host`, so a server behind a sign-in proxy can also listen on the network, such as
   `host = "0.0.0.0"`, for scripts. The proxy's username header is still trusted only from
   `trusted_peers`, so a direct request can't sign in as a person.
+- **TLS.** `sqb server` serves plain HTTP, and a key sent over plain HTTP crosses the network
+  unencrypted. Terminate TLS in front of any network listener, as in
+  [Serve over HTTPS](#serve-over-https), and give scripts its `https://` URL. The server warns at
+  start-up when it accepts keys on an address other than loopback without an `https://` origin.
 - **Without people's sign-in.** On a server with no `password_origin`, `[oidc]` or
-  `[trusted_proxy]`, service keys are the only way to call its person API.
+  `[trusted_proxy]`, service keys are the only way to call its person API. Its sign-in page and
+  `sqb login` say so instead of asking for a password, and Settings shows the sign-in as
+  service account keys only.
+- **Managing access.** A service account can't add, rotate, stop, disable or enable service
+  accounts, or give or remove anyone's roles, whatever its own role, so a leaked key can't plant
+  access that outlives it. Those changes need a person; a keyed attempt is refused and audited.
 - **Roles.** A service account holds its built-in role everywhere and doesn't get `default_role`.
   In the UI, changing it needs `role.assign`.
 - **No sign-in.** A service account has no password, browser session or `sqb login`, and a

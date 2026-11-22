@@ -1006,7 +1006,7 @@
              ],
              "dest": "admin_key_env",
              "metavar": "VAR",
-             "help": "import the key held in environment variable VAR instead of generating one, for setups that recreate a control store and must keep the same key: sqbk_ and at least 32 more characters; the result then omits the key",
+             "help": "import the key held in environment variable VAR instead of generating one, for setups that recreate a control store and must keep the same key: sqbk_ and at least 32 more characters, generated randomly (for example sqbk_ and 40 random letters and digits), since the key is only as strong as you make it; the result then omits the key",
              "group": 1
             }
            ]
