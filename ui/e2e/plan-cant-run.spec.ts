@@ -11,12 +11,12 @@ test('a missing provider secret lists what can’t run, disables Run, and planni
 	await page.goto(PLAN);
 	const pane = page.locator('.pane[data-section="cant_run"]');
 	await expect(pane).toBeVisible({ timeout: 30_000 });
-	await expect(page.getByTestId('index-cant-run')).toHaveText('Can’t run12');
-	// Will run leaves out what can't run: only stg_customers is left of the 13 planned.
+	await expect(page.getByTestId('index-cant-run')).toHaveText('Can’t run24');
+	// Will run leaves out what can't run: only stg_customers is left of the 25 planned.
 	await expect(page.getByTestId('index-will-run')).toHaveText('Will run1');
 	const problem = page.getByTestId('cant-run-problem');
 	await expect(problem).toContainText("Can't run: provider orders_api needs ORDERS_API_KEY");
-	await expect(problem).toContainText('raw__orders and the 11 nodes that read it');
+	await expect(problem).toContainText('raw__orders and the 23 nodes that read it');
 	await expect(problem).toContainText('set ORDERS_API_KEY in .env, then restart the location (in sqb dev, press r), or in the environment the location (or sqb dev) was started with, then restart it; after that, plan again');
 	await expect(pane.locator('tbody tr').first()).toContainText('provider orders_api: ORDERS_API_KEY not set');
 	const row = (node: string) => pane.locator('tbody tr').filter({ has: page.getByRole('link', { name: node, exact: true }) });
@@ -24,7 +24,7 @@ test('a missing provider secret lists what can’t run, disables Run, and planni
 
 	const run = page.getByRole('button', { name: 'Run', exact: true });
 	await expect(run).toBeDisabled();
-	await expect(page.locator('.foot .why')).toHaveText('Run is disabled: 1 missing secret. Fix it and plan again, or leave those 12 nodes out.');
+	await expect(page.locator('.foot .why')).toHaveText('Run is disabled: 1 missing secret. Fix it and plan again, or leave those 24 nodes out.');
 
 	await page.getByTestId('plan-without-blocked').click();
 	await expect(page.getByRole('textbox', { name: 'Command' })).toHaveValue(/--exclude raw__orders stg_orders fact_orders/);
