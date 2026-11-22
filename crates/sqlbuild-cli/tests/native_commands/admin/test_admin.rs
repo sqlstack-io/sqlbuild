@@ -140,6 +140,17 @@ fn given_a_standalone_control_server_when_bootstrapped_by_an_operator_then_scope
                 assert_eq!(triggers[0].status.as_str(), case.expected_status, "{}", case.description);
                 assert_eq!(triggers[0].last_tick_for.map(|value| value.to_rfc3339()).as_deref(), case.expected_cursor, "{}", case.description);
             }
+            for (change, extra, expected) in [
+                ("skip-event", ["--event", "run:orders-1"], "skip-event is for sensors"),
+                ("pause", ["--event", "run:orders-1"], "--event is only valid for skip-event"),
+            ] {
+                let event_id = Uuid::now_v7().to_string();
+                let mut arguments = vec!["change-trigger", &trigger_id, change, "--event-id", &event_id, "--reason", "Skip a stuck event"];
+                arguments.extend_from_slice(&extra);
+                let refused = invoke_admin(&control, &arguments);
+                assert!(!refused.status.success(), "{change} is refused");
+                assert!(String::from_utf8_lossy(&refused.stderr).contains(expected), "{change}: {}", String::from_utf8_lossy(&refused.stderr));
+            }
             snapshot.generation = 2;
             snapshot.documents.get_mut("triggers").expect("trigger document")["daily_orders"]["default_status"] = serde_json::json!("running");
             publish_remote_snapshot(&url, bearer, &snapshot).await.expect("publish a new default");

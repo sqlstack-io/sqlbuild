@@ -99,7 +99,7 @@ pub(crate) async fn sync_location_metadata(
                 result = &mut stopped => { result?; return Ok(None); },
                 () = metadata_health(&state, (client, poll), (started, None)) => {},
             }
-            return finish_metadata_page(next_scan(state)).await;
+            return finish_metadata_page(next_scan(state), stopped.as_mut()).await;
         }
         state = freeze_history_page(state, page, poll)?;
     }

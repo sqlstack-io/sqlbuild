@@ -110,6 +110,8 @@ pub(crate) fn request(
         window: None,
         pools: BTreeMap::new(),
         narrowing: None,
+        jobs: BTreeMap::new(),
+        job_settings: BTreeMap::new(),
         retry: None,
         member_attempt: None,
     }
@@ -536,4 +538,28 @@ pub(crate) fn owned_selection(
         next,
         error.map(str::to_owned),
     )
+}
+
+/// Give every stored run request the `concurrency_groups` field releases before 0.245 wrote, as a store upgraded from one still holds.
+pub(crate) async fn age_stored_requests(store: &ControlStore) {
+    for row in rows(
+        store,
+        "SELECT run_id, request_json FROM sqb_runs",
+        Vec::new(),
+    )
+    .await
+    {
+        let mut request: Value = json_column(&row["request_json"]);
+        request["concurrency_groups"] = json!(["orders"]);
+        let run_id: Uuid = serde_json::from_value(row["run_id"].clone()).expect("run ID");
+        let transaction = begin(store, TransactionMode::Write).await.expect("write");
+        let (transaction, _) = query(
+            transaction,
+            "UPDATE sqb_runs SET request_json=$1 WHERE run_id=$2",
+            vec![Parameter::Json(request), Parameter::Id(run_id)],
+        )
+        .await
+        .expect("age the stored request");
+        commit(transaction).await.expect("commit");
+    }
 }

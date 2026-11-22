@@ -35,14 +35,17 @@ export function conditionOf(item: AttentionItem): { key: string; shape: Conditio
 			return { key: `queue:${item.runId}`, noun: 'wait', shape: { members: [...new Set(item.waits.map((w) => w.kind))].sort() } };
 		case 'calendar_low':
 			return { key: `calendar:${item.triggerId}`, noun: 'warning', shape: {} };
+		case 'sensor_failing':
+			// A sensor that recovers and fails again is a new occurrence, so an acknowledgement doesn't hide it.
+			return { key: `sensor:${item.triggerId}`, noun: 'failed tick', shape: { occurrence: item.failing.since } };
 		case 'run_problem':
 		case 'run_unresponsive':
 			return null;
 	}
 }
 
-const COUNT_LABEL: Record<string, string> = { changed: 'changed', behind: 'behind', warn: 'late', error: 'past their error threshold', tick_overdue: 'late', calendar_horizon_low: 'running out of dates' };
-const NOUNS: Record<string, string> = { tick_overdue: 'schedule', calendar_horizon_low: 'calendar' };
+const COUNT_LABEL: Record<string, string> = { changed: 'changed', behind: 'behind', warn: 'late', error: 'past their error threshold', tick_overdue: 'late', calendar_horizon_low: 'running out of dates', trigger_skipped: 'skipped', sensor_rechecked: 'checked again from scratch', calendar_times_dropped: 'dropping pending times' };
+const NOUNS: Record<string, string> = { tick_overdue: 'schedule', calendar_horizon_low: 'calendar', trigger_skipped: 'trigger', sensor_rechecked: 'sensor', calendar_times_dropped: 'calendar' };
 
 /** The server keeps keys to 256 characters; a longer one is cut, with a hash of the whole to keep it distinct. */
 export const MAX_KEY_CHARS = 256;
@@ -137,11 +140,22 @@ export const CLEARED_REASON = 'automatic: the condition cleared';
 /**
  * Whether an event's condition is one every viewer of `scopeKey` (a `<location>:<target>` key) sees in full:
  * the server-wide scheduler, which everyone sees, or this target's own problems. Others' problems are
- * listed only to people who may view their target, so their absence here says nothing.
+ * listed only to people who may view their target, so their absence here says nothing. Missing provider
+ * secrets come from the target's health read, so only a `healthRead` that succeeded can show them gone.
  */
-export function visibleEventKey(key: string, scopeKey: string): boolean {
+export function visibleEventKey(key: string, scopeKey: string, healthRead = false): boolean {
 	if (key === boundedKey('event:scheduler_no_leader::')) return true;
-	return ['location_broken', 'tick_overdue', 'calendar_horizon_low'].some((kind) => key.startsWith(`event:${kind}:${scopeKey}:`));
+	if (key.startsWith('sensor:')) return true;
+	const kinds = [
+		'location_broken',
+		'tick_overdue',
+		'calendar_horizon_low',
+		'trigger_skipped',
+		'sensor_rechecked',
+		'calendar_times_dropped',
+		...(healthRead ? ['location_missing_secrets'] : [])
+	];
+	return kinds.some((kind) => key.startsWith(`event:${kind}:${scopeKey}:`));
 }
 
 /**

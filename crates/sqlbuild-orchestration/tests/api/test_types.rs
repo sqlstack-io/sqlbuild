@@ -62,6 +62,27 @@ pub(crate) struct ApiReadTestCase {
     pub(crate) expected_ticks: usize,
 }
 
+/// What a newer server sets in a worker's execution: the path, then the JSON it sets there.
+pub(crate) type NewerEdit = Option<(&'static [&'static str], &'static str)>;
+
+/// A newer server that edits a worker's execution, and whether the worker then starts.
+pub(crate) struct NewerServerTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// What the server sets; `None` serves the execution as it is.
+    pub(crate) edit: NewerEdit,
+    /// The run's status once the worker tried to start, and the part its refusal names.
+    pub(crate) expected_status: RunStatus,
+    pub(crate) expected_unreadable: Option<&'static str>,
+}
+
+/// Where the real API is and what a newer server sets in a worker's execution.
+#[derive(Clone)]
+pub(crate) struct NewerServer {
+    pub(crate) real: String,
+    pub(crate) edit: NewerEdit,
+}
+
 pub(crate) struct TestApi {
     pub(crate) url: String,
     pub(crate) shutdown: tokio::sync::oneshot::Sender<()>,
@@ -122,6 +143,21 @@ pub(crate) struct WarehouseMetadataTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) expected_observations: usize,
+}
+
+pub(crate) struct CheckListRerunTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_before: (&'static str, &'static str),
+    pub(crate) expected_after: (&'static str, &'static str),
+    pub(crate) expected_revalidated: u16,
+}
+
+pub(crate) struct CheckListRebuildTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_listed: (&'static str, &'static str),
+    pub(crate) expected_revalidated: u16,
 }
 
 pub(crate) struct MirrorConflictTestCase {
@@ -474,4 +510,24 @@ pub(crate) struct IngestionTurnTestCase {
     pub(crate) pages: usize,
     pub(crate) relations_per_page: usize,
     pub(crate) expected_writer_first: bool,
+}
+
+/// One request to add a person who signs in with a password, and what it leaves behind.
+pub(crate) struct PasswordPersonTestCase {
+    pub(crate) description: &'static str,
+    /// Whose session asks, signed in with the shared password; none asks signed out.
+    pub(crate) signed_in_as: &'static [&'static str],
+    pub(crate) body: serde_json::Value,
+    pub(crate) expected_status: reqwest::StatusCode,
+    /// Whether the new person can then sign in with the password given.
+    pub(crate) expected_sign_in: bool,
+    /// The built-in roles the new person holds everywhere afterwards.
+    pub(crate) expected_roles: &'static [&'static str],
+}
+
+/// A way people sign in other than passwords, built for the development person.
+pub(crate) struct NoPasswordPeopleTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) login: fn(uuid::Uuid) -> crate::api::models::HumanLogin,
+    pub(crate) expected_status: reqwest::StatusCode,
 }

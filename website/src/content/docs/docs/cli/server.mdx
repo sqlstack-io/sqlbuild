@@ -56,6 +56,9 @@ executable = "/usr/local/bin/sqb"
   listens on port 9000.
 - Keep secrets in environment variables. The file names the variable, as `database_env` and
   `client_secret_env` do, never the secret itself.
+- A worker loads its project's [env file](/docs/concepts/project-configuration#env-file) for its
+  target when it starts, so provider secrets can live there instead of in the launcher's
+  environment. Variables already in that environment win.
 - Each launcher names a location by the name you gave `sqb admin create-location`. Create the
   location before you start the server; an unknown name stops it.
 - `sqb scheduler --config server.toml` reads the same file for its control database and launchers.
@@ -64,6 +67,15 @@ executable = "/usr/local/bin/sqb"
 - An unknown section or key stops the server with the line it is on.
 
 Use `sqb server --help` for the remaining options.
+
+## Stop the server
+
+SIGINT (Ctrl+C), SIGTERM and SIGHUP, which a closed terminal sends, all stop the server the same
+way: it stops scheduling, asks each local worker to stop, waits for the workers to cancel their
+statements and record their runs, and releases their claims. Each local worker runs in its own
+process group, so Ctrl+C in the server's terminal reaches only the server. A second SIGINT or
+SIGTERM while the workers stop kills their process groups at once; the server still records the
+runs and releases their claims before it exits.
 
 ## Serve over HTTPS
 
@@ -77,6 +89,14 @@ warning: the bearer token for http://control.example.com travels unencrypted ove
 ```
 
 Connections to `localhost`, `127.0.0.1` or `::1` print no warning.
+
+## Add people who sign in with passwords
+
+With `password_origin` set, people sign in with a name and password. Someone with `user.manage`
+adds a person from **People → Add person** with their sign-in name, a first password of at least
+12 characters and, with `role.assign` as well, a built-in role everywhere. Share the password with
+them; they can change it after they sign in. Behind OIDC or a trusted proxy, people appear the
+first time they sign in instead, and the button isn't shown.
 
 ## Sign in through a reverse proxy
 
@@ -226,9 +246,18 @@ seconds, stops delivery and retries the same event. Deduplicate by `event_id`, w
 | `location_broken` | Every instance of a location and target has stopped reporting for over 90 seconds | `location_id`, `target`, `last_seen_at` |
 | `launch_failed` | Starting a worker failed; it may still start | `run_id`, `claim_id`, `code` |
 | `run_failed` | A job, group or ad-hoc run ends `failed` or `partial` | `run_id`, `run_kind`, `job_key`, `location_id`, `target`, `outcome`, `failed_nodes`, `failed_node_count` |
+| `trigger_skipped` | The scheduler skips a trigger whose stored job or snapshot can't be read, or a sensor whose check failed; the sensor is checked again a minute later | `trigger_id`, `snapshot_id`, `reason` |
+| `sensor_rechecked` | A sensor's last check can't be read, so it is checked again from scratch | `trigger_id`, `snapshot_id`, `evaluation_id` |
+| `calendar_times_dropped` | A publish drops a calendar schedule's due times | `trigger_id`, `snapshot_id`, `times` |
 
 Each condition is sent once when it starts, not on every 30-second scan. Monitor heartbeats from
 outside the server too: a stopped server can't report its own outage.
+
+For a sensor whose check failed, the `reason` of `trigger_skipped` ends with the error's text, with
+credentials redacted, cut to 2,000 characters. It is the first error since the sensor's last
+completed check in that snapshot: a later attempt that fails differently sends no new event and
+doesn't replace it. Everyone who can view the target sees the reason, and it can quote stored
+values.
 
 `run_failed` lists at most 20 failed nodes, ordered by node key; `failed_node_count` is the full
 number. A `partial` run is included because some of its nodes failed. `job_key` is `null` for
@@ -339,6 +368,15 @@ server can't read what they wrote.
 
 ```text
 the control server is older than this worker and refused its run report; upgrade the server before its workers
+```
+
+A server newer than a worker can send it a run request with a field or a value, such as a new
+command, that the worker's release can't read. The worker doesn't run part of what was asked: it
+fails the run with a reason naming what it can't read and where, before any warehouse work, and
+the run can be rerun once the location is upgraded:
+
+```text
+this worker runs SQLBuild 0.256.0 and can't read a run request from a newer server (unknown field `claim.request.<field>`); upgrade the location
 ```
 
 Some migrations add an index, which the server builds when it migrates. On PostgreSQL that build
@@ -565,8 +603,19 @@ Details:
   interval, add one more sync after it, not one each.
 - The interval restarts after every completed sync, so a location that syncs often for other
   reasons never syncs extra.
-- A sync reads the warehouse and never writes to it. On Snowflake, it skips state tables that
-  haven't changed since the last sync, so a sync with nothing new doesn't resume the warehouse.
+- A sync reads the warehouse and writes only to the dynamic pause table: on Snowflake, after it
+  completes, it resumes the [dynamic models](/docs/concepts/models/dynamic#when-a-build-dies) whose
+  pausing build has been silent past `[dynamic] heartbeat_grace`, and records that in the pause
+  table as `location-sync:<location ID>`. Before resuming, it records a `resuming` claim on each
+  model and reads the holds again, so a build that paused the model meanwhile keeps it paused; a
+  build that finds an open claim waits for it to close. A claim older than 2 minutes, the time a
+  sync gets to resume, is treated as abandoned. It checks the pause table in the target's schema and in every
+  schema the location's models write to. A model that fails to resume is logged as
+  `Resuming an expired dynamic hold failed: <model>: <error>`, keeps its hold, and is retried on
+  the next sync; the others still resume. Other adapters can't build dynamic models, so their
+  syncs don't open a session for this.
+- On Snowflake, a sync skips state tables that haven't changed since the last sync, the pause
+  table included, so a sync with nothing new doesn't resume the warehouse.
 - When a read fails, the Connections page shows the warehouse error. A read that ran out of memory
   or time retries a smaller page. Any other error, such as a missing permission or table, retries
   after 30 seconds, then waits twice as long after each failure in a row. After 5 failures in a row
@@ -667,7 +716,7 @@ delay_seconds = 600
 | `retry` | `attempts` from 2 to 11, `delay_seconds` from 0 to 86400 | None | A failed or partial run reruns its failed and skipped nodes after the delay, until it succeeds or has run `attempts` times in all |
 
 A skipped tick shows as **skipped** in the trigger's tick log, with the run it yielded to, and
-creates no run. A sensor check lists the requests it skipped the same way.
+creates no run. A sensor tick lists the requests it skipped the same way.
 
 | Sensor watches | A request skipped while the job runs |
 | --- | --- |
@@ -821,8 +870,31 @@ runs. A `build` loads the managed sources its models read, as `sqb build` does, 
 alone; `--no-load` turns that off.
 A `test` or `audit` run reports each selected node with the worst result of its tests or audits.
 
-Selectors use the CLI grammar: names, `seed:`, `source:`, `tag:`, `path:` and `test:`, with `+`
-for upstream or downstream nodes. Positional selectors work as on the command line.
+Selectors use the CLI grammar: names, `seed:`, `source:`, `tag:`, `path:`, `test:` and `job:`,
+with `+` for upstream or downstream nodes. Positional selectors work as on the command line.
+
+A `build` whose selection names a job takes the job's settings, exactly as `sqb build` and the
+job's own runs do; see
+[Settings when a build names a job](/docs/concepts/orchestration#settings-when-a-build-names-a-job).
+The server freezes each named job with the run: the nodes that take its settings and the settings
+themselves, as published. A rerun keeps those jobs, narrowed to the nodes it reruns, and works out
+what it writes from the same settings. Ad-hoc runs never retry, so a job's `[retry]` doesn't
+apply to them.
+
+Applying a job's settings needs the permissions running that job needs: `job.run` for each named
+job that gives the build a setting the command line doesn't replace, and `run.rewrite_history` or `run.load` when the job's own
+settings rewrite history (`full_refresh`, a cursor or an `allow_*` setting) or load sources
+(`reload`, `load_sources`), on top of what the typed flags need. With `job.run`, a job's settings
+that are refused when typed, such as `defer_to` or `plan_from`, apply as they do in the job's own
+runs. The job's `vars` and `warehouse` need no `run.vars` or `run.warehouse`, which gate only what a
+person types. A warehouse every named job shares is the whole build's, so it counts as applied
+whatever the adapter. A named job that gives the build nothing, because it has no settings, the
+command line replaces them, or it keeps none of the selected nodes and sets nothing build-wide,
+needs only `run.adhoc`.
+
+Upgrade the server and every location, and let each location publish again, before running ad-hoc
+commands that name a job. A location that hasn't been upgraded runs such a command without the
+job's settings, and refuses a plan of it.
 
 | Flags | Verbs | Needs |
 | --- | --- | --- |
@@ -856,7 +928,7 @@ flag is refused with its reason:
 For an ad-hoc run, the worker checks `--warehouse` against the warehouses the location
 configures for the target before any statement runs. An unconfigured warehouse fails the run with
 the reason `the requested warehouse is not configured for this target on this location; no
-warehouse statement ran`, which the run page shows. A job's own `warehouse` setting is not
+warehouse statement ran`, which the run page shows. A named job's own `warehouse` setting is not
 checked this way.
 
 A run with `--vars` is checked against the publication like any other run. The worker then
@@ -869,6 +941,12 @@ Anyone with `view` on every node of a target can see what a `build` command woul
 runs. The web UI's plan page does this for every Run button: the location serving the target runs
 [`sqb plan --json`](/docs/cli/plan/) on the command's nodes, and the page shows each model's action
 and reason, backfills, migrations and warnings. Running the command still needs `run.adhoc`.
+
+A plan of a command that names a job takes the job's settings as the run would, from the jobs the
+server froze with the request, so the plan shows the job's full refreshes, concurrency and, for a
+job that sets `changed`, what changed. It fails as the run would when the job's warehouse can't be
+selected. A plan never takes a warehouse a person types, but a typed `--warehouse` still replaces
+the job's own, as it does in the run.
 
 A plan reads the server's synced copy of the target's warehouse metadata, not the warehouse, so
 planning never resumes a suspended warehouse. The page shows when that copy synced, or that it
@@ -943,7 +1021,7 @@ permissions = ["view.evidence"]
 | No matching nodes | Publication succeeds with a warning; the grant gives nothing |
 | Permissions | Any non-administrative action; `user.manage`, `role.assign` and `audit.view` are rejected |
 | Runs | `job.run`, `run.rerun` and `run.rewrite_history` need the permission on every node the run writes; an [ad-hoc command](#run-ad-hoc-commands) needs `run.adhoc` and its flags' permissions on every node it selects; a priority above 0 also needs `run.prioritise` |
-| Triggers | `trigger.toggle` and `sensor.reset_cursor` need the permission on every node the trigger's job writes |
+| Triggers | `trigger.toggle` (on, off) and `sensor.reset_cursor` (start over, skip an event) need the permission on every node a schedule's job writes, and for a sensor on every node of the target |
 | Listings | The catalog, statistics, providers and run list need `view` on every node of the current publication; partial coverage is denied, not filtered |
 | Several roles | Grants add up across a person's roles |
 

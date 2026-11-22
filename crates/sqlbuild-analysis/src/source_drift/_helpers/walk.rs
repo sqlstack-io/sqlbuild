@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use sqlbuild_core::text::main::python_casefold::python_casefold;
-use sqlquack_syntax::expressions::queries::models::{JoinKind, Select, With};
+use sqlquack_syntax::expressions::queries::models::{Join, JoinKind, Select, With};
 use sqlquack_syntax::{Expression, ExpressionWalk};
 
 use crate::source_drift::constants::{COUNT_FUNCTION, OPAQUE_KINDS, SHARED_SCOPE_RELATIONS};
@@ -141,17 +141,14 @@ impl<'a> Walk<'a> {
             .map(|cte| std::ptr::from_ref(&cte.this))
             .collect();
         let mut local: Vec<(Option<String>, bool)> = Vec::new();
-        let relations = select
-            .from
-            .iter()
-            .flat_map(|from| from.expressions.iter())
-            .chain(select.joins.iter().map(|join| &join.this));
+        let (items, joins): (Vec<&Expression>, Vec<&Join>) = from_items_and_joins(select);
+        let relations = items.into_iter().chain(joins.iter().map(|join| &join.this));
         for relation in relations {
             walked.insert(std::ptr::from_ref(relation));
             local.extend(self.relation(relation, &ctes, outer));
         }
         let drifted_here: bool = local.iter().any(|(_, exposes)| *exposes);
-        for join in &select.joins {
+        for join in joins {
             let natural: bool = matches!(
                 join.kind,
                 JoinKind::Natural
@@ -337,4 +334,20 @@ fn nested_queries(expression: &Expression) -> Vec<&Expression> {
         }
     }
     found
+}
+
+/// The select's FROM items and joins, with each unaliased joined FROM item read as its left side and joins.
+fn from_items_and_joins(select: &Select) -> (Vec<&Expression>, Vec<&Join>) {
+    let mut items: Vec<&Expression> = Vec::new();
+    let mut joins: Vec<&Join> = select.joins.iter().collect();
+    for item in select.from.iter().flat_map(|from| from.expressions.iter()) {
+        match item {
+            Expression::JoinedTable(joined) if joined.alias.is_none() => {
+                items.push(&joined.left);
+                joins.extend(joined.joins.iter());
+            }
+            _ => items.push(item),
+        }
+    }
+    (items, joins)
 }

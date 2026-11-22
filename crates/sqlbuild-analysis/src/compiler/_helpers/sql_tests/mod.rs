@@ -13,6 +13,7 @@ pub mod helper_scope;
 pub mod macro_call_names;
 pub mod markers;
 pub mod mock_reads;
+pub(crate) mod partition_inputs;
 pub mod planning;
 pub mod reader_references;
 pub(crate) mod real_model_limit;

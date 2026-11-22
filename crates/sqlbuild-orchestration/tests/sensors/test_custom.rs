@@ -1,4 +1,4 @@
-//! The real outbound HTTP boundary returns data, never scheduler authority.
+//! A polling sensor's function answers over the real outbound HTTP boundary, which returns data, never scheduler authority.
 
 use std::time::Duration;
 
@@ -21,8 +21,8 @@ use crate::runs::main::listings::list_runs::list_runs;
 use crate::runs::models::RunOrigin;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
-use crate::sensors::main::complete_custom_sensor::complete_custom_sensor;
-use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationOutcome};
+use crate::sensors::main::complete_sensor::complete_sensor;
+use crate::sensors::models::{RequestedRun, SensorEvaluationOutcome, SensorFunctionOutcome};
 use crate::sensors::tests::helpers::{evaluations, snapshot};
 use crate::sensors::tests::test_types::{CustomSensorResultCase, SensorTestCase};
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
@@ -60,8 +60,11 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                 .await
                 .expect("location");
             let mut input = snapshot(location);
-            input.documents.get_mut("triggers").expect("triggers")["health_orders"]["when"] =
-                json!({"kind": "custom", "function": "orders_ready", "code_hash": "orders_v1"});
+            let sensor =
+                &mut input.documents.get_mut("triggers").expect("triggers")["health_orders"];
+            sensor.as_object_mut().expect("sensor").remove("when");
+            sensor["function"] = json!("orders_ready");
+            sensor["code_hash"] = json!("orders_v1");
             publish_snapshot(store, &input)
                 .await
                 .expect("publish custom sensor data");
@@ -118,7 +121,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
             };
             install_fault(store, &point).await;
             assert!(
-                begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+                begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                     .await
                     .is_err()
             );
@@ -127,12 +130,12 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                 evaluations(store).await.is_empty(),
                 "request fact rolled back with work"
             );
-            let requested = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+            let requested = begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                 .await
                 .expect("begin")
                 .expect("due");
             assert_eq!(
-                complete_custom_sensor(store, &lease, &requested)
+                complete_sensor(store, &lease, &requested)
                     .await
                     .expect("still waiting"),
                 0
@@ -168,9 +171,12 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
             );
             let empty_key = LocationWorkResult {
                 outcome: LocationWorkOutcome::SensorEvaluation {
-                    outcome: CustomSensorOutcome::Completed {
+                    outcome: SensorFunctionOutcome::Requested {
                         cursor: Some("unsafe".into()),
-                        run_keys: vec![" ".into()],
+                        runs: vec![RequestedRun {
+                            job: "orders".into(),
+                            run_key: " ".into(),
+                        }],
                     },
                 },
                 ..wrong.clone()
@@ -184,9 +190,22 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
             );
             let result = LocationWorkResult {
                 outcome: LocationWorkOutcome::SensorEvaluation {
-                    outcome: CustomSensorOutcome::Completed {
+                    outcome: SensorFunctionOutcome::Requested {
                         cursor: Some("orders/page-2".into()),
-                        run_keys: vec!["orders-2".into(), "orders-1".into(), "orders-2".into()],
+                        runs: vec![
+                            RequestedRun {
+                                job: "orders".into(),
+                                run_key: "orders-2".into(),
+                            },
+                            RequestedRun {
+                                job: "orders".into(),
+                                run_key: "orders-1".into(),
+                            },
+                            RequestedRun {
+                                job: "orders".into(),
+                                run_key: "orders-2".into(),
+                            },
+                        ],
                     },
                 },
                 ..wrong
@@ -224,11 +243,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                     postgres_body: "RAISE EXCEPTION 'injected sensor failure'",
                 };
                 install_fault(store, &point).await;
-                assert!(
-                    complete_custom_sensor(store, &lease, &requested)
-                        .await
-                        .is_err()
-                );
+                assert!(complete_sensor(store, &lease, &requested).await.is_err());
                 remove_fault(store, &point).await;
                 assert!(
                     list_runs(store, (location, "development"), 100)
@@ -242,7 +257,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                     "outcome rolled back with cursor and queue"
                 );
                 assert_eq!(
-                    begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+                    begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                         .await
                         .expect("unchanged cursor"),
                     Some(requested.clone())
@@ -250,13 +265,13 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
             }
             let replica = second_store(store).await;
             assert_eq!(
-                complete_custom_sensor(&replica, &lease, &requested)
+                complete_sensor(&replica, &lease, &requested)
                     .await
                     .expect("replica commit"),
                 test_case.expected_runs
             );
             assert_eq!(
-                complete_custom_sensor(store, &lease, &requested)
+                complete_sensor(store, &lease, &requested)
                     .await
                     .expect("retry commit"),
                 0
@@ -302,25 +317,38 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
             assert_eq!(run_ids.len(), test_case.expected_runs);
             for result_case in [
                 CustomSensorResultCase {
-                    outcome: CustomSensorOutcome::Completed {
+                    outcome: SensorFunctionOutcome::Requested {
                         cursor: Some("orders/page-2".into()),
-                        run_keys: vec!["orders-2".into(), "orders-1".into()],
+                        runs: vec![
+                            RequestedRun {
+                                job: "orders".into(),
+                                run_key: "orders-2".into(),
+                            },
+                            RequestedRun {
+                                job: "orders".into(),
+                                run_key: "orders-1".into(),
+                            },
+                        ],
                     },
                     expected_phase: "completed",
                     expected_cursor: Some("orders/page-2"),
                 },
                 CustomSensorResultCase {
-                    outcome: CustomSensorOutcome::Failed,
+                    outcome: SensorFunctionOutcome::Failed {
+                        error:
+                            "Traceback (most recent call last):\nValueError: orders feed is down"
+                                .into(),
+                    },
                     expected_phase: "failed",
                     expected_cursor: None,
                 },
                 CustomSensorResultCase {
-                    outcome: CustomSensorOutcome::TimedOut,
+                    outcome: SensorFunctionOutcome::TimedOut,
                     expected_phase: "timed_out",
                     expected_cursor: None,
                 },
                 CustomSensorResultCase {
-                    outcome: CustomSensorOutcome::Skipped {
+                    outcome: SensorFunctionOutcome::Skipped {
                         cursor: Some("orders/page-3".into()),
                         reason: "No new orders".into(),
                     },
@@ -329,7 +357,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                 },
             ] {
                 tokio::time::sleep(Duration::from_secs(1)).await;
-                let pending = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+                let pending = begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                     .await
                     .expect("next attempt")
                     .expect("due");
@@ -357,7 +385,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                         .await
                         .expect("complete callback")
                 );
-                complete_custom_sensor(store, &lease, &pending)
+                complete_sensor(store, &lease, &pending)
                     .await
                     .expect("apply phase");
                 let facts = evaluations(store).await;
@@ -377,7 +405,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                 test_case.expected_runs
             );
             tokio::time::sleep(Duration::from_secs(1)).await;
-            let stale = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+            let stale = begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                 .await
                 .expect("request before takeover")
                 .expect("due");
@@ -396,7 +424,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                     .is_none()
             );
             assert!(matches!(
-                complete_custom_sensor(store, &lease, &stale).await,
+                complete_sensor(store, &lease, &stale).await,
                 Err(ControlError::Fenced)
             ));
             let successor = acquire_lease(&replica, Uuid::now_v7())
@@ -407,9 +435,12 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                 claim_id: stale_claim.claim_id,
                 session_id: poll.session_id,
                 outcome: LocationWorkOutcome::SensorEvaluation {
-                    outcome: CustomSensorOutcome::Completed {
+                    outcome: SensorFunctionOutcome::Requested {
                         cursor: Some("uncommitted/stale".into()),
-                        run_keys: vec!["must-not-queue".into()],
+                        runs: vec![RequestedRun {
+                            job: "orders".into(),
+                            run_key: "must-not-queue".into(),
+                        }],
                     },
                 },
             };
@@ -420,14 +451,15 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                     .expect("late location result")
             );
             assert!(matches!(
-                complete_custom_sensor(&replica, &successor, &stale).await,
+                complete_sensor(&replica, &successor, &stale).await,
                 Err(ControlError::Fenced)
             ));
             tokio::time::sleep(Duration::from_secs(1)).await;
-            let recovered = begin_sensor_evaluation(&replica, &successor, trigger.trigger_id)
-                .await
-                .expect("recover abandoned callback")
-                .expect("due after minimum interval");
+            let recovered =
+                begin_sensor_evaluation(&replica, &successor, (trigger.trigger_id, None))
+                    .await
+                    .expect("recover abandoned callback")
+                    .expect("due after minimum interval");
             assert_eq!(recovered.cursor.custom.as_deref(), Some("orders/page-3"));
             assert_eq!(
                 list_runs(store, (location, "development"), 100)
@@ -441,7 +473,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                     .await
                     .iter()
                     .filter(|fact| fact.request.evaluation_id == stale.evaluation_id
-                        && fact.outcome == SensorEvaluationOutcome::Abandoned)
+                        && matches!(fact.outcome, SensorEvaluationOutcome::Abandoned { .. }))
                     .count(),
                 1
             );

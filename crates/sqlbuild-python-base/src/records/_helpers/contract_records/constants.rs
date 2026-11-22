@@ -152,6 +152,8 @@ const R_TARGET_CONFIG: RecordSpec = RecordSpec {
         FieldSpec::new("ignore_audit_failures", FieldDefault::None),
         FieldSpec::new("plan_from", FieldDefault::None),
         FieldSpec::new("pause_dynamic", FieldDefault::None),
+        FieldSpec::new("env_file", FieldDefault::None),
+        FieldSpec::new("allow_missing_secrets", FieldDefault::EmptyTuple),
     ],
 };
 const R_TARGET_SETTINGS: RecordSpec = RecordSpec {
@@ -212,6 +214,8 @@ const R_LOCAL_TARGET_CONFIG: RecordSpec = RecordSpec {
         FieldSpec::new("ignore_audit_failures", FieldDefault::None),
         FieldSpec::new("plan_from", FieldDefault::None),
         FieldSpec::new("pause_dynamic", FieldDefault::None),
+        FieldSpec::new("env_file", FieldDefault::None),
+        FieldSpec::new("allow_missing_secrets", FieldDefault::EmptyTuple),
     ],
 };
 const R_SETTINGS_CONFIG: RecordSpec = RecordSpec {
@@ -538,6 +542,7 @@ const R_PROJECT_CONFIG: RecordSpec = RecordSpec {
         ),
         FieldSpec::new("dbt", FieldDefault::NativeCall(RecordId::DbtConfig)),
         FieldSpec::new("sinks", FieldDefault::NativeCall(RecordId::SinksConfig)),
+        FieldSpec::new("env_file", FieldDefault::None),
     ],
 };
 const R_LOCAL_CONFIG: RecordSpec = RecordSpec {

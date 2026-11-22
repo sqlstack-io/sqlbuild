@@ -10,6 +10,7 @@
 	import { app } from '$lib/state/app.svelte';
 
 	import type { FolderBoxData } from './folder-graph';
+	import { clickGuard } from './click-guard';
 
 	type JobBoxData = { jobKey: string; nodeCount: number; drawnElsewhere: number; collapsed: boolean; ontoggle?: (jobKey: string) => void; lastRun?: RunRef | null };
 
@@ -17,6 +18,9 @@
 	let { data }: NodeProps = $props();
 	const d = $derived(data as JobBoxData);
 	const folder = $derived('folder' in data ? (data as FolderBoxData) : null);
+	// An open folder's header drags its box like a title bar; a click that did not move closes it.
+	const guard = clickGuard();
+	const close = (e: MouseEvent) => guard.still(e) && folder?.ontoggle?.(folder.folder);
 </script>
 
 <div class="box" class:collapsed={!folder && d.collapsed}>
@@ -25,9 +29,9 @@
 		<!-- Zoomed out, the header's target grows upward so it stays at least its height on screen. -->
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<span class="head-hit nodrag" aria-hidden="true" onclick={() => folder.ontoggle?.(folder.folder)}></span>
-		<!-- raw-button: the header of a box on the lineage canvas, clickable as a whole to close it -->
-		<button class="head folder-head nodrag" title="Close {folder.folder}" aria-expanded="true" onclick={() => folder.ontoggle?.(folder.folder)}>
+		<span class="head-hit" aria-hidden="true" onpointerdown={guard.down} onclick={close}></span>
+		<!-- raw-button: the header of a box on the lineage canvas: dragging it moves the box, a click closes it -->
+		<button class="head folder-head" title="Close {folder.folder}; drag to move it" aria-expanded="true" onpointerdown={guard.down} onclick={close}>
 			<ChevronDownIcon size={14} class="chevron" />
 			<span class="name" title={folder.folder}>{folder.label}</span>
 			<span class="faint">· {plural(folder.nodeCount, folder.noun ?? 'node')}{#if folder.stale} · <span class="stale">{folder.stale} stale</span>{/if}{#if folder.failed} · <span class="failed">{folder.failed} failed</span>{/if}</span>

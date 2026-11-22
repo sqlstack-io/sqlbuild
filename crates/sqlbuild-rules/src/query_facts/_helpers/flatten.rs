@@ -91,7 +91,7 @@ fn literal_key(expression: &Expression) -> Option<String> {
     let Expression::Literal(literal) = expression else {
         return None;
     };
-    let Literal::String(path) = literal.as_ref() else {
+    let (Literal::String(path) | Literal::JoinedString(path, _)) = literal.as_ref() else {
         return None;
     };
     let key: &str = path

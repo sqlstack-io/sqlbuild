@@ -1,9 +1,9 @@
 """Exercise alias deduplication and cyclic containers while discovering a sensor module."""
 
-from sqlbuild.orchestration import PlatformEventKind, platform_event, sensor
+from sqlbuild.orchestration import PlatformEventKind, RunRequest, platform_event, sensor
 
-edge_health = sensor(
-    "edge_platform_orders_sensor",
+
+@sensor(
     description="Catch up retained platform observations with a stopped group sensor.",
     when=platform_event(
         kinds=[
@@ -12,10 +12,13 @@ edge_health = sensor(
             PlatformEventKind.LAUNCH_FAILED,
         ]
     ),
-    run="edge_snapshot_job_group",
     minimum_interval_seconds=7,
     default_status="paused",
 )
-edge_alias = edge_health
-edge_factory_results = [[edge_health], (edge_alias,)]
+def edge_platform_orders_sensor(ctx):
+    return RunRequest(job="edge_snapshot_job_group")
+
+
+edge_alias = edge_platform_orders_sensor
+edge_factory_results = [[edge_platform_orders_sensor], (edge_alias,)]
 edge_factory_results.append(edge_factory_results)

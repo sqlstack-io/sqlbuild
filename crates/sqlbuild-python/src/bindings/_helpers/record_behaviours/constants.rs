@@ -1,5 +1,6 @@
 //! Native behaviour of the hosted shapes: computed attributes, methods, ordering and validation.
 
+use crate::bindings::_helpers::dbt_interop;
 use crate::bindings::_helpers::record_behaviours::auditing::{
     finish_measurement_contract, finish_threshold_bound, finish_thresholds,
 };
@@ -68,7 +69,6 @@ use crate::bindings::_helpers::record_behaviours::scopes::{
 use crate::bindings::_helpers::record_behaviours::values::{
     finish_fingerprint_set, logical_type_display_name, sql_value_kind,
 };
-use crate::bindings::_helpers::{dbt_events, dbt_interop};
 use sqlbuild_python_base::records::models::{GetterEntry, RecordBehaviours};
 use sqlbuild_python_base::records::types::ClassMethod;
 use sqlbuild_python_base::records::types::ClassProperty;
@@ -360,7 +360,7 @@ pub(crate) const GETTER_TABLES: &[&[GetterEntry]] = &[
     sqlbuild_python_base::compile_context::constants::GETTERS,
     sqlbuild_python_project::compiled_views::constants::GETTERS,
     sqlbuild_python_output::compute_logs::constants::GETTERS,
-    dbt_events::getters::GETTERS,
+    sqlbuild_python_output::dbt_events::constants::GETTERS,
     dbt_interop::getters::GETTERS,
     sqlbuild_python_base::diagnostics::constants::GETTERS,
     sqlbuild_python_front::discovery::constants::GETTERS,

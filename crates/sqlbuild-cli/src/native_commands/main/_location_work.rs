@@ -19,9 +19,9 @@ use crate::native_commands::_helpers::command::paths::location_files;
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::check_location_connection;
 use crate::native_commands::_helpers::location::plan_reuse::keep_plan;
+use crate::native_commands::_helpers::location::sensor_function::run_sensor_function;
 use crate::native_commands::_helpers::location::work::work_error;
 use crate::native_commands::main::_location_plan::plan_location;
-use crate::native_commands::main::_location_sensor::evaluate_location_sensor;
 use crate::native_commands::models::{
     LocationRuntimeRequest, LocationServe, LocationWatch, LocationWorkTurn, PlanToKeep,
 };
@@ -165,7 +165,7 @@ async fn perform_work(
     let message = match &work {
         LocationWork::CheckConnection {} => "Checking requested location connection...\n",
         LocationWork::SyncWarehouse {} => "Synchronizing warehouse history on request...\n",
-        LocationWork::EvaluateSensor { .. } => "Evaluating requested custom sensor...\n",
+        LocationWork::EvaluateSensor { .. } => "Running a sensor's function...\n",
         LocationWork::Plan { .. } => "Planning requested command...\n",
     };
     drop(write_output(&[(Stream::Stderr, message)]));
@@ -180,25 +180,29 @@ async fn perform_work(
                     (LocationWorkOutcome::Connection { healthy }, files, None)
                 })
         }
-        LocationWork::EvaluateSensor { evaluation } => {
-            evaluate_location_sensor(options, script, &evaluation, expires)
-                .await?
-                .map(|outcome| {
-                    (
-                        LocationWorkOutcome::SensorEvaluation { outcome },
-                        Vec::new(),
-                        None,
-                    )
-                })
-        }
+        LocationWork::EvaluateSensor { evaluation } => run_sensor_function(
+            (options, script),
+            (&*evaluation, evaluation.definition.timeout_seconds.get()),
+            expires,
+        )
+        .await?
+        .map(|outcome| {
+            (
+                LocationWorkOutcome::SensorEvaluation { outcome },
+                Vec::new(),
+                None,
+            )
+        }),
         LocationWork::Plan {
             selection,
             settings,
             fresh,
+            jobs,
+            given,
             ..
         } => plan_location(
             (options, runtime),
-            (&selection, &settings, fresh),
+            ((&selection, &jobs), (&settings, &given), fresh),
             copy,
             expires,
         )

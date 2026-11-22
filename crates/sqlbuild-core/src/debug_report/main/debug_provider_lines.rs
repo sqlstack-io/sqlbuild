@@ -41,7 +41,9 @@ pub fn debug_provider_lines(providers: &[DebugProvider], verbose: bool) -> Vec<D
             lines.push(DebugLine::checked(
                 &provider.name,
                 variable,
-                if *set {
+                if *set && provider.from_env_file.contains(variable) {
+                    (DebugStatus::Ok, Some("set from env file"))
+                } else if *set {
                     (DebugStatus::Ok, Some("set"))
                 } else {
                     (DebugStatus::Warn, Some("missing"))

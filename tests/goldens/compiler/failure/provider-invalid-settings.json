@@ -8,7 +8,8 @@
      "phase": "compile",
      "severity": "error",
      "code": "D012",
-     "message": "Provider 'export_settings' in providers/export_settings.py has invalid settings:\napi_token: Field required [missing]"
+     "message": "provider 'export_settings' (providers/export_settings.py) is missing secret API_TOKEN",
+     "help": "set API_TOKEN, or pass --allow-missing-secrets where secrets aren't available"
     }
    ]
   }

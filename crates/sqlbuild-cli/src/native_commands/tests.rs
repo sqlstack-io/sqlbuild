@@ -16,6 +16,8 @@ mod location_plan;
 mod paths;
 #[path = "tests/test_project_facts.rs"]
 mod project_facts;
+#[path = "tests/test_provider_secrets.rs"]
+mod provider_secrets;
 #[path = "tests/test_rules.rs"]
 mod rules;
 #[path = "tests/test_sync_schedule.rs"]

@@ -36,6 +36,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.models import ColumnInfo
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
+from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.compiler.auditing.types import (
     AuditAttachmentKind,
     AuditOutcome,
@@ -500,3 +501,21 @@ def build_tracked_seed_plan(*, seed_names: tuple[str, ...], seed_dir: Path) -> P
             for name in seed_names
         ),
     )
+
+
+class SessionSchemaSnowflakeAdapter(SnowflakeAdapter):
+    """A Snowflake adapter whose session has `session` as its current database and schema."""
+
+    def __init__(self, session: tuple[str, str] | None) -> None:
+        super().__init__()
+        self.session: tuple[str, str] | None = session
+        self.executed: list[str] = []
+
+    def session_schema(self, *, connection: Any) -> tuple[str, str] | None:
+        del connection
+        return self.session
+
+    def execute(self, *, connection: Any, sql: str) -> Any:
+        del connection
+        self.executed.append(sql)
+        return None

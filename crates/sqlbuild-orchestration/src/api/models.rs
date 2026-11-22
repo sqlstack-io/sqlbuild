@@ -51,6 +51,7 @@ use crate::api::_helpers::resources::{
     person_reads::ticks,
     person_reads::trigger_changes,
     person_reads::sensor_state,
+    person_reads::sensor_events,
     person_reads::snapshots,
     person_reads::health,
     person_reads::problems,
@@ -82,6 +83,7 @@ use crate::api::_helpers::resources::{
     password_sessions::current,
     password_sessions::logout,
     password_sessions::change_password,
+    password_sessions::create_person,
     cli_login::start,
     cli_login::approve,
     cli_login::claim,
@@ -293,6 +295,19 @@ pub enum HumanLogin {
     Oidc(OidcAuthentication),
 }
 
+impl HumanLogin {
+    /// The address people reach the server at, when a sign-in method names it.
+    #[must_use]
+    pub fn origin(&self) -> Option<&str> {
+        match self {
+            Self::Password(origin) => Some(origin),
+            Self::TrustedProxy(proxy) => Some(&proxy.origin),
+            Self::Oidc(oidc) => Some(&oidc.origin),
+            Self::None | Self::Development(_) => None,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct ApiAuthentication {
     pub login: HumanLogin,
@@ -464,6 +479,32 @@ impl std::fmt::Debug for PasswordChangeRequest {
     }
 }
 
+/// A person to add who signs in with a password: their sign-in name, first password and built-in role everywhere, if any.
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PasswordPersonRequest {
+    pub(crate) name: String,
+    pub(crate) password: String,
+    #[serde(default)]
+    pub(crate) role: Option<crate::credentials::models::BuiltinRole>,
+}
+
+impl std::fmt::Debug for PasswordPersonRequest {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PasswordPersonRequest")
+            .field("name", &self.name)
+            .field("role", &self.role)
+            .finish_non_exhaustive()
+    }
+}
+
+/// The person just added.
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonCreated {
+    pub principal_id: uuid::Uuid,
+}
+
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PasswordSessionResponse {
     pub identity: crate::credentials::models::SessionIdentity,
@@ -621,6 +662,8 @@ pub struct ServerFacts {
     pub pool_caps: crate::declarations::models::ServerPoolCaps,
     /// How long an acknowledged attention condition stays hidden while unchanged.
     pub attention_snooze: crate::acknowledgements::models::AttentionSnooze,
+    /// The address people reach the server at, which sensor events link runs under; `None` without a sign-in origin.
+    pub origin: Option<String>,
 }
 
 /// The server's version, storage, sign-in and retention, for administrators.

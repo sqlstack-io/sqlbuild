@@ -1,9 +1,10 @@
 //! A provider class's setting fields and which of its secret settings the environment leaves unset.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 
+use crate::discovery::main::sources::secret_places::secret_places;
 use sqlbuild_python_base::orchestration_reads::main::missing_secrets::missing_secrets;
 use sqlbuild_python_base::records::main::construct::new_annotated_error::new_annotated_error;
 use sqlbuild_python_base::records::main::fields::field::field;
@@ -15,6 +16,11 @@ pub(crate) const SINK_COLLECTIONS: [&str; 2] = ["event_exporters", "command_outp
 thread_local! {
     /// Whether the invocation running on this thread passed `--allow-missing-secrets`.
     pub(crate) static INVOCATION_ALLOWS_MISSING_SECRETS: Cell<bool> = const { Cell::new(false) };
+    /// The `--target` of the invocation running on this thread.
+    pub(crate) static INVOCATION_TARGET: RefCell<Option<String>> = const { RefCell::new(None) };
+    /// The target, and the providers its `allow_missing_secrets` lists, for the discovery running on this thread.
+    pub(crate) static TARGET_ALLOWED_MISSING_SECRETS: RefCell<(Option<String>, Vec<String>)> =
+        const { RefCell::new((None, Vec::new())) };
 }
 
 pub(crate) fn usage_pair(
@@ -77,12 +83,14 @@ pub(crate) fn require_used_secrets(
         py,
         ErrorId::ProviderDiscovery,
         format!(
-            "selected nodes need secrets that are missing:\n{}\nnothing was run",
+            "selected nodes need secrets that are missing from {}:\n{}\nnothing was run",
+            secret_places(&field(discovered, "project_dir")?.extract::<std::path::PathBuf>()?),
             lines.join("\n")
         ),
         &[(
             "help",
-            "set each variable, or narrow the selection".to_owned(),
+            "set each variable in this shell or the project's env file, or narrow the selection"
+                .to_owned(),
         )],
     ))
 }

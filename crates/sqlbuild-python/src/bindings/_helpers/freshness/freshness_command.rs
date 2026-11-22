@@ -63,9 +63,10 @@ fn user_error(py: Python<'_>, (message, code): (&str, &str)) -> PyErr {
     new_error(py, ErrorId::CliUser, message, (Some(code), None))
 }
 
-fn write(py: Python<'_>, text: &str) -> PyResult<()> {
+/// Write human text to `stream`, `stdout` or `stderr`.
+fn write(py: Python<'_>, (text, stream): (&str, &str)) -> PyResult<()> {
     py.import("sys")?
-        .getattr("stdout")?
+        .getattr(stream)?
         .call_method1("write", (text,))?;
     Ok(())
 }
@@ -274,7 +275,7 @@ fn write_json_output(
     )
 }
 
-/// Run one `sqb freshness` request; a claimed run observes its verified sources and reports to its worker.
+/// Run one `sqb freshness` request; a claimed run observes its verified sources and reports to its worker. With `--json` the results still print, on stderr as seed and audit print theirs, so a worker's run shows them.
 pub(crate) fn run_freshness_command<'py>(
     py: Python<'py>,
     request: &Bound<'py, PyAny>,
@@ -352,16 +353,15 @@ pub(crate) fn run_freshness_command<'py>(
     let payload: String =
         freshness_json(&results).map_err(|error| PyValueError::new_err(format!("{error:?}")))?;
     let json_output_path: Bound<'_, PyAny> = native_field(request, "json_output_path")?;
-    if native_field(request, "json_output")?.extract::<bool>()? {
-        write_json_output(py, &payload, (true, &json_output_path))?;
-    } else {
-        if !json_output_path.is_none() {
-            write_json_output(py, &payload, (false, &json_output_path))?;
-        }
-        let use_color: bool =
-            !native_field(request, "no_color")?.extract::<bool>()? && stdout_supports_color(py)?;
-        write(py, &render_freshness_text(&results, CliStyle { use_color }))?;
+    let json_output: bool = native_field(request, "json_output")?.extract()?;
+    if json_output || !json_output_path.is_none() {
+        write_json_output(py, &payload, (json_output, &json_output_path))?;
     }
+    let use_color: bool = !json_output
+        && !native_field(request, "no_color")?.extract::<bool>()?
+        && stdout_supports_color(py)?;
+    let text: String = render_freshness_text(&results, CliStyle { use_color });
+    write(py, (&text, if json_output { "stderr" } else { "stdout" }))?;
     Ok(freshness_exit_code(
         &results,
         (fail_on_stale, fail_on_error),

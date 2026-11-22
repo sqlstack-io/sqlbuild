@@ -65,6 +65,17 @@ pub(crate) fn optional_str(mapping: &Entries, key: &str) -> Loaded<Option<String
     })
 }
 
+/// A string that may be empty, such as `env_file = ""`, as a field value; `None` when unset.
+pub(crate) fn optional_text_allowing_empty(mapping: &Entries, key: &str) -> Loaded<Built> {
+    match get(mapping, key) {
+        None => Ok(text_or_none(None)),
+        Some(ConfigValue::String(text)) => Ok(text_or_none(Some(text.clone()))),
+        Some(_) => Err(ConfigFailure::plain(format!(
+            "Expected '{key}' to be a string when provided"
+        ))),
+    }
+}
+
 /// `_optional_str` as a field value.
 pub(crate) fn optional_text_field(mapping: &Entries, key: &str) -> Loaded<Built> {
     Ok(text_or_none(optional_str(mapping, key)?))

@@ -1,3 +1,4 @@
+pub mod dynamic_resume;
 pub mod ingest;
 pub mod location_reads;
 pub(crate) mod node_reads;

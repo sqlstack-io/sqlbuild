@@ -13,6 +13,7 @@ use crate::result_output::_helpers::events::terminal_index::TerminalEventClaim;
 use crate::result_output::_helpers::events::terminal_index::context_variable;
 use crate::result_output::_helpers::events::terminal_index::current_index_object;
 use crate::result_output::_helpers::events::terminal_index::terminal_fact;
+use crate::result_output::_helpers::results::discarded_reports::REPORTS_DISCARDED;
 use crate::result_output::_helpers::results::projection::resource_identity;
 use crate::result_output::constants::RESULT_PATH_ENV;
 use pyo3::exceptions::PyRuntimeError;
@@ -423,5 +424,17 @@ impl TerminalEventIndexScope {
             context_variable(py)?.call_method1("reset", (token,))?;
         }
         Ok(false)
+    }
+}
+
+/// Discards each `--json` report written to stdout until it is dropped, then restores what came before.
+#[derive(Debug)]
+pub struct DiscardedReportsScope {
+    pub(crate) previous: bool,
+}
+
+impl Drop for DiscardedReportsScope {
+    fn drop(&mut self) {
+        REPORTS_DISCARDED.set(self.previous);
     }
 }

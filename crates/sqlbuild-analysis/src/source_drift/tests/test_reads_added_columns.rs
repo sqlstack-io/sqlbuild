@@ -1,5 +1,5 @@
 use crate::source_drift::main::reads_added_columns::reads_added_columns;
-use crate::source_drift::tests::test_types::AddedColumnsTestCase;
+use crate::source_drift::tests::test_types::{AddedColumnsTestCase, DialectAddedColumnsTestCase};
 
 #[test]
 fn given_a_source_gaining_columns_when_reading_models_then_only_column_list_readers_are_affected() {
@@ -92,6 +92,89 @@ fn given_a_source_gaining_columns_when_reading_models_then_only_column_list_read
         assert_eq!(
             reads_added_columns(
                 "snowflake",
+                (test_case.sql, &[]),
+                &["orders".to_owned()],
+                &["region".to_owned()],
+            ),
+            test_case.expected_affected,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_comma_items_with_joins_when_a_joined_source_gains_columns_then_their_keys_and_names_count()
+{
+    let test_cases = [
+        DialectAddedColumnsTestCase {
+            description: "postgres: a later comma item joining the source USING a column it gains",
+            dialect: "postgres",
+            sql: r#"SELECT c.customer_id FROM __ref("customers") AS c,
+                __ref("products") AS p JOIN __source("orders") AS o USING (region)"#,
+            expected_affected: true,
+        },
+        DialectAddedColumnsTestCase {
+            description: "postgres: an unqualified name in a later comma item's join ON",
+            dialect: "postgres",
+            sql: r#"SELECT c.customer_id FROM __ref("customers") AS c,
+                __ref("products") AS p JOIN __source("orders") AS o ON p.product_id = product_ref"#,
+            expected_affected: true,
+        },
+        DialectAddedColumnsTestCase {
+            description: "postgres: qualified names across comma items and their joins",
+            dialect: "postgres",
+            sql: r#"SELECT c.customer_id FROM __ref("customers") AS c,
+                __ref("products") AS p JOIN __source("orders") AS o ON p.product_id = o.product_id"#,
+            expected_affected: false,
+        },
+        DialectAddedColumnsTestCase {
+            description: "duckdb: a later comma item joining the source USING a column it gains",
+            dialect: "duckdb",
+            sql: r#"SELECT c.customer_id FROM __ref("customers") AS c,
+                __ref("products") AS p JOIN __source("orders") AS o USING (region)"#,
+            expected_affected: true,
+        },
+        DialectAddedColumnsTestCase {
+            description: "duckdb: an unqualified name in a later comma item's join ON",
+            dialect: "duckdb",
+            sql: r#"SELECT c.customer_id FROM __ref("customers") AS c,
+                __ref("products") AS p JOIN __source("orders") AS o ON p.product_id = product_ref"#,
+            expected_affected: true,
+        },
+        DialectAddedColumnsTestCase {
+            description: "duckdb: qualified names across comma items and their joins",
+            dialect: "duckdb",
+            sql: r#"SELECT c.customer_id FROM __ref("customers") AS c,
+                __ref("products") AS p JOIN __source("orders") AS o ON p.product_id = o.product_id"#,
+            expected_affected: false,
+        },
+        DialectAddedColumnsTestCase {
+            description: "databricks: a later comma item joining the source USING a column it gains",
+            dialect: "databricks",
+            sql: r#"SELECT c.customer_id FROM __ref("customers") AS c,
+                __ref("products") AS p JOIN __source("orders") AS o USING (region)"#,
+            expected_affected: true,
+        },
+        DialectAddedColumnsTestCase {
+            description: "databricks: an unqualified name in a later comma item's join ON",
+            dialect: "databricks",
+            sql: r#"SELECT c.customer_id FROM __ref("customers") AS c,
+                __ref("products") AS p JOIN __source("orders") AS o ON p.product_id = product_ref"#,
+            expected_affected: true,
+        },
+        DialectAddedColumnsTestCase {
+            description: "databricks: qualified names across comma items and their joins",
+            dialect: "databricks",
+            sql: r#"SELECT c.customer_id FROM __ref("customers") AS c,
+                __ref("products") AS p JOIN __source("orders") AS o ON p.product_id = o.product_id"#,
+            expected_affected: false,
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            reads_added_columns(
+                test_case.dialect,
                 (test_case.sql, &[]),
                 &["orders".to_owned()],
                 &["region".to_owned()],

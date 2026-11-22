@@ -23,9 +23,9 @@ The command reports four groups of checks:
 
 **Runtime** - SQLBuild version, Python version, Python path, OS info.
 
-**Configuration** - Finds and validates `sqlbuild_project.toml`, loads `sqlbuild_local.toml` if present, resolves the adapter, active target, connection, database, and schema. For Snowflake it also shows the warehouse each [command group](../concepts/adapters/snowflake.md#command-group-warehouses) connects with and where that value came from.
+**Configuration** - Finds and validates `sqlbuild_project.toml`, loads `sqlbuild_local.toml` if present, shows the [env file](../concepts/project-configuration.md#env-file) and how many variables came from it, resolves the adapter, active target, connection, database, and schema. For Snowflake it also shows the warehouse each [command group](../concepts/adapters/snowflake.md#command-group-warehouses) connects with and where that value came from.
 
-**Providers** - Counts the [providers](../concepts/python-nodes/providers.md) whose [secrets](../concepts/python-nodes/providers.md#secrets) are all set, and lists each missing secret as `WARN`. When every secret is set it prints one line. `--verbose` lists every provider and secret.
+**Providers** - Counts the [providers](../concepts/python-nodes/providers.md) whose [secrets](../concepts/python-nodes/providers.md#secrets) are all set, and lists each missing secret as `WARN`. When every secret is set it prints one line. `--verbose` lists every provider and secret, and marks a secret the env file set as `set from env file`. Values are never shown.
 
 ```text
 Providers:
@@ -63,6 +63,7 @@ Runtime:
 Configuration:
   project file: /home/user/waffle_shop/sqlbuild_project.toml [OK found and valid]
   local config: /home/user/waffle_shop/sqlbuild_local.toml [OK found]
+  env file: /home/user/waffle_shop/.env [OK loaded, 3 variables]
   project: waffle_shop [OK loaded]
   adapter: snowflake [OK found]
   target: dev [OK resolved]

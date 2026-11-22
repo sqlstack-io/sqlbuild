@@ -23,6 +23,7 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { openRecord } from '../utils';
 	import { firstLine, summariseProcesses } from './utils';
+	import LocationSecrets from './location-secrets.svelte';
 
 	const id = $derived(page.params.id ?? '');
 	const location = createResource((client) => client.getLocation(id), ['snapshot', 'warehouse_sync']);
@@ -50,7 +51,7 @@
 	const instanceLabel: Record<LocationInstance['state'], string> = { live: 'Running', stale: 'Not checking in', gone: 'Stopped' };
 </script>
 
-<AppTopbar title="Locations">
+<AppTopbar title="Locations" subject={detail ? `${detail.name} · Locations` : null}>
 	<RefreshButton onclick={() => (location.refresh(), problems.refresh())} />
 </AppTopbar>
 
@@ -149,6 +150,7 @@
 					</span>
 				</div>
 			{/if}
+			{#if detail.missingSecrets.length}<LocationSecrets missing={detail.missingSecrets} />{/if}
 			{#if detail.poolCapWarnings.length}
 				<!-- The server's own warning, from its pool caps: it doesn't touch the location's health or last check-in. -->
 				<div class="alert note pool-caps">

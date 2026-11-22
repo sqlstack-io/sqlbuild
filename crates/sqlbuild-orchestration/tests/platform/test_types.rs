@@ -72,3 +72,12 @@ pub(crate) struct CompileFailureTestCase {
     pub(crate) message_chars: usize,
     pub(crate) expected_accepted: bool,
 }
+
+pub(crate) struct ProviderSecretsHealthTestCase {
+    pub(crate) description: &'static str,
+    /// Providers the target's `allow_missing_secrets` lists.
+    pub(crate) allowed: &'static [&'static str],
+    pub(crate) expected_providers: &'static [(&'static str, bool)],
+    pub(crate) expected_missing: u64,
+    pub(crate) expected_state: crate::platform::models::LocationState,
+}

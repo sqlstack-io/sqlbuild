@@ -141,5 +141,5 @@ pub(crate) async fn deliver_metadata_page(
         result = &mut stopped => { result?; return Ok(None); },
         () = metadata_health(&state, (client, poll), (started, None)) => {},
     }
-    finish_metadata_page(acknowledge_metadata_page(state)).await
+    finish_metadata_page(acknowledge_metadata_page(state), stopped).await
 }

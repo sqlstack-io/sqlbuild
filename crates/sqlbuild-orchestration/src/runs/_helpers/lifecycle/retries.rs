@@ -17,6 +17,7 @@ use crate::runs::main::requests::queue_run::queue_run;
 use crate::runs::models::{RerunRequest, RunCommand, RunOrigin, RunRequest, RunRetry};
 use crate::snapshots::constants::SOURCE_KEY_PREFIX;
 use crate::snapshots::main::write_sets::job_write_set::job_write_set;
+use crate::store::constants::UNREADABLE_SNAPSHOT;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -56,6 +57,9 @@ pub(crate) async fn queue_retry(
         return Ok((transaction, QueuedRetry::None));
     };
     let (transaction, definitions) = frozen_definitions(transaction, source.snapshot_id).await?;
+    let Ok(definitions) = definitions else {
+        return Ok((not_retried(transaction, run_id).await?, QueuedRetry::None));
+    };
     if source.parent_run_id.is_some() {
         let policy = definitions
             .jobs
@@ -105,6 +109,25 @@ pub(crate) async fn queue_retry(
         not_before: transaction.now + TimeDelta::seconds(i64::from(policy.retry_delay_seconds)),
     });
     Ok((queue_run(transaction, &frozen).await?, QueuedRetry::Run))
+}
+
+/// The failed run's status reason also says it was not retried because its snapshot can't be read, unless that is already why it failed.
+async fn not_retried(
+    transaction: ControlTransaction,
+    run_id: Uuid,
+) -> Result<ControlTransaction, ControlError> {
+    let (transaction, _) = query(
+        transaction,
+        "UPDATE sqb_runs SET status_reason=CASE WHEN status_reason IS NULL OR status_reason='' THEN $2 \
+         ELSE status_reason || '; not retried: ' || $2 END \
+         WHERE run_id=$1 AND (status_reason IS NULL OR status_reason<>$2)",
+        vec![
+            Parameter::Id(run_id),
+            Parameter::Text(UNREADABLE_SNAPSHOT.into()),
+        ],
+    )
+    .await?;
+    Ok(transaction)
 }
 
 /// The member's next attempt inside its running group: its failed nodes and those it skipped because of them.

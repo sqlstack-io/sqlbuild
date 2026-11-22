@@ -16,10 +16,8 @@ use crate::runs::models::{
     JobRunRequest, NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome,
 };
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::sensors::main::{
-    begin_sensor_evaluation::begin_sensor_evaluation,
-    complete_builtin_sensor::complete_builtin_sensor,
-};
+use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
+use crate::sensors::tests::helpers::complete_starting_job;
 use crate::sensors::tests::helpers::snapshot;
 use crate::sensors::tests::test_types::SensorTestCase;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
@@ -72,7 +70,7 @@ fn given_a_wide_group_when_only_the_last_node_has_not_started_then_all_chunks_mu
                 "wide_orders": {"description": "Wide group", "selection": selection, "jobs": {"source": []}}
             }));
             input.documents.insert("triggers".into(), json!({
-                "executed": {"description": "All source nodes must execute", "job_key": "destination",
+                "executed": {"description": "All source nodes must execute", "function": "start_destination", "code_hash": "v1", "timeout_seconds": 60,
                     "when": {"kind": "run_event", "job_key": "wide_orders", "kinds": ["completed"], "executed_successfully": selection},
                     "minimum_interval_seconds": 1}
             }));
@@ -168,13 +166,13 @@ fn given_a_wide_group_when_only_the_last_node_has_not_started_then_all_chunks_mu
                 .await
                 .expect("triggers")
                 .remove(0);
-            let evaluation = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+            let evaluation = begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                 .await
                 .expect("request evaluation")
                 .expect("due");
             let count = tokio::time::timeout(
                 Duration::from_secs(5),
-                complete_builtin_sensor(store, &lease, &evaluation),
+                complete_starting_job(store, &lease, &evaluation),
             )
             .await
             .expect("wide predicate must not hold the write lock unboundedly")

@@ -1,0 +1,13 @@
+{
+  "model": "MODEL (description 'Orders.', materialized table); SELECT 17 AS amount\n",
+  "dynamic": "[dynamic]\nheartbeat_grace = \"10m\"\n",
+  "holds": [
+    {"run_id": "stopped-build", "model": "daily_totals", "idle_seconds": 900},
+    {"run_id": "running-build", "model": "weekly_totals", "idle_seconds": 0}
+  ],
+  "lifecycle": [
+    "a DuckDB warehouse holds a pause table with one hold silent past the project's grace and one live hold",
+    "a served location's sync completes",
+    "DuckDB cannot build dynamic models, so the sync opens no resume session and both holds stay open"
+  ]
+}

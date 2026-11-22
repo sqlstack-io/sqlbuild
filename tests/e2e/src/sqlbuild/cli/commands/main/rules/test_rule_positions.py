@@ -161,11 +161,11 @@ def test_given_model_query_layout_when_running_rules_then_findings_use_file_posi
                 "  JOIN o AS p ON o.id = p.id, o AS q\n"
             ),
             expected_messages=(
-                "CTE/3:o AS",
-                "Join/3:JOIN",
-                "Star/3:*) A",
-                "Star/3:o.*,",
-                "Subquery/3:(SEL",
+                "cte/3:o AS",
+                "join/3:JOIN",
+                "star/3:*) A",
+                "star/3:o.*,",
+                "subquery/3:(SEL",
             ),
         ),
         SyntaxTreeRuleE2ETestCase(
@@ -183,7 +183,7 @@ def test_given_model_query_layout_when_running_rules_then_findings_use_file_posi
                 )
                 for name in ("customers", "raw_orders")
             },
-            expected_messages=("CTE/2:c AS", "Join/2:JOIN", "Star/2:* FR", "Star/2:o.*,"),
+            expected_messages=("cte/2:c AS", "join/2:JOIN", "star/2:* FR", "star/2:o.*,"),
         ),
     ],
     ids=lambda case: case.description,
@@ -274,7 +274,7 @@ def test_given_custom_rule_reading_node_facts_when_compiling_then_it_sees_the_au
                 'MODEL (\n  description "Orders",\n  materialized table\n);\n\n'
                 "SELECT\n  *\nFROM (SELECT 1 AS id) AS o\n"
             ),
-            expected_messages=("Star@7:3", "alias@8:14"),
+            expected_messages=("alias@8:14", "star@7:3"),
         ),
         SyntaxTreeRuleE2ETestCase(
             description="a multi-line macro expansion above a node leaves it on its file line",
@@ -283,7 +283,7 @@ def test_given_custom_rule_reading_node_facts_when_compiling_then_it_sees_the_au
                 "SELECT\n  @sql.blank_to_null('a') AS a,\n  *\nFROM (SELECT 'x' AS b) AS o\n"
             ),
             other_models=_BLANK_TO_NULL,
-            expected_messages=("Star@6:3", "alias@5:3", "alias@7:14"),
+            expected_messages=("alias@5:3", "alias@7:14", "star@6:3"),
         ),
     ],
     ids=lambda case: case.description,

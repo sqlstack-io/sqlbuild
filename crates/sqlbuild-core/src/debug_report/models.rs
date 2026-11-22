@@ -1,5 +1,6 @@
 //! `sqb debug` report lines and the facts they are built from.
 
+use crate::process_environment::models::EnvFileMarker;
 use std::path::PathBuf;
 
 /// The outcome a diagnostic line reports (`DebugCheckStatus`).
@@ -97,6 +98,8 @@ pub struct DebugProjectFacts {
     pub database: Option<String>,
     /// The effective schema, when it is a non-empty string.
     pub schema: Option<String>,
+    /// The env file this process tree loaded, `None` when no launcher loaded one.
+    pub env_file: Option<EnvFileMarker>,
 }
 
 /// One command group's warehouse as `sqb debug` resolved it.
@@ -127,6 +130,8 @@ pub struct DebugProvider {
     pub class_name: String,
     /// Each secret setting's environment variable and whether the environment sets it.
     pub secrets: Vec<(String, bool)>,
+    /// The secret variables the project env file set, by name.
+    pub from_env_file: Vec<String>,
 }
 
 /// One connection setting value, as Python would print it.

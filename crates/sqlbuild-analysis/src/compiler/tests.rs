@@ -28,6 +28,8 @@ mod sql_test_helper_references;
 mod sql_test_markers;
 #[path = "tests/test_sql_test_name_isolation.rs"]
 mod sql_test_name_isolation;
+#[path = "tests/test_sql_test_partition_inputs.rs"]
+mod sql_test_partition_inputs;
 #[path = "tests/test_sql_test_planning.rs"]
 mod sql_test_planning;
 #[path = "tests/test_sql_test_relation_markers.rs"]

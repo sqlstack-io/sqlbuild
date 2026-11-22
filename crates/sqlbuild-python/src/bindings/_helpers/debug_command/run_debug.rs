@@ -17,10 +17,12 @@ use sqlbuild_core::debug_report::main::debug_provider_lines::debug_provider_line
 use sqlbuild_core::debug_report::main::debug_runtime_lines::debug_runtime_lines;
 use sqlbuild_core::debug_report::main::format_debug_json::format_debug_json;
 use sqlbuild_core::debug_report::main::format_debug_text::format_debug_text;
+use sqlbuild_core::debug_report::main::write_report_file::write_report_file;
 use sqlbuild_core::debug_report::models::{
     ConnectionCheck, ConnectionValue, DebugConfigFiles, DebugProjectFacts, DebugProvider,
     DebugReport, DebugRuntime, WarehouseCheck,
 };
+use sqlbuild_orchestration::dev_events::constants::DEBUG_REPORT_VARIABLE;
 
 use crate::bindings::_helpers::cli::failure_cause::FailureCause;
 use crate::bindings::_helpers::cli::failure_cause::report_failure_cause;
@@ -36,6 +38,7 @@ use crate::bindings::_helpers::command_runtime::warehouses::command_scope;
 use crate::bindings::_helpers::command_runtime::warehouses::find_authored;
 use crate::bindings::_helpers::command_runtime::warehouses::resolve_warehouse;
 use crate::bindings::_helpers::native_host::warehouse_metadata::history_reads_wake_compute;
+use sqlbuild_core::process_environment::main::env_file_marker::env_file_marker;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::imported::imported;
 use sqlbuild_python_base::boundary::main::within::within;
@@ -170,19 +173,28 @@ fn warehouse_checks(
 }
 
 fn providers(discovered_inputs: &Bound<'_, PyAny>) -> PyResult<Vec<DebugProvider>> {
+    let from_env_file: Vec<String> = env_file_marker()
+        .map(|marker| marker.names)
+        .unwrap_or_default();
     let mut providers: Vec<DebugProvider> = Vec::new();
     for provider in native_field(discovered_inputs, "providers")?.try_iter()? {
         let provider: Bound<'_, PyAny> = provider?;
         let provider_class: Bound<'_, PyAny> = native_field(&provider, "provider_class")?;
         let missing: Vec<String> = missing_secrets(&provider_class)?;
+        let secrets: Vec<(String, bool)> = secret_variables(&provider_class)?
+            .into_iter()
+            .map(|variable| {
+                let set: bool = !missing.contains(&variable);
+                (variable, set)
+            })
+            .collect();
         providers.push(DebugProvider {
-            secrets: secret_variables(&provider_class)?
-                .into_iter()
-                .map(|variable| {
-                    let set: bool = !missing.contains(&variable);
-                    (variable, set)
-                })
+            from_env_file: secrets
+                .iter()
+                .filter(|(variable, set)| *set && from_env_file.contains(variable))
+                .map(|(variable, _)| variable.clone())
                 .collect(),
+            secrets,
             name: native_field(&provider, "name")?.str()?.extract()?,
             relative_path: native_field(&provider, "relative_path")?.str()?.extract()?,
             class_name: native_field(&provider, "provider_class")?
@@ -336,6 +348,7 @@ fn build_report(
         connection_name,
         database: target_value(&namespace.get_item(2)?)?,
         schema: target_value(&namespace.get_item(3)?)?,
+        env_file: env_file_marker(),
     };
     let warehouses: Vec<WarehouseCheck> =
         warehouse_checks(&context, (&command_scope, &base_connection))?;
@@ -400,9 +413,14 @@ pub(crate) fn run_debug_command(
         let use_color: bool = !arguments.flag("no_color")? && stdout_supports_color(py)?;
         format_debug_text(&report, CliStyle { use_color })
     };
-    let stdout: Bound<'_, PyAny> = py.import("sys")?.getattr("stdout")?;
-    stdout.call_method1("write", (text,))?;
-    stdout.call_method0("flush")?;
+    match std::env::var_os(DEBUG_REPORT_VARIABLE).filter(|_| json_output) {
+        Some(report_file) => write_report_file(report_file.as_ref(), &text)?,
+        None => {
+            let stdout: Bound<'_, PyAny> = py.import("sys")?.getattr("stdout")?;
+            stdout.call_method1("write", (text,))?;
+            stdout.call_method0("flush")?;
+        }
+    }
     if let Some(failure) = debug_failure(&report) {
         report_failure_cause(FailureCause {
             error_type: failure.error_type,

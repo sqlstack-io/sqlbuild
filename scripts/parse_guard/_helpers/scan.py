@@ -10,9 +10,11 @@ from scripts.parse_guard.constants import (
     DEFAULT_GUARD_PATTERNS,
     GUARD_FIELD,
     GUARDED_OPTION_LITERALS,
+    SHARED_DEPTH,
     SKIPPED_DIRECTORIES,
     SKIPPED_FILES,
     SOURCE_SUFFIX,
+    SQLCLEAN_REQUESTS,
     TYPE_POSITION_SUFFIXES,
 )
 
@@ -47,6 +49,13 @@ def unguarded_sites(*, label: str, text: str) -> tuple[str, ...]:
             f"{label}:{_line(text=text, offset=found.start())} {literal}"
             for found in re.finditer(re.escape(literal), text)
             if _unguarded_literal(text=text, start=found.start(), literal=literal)
+        )
+    request: str
+    for request in SQLCLEAN_REQUESTS:
+        sites.extend(
+            f"{label}:{_line(text=text, offset=found.start())} {request}"
+            for found in re.finditer(request, text)
+            if SHARED_DEPTH not in text
         )
     return tuple(sites)
 

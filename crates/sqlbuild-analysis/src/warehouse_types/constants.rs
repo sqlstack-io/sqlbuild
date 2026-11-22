@@ -10,3 +10,7 @@ pub(crate) const POSTGRES_DIALECT: &str = "postgres";
 pub(crate) const SNOWFLAKE_DIALECT: &str = "snowflake";
 /// The dialect whose type names are parsed as a BigQuery cast's target.
 pub(crate) const BIGQUERY_DIALECT: &str = "bigquery";
+/// The tree key naming a type's kind.
+pub(crate) const DATA_TYPE_KEY: &str = "data_type";
+/// The kind of a type SQLQuack keeps as written with its parameters in fields, such as Snowflake's `NUMBER(10, 2)`.
+pub(crate) const NAMED_TYPE_TAG: &str = "named";

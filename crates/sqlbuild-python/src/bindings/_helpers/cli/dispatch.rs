@@ -1,5 +1,6 @@
 //! `sqb` command dispatch: the native route table applied to a parsed namespace.
 
+use crate::bindings::_helpers::review_command::support::attribute;
 use sqlbuild_python_base::records::main::construct::new_error::new_error;
 use std::path::PathBuf;
 
@@ -455,7 +456,7 @@ fn run_implementation<'py>(
     code.into_bound_py_any(py)
 }
 
-/// Run `body` with the request record a parsed command's route passes, in the scopes `sqb` runs it in.
+/// Run `body` with the request record a parsed command's route passes, in the scopes `sqb` runs it in but the job scope, which the caller sets.
 pub(crate) fn with_routed_request<'py, T>(
     args: &Bound<'py, PyAny>,
     body: impl FnOnce(&Bound<'py, PyAny>) -> PyResult<T>,
@@ -466,6 +467,7 @@ pub(crate) fn with_routed_request<'py, T>(
         let _secrets = MissingSecretsScope::enter(
             args.getattr_opt(ALLOW_MISSING_SECRETS_DEST)?
                 .is_some_and(|allowed| allowed.is_truthy().unwrap_or(false)),
+            attribute(args, "target")?,
         );
         let route = match command_dispatch(&command_facts(args)?) {
             Dispatch::Run(route, None) => route,
@@ -476,18 +478,11 @@ pub(crate) fn with_routed_request<'py, T>(
                 return Err(PyTypeError::new_err("the command line names no command"));
             }
         };
-        let project_dir: PathBuf = invocation.value(Source::EffectiveProjectDir)?.extract()?;
-        let selected_target: Option<String> = match invocation.value(Source::Attr("target")) {
-            Ok(target) => optional_text(&target)?,
-            Err(_) => None,
-        };
-        with_job_scope((project_dir, selected_target), || {
-            let arguments = route_arguments(&invocation, route, false)?;
-            let request = argument(&arguments, "request")?.ok_or_else(|| {
-                PyTypeError::new_err(format!("{}() takes no request", route.implementation))
-            })?;
-            body(&request)
-        })
+        let arguments = route_arguments(&invocation, route, false)?;
+        let request = argument(&arguments, "request")?.ok_or_else(|| {
+            PyTypeError::new_err(format!("{}() takes no request", route.implementation))
+        })?;
+        body(&request)
     })
 }
 
@@ -501,6 +496,7 @@ fn routed_command<'py>(
     let _secrets = MissingSecretsScope::enter(
         args.getattr_opt(ALLOW_MISSING_SECRETS_DEST)?
             .is_some_and(|allowed| allowed.is_truthy().unwrap_or(false)),
+        attribute(args, "target")?,
     );
     match command_dispatch(&command_facts(args)?) {
         Dispatch::Nothing => 0.into_bound_py_any(py),

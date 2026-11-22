@@ -32,3 +32,9 @@ pub const NEXT_STEPS: [&str; 6] = [
     "  5. Add models to models/staging/ and models/marts/",
     "  6. Add tests to tests/unit/ or tests/scenarios/, reusable audits to audits/generic/, or standalone audits to audits/singular/",
 ];
+
+/// The git ignore file `sqb init` and the playground add the env file to.
+pub(crate) const GITIGNORE_FILE: &str = ".gitignore";
+/// The lines that keep the project env file, which holds provider secrets, out of git.
+pub(crate) const ENV_FILE_IGNORE: &str =
+    "# Provider settings and secrets that sqb loads (env_file); never commit them\n.env\n";

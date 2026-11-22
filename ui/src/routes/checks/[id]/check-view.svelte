@@ -77,7 +77,7 @@
 	]);
 </script>
 
-<AppTopbar title="Checks">
+<AppTopbar title="Checks" subject="{c?.name ?? id} · Check">
 	{#if c && app.client.supports('launchAdhocRun')}
 		<GatedButton size="bar" requires="run.adhoc" variant="default" onclick={() => goto(to(planHref(c?.node ? [c.node] : [], 'audit')))}><PlayIcon class="size-3.5 fill-current stroke-none" />Run check</GatedButton>
 	{/if}

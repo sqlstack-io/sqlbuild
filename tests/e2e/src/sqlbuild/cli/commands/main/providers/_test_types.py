@@ -1,4 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -142,6 +144,7 @@ class ProviderSecretE2ETestCase:
     expected_exit_code: int
     expected_output_fragments: tuple[str, ...]
     expected_marker_entries: tuple[str, ...]
+    unexpected_output_fragments: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -156,3 +159,39 @@ class SnowflakeKeyWarningE2ETestCase:
     description: str
     command: tuple[str, ...]
     expected_warnings: int = 1
+
+
+@dataclass(frozen=True)
+class EnvFileE2ETestCase:
+    """A project env file, the command run beside it, and what the provider saw."""
+
+    description: str
+    # Written after `name` and `adapter`, before the `[connection]` table.
+    project_toml: str
+    # Files written beside sqlbuild_project.toml, each with its permission bits.
+    files: dict[str, tuple[str, int]]
+    command: tuple[str, ...]
+    env: dict[str, str]
+    expected_exit_code: int
+    expected_output_fragments: tuple[str, ...]
+    # The region the provider read; empty when the task did not run.
+    expected_region: str
+    unexpected_output_fragments: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ProjectDirSpellingTestCase:
+    description: str
+    # The `--project-dir` argument for the project, such as a symlink to it or a relative path.
+    project_argument: Callable[[Path], Path]
+    expected_output_fragment: str
+
+
+@dataclass(frozen=True)
+class ChangedCantRunTestCase:
+    description: str
+    # Selectors built once with the secret set, then planned with --changed without it.
+    select: str
+    expected_cant_run_nodes: list[str]
+    expected_cant_run_readers: list[str]
+    expected_unchanged: list[str]

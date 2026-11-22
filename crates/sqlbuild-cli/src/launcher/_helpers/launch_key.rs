@@ -5,6 +5,8 @@ use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
+use sqlbuild_core::process_environment::main::environment_vars_os::environment_vars_os;
+
 use crate::launcher::constants::{
     LAUNCH_KEY_DOMAIN, MISSING_FILE_STAMP, PROJECT_DIR_ABBREVIATION_PREFIXES, PROJECT_DIR_OPTIONS,
     VOLATILE_ENVIRONMENT,
@@ -69,7 +71,8 @@ pub(crate) fn launch_key(
         update(&mut hasher, &os_bytes(argument));
     }
     update(&mut hasher, &os_bytes(cwd.as_os_str()));
-    let mut environment: Vec<(OsString, OsString)> = std::env::vars_os()
+    let mut environment: Vec<(OsString, OsString)> = environment_vars_os()
+        .into_iter()
         .filter(|(name, _)| !is_volatile(name))
         .collect();
     environment.sort();

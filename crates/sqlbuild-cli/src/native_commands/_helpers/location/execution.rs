@@ -8,11 +8,14 @@ use crate::compute_logs::main::finish_capture::finish_capture;
 use crate::compute_logs::main::open_log_root::open_log_root;
 use crate::compute_logs::main::start_capture::start_capture;
 use crate::compute_logs::models::{CaptureEnd, CaptureStart, OpenCapture};
+use crate::dev_screen::main::terminal_size::terminal_size;
 use crate::dev_screen::models::ScreenSetup;
 use crate::dev_screen::models::{DevStep, ScreenMessage};
 use crate::dev_screen::types::DevScreenParts;
 use crate::dev_session::main::run_dev_session::run_dev_session;
 use crate::dev_session::models::{DevProject, LocationPipes};
+use crate::dev_stop::main::stop_switch::stop_switch;
+use crate::dev_stop::models::DevEnd;
 use crate::native_commands::_helpers::command::decision::{
     control_address, control_database, control_database_variable, flag, text,
 };
@@ -22,7 +25,7 @@ use crate::native_commands::_helpers::command::paths::exclude_location_databases
 use crate::native_commands::_helpers::command::paths::{location_database_files, project_location};
 use crate::native_commands::_helpers::command::project_facts::has_no_runtime_extensions;
 use crate::native_commands::_helpers::command::project_facts::{
-    development_project_name, project_directory_name, project_name,
+    development_project_name, project_name,
 };
 use crate::native_commands::_helpers::command::rules::run_rules;
 use crate::native_commands::_helpers::command::skills::{run_skills, skill_freshness_notice};
@@ -30,14 +33,20 @@ use crate::native_commands::_helpers::command::terminal::share_terminal;
 use crate::native_commands::_helpers::command::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
-use crate::native_commands::_helpers::command::terminal::{live_screen, stderr_columns};
+use crate::native_commands::_helpers::command::terminal::{live_screen, screen_colour};
+use crate::native_commands::_helpers::location::dev_cancel::DevRuns;
+use crate::native_commands::_helpers::location::dev_supervision::{
+    DevRoles, supervise_development_roles,
+};
+use crate::native_commands::_helpers::location::dynamic_resume::resume_expired_holds;
+use crate::native_commands::_helpers::location::env_reload::env_file_summary;
+use crate::native_commands::_helpers::location::provider_secrets::report_provider_secrets;
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_timeout_seconds, rows_text, scan_line,
 };
 use crate::native_commands::constants::PLAN_NOT_PRODUCED;
-use crate::native_commands::constants::SCREEN_INDENT;
 use crate::native_commands::constants::{
-    ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS,
+    ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS, FALLBACK_ROWS,
     METADATA_OVERLAP_SECONDS, METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS,
     METADATA_RECONCILE_SECONDS, METADATA_REPLY_BYTES, METADATA_SAFETY_SYNC_SECONDS,
     METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS,
@@ -71,6 +80,8 @@ use sqlbuild_config::project::main::project_config_paths::project_config_paths;
 use sqlbuild_config::project::main::sync_interval_seconds::sync_interval_seconds;
 use sqlbuild_config::project::models::ControlConfig;
 use sqlbuild_core::cli_text::models::CliStyle;
+use sqlbuild_core::process_environment::constants::RUN_TOKEN_VARIABLE;
+use sqlbuild_core::process_environment::main::apply_environment_overlay::apply_environment_overlay;
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use sqlbuild_core::screen_text::models::{DevHeader, ScreenFacts};
 use sqlbuild_orchestration::api::constants::BODY_BYTES;
@@ -95,6 +106,7 @@ use sqlbuild_orchestration::platform::main::health::report_remote_location_healt
 use sqlbuild_orchestration::platform::main::installation::run_maintenance::run_maintenance;
 use sqlbuild_orchestration::platform::models::ConnectionCheckTrigger;
 use sqlbuild_orchestration::platform::models::LocationRuleFailure;
+use sqlbuild_orchestration::platform::models::PublishedGeneration;
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
     WarehouseSyncFailure,
@@ -135,13 +147,13 @@ use tokio::task::JoinSet;
 use tokio::time::{Instant, Interval, MissedTickBehavior};
 use uuid::Uuid;
 
-/// Own the API, scheduler and outbound location as one development process tree, drawn by `screen`.
+/// Own the API, scheduler and outbound location as one development process tree, drawn by `screen`, until a stop or a role ends it.
 pub(crate) async fn run_development_roles(
     (store, scope): (ControlStore, DevelopmentScope),
     (project, executable): (PathBuf, PathBuf),
     listener: tokio::net::TcpListener,
     (scheduler, (messages, actions, keys)): (bool, DevScreenParts),
-) -> Result<(), ControlError> {
+) -> Result<DevEnd, ControlError> {
     let address = listener.local_addr()?;
     let url = format!("http://{address}");
     let location_id = scope.location_id;
@@ -153,79 +165,98 @@ pub(crate) async fn run_development_roles(
         url.clone(),
     )?;
     let (stop, shutdown) = watch::channel(false);
-    let mut tasks = JoinSet::new();
+    let mut roles: DevRoles = DevRoles::default();
     drop(messages.send(ScreenMessage::Started {
         step: DevStep::Api,
         detail: String::new(),
     }));
     let api_ready = messages.clone();
-    tasks.spawn(serve_api(
-        store.clone(),
-        listener,
-        (
-            ApiAuthentication {
-                login: HumanLogin::Development(scope),
-                ..ApiAuthentication::default()
-            },
-            (Vec::new(), adhoc_planner()),
-            ServerFacts {
-                version: env!("CARGO_PKG_VERSION").into(),
-                scheduler,
-                ..ServerFacts::default()
-            },
+    roles.spawn(
+        Some("UI server"),
+        serve_api(
+            store.clone(),
+            listener,
+            (
+                ApiAuthentication {
+                    login: HumanLogin::Development(scope),
+                    ..ApiAuthentication::default()
+                },
+                (Vec::new(), adhoc_planner()),
+                ServerFacts {
+                    version: env!("CARGO_PKG_VERSION").into(),
+                    scheduler,
+                    ..ServerFacts::default()
+                },
+            ),
+            (
+                move || {
+                    drop(api_ready.send(ScreenMessage::Finished {
+                        step: DevStep::Api,
+                        detail: address.to_string(),
+                    }));
+                },
+                development_stopped(shutdown.clone()),
+            ),
         ),
-        (
-            move || {
-                drop(api_ready.send(ScreenMessage::Finished {
-                    step: DevStep::Api,
-                    detail: address.to_string(),
-                }));
-            },
-            development_stopped(shutdown.clone()),
-        ),
-    ));
-    start_platform_roles(&mut tasks, (&store, &shutdown), Default::default())?;
+    );
+    start_platform_roles(&mut roles.tasks, (&store, &shutdown), Default::default())?;
     let (location, pipes) = development_location_role(
         (&project, &executable),
         (location_id, &target),
         (&url, &store),
         shutdown.clone(),
     )?;
-    tasks.spawn(location);
-    tasks.spawn(run_dev_session(
-        (messages.clone(), actions, keys),
-        (
-            pipes,
-            DevProject {
-                executable: executable.clone(),
-                project: project.clone(),
-                target: target.clone(),
-            },
+    roles.spawn(Some("code location"), location);
+    roles.spawn(
+        None,
+        run_dev_session(
+            (messages.clone(), actions, keys),
+            (
+                pipes,
+                DevProject {
+                    executable: executable.clone(),
+                    project: project.clone(),
+                    target: target.clone(),
+                },
+            ),
+            (store.clone(), location_id, url.clone()),
+            shutdown.clone(),
         ),
-        (store.clone(), location_id, url),
-        shutdown.clone(),
-    ));
+    );
     drop(messages.send(ScreenMessage::Started {
         step: DevStep::Scheduler,
         detail: String::new(),
     }));
     if scheduler {
+        roles.runs = Some(DevRuns {
+            store: store.clone(),
+            location_id,
+            target: target.clone(),
+        });
         let scheduler_store = store.clone();
-        tasks.spawn(async move {
+        let origin = Some(url.clone());
+        roles.spawn(Some("scheduler"), async move {
             run_scheduler(
                 &scheduler_store,
-                SchedulerState::new(Uuid::now_v7()),
+                SchedulerState::new(Uuid::now_v7()).with_origin(origin),
                 shutdown,
                 workers,
             )
             .await
         });
     }
-    drop(messages.send(ScreenMessage::Finished {
-        step: DevStep::Scheduler,
-        detail: if scheduler { "started" } else { "off" }.to_owned(),
-    }));
-    supervise_control_roles(tasks, stop).await
+    drop(
+        messages.send(ScreenMessage::Finished {
+            step: DevStep::Scheduler,
+            detail: if scheduler {
+                "triggers start paused"
+            } else {
+                "off (--no-scheduler)"
+            }
+            .to_owned(),
+        }),
+    );
+    Ok(supervise_development_roles(roles, stop, &messages).await)
 }
 
 async fn development_stopped(mut shutdown: watch::Receiver<bool>) {
@@ -250,6 +281,7 @@ fn development_location_role(
     ControlError,
 > {
     let mut command = Command::new(executable);
+    apply_environment_overlay(command.as_std_mut());
     command
         .args(["--project-dir"])
         .arg(project)
@@ -267,13 +299,15 @@ fn development_location_role(
         .env_remove("SQLBUILD_CONTROL_DATABASE_URL")
         .env_remove("SQLBUILD_PLATFORM_WEBHOOK_URL")
         .env_remove(SECURITY_AUDIT_WEBHOOK_VARIABLE)
-        .env_remove("SQLBUILD_RUN_TOKEN")
+        .env_remove(RUN_TOKEN_VARIABLE)
         .env_remove("SQLBUILD_DEVELOPMENT_CONTROL_FILE")
         .env(DEV_EVENTS_VARIABLE, DEV_EVENTS_ON)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
+    #[cfg(unix)]
+    command.process_group(0);
     if let ControlStore::Sqlite(path) = store {
         command.env(
             "SQLBUILD_DEVELOPMENT_CONTROL_FILE",
@@ -281,6 +315,10 @@ fn development_location_role(
         );
     }
     let mut child = command.spawn()?;
+    let group: Option<u32> = child.id();
+    if let Some(group) = group {
+        stop_switch().register_group(group);
+    }
     let (Some(stdin), Some(stdout), Some(stderr)) =
         (child.stdin.take(), child.stdout.take(), child.stderr.take())
     else {
@@ -295,20 +333,25 @@ fn development_location_role(
     };
     Ok((
         async move {
-            tokio::select! {
+            let ended: Result<(), ControlError> = tokio::select! {
                 result = child.wait() => {
-                    result?;
-                    Err(ControlError::Invalid("development code location stopped unexpectedly".into()))
+                    let status = result?;
+                    Err(ControlError::Invalid(format!("the code location stopped unexpectedly ({status})")))
                 },
                 () = development_stopped(shutdown) => {
-                    terminate_child(&mut child)?;
+                    stop_switch().terminate_groups();
+                    terminate_child(&mut child, false)?;
                     match tokio::time::timeout(Duration::from_secs(10), child.wait()).await {
                         Ok(result) => { result?; },
                         Err(_) => child.kill().await?,
                     }
                     Ok(())
                 },
+            };
+            if let Some(group) = group {
+                stop_switch().forget_group(group);
             }
+            ended
         },
         pipes,
     ))
@@ -355,7 +398,13 @@ pub(crate) async fn compile_generation(
             }
         }
     };
-    let Some((record, refresh, locations)) = load.published else {
+    let Some(PublishedGeneration {
+        record,
+        refresh_at: refresh,
+        state_locations: locations,
+        missing_secrets,
+    }) = load.published
+    else {
         if let Some(rules) = &load.rules {
             dev_failure(dev_events, generation, rule_failure_text(rules));
         }
@@ -382,7 +431,7 @@ pub(crate) async fn compile_generation(
             record.snapshot_id
         )));
     }
-    Ok(Some(Ok((refresh_at, locations))))
+    Ok(Some(Ok((refresh_at, locations, missing_secrets))))
 }
 
 /// Under `sqb dev`, tell the screen a generation failed; the last good generation keeps serving.
@@ -394,6 +443,8 @@ fn dev_failure(dev_events: bool, generation: i64, message: String) {
                 generation,
                 position: None,
                 message,
+                code: None,
+                help: None,
             }),
         )]));
     }
@@ -512,6 +563,7 @@ pub(crate) fn metadata_sync(
         state_history_versions: None,
         progress: SyncProgress::new(),
         reads_wake_compute: false,
+        dynamic_quiet_tokens: std::collections::BTreeMap::new(),
     }
 }
 
@@ -956,7 +1008,7 @@ pub(crate) async fn check_published_location(
     )]));
     tokio::pin!(stopped);
     let started = Instant::now();
-    let Some((connected, (missing, wakes_compute), files)) =
+    let Some((connected, wakes_compute, files)) =
         check_location_connection((options, script, connect), stopped.as_mut()).await?
     else {
         return Ok(None);
@@ -971,22 +1023,6 @@ pub(crate) async fn check_published_location(
         result = &mut stopped => { result?; return Ok(None); },
         () = report_location_health(options, bearer, session_id, health) => {},
     }
-    tokio::select! {
-        result = &mut stopped => { result?; return Ok(None); },
-        () = report_location_health(options, bearer, session_id, LocationHealth::ProviderSecrets { generation, missing }) => {},
-    }
-    if missing > 0 {
-        drop(write_output(&[(
-            Stream::Stderr,
-            &format!(
-                "{missing} provider secret(s) are unset in this location's environment; runs that use them fail. Run sqb debug for the list.\n"
-            ),
-        )]));
-        location_warning(
-            "provider secrets unset",
-            format!("{missing} unset; runs that use them fail; sqb debug lists them"),
-        );
-    }
     drop(write_output(&[(
         Stream::Stderr,
         if connected {
@@ -998,11 +1034,11 @@ pub(crate) async fn check_published_location(
     Ok(Some((files, wakes_compute)))
 }
 
-/// Capture the debug check's local file paths, missing secret count and whether history reads wake billed compute; under `sqb dev` it never connects, so nobody signs in twice.
+/// Capture the debug check's local file paths and whether history reads wake billed compute; under `sqb dev` it never connects, so nobody signs in twice.
 pub(crate) async fn check_location_connection(
     (options, script, connect): (&LocationServe, &Path, bool),
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<(bool, (u64, bool), Vec<PathBuf>)>, ControlError> {
+) -> Result<Option<(bool, bool, Vec<PathBuf>)>, ControlError> {
     let mut command = location_child(options, script);
     command.args(["debug", "--target", &options.target, "--json"]);
     if !connect || options.dev_events {
@@ -1023,13 +1059,12 @@ pub(crate) async fn check_location_connection(
         },
         result = async { tokio::try_join!(child.wait(), stdout.read_to_end(&mut output)) } => result?.0.success(),
     };
-    let (files, missing, wakes_compute): (Vec<String>, u64, bool) = match serde_json::from_slice::<
+    let (files, wakes_compute): (Vec<String>, bool) = match serde_json::from_slice::<
         serde_json::Value,
     >(&output)
     .and_then(|report| {
         Ok((
             serde_json::from_value(report["local_files"].clone())?,
-            report["missing_secrets"].as_u64().unwrap_or_default(),
             report["history_reads_wake_compute"]
                 .as_bool()
                 .unwrap_or_default(),
@@ -1041,18 +1076,19 @@ pub(crate) async fn check_location_connection(
                 Stream::Stderr,
                 "Location connection check did not produce a valid report; retaining the published snapshot.\n",
             )]));
-            return Ok(Some((false, (0, false), Vec::new())));
+            return Ok(Some((false, false, Vec::new())));
         }
     };
     Ok(Some((
         connect && connected,
-        (missing, wakes_compute),
+        wakes_compute,
         location_database_files(&options.project_dir, files),
     )))
 }
 
 pub(crate) fn location_child(options: &LocationServe, script: &Path) -> Command {
     let mut command = Command::new(script);
+    apply_environment_overlay(command.as_std_mut());
     command.arg("--project-dir").arg(&options.project_dir);
     if terminal_columns().is_err() {
         command.env(COLUMNS_VARIABLE, FALLBACK_COLUMNS.to_string());
@@ -1178,43 +1214,6 @@ pub(crate) async fn open_control_workers(
     let workers = open_workers(store, launchers, (variable, scheduler_enabled)).await?;
     let images = docker_image_sources(&workers);
     Ok((workers, (images, adhoc_planner())))
-}
-
-pub(crate) async fn shutdown_signal() -> Result<(), ControlError> {
-    #[cfg(unix)]
-    {
-        let mut terminate =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
-        tokio::select! {
-            result = tokio::signal::ctrl_c() => result?,
-            _ = terminate.recv() => {},
-        }
-    }
-    #[cfg(not(unix))]
-    tokio::signal::ctrl_c().await?;
-    Ok(())
-}
-
-/// Stop sibling roles on a signal or role failure, then drain their shutdown results.
-pub(crate) async fn supervise_control_roles(
-    mut tasks: JoinSet<Result<(), ControlError>>,
-    stop: watch::Sender<bool>,
-) -> Result<(), ControlError> {
-    let mut result = tokio::select! {
-        result = tasks.join_next() => match result {
-            Some(result) => result.map_err(ControlError::from).and_then(std::convert::identity),
-            None => Ok(()),
-        },
-        result = shutdown_signal() => result,
-    };
-    stop.send_replace(true);
-    while let Some(joined) = tasks.join_next().await {
-        let joined = joined
-            .map_err(ControlError::from)
-            .and_then(std::convert::identity);
-        result = result.and(joined);
-    }
-    result
 }
 
 /// The capture Python's `dispatch_with_compute_logs` opens; a failure only loses the log.
@@ -1438,14 +1437,20 @@ pub(crate) async fn read_metadata_page(
     Ok(Some((state, read)))
 }
 
-/// A completed synchronization closes its reader, so no warehouse session outlives the sync.
+/// A completed synchronization resumes expired dynamic holds, then closes its reader, so no warehouse session outlives the sync.
 pub(crate) async fn finish_metadata_page(
     state: LocationMetadataSync,
+    stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
-    if state.idle {
-        return Ok(Some(close_metadata_reader(state).await?));
+    if !state.idle {
+        return Ok(Some(state));
     }
-    Ok(Some(state))
+    tokio::pin!(stopped);
+    let state: LocationMetadataSync = tokio::select! {
+        result = &mut stopped => { result?; return Ok(None); },
+        state = resume_expired_holds(state) => state,
+    };
+    Ok(Some(close_metadata_reader(state).await?))
 }
 
 /// End of input lets the reader close its warehouse session; one that ignores it is killed.
@@ -1541,7 +1546,7 @@ pub(crate) async fn next_turn(
     }
 }
 
-/// `sqb dev`'s control lines from stdin; outside `sqb dev`, a fixed connected state.
+/// `sqb dev`'s control lines from stdin; outside `sqb dev`, a fixed connected state. `sqb dev` holds stdin open while it lives, so its end, even after `sqb dev` was killed, stops the location as SIGTERM does.
 pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevControlState> {
     let (sender, receiver) = watch::channel(DevControlState {
         warehouse: (!options.dev_events).then_some(true),
@@ -1560,6 +1565,11 @@ pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevContro
                     None => {}
                 }
             }
+            #[cfg(unix)]
+            let _ = rustix::process::kill_process(
+                rustix::process::getpid(),
+                rustix::process::Signal::TERM,
+            );
         });
     }
     receiver
@@ -1636,13 +1646,16 @@ pub(crate) async fn settle_publication(
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Settled>, ControlError> {
     let (mut metadata, deferred) = if connect {
-        let sync: LocationMetadataSync = metadata_sync(
+        let mut sync: LocationMetadataSync = metadata_sync(
             (locations, generation),
             (
                 options.metadata_reconcile_seconds,
                 options.safety_sync_seconds,
             ),
         );
+        sync.dynamic_quiet_tokens = metadata
+            .map(|previous| previous.dynamic_quiet_tokens)
+            .unwrap_or_default();
         (Some(sync), None)
     } else {
         (metadata, Some((locations, generation)))
@@ -1727,24 +1740,35 @@ pub(crate) async fn announced_store(
     Ok((store, scope))
 }
 
-/// The header, width and paths the screen starts with.
-pub(crate) fn screen_setup(project: &Path, target: &str) -> ScreenSetup {
-    let live: bool = live_screen();
+/// The header, size and paths the screen starts with; `plain` asks for appended lines.
+pub(crate) fn screen_setup(
+    project: &Path,
+    (target, adapter): (&str, &str),
+    plain: bool,
+) -> ScreenSetup {
+    let live: bool = live_screen(plain);
+    let (columns, rows): (usize, usize) = terminal_size(None).unwrap_or((
+        usize::try_from(FALLBACK_COLUMNS).unwrap_or(80),
+        FALLBACK_ROWS,
+    ));
     ScreenSetup {
         live,
         facts: ScreenFacts {
-            columns: stderr_columns(),
-            style: CliStyle { use_color: live },
+            columns,
+            rows,
+            style: CliStyle {
+                use_color: screen_colour(live),
+            },
             links: live,
-            indent: SCREEN_INDENT,
         },
         header: DevHeader {
             version: env!("CARGO_PKG_VERSION").to_owned(),
             project: project_name(project),
             target: target.to_owned(),
         },
-        watching: format!("{}/", project_directory_name(project)),
+        adapter: adapter.to_owned(),
         project_root: project.to_string_lossy().into_owned(),
+        env_file: env_file_summary(project),
     }
 }
 
@@ -1796,7 +1820,7 @@ pub(crate) async fn finish_compile(
     ),
 ) -> Result<Option<Settled>, ControlError> {
     tokio::pin!(stopped);
-    let (refresh_at, locations) = match load {
+    let (refresh_at, locations, missing_secrets) = match load {
         Ok(published) => published,
         Err(rules) => {
             watch.retry_at = Some(Instant::now() + Duration::from_secs(30));
@@ -1812,6 +1836,10 @@ pub(crate) async fn finish_compile(
         }
     };
     watch.retry_at = refresh_at;
+    tokio::select! {
+        result = &mut stopped => { result?; return Ok(None); },
+        () = report_provider_secrets(options, session, (generation, missing_secrets)) => {},
+    }
     let trigger = if watch.checked {
         ConnectionCheckTrigger::Publish
     } else {

@@ -1,4 +1,4 @@
-//! A provider class's declared settings and whether the environment sets its required secrets.
+//! A provider class's declared settings and whether the environment sets its required secrets, its fields without a default.
 
 use crate::orchestration_reads::models::ProviderState;
 use pyo3::exceptions::PyValueError;
@@ -59,16 +59,22 @@ pub(crate) fn setting_rows(class: &Value) -> Vec<Value> {
             "secret": type_name.contains("Secret"),
             "env": if case_sensitive { env } else { env.to_uppercase() },
             "description": field["description"],
+            "line": field["line"],
         }));
     }
     rows
 }
 
-/// The environment variables of the class's secret settings.
+/// Whether a setting is a required secret: every field without a default is one.
+fn required_secret(row: &Value) -> bool {
+    row["required"].as_bool().unwrap_or_default()
+}
+
+/// The environment variables of the class's required secrets, its fields without a default.
 pub(crate) fn secret_variables(provider_class: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     Ok(setting_rows(&provider_class_settings(provider_class)?)
         .iter()
-        .filter(|row| row["secret"].as_bool().unwrap_or_default())
+        .filter(|row| required_secret(row))
         .filter_map(|row| row["env"].as_str().map(str::to_owned))
         .collect())
 }
@@ -129,10 +135,10 @@ pub(crate) fn missing_secrets(provider_class: &Bound<'_, PyAny>) -> PyResult<Vec
     }
 }
 
-/// The environment variable of the secret setting pydantic reports as `field`, by its name or alias.
+/// The environment variable of the required setting pydantic reports as `field`, by its name or alias.
 fn secret_env<'a>(rows: &'a [Value], field: &str) -> Option<&'a str> {
     rows.iter()
-        .filter(|row| row["secret"].as_bool().unwrap_or_default())
+        .filter(|row| required_secret(row))
         .find(|row| {
             row["name"].as_str() == Some(field)
                 || row["alias"].as_str() == Some(field)

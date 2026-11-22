@@ -2,9 +2,10 @@
 
 use std::ffi::OsString;
 
+use crate::argv::main::namespace_defaults::namespace_defaults;
 use crate::argv::main::parse_cli_arguments::parse_cli_arguments;
 use crate::argv::models::{ArgvOutcome, ArgvSettings, Namespace};
-use crate::native_commands::_helpers::command::argv_host::{NativeArgvHost, namespace_defaults};
+use crate::native_commands::_helpers::command::argv_host::NativeArgvHost;
 use crate::native_commands::_helpers::command::decision::{review_json_failure, text};
 use crate::native_commands::_helpers::command::terminal::{
     finish_rejected_parse, stdout_supports_color, terminal_columns,

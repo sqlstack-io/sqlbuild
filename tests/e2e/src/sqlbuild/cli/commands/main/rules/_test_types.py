@@ -54,6 +54,8 @@ class SharedDepthModelRuleCase:
     rule: str
     expected_evaluated_models: int
     expected_unevaluated_resources: int
+    path: str = "models/staging/orders.sql"
+    extra_files: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)

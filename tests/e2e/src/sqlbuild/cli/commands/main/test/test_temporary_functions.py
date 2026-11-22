@@ -98,6 +98,22 @@ _SECOND_CONNECTION_FAILS: dict[str, str] = {
     ),
 }
 
+_NO_COPIES: dict[str, str] = {
+    **_PROJECT_FILES,
+    "sqlbuild_project.toml": _PROJECT_FILES["sqlbuild_project.toml"].replace(
+        'adapter = "duckdb"', 'adapter = "duckdb_no_copies"'
+    ),
+    "adapters/duckdb_no_copies.py": (
+        "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
+        "class DuckDbNoCopiesAdapter(DuckDbAdapter):\n"
+        '    adapter_name = "duckdb_no_copies"\n\n'
+        "    def execute(self, *, connection, sql):\n"
+        '        if sql.startswith("CREATE OR REPLACE TEMP MACRO"):\n'
+        '            raise PermissionError("temporary macros are disabled on this session")\n'
+        "        return super().execute(connection=connection, sql=sql)\n"
+    ),
+}
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -242,6 +258,48 @@ def test_given_function_calling_another_when_testing_then_callee_current_definit
         tested.stdout + tested.stderr,
     )
     assert test_case.expected_stdout_fragment in tested.stdout, test_case.description
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        TemporaryFunctionConnectionE2ETestCase(
+            description="refused copy of a built function is a coded error, not the built function",
+            expected_exit_code=1,
+            expected_stderr_fragment=(
+                "error[T006]: could not create the temporary copy of function "
+                "is_completed_order on the first test connection: "
+                "temporary macros are disabled on this session"
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_copy_refused_when_testing_built_function_then_reports_coded_error(
+    test_case: TemporaryFunctionConnectionE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="orders_temporary_functions",
+        repo_files={**_NO_COPIES, _FUNCTION_PATH: _FUNCTION_HEADER + "order_status = 'completed'"},
+    )
+    built: subprocess.CompletedProcess[str] = run_sqb(
+        command=("build", "--no-tests", "--no-audits"), project_dir=project_dir
+    )
+    _ = (project_dir / _FUNCTION_PATH).write_text(
+        _FUNCTION_HEADER + "order_status = 'shipped'", encoding="utf-8"
+    )
+
+    tested: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "test"), project_dir=project_dir
+    )
+
+    output: str = tested.stdout + tested.stderr
+    assert built.returncode == 0, (test_case.description, built.stdout + built.stderr)
+    assert tested.returncode == test_case.expected_exit_code, (test_case.description, output)
+    assert test_case.expected_stderr_fragment in tested.stderr, (test_case.description, output)
+    assert "PASS=1" not in tested.stdout, (test_case.description, output)
 
 
 @pytest.mark.parametrize(

@@ -45,7 +45,7 @@
 	];
 </script>
 
-<AppTopbar title="Roles">
+<AppTopbar title="Roles" subject="{name} · Roles">
 	<RefreshButton onclick={() => role.refresh()} />
 </AppTopbar>
 

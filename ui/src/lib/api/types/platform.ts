@@ -173,6 +173,20 @@ export type LocationDetail = {
 	connectionTest: ConnectionTest | null;
 	/** Jobs and groups this server's pool caps make run alone in a pool: the server's own warning, not a check-in. */
 	poolCapWarnings: PoolCapWarning[];
+	/** Providers the location's environment leaves required secrets unset for, from its newest publication. */
+	missingSecrets: MissingProviderSecrets[];
+};
+
+/** A provider whose required secrets the location's environment leaves unset; names only, never values. */
+export type MissingProviderSecrets = {
+	provider: string;
+	/** The provider file, relative to the project. */
+	path: string;
+	settings: { field: string; variable: string; line: number | null }[];
+	/** Snapshot node keys that run the provider, such as `source:raw_payments`. */
+	nodes: string[];
+	/** The target's `allow_missing_secrets` lists the provider: a note, not a problem. */
+	allowed: boolean;
 };
 
 /** A job or group asking a pool for more than this server's cap, so it takes the whole pool. */
@@ -398,6 +412,13 @@ export type Account = Principal & {
 	disabled: boolean;
 	/** Signed-in browser sessions; disabling the account revokes them. */
 	activeSessions: number;
+};
+
+/** A person to add who signs in with a password: their sign-in name, first password and a built-in role everywhere, or none for the default role only. */
+export type NewPasswordAccount = {
+	name: string;
+	password: string;
+	role: BuiltInRole | null;
 };
 
 /** How much an action can do: look, operate runs, change warehouse data, or administer access. */

@@ -46,7 +46,7 @@ impl WorkerChild {
 
     pub(in crate::workers) async fn terminate(&mut self) -> Result<(), ControlError> {
         match self {
-            Self::Local(child) => terminate_child(child),
+            Self::Local(child) => terminate_child(child, false),
             Self::RecoveredLocal(owner) => Ok(stop_worker(owner, false)?),
             Self::Docker(child) => child.signal("SIGTERM").await,
         }
@@ -55,6 +55,7 @@ impl WorkerChild {
     pub(in crate::workers) async fn kill(&mut self) -> Result<(), ControlError> {
         match self {
             Self::Local(child) => {
+                terminate_child(child, true)?;
                 child.start_kill()?;
                 Ok(())
             }

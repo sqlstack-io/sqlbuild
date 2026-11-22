@@ -10,8 +10,8 @@ use crate::project::models::{ChangesConfig, ControlConfig, DynamicConfig, Review
 use crate::project::tests::helpers::{failure_at, first_failure, project_directory};
 use crate::project::tests::test_types::{
     ChangesConfigTestCase, ControlConfigTestCase, DynamicConfigErrorTestCase,
-    DynamicConfigTestCase, GitBaseRefTestCase, PoolsErrorTestCase, PoolsTestCase,
-    ProjectFailureTestCase, ReviewConfigErrorTestCase, ReviewConfigTestCase,
+    DynamicConfigTestCase, EnvFileConfigErrorTestCase, GitBaseRefTestCase, PoolsErrorTestCase,
+    PoolsTestCase, ProjectFailureTestCase, ReviewConfigErrorTestCase, ReviewConfigTestCase,
 };
 
 const PROJECT: &str = "name = 'orders'\nadapter = 'duckdb'\n";
@@ -630,6 +630,36 @@ fn given_invalid_pools_when_loading_then_project_loading_rejects_them() {
             project: "name = 'orders'\nadapter = 'duckdb'\n[pools]\nnightly = 1\n",
             local: "[targets.prod.pools]\nnightly = 2\n",
             expected_fragment: "targets.prod.pools is project policy; set it in \
+                                sqlbuild_project.toml",
+        },
+    ];
+    for test_case in test_cases {
+        let (_directory, paths) = project_directory(test_case.project, test_case.local);
+
+        let failure = format!("{:?}", first_failure(&paths).expect(test_case.description));
+
+        assert!(
+            failure.contains(test_case.expected_fragment),
+            "{}: {failure}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_invalid_env_file_settings_when_loading_then_loading_rejects_them() {
+    let test_cases = [
+        EnvFileConfigErrorTestCase {
+            description: "a project env_file that is not a string",
+            project: "name = 'orders'\nadapter = 'duckdb'\nenv_file = 1\n",
+            local: "",
+            expected_fragment: "Expected 'env_file' to be a string when provided",
+        },
+        EnvFileConfigErrorTestCase {
+            description: "a local target choosing the env file",
+            project: "name = 'orders'\nadapter = 'duckdb'\n",
+            local: "[targets.dev]\nenv_file = 'mine.env'\n",
+            expected_fragment: "targets.dev.env_file is project configuration; set it in \
                                 sqlbuild_project.toml",
         },
     ];

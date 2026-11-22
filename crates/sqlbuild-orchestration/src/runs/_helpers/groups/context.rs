@@ -32,6 +32,7 @@ pub(crate) async fn load_group(
     let children = rows.into_iter().map(decode_row).collect::<Result<_, _>>()?;
     let (transaction, definitions) =
         frozen_definitions(transaction, parent.request_json.snapshot_id).await?;
+    let definitions = definitions?;
     let (transaction, failures) = query(
         transaction,
         &format!("SELECT n.node_key FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \

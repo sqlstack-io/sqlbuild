@@ -216,7 +216,7 @@ impl SqlDocument {
         tree_node(py, tree, tree.nodes.len())
     }
 
-    /// Every node of `kind`, compared without case, as a stable source location.
+    /// Every node of exactly `kind`, a snake_case syntax tree kind, as a stable source location.
     #[pyo3(signature = (*, kind))]
     fn nodes<'py>(&self, py: Python<'py>, kind: &str) -> PyResult<Bound<'py, PyTuple>> {
         self.source_nodes(py, kind, |_, _| true)
@@ -224,17 +224,17 @@ impl SqlDocument {
 
     /// Every common table expression.
     fn ctes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
-        self.nodes(py, "CTE")
+        self.nodes(py, "cte")
     }
 
     /// Every join clause.
     fn joins<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
-        self.nodes(py, "Join")
+        self.nodes(py, "join")
     }
 
     /// Every parenthesized subquery.
     fn subqueries<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
-        self.nodes(py, "Subquery")
+        self.nodes(py, "subquery")
     }
 
     /// Where `node`, read from this model query, is in the model file; `None` for other SQL.
@@ -264,7 +264,7 @@ impl SqlDocument {
 
     /// Every projected star, bare or qualified; a star a function call takes, such as `COUNT(*)`, is no projection.
     fn star_projections<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
-        self.source_nodes(py, "Star", |nodes, node| {
+        self.source_nodes(py, "star", |nodes, node| {
             node.parent
                 .is_none_or(|parent| nodes[parent].kind != AGGREGATE_KIND)
         })
@@ -272,25 +272,24 @@ impl SqlDocument {
 }
 
 impl SqlDocument {
-    /// The nodes of `kind` that `keep` accepts, labelled `kind`, as `SqlNode` locations.
+    /// The nodes of exactly `kind` that `keep` accepts, as `SqlNode` locations.
     fn source_nodes<'py>(
         &self,
         py: Python<'py>,
         kind: &str,
         keep: impl Fn(&[TreeNode], &TreeNode) -> bool,
     ) -> PyResult<Bound<'py, PyTuple>> {
-        let wanted: String = kind.to_lowercase();
         let nodes: &[TreeNode] = &self.parsed(py)?.nodes;
         let mut found: Vec<Bound<'py, PyAny>> = Vec::new();
         for node in nodes
             .iter()
-            .filter(|node| node.kind == wanted && keep(nodes, node))
+            .filter(|node| node.kind == kind && keep(nodes, node))
         {
             found.push(new_record_with(
                 py,
                 RecordId::SqlNode,
                 &[
-                    ("kind", kind.into_pyobject(py)?.into_any()),
+                    ("kind", node.kind.into_pyobject(py)?.into_any()),
                     ("line", node.line.into_pyobject(py)?.into_any()),
                     ("column", node.column.into_pyobject(py)?.into_any()),
                 ],
