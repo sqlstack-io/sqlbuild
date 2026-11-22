@@ -122,5 +122,5 @@ pub(super) struct JobSettingFaultsTestCase {
 pub(super) struct CommandProjectTestCase {
     pub(super) description: &'static str,
     pub(super) argv: &'static [&'static str],
-    pub(super) expected: Option<(&'static str, Option<&'static str>)>,
+    pub(super) expected_project_and_target: Option<(&'static str, Option<&'static str>)>,
 }

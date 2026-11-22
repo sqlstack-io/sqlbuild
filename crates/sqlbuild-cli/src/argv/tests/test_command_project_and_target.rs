@@ -7,7 +7,7 @@ fn given_a_command_line_when_reading_its_project_and_target_then_typed_options_s
         CommandProjectTestCase {
             description: "no typed options",
             argv: &["--project-dir", "shop", "build", "--target", "dev"],
-            expected: Some(("shop", Some("dev"))),
+            expected_project_and_target: Some(("shop", Some("dev"))),
         },
         CommandProjectTestCase {
             description: "a concurrency",
@@ -20,7 +20,7 @@ fn given_a_command_line_when_reading_its_project_and_target_then_typed_options_s
                 "--target",
                 "dev",
             ],
-            expected: Some(("shop", Some("dev"))),
+            expected_project_and_target: Some(("shop", Some("dev"))),
         },
         CommandProjectTestCase {
             description: "run variables",
@@ -33,7 +33,7 @@ fn given_a_command_line_when_reading_its_project_and_target_then_typed_options_s
                 "--target",
                 "dev",
             ],
-            expected: Some(("shop", Some("dev"))),
+            expected_project_and_target: Some(("shop", Some("dev"))),
         },
         CommandProjectTestCase {
             description: "a command whose numeric defaults are validated",
@@ -46,12 +46,12 @@ fn given_a_command_line_when_reading_its_project_and_target_then_typed_options_s
                 "--browse",
                 "models",
             ],
-            expected: Some(("shop", None)),
+            expected_project_and_target: Some(("shop", None)),
         },
         CommandProjectTestCase {
             description: "an unknown option",
             argv: &["--project-dir", "shop", "build", "--no-such-option"],
-            expected: None,
+            expected_project_and_target: None,
         },
     ];
 
@@ -60,7 +60,7 @@ fn given_a_command_line_when_reading_its_project_and_target_then_typed_options_s
         assert_eq!(
             command_project_and_target(&arguments),
             test_case
-                .expected
+                .expected_project_and_target
                 .map(|(project, target)| (Some(project.to_owned()), target.map(str::to_owned))),
             "{}",
             test_case.description

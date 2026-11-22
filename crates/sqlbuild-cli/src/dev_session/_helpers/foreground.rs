@@ -196,14 +196,13 @@ fn echo_terminal(controller: File, screen: UnboundedSender<ScreenMessage>) {
     });
 }
 
-/// A pseudo-terminal: the controller `sqb dev` writes keys to, and the terminal the client reads, sized like this one. It echoes as a terminal does, so a plain prompt shows what is typed and a password prompt that turns echo off hides it.
+/// A pseudo-terminal: the controller `sqb dev` writes keys to, and the terminal the client reads, sized like this one. It echoes as a terminal does, so a plain prompt shows what is typed and a password prompt that turns echo off hides it. Outside Linux `openpt` can't open close-on-exec, so that is set straight after.
 #[cfg(unix)]
 fn open_terminal() -> std::io::Result<(File, File)> {
     use rustix::fs::{Mode, OFlags};
     use rustix::pty::{OpenptFlags, grantpt, openpt, ptsname, unlockpt};
     #[cfg(target_os = "linux")]
     let controller = openpt(OpenptFlags::RDWR | OpenptFlags::NOCTTY | OpenptFlags::CLOEXEC)?;
-    // Elsewhere `openpt` can't open close-on-exec, so it is set straight after.
     #[cfg(not(target_os = "linux"))]
     let controller = {
         let controller = openpt(OpenptFlags::RDWR | OpenptFlags::NOCTTY)?;
