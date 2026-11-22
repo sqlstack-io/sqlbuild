@@ -31,6 +31,16 @@ pub(crate) struct OutputReadTestCase {
     pub(crate) expected_downloads: (&'static str, &'static str),
 }
 
+/// A marked line holding a NUL, in a batch with another line after it and a batch after that.
+pub(crate) struct OutputNulTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) printed: [&'static str; 2],
+    pub(crate) expected_mark: &'static str,
+    /// Every line as printed, NUL included.
+    pub(crate) expected_lines: [&'static str; 4],
+}
+
 pub(crate) struct OutputFoldTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
