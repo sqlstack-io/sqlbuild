@@ -3,7 +3,7 @@
 use sqlbuild_orchestration::dev_events::models::UnsetProviderSecrets;
 use sqlbuild_orchestration::platform::models::{MissingProviderSecrets, MissingProviderSetting};
 
-use crate::native_commands::_helpers::location::execution::unset_provider_secrets;
+use crate::native_commands::_helpers::location::provider_secrets::unset_provider_secrets;
 use crate::native_commands::tests::test_types::UnsetProviderSecretsTestCase;
 
 #[test]

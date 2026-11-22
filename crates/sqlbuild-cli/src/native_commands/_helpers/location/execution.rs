@@ -40,6 +40,7 @@ use crate::native_commands::_helpers::location::dev_supervision::{
 };
 use crate::native_commands::_helpers::location::dynamic_resume::resume_expired_holds;
 use crate::native_commands::_helpers::location::env_reload::env_file_summary;
+use crate::native_commands::_helpers::location::provider_secrets::report_provider_secrets;
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_timeout_seconds, rows_text, scan_line,
 };
@@ -99,18 +100,17 @@ use sqlbuild_orchestration::dev_events::main::dev_events_enabled::dev_events_ena
 use sqlbuild_orchestration::dev_events::main::emit_dev_event::emit_dev_event;
 use sqlbuild_orchestration::dev_events::main::parse_dev_control::parse_dev_control;
 use sqlbuild_orchestration::dev_events::main::parse_dev_event::parse_dev_event;
-use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent, UnsetProviderSecrets};
+use sqlbuild_orchestration::dev_events::models::{DevControl, DevEvent};
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::health::report_remote_location_health::report_remote_location_health;
-use sqlbuild_orchestration::platform::main::health::unallowed_secret_count::unallowed_secret_count;
 use sqlbuild_orchestration::platform::main::installation::run_maintenance::run_maintenance;
 use sqlbuild_orchestration::platform::models::ConnectionCheckTrigger;
 use sqlbuild_orchestration::platform::models::LocationRuleFailure;
+use sqlbuild_orchestration::platform::models::PublishedGeneration;
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
     WarehouseSyncFailure,
 };
-use sqlbuild_orchestration::platform::models::{MissingProviderSecrets, PublishedGeneration};
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
@@ -835,62 +835,6 @@ pub(crate) fn location_warning(title: &str, detail: String) {
         title: title.to_owned(),
         detail,
     }));
-}
-
-/// The providers whose missing secrets stop runs, by the variables they read: a provider the target allows to miss secrets is left out.
-pub(crate) fn unset_provider_secrets(
-    providers: &[MissingProviderSecrets],
-) -> Vec<UnsetProviderSecrets> {
-    let mut unset: Vec<UnsetProviderSecrets> = Vec::new();
-    for provider in providers.iter().filter(|provider| !provider.allowed) {
-        let mut variables: Vec<String> = Vec::new();
-        for setting in &provider.settings {
-            variables.push(setting.variable.clone());
-        }
-        unset.push(UnsetProviderSecrets {
-            provider: provider.provider.clone(),
-            variables,
-        });
-    }
-    unset
-}
-
-/// Report the providers a publication shows missing secrets; under `sqb dev`, also tell the screen, which warns until a report shows none.
-pub(crate) async fn report_provider_secrets(
-    options: &LocationServe,
-    (bearer, session_id): (&str, Uuid),
-    (generation, providers): (i64, Vec<MissingProviderSecrets>),
-) {
-    let missing: u64 = unallowed_secret_count(&providers);
-    if missing > 0 {
-        let mut variables: Vec<String> = Vec::new();
-        for provider in providers.iter().filter(|provider| !provider.allowed) {
-            for setting in &provider.settings {
-                variables.push(format!("{} {}", provider.provider, setting.variable));
-            }
-        }
-        drop(write_output(&[(
-            Stream::Stderr,
-            &format!(
-                "Providers are missing secrets in this location's environment; runs that use them stop before the warehouse: {}\n",
-                variables.join(", ")
-            ),
-        )]));
-    }
-    drop(emit_dev_event(&DevEvent::MissingSecrets {
-        providers: unset_provider_secrets(&providers),
-    }));
-    report_location_health(
-        options,
-        bearer,
-        session_id,
-        LocationHealth::ProviderSecrets {
-            generation,
-            missing,
-            providers,
-        },
-    )
-    .await;
 }
 
 /// Health IO remains native even while a user-code child holds its interpreter's GIL.
