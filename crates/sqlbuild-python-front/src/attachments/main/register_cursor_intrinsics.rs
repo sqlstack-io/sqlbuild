@@ -2,6 +2,7 @@
 
 use crate::attachments::_helpers::cursor_intrinsics::cursor_intrinsics_analysis_sql;
 use crate::attachments::_helpers::cursor_intrinsics::validated_model_cursor_intrinsics;
+use crate::attachments::main::replace_cursor_markers::replace_cursor_markers;
 use crate::attachments::main::resolve_cursor_intrinsics::resolve_cursor_intrinsics;
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::wrap_pyfunction;
@@ -10,6 +11,7 @@ use pyo3::wrap_pyfunction;
 pub fn register_cursor_intrinsics(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(validated_model_cursor_intrinsics, module)?)?;
     module.add_function(wrap_pyfunction!(cursor_intrinsics_analysis_sql, module)?)?;
+    module.add_function(wrap_pyfunction!(replace_cursor_markers, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_cursor_intrinsics, module)?)?;
     Ok(())
 }

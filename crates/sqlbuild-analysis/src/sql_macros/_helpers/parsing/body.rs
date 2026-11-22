@@ -8,6 +8,9 @@ use sqlquack_syntax::{Expression, ExpressionWalk, Parsed};
 use crate::analysis_route::main::analysis_route::analysis_route;
 use crate::analysis_route::models::AnalysisRoute;
 use crate::analysis_route::types::NativeDialect;
+use sqlbuild_sqltext::sql_scan::main::bounded_expansions::bounded_expansions;
+use sqlbuild_sqltext::sql_scan::main::expansion_followed_by::expansion_followed_by;
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::sql_macros::_helpers::parsing::captures::{output_selects, slot_captures};
 use crate::sql_macros::_helpers::parsing::header::unquoted;
@@ -309,6 +312,7 @@ fn substituted(
     parameter: &str,
     argument: &RenderedArgument,
     (sql, scanned, token): (&str, &[Token], usize),
+    syntax: Option<&LexicalSyntax>,
 ) -> String {
     match kind {
         ParameterKind::Relation { .. } => {
@@ -329,7 +333,7 @@ fn substituted(
         | ParameterKind::Constant { .. }
             if !is_atomic(&argument.sql) =>
         {
-            format!("({})", argument.sql)
+            format!("({})", expansion_followed_by(&argument.sql, ")", syntax))
         }
         _ => argument.sql.clone(),
     }
@@ -646,11 +650,13 @@ fn substituted_body(
     (body, scanned): (&str, &[Token]),
     (references, reads): (&[ParameterReference], &[SlotRead]),
     (arguments, body_calls): (&[RenderedArgument], &[TypedCall]),
+    syntax: Option<&LexicalSyntax>,
 ) -> (String, Vec<TypedCall>) {
     let mut expanded: String = String::with_capacity(body.len());
     let mut splices: Vec<TextSplice> = Vec::new();
     let mut argument_calls: Vec<TypedCall> = Vec::new();
     let mut cursor: usize = 0;
+    let mut replacements: Vec<((usize, usize), String, &RenderedArgument)> = Vec::new();
     for (position, reference) in references.iter().enumerate() {
         let Some(argument) = arguments.iter().find(|argument| {
             definition.parameters[argument.parameter]
@@ -664,12 +670,12 @@ fn substituted_body(
         let source: (usize, usize) = read.map_or((reference.start, reference.end), |read| {
             (read.start, read.end)
         });
-        expanded.push_str(&body[cursor..source.0]);
         let text: String = substituted(
             &parameter.kind,
             &parameter.name,
             argument,
             (body, scanned, reference.token),
+            syntax,
         );
         let text: String = match read {
             Some(read) => substituted_read(
@@ -680,17 +686,39 @@ fn substituted_body(
             ),
             None => text,
         };
+        replacements.push((source, text, argument));
+    }
+    let sites: Vec<(usize, usize, &str)> = replacements
+        .iter()
+        .map(|((start, end), text, _)| (*start, *end, text.as_str()))
+        .collect();
+    let mut bounded = bounded_expansions(body, &sites, syntax)
+        .into_iter()
+        .peekable();
+    for (index, (source, original, argument)) in replacements.iter().enumerate() {
+        let (text, lead): (String, usize) = bounded
+            .next_if(|expansion| expansion.index == index)
+            .map_or_else(
+                || (original.clone(), 0),
+                |expansion| (expansion.text, expansion.lead),
+            );
+        let source: (usize, usize) = *source;
+        expanded.push_str(&body[cursor..source.0]);
         let start: usize = expanded.len();
         if !argument.calls.is_empty() {
-            let inner: Option<usize> = if text == argument.sql {
+            let inner: Option<usize> = if *original == argument.sql {
                 Some(0)
-            } else if text.len() == argument.sql.len() + 2 && text[1..].starts_with(&argument.sql) {
+            } else if original
+                .strip_prefix('(')
+                .and_then(|rest| rest.strip_prefix(argument.sql.as_str()))
+                .is_some_and(|rest| rest == ")" || rest == "\n)")
+            {
                 Some(1)
             } else {
                 None
             };
             if let Some(inner) = inner {
-                argument_calls.extend(shifted(argument.calls.clone(), start + inner));
+                argument_calls.extend(shifted(argument.calls.clone(), start + lead + inner));
             }
         }
         expanded.push_str(&text);
@@ -723,7 +751,7 @@ fn within(calls: Vec<TypedCall>, (start, end): (usize, usize)) -> Vec<TypedCall>
 pub(crate) fn expand_body(
     parser: &dyn NativeDialect,
     (definition, outer): (&SqlMacroDefinition, Option<&SqlMacroDefinition>),
-    body: &ExpandedText,
+    (body, syntax): (&ExpandedText, Option<&LexicalSyntax>),
     arguments: &[RenderedArgument],
 ) -> Result<BodyExpansion, SqlMacroError> {
     let (body, body_calls): (&str, &[TypedCall]) = (&body.sql, &body.calls);
@@ -765,6 +793,7 @@ pub(crate) fn expand_body(
         (body, &scanned),
         (&references, &reads),
         (arguments, body_calls),
+        syntax,
     );
     let kept: (usize, usize) = match definition.form {
         SqlMacroForm::Expression => trimmed_range(&expanded, 0),

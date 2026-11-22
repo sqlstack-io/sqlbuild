@@ -9,6 +9,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyString, PyStringMethods};
 use pyo3::{Python, pyfunction};
 use sqlbuild_attachments::cursor_intrinsics::main::replace_intrinsics::replace_intrinsics;
+use sqlbuild_sqltext::sql_scan::main::bounded_expansions::bounded_expansions;
 
 use sqlbuild_python_base::boundary::main::compiler_guard::compiler_guard;
 
@@ -31,6 +32,34 @@ pub(crate) fn text_value(value: &Bound<'_, PyAny>) -> Option<String> {
         Ok(text) => Some(text.to_string_lossy().into_owned()),
         Err(_) => None,
     }
+}
+
+/// `sql` with the cursor markers replaced by concrete bounds, none joining a neighbour into a comment.
+pub(crate) fn markers_replaced(sql: &str, (start, end): (&str, &str)) -> String {
+    let mut sites: Vec<(usize, usize, &str)> = Vec::new();
+    for (marker, value) in RESERVED_CURSOR_MARKERS.into_iter().zip([start, end]) {
+        sites.extend(
+            sql.match_indices(marker)
+                .map(|(position, found)| (position, position + found.len(), value)),
+        );
+    }
+    sites.sort_unstable_by_key(|(position, _, _)| *position);
+    let mut texts: Vec<String> = sites
+        .iter()
+        .map(|(_, _, value)| (*value).to_owned())
+        .collect();
+    for bounded in bounded_expansions(sql, &sites, None) {
+        texts[bounded.index] = bounded.text;
+    }
+    let mut replaced: String = String::with_capacity(sql.len());
+    let mut copied: usize = 0;
+    for ((position, after, _), text) in sites.iter().zip(&texts) {
+        replaced.push_str(&sql[copied..*position]);
+        replaced.push_str(text);
+        copied = *after;
+    }
+    replaced.push_str(&sql[copied..]);
+    replaced
 }
 
 /// `sql` with each intrinsic replaced by its bound and whether any was, raising for `context`.

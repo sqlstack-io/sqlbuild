@@ -34,6 +34,8 @@ use crate::sql_macros::models::{
     SqlMacroForm, SqlMacroLocation, TextContext, TypedCall,
 };
 use crate::sql_macros::types::{ConstantShape, SqlMacroHost, SqlMacroScope};
+use sqlbuild_sqltext::sql_scan::main::bounded_expansions::bounded_expansions;
+use sqlbuild_sqltext::sql_scan::main::expansion_followed_by::expansion_followed_by;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 /// The outer SQL macro calls of `text`, or why its `@` constructs could not be read.
@@ -153,9 +155,26 @@ pub(crate) fn expand_text<H: SqlMacroHost>(
     let mut spliced_text: String = String::with_capacity(context.text.len());
     let mut typed: Vec<TypedCall> = Vec::new();
     let mut cursor: usize = 0;
+    let mut expansions: Vec<ExpandedText> = Vec::with_capacity(calls.len());
     for call in &calls {
         let (expansion, updated) = expand_call(host, context, (&scanned, inserted), call)?;
         inserted = updated;
+        expansions.push(expansion);
+    }
+    let sites: Vec<(usize, usize, &str)> = calls
+        .iter()
+        .zip(&expansions)
+        .map(|(call, expansion)| (call.start, call.replaced_end, expansion.sql.as_str()))
+        .collect();
+    for bounded in bounded_expansions(context.text, &sites, syntax) {
+        let expansion: &mut ExpandedText = &mut expansions[bounded.index];
+        expansion.sql = bounded.text;
+        for call in &mut expansion.calls {
+            call.start += bounded.lead;
+            call.end += bounded.lead;
+        }
+    }
+    for (call, expansion) in calls.iter().zip(expansions) {
         spliced_text.push_str(&context.text[cursor..call.start]);
         typed.extend(shifted(expansion.calls, spliced_text.len()));
         spliced_text.push_str(&expansion.sql);
@@ -265,8 +284,13 @@ pub(crate) fn expand_call<H: SqlMacroHost>(
         SqlMacroScope::Macro(outer) => Some(outer.as_ref()),
         SqlMacroScope::Caller => None,
     };
-    let mut expansion: BodyExpansion = expand_body(parser, (&definition, outer), &body, &rendered)
-        .map_err(|error| error.at(body_location(&definition)))?;
+    let mut expansion: BodyExpansion = expand_body(
+        parser,
+        (&definition, outer),
+        (&body, host.lexical_syntax()),
+        &rendered,
+    )
+    .map_err(|error| error.at(body_location(&definition)))?;
     expansion.like = definition.returns_like.as_deref().and_then(|name| {
         rendered
             .iter()
@@ -328,7 +352,7 @@ pub(crate) fn expand_call<H: SqlMacroHost>(
     placed(
         &definition,
         (&site, inserted, line_continues),
-        &expansion,
+        (&expansion, host.lexical_syntax()),
         context.owner,
     )
     .map_err(ExpansionFailure::Macro)
@@ -444,13 +468,13 @@ fn python_string(sql: &str) -> String {
 fn placed(
     definition: &SqlMacroDefinition,
     (site, inserted, line_continues): (&CallSite<'_>, InsertedNames, bool),
-    expansion: &BodyExpansion,
+    (expansion, syntax): (&BodyExpansion, Option<&LexicalSyntax>),
     owner: &str,
 ) -> Result<(ExpandedText, InsertedNames), SqlMacroError> {
     let (text, inserted, prefix) = placed_text(
         definition,
         (site, inserted, line_continues),
-        expansion,
+        (expansion, syntax),
         owner,
     )?;
     let mut calls: Vec<TypedCall> = shifted(expansion.calls.clone(), prefix).collect();
@@ -471,7 +495,7 @@ fn placed(
 fn placed_text(
     definition: &SqlMacroDefinition,
     (site, inserted, line_continues): (&CallSite<'_>, InsertedNames, bool),
-    expansion: &BodyExpansion,
+    (expansion, syntax): (&BodyExpansion, Option<&LexicalSyntax>),
     owner: &str,
 ) -> Result<(String, InsertedNames, usize), SqlMacroError> {
     let closed = |after: &str| {
@@ -479,7 +503,11 @@ fn placed_text(
             None => line_continues,
             Some(next) => next != '\n' && next != '\r',
         };
-        with_line_comment_closed(&expansion.sql, followed)
+        expansion_followed_by(
+            &with_line_comment_closed(&expansion.sql, followed),
+            after,
+            syntax,
+        )
     };
     let position: CallPosition = site.position();
     let name: &str = &definition.name;

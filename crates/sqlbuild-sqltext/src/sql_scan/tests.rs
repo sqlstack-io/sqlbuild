@@ -1,3 +1,7 @@
+#[path = "tests/boundary_helpers.rs"]
+mod boundary_helpers;
+#[path = "tests/test_bounded_expansions.rs"]
+mod bounded_expansions;
 #[path = "tests/test_dialect_scan.rs"]
 mod dialect_scan;
 #[path = "tests/helpers.rs"]
