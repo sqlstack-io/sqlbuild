@@ -963,3 +963,14 @@ class WaitingRepublishTestCase:
     release: str
     expected_exit_code: int
     expected_check_finished: bool
+
+
+@dataclass(frozen=True)
+class KeyedRepublishTestCase:
+    description: str
+    role: str
+    sign_in_arguments: tuple[str, ...]
+    expected_exit_code: int
+    expected_stderr: str
+    expected_generation: int
+    expected_release: str

@@ -14,6 +14,7 @@ import re
 import secrets
 import select
 import signal
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -806,6 +807,14 @@ def wait_for_location_work(
             result = json.load(response)
         time.sleep(0.02)
     return result
+
+
+def network_address() -> str:
+    """The IPv4 address other hosts reach this machine on; connecting UDP sends nothing."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as route:
+        route.connect(("192.0.2.1", 9))
+        address: str = route.getsockname()[0]
+    return address
 
 
 def api_address(process: subprocess.Popen[bytes], log: Path) -> str:

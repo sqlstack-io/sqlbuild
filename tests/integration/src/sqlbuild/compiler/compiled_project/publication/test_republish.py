@@ -1,5 +1,6 @@
 """The real CLI republishes a `sqb dev` location, which rediscovers, and reads the new tags back."""
 
+import ipaddress
 import json
 import os
 import shutil
@@ -9,17 +10,23 @@ import sys
 import time
 from pathlib import Path
 from typing import Any
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     DevelopmentRepublishTestCase,
+    KeyedRepublishTestCase,
     SessionRepublishTestCase,
+    SnapshotApi,
     WaitingRepublishTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    current_snapshot,
+    location_process,
+    network_address,
     wait_for_development_ready,
+    wait_for_generation,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.login.helpers import (
     authentication_arguments,
@@ -327,3 +334,117 @@ def test_given_a_republish_waiting_on_a_check_when_the_grace_passes_then_the_rep
     finally:
         process.send_signal(signal.SIGINT)
         process.wait(timeout=30)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        KeyedRepublishTestCase(
+            description="an operator's key publishes the changed plan",
+            role="operator",
+            sign_in_arguments=(),
+            expected_exit_code=0,
+            expected_stderr="Republish published a snapshot",
+            expected_generation=2,
+            expected_release="0.58.0",
+        ),
+        KeyedRepublishTestCase(
+            description="an operator's key needs neither the password origin nor a CSRF proof",
+            role="operator",
+            sign_in_arguments=("--password-origin", "https://control.example.com"),
+            expected_exit_code=0,
+            expected_stderr="Republish published a snapshot",
+            expected_generation=2,
+            expected_release="0.58.0",
+        ),
+        KeyedRepublishTestCase(
+            description="a viewer's key is refused and nothing is published",
+            role="viewer",
+            sign_in_arguments=(),
+            expected_exit_code=2,
+            expected_stderr="API rejected the request with HTTP 403",
+            expected_generation=1,
+            expected_release="0.57.0",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_service_account_key_over_network_http_when_republishing_then_its_role_decides(
+    test_case: KeyedRepublishTestCase, tmp_path: Path
+) -> None:
+    executable: Path = Path(sys.executable).with_name("sqb")
+    installation: tuple[Path, Path] = executable, tmp_path
+    project: Path = tmp_path / "project"
+    plan: Path = tmp_path / "plan.json"
+    log: Path = tmp_path / "location.log"
+    plan.write_text(json.dumps({"steps": ["pick"], "release": "0.57.0"}))
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
+            'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
+            '[targets.development]\nschema = "main"\n',
+            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            "python/plan/nodes.py": _NODES.format(plan=str(plan)),
+        },
+    )
+    successful(administer(installation, ["create-user", "orders-admin"]))
+    created: dict[str, Any] = successful(administer(installation, ["create-location", "orders"]))
+    location: str = created["location_id"]
+    credential: dict[str, Any] = successful(
+        administer(
+            installation,
+            ["issue-location-token", location, "--expires-at", "2099-01-01T00:00:00Z"],
+        )
+    )
+    account: dict[str, Any] = successful(
+        administer(
+            installation, ["create-service-account", "orders-deploy", "--role", test_case.role]
+        )
+    )
+    key: str = account["key"]
+    address: str = network_address()
+    assert not ipaddress.ip_address(address).is_loopback
+    with serve(
+        installation, authentication_arguments=("--host", "0.0.0.0", *test_case.sign_in_arguments)
+    ) as listening:
+        port: str = listening.rsplit(":", 1)[1]
+        api: SnapshotApi = SnapshotApi(
+            url=f"http://127.0.0.1:{port}", location_id=location, bearer=credential["bearer"]
+        )
+        with location_process(
+            [str(executable), "--project-dir", str(project), "location", "serve"]
+            + ["--server", api.url, "--location-id", location, "--target", "development"],
+            log,
+            tmp_path / "location.stdout",
+            env=environment({"SQLBUILD_LOCATION_TOKEN": api.bearer}),
+        ) as served:
+            _ = wait_for_generation(api, "development", 1, served, log)
+            plan.write_text(json.dumps({"steps": ["pick", "pack"], "release": "0.58.0"}))
+            republished: subprocess.CompletedProcess[str] = subprocess.run(
+                [str(executable), "location", "republish", "--location-id", location]
+                + ["--server", f"http://{address}:{port}", "--target", "development"]
+                + ["--reason", "deploy", "--wait", "--timeout", "45"],
+                cwd=tmp_path,
+                env=environment({"SQLBUILD_API_KEY": key, "NO_PROXY": address}),
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+            assert republished.returncode == test_case.expected_exit_code, republished.stderr
+            assert test_case.expected_stderr in republished.stderr
+            assert republished.stderr.count("travels unencrypted over HTTP") == 1
+            current: dict[str, Any] = current_snapshot(api, "development")
+            assert current["record"]["generation"] == test_case.expected_generation, log.read_text()
+            readback_request: Request = Request(
+                f"{api.url}/api/control/locations/{location}/targets/development/discovered",
+                headers={"Authorization": f"Bearer {key}"},
+            )
+            with urlopen(readback_request, timeout=5) as response:
+                readback: dict[str, Any] = json.load(response)
+            assert readback["snapshot_id"] == current["record"]["snapshot_id"]
+            assert readback["sets"][0]["tags"] == {"release": test_case.expected_release}
+            assert key not in republished.stdout + republished.stderr
+        assert key not in log.read_text() + (tmp_path / "server.log").read_text()
