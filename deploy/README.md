@@ -79,8 +79,9 @@ its warehouse connection. The example schedule runs every minute. The server res
 running container's actual Docker image ID at publication; no `--image-id` or Docker socket is
 needed in the location. Workers recompile in that pinned image and verify environment and node
 hashes before writing. The warehouse persists in its named volume, and so does run output: the
-`output` volume is mounted at `/home/sqlbuild/output`, the server image's default output folder with
-PostgreSQL, so recreating the server keeps it. `docker compose down --volumes` deletes both.
+`output` volume is mounted at `/home/sqlbuild/.local/state/sqlbuild/output`, the server's default output
+folder with PostgreSQL in this image, so recreating the server keeps it. `docker compose down
+--volumes` deletes both.
 
 Check the location the way a container health check would; it exits 1 when the location is down
 or its last load failed:
@@ -221,7 +222,7 @@ Network=sqlbuild.network
 PublishPort=127.0.0.1:8000:8000
 Volume=/etc/sqlbuild/server.toml:/etc/sqlbuild/server.toml:ro
 Volume=/run/podman/podman.sock:/var/run/docker.sock
-Volume=sqlbuild-output:/home/sqlbuild/output
+Volume=sqlbuild-output:/home/sqlbuild/.local/state/sqlbuild/output
 GroupAdd=993
 SecurityLabelDisable=true
 Secret=sqlbuild-control-database-url,type=env,target=SQLBUILD_CONTROL_DATABASE_URL
