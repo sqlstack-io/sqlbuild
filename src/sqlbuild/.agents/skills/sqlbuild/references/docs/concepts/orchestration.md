@@ -287,7 +287,7 @@ Pass `name="..."` to choose another name, which must also end in `_sensor`.
 | --- | --- |
 | `run_event(job="...", kinds=[...])` | Each run of the job or group that ends with one of `kinds`, optionally only when `executed_successfully` nodes ran and succeeded |
 | `node_event(select="...", kinds=[...])` | Each success, failure or recovery of the selected nodes in any run |
-| `check_event(select="...", kinds=[...])` | Each check, audit or SQL test on the selected nodes that fails or warns inside a job or job group run, whatever the run's outcome; ad-hoc `sqb test` and `sqb audit` runs don't count |
+| `check_event(select="...", kinds=[...])` | Each check, audit or SQL test on the selected nodes that fails or warns inside a job, job group or manual build run, whatever the run's outcome; standalone `sqb test` and `sqb audit` runs don't count |
 | `source_new_data(select="...")` | Each new version of the selected sources |
 | `source_stale(select="...", after_seconds=...)` | Each source version older than `after_seconds` |
 | `platform_event(kinds=[...])` | Each server event of `kinds`, such as an overdue tick or a failed run |
@@ -296,8 +296,9 @@ Pass `name="..."` to choose another name, which must also end in `_sensor`.
 `kinds` take the enums `RunEventKind`, `NodeEventKind`, `CheckEventKind` and `PlatformEventKind`
 from `sqlbuild.orchestration`. `RunEventKind` has `SUCCESS`, `WARN`, `PARTIAL`, `FAILED`,
 `CANCELLED`, `SKIPPED` (a member its group did not run) and `COMPLETED` for any of them.
-`CheckEventKind` has `FAILED` and `WARN`. `check_event` covers checks inside job runs, not
-`sqb test` or `sqb scenario test`.
+`CheckEventKind` has `FAILED` and `WARN`. `check_event` covers checks inside job runs and manual
+builds, such as one started from the Plan page, where the event's `job` is `None`. It doesn't
+cover standalone `sqb test` or `sqb audit` runs, or `sqb scenario test`.
 
 ### What the function gets and returns
 

@@ -8,9 +8,11 @@ use uuid::Uuid;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::runs::main::listings::list_runs::list_runs;
-use crate::runs::models::{NodeOutcome, RunOutcome, RunStatus};
+use crate::runs::models::{NodeOutcome, RunCommand, RunOutcome, RunStatus};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::sensors::tests::helpers::{drain_sensor, finish_run_with_checks, snapshot};
+use crate::sensors::tests::helpers::{
+    drain_sensor, finish_run_with_checks, record_as_adhoc, snapshot,
+};
 use crate::sensors::tests::test_types::CheckEventTestCase;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::{
@@ -28,21 +30,56 @@ fn given_a_successful_run_with_a_failed_check_and_a_warned_audit_when_a_check_se
             description: "SQLite failures and warnings",
             backend: Backend::Sqlite,
             kinds: &["failed", "warn"],
-            run_kind: "job",
+            adhoc_command: &[],
             expected_checks: &["audit:orders_amount", "check:orders_valid"],
         },
         CheckEventTestCase {
             description: "PostgreSQL failures only",
             backend: Backend::Postgres,
             kinds: &["failed"],
-            run_kind: "job",
+            adhoc_command: &[],
             expected_checks: &["check:orders_valid"],
         },
         CheckEventTestCase {
-            description: "SQLite: an ad-hoc test or audit run is a development command, not an event",
+            description: "SQLite: a manual build is watched like a job run",
             backend: Backend::Sqlite,
             kinds: &["failed", "warn"],
-            run_kind: "adhoc",
+            adhoc_command: &[RunCommand::Build],
+            expected_checks: &["audit:orders_amount", "check:orders_valid"],
+        },
+        CheckEventTestCase {
+            description: "SQLite: a standalone test run is not an event",
+            backend: Backend::Sqlite,
+            kinds: &["failed", "warn"],
+            adhoc_command: &[RunCommand::Test],
+            expected_checks: &[],
+        },
+        CheckEventTestCase {
+            description: "SQLite: a standalone audit run is not an event",
+            backend: Backend::Sqlite,
+            kinds: &["failed", "warn"],
+            adhoc_command: &[RunCommand::Audit],
+            expected_checks: &[],
+        },
+        CheckEventTestCase {
+            description: "PostgreSQL: a manual build is watched like a job run",
+            backend: Backend::Postgres,
+            kinds: &["failed", "warn"],
+            adhoc_command: &[RunCommand::Build],
+            expected_checks: &["audit:orders_amount", "check:orders_valid"],
+        },
+        CheckEventTestCase {
+            description: "PostgreSQL: a standalone test run is not an event",
+            backend: Backend::Postgres,
+            kinds: &["failed", "warn"],
+            adhoc_command: &[RunCommand::Test],
+            expected_checks: &[],
+        },
+        CheckEventTestCase {
+            description: "PostgreSQL: a standalone audit run is not an event",
+            backend: Backend::Postgres,
+            kinds: &["failed", "warn"],
+            adhoc_command: &[RunCommand::Audit],
             expected_checks: &[],
         },
     ];
@@ -95,17 +132,9 @@ fn given_a_successful_run_with_a_failed_check_and_a_warned_audit_when_a_check_se
                 ],
             )
             .await;
-            let (transaction, _) = query(
-                begin(store, TransactionMode::Write).await.expect("write"),
-                "UPDATE sqb_runs SET kind=$2 WHERE run_id=$1",
-                vec![
-                    Parameter::Id(source),
-                    Parameter::Text(test_case.run_kind.into()),
-                ],
-            )
-            .await
-            .expect("run kind");
-            commit(transaction).await.expect("commit");
+            for command in test_case.adhoc_command {
+                record_as_adhoc(store, source, *command).await;
+            }
             assert_eq!(
                 drain_sensor(store, &lease, trigger.trigger_id).await,
                 test_case.expected_checks.len(),

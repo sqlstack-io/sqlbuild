@@ -12,7 +12,8 @@ use crate::runs::main::{
     execution::claim_next_run::claim_next_run, requests::request_job_run::request_job_run,
 };
 use crate::runs::models::{
-    JobRunRequest, NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome,
+    JobRunRequest, NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunCommand, RunKind,
+    RunOutcome, RunRequest,
 };
 use crate::scheduler::models::SchedulerLease;
 use crate::sensors::main::complete_sensor::complete_sensor;
@@ -27,6 +28,7 @@ use crate::store::main::query::query;
 use crate::store::models::{ControlEvent, ControlStore, Parameter, TransactionMode};
 
 use crate::runs::tests::helpers::snapshot as base_snapshot;
+use crate::runs::tests::helpers::{json_column, rows};
 
 /// Ticks a drain runs: more than any test has events, so each is delivered and the cursor reaches the end.
 const DRAIN_TICKS: usize = 160;
@@ -214,6 +216,30 @@ pub(crate) async fn finish_claimed_run(
         &[],
     )
     .await;
+}
+
+/// Store a run as the ad-hoc run of `command` a worker would have executed.
+pub(crate) async fn record_as_adhoc(store: &ControlStore, run_id: Uuid, command: RunCommand) {
+    let stored = rows(
+        store,
+        "SELECT request_json FROM sqb_runs WHERE run_id=$1",
+        vec![Parameter::Id(run_id)],
+    )
+    .await
+    .remove(0);
+    let mut request: RunRequest =
+        serde_json::from_value(json_column(&stored["request_json"])).expect("stored request");
+    request.kind = RunKind::Adhoc;
+    request.job_key = None;
+    request.command = command;
+    let (transaction, _) = query(
+        begin(store, TransactionMode::Write).await.expect("write"),
+        "UPDATE sqb_runs SET kind='adhoc',job_key=NULL,request_json=$1 WHERE run_id=$2",
+        vec![Parameter::Json(json!(request)), Parameter::Id(run_id)],
+    )
+    .await
+    .expect("ad-hoc run");
+    commit(transaction).await.expect("commit");
 }
 
 /// Request a run of `job_key` and finish it with `outcome`, its nodes succeeding and each attached check ending as given.
