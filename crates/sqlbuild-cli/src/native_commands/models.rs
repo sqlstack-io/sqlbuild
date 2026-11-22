@@ -199,7 +199,7 @@ pub(crate) struct LocationWatch {
     pub(crate) commit_checked_at: tokio::time::Instant,
     /// Whether a generation has published, so the next publication's connection check is not the startup check.
     pub(crate) checked: bool,
-    /// A republish just claimed, which the watch loop starts and owes a result.
+    /// A claimed republish, owed the result of the next compile to finish.
     pub(crate) republish: Option<PendingRepublish>,
 }
 

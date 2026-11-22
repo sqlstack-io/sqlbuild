@@ -14,7 +14,7 @@ mod test_location_health;
 mod test_passwords;
 #[path = "native_commands/test_proxy.rs"]
 mod test_proxy;
-#[path = "native_commands/republish/test_republish.rs"]
+#[path = "native_commands/test_republish.rs"]
 mod test_republish;
 #[path = "native_commands/test_types.rs"]
 mod test_types;

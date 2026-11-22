@@ -64,16 +64,20 @@ pub(crate) fn republish_turn(
     })
 }
 
-/// Start the compile a claimed republish waits for, and keep the claim until it has finished.
+/// `location` owing `claimed` a result, with the compile it waits for started; unchanged without one.
 pub(crate) fn start_republish(
     republisher: &watch::Sender<DevControlState>,
-    location: &mut LocationWatch,
-    owed: &mut Option<PendingRepublish>,
-) {
-    if let Some(claimed) = location.republish.take() {
-        request_republish(republisher, true);
-        location.retry_at = Some(Instant::now());
-        *owed = Some(claimed);
+    claimed: Option<PendingRepublish>,
+    location: LocationWatch,
+) -> LocationWatch {
+    let Some(claimed) = claimed else {
+        return location;
+    };
+    request_republish(republisher, true);
+    LocationWatch {
+        retry_at: Some(Instant::now()),
+        republish: Some(claimed),
+        ..location
     }
 }
 

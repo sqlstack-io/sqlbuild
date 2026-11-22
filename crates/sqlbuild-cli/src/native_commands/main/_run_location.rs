@@ -25,7 +25,7 @@ use crate::native_commands::_helpers::location::execution::{
 use crate::native_commands::_helpers::location::execution::{
     dev_controls, location_clock, location_heartbeats, next_turn, shutdown_signal,
 };
-use crate::native_commands::_helpers::location::republish::{settle_republish, start_republish};
+use crate::native_commands::_helpers::location::republish::start_republish;
 use crate::native_commands::_helpers::location::work::next_work_check;
 use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
 use crate::native_commands::main::_location_changed_build::report_changed_build;
@@ -34,7 +34,6 @@ use crate::native_commands::main::_location_metadata::sync_location_metadata;
 use crate::native_commands::main::_location_work::run_location_work;
 use crate::native_commands::models::{
     DevControlState, LocationMetadataSync, LocationRuntimeRequest, LocationServe, LocationWatch,
-    PendingRepublish,
 };
 use crate::native_commands::types::LoadOutcome;
 
@@ -82,7 +81,6 @@ async fn watch_location(
     ),
 ) -> Result<(), ControlError> {
     let mut watch = location_watch(&options.project_dir);
-    let mut owed: Option<PendingRepublish> = None;
     let mut recompiles: u64 = 0;
     let mut compiled_inputs: Option<Vec<PathStamp>> = None;
     let mut deferred_sync: Option<(Vec<WarehouseStateLocation>, i64)> = None;
@@ -123,7 +121,7 @@ async fn watch_location(
             let connected: bool = controls.borrow().warehouse == Some(true);
             let Some(idle) = poll_location(
                 (options, script, (&requests, connected)),
-                (client, poll, published_generation),
+                (client, poll, (published_generation, republisher)),
                 (watch, work_at, metadata),
                 stopped.as_mut(),
             )
@@ -132,7 +130,6 @@ async fn watch_location(
                 return Ok(());
             };
             (watch, work_at, metadata) = idle;
-            start_republish(republisher, &mut watch, &mut owed);
             continue;
         }
         published_generation = None;
@@ -151,16 +148,12 @@ async fn watch_location(
             watch.retry_at = Some(Instant::now() + Duration::from_secs(5));
             continue;
         };
-        let session = (client, poll.session_id);
-        let compiled = (&load, generation);
-        if let Some(result) =
-            settle_republish(session, owed.take(), compiled, stopped.as_mut()).await
-        {
-            return result;
-        }
-        published_generation = load.is_ok().then_some(generation);
+        published_generation = match &load {
+            Ok(_) => Some(generation),
+            Err(_) => None,
+        };
         let Some(settled) = finish_compile(
-            (options, script, (bearer, poll.session_id)),
+            (options, script, ((bearer, poll.session_id), client)),
             (load, generation),
             (watch, metadata, deferred_sync),
             (&mut controls, stopped.as_mut()),
@@ -180,7 +173,11 @@ async fn poll_location(
         &Path,
         (&mpsc::Sender<LocationRuntimeRequest>, bool),
     ),
-    (client, poll, generation): (&LocationWorkClient, &LocationWorkPoll, Option<i64>),
+    (client, poll, (generation, republisher)): (
+        &LocationWorkClient,
+        &LocationWorkPoll,
+        (Option<i64>, &watch::Sender<DevControlState>),
+    ),
     (mut watch, mut work_at, mut metadata): (LocationWatch, Instant, Option<LocationMetadataSync>),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<(LocationWatch, Instant, Option<LocationMetadataSync>)>, ControlError> {
@@ -206,7 +203,7 @@ async fn poll_location(
                 return Ok(None);
             };
             work_at = next_work_check(&turn, Instant::now());
-            watch.republish = turn.republish;
+            watch = start_republish(republisher, turn.republish, watch);
             watch = exclude_location_databases(&options.project_dir, turn.files, watch);
             if turn.sync
                 && let Some(state) = metadata.as_mut()

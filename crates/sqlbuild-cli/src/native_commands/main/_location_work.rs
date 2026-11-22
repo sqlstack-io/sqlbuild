@@ -42,15 +42,13 @@ pub(super) async fn run_location_work(
     let claim = tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
         result = client.poll(poll) => match result {
-            Ok(claim) => claim,
+            Ok(Some(claim)) => claim,
+            Ok(None) => return Ok(Some(LocationWorkTurn::default())),
             Err(error) => {
                 work_error(&error)?;
                 return Ok(Some(LocationWorkTurn::default()));
             },
         },
-    };
-    let Some(claim) = claim else {
-        return Ok(Some(LocationWorkTurn::default()));
     };
     let deadline = Instant::now()
         + (claim.lease_expires_at - Utc::now())

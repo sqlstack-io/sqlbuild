@@ -31,6 +31,7 @@ use crate::native_commands::_helpers::command::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
 use crate::native_commands::_helpers::command::terminal::{live_screen, stderr_columns};
+use crate::native_commands::_helpers::location::republish::settle_republish;
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_timeout_seconds, rows_text, scan_line,
 };
@@ -47,6 +48,7 @@ use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_control::run_control;
 use crate::native_commands::main::_run_cost::run_cost;
+use crate::native_commands::models::PendingRepublish;
 use crate::native_commands::models::{
     CommandOutput, DevControlState, InstalledPackage, LocationCompileRequest, LocationCompiler,
     LocationMetadataPage, LocationMetadataSync, LocationServe, LocationWatch, LostStdout,
@@ -1861,7 +1863,11 @@ pub(crate) async fn development_store(
 
 /// After a compile: a publication waits for the `sqb dev` warehouse verdict and settles; a failure keeps the last good snapshot.
 pub(crate) async fn finish_compile(
-    (options, script, session): (&LocationServe, &Path, (&str, Uuid)),
+    (options, script, (session, client)): (
+        &LocationServe,
+        &Path,
+        ((&str, Uuid), &LocationWorkClient),
+    ),
     (load, generation): (LoadOutcome, i64),
     (mut watch, metadata, deferred): Settled,
     (controls, stopped): (
@@ -1870,6 +1876,14 @@ pub(crate) async fn finish_compile(
     ),
 ) -> Result<Option<Settled>, ControlError> {
     tokio::pin!(stopped);
+    let owed: Option<PendingRepublish> = watch.republish.take();
+    let compiled = (&load, generation);
+    if let Some(result) =
+        settle_republish((client, session.1), owed, compiled, stopped.as_mut()).await
+    {
+        result?;
+        return Ok(None);
+    }
     let (refresh_at, locations) = match load {
         Ok((refresh_at, locations, _)) => (refresh_at, locations),
         Err((rules, _)) => {
