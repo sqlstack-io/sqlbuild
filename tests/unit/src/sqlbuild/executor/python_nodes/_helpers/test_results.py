@@ -404,10 +404,28 @@ def test_given_a_python_failure_when_its_traceback_is_kept_then_its_end_fits_the
             expected_absent="example-value",
         ),
         TracebackRedactionTestCase(
-            description="a secret whose key holds NUL, which is dropped before redacting",
+            description="a match only without NUL withholds the whole text",
             message="pass\0word=example-value",
-            expected_kept="ValueError: password=",
+            expected_kept="[REDACTED]",
             expected_absent="example-value",
+        ),
+        TracebackRedactionTestCase(
+            description="a match only as it is withholds the whole text",
+            message="x\0Bearer example-value",
+            expected_kept="[REDACTED]",
+            expected_absent="example-value",
+        ),
+        TracebackRedactionTestCase(
+            description="a match in a long text with NUL withholds it before the cut",
+            message="x\0Bearer example-value" + "\n  refused row" * 400,
+            expected_kept="[REDACTED]",
+            expected_absent="example-value",
+        ),
+        TracebackRedactionTestCase(
+            description="a long text with NUL and no match keeps the exception without it",
+            message="order \0rows refused" + "\n  refused row" * 400,
+            expected_kept="ValueError: order rows refused",
+            expected_absent="\0",
         ),
         TracebackRedactionTestCase(
             description="a message of many lines keeps the line naming the exception",
