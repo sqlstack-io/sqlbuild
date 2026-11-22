@@ -741,3 +741,13 @@ class CancelledChainTestCase:
     expected_second_run: list[str]
     expected_statuses: dict[str, str]
     expected_torn_down: bool
+
+
+@dataclass(frozen=True)
+class CancelledWriteTestCase:
+    description: str
+    job_select: str
+    job_settings: str
+    files: dict[str, str]
+    expected_statuses: dict[str, str]
+    expected_rerun: list[str]
