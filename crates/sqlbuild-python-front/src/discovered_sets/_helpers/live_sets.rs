@@ -14,6 +14,7 @@ use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_e
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::ErrorId;
 
+use crate::discovered_sets::_helpers::project_nodes::{missing_node, usable_set};
 use crate::discovered_sets::_helpers::state::RUNNER;
 use crate::discovered_sets::models::{DiscoverySource, LiveDiscovery, Rediscover, SeedSource};
 
@@ -57,7 +58,10 @@ pub(crate) fn resolved_sets(
     match source {
         DiscoverySource::Live(LiveDiscovery {
             seed: Some(seed), ..
-        }) => Ok(seeded(py, sets, seed)),
+        }) => seeded(py, sets, seed)
+            .into_iter()
+            .map(|(name, set)| Ok((name, usable_set(inputs, set)?)))
+            .collect(),
         _ => Ok(sets),
     }
 }
@@ -128,10 +132,13 @@ pub(crate) fn live_set(
     let previous: Option<&DiscoveredSet> = live.previous.get(name);
     let untried: bool = previous.is_none_or(|set| set.status == DiscoveredSetStatus::Never);
     if !requested && !untried {
-        return Ok(previous.cloned().map_or_else(
-            || never_discovered(check_every),
-            |set| checked(set, check_every),
-        ));
+        return usable_set(
+            inputs,
+            previous.cloned().map_or_else(
+                || never_discovered(check_every),
+                |set| checked(set, check_every),
+            ),
+        );
     }
     let runner = RUNNER.get().ok_or_else(|| {
         new_plain_error(
@@ -151,7 +158,17 @@ pub(crate) fn live_set(
         serde_json::from_str(&json)
             .map_err(|error| format!("discover function returned an unreadable result: {error}"))
     });
-    let set: DiscoveredSet = record_attempt(previous, attempt, (Utc::now(), check_every));
+    let attempt: Result<DiscoveredResult, String> = match attempt {
+        Ok(result) => match missing_node(inputs, &result)? {
+            Some(problem) => Err(problem),
+            None => Ok(result),
+        },
+        Err(error) => Err(error),
+    };
+    let set: DiscoveredSet = usable_set(
+        inputs,
+        record_attempt(previous, attempt, (Utc::now(), check_every)),
+    )?;
     if !live.keep_last_good && set.status == DiscoveredSetStatus::Failed {
         return Err(new_plain_error(
             py,

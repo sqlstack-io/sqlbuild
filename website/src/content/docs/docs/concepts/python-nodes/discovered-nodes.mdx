@@ -50,6 +50,7 @@ A set fails as a whole, and keeps its last good items, when:
 - the function raises or returns something other than `Discovered`;
 - it returns no items, as an empty answer from a remote system is far more often a fault than a plan with no steps;
 - an ID is invalid or repeated, an item depends on an ID outside the set, or items depend on each other in a cycle;
+- an item depends on a model, source, seed or job the project doesn't have;
 - an item's `args` name a parameter the asset doesn't have, or leave a parameter without a default unset;
 - `args` or `tags` aren't JSON data.
 
@@ -111,6 +112,7 @@ Only a location, including `sqb dev`, calls discover functions. Every other comp
 ## When discovery fails
 
 - **A set fails on its own.** It keeps its last good items, the location's health shows **Discovery failed** with the set and its error, and everything else publishes normally. A location that restarts reads the last good items from the server's current snapshot.
+- **Last good items that name a model, source, seed or job the project no longer has** aren't kept. That covers a publish that reuses a set after the model it names was renamed or removed: the set fails with an error naming the item and the missing node, and compiles as its placeholder until it's discovered again.
 - **A set that never succeeded** compiles as its **placeholder node**, `<asset>[*]`. Its `job()` and `tag()` dependants stay valid. A run that reaches it fails that node with `never discovered: <error>`, and its downstream nodes are skipped.
 
 ## Outside a location

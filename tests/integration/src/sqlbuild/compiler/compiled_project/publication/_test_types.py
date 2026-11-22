@@ -751,3 +751,20 @@ class CancelledWriteTestCase:
     files: dict[str, str]
     expected_statuses: dict[str, str]
     expected_rerun: list[str]
+
+
+@dataclass(frozen=True)
+class UnknownDependencyTestCase:
+    description: str
+    first: str
+    then: str
+    removed: tuple[str, ...]
+    missing: str
+    expected_nodes: frozenset[str]
+
+
+@dataclass(frozen=True)
+class UnknownDependencyDiscoverTestCase:
+    description: str
+    dependency: str
+    expected_error: str
