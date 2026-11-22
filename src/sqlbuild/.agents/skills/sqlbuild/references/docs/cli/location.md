@@ -16,7 +16,7 @@ sqb location serve --server https://control.example.com --location-id "$LOCATION
 
 Create the location and its token with `sqb admin create-location orders` and
 `sqb admin issue-location-token` on the server's host. The token is the only thing on stdout, so
-`SQLBUILD_LOCATION_TOKEN="$(sqb admin issue-location-token "$LOCATION_ID" --expires-at "$EXPIRY")"`
+`export SQLBUILD_LOCATION_TOKEN="$(sqb admin issue-location-token "$LOCATION_ID" --expires-at "$EXPIRY")"`
 captures it. The location reads it from `SQLBUILD_LOCATION_TOKEN` and never opens the control
 database.
 
