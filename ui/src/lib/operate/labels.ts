@@ -258,11 +258,11 @@ export const evaluationHelp: Record<SensorEvaluationOutcome, string> = {
 };
 
 export const abandonReasonLabel: Record<AbandonReason, string> = {
-	unanswered: "The location didn't answer in time",
-	superseded: 'The location replaced it, as when it restarted',
+	unanswered: 'The location timed out',
+	superseded: 'The location replaced it',
 	republished: 'The location published again',
 	paused: 'The sensor was paused',
-	cursor_reset: 'The cursor was reset or moved',
+	cursor_reset: 'The cursor moved',
 	leader_changed: 'Another server took over scheduling',
 	skipped: 'An operator skipped its event'
 };
