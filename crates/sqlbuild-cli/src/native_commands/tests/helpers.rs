@@ -7,9 +7,10 @@ use serde_json::json;
 use sqlbuild_orchestration::warehouse_metadata::models::{MetadataBatch, WarehouseStateLocation};
 use uuid::Uuid;
 
+use crate::argv::main::namespace_defaults::namespace_defaults;
 use crate::argv::main::parse_cli_arguments::parse_cli_arguments;
 use crate::argv::models::{ArgvOutcome, ArgvSettings};
-use crate::native_commands::_helpers::command::argv_host::{NativeArgvHost, namespace_defaults};
+use crate::native_commands::_helpers::command::argv_host::NativeArgvHost;
 use crate::native_commands::_helpers::command::paths::location_watch;
 use crate::native_commands::_helpers::location::execution::{
     acknowledge_metadata_page, settle_publication,

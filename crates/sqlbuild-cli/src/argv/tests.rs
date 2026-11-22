@@ -1,3 +1,5 @@
+#[path = "tests/test_command_project_and_target.rs"]
+mod command_project_and_target;
 #[path = "tests/test_given_setting_dests.rs"]
 mod given_setting_dests;
 #[path = "tests/helpers.rs"]
