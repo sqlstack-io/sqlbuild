@@ -68,3 +68,15 @@ pub(crate) struct RolesFileTestCase {
     pub(crate) text: &'static str,
     pub(crate) expected_compiled: Result<(Value, Vec<&'static str>), &'static str>,
 }
+
+pub(crate) struct UnreadableJobToggleTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: crate::store::tests::store_test_types::Backend,
+    /// The nodes the member may toggle; the schedule's job writes only `customers`.
+    pub(crate) nodes: &'static [&'static str],
+    /// The forms an earlier release left the stored job in; none leaves it readable.
+    pub(crate) earlier_forms: &'static [&'static str],
+    /// Pause, resume, then reset to the published default.
+    pub(crate) expected_outcomes: [Result<bool, &'static str>; 3],
+    pub(crate) expected_statuses: [&'static str; 3],
+}
