@@ -675,3 +675,11 @@ class HungCheckTestCase:
     check_every: str
     check_starts_within_seconds: float
     expected_message: str
+
+
+@dataclass(frozen=True)
+class EmptyDiscoveryTestCase:
+    description: str
+    first_items: tuple[str, ...]
+    expected_nodes: frozenset[str]
+    expected_kept_items: tuple[str, ...]

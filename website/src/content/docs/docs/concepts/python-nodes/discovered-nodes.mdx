@@ -48,6 +48,7 @@ With steps `pick`, `pack` and `ship`, where each waits on the one before, the gr
 A set fails as a whole, and keeps its last good items, when:
 
 - the function raises or returns something other than `Discovered`;
+- it returns no items, as an empty answer from a remote system is far more often a fault than a plan with no steps;
 - an ID is invalid or repeated, an item depends on an ID outside the set, or items depend on each other in a cycle;
 - an item's `args` name a parameter the asset doesn't have, or leave a parameter without a default unset;
 - `args` or `tags` aren't JSON data.

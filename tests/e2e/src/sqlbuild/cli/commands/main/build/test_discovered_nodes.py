@@ -172,5 +172,45 @@ def test_given_a_for_each_asset_when_compiling_then_the_dag_shows_the_placeholde
         assert node in discovered_dag, discovered_dag
 
 
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DiscoveredNodesE2ETestCase(
+            description=f"{command} --discover stops on a set without items",
+            command=(command, "--discover"),
+            expected_exit_code=1,
+            expected_output_patterns=(
+                r"Discover function 'plan' failed: the discover function returned no items",
+            ),
+            expected_runs=(),
+        )
+        for command in ("compile", "plan", "build")
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_set_without_items_when_discovering_for_a_command_then_it_stops_with_the_error(
+    tmp_path: Path, test_case: DiscoveredNodesE2ETestCase
+) -> None:
+    nodes: str = re.sub(r"items=\[.*\],", "items=[],", _NODES)
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="discovered",
+        repo_files={
+            "sqlbuild_project.toml": _PROJECT,
+            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            "python/plan/nodes.py": nodes,
+        },
+    )
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", *test_case.command), project_dir=project_dir
+    )
+    output: str = result.stdout + result.stderr
+
+    assert result.returncode == test_case.expected_exit_code, output
+    for pattern in test_case.expected_output_patterns:
+        assert re.search(pattern, output), output
+    assert not (project_dir / "runs.txt").exists(), test_case.expected_runs
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-vv"])
