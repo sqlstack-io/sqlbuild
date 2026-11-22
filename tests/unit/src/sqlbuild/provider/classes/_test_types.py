@@ -34,3 +34,10 @@ class ProviderSessionErrorTestCase:
     description: str
     provider_name: str
     expected_error_fragment: str
+
+
+@dataclass(frozen=True)
+class ProviderSessionLeftOpenTestCase:
+    description: str
+    within_seconds: float
+    expected_events: tuple[str, ...]

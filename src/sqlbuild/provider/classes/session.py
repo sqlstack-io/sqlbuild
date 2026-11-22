@@ -40,6 +40,7 @@ class ProviderSession:
         self._lifecycle_lock: RLock = RLock()
         self._close_holds: int = 0
         self._close_requested: bool = False
+        self._left_open: bool = False
         self.teardown_error: ProviderTeardownError | None = None
 
     @property
@@ -77,6 +78,8 @@ class ProviderSession:
                     f"Provider '{name}' was not found. Available providers: {available}"
                 )
             if name not in self._setup_names:
+                if self._is_closed:
+                    raise ProviderLookupError(f"Provider session is closed; cannot set up '{name}'")
                 self._setup_provider(name=name, provider=provider)
             return provider
 
@@ -85,6 +88,11 @@ class ProviderSession:
 
         with self._lifecycle_lock:
             self._close_holds += 1
+
+    def leave_open(self) -> None:
+        """Skip teardown for a step that may still use the providers; waits for no running setup."""
+
+        self._left_open = True
 
     def release(self) -> None:
         """Release an outer ownership hold and honor any deferred close request."""
@@ -99,6 +107,9 @@ class ProviderSession:
             self.close()
 
     def close(self, *, force: bool = False) -> None:
+        if self._left_open and not force:
+            self._is_closed = True
+            return
         with self._lifecycle_lock:
             if self._is_closed:
                 return

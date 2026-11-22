@@ -1603,3 +1603,11 @@ class IgnoredCancelTestCase:
     sent_signal: signal.Signals
     expected_exit_code: int
     expected_within_seconds: float
+
+
+@dataclass(frozen=True)
+class HungSetupCancelTestCase:
+    description: str
+    sent_signal: signal.Signals
+    expected_exit_code: int
+    expected_within_seconds: float

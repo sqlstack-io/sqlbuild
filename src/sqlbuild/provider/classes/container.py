@@ -38,7 +38,7 @@ class ProviderContainer:
     def leave_open(self) -> None:
         """Skip teardown, as a step that ignored a cancel may still use the providers."""
 
-        self._session.hold_open()
+        self._session.leave_open()
 
     def keys(self) -> tuple[str, ...]:
         return self._session.keys()
