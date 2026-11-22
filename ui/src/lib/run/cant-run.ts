@@ -62,10 +62,14 @@ export function needsText(entry: PlanCantRun): string {
 	return `${users} and the ${plural(entry.readers.length, 'node')} that read ${it} (${entry.readers.map(keyName).join(', ')})`;
 }
 
-/** How to fix it at the location, then `then`: "plan again" on a plan, "the next run works" on a run. */
+/**
+ * How to fix it at the location, then `then`: "plan again" on a plan, "the next run works" on a run. A location reads
+ * its env file again when it restarts, or on `r` under `sqb dev`; only a restart sees a changed environment.
+ */
 export function fixText(entry: PlanCantRun, then: string): string {
-	const where = entry.env_file ? `the location's environment (or its ${entry.env_file})` : "the location's environment";
-	return `set ${variablesText(entry)} in ${where}, restart the location, then ${then}`;
+	const environment = 'in the environment the location (or sqb dev) was started with, then restart it';
+	const file = entry.env_file ? `in ${entry.env_file}, then restart the location (in sqb dev, press r), or ` : '';
+	return `set ${variablesText(entry)} ${file}${environment}; after that, ${then}`;
 }
 
 /** One table row: the node, whether it uses the provider or only reads a node that does, and why it can't run. */

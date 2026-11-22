@@ -17,6 +17,7 @@ pub(crate) fn new_dev_screen(setup: ScreenSetup) -> DevScreen {
         location: String::new(),
         env_file: setup.env_file,
         missing_secrets: Vec::new(),
+        secrets_env_file: None,
         triggers: String::new(),
         steps: STEPS.into_iter().map(pending).collect(),
         ready: false,

@@ -17,7 +17,7 @@ test('a missing provider secret lists what can’t run, disables Run, and planni
 	const problem = page.getByTestId('cant-run-problem');
 	await expect(problem).toContainText("Can't run: provider orders_api needs ORDERS_API_KEY");
 	await expect(problem).toContainText('raw__orders and the 11 nodes that read it');
-	await expect(problem).toContainText("set ORDERS_API_KEY in the location's environment (or its .env), restart the location, then plan again");
+	await expect(problem).toContainText('set ORDERS_API_KEY in .env, then restart the location (in sqb dev, press r), or in the environment the location (or sqb dev) was started with, then restart it; after that, plan again');
 	await expect(pane.locator('tbody tr').first()).toContainText('provider orders_api: ORDERS_API_KEY not set');
 	const row = (node: string) => pane.locator('tbody tr').filter({ has: page.getByRole('link', { name: node, exact: true }) });
 	await expect(row('stg_orders')).toContainText('reads raw__orders');

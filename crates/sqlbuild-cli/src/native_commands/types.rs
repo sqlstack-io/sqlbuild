@@ -18,12 +18,18 @@ pub(crate) type NextGeneration = (
     Option<Vec<sqlbuild_cache::project_snapshot::models::PathStamp>>,
 );
 
+/// The providers a generation shows missing secrets, and the node keys that need each.
+pub(crate) type GenerationSecrets = (
+    Vec<MissingProviderSecrets>,
+    std::collections::BTreeMap<String, Vec<String>>,
+);
+
 /// A published generation's refresh deadline, state locations and providers missing secrets, or the rule findings that failed it.
 pub(crate) type LoadOutcome = Result<
     (
         Option<tokio::time::Instant>,
         Vec<WarehouseStateLocation>,
-        Vec<MissingProviderSecrets>,
+        GenerationSecrets,
     ),
     Option<LocationRuleFailure>,
 >;

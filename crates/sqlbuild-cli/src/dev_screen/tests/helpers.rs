@@ -10,6 +10,7 @@ use sqlbuild_core::text::main::cell_len::cell_len;
 use sqlbuild_orchestration::dev_events::models::{
     DevEvent, DevPhase, DevStepState, SourcePosition, UnsetProviderSecrets,
 };
+use sqlbuild_orchestration::platform::models::MissingProviderSetting;
 
 use crate::dev_screen::_helpers::apply_screen_message::apply_screen_message;
 use crate::dev_screen::_helpers::drawing::closing_text;
@@ -144,7 +145,10 @@ pub(super) fn ready() -> Vec<ScreenMessage> {
 }
 
 /// Start-up through the ready box, then one health read per report of the providers missing secrets.
-pub(super) fn secrets_reported(reports: Vec<Vec<(&str, Vec<&str>)>>) -> Vec<ScreenMessage> {
+pub(super) fn secrets_reported(
+    reports: Vec<Vec<(&str, Vec<&str>)>>,
+    (env_file, needed_by): (Option<&str>, &[&str]),
+) -> Vec<ScreenMessage> {
     let mut messages: Vec<ScreenMessage> = ready();
     for report in reports {
         messages.push(ScreenMessage::Child(DevEvent::MissingSecrets {
@@ -152,9 +156,20 @@ pub(super) fn secrets_reported(reports: Vec<Vec<(&str, Vec<&str>)>>) -> Vec<Scre
                 .into_iter()
                 .map(|(provider, variables)| UnsetProviderSecrets {
                     provider: provider.to_owned(),
-                    variables: variables.into_iter().map(str::to_owned).collect(),
+                    path: format!("providers/{provider}.py"),
+                    settings: variables
+                        .into_iter()
+                        .zip(9..)
+                        .map(|(variable, line)| MissingProviderSetting {
+                            field: variable.to_lowercase(),
+                            variable: variable.to_owned(),
+                            line: Some(line),
+                        })
+                        .collect(),
+                    needed_by: needed_by.iter().map(|key| (*key).to_owned()).collect(),
                 })
                 .collect(),
+            env_file: env_file.map(str::to_owned),
         }));
     }
     messages

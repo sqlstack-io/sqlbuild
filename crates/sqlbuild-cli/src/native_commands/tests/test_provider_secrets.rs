@@ -53,15 +53,23 @@ fn given_providers_missing_secrets_when_the_dev_warning_is_built_then_allowed_pr
                 allowed: *allowed,
             })
             .collect();
-        let unset: Vec<(String, Vec<String>)> = unset_provider_secrets(&providers)
-            .into_iter()
-            .map(
-                |UnsetProviderSecrets {
-                     provider,
-                     variables,
-                 }| (provider, variables),
-            )
-            .collect();
+        let unset: Vec<(String, Vec<String>)> =
+            unset_provider_secrets(&providers, &std::collections::BTreeMap::new())
+                .into_iter()
+                .map(
+                    |UnsetProviderSecrets {
+                         provider, settings, ..
+                     }| {
+                        (
+                            provider,
+                            settings
+                                .into_iter()
+                                .map(|setting| setting.variable)
+                                .collect(),
+                        )
+                    },
+                )
+                .collect();
 
         assert_eq!(
             unset,
