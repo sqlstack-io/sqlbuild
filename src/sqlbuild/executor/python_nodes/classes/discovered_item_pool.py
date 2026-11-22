@@ -1,4 +1,4 @@
-"""Runs ready discovered items on threads, capped per set; the calling thread keeps all run state."""
+"""Runs ready discovered items on threads, capped per set; only the calling thread records them."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from sqlbuild._native import CommandTerminated, termination_requested
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.compiler.python_nodes.types import PythonNodeStatus
 from sqlbuild.executor.node_results.main._direct_store import build_direct_node_result_store
-from sqlbuild.executor.python_nodes._helpers.parallel_items import parallel_set
+from sqlbuild.executor.python_nodes._helpers.discovered_items import parallel_set
 from sqlbuild.executor.python_nodes.constants import CANCEL_REPEAT_SECONDS
 from sqlbuild.executor.python_nodes.main._ready import run_ready_python_node
 from sqlbuild.executor.python_nodes.models import (
@@ -25,17 +25,13 @@ from sqlbuild.executor.python_nodes.models import (
     RunningItem,
 )
 from sqlbuild.executor.python_nodes.types import ExecutablePythonNode
-from sqlbuild.runtime.execution_limits.main._cancel_running_statements import (
+from sqlbuild.runtime.execution_limits.main.cancel_running_statements import (
     cancel_running_statements,
 )
 
 
 class DiscoveredItemPool:
-    """One warehouse connection and result store per running item, and one write at a time.
-
-    Threads only call the items. The calling thread submits them, and records and reports each as
-    soon as it finishes, before it submits what that one unlocked.
-    """
+    """One connection and result store per running item, with each result recorded as it finishes."""
 
     def __init__(
         self,
@@ -115,12 +111,12 @@ class DiscoveredItemPool:
     ) -> None:
         item: RunningItem = self._running[future]
         with self._write_lock:
-            self._callbacks.complete(item.node, result)
+            self._callbacks.complete(node=item.node, result=result)
         del self._running[future]
         self._idle.append(item.slot)
 
     def _stop(self, *, cancelled: bool) -> None:
-        """Start nothing more; keep what succeeded, and record the other items of a cancel as cancelled."""
+        """Start nothing more; keep what succeeded, and record a cancel's other items as cancelled."""
 
         while self._running:
             if cancelled:

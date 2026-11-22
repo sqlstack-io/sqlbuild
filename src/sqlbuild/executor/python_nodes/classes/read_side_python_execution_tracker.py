@@ -10,11 +10,11 @@ from sqlbuild._native import CostContext, DiscoveredPythonNode, PythonNodeGraph,
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.compiler.python_nodes.types import PythonNodeKind, PythonNodeStatus
 from sqlbuild.executor.node_results.main._direct_store import build_direct_node_result_store
+from sqlbuild.executor.python_nodes._helpers.discovered_items import parallel_set
 from sqlbuild.executor.python_nodes._helpers.fingerprinting import (
     try_write_python_node_identity_fingerprint,
 )
 from sqlbuild.executor.python_nodes._helpers.ingress_execution import _to_executable_python_node
-from sqlbuild.executor.python_nodes._helpers.parallel_items import parallel_set
 from sqlbuild.executor.python_nodes._helpers.read_side_execution import (
     _sql_result_failed,
     _sql_result_name,
@@ -129,10 +129,7 @@ class ReadSidePythonExecutionTracker:
         self.dispatch_ready_python_nodes()
 
     def dispatch_ready_python_nodes(self) -> None:
-        """Run all currently-ready selected Python nodes, reporting each as it finishes.
-
-        Discovered items with a `max_parallel` run beside each other; every other node runs alone.
-        """
+        """Run every ready node, items with `max_parallel` side by side, reporting each at once."""
 
         progressed: bool = True
         while progressed:
@@ -176,7 +173,9 @@ class ReadSidePythonExecutionTracker:
             if self._is_ready(name)
         )
 
-    def _complete_item(self, node: ExecutablePythonNode, result: PythonNodeExecutionResult) -> None:
+    def _complete_item(
+        self, *, node: ExecutablePythonNode, result: PythonNodeExecutionResult
+    ) -> None:
         self._finalize_owned_result(node=node, result=result)
         if self._on_node_complete is not None:
             self._on_node_complete(result)

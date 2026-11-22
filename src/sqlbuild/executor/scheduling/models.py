@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlbuild.compiler.python_nodes.types import SkipMode
 from sqlbuild.executor.scheduling.types import LifecycleNodeStatus
+
+if TYPE_CHECKING:
+    from sqlbuild.executor.scheduling.classes.lifecycle_progress import LifecycleProgress
 
 
 @dataclass(frozen=True)
@@ -41,17 +44,10 @@ class LifecycleSchedulerResult:
 
 @dataclass(frozen=True)
 class LifecycleConcurrency:
-    """Which ready nodes may run beside each other, and what runs them until none is ready.
-
-    `run` takes a reader of the ready nodes and a recorder of each result, and calls both only on
-    the scheduler's thread.
-    """
+    """Which ready nodes may run beside each other, and what runs them until none is ready."""
 
     eligible: Callable[[LifecycleExecutionNode], bool]
     run: Callable[
-        [
-            Callable[[], tuple[LifecycleExecutionNode, ...]],
-            Callable[[LifecycleExecutionNode, LifecycleNodeResult], None],
-        ],
+        [LifecycleProgress],
         None,
     ]

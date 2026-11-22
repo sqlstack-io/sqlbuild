@@ -27,12 +27,12 @@ from sqlbuild.executor.load.main._resource_kind import load_resource_kind
 from sqlbuild.executor.load.main._skipped_result import skipped_load_result
 from sqlbuild.executor.load.models import LoadExecutionResult, LoadRuntimeParams
 from sqlbuild.executor.node_results.main._direct_store import build_direct_node_result_store
+from sqlbuild.executor.python_nodes._helpers.discovered_items import parallel_set
 from sqlbuild.executor.python_nodes._helpers.fingerprinting import (
     try_write_python_node_identity_fingerprint,
 )
 from sqlbuild.executor.python_nodes._helpers.lifecycle_nodes import build_ingress_lifecycle_nodes
 from sqlbuild.executor.python_nodes._helpers.node_warehouse import node_runtime
-from sqlbuild.executor.python_nodes._helpers.parallel_items import parallel_set
 from sqlbuild.executor.python_nodes.classes.discovered_item_pool import DiscoveredItemPool
 from sqlbuild.executor.python_nodes.classes.ingress_results import IngressResultAccumulator
 from sqlbuild.executor.python_nodes.main._ready import run_ready_python_node
@@ -45,6 +45,7 @@ from sqlbuild.executor.python_nodes.models import (
     PythonNodeRuntime,
 )
 from sqlbuild.executor.python_nodes.types import ExecutablePythonNode
+from sqlbuild.executor.scheduling.classes.lifecycle_progress import LifecycleProgress
 from sqlbuild.executor.scheduling.main._run_lifecycle import run_lifecycle_scheduler
 from sqlbuild.executor.scheduling.models import (
     LifecycleConcurrency,
@@ -174,11 +175,8 @@ def _item_concurrency(
         return None
     by_name: dict[str, LifecycleExecutionNode] = {node.name: node for node in nodes}
 
-    def run(
-        ready: Callable[[], tuple[LifecycleExecutionNode, ...]],
-        complete: Callable[[LifecycleExecutionNode, LifecycleNodeResult], None],
-    ) -> None:
-        def complete_item(node: ExecutablePythonNode, result: PythonNodeExecutionResult) -> None:
+    def run(progress: LifecycleProgress) -> None:
+        def complete_item(*, node: ExecutablePythonNode, result: PythonNodeExecutionResult) -> None:
             _finalize_ingress_python_result(
                 node=node,
                 result=result,
@@ -190,7 +188,9 @@ def _item_concurrency(
             )
             if callbacks.on_node_complete is not None:
                 callbacks.on_node_complete(result)
-            complete(by_name[node.name], _python_result_to_lifecycle_result(result))
+            progress.complete(
+                node=by_name[node.name], result=_python_result_to_lifecycle_result(result)
+            )
 
         DiscoveredItemPool(
             runtime=runtime,
@@ -198,7 +198,7 @@ def _item_concurrency(
             callbacks=DiscoveredItemCallbacks(
                 ready=lambda: tuple(
                     _to_executable_python_node(python_graph.nodes_by_name[node.name])
-                    for node in ready()
+                    for node in progress.startable(eligible=lambda node: node.name in parallel)
                 ),
                 upstream_results=lambda name: _python_upstream_results(
                     name=name, python_graph=python_graph, results=results

@@ -20,10 +20,7 @@ def build_direct_node_result_store(
     target_config: TargetSettings | None = None,
     write_lock: AbstractContextManager[Any] | None = None,
 ) -> DirectNodeResultStore:
-    """Build a direct-mode node result store that, for one release, also reads older locations.
-
-    Stores on connections that write at the same time share a `write_lock`.
-    """
+    """Build a direct-mode node result store that, for one release, also reads older locations."""
 
     earlier: list[tuple[str | None, str | None]] = [
         (adapter.default_database(), adapter.default_schema())

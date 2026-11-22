@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 from sqlbuild.compiler.python_nodes.types import SkipMode
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
+from sqlbuild.executor.scheduling.classes.lifecycle_progress import LifecycleProgress
 from sqlbuild.executor.scheduling.models import (
     LifecycleConcurrency,
     LifecycleExecutionNode,
@@ -34,59 +35,25 @@ def run_lifecycle_scheduler(
         node_names=tuple(node.name for node in nodes),
         upstream_names=upstream_names,
     )
-    in_degree: dict[str, int] = {
-        node_name: len(upstreams) for node_name, upstreams in upstream_names.items()
-    }
-    ready: list[str] = sorted(name for name, degree in in_degree.items() if degree == 0)
-    results_by_name: dict[str, LifecycleNodeResult] = {}
-    ordered_results: list[LifecycleNodeResult] = []
-
-    def complete(node: LifecycleExecutionNode, result: LifecycleNodeResult) -> None:
-        ready.remove(node.name)
-        results_by_name[node.name] = result
-        ordered_results.append(result)
-        downstream_name: str
-        for downstream_name in downstream_names[node.name]:
-            in_degree[downstream_name] -= 1
-            if in_degree[downstream_name] == 0:
-                ready.append(downstream_name)
-        ready.sort()
-
-    def startable() -> tuple[LifecycleExecutionNode, ...]:
-        if concurrency is None:
-            return ()
-        while True:
-            candidates: tuple[LifecycleExecutionNode, ...] = tuple(
-                node_by_name[name] for name in ready if concurrency.eligible(node_by_name[name])
-            )
-            skips: list[tuple[LifecycleExecutionNode, LifecycleNodeResult]] = []
-            candidate: LifecycleExecutionNode
-            for candidate in candidates:
-                skip: LifecycleNodeResult | None = _skip_result(
-                    node=candidate, results_by_name=results_by_name
-                )
-                if skip is not None:
-                    skips.append((candidate, skip))
-            if not skips:
-                return candidates
-            for candidate, skip in skips:
-                complete(candidate, skip)
-
-    while ready:
-        node: LifecycleExecutionNode = node_by_name[ready[0]]
-        skipped: LifecycleNodeResult | None = _skip_result(
-            node=node, results_by_name=results_by_name
-        )
+    progress: LifecycleProgress = LifecycleProgress(
+        node_by_name=node_by_name,
+        upstream_names=upstream_names,
+        downstream_names=downstream_names,
+        skip_result=_skip_result,
+    )
+    while progress.ready:
+        node: LifecycleExecutionNode = node_by_name[progress.ready[0]]
+        skipped: LifecycleNodeResult | None = progress.skip(node)
         if skipped is not None:
-            complete(node, skipped)
+            progress.complete(node=node, result=skipped)
         elif concurrency is not None and concurrency.eligible(node):
-            concurrency.run(startable, complete)
+            concurrency.run(progress)
         else:
-            complete(node, handler(node))
+            progress.complete(node=node, result=handler(node))
 
-    if len(ordered_results) != len(nodes):
+    if len(progress.results) != len(nodes):
         raise ExecutorInputError("Lifecycle scheduler could not resolve all dependencies")
-    return LifecycleSchedulerResult(results=tuple(ordered_results))
+    return LifecycleSchedulerResult(results=tuple(progress.results))
 
 
 def _skip_result(

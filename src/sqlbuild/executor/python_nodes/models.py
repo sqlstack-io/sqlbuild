@@ -28,7 +28,11 @@ from sqlbuild.executor.python_nodes.classes.runtime_relation_guard import Runtim
 from sqlbuild.executor.python_nodes.constants import (
     PYTHON_NODE_RELATION_QUALIFIER_SEPARATOR,
 )
-from sqlbuild.executor.python_nodes.types import ExecutablePythonNode, PythonIdentityRecorder
+from sqlbuild.executor.python_nodes.types import (
+    ExecutablePythonNode,
+    OwnedResultCallback,
+    PythonIdentityRecorder,
+)
 from sqlbuild.executor.scheduling.classes.session_warehouses import (
     SessionWarehouses,
     configured_warehouse,
@@ -398,5 +402,5 @@ class DiscoveredItemCallbacks:
 
     ready: Callable[[], tuple[ExecutablePythonNode, ...]]
     upstream_results: Callable[[str], tuple[PythonNodeExecutionResult, ...]]
-    complete: Callable[[ExecutablePythonNode, PythonNodeExecutionResult], None]
+    complete: OwnedResultCallback
     cancelled: Callable[[str], None] | None = None
