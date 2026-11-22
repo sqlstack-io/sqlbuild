@@ -7,6 +7,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, ClassVar, cast
 
+import pytest
+
 from sqlbuild._native import (
     DiscoveredAssetFunction,
     DiscoveredProjectInputs,
@@ -29,6 +31,7 @@ from sqlbuild.executor.python_nodes.models import (
     PythonNodeExecutionResult,
     PythonNodeRuntime,
 )
+from sqlbuild.executor.scheduling.classes.lifecycle_progress import LifecycleProgress
 from sqlbuild.python_nodes.models import DiscoveredItemRef
 
 WAIT_SECONDS: float = 30
@@ -342,3 +345,16 @@ def interrupted_probe() -> ItemProbe:
 
     probe.after_report = interrupt
     return probe
+
+
+def interrupt_after_next_record(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Raise an interrupt once the next ingress result is recorded, as a signal can."""
+
+    record: Callable[..., None] = LifecycleProgress.complete
+
+    def record_then_interrupt(progress: LifecycleProgress, **recorded: Any) -> None:
+        monkeypatch.setattr(LifecycleProgress, "complete", record)
+        record(progress, **recorded)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(LifecycleProgress, "complete", record_then_interrupt)

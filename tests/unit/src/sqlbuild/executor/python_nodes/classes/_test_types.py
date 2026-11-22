@@ -67,3 +67,10 @@ class ItemPoolWriteTestCase:
     description: str
     steps: tuple[str, ...]
     expected_status: str
+
+
+@dataclass(frozen=True)
+class ItemPoolRecordedInterruptTestCase:
+    description: str
+    items: tuple[str, ...]
+    expected_reported: frozenset[tuple[str, str]]

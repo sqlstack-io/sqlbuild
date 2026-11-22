@@ -36,8 +36,10 @@ class LifecycleProgress:
         return self._skip_result(node=node, results_by_name=self._results_by_name)
 
     def complete(self, *, node: LifecycleExecutionNode, result: LifecycleNodeResult) -> None:
-        """Record `result`, and make ready what waited only on `node`."""
+        """Record `result` once, as a cancel may offer it again, and ready what waited on `node`."""
 
+        if node.name not in self.ready:
+            return
         self.ready.remove(node.name)
         self._results_by_name[node.name] = result
         self.results.append(result)
