@@ -1943,6 +1943,12 @@ symbols = ["warn_plain_http"]
 reason = "Locations, workers and remote publication share this client; it warns once per process on stderr, before any request, when a bearer token would travel over plain HTTP to a non-loopback host."
 
 [[targets.rust.rule_exceptions]]
+rule = "FPRSS130"
+path = "crates/sqlbuild-orchestration/src/warehouse_history/_helpers/audit_repeats.rs"
+symbols = ["audit_due", "record_audit"]
+reason = "A page following a run repeats its output reads every few seconds; this process-wide record of when each person last had each kind of read of each run audited lets the server audit those reads once per window rather than writing an audit row per poll. Authorization still runs on every read."
+
+[[targets.rust.rule_exceptions]]
 rule = "FPRSH011"
 path = "crates/sqlbuild-orchestration/src/run_output/_helpers/prune.rs"
 symbols = ["report_retention_failure"]

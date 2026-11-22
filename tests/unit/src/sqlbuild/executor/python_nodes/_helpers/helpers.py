@@ -11,6 +11,8 @@ from itertools import chain, repeat
 from pathlib import Path
 from typing import Any, ClassVar, cast
 
+import pytest
+
 from sqlbuild._native import (
     CostContext,
     DiscoveredAssetFunction,
@@ -689,3 +691,16 @@ def missing_warehouse_runtime(*, adapter: Any, node: str) -> PythonNodeRuntime:
         node_warehouses={node: "MISSING_WH"},
         session_warehouses=SessionWarehouses(adapter=cast(BaseAdapter, adapter), home="BUILD_WH"),
     )
+
+
+def nested_key_error(*, depth: int) -> BaseException:
+    """Return the KeyError a lookup raises through `depth` distinct calls, with its traceback."""
+
+    source: str = "def step_0():\n    return {'customer_id': 1}['customer_segment']\n" + "".join(
+        f"def step_{n}():\n    return step_{n - 1}()\n" for n in range(1, depth + 1)
+    )
+    steps: dict[str, Any] = {}
+    exec(compile(source, "steps.py", "exec"), steps)  # noqa: S102
+    with pytest.raises(KeyError) as raised:
+        steps[f"step_{depth}"]()
+    return raised.value

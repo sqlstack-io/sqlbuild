@@ -22,12 +22,11 @@ pub async fn read_person_output_index(
         store,
         credentials,
         (run, default_role, Action::ViewEvidence),
-        (
+        ((
             "output.index",
             async move |transaction, _| output_index(transaction, (run_id, node)).await,
             |index: &RunOutputIndex| json!({"nodes": index.nodes.len(), "logs": index.logs.len(), "node": node}),
-        ),
-        Some(REPEATED_READ_AUDIT),
+        ), Some(REPEATED_READ_AUDIT)),
     )
     .await
 }

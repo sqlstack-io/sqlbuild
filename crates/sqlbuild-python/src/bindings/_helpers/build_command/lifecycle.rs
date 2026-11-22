@@ -604,6 +604,9 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
         }
         tracker.call_method0("dispatch_ready_python_nodes")?;
         let initial: Bound<'py, PyAny> = native_field(&tracker, "results")?;
+        for result in initial.try_iter()? {
+            inputs.on_node_complete.call1((result?,))?;
+        }
         if initial.is_truthy()? {
             write_python_node_results(&context.stream, &initial, context.use_color)?;
         }

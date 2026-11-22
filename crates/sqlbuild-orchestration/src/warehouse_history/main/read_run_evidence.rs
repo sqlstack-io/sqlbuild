@@ -16,14 +16,16 @@ pub(crate) async fn read_run_evidence<T>(
     credentials: (&AuditContext, Uuid),
     run: ((Uuid, &str, Uuid), DefaultRole, Action),
     read: (
-        &str,
-        impl AsyncFnOnce(
-            ControlTransaction,
-            &RunRecallScope,
-        ) -> Result<(ControlTransaction, T), ControlError>,
-        impl FnOnce(&T) -> Value,
+        (
+            &str,
+            impl AsyncFnOnce(
+                ControlTransaction,
+                &RunRecallScope,
+            ) -> Result<(ControlTransaction, T), ControlError>,
+            impl FnOnce(&T) -> Value,
+        ),
+        Option<Duration>,
     ),
-    repeat: Option<Duration>,
 ) -> Result<Option<T>, ControlError> {
-    sensitive_run_read(store, credentials, run, read, repeat).await
+    sensitive_run_read(store, credentials, run, read).await
 }

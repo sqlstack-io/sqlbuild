@@ -4,10 +4,10 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::credentials::models::{Action, AuditContext, DefaultRole};
+use crate::runs::constants::REPEATED_READ_AUDIT;
 use crate::runs::models::RunOutput;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
-use crate::runs::constants::REPEATED_READ_AUDIT;
 use crate::warehouse_history::_helpers::run_recall::{run_output_in, sensitive_run_read};
 
 /// `None` when the run is not in this location and target; each read is audited like check evidence.
@@ -21,12 +21,11 @@ pub async fn read_person_run_output(
         store,
         credentials,
         (run, default_role, Action::ViewEvidence),
-        (
+        ((
             "output.read",
             run_output_in,
             |output: &RunOutput| json!({"lines": output.lines.len(), "errors": output.errors.len()}),
-        ),
-        Some(REPEATED_READ_AUDIT),
+        ), Some(REPEATED_READ_AUDIT)),
     )
     .await
 }

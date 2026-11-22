@@ -35,11 +35,13 @@ pub async fn search_person_output(
         credentials,
         (run, default_role, Action::ViewEvidence),
         (
-            "output.search",
-            async |transaction, _| view_chunk_count(transaction, &view).await,
-            |_: &i64| json!({"node": query.node, "stream": query.stream}),
+            (
+                "output.search",
+                async |transaction, _| view_chunk_count(transaction, &view).await,
+                |_: &i64| json!({"node": query.node, "stream": query.stream}),
+            ),
+            None,
         ),
-        None,
     )
     .await?
     else {

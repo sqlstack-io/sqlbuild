@@ -133,18 +133,20 @@ def test_given_a_node_printing_a_large_log_when_a_worker_runs_it_then_its_lines_
             "an asset failing sixty calls deep",
             "SELECT 17 AS amount",
             "SELECT amount FROM orders",
-            "failed",
+            "partial",
             [(17,)],
             files={
                 "python/assets/score_orders.py": (
                     "from sqlbuild.assets import asset\n\n\n"
-                    "def lookup(row, depth):\n"
-                    "    if depth == 0:\n"
-                    "        return row['customer_segment']\n"
-                    "    return lookup(row, depth - 1)\n\n\n"
-                    "@asset(description='Scores orders.')\n"
+                    "def lookup_0(row):\n"
+                    "    return row['customer_segment']\n\n\n"
+                    + "".join(
+                        f"def lookup_{n}(row):\n    return lookup_{n - 1}(row)\n\n\n"
+                        for n in range(1, 61)
+                    )
+                    + "@asset(description='Scores orders.')\n"
                     "def score_orders(ctx):\n"
-                    "    return lookup({'customer_id': 1}, 60)\n"
+                    "    return lookup_60({'customer_id': 1})\n"
                 ),
                 "orchestration/jobs/annual_orders_job.toml": (
                     'name = "annual_orders_job"\n'
@@ -178,5 +180,5 @@ def test_given_a_failing_python_node_when_a_worker_runs_it_then_its_run_error_is
             error.startswith(test_case.expected_error_start),
             error.endswith(test_case.expected_error_end),
             len(error) < test_case.expected_error_below,
-            "in lookup" in error,
+            "in lookup_0" in error,
         ) == (True, True, True, True), error

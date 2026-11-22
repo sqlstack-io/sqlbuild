@@ -95,14 +95,16 @@ def build_python_node_failure_result(
 
 
 def traceback_tail(*, error: BaseException) -> str:
-    """Return the error's formatted traceback, keeping its end when it is too long to keep whole."""
+    """Return the error's formatted traceback, cut to its exception and last frames if too long."""
 
     text: str = "".join(traceback.format_exception(error))
     if len(text) <= ERROR_DETAIL_CHARS:
         return text
     lines: list[str] = text.splitlines(keepends=True)
     kept: list[str] = []
-    room: int = ERROR_DETAIL_CHARS - len(TRACEBACK_HEADER) - len(TRACEBACK_ELIDED.format(count=len(lines)))
+    room: int = (
+        ERROR_DETAIL_CHARS - len(TRACEBACK_HEADER) - len(TRACEBACK_ELIDED.format(count=len(lines)))
+    )
     for line in reversed(lines):
         if len(line) > room:
             break

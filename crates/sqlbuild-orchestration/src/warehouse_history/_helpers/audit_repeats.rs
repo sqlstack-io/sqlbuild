@@ -6,8 +6,10 @@ use std::time::{Duration, Instant};
 
 use uuid::Uuid;
 
+use crate::warehouse_history::types::AuditKey;
+
 /// When each person last had each kind of read of each run audited, on this server.
-static AUDITED: LazyLock<Mutex<HashMap<(String, String, Uuid), Instant>>> =
+static AUDITED: LazyLock<Mutex<HashMap<AuditKey, Instant>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Whether a read by `actor` of kind `action` of `run_id` needs a new audit row: none within `window`.
@@ -23,5 +25,8 @@ pub(crate) fn record_audit((actor, action, run_id): (&str, &str, Uuid)) {
     AUDITED
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
-        .insert((actor.to_owned(), action.to_owned(), run_id), Instant::now());
+        .insert(
+            (actor.to_owned(), action.to_owned(), run_id),
+            Instant::now(),
+        );
 }

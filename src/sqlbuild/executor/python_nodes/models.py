@@ -106,7 +106,6 @@ class PythonNodeExecutionResult:
     skip_reason: str | None = None
     error_message: str | None = None
     warning_messages: tuple[str, ...] = field(default_factory=tuple)
-    # The end of a failure's formatted traceback, for the run's node error.
     error_detail: str | None = None
 
 

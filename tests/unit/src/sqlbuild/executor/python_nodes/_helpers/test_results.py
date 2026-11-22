@@ -40,6 +40,7 @@ from tests.unit.src.sqlbuild.executor.python_nodes._helpers._test_types import (
 from tests.unit.src.sqlbuild.executor.python_nodes._helpers.helpers import (
     PythonNodeContextTestAdapter,
     build_check_context,
+    nested_key_error,
 )
 
 
@@ -339,17 +340,6 @@ def test_given_upstream_python_node_results_when_evaluating_fan_in_then_returns_
     assert decision.reason == test_case.expected_reason
 
 
-def _failure(depth: int) -> BaseException:
-    def lookup(row: dict[str, int], left: int) -> int:
-        return row["customer_segment"] if left == 0 else lookup(row, left - 1)
-
-    try:
-        lookup({"customer_id": 1}, depth)
-    except KeyError as error:
-        return error
-    raise AssertionError("lookup did not raise")
-
-
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -373,7 +363,7 @@ def _failure(depth: int) -> BaseException:
 def test_given_a_python_failure_when_its_traceback_is_kept_then_its_end_fits_the_run_error(
     test_case: TracebackTailTestCase,
 ) -> None:
-    error: BaseException = _failure(test_case.depth)
+    error: BaseException = nested_key_error(depth=test_case.depth)
     result: PythonNodeExecutionResult = build_python_node_failure_result(
         node_name="score_orders", kind=PythonNodeKind.ASSET, error=error
     )

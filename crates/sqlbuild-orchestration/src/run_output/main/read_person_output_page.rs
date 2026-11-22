@@ -36,12 +36,11 @@ pub async fn read_person_output_page(
         store,
         credentials,
         (run, default_role, Action::ViewEvidence),
-        (
+        ((
             "output.page",
             async |transaction, _| view_line_count(transaction, &view).await,
             |_: &i64| json!({"node": query.node, "stream": query.stream, "from": query.from, "before": query.before, "tail": query.tail}),
-        ),
-        Some(REPEATED_READ_AUDIT),
+        ), Some(REPEATED_READ_AUDIT)),
     )
     .await?
     else {

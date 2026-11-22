@@ -7,7 +7,6 @@ use serde_json::{Value, json};
 use sqlbuild_recall::records::constants::AUDIT_COMPLETED_EVENT;
 use uuid::Uuid;
 
-use crate::warehouse_history::_helpers::audit_repeats::{audit_due, record_audit};
 use crate::authorization::main::decisions::authorize_listing::authorize_listing;
 use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::main::audit::append_audit::append_audit;
@@ -26,6 +25,7 @@ use crate::store::main::query::query;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 use crate::store::types::Row;
+use crate::warehouse_history::_helpers::audit_repeats::{audit_due, record_audit};
 
 /// Events whose node may be named only in their payload: older node and check events, and audit results.
 const NODE_EVENTS: &str = "'run_node_started','run_node_finished','run_check_started','run_check_finished','audit_completed'";
@@ -115,15 +115,17 @@ pub(crate) async fn sensitive_run_read<T>(
     store: &ControlStore,
     credentials: (&AuditContext, Uuid),
     (run, default_role, action): ((Uuid, &str, Uuid), DefaultRole, Action),
-    (audit_action, read, details): (
-        &str,
-        impl AsyncFnOnce(
-            ControlTransaction,
-            &RunRecallScope,
-        ) -> Result<(ControlTransaction, T), ControlError>,
-        impl FnOnce(&T) -> Value,
+    ((audit_action, read, details), repeat): (
+        (
+            &str,
+            impl AsyncFnOnce(
+                ControlTransaction,
+                &RunRecallScope,
+            ) -> Result<(ControlTransaction, T), ControlError>,
+            impl FnOnce(&T) -> Value,
+        ),
+        Option<Duration>,
     ),
-    repeat: Option<Duration>,
 ) -> Result<Option<T>, ControlError> {
     let Some((transaction, scope, Some((context, permission)))) =
         begin_run_recall(store, credentials, run, (default_role, Some(action))).await?
