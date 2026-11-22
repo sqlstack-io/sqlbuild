@@ -21,10 +21,10 @@ from tests.unit.src.sqlbuild.executor.python_nodes.classes._test_types import (
     ItemPoolWriteTestCase,
 )
 from tests.unit.src.sqlbuild.executor.python_nodes.classes.helpers import (
-    WAIT_SECONDS,
     ItemPoolTestAdapter,
     ItemProbe,
     fail_item,
+    interrupted_probe,
     item_graph,
     meet_at,
     run_ingress,
@@ -267,23 +267,7 @@ def test_given_steps_in_flight_when_interrupted_then_finished_stay_succeeded_and
     test_case: ItemPoolCancelTestCase,
 ) -> None:
     for run_path in _PATHS:
-        both_running: threading.Barrier = threading.Barrier(2)
-        interrupted: threading.Event = threading.Event()
-
-        def slow() -> object:
-            _ = both_running.wait(timeout=WAIT_SECONDS)
-            assert interrupted.wait(timeout=WAIT_SECONDS)
-            return fail_item()
-
-        def interrupt(name: str) -> None:
-            probe.after_report = lambda reported: None
-            interrupted.set()
-            raise KeyboardInterrupt(name)
-
-        probe: ItemProbe = ItemProbe(
-            actions={"quick": partial(meet_at, both_running), "slow": slow}
-        )
-        probe.after_report = interrupt
+        probe: ItemProbe = interrupted_probe()
         adapter: ItemPoolTestAdapter = ItemPoolTestAdapter()
         graph: PythonNodeGraph = item_graph(
             (("quick", "plan", 2, ()), ("slow", "plan", 2, ()), ("waiting", "plan", 2, ("quick",)))

@@ -317,3 +317,28 @@ def run_shape(
             probe=ItemProbe(actions={"a": action}),
         )
     )
+
+
+def interrupted_probe() -> ItemProbe:
+    """`quick` finishes and its report raises an interrupt while `slow` is still running."""
+
+    both_running: threading.Barrier = threading.Barrier(2)
+    interrupted: threading.Event = threading.Event()
+
+    def quick() -> object:
+        return meet_at(both_running)
+
+    def slow() -> object:
+        _ = both_running.wait(timeout=WAIT_SECONDS)
+        assert interrupted.wait(timeout=WAIT_SECONDS)
+        return fail_item()
+
+    probe: ItemProbe = ItemProbe(actions={"quick": quick, "slow": slow})
+
+    def interrupt(name: str) -> None:
+        probe.after_report = lambda reported: None
+        interrupted.set()
+        raise KeyboardInterrupt(name)
+
+    probe.after_report = interrupt
+    return probe
