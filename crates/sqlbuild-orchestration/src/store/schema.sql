@@ -235,6 +235,7 @@ CREATE TABLE sqb_run_output_segments (
     FOREIGN KEY (run_id, chunk) REFERENCES sqb_run_output_chunks(run_id, chunk)
 );
 CREATE INDEX sqb_run_output_segments_node ON sqb_run_output_segments(run_id, node_key, node_line);
+CREATE INDEX sqb_run_output_segments_chunk ON sqb_run_output_segments(run_id, chunk);
 CREATE TABLE sqb_run_output_streams (
     run_id {uuid} NOT NULL REFERENCES sqb_run_output(run_id),
     node_key TEXT NOT NULL,
