@@ -20,6 +20,21 @@ pub fn openapi_document() -> utoipa::openapi::OpenApi {
         .components
         .get_or_insert_with(Default::default)
         .add_security_scheme(
+        "serviceKey",
+        SecurityScheme::Http(
+            HttpBuilder::new()
+                .scheme(HttpAuthScheme::Bearer)
+                .description(Some(
+                    "A service account key, sqbk_…, from sqb admin create-service-account or the \
+                         Service accounts tab. Accepted on any listen address.",
+                ))
+                .build(),
+        ),
+    );
+    document
+        .components
+        .get_or_insert_with(Default::default)
+        .add_security_scheme(
             "session",
             SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new(PASSWORD_COOKIE))),
         );

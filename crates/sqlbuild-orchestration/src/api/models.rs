@@ -1,5 +1,9 @@
 //! Typed HTTP responses shared with the generated OpenAPI contract.
 
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+
 use serde::{Deserialize, Serialize};
 
 use crate::api::_helpers::authentication::password_sessions;
@@ -7,8 +11,8 @@ use crate::api::_helpers::authentication::{cli_login, oidc};
 use crate::api::_helpers::resources::{
     administrators, audit, changed_builds, changes, location_health, location_work,
     person_bootstrap, person_checks, person_location_work, person_maintenance, person_node_sql,
-    person_operations, person_plans, person_reads, person_selection, run_reads, runs, snapshots,
-    trigger_reads, warehouse_metadata,
+    person_operations, person_plans, person_reads, person_selection, run_reads, runs,
+    service_accounts, snapshots, trigger_reads, warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
@@ -19,6 +23,13 @@ use crate::api::_helpers::resources::{
     administrators::holdings,
     administrators::definitions,
     administrators::server,
+    crate::api::_helpers::authentication::service_keys::keys_only_mode,
+    service_accounts::list,
+    service_accounts::create,
+    service_accounts::rotate,
+    service_accounts::revoke,
+    service_accounts::disable,
+    service_accounts::role,
     audit::read,
     person_operations::request_job,
     person_operations::request_adhoc,
@@ -243,6 +254,14 @@ pub enum LoginMode {
     Oidc,
     /// `sqb dev` on loopback: no sign-in, every request acts as the local development person.
     Disabled,
+    /// No sign-in for people: only service account keys call the server.
+    Keys,
+}
+
+/// How a server without a session is signed in to, answered before sign-in only where people can't.
+#[derive(Clone, Copy, Debug, Serialize, utoipa::ToSchema)]
+pub struct LoginModeAnswer {
+    pub login_mode: LoginMode,
 }
 
 /// What the UI needs first: how people sign in, and what this person may see and do.
@@ -702,3 +721,7 @@ pub struct ServerRetention {
     pub location_health_days: i64,
     pub sensor_evaluation_days: i64,
 }
+
+/// When each service key's refusal was last audited, kept per router so the throttle stays local.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct KeyRefusals(pub(crate) Arc<Mutex<HashMap<uuid::Uuid, Instant>>>);

@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use sqlbuild_cache::project_snapshot::models::{PathStamp, SnapshotRules};
-use sqlbuild_orchestration::credentials::models::CredentialScope;
+use sqlbuild_orchestration::credentials::models::{CredentialScope, NewServiceAccount};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWorkRequest, WarehouseReadFailure};
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
@@ -26,9 +26,7 @@ pub(crate) enum ControlAdmin {
     CreateLocation(String),
     CreatePrincipal(String),
     BootstrapUser(String),
-    IssueToken(CredentialScope, DateTime<Utc>),
-    RevokeToken(Uuid),
-    RotateToken(Uuid),
+    Token(TokenAdmin),
     SetPassword(Uuid, String),
     GrantAdmin(Uuid),
     RequestJobRun(JobRunRequest),
@@ -46,6 +44,33 @@ pub(crate) enum ControlAdmin {
         change: TriggerChange,
         reason: String,
     },
+    ServiceAccount(ServiceAccountAdmin),
+}
+
+/// The location token commands.
+#[derive(Debug)]
+pub(crate) enum TokenAdmin {
+    Issue(CredentialScope, DateTime<Utc>),
+    Revoke(Uuid),
+    Rotate(Uuid),
+}
+
+/// The service account commands, which name accounts rather than numbering them.
+pub(crate) enum ServiceAccountAdmin {
+    /// A new account, with the key read from `--key-from-env` when one is imported.
+    Create {
+        request: NewServiceAccount,
+        key: Option<String>,
+    },
+    Rotate {
+        name: String,
+        overlap_minutes: i64,
+    },
+    SetDisabled {
+        name: String,
+        disabled: bool,
+    },
+    List,
 }
 
 /// Parsing can finish an invocation before package discovery or any Python handoff.
@@ -654,4 +679,31 @@ pub(crate) struct SensorTrialArguments {
     pub(crate) target: String,
     pub(crate) choice: SensorEventChoice,
     pub(crate) source: EventSource,
+}
+
+/// Never prints an imported key, so a debug log can't leak it.
+impl std::fmt::Debug for ServiceAccountAdmin {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Create { request, key } => formatter
+                .debug_struct("Create")
+                .field("request", request)
+                .field("key", &key.as_ref().map(|_| "[redacted]"))
+                .finish(),
+            Self::Rotate {
+                name,
+                overlap_minutes,
+            } => formatter
+                .debug_struct("Rotate")
+                .field("name", name)
+                .field("overlap_minutes", overlap_minutes)
+                .finish(),
+            Self::SetDisabled { name, disabled } => formatter
+                .debug_struct("SetDisabled")
+                .field("name", name)
+                .field("disabled", disabled)
+                .finish(),
+            Self::List => formatter.write_str("List"),
+        }
+    }
 }

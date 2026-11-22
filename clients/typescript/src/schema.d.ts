@@ -80,6 +80,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/service-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Every service account by name with its working keys, never the keys themselves. Needs user.manage or role.assign. */
+        get: operations["listServiceAccounts"];
+        put?: never;
+        /** @description Adds a service account with a built-in role everywhere and returns its first key, only this once. Needs user.manage and role.assign. */
+        post: operations["createServiceAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/service-accounts/{principal_id}/disabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Disabling refuses every key of the account at once; enabling accepts the same keys again. Needs user.manage. */
+        post: operations["setServiceAccountDisabled"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/service-accounts/{principal_id}/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Issues a new key, returned only this once. The replaced key works on for overlap_minutes (at most 1440), else stops now; a key already in an overlap stops now. Needs user.manage. */
+        post: operations["rotateServiceAccountKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/service-accounts/{principal_id}/keys/{key_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Stops one working key now, such as an old key before its overlap ends. Needs user.manage. */
+        post: operations["revokeServiceAccountKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/service-accounts/{principal_id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Gives the account a built-in role everywhere in place of its other built-in roles everywhere. Needs role.assign. */
+        post: operations["setServiceAccountRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/cli/approve": {
         parameters: {
             query?: never;
@@ -122,6 +208,23 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["startCliLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/login-mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Answered only by a server without sign-in for people, so a browser or sqb login can say so instead of offering a password. */
+        get: operations["readLoginMode"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2203,6 +2306,11 @@ export interface components {
              */
             store_bytes: number;
         };
+        /** @description A service account with a key that is returned only this once; the store keeps only its hash. */
+        IssuedServiceKey: {
+            account: components["schemas"]["ServiceAccountSummary"];
+            key: string;
+        };
         /** @description One job or group as declared, for a person who may list the target; free-form setting values are withheld. */
         JobDetailRecord: {
             /**
@@ -2515,7 +2623,11 @@ export interface components {
          * @description How people sign in to this server.
          * @enum {string}
          */
-        LoginMode: "password" | "trusted_proxy" | "oidc" | "disabled";
+        LoginMode: "password" | "trusted_proxy" | "oidc" | "disabled" | "keys";
+        /** @description How a server without a session is signed in to, answered before sign-in only where people can't. */
+        LoginModeAnswer: {
+            login_mode: components["schemas"]["LoginMode"];
+        };
         /** @description A running calendar schedule whose last date is at most a day away, or which has none left. */
         LowCalendar: {
             /**
@@ -2633,6 +2745,12 @@ export interface components {
         };
         MutationResponse: {
             applied: boolean;
+        };
+        /** @description A service account to add: its name, what uses it, and its built-in role everywhere. */
+        NewServiceAccount: {
+            description?: string | null;
+            name: string;
+            role: components["schemas"]["BuiltinRole"];
         };
         /** @description One build's estimated query cost of one node, across every warehouse it used. */
         NodeCostRecord: {
@@ -3363,6 +3481,11 @@ export interface components {
             state_database?: string | null;
             state_schema: string;
         };
+        /**
+         * @description A principal signs in as a person, or calls with an API key as a service account.
+         * @enum {string}
+         */
+        PrincipalKind: "person" | "service";
         /** @description Code that injects a provider: a node (`loader`, `asset`, `check`, `hook` or `materialization`, keyed `kind:name`), an `event_exporter` or a `sink`. */
         ProviderConsumer: {
             kind: string;
@@ -4076,6 +4199,7 @@ export interface components {
         SecurityAuditEvent: {
             action: string;
             actor: string;
+            actor_kind?: null | components["schemas"]["PrincipalKind"];
             /** @description The person's name when `actor` is a principal; person reads set it, exports leave it out. */
             actor_name?: string | null;
             after_json: unknown;
@@ -4384,6 +4508,67 @@ export interface components {
             /** @description Whether this server runs the scheduler; another server may hold the lease. */
             scheduler: boolean;
             version: string;
+        };
+        ServiceAccountRole: {
+            role: components["schemas"]["BuiltinRole"];
+        };
+        ServiceAccountState: {
+            disabled: boolean;
+        };
+        /** @description A service account as administrators see it: its role, state and working keys. */
+        ServiceAccountSummary: {
+            /** Format: date-time */
+            created_at: string;
+            created_by?: string | null;
+            description?: string | null;
+            /**
+             * Format: date-time
+             * @description While set, every key of the account is refused.
+             */
+            disabled_at?: string | null;
+            /** @description Keys that work, or will once the account is enabled: the current key first, then one still in its overlap. */
+            keys: components["schemas"]["ServiceKeySummary"][];
+            /**
+             * Format: date-time
+             * @description The newest last use of any of its keys, stopped ones included.
+             */
+            last_used_at?: string | null;
+            name: string;
+            /** Format: uuid */
+            principal_id: string;
+            role?: null | components["schemas"]["BuiltinRole"];
+        };
+        /**
+         * @description How a service account key came to be: made by SQLBuild, or chosen with the CLI's `--key-from-env`.
+         * @enum {string}
+         */
+        ServiceKeyOrigin: "issued" | "imported";
+        /** @description A rotation: how many minutes the replaced key keeps working, at most a day; none or 0 stops it at once. */
+        ServiceKeyRotation: {
+            /** Format: int64 */
+            overlap_minutes?: number | null;
+        };
+        /** @description One working key of a service account; never the key itself. */
+        ServiceKeySummary: {
+            /** Format: date-time */
+            created_at: string;
+            /** @description Who made it; none when the control-store owner did, with the CLI. */
+            created_by?: string | null;
+            /**
+             * Format: date-time
+             * @description When a key replaced by a rotation stops working; none for the current key.
+             */
+            expires_at?: string | null;
+            /** Format: uuid */
+            key_id: string;
+            /**
+             * Format: date-time
+             * @description The last request this key authenticated that wasn't refused.
+             */
+            last_used_at?: string | null;
+            origin: components["schemas"]["ServiceKeyOrigin"];
+            /** @description The non-secret start of the key, e.g. `sqbk_Q7m2xT`. */
+            prefix: string;
         };
         SessionIdentity: {
             /** Format: date-time */
@@ -5089,6 +5274,290 @@ export interface operations {
             };
         };
     };
+    listServiceAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAccountSummary"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    createServiceAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewServiceAccount"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuedServiceKey"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    setServiceAccountDisabled: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path: {
+                principal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceAccountState"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAccountSummary"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    rotateServiceAccountKey: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path: {
+                principal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceKeyRotation"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuedServiceKey"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    revokeServiceAccountKey: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path: {
+                principal_id: string;
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAccountSummary"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    setServiceAccountRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path: {
+                principal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceAccountRole"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAccountSummary"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     approveCliLogin: {
         parameters: {
             query?: never;
@@ -5183,6 +5652,32 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AuthenticationDenial"];
                 };
+            };
+        };
+    };
+    readLoginMode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginModeAnswer"];
+                };
+            };
+            /** @description People sign in on this server */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

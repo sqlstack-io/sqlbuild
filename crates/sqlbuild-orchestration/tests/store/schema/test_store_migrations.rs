@@ -1,16 +1,18 @@
 //! Numbered control-store migrations: baseline upgrades, table rebuilds, refusals and the dry run.
 
+use crate::credentials::main::service_keys::authenticate_service_key::authenticate_service_key;
+use crate::credentials::models::ServiceKeyCheck;
 use crate::store::constants::{INDEXES, SCHEMA};
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::schema::helpers::{
     BASELINE_ROWS, POPULATED_TABLES, POSTGRES_STORE, SQLITE_STORE, create_unversioned_baseline,
     execute, migration_names, query_items, rebuilt_runs_table, recorded_version, schema_shape,
-    table_rows, without_added_columns,
+    service_account_key, table_rows, without_added_columns,
 };
 use crate::store::tests::schema::test_types::{
     BaselineUpgradeTestCase, BrokenMigrationTestCase, LiveWorkUpgradeTestCase,
-    MigrationRefusalTestCase, PinnedChecksumTestCase, StoreMigrationPlanTestCase,
-    TableRebuildTestCase,
+    MigrationRefusalTestCase, PinnedChecksumTestCase, ServiceAccountUpgradeTestCase,
+    StoreMigrationPlanTestCase, TableRebuildTestCase,
 };
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_migrations::_helpers::migration::{
@@ -58,6 +60,11 @@ const SQLITE_CHECKSUMS: &[(i64, &str)] = &[
         7,
         "1e804eaedea2c8da1844dfc3fb1cb6286d55fbe1ec39678333e9381168ba297a",
     ),
+    // 0009_service_accounts, the seventh migration until 0008 lands, so version 8 until then.
+    (
+        8,
+        "7d29a67bda48c4d9bf32bab195f3034073274bd56911ef85d7d6ac6004505113",
+    ),
 ];
 const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
     (
@@ -88,6 +95,11 @@ const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
     (
         7,
         "34729be86bb8766ef2cd3dab50202da63dda2f6b32e91aaf1bdf9fc5b1379c62",
+    ),
+    // 0009_service_accounts, the seventh migration until 0008 lands, so version 8 until then.
+    (
+        8,
+        "ad1fdd2fe656103d86a916a4c0e7f653b0fa079ce30a56b7387765255aca9bcc",
     ),
 ];
 /// A version 1 store mid-run: a child run holding a concurrency slot, a jobs document and an audit result.
@@ -197,6 +209,100 @@ fn given_store_at_the_baseline_when_migrating_then_it_matches_a_new_store_and_ke
                 ),
                 "{}: a schema change needs a numbered migration that brings the baseline to it, \
                  and upgrading keeps every row",
+                test_case.description
+            );
+            close_test_store(upgraded).await;
+            close_test_store(created).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_store_from_before_service_accounts_when_upgraded_then_it_matches_a_new_store_and_takes_keys()
+ {
+    let test_cases = [
+        ServiceAccountUpgradeTestCase {
+            description: "SQLite store from the version before service accounts",
+            dialect: &SQLITE_STORE,
+            versions_behind: 0,
+            expected_objects_before: 0,
+            expected_version: current_version(MIGRATIONS),
+        },
+        ServiceAccountUpgradeTestCase {
+            description: "PostgreSQL store from the version before service accounts",
+            dialect: &POSTGRES_STORE,
+            versions_behind: 0,
+            expected_objects_before: 0,
+            expected_version: current_version(MIGRATIONS),
+        },
+        ServiceAccountUpgradeTestCase {
+            description: "SQLite store from two versions earlier",
+            dialect: &SQLITE_STORE,
+            versions_behind: 2,
+            expected_objects_before: 0,
+            expected_version: current_version(MIGRATIONS),
+        },
+        ServiceAccountUpgradeTestCase {
+            description: "PostgreSQL store from two versions earlier",
+            dialect: &POSTGRES_STORE,
+            versions_behind: 2,
+            expected_objects_before: 0,
+            expected_version: current_version(MIGRATIONS),
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let backend = test_case.dialect.backend;
+            let upgraded = open_test_store(backend).await.expect("required backend");
+            let created = open_test_store(backend).await.expect("required backend");
+            let store = &upgraded.store;
+            create_unversioned_baseline(
+                store,
+                test_case.dialect,
+                test_case.dialect.baseline_checksum,
+            )
+            .await;
+            let position = MIGRATIONS
+                .iter()
+                .position(|migration| migration.name == "service_accounts")
+                .expect("the service accounts migration");
+            migrate_with(store, &MIGRATIONS[..position - test_case.versions_behind])
+                .await
+                .expect("a store from an older release");
+            let objects_before = schema_shape(store, test_case.dialect)
+                .await
+                .into_iter()
+                .filter(|item| item.contains("service_account"))
+                .count();
+            let before = table_rows(store, &POPULATED_TABLES).await;
+
+            migrate_store(store).await.expect("upgrade the older store");
+            let kept = without_added_columns(table_rows(store, &POPULATED_TABLES).await, &before);
+            let key = service_account_key(store).await;
+            migrate_store(store)
+                .await
+                .expect("open the upgraded store again");
+            migrate_store(&created.store).await.expect("create a store");
+            let check = authenticate_service_key(store, &key, chrono::Utc::now())
+                .await
+                .expect("check the key");
+
+            assert_eq!(
+                (
+                    objects_before,
+                    schema_shape(store, test_case.dialect).await,
+                    kept,
+                    recorded_version(store).await,
+                    matches!(check, ServiceKeyCheck::Accepted(_)),
+                ),
+                (
+                    test_case.expected_objects_before,
+                    schema_shape(&created.store, test_case.dialect).await,
+                    before,
+                    Some(test_case.expected_version),
+                    true,
+                ),
+                "{}: the migration adds what a new store has, keeps every row and takes keys",
                 test_case.description
             );
             close_test_store(upgraded).await;

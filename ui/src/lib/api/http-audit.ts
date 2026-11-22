@@ -59,7 +59,7 @@ export function toAuditEntry(wire: Wire['SecurityAuditEvent']): AuditEntry {
 	return {
 		id: wire.event_id,
 		at: wire.occurred_at,
-		actor: { kind: wire.actor_name ? 'user' : 'system', name, displayName: name },
+		actor: { kind: wire.actor_kind === 'service' ? 'service' : wire.actor_name ? 'user' : 'system', name, displayName: name },
 		action: denied ? (textOf(scope.action) ?? DENIED) : wire.action,
 		outcome: denied ? 'denied' : 'allowed',
 		scope: scopeOf(scope),

@@ -14,9 +14,7 @@ use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::tests::helpers::{add_old_form_sensor, finish_run, triggers_document};
 use crate::sensors::tests::test_types::SensorUpgradeTestCase;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
-use crate::store::main::{
-    begin::begin, commit::commit, migrate_store::migrate_store, query::query,
-};
+use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::TransactionMode;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
@@ -72,9 +70,13 @@ fn given_a_snapshot_with_an_old_form_sensor_when_the_store_upgrades_then_its_job
                 .expect("publish before upgrade");
             add_old_form_sensor(store, &snapshot).await;
 
-            migrate_store(store).await.expect("upgrade");
+            migrate_with(store, &MIGRATIONS[..4])
+                .await
+                .expect("upgrade to version 5");
             let migrated = triggers_document(store, snapshot.snapshot_id).await;
-            migrate_store(store).await.expect("open again");
+            migrate_with(store, &MIGRATIONS[..4])
+                .await
+                .expect("open again");
             let again =
                 drop_old_form_sensors(begin(store, TransactionMode::Write).await.expect("step"))
                     .await

@@ -4,6 +4,10 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+use crate::authorization::main::service_accounts::create_service_account::create_service_account;
+use crate::credentials::models::{
+    AuditContext, BuiltinRole, NewServiceAccount, ServiceAccountAuthority,
+};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -307,6 +311,29 @@ pub(crate) async fn query_items(store: &ControlStore, sql: &str) -> Vec<String> 
         .unwrap_or_else(|error| panic!("{sql}: {error}"));
     commit(transaction).await.expect("finish read");
     rows.iter().map(|row| text(row, "item")).collect()
+}
+
+/// The key of a service account the store's owner adds, which needs the service account tables.
+pub(crate) async fn service_account_key(store: &ControlStore) -> String {
+    let context = AuditContext {
+        actor: "local-control-store-owner".into(),
+        granting_role: "control-store-owner".into(),
+        request_id: uuid::Uuid::now_v7(),
+        ip_address: None,
+    };
+    let request = NewServiceAccount {
+        name: "orders-deploy".into(),
+        description: None,
+        role: BuiltinRole::Developer,
+    };
+    create_service_account(
+        store,
+        (&context, ServiceAccountAuthority::Owner),
+        (&request, None),
+    )
+    .await
+    .expect("a service account")
+    .key
 }
 
 /// The store's recorded schema version.

@@ -11,6 +11,7 @@ import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
 import { manualConnectionTest, missingSecretsEventOf, snapshotOf, toLocationDetail, toLocationSummary, toWarehouseConnection, warehouseSyncOf } from './http-locations';
 import { toAccount, toRoleAssignments, toServerSettings } from './http-people';
+import { toIssuedKey, toServiceAccount } from './http-service-accounts';
 import { toMaintenanceHistory } from './http-maintenance';
 import { toProviders } from './http-providers';
 import { overviewOf } from './http-overview';
@@ -21,8 +22,8 @@ import { timelineOf } from './http-timeline';
 import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements, toIgnoredAuditFailures, toRunCostRows, toCostSummary, toNodeBuildCosts } from './http-runs';
 import { toSelectionEvaluation, toSelectionVocabulary } from './http-selection';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
-import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
-import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, NewPasswordAccount, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
+import type { AuthMode, Bootstrap, BuiltInRole, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
+import type { Account, AuditEntry, AuditQuery, ConnectionTest, IssuedToken, KeyRotation, LocationDetail, NewPasswordAccount, NewServiceAccount, ServiceAccount, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape, AutomaticWithdrawal } from './types/build';
 import type { NodeOutputIndex, NodeOutputPage, NodeOutputSearch, RunNode, RunOutputFollow, AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 import { newRequestId } from '$lib/browser/request-id';
@@ -85,6 +86,12 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'disableAccount',
 	'enableAccount',
 	'createPasswordAccount',
+	'listServiceAccounts',
+	'createServiceAccount',
+	'rotateServiceAccountKey',
+	'revokeServiceAccountKey',
+	'setServiceAccountDisabled',
+	'setServiceAccountRole',
 	'listLocations',
 	'getLocation',
 	'listPlatformEvents',
@@ -862,8 +869,10 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			return role ? roleDetailOf(role, assignments, locationId) : null;
 		},
 		async listRoleAssignments(): Promise<RoleAssignment[]> {
-			// Group members come from the people read; without it, SSO-derived roles stay unlisted.
-			return toRoleAssignments(await roleHoldings(), await people().catch(() => []));
+			// Group members come from the people read; without it, SSO-derived roles stay unlisted, and without
+			// the service account read its holders read as people.
+			const [holdings, members, services] = await Promise.all([roleHoldings(), people().catch(() => []), serviceAccounts().catch(() => [])]);
+			return toRoleAssignments(holdings, members, new Set(services.map((s) => s.name)));
 		},
 		async createRoleAssignment(request: RoleAssignmentRequest): Promise<RoleAssignment> {
 			const person = await personNamed(request.principal);
@@ -892,6 +901,51 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return toAccount(await personNamed(request.name));
+		},
+		listServiceAccounts: async (): Promise<ServiceAccount[]> => (await serviceAccounts()).map(toServiceAccount),
+		async createServiceAccount(request: NewServiceAccount): Promise<IssuedToken<ServiceAccount>> {
+			const { data, error, response } = await http.POST('/api/admin/service-accounts', {
+				body: { name: request.name, description: request.description, role: request.role },
+				params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toIssuedKey(data);
+		},
+		async rotateServiceAccountKey(name: string, rotation: KeyRotation): Promise<IssuedToken<ServiceAccount>> {
+			const { data, error, response } = await http.POST('/api/admin/service-accounts/{principal_id}/keys', {
+				body: { overlap_minutes: rotation.overlapMinutes },
+				params: { path: { principal_id: await serviceAccountId(name) }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toIssuedKey(data);
+		},
+		async revokeServiceAccountKey(name: string, keyId: string): Promise<ServiceAccount> {
+			const { data, error, response } = await http.POST('/api/admin/service-accounts/{principal_id}/keys/{key_id}/revoke', {
+				params: { path: { principal_id: await serviceAccountId(name), key_id: keyId }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toServiceAccount(data);
+		},
+		async setServiceAccountDisabled(name: string, disabled: boolean): Promise<ServiceAccount> {
+			const { data, error, response } = await http.POST('/api/admin/service-accounts/{principal_id}/disabled', {
+				body: { disabled },
+				params: { path: { principal_id: await serviceAccountId(name) }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toServiceAccount(data);
+		},
+		async setServiceAccountRole(name: string, role: BuiltInRole): Promise<ServiceAccount> {
+			const { data, error, response } = await http.POST('/api/admin/service-accounts/{principal_id}/role', {
+				body: { role },
+				params: { path: { principal_id: await serviceAccountId(name) }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toServiceAccount(data);
 		},
 		async getColumnLineage(scope: Scope, ref: string, listing?: CatalogNode[]): Promise<ColumnLineage | null> {
 			const nodes = listing ?? (await listingWithStates(scope));
@@ -1212,6 +1266,20 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		return toAccount(await personNamed(name));
 	}
 
+	async function serviceAccounts() {
+		const { data, error, response } = await http.GET('/api/admin/service-accounts');
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	/** The server numbers service accounts; the UI names them, as it does people. */
+	async function serviceAccountId(name: string): Promise<string> {
+		const account = (await serviceAccounts()).find((a) => a.name === name);
+		if (!account) throw new ApiError(`No service account named ${name}`, 404);
+		return account.principal_id;
+	}
+
 	async function people() {
 		const { data, error, response } = await http.GET('/api/admin/people');
 		if (response.status === 401) onUnauthorized();
@@ -1448,6 +1516,13 @@ export async function loginWithPassword(username: string, password: string, base
 	if (response.ok) return 'ok';
 	if (response.status === 429) return 'throttled';
 	return response.status === 401 ? 'rejected' : 'unavailable';
+}
+
+/** Whether the server takes only service account keys, so the sign-in page offers no password. */
+export async function keysOnly(baseUrl = ''): Promise<boolean> {
+	const http = createFetch<paths>({ baseUrl, credentials: 'same-origin' });
+	const { data } = await http.GET('/api/auth/login-mode');
+	return data?.login_mode === 'keys';
 }
 
 export async function logout(baseUrl = ''): Promise<void> {

@@ -72,6 +72,19 @@ pub(crate) struct ProxyRemotePeerTestCase {
     pub(crate) expected_warnings: usize,
 }
 
+/// A trusted-proxy server over plain HTTP, open to the network and reached by a peer that isn't the proxy.
+#[cfg(unix)]
+pub(crate) struct NetworkKeyTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) configuration: &'static str,
+    /// The Host the peer sends, neither the origin's nor an allowed one.
+    pub(crate) host: &'static str,
+    /// A keyed read and write, then the username header without a key under that Host and the origin's.
+    pub(crate) expected_statuses: [reqwest::StatusCode; 4],
+    /// Whom the keyed read authenticated as.
+    pub(crate) expected_name: &'static str,
+}
+
 pub(crate) struct ServerConfigurationTestCase {
     pub(crate) description: &'static str,
     pub(crate) configuration: &'static str,
@@ -108,4 +121,29 @@ pub(crate) struct StoreMigrationCommandTestCase {
     pub(crate) expected_stdout: &'static str,
     /// Whether the SQLite store file exists after the command.
     pub(crate) expected_store: bool,
+}
+
+pub(crate) struct GeneratedKeyCliTestCase {
+    pub(crate) description: &'static str,
+    /// The arguments of `sqb admin create-service-account` after the name.
+    pub(crate) arguments: &'static [&'static str],
+    pub(crate) expected_role: &'static str,
+    /// What the key's bootstrap read answers: when made, in the overlap, once replaced, disabled, enabled.
+    pub(crate) expected_statuses: [u16; 5],
+}
+
+pub(crate) struct ImportedKeyCliTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) key: &'static str,
+    pub(crate) expected_status: u16,
+    /// Whether the JSON result repeats the key.
+    pub(crate) expected_key_printed: bool,
+}
+
+pub(crate) struct RefusedServiceAccountCliTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) arguments: &'static [&'static str],
+    /// The value of `SQB_TEST_IMPORTED_KEY`.
+    pub(crate) imported_key: &'static str,
+    pub(crate) expected_error: &'static str,
 }

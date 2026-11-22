@@ -1376,7 +1376,7 @@ paths = ["crates/sqlbuild-rules/src/custom_rule_cache/main/parse_custom_rule_cac
 reason = "Each reads its own cache format: the SQL rule cache checks its version and the build identity and returns findings by path, the custom-rule cache checks only its version, because its identities already include the build, and returns rules by code. Only the parse-and-filter shape is alike."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-orchestration/src/api/_helpers/resources/administrators.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/audit.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/changed_builds.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/location_health.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/location_work.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_checks.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_location_work.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_maintenance.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_node_sql.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_operations.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_plans.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_reads.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_selection.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/run_reads.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/runs.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/snapshots.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/trigger_reads.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/warehouse_metadata.rs"]
+paths = ["crates/sqlbuild-orchestration/src/api/_helpers/resources/administrators.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/audit.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/changed_builds.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/location_health.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/location_work.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_checks.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_location_work.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_maintenance.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_node_sql.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_operations.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_plans.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_reads.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/person_selection.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/run_reads.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/runs.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/service_accounts.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/snapshots.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/trigger_reads.rs", "crates/sqlbuild-orchestration/src/api/_helpers/resources/warehouse_metadata.rs"]
 reason = "Each function is one utoipa-annotated axum route: OpenAPI needs one annotated handler per operation, and each body only checks the caller's scope and calls one store operation. Scope checks and store work live in their shared owners."
 
 [[dupes.allowlist]]
@@ -1752,6 +1752,12 @@ exceptions = [
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
+path = "crates/sqlbuild-orchestration/src/credentials/models.rs"
+symbols = ["IssuedServiceKey", "NewServiceKey"]
+reason = "They implement Debug manually so a debug print never shows the service account key they carry; other models derive it."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS201"
 path = "crates/sqlbuild-python-base/src/compile_context/models.rs"
 symbols = ["PythonProcessClock"]
 reason = "PythonProcessClock implements Debug manually because it holds the interpreter token, which does not implement Debug; other models derive it."
@@ -1970,8 +1976,8 @@ reason = "Output retention runs in the server's maintenance role, which has no c
 [[targets.rust.rule_exceptions]]
 rule = "FPRSH011"
 path = "crates/sqlbuild-orchestration/src/api/_helpers/authentication/proxy_warnings.rs"
-symbols = ["warn_plain_http_origin", "warn_untrusted_source", "warn_untrusted_overflow", "warn_taken_username", "warn_refused_host"]
-reason = "The server's operator reads trusted-proxy misconfiguration on stderr: a plain-HTTP origin at start-up, and once each the untrusted peers that send the username header, the usernames refused because another principal holds the name, and the escaped Host values a trusted peer was refused under, so they can be added to allowed_hosts. Untrusted peers' header values are never printed."
+symbols = ["warn_plain_http_origin", "warn_plain_http_keys", "warn_untrusted_source", "warn_untrusted_overflow", "warn_taken_username", "warn_refused_host"]
+reason = "The server's operator reads sign-in misconfiguration on stderr: a plain-HTTP origin, or service keys accepted on a network listener without an https:// origin, at start-up, and once each the untrusted peers that send the username header, the usernames refused because another principal holds the name, and the escaped Host values a trusted peer was refused under, so they can be added to allowed_hosts. Untrusted peers' header values are never printed."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"

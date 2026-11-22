@@ -971,6 +971,242 @@
             }
            ]
           }
+         },
+         {
+          "name": "create-service-account",
+          "parser": {
+           "prog": "sqb admin create-service-account",
+           "description": "Add a service account with a built-in role everywhere and print its API key once in the JSON result; store it now, it isn't shown again. Only the key's hash is kept.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "NAME",
+             "required": true,
+             "help": "new service account name: 2 to 63 lowercase letters, digits, - or _, starting with a letter",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--role"
+             ],
+             "dest": "admin_role",
+             "choices": [
+              "viewer",
+              "operator",
+              "developer",
+              "admin"
+             ],
+             "required": true,
+             "help": "built-in role everywhere",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--description"
+             ],
+             "dest": "admin_description",
+             "help": "what uses it, shown in the Service accounts tab",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--key-from-env"
+             ],
+             "dest": "admin_key_env",
+             "metavar": "VAR",
+             "help": "import the key held in environment variable VAR instead of generating one, for setups that recreate a control store and must keep the same key: sqbk_ and at least 32 more characters, generated randomly (for example sqbk_ and 40 random letters and digits), since the key is only as strong as you make it; the result then omits the key",
+             "group": 1
+            }
+           ]
+          }
+         },
+         {
+          "name": "rotate-service-account",
+          "parser": {
+           "prog": "sqb admin rotate-service-account",
+           "description": "Issue a service account a new API key, printed once in the JSON result; the replaced key stops now unless --overlap-minutes keeps it working a little longer.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "NAME",
+             "required": true,
+             "help": "service account name",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--overlap-minutes"
+             ],
+             "dest": "admin_overlap_minutes",
+             "type": "int",
+             "help": "minutes the replaced key keeps working, 0 to 1440 (default: 0)",
+             "group": 1
+            }
+           ]
+          }
+         },
+         {
+          "name": "disable-service-account",
+          "parser": {
+           "prog": "sqb admin disable-service-account",
+           "description": "Refuse every key of a service account at once.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "NAME",
+             "required": true,
+             "help": "service account name",
+             "group": 0
+            }
+           ]
+          }
+         },
+         {
+          "name": "enable-service-account",
+          "parser": {
+           "prog": "sqb admin enable-service-account",
+           "description": "Accept a disabled service account's keys again.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "NAME",
+             "required": true,
+             "help": "service account name",
+             "group": 0
+            }
+           ]
+          }
+         },
+         {
+          "name": "list-service-accounts",
+          "parser": {
+           "prog": "sqb admin list-service-accounts",
+           "description": "List service accounts with their roles and the prefixes of their working keys, never the keys.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            }
+           ]
+          }
          }
         ],
         "choices_help": [
@@ -1038,6 +1274,31 @@
           "dest": "change-trigger",
           "metavar": "change-trigger",
           "help": "change trigger status or cursor with an atomic audit and retry identity"
+         },
+         {
+          "dest": "create-service-account",
+          "metavar": "create-service-account",
+          "help": "add a service account with a role; its API key is printed once"
+         },
+         {
+          "dest": "rotate-service-account",
+          "metavar": "rotate-service-account",
+          "help": "issue a service account a new API key, printed once"
+         },
+         {
+          "dest": "disable-service-account",
+          "metavar": "disable-service-account",
+          "help": "refuse every key of a service account at once"
+         },
+         {
+          "dest": "enable-service-account",
+          "metavar": "enable-service-account",
+          "help": "accept a disabled service account's keys again"
+         },
+         {
+          "dest": "list-service-accounts",
+          "metavar": "list-service-accounts",
+          "help": "list service accounts and their key prefixes"
          }
         ]
        }

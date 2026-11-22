@@ -123,7 +123,9 @@ fn given_jobs_published_before_0004_when_migrating_then_plain_job_runs_work_and_
                 ]
             };
 
-            migrate_store(store).await.expect("migrate to version 4");
+            migrate_with(store, &MIGRATIONS[..3])
+                .await
+                .expect("migrate to version 4");
             let stored = rows(
                 store,
                 "SELECT definition_json FROM sqb_jobs WHERE job_key='orders'",
@@ -233,7 +235,9 @@ fn given_a_group_schedule_published_before_0004_when_the_scheduler_cycles_then_o
             publish_snapshot(store, &input).await.expect("publish");
             store_old_job_definitions(store, test_case.stored_source).await;
             store_old_documents(store, test_case.stored_source).await;
-            migrate_store(store).await.expect("migrate to version 4");
+            migrate_with(store, &MIGRATIONS[..3])
+                .await
+                .expect("migrate to version 4");
             let other = create_location(store, "returns", "test-admin")
                 .await
                 .expect("another location");
@@ -331,7 +335,9 @@ fn given_a_job_published_before_0004_when_its_run_fails_before_a_republish_then_
             publish_snapshot(store, &input).await.expect("publish");
             store_old_job_definitions(store, test_case.stored_source).await;
             store_old_documents(store, test_case.stored_source).await;
-            migrate_store(store).await.expect("migrate to version 4");
+            migrate_with(store, &MIGRATIONS[..3])
+                .await
+                .expect("migrate to version 4");
             request_job_run(store, (&operator(), None), &manual_run(location, "orders"))
                 .await
                 .expect("a manual run of the migrated job");

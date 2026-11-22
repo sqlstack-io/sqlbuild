@@ -24,8 +24,9 @@ function scopeKey(locationId: string | null | undefined, target: string | null |
 }
 
 /** Assignments given here, then one SSO assignment per member of each mapped group. */
-export function toRoleAssignments(holdings: Wire['RoleHoldings'], people: Wire['PersonSummary'][]): RoleAssignment[] {
-	const person = (name: string) => ({ kind: 'user' as const, name, displayName: name });
+/** Role holders; `services` names the service accounts among them, which hold roles as people do. */
+export function toRoleAssignments(holdings: Wire['RoleHoldings'], people: Wire['PersonSummary'][], services: ReadonlySet<string> = new Set()): RoleAssignment[] {
+	const person = (name: string) => ({ kind: services.has(name) ? ('service' as const) : ('user' as const), name, displayName: name });
 	const manual: RoleAssignment[] = holdings.assignments.map((a) => ({
 		id: a.assignment_id,
 		principal: person(a.name),

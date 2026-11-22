@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { Account, RoleAssignment } from '$lib/api';
+	import ConfirmDialog from '$lib/components/platform/confirm-dialog.svelte';
+	import MenuSelect from '$lib/components/platform/menu-select.svelte';
 	import { to } from '$lib/paths';
 	import { personHref } from '$lib/platform/access';
 	import { errorMessage } from '$lib/platform/labels';
@@ -11,30 +13,42 @@
 	type Props = { account: Account; assignments: RoleAssignment[]; defaultRole: string | null; lastAdmin: boolean; canAssign: boolean; onchange: () => void };
 	let { account, assignments, defaultRole, lastAdmin, canAssign, onchange }: Props = $props();
 
+	type Choice = BuiltinRole | 'none';
 	const choice = $derived(roleChoice(assignments, defaultRole));
 	const LAST_ADMIN = 'The last admin can’t be demoted; make someone else an admin first.';
+	const options = $derived([
+		...(defaultRole === null ? [{ value: 'none' as Choice, label: 'No role', disabled: lastAdmin, title: lastAdmin ? LAST_ADMIN : undefined }] : []),
+		...BUILTIN_ROLES.map((role) => ({
+			value: role as Choice,
+			label: `${role}${role === defaultRole ? ' (default)' : ''}`,
+			disabled: lastAdmin && role !== 'admin',
+			title: lastAdmin && role !== 'admin' ? LAST_ADMIN : undefined
+		}))
+	]);
 	let busy = $state(false);
 	let error = $state<string | null>(null);
+	/** A promotion to admin waiting for its confirmation. */
+	let promoting = $state(false);
 
-	async function pick(e: Event & { currentTarget: HTMLSelectElement }) {
-		const select = e.currentTarget;
-		const role = select.value as BuiltinRole | 'none';
-		if (choice.kind !== 'single' || role === choice.role) return;
-		if (role === 'admin' && !confirm(`Make ${account.displayName} (${account.name}) an admin? Admins can manage people, roles, locations and the audit log everywhere.`)) {
-			select.value = choice.role;
-			return;
-		}
+	async function apply(role: Choice) {
+		if (choice.kind !== 'single') return;
 		busy = true;
 		error = null;
 		try {
 			await changeRole(account.name, roleChange(choice, role, defaultRole));
-		} catch (err) {
-			error = errorMessage(err);
-			select.value = choice.role;
 		} finally {
 			busy = false;
 			onchange();
 		}
+	}
+
+	function pick(role: Choice) {
+		if (choice.kind !== 'single' || role === choice.role) return;
+		if (role === 'admin') {
+			promoting = true;
+			return;
+		}
+		apply(role).catch((e) => (error = errorMessage(e)));
 	}
 </script>
 
@@ -46,15 +60,21 @@
 	<span>{choice.role === 'none' ? 'No role' : choice.role}</span>
 {:else}
 	<span class="pick" data-control>
-		<select aria-label="Role of {account.displayName}" value={choice.role} disabled={busy} onchange={pick} data-testid="role-select">
-			{#if defaultRole === null}<option value="none">No role</option>{/if}
-			{#each BUILTIN_ROLES as role (role)}
-				<option value={role} disabled={lastAdmin && role !== 'admin'} title={lastAdmin && role !== 'admin' ? LAST_ADMIN : undefined}>{role}{role === defaultRole ? ' (default)' : ''}</option>
-			{/each}
-		</select>
+		<MenuSelect value={choice.role as Choice} {options} onchange={pick} disabled={busy} label="Role of {account.displayName}" testid="role-select" />
 		{#if lastAdmin}<span class="hint" title={LAST_ADMIN}>last admin</span>{/if}
 	</span>
 	{#if error}<div class="err" role="alert">{error}</div>{/if}
+	{#if promoting}
+		<ConfirmDialog
+			open
+			title="Make {account.displayName} an admin?"
+			body="{account.displayName} ({account.name}) can then manage people, roles, locations and the audit log everywhere."
+			confirm="Make admin"
+			destructive
+			onconfirm={() => apply('admin')}
+			onclose={() => (promoting = false)}
+		/>
+	{/if}
 {/if}
 
 <style>
@@ -71,15 +91,6 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 8px;
-	}
-	select {
-		height: 26px;
-		padding: 0 6px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		background: var(--background);
-		color: var(--foreground);
-		font-size: 12.5px;
 	}
 	.err {
 		margin-top: 3px;

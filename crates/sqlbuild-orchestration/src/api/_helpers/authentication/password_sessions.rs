@@ -32,9 +32,11 @@ use crate::store::models::{ControlStore, TransactionMode};
 
 /// Session-authenticated person routes, plus routes acting on the caller's own session.
 pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
-    person_routes()
-        .route_layer(middleware::from_fn_with_state(store.clone(), authenticate))
-        .merge(session_routes(store))
+    super::service_keys::keyed(
+        store,
+        person_routes().route_layer(middleware::from_fn_with_state(store.clone(), authenticate)),
+    )
+    .merge(session_routes(store))
 }
 
 /// Routes that act on the caller's own session.
@@ -73,6 +75,27 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
         .route(
             "/api/admin/server",
             get(crate::api::_helpers::resources::administrators::server),
+        )
+        .route(
+            "/api/admin/service-accounts",
+            get(crate::api::_helpers::resources::service_accounts::list)
+                .post(crate::api::_helpers::resources::service_accounts::create),
+        )
+        .route(
+            "/api/admin/service-accounts/{principal_id}/keys",
+            post(crate::api::_helpers::resources::service_accounts::rotate),
+        )
+        .route(
+            "/api/admin/service-accounts/{principal_id}/keys/{key_id}/revoke",
+            post(crate::api::_helpers::resources::service_accounts::revoke),
+        )
+        .route(
+            "/api/admin/service-accounts/{principal_id}/disabled",
+            post(crate::api::_helpers::resources::service_accounts::disable),
+        )
+        .route(
+            "/api/admin/service-accounts/{principal_id}/role",
+            post(crate::api::_helpers::resources::service_accounts::role),
         )
         .route(
             "/api/admin/locations/{location_id}/targets/{target}/roles",

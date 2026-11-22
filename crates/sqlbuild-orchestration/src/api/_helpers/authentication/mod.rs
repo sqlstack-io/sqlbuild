@@ -9,4 +9,5 @@ pub(crate) mod password_sessions;
 pub(crate) mod password_transport;
 pub(crate) mod proxy_settings;
 pub(crate) mod proxy_warnings;
+pub(crate) mod service_keys;
 pub(crate) mod trusted_proxy;

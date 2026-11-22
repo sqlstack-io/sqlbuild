@@ -3,7 +3,11 @@
 use reqwest::{Client, StatusCode, header};
 use serde_json::{Value, json};
 
+#[cfg(unix)]
+use crate::admin_helpers::administer;
 use crate::helpers::{api_ready, start_control_in, wait_for_exit};
+#[cfg(unix)]
+use crate::test_types::NetworkKeyTestCase;
 use crate::test_types::{
     ProxyCliTestCase, ProxyRemotePeerTestCase, ProxyStartupTestCase, ServerConfigurationTestCase,
 };
@@ -439,6 +443,109 @@ fn given_the_default_trusted_peers_when_a_non_loopback_peer_sends_the_username_h
                 test_case.description
             );
             #[cfg(unix)]
+            crate::helpers::terminate(&mut control).await;
+        });
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn given_a_plain_http_proxy_server_open_to_the_network_when_an_untrusted_peer_calls_then_only_its_key_gets_in()
+ {
+    let test_cases = [NetworkKeyTestCase {
+        description: "an http:// origin, a foreign Host and a peer outside trusted_peers",
+        configuration: "[server]\nhost = \"0.0.0.0\"\n\n[trusted_proxy]\norigin = \"http://control.example.com\"\ntrusted_peers = [\"192.0.2.10\"]\n",
+        host: "scripts.example.net:8000",
+        expected_statuses: [
+            StatusCode::OK,
+            StatusCode::OK,
+            StatusCode::UNAUTHORIZED,
+            StatusCode::UNAUTHORIZED,
+        ],
+        expected_name: "orders-deploy",
+    }];
+    let route = std::net::UdpSocket::bind("0.0.0.0:0").expect("UDP socket");
+    route.connect("192.0.2.1:9").expect("a non-loopback route");
+    let peer = route.local_addr().expect("route address").ip();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    for test_case in test_cases {
+        runtime.block_on(async {
+            let directory = tempfile::tempdir().expect("proxy installation");
+            std::fs::write(
+                directory.path().join("server.toml"),
+                test_case.configuration,
+            )
+            .expect("server configuration");
+            let mut control = start_control_in(
+                directory,
+                &[
+                    "server",
+                    "--port",
+                    "0",
+                    "--no-scheduler",
+                    "--config",
+                    "server.toml",
+                ],
+            );
+            let ready = api_ready(&mut control).await;
+            let (_, port) = ready.rsplit_once(':').expect("listening port");
+            let url = format!("http://{peer}:{port}");
+            let created = administer(
+                &control,
+                &["create-service-account", "orders-deploy", "--role", "admin"],
+            );
+            let key = created["key"].as_str().expect("printed key");
+            let client = Client::builder()
+                .no_proxy()
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .expect("HTTP client");
+            let bootstrap = format!("{url}/api/control/bootstrap");
+            let read = client
+                .get(&bootstrap)
+                .header(header::HOST, test_case.host)
+                .bearer_auth(key)
+                .send()
+                .await
+                .expect("keyed read");
+            let read_status = read.status();
+            let body: Value = read.json().await.unwrap_or(Value::Null);
+            let write = client
+                .post(format!("{url}/api/admin/service-accounts"))
+                .header(header::HOST, test_case.host)
+                .bearer_auth(key)
+                .json(&json!({"name": "report-export", "role": "viewer"}))
+                .send()
+                .await
+                .expect("keyed write");
+            let named = |host: &'static str| {
+                client
+                    .get(&bootstrap)
+                    .header(header::HOST, host)
+                    .header("x-sqb-user", "orders-reader")
+                    .send()
+            };
+            let statuses = [
+                read_status,
+                write.status(),
+                named(test_case.host)
+                    .await
+                    .expect("username under the foreign Host")
+                    .status(),
+                named("control.example.com")
+                    .await
+                    .expect("username under the origin's Host")
+                    .status(),
+            ];
+            assert_eq!(
+                (statuses, body["access"]["name"].as_str()),
+                (test_case.expected_statuses, Some(test_case.expected_name)),
+                "{}: peer {peer}",
+                test_case.description
+            );
             crate::helpers::terminate(&mut control).await;
         });
     }
