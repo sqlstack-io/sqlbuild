@@ -28,7 +28,7 @@ pub(super) fn order_arguments() -> Vec<(String, ArgumentValue)> {
 }
 
 pub(super) fn rendered_sql(sql: &str) -> Result<String, RenderStop> {
-    render_parameterized_sql(sql, &order_arguments())
+    render_parameterized_sql(sql, &order_arguments(), None)
 }
 
 /// A violations audit over `@column` with the given explicit arguments and policies.

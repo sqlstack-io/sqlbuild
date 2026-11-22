@@ -220,7 +220,7 @@ fn given_attached_audits_when_rendering_then_python_rendering_is_returned() {
 
     for test_case in test_cases {
         assert_eq!(
-            render_attached_audit(&test_case.attachment),
+            render_attached_audit(&test_case.attachment, None),
             test_case.expected_rendering,
             "{}",
             test_case.description

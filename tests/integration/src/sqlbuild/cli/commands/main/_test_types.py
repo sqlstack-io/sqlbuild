@@ -1595,3 +1595,21 @@ class DynamicRefreshWarehouseTestCase:
     description: str
     argv: tuple[str, ...]
     expected_refresh_warehouses: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ExpansionBoundaryTestCase:
+    """A project whose model splices text beside its own, and the rows a build gives."""
+
+    description: str
+    model_sql: str
+    expected_rows: tuple[tuple[object, ...], ...]
+    model_config: str = ""
+    files: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class CursorBoundaryTestCase:
+    description: str
+    start: str
+    expected_sql: str

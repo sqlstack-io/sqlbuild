@@ -22,6 +22,10 @@ use sqlbuild_sqltext::resolution::main::column_name_key::column_name_key;
 use sqlbuild_sqltext::resolution::main::{
     reference_spans::reference_spans, source_alias::source_alias,
 };
+use sqlbuild_sqltext::sql_scan::main::bounded_expansions::bounded_expansions;
+use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
+use sqlbuild_sqltext::sql_scan::main::expansion_followed_by::expansion_followed_by;
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 fn source_error(py: Python<'_>, message: &str, code: &str) -> PyErr {
     input_error(py, ErrorId::PlannerInput, message, Some(code))
@@ -333,21 +337,42 @@ pub(crate) fn resolve_sources(
         .is_truthy()?;
     let mut output = String::new();
     let mut last = 0;
-    for span in reference_spans(sql, "source") {
+    let spans = reference_spans(sql, "source");
+    if spans.is_empty() {
+        return Ok(sql.to_owned());
+    }
+    let dialect_name: Option<String> = dialect.syntax("sql_analysis_dialect_name")?.extract()?;
+    let syntax: LexicalSyntax = dialect_lexical_syntax(dialect_name.as_deref().unwrap_or_default());
+    let mut relations: Vec<(usize, usize, String)> = Vec::with_capacity(spans.len());
+    for span in spans {
         let mut relation = resolve_one(
             lookups,
             dialect,
             filtering,
             (&span.name, &sql[span.start..span.end]),
         )?;
-        output.push_str(sql.get(last..span.start).unwrap_or_default());
-        last = span.end;
+        let mut end = span.end;
         if aliases && relation.trim_start().starts_with('(') {
-            let (end, alias) = source_alias(sql, span.end, &span.name);
-            relation.push_str(&format!(" AS {alias}"));
-            last = end;
+            let (aliased_end, alias) = source_alias(sql, span.end, &span.name);
+            let clause = format!(" AS {alias}");
+            relation = expansion_followed_by(&relation, &clause, Some(&syntax));
+            relation.push_str(&clause);
+            end = aliased_end;
         }
-        output.push_str(&relation);
+        relations.push((span.start, end, relation));
+    }
+    let sites: Vec<(usize, usize, &str)> = relations
+        .iter()
+        .map(|(start, end, relation)| (*start, *end, relation.as_str()))
+        .collect();
+    let bounded = bounded_expansions(sql, &sites, Some(&syntax));
+    for expansion in bounded {
+        relations[expansion.index].2 = expansion.text;
+    }
+    for (start, end, relation) in &relations {
+        output.push_str(sql.get(last..*start).unwrap_or_default());
+        output.push_str(relation);
+        last = *end;
     }
     output.push_str(&sql[last..]);
     Ok(output)

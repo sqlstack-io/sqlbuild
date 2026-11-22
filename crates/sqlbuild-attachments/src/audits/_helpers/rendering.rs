@@ -9,6 +9,7 @@ use crate::audits::constants::{
     SEED_RESOURCE, SOURCE_RESOURCE,
 };
 use crate::audits::models::{ArgumentValue, AuditAttachment, PolicySource};
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 /// Severity first, then run scope, as Python resolves them after expanding the SQL.
 pub(crate) fn policies(
@@ -42,8 +43,9 @@ pub(crate) fn rendered(
     attachment: &AuditAttachment,
     sql: &str,
     arguments: &[(String, ArgumentValue)],
+    syntax: Option<&LexicalSyntax>,
 ) -> Result<String, String> {
-    render_parameterized_sql(sql, arguments).map_err(|stop| match stop {
+    render_parameterized_sql(sql, arguments, syntax).map_err(|stop| match stop {
         RenderStop::MissingArgument(name) => format!(
             "{} is missing argument '{name}' for generic audit '{}'{}",
             attachment.owner_label,

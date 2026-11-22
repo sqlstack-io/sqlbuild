@@ -147,3 +147,6 @@ pub(crate) const BIGQUERY_BIG_DECIMAL_NAMES: [&str; 2] = ["BIGNUMERIC", "BIGDECI
 pub(crate) const RELATION_FUNCTION_PREFIX: &str = "__";
 /// Parse-verified marker sets a process keeps before starting over; each holds one model's SQL.
 pub(crate) const MARKER_MEMO_ENTRIES: usize = 8192;
+
+/// What closes a parenthesised argument, after its last line comment when it has one.
+pub(crate) const PARAMETER_CLOSINGS: [&str; 2] = [")", "\n)"];

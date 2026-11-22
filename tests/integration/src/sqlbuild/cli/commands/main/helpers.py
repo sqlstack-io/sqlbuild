@@ -37,6 +37,7 @@ from sqlbuild.adapter.contract.models import (
 from sqlbuild.adapter.contract.types import RetentionChangePhase
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
+    ExpansionBoundaryTestCase,
     RepeatedJsonParseTestCase,
 )
 from tests.unit.src.sqlbuild.rule_engine._helpers.run.helpers import rebuild_identity
@@ -656,6 +657,24 @@ def compile_duckdb_query(
     result: dict[str, object] = json.loads(capsys.readouterr().out)
     diagnostics: list[dict[str, object]] = cast(list[dict[str, object]], result["diagnostics"])
     return exit_code, tuple(item["code"] for item in diagnostics)
+
+
+def write_boundary_project(*, project_dir: Path, test_case: ExpansionBoundaryTestCase) -> None:
+    """Write one case's model and the declarations it expands, on a DuckDB file."""
+
+    files: dict[str, str] = {
+        "sqlbuild_project.toml": (
+            'name = "orders"\nadapter = "duckdb"\n[connection]\ndatabase = "orders.duckdb"\n'
+            '[vars]\nnegative = "-1"\n'
+        ),
+        "models/orders.sql": (
+            f"MODEL (description 'Orders.', materialized table{test_case.model_config});\n"
+            f"{test_case.model_sql}\n"
+        ),
+    } | test_case.files
+    for path, text in files.items():
+        (project_dir / path).parent.mkdir(parents=True, exist_ok=True)
+        _ = (project_dir / path).write_text(text)
 
 
 def write_expression_source_project(

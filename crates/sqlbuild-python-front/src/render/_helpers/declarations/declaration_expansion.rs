@@ -13,6 +13,8 @@ use sqlbuild_analysis::compiled_project::models::{
     DeclarationSplice, InaccessibleDeclaration, SplicedSql,
 };
 use sqlbuild_analysis::sql_macros::models::{ExpandedText, TypedCall};
+use sqlbuild_sqltext::sql_scan::main::bounded_expansions::bounded_expansions;
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::render::_helpers::sql_macros::sql_macro_host::{
     expanded_sql_macro_calls, is_sql_macro_reference, reject_bare_macro_calls,
@@ -114,6 +116,19 @@ pub(crate) fn expand_declarations<'py>(
     if let Some(code) = request.stop {
         return Err(compile_error(request, &DeclarationError::ScanStop(code)));
     }
+    let syntax: Option<&LexicalSyntax> = request.sql_macros.and_then(|source| source.syntax);
+    let (splices, leads) = bound_splices(request.sql, splices, syntax);
+    for (index, lead) in leads {
+        for (_, calls) in call_splices
+            .iter_mut()
+            .filter(|(splice, _)| *splice == index)
+        {
+            for call in calls {
+                call.start += lead;
+                call.end += lead;
+            }
+        }
+    }
     let spliced: SplicedSql = splice_declarations(request.sql, &splices);
     let typed_calls: Vec<TypedCall> = spliced_call_positions(&spliced, call_splices);
     Ok(ExpandedDeclarations {
@@ -123,6 +138,43 @@ pub(crate) fn expand_declarations<'py>(
         sql_macro_checks,
         typed_calls,
     })
+}
+
+/// Bound each character-indexed replacement against comments, returning how far each changed one moved.
+fn bound_splices(
+    sql: &str,
+    mut splices: Vec<DeclarationSplice>,
+    syntax: Option<&LexicalSyntax>,
+) -> (Vec<DeclarationSplice>, Vec<(usize, usize)>) {
+    if splices.is_empty() {
+        return (splices, Vec::new());
+    }
+    let characters: Vec<usize> = if sql.is_ascii() {
+        Vec::new()
+    } else {
+        sql.char_indices()
+            .map(|(offset, _)| offset)
+            .chain([sql.len()])
+            .collect()
+    };
+    let byte = |position: usize| characters.get(position).copied().unwrap_or(position);
+    let expansions: Vec<(usize, usize, &str)> = splices
+        .iter()
+        .map(|splice| {
+            (
+                byte(splice.start),
+                byte(splice.end),
+                splice.replacement.as_str(),
+            )
+        })
+        .collect();
+    let bounded = bounded_expansions(sql, &expansions, syntax);
+    let mut leads: Vec<(usize, usize)> = Vec::with_capacity(bounded.len());
+    for expansion in bounded {
+        splices[expansion.index].replacement = expansion.text;
+        leads.push((expansion.index, expansion.lead));
+    }
+    (splices, leads)
 }
 
 /// Each call text's typed calls moved to where its splice landed in `spliced`, by byte.

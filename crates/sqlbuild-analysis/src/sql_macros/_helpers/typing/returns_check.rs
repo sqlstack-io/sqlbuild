@@ -91,7 +91,7 @@ fn body_probe(
             slots: Vec::new(),
         });
     }
-    let expansion = match expand_body(parser, (definition, None), body, &arguments) {
+    let expansion = match expand_body(parser, (definition, None), (body, None), &arguments) {
         Ok(expansion) => expansion,
         Err(_) => return None,
     };

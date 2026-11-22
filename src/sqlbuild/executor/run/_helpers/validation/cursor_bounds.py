@@ -35,6 +35,7 @@ from sqlbuild._native import (
     cursor_window_override_flags,
     decide_empty_cursor_inputs,
     empty_input_rebuild_refusal,
+    replace_cursor_markers,
     resolve_cursor_intrinsics,
 )
 from sqlbuild._native import cursor_clamp as clamp
@@ -679,8 +680,11 @@ def substitute_cursor_sentinels(*, sql: str, bounds: CursorBounds) -> str:
 
     if sentinel_from_token(token=MICROBATCH_START_SENTINEL) is None:
         raise ExecutorInputError("invalid start cursor marker")
-    result: str = sql.replace(MICROBATCH_START_SENTINEL, sentinel_to_token(sentinel=bounds.start))
-    result = result.replace(MICROBATCH_END_SENTINEL, sentinel_to_token(sentinel=bounds.end))
+    result: str = replace_cursor_markers(
+        sql=sql,
+        start_sql=sentinel_to_token(sentinel=bounds.start),
+        end_sql=sentinel_to_token(sentinel=bounds.end),
+    )
     _, has_intrinsics = resolve_cursor_intrinsics(sql=result)
     if has_intrinsics or MICROBATCH_START_SENTINEL in result or MICROBATCH_END_SENTINEL in result:
         raise ExecutorInputError("executable model SQL contains unresolved cursor markers")
