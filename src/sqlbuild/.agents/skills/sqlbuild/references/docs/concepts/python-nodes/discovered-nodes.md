@@ -76,7 +76,7 @@ A set fails as a whole, and keeps its last good items, when:
 | `ctx.discovered.item` | The item ID this node runs for |
 | `ctx.discovered.set` | The discover function's name |
 | `ctx.discovered.tags` | The set's tags, as saved at publish |
-| `ctx.root_run_id` | The ID of the first run of a rerun chain. Reruns and automatic retries keep it, so an external pipeline can keep one identity across them |
+| `ctx.root_run_id` | The server's run ID of the first run in the rerun chain. Reruns and automatic retries keep it, so an external pipeline can keep one identity across them. Don't compare it with `ctx.run_id`, which is the worker's own ID and differs on every run. Outside a worker it is the local run's ID |
 
 `ctx.discovered` is `None` for an asset without `for_each`.
 

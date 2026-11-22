@@ -152,7 +152,7 @@ Each node receives a context object as its first argument (`AssetContext`, `Chec
 
 | Helper | Description |
 |--------|-------------|
-| `ctx.run_id` | Unique identifier for this run |
+| `ctx.run_id` | Unique identifier for this run; in a worker, the worker's own ID rather than the server's run ID |
 | `ctx.target` | Active target name |
 | `ctx.target_config` | The active target's database and schemas, as SQLBuild resolves them (see [Target settings](#target-settings)) |
 | `ctx.vars` | Project variables |
