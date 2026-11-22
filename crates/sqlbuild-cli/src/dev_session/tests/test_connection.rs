@@ -25,7 +25,42 @@ fn given_a_debug_report_when_read_then_the_adapter_and_warehouse_state_follow_it
                 ]),
             ),
             expected_adapter: "duckdb",
-            expected_state: r#"Connected { detail: "/work/shop/warehouse.duckdb" }"#.to_owned(),
+            expected_state: r#"Connected { facts: ["database /work/shop/warehouse.duckdb"] }"#
+                .to_owned(),
+        },
+        OutcomeTestCase {
+            description: "a Snowflake connection is labelled in a fixed order, without booleans, dicts or masked values",
+            report: report(
+                json!([row("adapter", Some("OK"), "snowflake", "found")]),
+                json!([
+                    row("user", None, "sam.lee@example.com", ""),
+                    row("warehouse", None, "TRANSFORM_XS", ""),
+                    row("client_session_keep_alive", None, "True", ""),
+                    row("role", None, "TRANSFORMER", ""),
+                    row("session_parameters", None, "{'QUERY_TAG': 'sqb', 'TIMEOUT': 0}", ""),
+                    row("authenticator", None, "OAUTH_AUTHORIZATION_CODE", ""),
+                    row("password", None, "****", ""),
+                    row("account", None, "xy12345", ""),
+                    row("database", None, "ANALYTICS", ""),
+                    row("connection test", Some("OK"), "", "connected"),
+                ]),
+            ),
+            expected_adapter: "snowflake",
+            expected_state: r#"Connected { facts: ["account xy12345", "auth browser sign-in (OAuth)", "role TRANSFORMER", "warehouse TRANSFORM_XS"] }"#
+                .to_owned(),
+        },
+        OutcomeTestCase {
+            description: "a private key without an authenticator is key-pair authentication",
+            report: report(
+                json!([row("adapter", Some("OK"), "snowflake", "found")]),
+                json!([
+                    row("account", None, "xy12345", ""),
+                    row("private_key_file", None, "/keys/sqb.p8", ""),
+                    row("connection test", Some("OK"), "", "connected"),
+                ]),
+            ),
+            expected_adapter: "snowflake",
+            expected_state: r#"Connected { facts: ["account xy12345", "auth key pair"] }"#.to_owned(),
         },
         OutcomeTestCase {
             description: "a failing connection test reports its own message, not the skipped query test",

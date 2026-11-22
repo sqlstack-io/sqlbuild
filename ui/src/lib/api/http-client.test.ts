@@ -221,6 +221,112 @@ describe('HttpChangeFeed', () => {
 	});
 });
 
+describe('check list', () => {
+	const result = {
+		event_id: '0191f0cc-0000-0000-0000-0000000000c1',
+		binding_key: 'b-orders-not-null',
+		audit_name: 'not_null(order_id)',
+		audit_definition_name: 'not_null',
+		audit_description: null,
+		attachment_kind: 'model',
+		attached_target_kind: 'model',
+		attached_target_name: 'orders',
+		attached_column_name: 'order_id',
+		severity: 'error',
+		evaluation_mode: 'failing_rows',
+		run_scope_phase: 'final',
+		thresholds_json: null,
+		occurred_at: '2026-01-02T00:00:00Z',
+		run_id: 'r1',
+		invocation_id: 'i1',
+		outcome: 'pass',
+		violation_count: 0,
+		measured_value: null,
+		sample_count: null,
+		sample_unit: null,
+		minimum_samples: null,
+		evidence_count: null,
+		evidence_truncated: null,
+		reused: 'false',
+		ignored: false
+	};
+
+	function server(etag: string | null = '"s1:c1"') {
+		const asked: (string | null)[] = [];
+		const paths: string[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = new URL(request.url).pathname;
+				paths.push(path);
+				if (path.endsWith('/checks')) {
+					const sent = request.headers.get('if-none-match');
+					asked.push(sent);
+					if (etag && sent === etag) return new Response(null, { status: 304, headers: { etag } });
+					return Response.json([result], etag ? { headers: { etag } } : undefined);
+				}
+				if (path.endsWith('/nodes')) return Response.json([{ node_key: 'model:orders', name: 'orders', kind: 'model', materialization: 'table', snapshot_id: 's1', tags: [], dependencies: [], definition_changed: false, checks: { total: 1, passing: 1, warning: 0, failing: 0 } }]);
+				if (path.endsWith('/node-states')) return Response.json({ snapshot_id: 's1', version: 1, states: {} });
+				return Response.json(path.endsWith('/node-status') ? null : []);
+			})
+		);
+		return { asked, paths, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('sends the held ETag and keeps the held list on a 304', async () => {
+		const { asked, client } = server();
+		const first = await client.listChecks(ORDERS);
+		const again = await client.listChecks(ORDERS);
+		expect(asked).toEqual([null, '"s1:c1"']);
+		expect(again).toBe(first);
+		expect(first.map((c) => c.id)).toEqual(['b-orders-not-null']);
+	});
+
+	it('shares one read between callers asking at once, and sends no ETag when the server gave none', async () => {
+		const { asked, client } = server(null);
+		const [a, b] = await Promise.all([client.listChecks(ORDERS), client.listChecks(ORDERS)]);
+		expect(a).toBe(b);
+		await client.listChecks(ORDERS);
+		expect(asked).toEqual([null, null]);
+	});
+
+	it('starts a new read for a caller that needs one begun after a signal, rather than joining an older one', async () => {
+		let release!: () => void;
+		const held = new Promise<void>((resolve) => (release = resolve));
+		let reads = 0;
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => {
+				const read = ++reads;
+				if (read === 1) await held;
+				return Response.json([{ ...result, run_id: `r${read}` }]);
+			})
+		);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		// A read begun before the signal, such as the navigation counts', is still in flight.
+		const older = client.listChecks(ORDERS);
+		await vi.waitFor(() => expect(reads).toBe(1));
+		const signalledAt = performance.now();
+		const joined = client.listChecks(ORDERS);
+		const fresh = client.listChecks(ORDERS, signalledAt);
+		release();
+		expect((await older).map((c) => c.latest?.fingerprintRunId)).toEqual(['r1']);
+		expect(await joined).toBe(await older);
+		expect((await fresh).map((c) => c.latest?.fingerprintRunId)).toEqual(['r2']);
+		expect(reads).toBe(2);
+	});
+
+	it('gives a node its checks from the list it is handed, without reading the list', async () => {
+		const { paths, client } = server();
+		const held = await client.listChecks(ORDERS);
+		const listing = await client.listCatalogNodes(ORDERS);
+		paths.length = 0;
+		const detail = await client.getCatalogNode(ORDERS, 'model:orders', listing, held);
+		expect(paths.filter((p) => p.endsWith('/checks'))).toEqual([]);
+		expect(detail?.checkResults.map((c) => c.id)).toEqual(['b-orders-not-null']);
+	});
+});
+
 describe('node listing and states', () => {
 	const record = { node_key: 'model:orders', name: 'orders', kind: 'model', materialization: 'table', snapshot_id: '0191f0cc-0000-0000-0000-000000000001', tags: [], dependencies: [], definition_changed: false, checks: { total: 0, passing: 0, warning: 0, failing: 0 } };
 

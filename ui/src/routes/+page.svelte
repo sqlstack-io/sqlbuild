@@ -8,7 +8,6 @@
 	import Loading from '$lib/components/loading.svelte';
 	import { to } from '$lib/paths';
 	import { goto } from '$app/navigation';
-	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import HammerIcon from '@lucide/svelte/icons/hammer';
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
 	import DisclosureButton from '$lib/components/disclosure-button.svelte';
@@ -155,10 +154,11 @@
 		});
 	});
 	const staleListed = $derived(issues.some(({ item }) => item.kind === 'stale_models'));
-	// Until the first read settles there is nothing to judge, so the banner stays neutral rather than claiming health.
+	// Until the first read settles there is nothing to judge, so no attention panel or line shows.
 	const loaded = $derived(data !== null);
+	// The panel shows only while something needs attention; its edge takes the worst item's tone.
 	const healthTone = $derived(
-		!loaded ? 'var(--sb-text-faint)' : issues.some((i) => i.view.tone === 'error') ? 'var(--sb-error)' : issues.some((i) => i.view.tone === 'warning') ? 'var(--sb-warning)' : issues.some((i) => i.view.tone === 'stale') ? 'var(--sb-stale)' : 'var(--sb-success)'
+		issues.some((i) => i.view.tone === 'error') ? 'var(--sb-error)' : issues.some((i) => i.view.tone === 'warning') ? 'var(--sb-warning)' : 'var(--sb-stale)'
 	);
 	const latest = $derived(data?.latestRun ?? null);
 	const latestText = $derived(latest ? `Last run ${runStatusLabel[latest.status].toLowerCase()} ${formatAgo(latest.endedAt, app.now)}` : 'No runs yet');
@@ -186,6 +186,28 @@
 </AppTopbar>
 
 
+{#snippet handledRows()}
+	<div class="handled-rows">
+	{#each handled as { item, view } (view.key)}
+		{@const ack = acknowledgementOf(item) ?? { by: 'you', at: new Date(app.now).toISOString(), until: 'acknowledged' in item ? undefined : snoozeSeconds === null ? null : new Date(app.now + snoozeSeconds * 1000).toISOString() }}
+		<div class="issue muted">
+			<span class="issue-icon info"><BellOffIcon size={13} /></span>
+			<div class="issue-copy">
+				<a class="issue-title" href={to(view.href)}>{view.title}</a>
+				<p class="issue-detail">{ack ? `Acknowledged by ${ack.by} · ${formatAgo(ack.at, app.now)} · ${handledLabel(ack.until)}` : ''}</p>
+			</div>
+			<small>{view.since}</small>
+			<span class="issue-ack">
+				{#if canAck(item)}
+					<Button variant="ghost" size="sm" disabled={acknowledging === view.key} onclick={() => acknowledge(item, view.key, false)} data-testid="attention-undo">Undo</Button>
+				{/if}
+			</span>
+			<span class="issue-actions"><a href={to(view.href)}>{view.action} →</a></span>
+		</div>
+	{/each}
+	</div>
+{/snippet}
+
 <!-- Padding sits on an inner box: sticky headers stick below a scroller's own padding, so rows would show through above them. -->
 <PageBody padding="18px 20px 64px">
 	{#if overview.error}<div class="error-note mb-[14px]">{overview.error}</div>{/if}
@@ -203,99 +225,89 @@
 		</section>
 	{:else}
 		<div class="flex flex-col gap-[14px]">
-			<section class="health" style:--tone={healthTone}>
-				<div class="health-head">
-					<div class="health-icon">
-						{#if loaded && issues.length}<AlertCircleIcon size={15} />{:else}<ActivityIcon size={15} />{/if}
-					</div>
-					<div class="health-copy">
-						{#if !loaded}
-							<strong>{app.location?.name}</strong>
-							<span>{overview.error ? 'Couldn’t check its health' : 'Checking…'}</span>
-						{:else}
-							<strong>{issues.length ? `${app.location?.name} needs attention` : `${app.location?.name} is healthy`}</strong>
-							<span>{issues.length > 1 ? `${issues.length} items · ${latestText}` : latestText}</span>
-						{/if}
-					</div>
-					{#if m}
-						<div class="health-facts">
-							<!-- The out-of-date alert below already counts these. -->
-							{#if m.stale?.changed && !staleListed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
-							{#if m.stale?.behind && !staleListed}<span><i class="status-dot behind"></i><b>{m.stale.behind}</b> behind</span>{/if}
-							{#if m.checks.failing}<a class="fact-link" href={to(FAILING_CHECKS_HREF)}><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {noun(m.checks.failing, 'check')}</a>{/if}
+			<!-- Attention: the panel while something needs it; with only acknowledged items, a slim line that opens them; otherwise nothing, as the header and cards already say all is well. -->
+			{#if loaded && issues.length}
+				<section class="health" style:--tone={healthTone}>
+					<div class="health-head">
+						<div class="health-icon">
+							<AlertCircleIcon size={15} />
 						</div>
-					{/if}
-					{#if latest}<a href={to(`/runs/${latest.id}`)}>View latest run →</a>{/if}
-				</div>
-				{#if issues.length}
-					<div class="issues">
-						{#each issues as { item, view } (view.key)}
-							{@const Glyph = attentionIcon[view.tone]}
-							<div class="issue">
-								<span class="issue-icon {view.tone}"><Glyph size={14} /></span>
-								<div class="issue-copy">
-									<a class="issue-title" href={to(view.href)}>{view.title}</a>
-									<p class="issue-detail">{view.detail}</p>
-									{#if conditionFor(item)?.lapsed}
-										{@const lapsed = conditionFor(item)!.lapsed!}
-										<p class="lapsed" data-testid="attention-lapsed">Back on the list: {lapsed.reason} (acknowledged by {lapsed.by} {formatAgo(lapsed.at, app.now)}).</p>
-									{/if}
-									{#if view.consequences.length}
-										<ul class="consequences" aria-label="Caused by this">
-											{#each view.consequences as c, i (i)}<li><a href={to(c.href)}>{c.text}</a></li>{/each}
-										</ul>
-									{/if}
-								</div>
-								<small>{view.since}</small>
-								<span class="issue-ack">
-									{#if canAck(item)}
-										<!-- Short text, always visible, stronger while the row is hovered; the tooltip says what it does. -->
-										<Button variant="ghost" size="sm" class="ack" title={'acknowledged' in item ? ACK_HELP.run : ACK_HELP.condition} aria-label="Acknowledge" disabled={acknowledging === view.key} onclick={() => acknowledge(item, view.key, true)} data-testid="attention-ack">
-											<BellOffIcon />Ack
-										</Button>
-									{/if}
-								</span>
-								<span class="issue-actions">
-									{#if view.build}
-										{@const build = view.build}
-										<GatedButton requires="run.adhoc" size="sm" variant={build.variant} hint={build.tooltip ?? undefined} onclick={() => goto(to(build.href))}
-											>{#if build.variant === 'stale'}<HammerIcon class="size-3.5" />{/if}<span>{build.label}{#if build.extra}<span class="label-extra">{build.extra}</span>{/if}</span></GatedButton
-										>
-									{/if}
-									<a href={to(view.href)}>{view.action} →</a>
-								</span>
+						<div class="health-copy">
+							<strong>{app.location?.name} needs attention</strong>
+							<span>{issues.length > 1 ? `${issues.length} items · ${latestText}` : latestText}</span>
+						</div>
+						{#if m}
+							<div class="health-facts">
+								<!-- The out-of-date alert below already counts these. -->
+								{#if m.stale?.changed && !staleListed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
+								{#if m.stale?.behind && !staleListed}<span><i class="status-dot behind"></i><b>{m.stale.behind}</b> behind</span>{/if}
+								{#if m.checks.failing}<a class="fact-link" href={to(FAILING_CHECKS_HREF)}><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {noun(m.checks.failing, 'check')}</a>{/if}
 							</div>
-						{/each}
+						{/if}
+						{#if latest}<a href={to(`/runs/${latest.id}`)}>View latest run →</a>{/if}
 					</div>
-				{/if}
-				{#if handled.length}
-					<div class="handled">
-						<DisclosureButton open={showHandled} onclick={() => (showHandled = !showHandled)} class="h-[34px] pr-3.5 pl-[17px] text-[12px]">Acknowledged ({handled.length})</DisclosureButton>
-						{#if showHandled}
-							<div class="handled-rows">
-							{#each handled as { item, view } (view.key)}
-								{@const ack = acknowledgementOf(item) ?? { by: 'you', at: new Date(app.now).toISOString(), until: 'acknowledged' in item ? undefined : snoozeSeconds === null ? null : new Date(app.now + snoozeSeconds * 1000).toISOString() }}
-								<div class="issue muted">
-									<span class="issue-icon info"><BellOffIcon size={13} /></span>
+					{#if issues.length}
+						<div class="issues">
+							{#each issues as { item, view } (view.key)}
+								{@const Glyph = attentionIcon[view.tone]}
+								<div class="issue">
+									<span class="issue-icon {view.tone}"><Glyph size={14} /></span>
 									<div class="issue-copy">
 										<a class="issue-title" href={to(view.href)}>{view.title}</a>
-										<p class="issue-detail">{ack ? `Acknowledged by ${ack.by} · ${formatAgo(ack.at, app.now)} · ${handledLabel(ack.until)}` : ''}</p>
+										<p class="issue-detail">{view.detail}</p>
+										{#if conditionFor(item)?.lapsed}
+											{@const lapsed = conditionFor(item)!.lapsed!}
+											<p class="lapsed" data-testid="attention-lapsed">Back on the list: {lapsed.reason} (acknowledged by {lapsed.by} {formatAgo(lapsed.at, app.now)}).</p>
+										{/if}
+										{#if view.consequences.length}
+											<ul class="consequences" aria-label="Caused by this">
+												{#each view.consequences as c, i (i)}<li><a href={to(c.href)}>{c.text}</a></li>{/each}
+											</ul>
+										{/if}
 									</div>
 									<small>{view.since}</small>
 									<span class="issue-ack">
 										{#if canAck(item)}
-											<Button variant="ghost" size="sm" disabled={acknowledging === view.key} onclick={() => acknowledge(item, view.key, false)} data-testid="attention-undo">Undo</Button>
+											<!-- Short text, always visible, stronger while the row is hovered; the tooltip says what it does. -->
+											<Button variant="ghost" size="sm" class="ack" title={'acknowledged' in item ? ACK_HELP.run : ACK_HELP.condition} aria-label="Acknowledge" disabled={acknowledging === view.key} onclick={() => acknowledge(item, view.key, true)} data-testid="attention-ack">
+												<BellOffIcon />Ack
+											</Button>
 										{/if}
 									</span>
-									<span class="issue-actions"><a href={to(view.href)}>{view.action} →</a></span>
+									<span class="issue-actions">
+										{#if view.build}
+											{@const build = view.build}
+											<GatedButton requires="run.adhoc" size="sm" variant={build.variant} hint={build.tooltip ?? undefined} onclick={() => goto(to(build.href))}
+												>{#if build.variant === 'stale'}<HammerIcon class="size-3.5" />{/if}<span>{build.label}{#if build.extra}<span class="label-extra">{build.extra}</span>{/if}</span></GatedButton
+											>
+										{/if}
+										<a href={to(view.href)}>{view.action} →</a>
+									</span>
 								</div>
 							{/each}
-							</div>
-						{/if}
+						</div>
+					{/if}
+					{#if handled.length}
+						<div class="handled">
+							<DisclosureButton open={showHandled} onclick={() => (showHandled = !showHandled)} class="h-[34px] pr-3.5 pl-[17px] text-[12px]">Acknowledged ({handled.length})</DisclosureButton>
+							{#if showHandled}{@render handledRows()}{/if}
+						</div>
+					{/if}
+					{#if acknowledgeError}<p class="ack-error">{acknowledgeError}</p>{/if}
+				</section>
+			{:else if loaded && handled.length}
+				<section class="quiet" data-testid="attention-quiet">
+					<div class="quiet-head">
+						<span>Nothing needs attention</span>
+						<span class="sep">·</span>
+						<DisclosureButton open={showHandled} onclick={() => (showHandled = !showHandled)} class="h-[30px] px-1.5 text-[12px]">Acknowledged ({handled.length})</DisclosureButton>
 					</div>
-				{/if}
-				{#if acknowledgeError}<p class="ack-error">{acknowledgeError}</p>{/if}
-			</section>
+					{#if showHandled}{@render handledRows()}{/if}
+					{#if acknowledgeError}<p class="ack-error">{acknowledgeError}</p>{/if}
+				</section>
+			{:else if acknowledgeError}
+				<p class="ack-error standalone">{acknowledgeError}</p>
+			{/if}
 
 			<section class="metric-strip" style:--metrics={3 + (m?.stale ? 1 : 0) + (m?.cost ? 1 : 0)}>
 				{#if m}
@@ -436,6 +448,12 @@
 	.issue :global(.ack:hover) { border-color: var(--muted-foreground); }
 	.issue.muted .issue-title { color: var(--muted-foreground); font-weight: 500; }
 	.ack-error { margin: 0; padding: 8px 17px; border-top: 1px solid var(--inner-line); color: var(--sb-error); font-size: 12px; }
+	.ack-error.standalone { border-top: 0; padding: 0; }
+	/* Only acknowledged items: a neutral line, not a panel. */
+	.quiet { border: 1px solid var(--panel-border); border-radius: 2px; background: var(--card); }
+	.quiet-head { display: flex; min-height: 32px; align-items: center; gap: 6px; padding: 0 8px 0 13px; color: var(--muted-foreground); font-size: 12px; }
+	.quiet-head .sep { color: var(--sb-text-faint); }
+	.quiet .handled-rows { border-top: 1px solid var(--inner-line); }
 	.issue-icon { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 2px; }
 	.issue-icon.error { color: var(--sb-error); background: color-mix(in srgb, var(--sb-error) 12%, transparent); }
 	.issue-icon.warning { color: var(--sb-warning); background: color-mix(in srgb, var(--sb-warning) 12%, transparent); }

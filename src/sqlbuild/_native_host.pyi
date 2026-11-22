@@ -265,6 +265,9 @@ from sqlbuild.executor.diff.models import DiffExecutionOptions as DiffExecutionO
 from sqlbuild.executor.diff.models import DiffExecutionResult as DiffExecutionResult
 from sqlbuild.executor.diff.models import FullDiffSizeLimits as FullDiffSizeLimits
 from sqlbuild.executor.diff.models import RowDiffSamplingOverride as RowDiffSamplingOverride
+from sqlbuild.executor.dynamic_pauses.main.resume_expired_holds import (
+    resume_expired_holds as resume_expired_holds,
+)
 from sqlbuild.executor.janitor.main.execute import execute_janitor_plan as execute_janitor_plan
 from sqlbuild.executor.janitor.models import JanitorArchiveCandidate as JanitorArchiveCandidate
 from sqlbuild.executor.janitor.models import JanitorArchivedRelation as JanitorArchivedRelation

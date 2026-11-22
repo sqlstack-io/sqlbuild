@@ -57,7 +57,9 @@ import type {
 	Trigger,
 	TriggerDetail,
 	TriggerState,
-	TriggerStateEvent
+	TriggerStateEvent,
+	SensorEvaluation,
+	SensorFailing,
 } from '../types';
 import { newRequestId } from '$lib/browser/request-id';
 import {
@@ -807,6 +809,23 @@ export class MockOperate {
 		return this.#ctx.reply(this.#triggerDetail(def, scope));
 	}
 
+	skipSensorEvent(scope: Scope, id: string, eventId: string, reason: string): Promise<TriggerDetail> {
+		this.#need('sensor.reset_cursor');
+		const def = TRIGGER_DEFS.find((t) => triggerId(t.name) === id);
+		if (!def?.sensor) throw new ApiError(`${id} is not a sensor`, 422);
+		const stuck = (this.#fx.evaluations[def.name] ?? []).find((e) => e.outcome !== 'running');
+		if (!stuck || stuck.eventId !== eventId || stuck.outcome === 'handled' || stuck.outcome === 'skipped' || stuck.outcome === 'started') throw new ApiError(`The sensor isn't waiting on ${eventId}`, 422);
+		const now = new Date().toISOString();
+		const actor = this.#ctx.user();
+		this.#fx.evaluations[def.name] = [
+			{ ...stuck, id: `eval-skip-${++this.#seq}`, outcome: 'skipped', requestedAt: now, finishedAt: now, runIds: [], skippedFor: [], failureCode: null, error: null, abandonedBecause: null, skipReason: reason, skippedBy: actor.displayName },
+			...(this.#fx.evaluations[def.name] ?? [])
+		];
+		this.#runtime(scope, def.name).history.unshift(this.#stateEvent('event_skipped', reason, eventId));
+		this.#ctx.changes.emit('triggers');
+		return this.#ctx.reply(this.#triggerDetail(def, scope));
+	}
+
 	// ---- shell counts ----
 
 	activeRunCount(): number {
@@ -1437,7 +1456,8 @@ export class MockOperate {
 						cursorUpdatedAt: rt.cursorUpdatedAt ? new Date(rt.cursorUpdatedAt).toISOString() : null,
 						cursorKnown: true,
 						currentFingerprint: currentFp,
-						lastEvaluatedFingerprint: sensorFp
+						lastEvaluatedFingerprint: sensorFp,
+						failing: failingOf(evaluations ?? [])
 					}
 				: null,
 			ticks: this.#ticksOf(def.name).map(plainTick),
@@ -1495,4 +1515,13 @@ function changedDecision(selection: string[], changed: Map<string, string>): Pla
 		}
 	}
 	return decision;
+}
+
+/** The run of failed ticks at the head of `evaluations` (newest first), as the server reports it. */
+function failingOf(evaluations: SensorEvaluation[]): SensorFailing | null {
+	const done = evaluations.filter((e) => e.outcome !== 'running');
+	const end = done.findIndex((e) => e.outcome !== 'failed' && e.outcome !== 'timed_out');
+	const failed = end === -1 ? done : done.slice(0, end);
+	const first = failed.at(-1);
+	return first ? { reason: null, since: first.requestedAt, failedTicks: failed.length, eventId: first.eventId, eventSummary: first.eventSummary } : null;
 }

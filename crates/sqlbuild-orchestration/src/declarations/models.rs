@@ -378,7 +378,8 @@ pub struct JobMember {
 pub struct TriggerRecord {
     pub trigger_id: uuid::Uuid,
     pub name: String,
-    pub job_key: String,
+    /// The job or group a schedule starts; `None` for a sensor, whose function chooses.
+    pub job_key: Option<String>,
     pub definition_json: TriggerDeclaration,
     pub status: TriggerStatus,
     pub last_tick_for: Option<DateTime<Utc>>,
@@ -393,6 +394,9 @@ pub struct PersonTriggerRecord {
     pub latest_tick: Option<crate::scheduler::models::TickRecord>,
     /// A running schedule's next due times from `next_due_at` on, at most five; empty otherwise.
     pub upcoming: Vec<DateTime<Utc>>,
+    /// A sensor whose latest ticks failed: since when and the event it is stuck on.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sensor_failing: Option<crate::sensors::models::SensorFailing>,
 }
 
 /// One operator change of a trigger, as a person reads it: what changed, who changed it, when and why.
@@ -419,8 +423,15 @@ pub enum TriggerChange {
     Enable,
     Pause,
     ResetDefault,
-    SetCursor { time: DateTime<Utc> },
+    SetCursor {
+        time: DateTime<Utc>,
+    },
+    /// A sensor reads every retained event again from the start.
     ResetCursor,
+    /// A sensor's stuck `event` counts as delivered without calling the function again.
+    SkipEvent {
+        event: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -449,12 +460,42 @@ pub(crate) struct EditableTriggerState {
     pub(crate) status_override: Option<TriggerStatus>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+/// A schedule's state before a republish: its timing columns, which always read, and its definition, `None` when an earlier release stored it in a form that no longer decodes.
+#[derive(Clone, Debug)]
 pub(crate) struct PreviousTriggerState {
-    pub(crate) definition_json: TriggerDefinition,
+    pub(crate) definition_json: Option<TriggerDefinition>,
     pub(crate) started_at: DateTime<Utc>,
     pub(crate) last_tick_for: Option<DateTime<Utc>>,
     pub(crate) status_override: Option<TriggerStatus>,
+}
+
+/// A schedule's stored state as read before a republish, with its definition still undecoded.
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct StoredTriggerState {
+    pub(crate) definition_json: serde_json::Value,
+    pub(crate) started_at: DateTime<Utc>,
+    pub(crate) last_tick_for: Option<DateTime<Utc>>,
+    pub(crate) status_override: Option<TriggerStatus>,
+}
+
+/// Only the calendar times of a stored definition, read leniently to report which a republish drops when the rest no longer decodes.
+#[derive(Clone, Debug, Default, Deserialize)]
+pub(crate) struct StoredCalendarTimes {
+    #[serde(default)]
+    pub(crate) schedule: StoredSchedule,
+}
+
+/// A stored schedule's calendar times; any other kind has none.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub(crate) enum StoredSchedule {
+    Calendar {
+        #[serde(default)]
+        times: Vec<DateTime<Utc>>,
+    },
+    #[default]
+    #[serde(other)]
+    Other,
 }
 
 /// Each member job's waits, why it waits (the first lineage edge found, as node and upstream), and its cycles.

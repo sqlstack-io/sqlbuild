@@ -6,8 +6,8 @@ use crate::project::_helpers::defaults::{
     load_defaults, load_materialization_defaults, load_path_defaults,
 };
 use crate::project::_helpers::fields::{
-    coerce_mapping, get, has, object, optional_mapping, optional_str, require_str, string_mapping,
-    text_or_none,
+    coerce_mapping, get, has, object, optional_mapping, optional_str, optional_text_allowing_empty,
+    require_str, string_mapping, text_or_none,
 };
 use crate::project::_helpers::help::{
     Setting, SettingValue, join_helps, setting_help, setting_note,
@@ -25,9 +25,9 @@ use crate::project::_helpers::targets::{
 };
 use crate::project::_helpers::values::is_truthy;
 use crate::project::constants::{
-    ALLOW_MISSING_SECRETS_KEY, COLUMN_CONTRACT_MODES, LEGACY_COLUMN_CONTRACT_MODE_KEY,
-    LEGACY_EVENT_EXPORTERS_KEY, LOCAL_CONFIG_FILENAME, POOLS_KEY, QUERY_CHANGE_TRACKING_KEY,
-    REQUIRE_SQL_ANALYSIS_KEY, SHARED_POLICY_SETTINGS, SQL_ANALYSIS_KEY,
+    ALLOW_MISSING_SECRETS_KEY, COLUMN_CONTRACT_MODES, ENV_FILE_KEY,
+    LEGACY_COLUMN_CONTRACT_MODE_KEY, LEGACY_EVENT_EXPORTERS_KEY, LOCAL_CONFIG_FILENAME, POOLS_KEY,
+    QUERY_CHANGE_TRACKING_KEY, REQUIRE_SQL_ANALYSIS_KEY, SHARED_POLICY_SETTINGS, SQL_ANALYSIS_KEY,
 };
 use crate::project::errors::{ConfigFailure, FailureClass, LoadFailure, MessagePiece};
 use crate::project::models::{
@@ -200,7 +200,9 @@ fn sections(payload: &Entries) -> Loaded<Fields> {
             ),
         )
         .with_help(format!(
-            "move it to {LOCAL_CONFIG_FILENAME}, or set SQLBUILD_ALLOW_MISSING_SECRETS=1 in CI"
+            "move it to {LOCAL_CONFIG_FILENAME}, set SQLBUILD_ALLOW_MISSING_SECRETS=1 in CI, or list \
+             the providers whose secrets a target may lack in [targets.<name>] \
+             {ALLOW_MISSING_SECRETS_KEY}"
         )));
     }
     Ok(vec![
@@ -310,6 +312,10 @@ fn project_fields(payload: &Entries) -> Loaded<Fields> {
     let settings = &fields[5].1;
     reject_untracked_janitor(&operations[0].1, settings)?;
     fields.extend(operations);
+    fields.push((
+        ENV_FILE_KEY,
+        optional_text_allowing_empty(payload, ENV_FILE_KEY)?,
+    ));
     Ok(fields)
 }
 

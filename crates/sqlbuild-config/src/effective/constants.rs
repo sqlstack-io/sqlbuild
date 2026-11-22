@@ -245,4 +245,18 @@ pub(crate) const TARGET_FIELDS: &[TargetField] = &[
             decided_by: &["pause_dynamic"],
         },
     },
+    TargetField {
+        group: None,
+        name: "env_file",
+        rule: MergeRule::Overlay {
+            decided_by: &["env_file"],
+        },
+    },
+    TargetField {
+        group: None,
+        name: "allow_missing_secrets",
+        rule: MergeRule::Overlay {
+            decided_by: &["allow_missing_secrets"],
+        },
+    },
 ];

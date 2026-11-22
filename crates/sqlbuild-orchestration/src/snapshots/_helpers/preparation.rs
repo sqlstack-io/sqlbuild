@@ -6,9 +6,9 @@ use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 
 use crate::snapshots::_helpers::content::{json_bytes, prepare_node};
 use crate::snapshots::constants::SNAPSHOT_DOCUMENT_KINDS;
+use crate::snapshots::main::publication::stored_document::stored_document;
 use crate::snapshots::models::{PreparedNode, PreparedSnapshot, SnapshotInput};
 use crate::store::errors::ControlError;
-use crate::store::main::compress::compress;
 
 pub(crate) fn prepare_snapshot(input: &SnapshotInput) -> Result<PreparedSnapshot, ControlError> {
     if input.target.trim().is_empty()
@@ -60,8 +60,7 @@ fn prepare_documents(
                 "unknown snapshot document {kind}"
             )));
         }
-        let bytes = json_bytes(value)?;
-        documents.insert(kind.clone(), (sha256_hex(&bytes), compress(&bytes)?));
+        documents.insert(kind.clone(), stored_document(value)?);
     }
     Ok(documents)
 }

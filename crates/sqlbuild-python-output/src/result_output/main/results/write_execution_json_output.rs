@@ -1,7 +1,9 @@
-//! Write execution JSON to stdout or a requested side-channel file.
+//! Write execution JSON to stdout or a requested side-channel file; a worker's run discards it.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
+
+use crate::result_output::_helpers::results::discarded_reports::REPORTS_DISCARDED;
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 
@@ -24,7 +26,7 @@ pub fn write_execution_json_output(
         json_output_path.call_method("write_text", (payload,), Some(&encoding))?;
         return Ok(());
     }
-    if json_output {
+    if json_output && !REPORTS_DISCARDED.get() {
         let stdout: Bound<'_, PyAny> = py.import("sys")?.getattr("stdout")?;
         stdout.call_method1("write", (payload,))?;
         stdout.call_method0("flush")?;

@@ -134,7 +134,7 @@ describe('acknowledgements of conditions that cleared', () => {
 	const built = (stale: StaleReason[] | null): CatalogNode => ({ key: 'model:orders', kind: 'table', path: 'models/orders.sql', group: null, upstream: [], stale, lastOutcome: 'success', lastBuild: { builtAt: iso(-1) } }) as unknown as CatalogNode;
 	const changed: StaleReason = { reason: 'changed', change: 'definition', detail: '', since: iso(-3) };
 	const read = (nodes: CatalogNode[], acks: AttentionAcknowledgement[]) =>
-		overviewOf({ runs: [], checks: [], nodes, changes: [], events: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: acks }, now, scopeKey: 'loc-1:dev' });
+		overviewOf({ runs: [], checks: [], nodes, changes: [], events: [], triggers: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: acks }, now, scopeKey: 'loc-1:dev' });
 
 	it('lists one whose condition the read can see and no longer finds', () => {
 		const nodesOutOfDate = ack('stale_models', { counts: { changed: 2, behind: 0 } });
@@ -155,6 +155,17 @@ describe('acknowledgements of conditions that cleared', () => {
 		expect(read([built([])], elsewhere).clearedAcknowledgements).toEqual([]);
 		expect(read([built([])], [ack('event:scheduler_no_leader::')]).clearedAcknowledgements).toEqual([ack('event:scheduler_no_leader::')]);
 		expect(read([built([])], [ack('event:location_broken:loc-1:dev:shop · dev')]).clearedAcknowledgements).toHaveLength(1);
+	});
+
+	it('withdraws missing secrets only when the health read succeeded and shows none for this location', () => {
+		const secrets = ack('event:location_missing_secrets:loc-1:dev:');
+		const healthy = (acks: AttentionAcknowledgement[], events: PlatformEvent[] = []) =>
+			overviewOf({ runs: [], checks: [], nodes: [built([])], changes: [], events, triggers: [], acknowledgements: new Map(), conditions: { snoozeSeconds: 86_400, acknowledgements: acks }, now, scopeKey: 'loc-1:dev', healthRead: true });
+		const stillMissing: PlatformEvent = { id: 'secrets:loc-1:dev', kind: 'location_missing_secrets', severity: 'warning', occurredAt: iso(-1), active: true, locationId: 'loc-1:dev', subject: null, message: 'orders_api is missing ORDERS_API_KEY', members: ['ORDERS_API_KEY'] };
+		expect(read([built([])], [secrets]).clearedAcknowledgements).toEqual([]);
+		expect(healthy([secrets]).clearedAcknowledgements).toEqual([secrets]);
+		expect(healthy([secrets], [stillMissing]).clearedAcknowledgements).toEqual([]);
+		expect(healthy([ack('event:location_missing_secrets:loc-2:dev:')]).clearedAcknowledgements).toEqual([]);
 	});
 
 	it('judges only the page’s own latest read, for the target now selected, shown and not failed', () => {

@@ -45,11 +45,11 @@ fn given_databricks_model_sql_when_probing_its_parser_then_only_sql_it_reads_who
         },
         NativeGapTestCase {
             description: "a construct the shared tree lacks is a gap named by the parser",
-            sql: "VACUUM t",
+            sql: "REPAIR PRIVILEGES t",
             placeholders: &[],
             expected_gap: Some(LocatedGap {
-                construct: "vacuum".to_owned(),
-                message: "vacuum".to_owned(),
+                construct: "repair".to_owned(),
+                message: "repair".to_owned(),
                 line: 1,
                 column: 1,
                 syntax: false,
@@ -275,7 +275,7 @@ fn given_sql_databricks_refuses_when_parsing_then_the_gap_says_whether_it_is_a_s
         },
         ParseFailureTestCase {
             description: "the nesting limit is not a syntax error",
-            sql: format!("SELECT {}1{}", "(".repeat(300), ")".repeat(300)),
+            sql: format!("SELECT {}1{}", "(".repeat(600), ")".repeat(600)),
             expected_syntax: false,
             expected_offset: None,
         },

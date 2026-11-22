@@ -17,7 +17,7 @@
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import { planHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
-	import { createResource } from '$lib/state/resource.svelte';
+	import { useChecks } from '$lib/state/checks.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
 	import { attachmentLabel, evaluationModeHelp, evaluationModeLabel, runScopePhaseHelp, runScopePhaseLabel } from '$lib/build-area/labels';
@@ -28,7 +28,7 @@
 	import { createSelection } from '$lib/state/selection.svelte';
 	import { readSelectionParams } from '$lib/selection/command';
 
-	const checks = createResource((client, scope) => client.listChecks(scope), ['checks', 'runs', 'node_status']);
+	const checks = useChecks();
 	const all = $derived(checks.data ?? []);
 
 	let query = $state(page.url.searchParams.get('q') ?? '');
@@ -82,15 +82,16 @@
 
 	const ROW_H = 52;
 	const tableColumns = $derived<TableColumn[]>([
-		{ id: 'check', label: 'Check', minWidth: 220 },
+		// Check and Attached to share what is left; together the columns fit a 1,440 px window without scrolling sideways.
+		{ id: 'check', label: 'Check', minWidth: 200 },
 		{ id: 'outcome', label: 'Outcome', width: '160px' },
-		{ id: 'node', label: 'Attached to', width: '240px' },
+		{ id: 'node', label: 'Attached to', minWidth: 160 },
 		{ id: 'severity', label: 'Severity', width: '100px' },
 		{ id: 'phase', label: 'Scope', width: '150px' },
-		{ id: 'mode', label: 'Result type', width: '130px' },
+		{ id: 'mode', label: 'Result type', width: '120px' },
 		{ id: 'result', label: 'Result', width: '100px', align: 'right' },
 		...(hasRecent ? [{ id: 'recent', label: 'Recent', width: '100px' }] : []),
-		{ id: 'checked', label: 'Last checked', width: '130px' }
+		{ id: 'checked', label: 'Last checked', width: '120px' }
 	]);
 </script>
 

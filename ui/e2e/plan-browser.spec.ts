@@ -28,7 +28,7 @@ async function select(page: Page, key: string) {
 
 test('the index lists the sections in order, opens on the first, and the address keeps the one picked', async ({ page }) => {
 	await openPlan(page);
-	await expect(page).toHaveTitle('Plan · sqb build --changed');
+	await expect(page).toHaveTitle('Plan · sqb build --changed · SQLBuild');
 	// Grouped under what will run and what won't, each heading counting nodes once, with no summary sentence.
 	await expect(page.locator('.index .summary')).toHaveCount(0);
 	await expect(page.getByTestId('index-will-run')).toHaveText('Will run2,770');

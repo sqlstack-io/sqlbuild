@@ -386,6 +386,10 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "sqlbuild.executor.review.main.leftover_review_schemas",
         "leftover_review_schemas",
     ),
+    "resume_expired_holds": (
+        "sqlbuild.executor.dynamic_pauses.main.resume_expired_holds",
+        "resume_expired_holds",
+    ),
     "FullDiffSizeGuardError": ("sqlbuild.executor.diff.exceptions", "FullDiffSizeGuardError"),
     "execute_query_diff": ("sqlbuild.executor.diff.main._execute_query", "execute_query_diff"),
     "execute_diff": ("sqlbuild.executor.diff.main.execute", "execute_diff"),

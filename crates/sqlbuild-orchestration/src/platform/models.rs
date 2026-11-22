@@ -4,8 +4,8 @@ use crate::api::models::ControlClient;
 use crate::credentials::models::AuditRetention;
 use crate::declarations::models::TriggerDefinition;
 use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
-use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
-use crate::snapshots::models::SnapshotRetention;
+use crate::sensors::models::{SensorEvaluationRequest, SensorFunctionOutcome};
+use crate::snapshots::models::{SnapshotRecord, SnapshotRetention};
 use crate::warehouse_metadata::models::StateHistoryRetention;
 use crate::warehouse_metadata::models::{
     StatisticsRetention, WarehouseHistoryKind, WarehouseStateLocation,
@@ -53,10 +53,13 @@ pub enum LocationHealth {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         elapsed_millis: Option<u64>,
     },
-    /// How many provider secret settings the location's environment leaves unset.
+    /// The providers whose required secrets the location's environment leaves unset.
     ProviderSecrets {
         generation: i64,
+        /// Unset secrets of providers the target doesn't allow to miss them; above zero is a health problem.
         missing: u64,
+        /// Every provider missing a secret, including those the target allows; names only, never values.
+        providers: Vec<MissingProviderSecrets>,
     },
     /// Jobs and groups this server's `pool_caps` clamp, derived by the server, never reported by a location.
     PoolCapped {
@@ -89,6 +92,41 @@ pub enum LocationHealth {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         mirrored_records: Option<u64>,
     },
+}
+
+/// A location's published generation, as its interpreter hands it to the supervisor.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PublishedGeneration {
+    pub record: SnapshotRecord,
+    /// The earliest calendar refresh deadline.
+    pub refresh_at: Option<DateTime<Utc>>,
+    /// The state locations its nodes write.
+    pub state_locations: Vec<WarehouseStateLocation>,
+    /// The providers whose required secrets the location's environment leaves unset.
+    pub missing_secrets: Vec<MissingProviderSecrets>,
+}
+
+/// A provider whose required secrets are unset: what is missing and which nodes need it, never a value.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MissingProviderSecrets {
+    pub provider: String,
+    /// The provider's file, relative to the project directory.
+    pub path: String,
+    pub settings: Vec<MissingProviderSetting>,
+    /// Snapshot node keys that run the provider, such as `source:raw_payments`.
+    pub nodes: Vec<String>,
+    /// The target's `allow_missing_secrets` lists the provider, so its location shows a note, not a problem.
+    pub allowed: bool,
+}
+
+/// One unset required setting: the field, the variable it reads and the field's line in the provider file.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MissingProviderSetting {
+    pub field: String,
+    pub variable: String,
+    pub line: Option<u64>,
 }
 
 /// The stage a warehouse sync failed at; only a failed read also reports its redacted error.
@@ -216,6 +254,12 @@ pub enum LocationWork {
         settings: std::collections::BTreeMap<String, serde_json::Value>,
         /// Plan again even when the location kept a plan for the same request.
         fresh: bool,
+        /// The jobs the command names, pinned as an ad-hoc build of it pins them.
+        #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+        jobs: std::collections::BTreeMap<String, crate::runs::models::PinnedJob>,
+        /// The settings the command gives, `warehouse` included though a plan never takes it; they replace the pinned jobs' own.
+        #[serde(default, skip_serializing_if = "std::collections::BTreeSet::is_empty")]
+        given: std::collections::BTreeSet<String>,
     },
 }
 
@@ -271,7 +315,7 @@ pub enum LocationWorkOutcome {
         healthy: bool,
     },
     SensorEvaluation {
-        outcome: CustomSensorOutcome,
+        outcome: SensorFunctionOutcome,
     },
     /// The plan document `sqb plan --json` printed, or its `{"error": ...}` report.
     Plan {
@@ -327,6 +371,27 @@ pub enum PlatformEventKind {
     LocationBroken,
     LaunchFailed,
     RunFailed,
+    TriggerSkipped,
+    SensorRechecked,
+    CalendarTimesDropped,
+}
+
+impl PlatformEventKind {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Heartbeat => "heartbeat",
+            Self::SchedulerNoLeader => "scheduler_no_leader",
+            Self::TickOverdue => "tick_overdue",
+            Self::CalendarHorizonLow => "calendar_horizon_low",
+            Self::LocationBroken => "location_broken",
+            Self::LaunchFailed => "launch_failed",
+            Self::RunFailed => "run_failed",
+            Self::TriggerSkipped => "trigger_skipped",
+            Self::SensorRechecked => "sensor_rechecked",
+            Self::CalendarTimesDropped => "calendar_times_dropped",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -371,6 +436,24 @@ pub enum PlatformEvent {
         failed_nodes: Vec<RunNodeFailure>,
         failed_node_count: i64,
     },
+    /// A trigger was skipped because its stored job or pinned snapshot can't be read, or a sensor because its check failed; `reason` says which.
+    TriggerSkipped {
+        trigger_id: Uuid,
+        snapshot_id: Uuid,
+        reason: String,
+    },
+    /// A sensor's last check was recorded by an earlier release in a form that can't be read, so evaluation `evaluation_id` checked it again from scratch; withdrawn once a check completes.
+    SensorRechecked {
+        trigger_id: Uuid,
+        snapshot_id: Uuid,
+        evaluation_id: Uuid,
+    },
+    /// A republish dropped a calendar's pending past-due `times`, because its previous definition, published by an earlier release, can't be read; withdrawn at the trigger's next successful tick.
+    CalendarTimesDropped {
+        trigger_id: Uuid,
+        snapshot_id: Uuid,
+        times: Vec<DateTime<Utc>>,
+    },
 }
 
 impl PlatformEvent {
@@ -384,6 +467,9 @@ impl PlatformEvent {
             Self::LocationBroken { .. } => PlatformEventKind::LocationBroken,
             Self::LaunchFailed { .. } => PlatformEventKind::LaunchFailed,
             Self::RunFailed { .. } => PlatformEventKind::RunFailed,
+            Self::TriggerSkipped { .. } => PlatformEventKind::TriggerSkipped,
+            Self::SensorRechecked { .. } => PlatformEventKind::SensorRechecked,
+            Self::CalendarTimesDropped { .. } => PlatformEventKind::CalendarTimesDropped,
         }
     }
 
@@ -397,6 +483,9 @@ impl PlatformEvent {
             Self::LocationBroken { .. } => "platform_location_broken",
             Self::LaunchFailed { .. } => "platform_launch_failed",
             Self::RunFailed { .. } => "platform_run_failed",
+            Self::TriggerSkipped { .. } => "platform_trigger_skipped",
+            Self::SensorRechecked { .. } => "platform_sensor_rechecked",
+            Self::CalendarTimesDropped { .. } => "platform_calendar_times_dropped",
         }
     }
 }
@@ -475,6 +564,71 @@ pub struct PlatformProblems {
     /// Running calendar schedules whose dates run out within a day.
     #[serde(default)]
     pub low_calendars: Vec<LowCalendar>,
+    /// Triggers skipped because their stored job or pinned snapshot can't be read, until their location publishes again.
+    #[serde(default)]
+    pub skipped_triggers: Vec<SkippedTrigger>,
+    /// Calendars whose pending times a republish dropped, until their next successful tick.
+    #[serde(default)]
+    pub dropped_calendar_times: Vec<DroppedCalendarTimes>,
+    /// Sensors checked again from scratch because their last check can't be read, until a check completes.
+    #[serde(default)]
+    pub rechecked_sensors: Vec<RecheckedSensor>,
+}
+
+/// A calendar whose pending past-due times a republish dropped, because its previous definition can't be read; it clears at its next successful tick.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct DroppedCalendarTimes {
+    pub trigger_id: Uuid,
+    pub name: String,
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    pub dropped_at: DateTime<Utc>,
+    /// The times that were due by the republish but never ticked, oldest first.
+    pub times: Vec<DateTime<Utc>>,
+}
+
+/// The live trigger problems, each list with its own withdrawal.
+#[derive(Debug, Default)]
+pub(crate) struct TriggerProblems {
+    pub(crate) skipped: Vec<SkippedTrigger>,
+    pub(crate) rechecked: Vec<RecheckedSensor>,
+    pub(crate) dropped: Vec<DroppedCalendarTimes>,
+}
+
+/// A sensor whose last check, recorded by an earlier release, can't be read, so it is checked again from scratch; it clears once a check completes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RecheckedSensor {
+    pub trigger_id: Uuid,
+    pub name: String,
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    pub rechecked_at: DateTime<Utc>,
+}
+
+/// A trigger the scheduler skips because its stored job or pinned snapshot can't be read, or a sensor whose check failed; it clears once its location publishes again or, for a sensor, a later check completes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SkippedTrigger {
+    pub trigger_id: Uuid,
+    pub name: String,
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    /// When it was first skipped for this snapshot.
+    pub skipped_at: DateTime<Utc>,
+    pub reason: String,
+}
+
+/// A live trigger and the snapshot it was published in.
+#[derive(Debug, Deserialize)]
+pub(crate) struct PublishedTrigger {
+    pub(crate) trigger_id: Uuid,
+    pub(crate) name: String,
+    pub(crate) location_id: Uuid,
+    pub(crate) location_name: String,
+    pub(crate) target: String,
+    pub(crate) snapshot_id: Uuid,
 }
 
 /// A running calendar schedule whose last date is at most a day away, or which has none left.
@@ -541,6 +695,9 @@ pub(crate) struct ProblemScan {
     pub(crate) broken: Vec<BrokenLocation>,
     pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
     pub(crate) low_calendars: Vec<LowCalendar>,
+    pub(crate) skipped_triggers: Vec<SkippedTrigger>,
+    pub(crate) rechecked_sensors: Vec<RecheckedSensor>,
+    pub(crate) dropped_calendar_times: Vec<DroppedCalendarTimes>,
 }
 
 /// Where the control store keeps its data.

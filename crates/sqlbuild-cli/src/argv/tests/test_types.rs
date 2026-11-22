@@ -117,3 +117,10 @@ pub(super) struct JobSettingFaultsTestCase {
     pub(super) faults: fn() -> Vec<&'static str>,
     pub(super) expected_faults: Vec<&'static str>,
 }
+
+/// A command line and the project and target read from it before it runs.
+pub(super) struct CommandProjectTestCase {
+    pub(super) description: &'static str,
+    pub(super) argv: &'static [&'static str],
+    pub(super) expected_project_and_target: Option<(&'static str, Option<&'static str>)>,
+}

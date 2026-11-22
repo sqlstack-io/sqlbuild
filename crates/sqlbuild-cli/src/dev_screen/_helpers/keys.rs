@@ -1,10 +1,10 @@
-//! Hotkeys from the terminal: stdin in raw mode, handed back to the warehouse client while it prompts.
+//! Keys from the terminal in raw mode: Ctrl+C and `q` stop `sqb dev`, Ctrl+\\ forces the stop, typing at a sign-in prompt goes to the client, and a terminal that hangs up stops it.
 
+#[cfg(unix)]
+use std::io::Write;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::thread::JoinHandle;
-#[cfg(unix)]
-use std::time::Duration;
 
 #[cfg(unix)]
 use rustix::termios::{
@@ -13,88 +13,126 @@ use rustix::termios::{
 use tokio::sync::mpsc::UnboundedSender;
 
 #[cfg(unix)]
-use crate::dev_screen::constants::KEY_POLL;
-use crate::dev_screen::models::{KeyGate, ScreenMessage};
+use crate::dev_screen::constants::{
+    FORCE_BYTE, INTERRUPT_BYTE, KEY_WAIT, SUSPEND_BYTE, SUSPEND_UNSUPPORTED,
+};
+use crate::dev_screen::models::{KeyInput, ScreenMessage};
+use crate::dev_stop::main::stop_switch::stop_switch;
+#[cfg(unix)]
+use crate::dev_stop::models::StopReason;
 
-/// The hotkey thread; dropping it restores the terminal.
+/// The key thread; dropping it stops the thread and restores the terminal.
 pub(crate) struct KeyReader {
-    gate: Arc<KeyGate>,
+    input: Arc<KeyInput>,
     thread: Option<JoinHandle<()>>,
 }
 
 impl KeyReader {
-    /// Start reading keys into `keys`, or `None` when stdin is not a terminal.
+    /// Put stdin in raw mode and read keys into `keys`, or `None` when stdin is not a terminal.
     #[cfg(unix)]
     pub(crate) fn start(keys: UnboundedSender<ScreenMessage>) -> Option<Self> {
         let cooked: Termios = match tcgetattr(std::io::stdin()) {
             Ok(cooked) => cooked,
-            Err(_) => return None,
+            Err(_not_a_terminal) => return None,
         };
-        let gate: Arc<KeyGate> = Arc::new(KeyGate::default());
-        let shared: Arc<KeyGate> = Arc::clone(&gate);
-        let thread = std::thread::spawn(move || read_keys(&shared, &cooked, &keys));
+        stop_switch().save_cooked(cooked.clone());
+        if let Err(_unchangeable) =
+            tcsetattr(std::io::stdin(), OptionalActions::Now, &raw_mode(&cooked))
+        {
+            return None;
+        }
+        let input: Arc<KeyInput> = Arc::new(KeyInput::default());
+        let shared: Arc<KeyInput> = Arc::clone(&input);
+        let thread = std::thread::spawn(move || read_keys(&shared, &keys));
         Some(Self {
-            gate,
+            input,
             thread: Some(thread),
         })
     }
 
-    /// Hotkeys need a Unix terminal; the screen is plain elsewhere.
+    /// Keys need a Unix terminal; the screen is plain elsewhere.
     #[cfg(not(unix))]
     pub(crate) fn start(_keys: UnboundedSender<ScreenMessage>) -> Option<Self> {
         None
     }
 
-    pub(crate) fn gate(&self) -> Arc<KeyGate> {
-        Arc::clone(&self.gate)
+    pub(crate) fn input(&self) -> Arc<KeyInput> {
+        Arc::clone(&self.input)
     }
 }
 
 impl Drop for KeyReader {
     fn drop(&mut self) {
-        self.gate.stop.store(true, Ordering::SeqCst);
+        self.input.stop.store(true, Ordering::SeqCst);
         if let Some(thread) = self.thread.take() {
             drop(thread.join());
         }
+        stop_switch().restore_terminal();
     }
 }
 
-/// Keys without echo or line buffering; Ctrl-C still interrupts, and reads give up after a tenth of a second.
+/// No echo, no line buffering and no signal keys, so Ctrl+C, Ctrl+\\ and Ctrl+Z arrive as bytes; a read returns what is there without waiting.
 #[cfg(unix)]
 fn raw_mode(cooked: &Termios) -> Termios {
     let mut raw: Termios = cooked.clone();
-    raw.local_modes -= LocalModes::ICANON | LocalModes::ECHO;
+    raw.local_modes -= LocalModes::ICANON | LocalModes::ECHO | LocalModes::ISIG;
     raw.special_codes[SpecialCodeIndex::VMIN] = 0;
-    raw.special_codes[SpecialCodeIndex::VTIME] = 1;
+    raw.special_codes[SpecialCodeIndex::VTIME] = 0;
     raw
 }
 
+/// Wait up to `KEY_WAIT` for a key; a terminal that is readable but has nothing to read has hung up.
 #[cfg(unix)]
-fn read_keys(gate: &KeyGate, cooked: &Termios, keys: &UnboundedSender<ScreenMessage>) {
-    let raw: Termios = raw_mode(cooked);
+fn read_keys(input: &KeyInput, keys: &UnboundedSender<ScreenMessage>) {
+    use rustix::event::{PollFd, PollFlags, Timespec, poll};
+    let wait: Timespec = Timespec {
+        tv_sec: 0,
+        tv_nsec: i64::from(KEY_WAIT.subsec_nanos()),
+    };
     let mut byte: [u8; 1] = [0];
-    while !gate.stop.load(Ordering::SeqCst) && !keys.is_closed() {
-        let reading: bool = gate.reading.load(Ordering::SeqCst);
-        if gate.closed.load(Ordering::SeqCst) {
-            if reading {
-                let _ = tcsetattr(std::io::stdin(), OptionalActions::Now, cooked);
-                gate.reading.store(false, Ordering::SeqCst);
-            }
-            std::thread::sleep(KEY_POLL);
-            continue;
-        }
-        if !reading {
-            if tcsetattr(std::io::stdin(), OptionalActions::Now, &raw).is_err() {
-                return;
-            }
-            gate.reading.store(true, Ordering::SeqCst);
-        }
-        match rustix::io::read(std::io::stdin(), &mut byte) {
-            Ok(1) => drop(keys.send(ScreenMessage::Key(char::from(byte[0]).to_ascii_lowercase()))),
+    while !input.stop.load(Ordering::SeqCst) {
+        let stdin = std::io::stdin();
+        let mut ready: [PollFd<'_>; 1] = [PollFd::new(&stdin, PollFlags::IN)];
+        match poll(&mut ready, Some(&wait)) {
+            Ok(0) | Err(rustix::io::Errno::INTR | rustix::io::Errno::AGAIN) => continue,
             Ok(_) => {}
-            Err(_) => std::thread::sleep(Duration::from_millis(100)),
+            Err(_) => return hung_up(),
+        }
+        match rustix::io::read(&stdin, &mut byte) {
+            Ok(1) => key(input, keys, byte[0]),
+            Err(rustix::io::Errno::INTR | rustix::io::Errno::AGAIN) => {}
+            Ok(_) | Err(_) => return hung_up(),
         }
     }
-    let _ = tcsetattr(std::io::stdin(), OptionalActions::Now, cooked);
-    gate.reading.store(false, Ordering::SeqCst);
+}
+
+/// The terminal went away: stop as SIGHUP would.
+#[cfg(unix)]
+fn hung_up() {
+    stop_switch().request(StopReason::Hangup);
+}
+
+#[cfg(unix)]
+fn key(input: &KeyInput, keys: &UnboundedSender<ScreenMessage>, byte: u8) {
+    if byte == INTERRUPT_BYTE {
+        stop_switch().request(StopReason::Interrupt);
+        return;
+    }
+    if byte == FORCE_BYTE {
+        stop_switch().force(StopReason::Interrupt);
+    }
+    if byte == SUSPEND_BYTE {
+        drop(keys.send(ScreenMessage::Log(SUSPEND_UNSUPPORTED.to_owned())));
+        return;
+    }
+    if let Ok(mut forward) = input.forward.lock()
+        && let Some(client) = forward.as_mut()
+    {
+        drop(client.write_all(&[byte]));
+        return;
+    }
+    match char::from(byte).to_ascii_lowercase() {
+        'q' => stop_switch().request(StopReason::Quit),
+        key => drop(keys.send(ScreenMessage::Key(key))),
+    }
 }

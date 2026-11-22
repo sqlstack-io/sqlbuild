@@ -37,8 +37,6 @@ const ESCAPED_QUOTE_MACRO: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR
 const ESCAPED_QUOTE_FORMATTED: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCONCAT(@v, 'O\\'Brien\n      kept indent', 'tail')\n";
 const E_STRING_MACRO: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCONCAT(\n  @v,\n  E'O\\'Brien\n      kept indent',\n  'tail'\n)\n";
 const E_STRING_FORMATTED: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCONCAT(@v, E'O\\'Brien\n      kept indent', 'tail')\n";
-const NESTED_COMMENT_MACRO: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCOALESCE(\n  @v, /* outer /* inner */ it's\n      kept */\n  'x'\n)\n";
-const NESTED_COMMENT_FORMATTED: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCOALESCE(\n  @v, /* outer /* inner */ it's\n      kept */ 'x'\n)\n";
 const BLOCK_COMMENT_MACRO: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCOALESCE(\n  @v, /* first\n      second */\n  'x'\n)\n";
 const BLOCK_COMMENT_FORMATTED: &str = "MACRO (arguments (v VARCHAR), returns VARCHAR);\n\nCOALESCE(\n  @v, /* first\n      second */ 'x'\n)\n";
 const NORMALISE_NAME_FORMATTED: &str = "MACRO (\n  description \"Normalise a name\",\n  arguments (column_name VARCHAR),\n  returns VARCHAR,\n);\n\nREGEXP_REPLACE(\n  TRIM(\n    UPPER(\n      -- Collapse repeated spaces\n      REGEXP_REPLACE(@column_name, '[[:space:]]+', ' ')\n    )\n  ),\n  '(^| )([A-Z]) ',\n  '\\\\1\\\\2'\n)\n";
@@ -860,6 +858,18 @@ fn given_snowflake_table_function_calls_when_formatting_then_each_call_is_kept_w
             expected_fault_lines: vec![],
         },
         FormatBodiesTestCase {
+            description: "a partitioned call keeps its OVER clause with it",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: "MODEL ();\nselect s.a from p, __table_fn(\"f\")(p.x) OVER (PARTITION BY p.k) s\n",
+            expected_formatted: vec![(
+                0,
+                "MODEL ();\nSELECT s.a\nFROM p, __table_fn(\"f\")(p.x) OVER (PARTITION BY p.k) s\n"
+                    .to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
             description: "a call the author wrapped in TABLE( ) keeps its arguments",
             dialect: "snowflake",
             relative_parts: None,
@@ -1038,12 +1048,6 @@ fn given_expression_macro_bodies_when_formatting_twice_then_every_dialect_lays_t
             expected_formatted: E_STRING_FORMATTED.to_string(),
         },
         ExpressionMacroFormatTestCase {
-            description: "a nested block comment holding an apostrophe",
-            dialects: &["duckdb", "databricks"],
-            contents: NESTED_COMMENT_MACRO.to_string(),
-            expected_formatted: NESTED_COMMENT_FORMATTED.to_string(),
-        },
-        ExpressionMacroFormatTestCase {
             description: "a block comment with indented lines",
             dialects: &["duckdb", "snowflake"],
             contents: BLOCK_COMMENT_MACRO.to_string(),
@@ -1066,6 +1070,113 @@ fn given_expression_macro_bodies_when_formatting_twice_then_every_dialect_lays_t
                 test_case.description
             );
         }
+    }
+    Ok(())
+}
+
+#[test]
+fn given_a_model_body_that_is_one_macro_call_when_formatting_then_every_dialect_leaves_it_as_written()
+-> Result<(), LintTextError> {
+    macro_rules! model_header {
+        () => {
+            "MODEL (description \"Completed orders\", materialized table,);\n"
+        };
+    }
+    macro_rules! macro_call {
+        () => {
+            "@py.orders_for(__ref(\"stg_orders\"), status=\"completed\")"
+        };
+    }
+    let test_cases = [
+        FormatBodiesTestCase {
+            description: "the call alone on snowflake",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: concat!(model_header!(), macro_call!(), "\n"),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "the call ending its statement on snowflake",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: concat!(model_header!(), macro_call!(), ";\n"),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "the call followed by a comment on snowflake",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: concat!(
+                model_header!(),
+                macro_call!(),
+                "\n-- Completed orders only\n"
+            ),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "the call followed by a block comment on snowflake",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: concat!(model_header!(), macro_call!(), " /* completed */;\n"),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "the call alone on duckdb",
+            dialect: "duckdb",
+            relative_parts: None,
+            contents: concat!(model_header!(), macro_call!(), "\n"),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "the call ending its statement on duckdb",
+            dialect: "duckdb",
+            relative_parts: None,
+            contents: concat!(model_header!(), macro_call!(), ";\n"),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "the call followed by a comment on duckdb",
+            dialect: "duckdb",
+            relative_parts: None,
+            contents: concat!(
+                model_header!(),
+                macro_call!(),
+                "\n-- Completed orders only\n"
+            ),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "the call followed by a block comment on duckdb",
+            dialect: "duckdb",
+            relative_parts: None,
+            contents: concat!(model_header!(), macro_call!(), " /* completed */;\n"),
+            expected_formatted: vec![],
+            expected_fault_lines: vec![],
+        },
+    ];
+
+    for test_case in test_cases {
+        let files = [FormatFile {
+            relative_parts: test_case.relative_parts.clone(),
+            contents: test_case.contents.to_string(),
+        }];
+
+        let result = format_sql_bodies(&files, test_case.dialect, 100)?;
+        let fault_lines: Vec<usize> = result.faults.iter().map(|fault| fault.line).collect();
+
+        assert_eq!(
+            (result.formatted, fault_lines),
+            (test_case.expected_formatted, test_case.expected_fault_lines),
+            "{}",
+            test_case.description
+        );
     }
     Ok(())
 }

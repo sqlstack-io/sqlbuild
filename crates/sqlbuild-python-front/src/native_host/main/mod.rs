@@ -11,5 +11,6 @@ pub mod register_audit_results_state;
 pub mod register_consumption_state;
 pub mod register_observations_state;
 pub mod reports_cost_capability;
+pub mod resume_expired_dynamic_holds;
 pub mod seconds_since;
 pub mod state_table_name;

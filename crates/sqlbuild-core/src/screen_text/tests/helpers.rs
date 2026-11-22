@@ -1,28 +1,28 @@
 use std::time::Duration;
 
-use regex::Regex;
-
 use crate::cli_text::models::CliStyle;
 use crate::screen_text::main::render_dev_header::render_dev_header;
 use crate::screen_text::main::render_event_line::render_event_line;
-use crate::screen_text::main::render_frame_rule::render_frame_rule;
-use crate::screen_text::main::render_hotkey_bar::render_hotkey_bar;
-use crate::screen_text::main::render_phase_lines::render_phase_lines;
-use crate::screen_text::main::render_ready_card::render_ready_card;
-use crate::screen_text::main::render_tree_group::render_tree_group;
+use crate::screen_text::main::render_key_line::render_key_line;
+use crate::screen_text::main::render_log_line::render_log_line;
+use crate::screen_text::main::render_problem::render_problem;
+use crate::screen_text::main::render_prompt::render_prompt;
+use crate::screen_text::main::render_ready_box::render_ready_box;
+use crate::screen_text::main::render_result::render_result;
+use crate::screen_text::main::render_step_line::render_step_line;
+use crate::screen_text::main::visible_cells::visible_cells;
 use crate::screen_text::models::{
-    DevHeader, EventLine, EventMark, Hotkey, PhaseLayout, PhaseLine, PhaseState, ReadyCard,
-    ScreenFacts, Segment, Tone, TreeEntry, TreeGroup, TreeRow, WarehouseState,
+    BoxRow, DevHeader, EventLine, EventMark, Hotkey, PhaseState, Problem, ProblemLevel,
+    PromptBlock, ResultLine, ScreenFacts, Segment, StepLine, Tone, TreeEntry, TreeGroup, TreeRow,
 };
-use crate::text::main::cell_len::cell_len;
 
-/// Uncoloured facts without links, `columns` wide, rows indented by two spaces.
+/// Uncoloured facts without links, `columns` wide and 24 rows tall.
 pub(super) fn plain_facts(columns: usize) -> ScreenFacts {
     ScreenFacts {
         columns,
+        rows: 24,
         style: CliStyle { use_color: false },
         links: false,
-        indent: 2,
     }
 }
 
@@ -39,141 +39,80 @@ pub(super) fn millis(value: u64) -> Option<Duration> {
     Some(Duration::from_millis(value))
 }
 
-pub(super) fn phase(
+pub(super) fn step(
     state: PhaseState,
     label: &str,
-    detail: &str,
     elapsed: Option<Duration>,
-) -> PhaseLine {
-    PhaseLine {
+    detail: &str,
+) -> StepLine {
+    StepLine {
         state,
         label: label.to_owned(),
-        detail: detail.to_owned(),
         elapsed,
+        detail: detail.to_owned(),
     }
 }
 
-/// The `sqb dev` checklist while discovery runs, with one detail too wide for 80 columns.
-pub(super) fn starting_checklist() -> Vec<PhaseLine> {
-    vec![
-        phase(
-            PhaseState::Ok,
-            "Control store",
-            "sqlite \u{b7} target/dev/control.db",
-            millis(100),
-        ),
-        phase(PhaseState::Ok, "API", "127.0.0.1:8000", millis(240)),
-        phase(
-            PhaseState::Ok,
-            "Scheduler",
-            "41 triggers paused",
-            millis(120),
-        ),
-        phase(
-            PhaseState::Running { frame: 2 },
-            "Discover project",
-            "Python nodes 287/412 \u{b7} models/marts/finance/fct_revenue_by_region.sql",
-            millis(24_650),
-        ),
-        phase(PhaseState::Pending, "Compile snapshot", "", None),
-        phase(PhaseState::Pending, "Publish", "", None),
-        phase(PhaseState::Pending, "Warehouse", "", None),
-    ]
-}
-
-pub(super) fn ready_card(warehouse: WarehouseState) -> ReadyCard {
-    ReadyCard {
-        version: "0.231.0".to_owned(),
-        ready_in: Duration::from_millis(43_120),
-        ui_url: "http://127.0.0.1:8000".to_owned(),
-        location:
-            "dev \u{b7} gen 1 \u{b7} 2280 models \u{b7} 412 python \u{b7} 85 jobs \u{b7} 7 groups"
-                .to_owned(),
-        adapter: "snowflake".to_owned(),
-        warehouse,
-        triggers: "41 paused".to_owned(),
-        watching: "project/".to_owned(),
+pub(super) fn plain(text: &str) -> Segment {
+    Segment {
+        text: text.to_owned(),
+        tone: Tone::Plain,
+        link: None,
     }
 }
 
-pub(super) fn event(
-    mark: EventMark,
-    title: &str,
-    detail: &str,
-    elapsed: Option<Duration>,
-) -> EventLine {
+/// The removed-key error the mock-up shows, with a long explanation.
+pub(super) fn removed_key() -> Problem {
+    Problem {
+        level: ProblemLevel::Error,
+        title: "sqlbuild_project.toml".to_owned(),
+        code: "D001".to_owned(),
+        at: vec![plain("sqlbuild_project.toml:23:1")],
+        why: "dev.auto_build_on_save was removed in sqb 0.250.0. sqb dev no longer builds on \
+              every save by default, and this key is no longer read."
+            .to_owned(),
+        fix: "replace it with dev.on_save = \"build\" to keep building on save, or delete the \
+              line to get the new default, dev.on_save = \"compile\""
+            .to_owned(),
+    }
+}
+
+/// The Snowflake Warehouse row of the ready box.
+pub(super) fn warehouse_row() -> BoxRow {
+    BoxRow {
+        label: "Warehouse".to_owned(),
+        parts: [
+            "snowflake",
+            "account xy12345",
+            "auth browser sign-in (OAuth)",
+            "role TRANSFORMER",
+            "warehouse TRANSFORM_XS",
+        ]
+        .map(str::to_owned)
+        .to_vec(),
+        link: None,
+    }
+}
+
+pub(super) fn ui_row() -> BoxRow {
+    BoxRow {
+        label: "UI".to_owned(),
+        parts: vec!["http://127.0.0.1:8640".to_owned()],
+        link: Some("http://127.0.0.1:8640".to_owned()),
+    }
+}
+
+pub(super) fn run_started() -> EventLine {
     EventLine {
-        clock: "09:41:03".to_owned(),
-        mark,
-        title: title.to_owned(),
-        detail: detail.to_owned(),
-        elapsed,
+        clock: "14:20:31".to_owned(),
+        mark: EventMark::Started,
+        title: "run r_8f3a21c0 shop_job".to_owned(),
+        detail: "started manually by Sam Lee from the jobs page of the web UI".to_owned(),
+        elapsed: None,
         notes: Vec::new(),
     }
 }
 
-/// A failed generation with its clickable location and the retry hint.
-pub(super) fn failed_generation() -> EventLine {
-    EventLine {
-        notes: vec![
-            vec![
-                Segment {
-                    text: "models/finance/fct_revenue.sql:42:7".to_owned(),
-                    tone: Tone::Muted,
-                    link: Some("file:///work/shop/models/finance/fct_revenue.sql".to_owned()),
-                },
-                Segment {
-                    text: "  unknown column net_amount_usd".to_owned(),
-                    tone: Tone::Plain,
-                    link: None,
-                },
-            ],
-            vec![Segment {
-                text: "r retry \u{b7} l full log".to_owned(),
-                tone: Tone::Muted,
-                link: None,
-            }],
-        ],
-        ..event(
-            EventMark::Failed,
-            "gen 4 failed \u{b7} still serving gen 3",
-            "",
-            None,
-        )
-    }
-}
-
-pub(super) fn hotkeys() -> Vec<Hotkey> {
-    [
-        ('o', "open UI"),
-        ('r', "recompile"),
-        ('s', "retry warehouse"),
-        ('l', "logs"),
-        ('q', "quit"),
-    ]
-    .into_iter()
-    .map(|(key, label)| Hotkey {
-        key,
-        label: label.to_owned(),
-    })
-    .collect()
-}
-
-/// A connected warehouse with a long role and warehouse detail.
-pub(super) fn connected() -> WarehouseState {
-    WarehouseState::Connected {
-        detail: "ANALYST \u{b7} DEVELOPER_ROLE @ DEV_ANALYST_WAREHOUSE_LARGE".to_owned(),
-    }
-}
-
-/// A warehouse whose sign-in was skipped.
-pub(super) fn not_connected() -> WarehouseState {
-    WarehouseState::NotConnected {
-        reason: "sign-in skipped".to_owned(),
-    }
-}
-
-/// Two partial semantic checks of `total`, one with a clickable error location.
 pub(super) fn semantic_group(total: usize) -> TreeGroup {
     let entry = |name: &str, rows: &[(&str, &str, Tone)]| TreeEntry {
         name: name.to_owned(),
@@ -219,87 +158,94 @@ pub(super) fn semantic_group(total: usize) -> TreeGroup {
     }
 }
 
-/// The events of one editing session: two changes, a publish, a restart, a failure and a run.
-pub(super) fn edited_events() -> Vec<EventLine> {
-    vec![
-        event(EventMark::Changed, "models/orders/int_orders.sql", "", None),
-        event(
-            EventMark::Changed,
-            "python/exports/partner_feed/fulfilment_partner_daily_export_node.py",
-            "",
-            None,
+/// Every row any renderer draws at `facts`, with whether it is live (cut) rather than lasting (wrapped).
+pub(super) fn every_row(facts: &ScreenFacts) -> Vec<(bool, String)> {
+    let long: &str = "Python nodes 287/412 \u{b7} models/marts/finance/fct_revenue_by_region.sql \
+                      \u{b7} a_very_long_identifier_without_any_spaces_in_it_at_all_whatsoever";
+    let mut rows: Vec<(bool, String)> = Vec::new();
+    for state in [
+        PhaseState::Pending,
+        PhaseState::Running { frame: 3 },
+        PhaseState::Ok,
+        PhaseState::Fail,
+    ] {
+        let line: StepLine = step(state, "Connecting warehouse", millis(24_650), long);
+        rows.extend(
+            render_step_line(&line, facts, false)
+                .into_iter()
+                .map(|row| (true, row)),
+        );
+        rows.extend(
+            render_step_line(&line, facts, true)
+                .into_iter()
+                .map(|row| (false, row)),
+        );
+    }
+    rows.push((
+        true,
+        render_key_line(
+            &[('o', "open UI"), ('l', "full log"), ('q', "quit")].map(|(key, label)| Hotkey {
+                key,
+                label: label.to_owned(),
+            }),
+            facts,
         ),
-        event(
-            EventMark::Succeeded,
-            "gen 2 published",
-            "1 model changed",
-            millis(1_400),
-        ),
-        event(
-            EventMark::Restarted,
-            "location restarted",
-            "Python changed",
-            millis(3_900),
-        ),
-        failed_generation(),
-        event(
-            EventMark::Started,
-            "run nightly_group",
-            "started from UI",
-            None,
-        ),
-        event(
-            EventMark::Succeeded,
-            "run nightly_group",
-            "212 nodes",
-            millis(1_003_000),
-        ),
-    ]
-}
-
-/// The header, a titled rule, a plain rule and the hotkey bar.
-pub(super) fn chrome_rows(facts: &ScreenFacts) -> Vec<String> {
-    let header: DevHeader = DevHeader {
-        version: "0.231.0".to_owned(),
-        project: "shop".to_owned(),
-        target: "dev".to_owned(),
-    };
-    vec![
-        render_dev_header(&header, facts),
-        render_frame_rule(Some("snowflake"), facts),
-        render_frame_rule(None, facts),
-        render_hotkey_bar(&hotkeys(), facts),
-    ]
-}
-
-/// Every row any screen piece draws at `columns` whose visible text is wider than the screen.
-pub(super) fn rows_wider_than_screen(columns: usize, colour: bool) -> Vec<String> {
-    let facts: ScreenFacts = ScreenFacts {
-        style: CliStyle { use_color: colour },
-        links: colour,
-        ..plain_facts(columns)
-    };
-    let escapes: Regex = Regex::new("\u{1b}\\[[0-9;]*[A-Za-z]|\u{1b}\\][^\u{1b}]*\u{1b}\\\\")
-        .expect("escape pattern");
-    let mut rows: Vec<String> =
-        render_phase_lines(&starting_checklist(), PhaseLayout::TimeLast, &facts);
-    rows.extend(render_phase_lines(
-        &starting_checklist(),
-        PhaseLayout::TimeFirst,
-        &facts,
     ));
-    rows.extend(render_ready_card(&ready_card(connected()), &facts));
-    rows.extend(render_ready_card(&ready_card(not_connected()), &facts));
     rows.extend(
-        edited_events()
-            .iter()
-            .flat_map(|line| render_event_line(line, &facts)),
+        render_prompt(
+            &PromptBlock {
+                title: "snowflake needs you to sign in".to_owned(),
+                text: format!(
+                    "Go to https://example.com/authorize?{} to sign in\n",
+                    "x".repeat(150)
+                ),
+                waited: Duration::from_secs(24),
+            },
+            facts,
+        )
+        .into_iter()
+        .map(|row| (true, row)),
     );
-    rows.extend(render_tree_group(&semantic_group(5), &facts));
-    rows.extend(chrome_rows(&facts));
-    rows.into_iter()
-        .map(|row| escapes.replace_all(&row, "").into_owned())
-        .filter(|row| cell_len(row) > columns)
-        .map(|row| format!("{columns} columns: {row}"))
+    let lasting: Vec<String> = [
+        render_dev_header(
+            &DevHeader {
+                version: "0.256.0".to_owned(),
+                project: "shop".to_owned(),
+                target: "dev".to_owned(),
+            },
+            facts,
+        ),
+        render_problem(&removed_key(), facts),
+        render_ready_box(&[ui_row(), warehouse_row()], facts),
+        render_event_line(&run_started(), facts),
+        render_log_line(long, facts),
+        render_result(
+            &ResultLine {
+                failed: true,
+                title: "sqb dev did not start".to_owned(),
+                detail: "could not connect to the warehouse".to_owned(),
+                elapsed: millis(14_700),
+                next: vec![(
+                    "sqb debug".to_owned(),
+                    "test the connection on its own".to_owned(),
+                )],
+            },
+            facts,
+        ),
+    ]
+    .concat();
+    rows.extend(lasting.into_iter().map(|row| (false, row)));
+    rows
+}
+
+/// Rows wider than they may be: live rows one cell short of the terminal, lasting rows too unless the terminal is narrower than their minimum wrap.
+pub(super) fn rows_too_wide(columns: usize, facts: fn(usize) -> ScreenFacts) -> Vec<String> {
+    every_row(&facts(columns))
+        .into_iter()
+        .filter(|(live, row)| {
+            let cells: usize = visible_cells(row);
+            cells > columns.saturating_sub(1).max(1) && (*live || columns >= 60)
+        })
+        .map(|(_, row)| format!("{columns}: {row}"))
         .collect()
 }

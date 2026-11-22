@@ -133,4 +133,9 @@ describe('the out-of-date sentence', () => {
 		expect(staleSentence([], ['model:inventory', 'model:orders', 'model:customers'])).toBe('3 are behind an upstream rebuild: inventory, orders and customers.');
 		expect(staleSentence([], keys('inventory_', 4))).toBe('4 are behind an upstream rebuild. Including inventory_1, inventory_2, inventory_3 and 1 more.');
 	});
+	it("names why a sensor fails when its location didn't answer, before the stuck event and the count", () => {
+		const failing = { reason: "the location didn't answer within 60s", since: ago(30), failedTicks: 2, eventId: 'run:r-1', eventSummary: null };
+		const [{ view }] = attentionViews([{ kind: 'sensor_failing', triggerId: 't-1', triggerName: 'orders_sensor', failing }], now);
+		expect(view.detail).toBe("the location didn't answer within 60s · Stuck on run:r-1 · 2 failed ticks");
+	});
 });

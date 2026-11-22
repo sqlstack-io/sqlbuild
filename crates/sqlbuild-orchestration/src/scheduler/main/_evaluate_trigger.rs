@@ -8,10 +8,10 @@ use crate::scheduler::main::_plan_ticks::plan_ticks;
 use crate::scheduler::main::active_job_run::active_job_run;
 use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::{DueTrigger, SchedulerLease, TickPlan, TickState};
+use crate::snapshots::main::reads::decode_published_row::decode_published_row;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
-use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
@@ -29,14 +29,10 @@ pub(crate) async fn evaluate_trigger(
          JOIN sqb_jobs j ON j.location_id=t.location_id AND j.target=t.target AND j.job_key=t.job_key \
          WHERE t.trigger_id=$1 AND t.kind='schedule' AND t.removed_in_snapshot_id IS NULL",
         vec![Parameter::Id(trigger_id)]).await?;
-    let Some(trigger) = rows
-        .into_iter()
-        .next()
-        .map(decode_row::<DueTrigger>)
-        .transpose()?
-    else {
+    let Some(row) = rows.into_iter().next() else {
         return Ok(None);
     };
+    let trigger: DueTrigger = decode_published_row(row)?;
     if trigger.status != TriggerStatus::Running {
         return Ok(None);
     }

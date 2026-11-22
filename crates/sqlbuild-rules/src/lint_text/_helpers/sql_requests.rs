@@ -1,5 +1,6 @@
 //! Native SQL lint request payloads and the batch engine call.
 
+use sqlbuild_analysis::parse_guard::constants::MAX_FUNCTION_CALL_DEPTH;
 use std::borrow::Cow;
 
 use serde_json::{Map, Value};
@@ -153,6 +154,10 @@ pub(crate) fn lint_payload(
     let _ = payload.insert("version".to_string(), Value::from(LINT_API_VERSION));
     let _ = payload.insert("sql".to_string(), Value::from(sql));
     let _ = payload.insert("dialect".to_string(), Value::from(options.dialect.clone()));
+    let _ = payload.insert(
+        "max_function_call_depth".to_string(),
+        Value::from(MAX_FUNCTION_CALL_DEPTH),
+    );
     let _ = payload.insert(
         "config_file".to_string(),
         Value::from(PROJECT_CONFIG_FILENAME),

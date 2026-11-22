@@ -10,15 +10,46 @@ use crate::runs::models::{OutputPublication, RunChange, RunChangeRequest, RunExe
 use crate::worker::errors::WorkerError;
 use crate::worker::models::WorkerClient;
 
+/// Decode a run execution, refusing one with any part this release can't read: a field it would drop at any depth, or a field or variant it can't decode.
+pub(crate) fn read_execution(body: serde_json::Value) -> Result<RunExecution, WorkerError> {
+    let mut ignored: Option<String> = None;
+    let mut note = |path: serde_ignored::Path<'_>| {
+        ignored.get_or_insert_with(|| path.to_string());
+    };
+    let decoded = serde_path_to_error::deserialize::<_, RunExecution>(
+        serde_ignored::Deserializer::new(body, &mut note),
+    );
+    match (decoded, ignored) {
+        (Err(error), _) => Err(WorkerError::UnreadableExecution(unreadable_part(
+            &error.path().to_string(),
+            &error.inner().to_string(),
+        ))),
+        (Ok(_), Some(field)) => Err(WorkerError::UnreadableExecution(format!(
+            "unknown field `{field}`"
+        ))),
+        (Ok(execution), None) => Ok(execution),
+    }
+}
+
+/// Serde's message without the list of what it expected, then where in the execution it failed, such as ``unknown variant `x` in `claim.request.command` ``.
+fn unreadable_part(path: &str, message: &str) -> String {
+    let head: &str = message.split(", expected").next().unwrap_or(message);
+    match path {
+        "" | "." => head.to_owned(),
+        path => format!("{head} in `{path}`"),
+    }
+}
+
 impl WorkerClient {
-    /// Fetch the launcher's immutable request, not the location's latest deployment.
+    /// Fetch the launcher's immutable request, not the location's latest deployment; a field this release can't read refuses it rather than run part of what was asked.
     pub async fn execution(&self) -> Result<RunExecution, WorkerError> {
-        let execution: RunExecution = client_response(
+        let body: serde_json::Value = client_response(
             self.connection
                 .client
                 .get(format!("{}execution", self.run_url)),
         )
         .await?;
+        let execution: RunExecution = read_execution(body)?;
         if execution.claim.request.run_id != self.run_id
             || execution.claim.claim_id != self.claim_id
         {

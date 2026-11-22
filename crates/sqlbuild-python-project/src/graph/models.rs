@@ -507,7 +507,7 @@ impl ProjectSelection {
     }
 
     /// The key a selected Python node's run reports under; a loader reports as the source it writes.
-    pub(crate) fn run_key(&self, name: &str) -> Option<String> {
+    pub fn run_key(&self, name: &str) -> Option<String> {
         let node = self
             .nodes
             .nodes

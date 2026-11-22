@@ -306,7 +306,7 @@ class SnapshotSqlDialect:
 
 @dataclass(frozen=True)
 class FunctionDefinition:
-    """Warehouse function definition inputs for create/render adapter methods."""
+    """Warehouse function definition inputs; `database` and `schema` place a temporary copy."""
 
     destination: str
     arguments: tuple[Any, ...]
@@ -319,6 +319,8 @@ class FunctionDefinition:
     packages: tuple[str, ...] = ()
     dataframe: str | None = None
     source_file_path: Path | None = None
+    database: str | None = None
+    schema: str | None = None
 
 
 @dataclass(frozen=True)

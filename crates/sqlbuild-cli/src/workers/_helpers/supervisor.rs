@@ -1,5 +1,6 @@
 //! One privileged owner supervises both launchers; workers receive only claim-scoped HTTP.
 
+use sqlbuild_core::process_environment::main::environment_without_env_file::environment_without_env_file;
 use std::io::Write;
 use std::process::{ExitStatus, Stdio};
 use std::time::{Duration, Instant};
@@ -25,6 +26,7 @@ use sqlbuild_process_ownership::ownership::main::{
 use tokio::process::Command;
 use uuid::Uuid;
 
+use crate::dev_stop::main::stop_switch::stop_switch;
 use crate::workers::_helpers::invocation::{arguments, environment, excluded};
 use crate::workers::constants::SLOW_SCHEDULER_CYCLE;
 use crate::workers::models::{
@@ -68,7 +70,8 @@ impl sqlbuild_orchestration::scheduler::types::RunLauncher for Workers {
             let worker = &mut self.active[index];
             let mut state = observe_run(store, worker.claim.request.run_id).await?;
             if let Some(child) = worker.child.as_mut() {
-                worker.exit = worker.exit.or(child.try_wait().await?);
+                let exit = child.try_wait().await?;
+                worker.record_exit(exit);
             }
             if worker.exit.is_none()
                 && let Some(child) = worker.child.as_mut()
@@ -92,7 +95,8 @@ impl sqlbuild_orchestration::scheduler::types::RunLauncher for Workers {
                     .is_some_and(|at| at.elapsed() >= Duration::from_secs(60))
                 {
                     child.kill().await?;
-                    worker.exit = child.try_wait().await?;
+                    let exit = child.try_wait().await?;
+                    worker.record_exit(exit);
                     state = observe_run(store, worker.claim.request.run_id).await?;
                 }
             }
@@ -225,6 +229,7 @@ impl Workers {
                     exit: None,
                     launch_failure: None,
                     recovered: false,
+                    group: None,
                 });
                 let worker = &mut self.active[index];
                 let claim = &worker.claim;
@@ -298,6 +303,10 @@ impl Workers {
                 .await?;
                 let launched = match local_command {
                     Some(command) => command.spawn().map(|child| {
+                        worker.group = child.id();
+                        if let Some(group) = worker.group {
+                            stop_switch().register_group(group);
+                        }
                         worker.child = Some(WorkerChild::Local(child));
                     }),
                     None => {
@@ -354,7 +363,7 @@ impl Workers {
     }
 }
 
-/// The worker holds its claim's ownership before it runs any code; other platforms never adopt.
+/// The worker holds its claim's ownership before it runs any code; other platforms never adopt. It leads its own process group, so a terminal's Ctrl+C reaches the server, not the worker, and stopping the worker stops everything it started.
 fn prepare_spawn(
     location: &LocalLauncher,
     claim: &RunClaim,
@@ -367,14 +376,20 @@ fn prepare_spawn(
         .arg(&location.project_dir)
         .current_dir(&location.project_dir)
         .env_clear()
-        .envs(std::env::vars_os().filter(|(key, _)| {
-            key.to_str()
-                .is_none_or(|key| !excluded(key, control_variable))
-        }))
+        .envs(
+            environment_without_env_file()
+                .into_iter()
+                .filter(|(key, _)| {
+                    key.to_str()
+                        .is_none_or(|key| !excluded(key, control_variable))
+                }),
+        )
         .envs(environment(claim, bearer))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(&mut command, 0);
     let (command, ownership) = prepare_worker(command, &location.claim(claim))?;
     let mut command = Command::from(command);
     command.kill_on_drop(true);
@@ -410,7 +425,26 @@ impl LocalSpawn {
     }
 }
 
+impl Drop for ClaimedWorker {
+    /// A worker dropped before its exit was seen no longer belongs to this scheduler's stop.
+    fn drop(&mut self) {
+        if let Some(group) = self.group.take() {
+            stop_switch().forget_group(group);
+        }
+    }
+}
+
 impl ClaimedWorker {
+    /// Record the worker's exit once it is seen; its process group may be reused from then on, so a forced stop, even one that retries shutdown while the store is away, must no longer signal it.
+    pub(in crate::workers) fn record_exit(&mut self, exit: Option<WorkerExit>) {
+        self.exit = self.exit.or(exit);
+        if self.exit.is_some()
+            && let Some(group) = self.group.take()
+        {
+            stop_switch().forget_group(group);
+        }
+    }
+
     pub(in crate::workers) async fn publish_launch_failure(
         &mut self,
         store: &ControlStore,

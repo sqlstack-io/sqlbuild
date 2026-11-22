@@ -76,6 +76,9 @@ pub(crate) async fn migrate_with(
                 for statement in statements(&sql) {
                     (transaction, _) = query(transaction, statement, vec![]).await?;
                 }
+                if let Some(step) = migration.step {
+                    transaction = step(transaction).await?;
+                }
             }
             if !pending.is_empty() && matches!(store, ControlStore::Sqlite(_)) {
                 let violations;

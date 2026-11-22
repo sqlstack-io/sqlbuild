@@ -271,6 +271,17 @@ for (const width of WIDTHS) {
 			});
 		}
 
+		// The two long lists fit their box at desktop widths: no sideways scrollbar for a few pixels of columns.
+		for (const path of ['/catalog', '/checks']) {
+			test(`${path}'s list does not scroll sideways`, async ({ page }) => {
+				await page.goto(awkward(path));
+				await settle(page);
+				const box = page.locator('.sb-table-scroll').first();
+				const [scroll, client] = await box.evaluate((el) => [el.scrollWidth, el.clientWidth]);
+				expect(scroll, `${path}: list ${scroll}px wide in a ${client}px box`).toBeLessThanOrEqual(client + 1);
+			});
+		}
+
 		// Cards drawn in full, so their status lines show: a job's node cards, and a group's folder and
 		// job cards. Zoomed in until cards aren't compact, as a narrow window may open them compact.
 		for (const path of ['/jobs/core_build', '/jobs/warehouse_nightly']) {

@@ -12,11 +12,9 @@ use crate::platform::main::health::report_location_health::report_location_healt
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::runs::main::listings::list_runs::list_runs;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
-use crate::sensors::main::{
-    begin_sensor_evaluation::begin_sensor_evaluation,
-    complete_builtin_sensor::complete_builtin_sensor,
-};
+use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
 use crate::sensors::tests::helpers::snapshot;
+use crate::sensors::tests::helpers::{complete_starting_job, drain_sensor};
 use crate::sensors::tests::test_types::SensorTestCase;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::SnapshotNode;
@@ -74,7 +72,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
             input.documents.insert(
                 "triggers".into(),
                 json!({"orders_changed": {
-                    "description": "Refresh orders after source data changes.", "job_key": "orders",
+                    "description": "Refresh orders after source data changes.", "function": "start_orders", "code_hash": "v1", "timeout_seconds": 60,
                     "when": {"kind": "source_new_data", "selection": ["source:raw_orders"]},
                     "minimum_interval_seconds": 1
                 }}),
@@ -183,7 +181,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 .await
                 .expect("triggers")
                 .remove(0);
-            let pending = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+            let pending = begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                 .await
                 .expect("evaluation")
                 .expect("due");
@@ -197,7 +195,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
             };
             install_fault(store, &fault).await;
             assert!(
-                complete_builtin_sensor(store, &lease, &pending)
+                complete_starting_job(store, &lease, &pending)
                     .await
                     .is_err()
             );
@@ -209,7 +207,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                     .is_empty()
             );
             assert_eq!(
-                begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+                begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                     .await
                     .expect("retry"),
                 Some(pending.clone())
@@ -217,7 +215,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
             assert_eq!(
                 tokio::time::timeout(
                     Duration::from_secs(5),
-                    complete_builtin_sensor(store, &lease, &pending)
+                    complete_starting_job(store, &lease, &pending)
                 )
                 .await
                 .expect("bounded source page")
@@ -225,21 +223,15 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 1
             );
             assert_eq!(
-                complete_builtin_sensor(store, &lease, &pending)
+                complete_starting_job(store, &lease, &pending)
                     .await
                     .expect("lost acknowledgement retry"),
                 0
             );
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            let second = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                .await
-                .expect("second page")
-                .expect("due");
             assert_eq!(
-                complete_builtin_sensor(store, &lease, &second)
-                    .await
-                    .expect("unchanged source versions"),
-                0
+                drain_sensor(store, &lease, trigger.trigger_id).await,
+                0,
+                "unchanged source versions"
             );
             let mut late = data["record"].as_object().expect("record").clone();
             late.extend(
@@ -259,16 +251,10 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
             ingest_source_freshness(store, (location, "development"), &batch)
                 .await
                 .expect("late commit");
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            let later = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                .await
-                .expect("late evaluation")
-                .expect("due");
             assert_eq!(
-                complete_builtin_sensor(store, &lease, &later)
-                    .await
-                    .expect("late warehouse time must not skip new receipt"),
-                1
+                drain_sensor(store, &lease, trigger.trigger_id).await,
+                1,
+                "late warehouse time must not skip new receipt"
             );
             let (transaction, _) = query(
                 begin(store, TransactionMode::Write)
@@ -301,16 +287,10 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
             ingest_source_freshness(store, (location, "development"), &batch)
                 .await
                 .expect("rebuild late fact");
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            let rebuilt = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                .await
-                .expect("rebuilt evaluation")
-                .expect("due");
             assert_eq!(
-                complete_builtin_sensor(store, &lease, &rebuilt)
-                    .await
-                    .expect("re-ingesting the same observations changes no version"),
-                0
+                drain_sensor(store, &lease, trigger.trigger_id).await,
+                0,
+                "re-ingesting the same observations changes no version"
             );
             assert_eq!(
                 list_runs(store, (location, "development"), 100)
@@ -365,7 +345,7 @@ fn given_a_source_version_that_returns_after_a_complete_scan_prunes_history_when
             input.documents.insert(
                 "triggers".into(),
                 json!({"orders_changed": {
-                    "description": "Refresh orders after source data changes.", "job_key": "orders",
+                    "description": "Refresh orders after source data changes.", "function": "start_orders", "code_hash": "v1", "timeout_seconds": 60,
                     "when": {"kind": "source_new_data", "selection": ["source:raw_orders"]},
                     "minimum_interval_seconds": 1
                 }}),
@@ -431,20 +411,7 @@ fn given_a_source_version_that_returns_after_a_complete_scan_prunes_history_when
                 )
                 .await
                 .expect("ingest observation");
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                let request = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                    .await
-                    .expect("evaluation")
-                    .expect("due");
-                complete_builtin_sensor(store, &lease, &request)
-                    .await
-                    .expect("complete");
-                assert_eq!(
-                    complete_builtin_sensor(store, &lease, &request)
-                        .await
-                        .expect("lost acknowledgement"),
-                    0
-                );
+                drain_sensor(store, &lease, trigger.trigger_id).await;
                 assert_eq!(
                     list_runs(store, (location, "development"), 100)
                         .await
@@ -521,7 +488,7 @@ fn given_timestamp_observations_when_age_crosses_the_boundary_then_scoped_pages_
                 );
             }
             input.documents.insert("triggers".into(), json!({"stale_orders": {
-                "description": "Refresh stale timestamp sources", "job_key": "orders",
+                "description": "Refresh stale timestamp sources", "function": "start_orders", "code_hash": "v1", "timeout_seconds": 60,
                 "when": {"kind": "source_stale", "selection": keys, "after_seconds": data["after_seconds"]},
                 "minimum_interval_seconds": 1
             }}));
@@ -547,15 +514,11 @@ fn given_timestamp_observations_when_age_crosses_the_boundary_then_scoped_pages_
                 .await
                 .expect("triggers")
                 .remove(0);
-            let first = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                .await
-                .expect("evaluation")
-                .expect("due");
+            let base = chrono::Utc::now();
             let mut records = Vec::new();
             for (ordinal, case) in data["cases"].as_array().expect("cases").iter().enumerate() {
                 let index = case["index"].as_u64().expect("index");
-                let instant = first.requested_at
-                    - TimeDelta::seconds(case["age_seconds"].as_i64().expect("age"));
+                let instant = base - TimeDelta::seconds(case["age_seconds"].as_i64().expect("age"));
                 let version = case["data_version"]
                     .as_str()
                     .map(str::to_owned)
@@ -583,7 +546,7 @@ fn given_timestamp_observations_when_age_crosses_the_boundary_then_scoped_pages_
                     value_kind: case["value_kind"].as_str().unwrap_or("timestamp").into(),
                     data_version: (!case["null"].as_bool().unwrap_or(false)).then_some(version),
                     data_version_hash: format!("orders-version-{index}"),
-                    observed_at: first.requested_at
+                    observed_at: base
                         + TimeDelta::microseconds(
                             case["observed_offset_microseconds"].as_i64().unwrap_or(0),
                         ),
@@ -609,12 +572,12 @@ fn given_timestamp_observations_when_age_crosses_the_boundary_then_scoped_pages_
                 sqlite_body: "SELECT RAISE(ABORT, 'injected stale cursor failure')",
                 postgres_body: "RAISE EXCEPTION 'injected stale cursor failure'",
             };
+            let first = begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
+                .await
+                .expect("evaluation")
+                .expect("a stale version is an event");
             install_fault(store, &fault).await;
-            assert!(
-                complete_builtin_sensor(store, &lease, &first)
-                    .await
-                    .is_err()
-            );
+            assert!(complete_starting_job(store, &lease, &first).await.is_err());
             remove_fault(store, &fault).await;
             assert!(
                 list_runs(store, (location, "development"), 100)
@@ -624,55 +587,42 @@ fn given_timestamp_observations_when_age_crosses_the_boundary_then_scoped_pages_
             );
             tokio::time::timeout(
                 Duration::from_secs(5),
-                complete_builtin_sensor(store, &lease, &first),
+                complete_starting_job(store, &lease, &first),
             )
             .await
-            .expect("bounded first page")
+            .expect("bounded first tick")
             .expect("complete");
+            tokio::time::timeout(
+                Duration::from_secs(5),
+                drain_sensor(store, &lease, trigger.trigger_id),
+            )
+            .await
+            .expect("bounded indexed source lookups");
+            let pages = data["later_pages"].as_array().expect("page outcomes");
+            let final_runs = pages.last().map_or(1, |page| {
+                page["expected_runs"].as_u64().expect("run count") as usize
+            });
+            let soon = list_runs(store, (location, "development"), 100)
+                .await
+                .expect("queued runs")
+                .len();
+            assert!(
+                soon == final_runs - 1
+                    || (soon == final_runs && chrono::Utc::now() - base >= TimeDelta::seconds(1)),
+                "{}: strict age threshold and current source binding; the version 59 seconds old isn't stale yet ({soon} runs)",
+                test_case.description
+            );
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            drain_sensor(store, &lease, trigger.trigger_id).await;
             assert_eq!(
                 list_runs(store, (location, "development"), 100)
                     .await
-                    .expect("first page")
+                    .expect("queued runs")
                     .len(),
-                1,
-                "{}: strict age threshold and current source binding",
+                final_runs,
+                "{}: two seconds later it is, and each version starts one run",
                 test_case.description
             );
-            for page in data["later_pages"].as_array().expect("page outcomes") {
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                let request = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                    .await
-                    .expect("next evaluation")
-                    .expect("due");
-                assert_eq!(
-                    request.cursor.custom.as_deref(),
-                    page["expected_cursor"].as_str(),
-                    "{}",
-                    test_case.description
-                );
-                tokio::time::timeout(
-                    Duration::from_secs(5),
-                    complete_builtin_sensor(store, &lease, &request),
-                )
-                .await
-                .expect("bounded indexed source lookup")
-                .expect("complete");
-                assert_eq!(
-                    list_runs(store, (location, "development"), 100)
-                        .await
-                        .expect("queued runs")
-                        .len(),
-                    page["expected_runs"].as_u64().expect("run count") as usize,
-                    "{}",
-                    test_case.description
-                );
-                assert_eq!(
-                    complete_builtin_sensor(store, &lease, &request)
-                        .await
-                        .expect("lost acknowledgement"),
-                    0
-                );
-            }
             let (transaction, _) = query(
                 begin(store, TransactionMode::Write)
                     .await
@@ -686,14 +636,7 @@ fn given_timestamp_observations_when_age_crosses_the_boundary_then_scoped_pages_
             ingest_source_freshness(store, (location, "development"), &batch)
                 .await
                 .expect("re-ingest observations");
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            let request = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                .await
-                .expect("rebuilt evaluation")
-                .expect("due");
-            complete_builtin_sensor(store, &lease, &request)
-                .await
-                .expect("replay stale conditions");
+            drain_sensor(store, &lease, trigger.trigger_id).await;
             assert_eq!(
                 list_runs(store, (location, "development"), 100)
                     .await

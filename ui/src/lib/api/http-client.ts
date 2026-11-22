@@ -8,7 +8,7 @@ import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-chec
 import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage, toNodeStates, toNodeStatusDelta } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
-import { manualConnectionTest, snapshotOf, toLocationDetail, toLocationSummary, toWarehouseConnection, warehouseSyncOf } from './http-locations';
+import { manualConnectionTest, missingSecretsEventOf, snapshotOf, toLocationDetail, toLocationSummary, toWarehouseConnection, warehouseSyncOf } from './http-locations';
 import { toAccount, toRoleAssignments, toServerSettings } from './http-people';
 import { toMaintenanceHistory } from './http-maintenance';
 import { toProviders } from './http-providers';
@@ -21,7 +21,7 @@ import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf
 import { toSelectionEvaluation, toSelectionVocabulary } from './http-selection';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
-import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
+import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, NewPasswordAccount, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape, AutomaticWithdrawal } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 import { newRequestId } from '$lib/browser/request-id';
@@ -66,6 +66,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'setTriggerStates',
 	'resetTriggerToDefault',
 	'resetSensorCursor',
+	'skipSensorEvent',
 	'listChecks',
 	'getCheck',
 	'getCheckSql',
@@ -82,6 +83,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'deleteRoleAssignment',
 	'disableAccount',
 	'enableAccount',
+	'createPasswordAccount',
 	'listLocations',
 	'getLocation',
 	'listPlatformEvents',
@@ -295,6 +297,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 	const healthRefused = new Set<string>();
 	// The node listing per location with the server's ETag; the server answers a repeat with 304 until the snapshot changes.
 	const listings = new Map<string, { etag: string; nodes: CatalogNode[] }>();
+	// The check list per location with the server's ETag; the server answers a repeat with 304 until a check result changes.
+	const checkLists = new Map<string, { etag: string; checks: Check[] }>();
 	// Statistics samples per relation, oldest first, with the cursor after the newest; a refresh reads only newer samples.
 	const samples = new Map<string, { records: Wire['WarehouseStatisticsRecord'][]; after: Wire['WarehouseMirrorCursor'] }>();
 	async function relationStatistics(scope: Scope, relation: { database: string | null; schema: string; name: string }): Promise<Wire['WarehouseStatisticsRecord'][]> {
@@ -813,6 +817,16 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		},
 		disableAccount: (name: string): Promise<Account> => changePerson(name, 'disable'),
 		enableAccount: (name: string): Promise<Account> => changePerson(name, 'enable'),
+		/** The server offers this only under password sign-in. */
+		async createPasswordAccount(request: NewPasswordAccount): Promise<Account> {
+			const { error, response } = await http.POST('/api/auth/password/people', {
+				body: { name: request.name, password: request.password, role: request.role },
+				params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+			return toAccount(await personNamed(request.name));
+		},
 		async getColumnLineage(scope: Scope, ref: string, listing?: CatalogNode[]): Promise<ColumnLineage | null> {
 			const nodes = listing ?? (await listingWithStates(scope));
 			const node = findNode(nodes, ref);
@@ -825,7 +839,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toColumnLineage(data, nodes);
 		},
-		async getCatalogNode(scope: Scope, ref: string, listing?: CatalogNode[]): Promise<CatalogNodeDetail | null> {
+		async getCatalogNode(scope: Scope, ref: string, listing?: CatalogNode[], checkList?: Check[]): Promise<CatalogNodeDetail | null> {
 			const nodes = listing ?? (await listingWithStates(scope));
 			const node = findNode(nodes, ref);
 			if (!node) return null;
@@ -836,7 +850,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				sqlLocations.has(scope.locationId) && !sqlRefused.has(`${scope.locationId}|${node.key}`)
 					? http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql', { params: { path: { ...path, node_key: node.key } } })
 					: null,
-				keptRead(`checks ${scope.locationId}`, () => checkResults(scope)).catch(() => []),
+				checkList ?? implemented.listChecks(scope).catch((): Check[] => []),
 				node.kind === 'source'
 					? null
 					: http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs', { params: { path: { ...path, node_key: node.key }, query: { limit: 100 } } }),
@@ -852,7 +866,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (status.response.status === 401 || sql?.response.status === 401 || runs?.response.status === 401) onUnauthorized();
 			if (sql?.response.status === 403) sqlRefused.add(`${scope.locationId}|${node.key}`);
 			// Status and SQL have their own permissions; a refusal leaves that part out rather than failing the page.
-			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks.map(toCheck), {
+			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks, {
 				runs: runs?.data ? toNodeRuns(runs.data) : null,
 				jobs,
 				statistics,
@@ -868,7 +882,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				implemented.listSnapshotChanges(scope, { limit: 100 }),
 				implemented.listPlatformEvents(),
 				acknowledgementsOf(scope),
-				attentionAcknowledgementsOf(scope)
+				attentionAcknowledgementsOf(scope),
+				// Missing provider secrets come from the target's own health; a refused or failed read leaves the item out and judges nothing.
+				locationHealth(scope.locationId)
+					.then(([health]) => (health.data ? { read: true, event: missingSecretsEventOf(scope.locationId, health.data) } : { read: false, event: null }))
+					.catch(() => ({ read: false, event: null })),
+				listedTriggers(scope)
 			]);
 			// Every listing needs view on all of the target, so a partial viewer gets no counts at all.
 			const read = await reads.catch((error: unknown) => {
@@ -876,10 +895,11 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 				throw error;
 			});
 			if (!read) return null;
-			const [runs, checks, nodes, changes, events, acknowledgements, conditions] = read;
-			return overviewOf({ runs, checks, nodes, changes, events, acknowledgements, conditions, now: Date.now(), scopeKey: scope.locationId });
+			const [runs, checks, nodes, changes, listed, acknowledgements, conditions, secrets, triggers] = read;
+			const events = secrets.event ? [...listed, secrets.event] : listed;
+			return overviewOf({ healthRead: secrets.read, runs, checks, nodes, changes, events, triggers, acknowledgements, conditions, now: Date.now(), scopeKey: scope.locationId });
 		},
-		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
+		listChecks: (scope: Scope, notBefore?: number): Promise<Check[]> => shared(`checks ${scope.locationId}`, () => checkListing(scope), notBefore),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
 		async getCheckSql(scope: Scope, checkId: string): Promise<CheckSql> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
@@ -933,6 +953,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			const detail = await implemented.getTrigger(scope, id);
 			if (!detail) throw new ApiError('The trigger is no longer published', 404);
 			return detail;
+		},
+		async skipSensorEvent(scope: Scope, id: string, eventId: string, reason: string): Promise<TriggerDetail> {
+			await changeTrigger(id, { kind: 'skip_event', event: eventId }, reason);
+			const detail = await implemented.getTrigger(scope, id);
+			if (!detail) throw new ApiError('The trigger is no longer published', 404);
+			return detail;
 		}
 	};
 
@@ -945,7 +971,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 	 * One request per listing at a time: pages that refresh together on a change notice share it
 	 * instead of each asking the server again. A write clears it, so reads after a write see it.
 	 */
-	const inFlight = new Map<string, Promise<unknown>>();
+	/** Reads in flight by key, with when each began (`performance.now()`). */
+	const inFlight = new Map<string, { read: Promise<unknown>; startedAt: number }>();
 	/** Windows of runs older than the newest, by the run each starts after; a mutation here forgets them. */
 	const olderWindows = new Map<string, Promise<Wire['RunRecord'][]>>();
 	function forgetPending() {
@@ -967,11 +994,13 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		return read;
 	}
 
-	function shared<T>(key: string, load: () => Promise<T>): Promise<T> {
-		const pending = inFlight.get(key) as Promise<T> | undefined;
-		if (pending) return pending;
-		const started: Promise<T> = load().finally(() => inFlight.get(key) === started && inFlight.delete(key));
-		inFlight.set(key, started);
+	/** Joins the read in flight under `key`, unless it began before `notBefore`, such as a change signal, and may miss it. */
+	function shared<T>(key: string, load: () => Promise<T>, notBefore = -Infinity): Promise<T> {
+		const pending = inFlight.get(key);
+		if (pending && pending.startedAt > notBefore) return pending.read as Promise<T>;
+		const startedAt = performance.now();
+		const started: Promise<T> = load().finally(() => inFlight.get(key)?.read === started && inFlight.delete(key));
+		inFlight.set(key, { read: started, startedAt });
 		return started;
 	}
 
@@ -1004,6 +1033,27 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		if (etag) listings.set(scope.locationId, { etag, nodes });
 		else listings.delete(scope.locationId);
 		return nodes;
+	}
+
+	/** Sends the held check list's ETag, so unchanged results come back as a 304 and are not sent or converted again. */
+	async function checkListing(scope: Scope): Promise<Check[]> {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const held = checkLists.get(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/checks', {
+			params: { path: { location_id: locationId, target } },
+			headers: held ? { 'if-none-match': held.etag } : undefined
+		});
+		if (response.status === 401) onUnauthorized();
+		if (response.status === 304 && held) return held.checks;
+		if (!data) {
+			if (isRefusalStatus(response.status)) checkLists.delete(scope.locationId);
+			throw new ApiError(errorText(error, response), response.status);
+		}
+		const checks = data.map(toCheck);
+		const etag = response.headers.get('etag');
+		if (etag) checkLists.set(scope.locationId, { etag, checks });
+		else checkLists.delete(scope.locationId);
+		return checks;
 	}
 
 	const listedJobs = (scope: Scope) => shared(`jobs ${scope.locationId}`, () => fetchJobs(scope));
@@ -1129,14 +1179,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		return [health, snapshots.data?.[0] ?? null] as const;
 	}
 
-	/** The newest result of every check, or one check's results newest first. */
-	async function checkResults(scope: Scope, bindingKey?: string) {
+	/** One check's results, newest first. */
+	async function checkResults(scope: Scope, bindingKey: string) {
 		const { locationId, target } = parseLocationKey(scope.locationId);
-		const { data, error, response } = bindingKey
-			? await http.GET('/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}', {
-					params: { path: { location_id: locationId, target, binding_key: bindingKey } }
-				})
-			: await http.GET('/api/control/locations/{location_id}/targets/{target}/checks', { params: { path: { location_id: locationId, target } } });
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}', {
+			params: { path: { location_id: locationId, target, binding_key: bindingKey } }
+		});
 		if (response.status === 401) onUnauthorized();
 		if (!data) throw new ApiError(errorText(error, response), response.status);
 		return data;

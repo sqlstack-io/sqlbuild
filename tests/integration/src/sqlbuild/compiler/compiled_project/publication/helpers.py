@@ -3,22 +3,34 @@
 from __future__ import annotations
 
 import base64
+import fcntl
 import gzip
 import hashlib
 import json
 import os
+import pty
 import random
+import re
 import secrets
 import select
 import signal
 import sqlite3
 import subprocess
 import sys
+import termios
 import time
 from collections.abc import Callable, Iterator
-from contextlib import AbstractContextManager, closing, contextmanager, nullcontext, suppress
+from contextlib import (
+    AbstractContextManager,
+    ExitStack,
+    closing,
+    contextmanager,
+    nullcontext,
+    suppress,
+)
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from io import StringIO
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -62,7 +74,10 @@ from sqlbuild.microbatches.classes.direct_store import DirectMicrobatchEventStor
 from sqlbuild.microbatches.classes.event_codec import MicrobatchEventCodec
 from sqlbuild.microbatches.constants import MICROBATCH_COLUMNS
 from sqlbuild.microbatches.models import MicrobatchEvent, MicrobatchWriteResult
-from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import duckshop_orchestration
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
+    PUBLISHABLE_FILES,
+    duckshop_orchestration,
+)
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ClaimedWorker,
     ScheduledWorker,
@@ -76,6 +91,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalo
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.docker.helpers import (
     docker_deployment,
 )
+from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person.helpers import (
+    person_login,
+    person_request,
+    provision_person,
+)
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 from tests.integration.src.sqlbuild.executor.audit_results.main.helpers import build_record
 
@@ -85,6 +105,37 @@ class RejectedPublicationOutput(StringIO):
 
     def write(self, text: str) -> int:
         raise OSError("synthetic publication result delivery failure")
+
+
+# A provider whose settings only the project's .env sets; the worker must see them.
+REGION_PROVIDER_FILES: dict[str, str] = {
+    "providers/region.py": (
+        "from pydantic import Field, SecretStr\n"
+        "from sqlbuild.providers import Provider\n\n\n"
+        "class Region(Provider):\n"
+        '    """Region settings from the environment."""\n'
+        "    token: SecretStr = Field(validation_alias='WORKER_ENV_TOKEN')\n"
+        "    code: int = Field(validation_alias='WORKER_ENV_REGION_CODE')\n"
+    ),
+    "sources/regions.yml": (
+        "sources:\n"
+        "  - name: raw_regions\n"
+        "    description: The region code the provider reads.\n"
+        "    managed: true\n"
+        "    write_strategy: table\n"
+        "    columns:\n"
+        "      - name: code\n"
+        "        type: BIGINT\n"
+    ),
+    "python/loaders/regions.py": (
+        "from providers.region import Region\n"
+        "from sqlbuild.loaders import loader\n\n\n"
+        "@loader\n"
+        "def raw_regions(ctx, region: Region):\n"
+        '    """Load the provider\'s region code."""\n'
+        "    return [{'code': region.code}]\n"
+    ),
+}
 
 
 @contextmanager
@@ -108,9 +159,9 @@ def location_process(
 
 
 def stop_location(process: subprocess.Popen[bytes], interpreter_pid: int, log: Path) -> None:
-    """Exercise graceful supervisor shutdown and prove its interpreter was reaped."""
+    """Exercise graceful `sqb dev` shutdown on SIGTERM and prove its interpreter was reaped."""
     process.send_signal(signal.SIGTERM)
-    assert process.wait(timeout=15) == 0, log.read_text()
+    assert process.wait(timeout=15) == 128 + signal.SIGTERM, log.read_text()
     with pytest.raises(ProcessLookupError):
         os.kill(interpreter_pid, 0)
 
@@ -564,11 +615,11 @@ def wait_for_log_count(
 def wait_for_development_ready(
     process: subprocess.Popen[bytes], log: Path, *, timeout: float = 60
 ) -> tuple[str, str]:
-    """The UI URL and location ID from `sqb dev`'s plain `ready` and `location` lines."""
-    wait_for_log(process, log, "sqlbuild dev: ready ", timeout=timeout)
+    """The UI URL and location ID from `sqb dev`'s plain `ready` block."""
+    wait_for_log(process, log, "  location   ", timeout=timeout)
     text: str = log.read_text()
-    url: str = text.partition("sqlbuild dev: ready ")[2].splitlines()[0]
-    identity: str = text.partition("sqlbuild dev: location ")[2].split()[0]
+    url: str = text.partition("\u2713 ready  ")[2].splitlines()[0]
+    identity: str = text.partition("  location   ")[2].split()[0]
     return url, identity
 
 
@@ -900,6 +951,8 @@ def scheduled_worker(
     test_case: WorkerExecutionTestCase,
     *,
     server_arguments: tuple[str, ...] = (),
+    serve_sensors: bool = True,
+    scheduler_settings: dict[str, Any] | None = None,
 ) -> Iterator[ScheduledWorker]:
     """Declare, publish and schedule isolated DuckDB work without provisioning claims."""
     project: Path = directory / "project"
@@ -975,7 +1028,7 @@ def scheduled_worker(
         )
         write_server_config(
             configuration,
-            {"launchers": {deployment.kind: [launcher]}},
+            {"launchers": {deployment.kind: [launcher]}} | (scheduler_settings or {}),
         )
         control_store: Path = directory / "control/.sqlbuild/control.sqlite3"
         with sqlite3.connect(control_store) as control:
@@ -991,18 +1044,48 @@ def scheduled_worker(
             "http://127.0.0.1:1/audit?token=synthetic-audit-credential",
         )
         log: Path = directory / "scheduler.log"
-        with location_process(
-            [
-                executable,
-                "scheduler",
-                "--database-env",
-                "SQLBUILD_SCHEDULER_TEST_STORE",
-                "--config",
-                str(configuration),
-            ],
-            log,
-            directory / "scheduler.stdout",
-        ) as process:
+        serves: bool = serve_sensors and any(
+            path.startswith("orchestration/sensors/") for path in test_case.files
+        )
+        locations: dict[bool, Callable[[], AbstractContextManager[object]]] = {
+            True: partial(
+                location_process,
+                [
+                    executable,
+                    "--project-dir",
+                    str(project),
+                    "location",
+                    "serve",
+                    "--server",
+                    api.url,
+                    "--location-id",
+                    api.location_id,
+                    "--target",
+                    "development",
+                ],
+                directory / "location.log",
+                directory / "location.stdout",
+                env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+            ),
+            False: nullcontext,
+        }
+        with ExitStack() as serving:
+            # A project with sensors gets a serving location, which runs their functions.
+            _ = serving.enter_context(locations[serves]())
+            process: subprocess.Popen[bytes] = serving.enter_context(
+                location_process(
+                    [
+                        executable,
+                        "scheduler",
+                        "--database-env",
+                        "SQLBUILD_SCHEDULER_TEST_STORE",
+                        "--config",
+                        str(configuration),
+                    ],
+                    log,
+                    directory / "scheduler.stdout",
+                )
+            )
             yield ScheduledWorker(api, project, control_store, process, log, deployment.docker)
 
 
@@ -1987,8 +2070,41 @@ def failed_load(tmp_path: Path, project: Path) -> tuple[dict[str, Any], int, str
     return report["report"]["health"], missing.value.code, log.read_text()
 
 
+def provider_secrets_health(tmp_path: Path, project: Path) -> tuple[dict[str, Any], str]:
+    """Serve `project` until it reports which providers miss secrets: that health and the log."""
+    log: Path = tmp_path / "location.log"
+    with (
+        snapshot_api(tmp_path / "control") as api,
+        location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location,
+    ):
+        report: dict[str, Any] = wait_for_location_health(
+            api, "development", {"kind": "provider_secrets"}, location, log
+        )
+    return report["report"]["health"], log.read_text()
+
+
 def plan_before_sync(
-    tmp_path: Path, project: Path, settings: dict[str, object]
+    tmp_path: Path,
+    project: Path,
+    settings: dict[str, object],
+    selection: tuple[str, ...] = (),
 ) -> tuple[dict[str, Any], str]:
     """Serve `project` until it publishes, then plan from its copy without waiting for a sync."""
     control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
@@ -2015,6 +2131,278 @@ def plan_before_sync(
         ) as location,
     ):
         _ = wait_for_generation(api, "dev", 1, location, log)
-        request_id: str = request_plan(control, [], settings)
+        request_id: str = request_plan(control, list(selection), settings)
         result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
     return result["result_json"]["outcome"], log.read_text()
+
+
+def development_environment(extra: dict[str, str], unset: frozenset[str]) -> dict[str, str]:
+    """This environment with `extra` and `TERM=xterm`, less `unset` and the platform webhook."""
+    environment: dict[str, str] = dict(os.environ) | {"TERM": "xterm"} | extra
+    dropped: frozenset[str] = unset | {"SQLBUILD_PLATFORM_WEBHOOK_URL"}
+    return dict(filter(lambda item: item[0] not in dropped, environment.items()))
+
+
+def start_development_on_terminal(
+    project: Path, arguments: list[str], environment: dict[str, str]
+) -> tuple[int, subprocess.Popen[bytes]]:
+    """`sqb dev` for `project` on a new 80x24 controlling terminal: its controller, the process."""
+    terminal, attached = pty.openpty()
+    termios.tcsetwinsize(attached, (24, 80))
+    process: subprocess.Popen[bytes] = subprocess.Popen(
+        [
+            str(Path(sys.executable).with_name("sqb")),
+            "dev",
+            "--project-dir",
+            str(project),
+            "--port",
+            "0",
+            *arguments,
+        ],
+        stdin=attached,
+        stdout=attached,
+        stderr=attached,
+        env=environment,
+        start_new_session=True,
+        preexec_fn=_take_terminal,
+    )
+    os.close(attached)
+    return terminal, process
+
+
+def _take_terminal() -> None:
+    """In the child, after `setsid`: the terminal on stdin becomes the session's terminal."""
+    fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+
+def drain_terminal(terminal: int) -> str:
+    """What is left to read on `terminal` once its process has exited."""
+    written: bytes = b""
+    with suppress(OSError):
+        while select.select([terminal], [], [], 0.2)[0] and (chunk := os.read(terminal, 65536)):
+            written += chunk
+    return written.decode(errors="replace")
+
+
+def _command_line(process_directory: Path) -> str:
+    """A `/proc/<pid>` directory's command line, empty once the process is gone."""
+    with suppress(OSError):
+        return (process_directory / "cmdline").read_bytes().replace(b"\0", b" ").decode()
+    return ""
+
+
+def processes_naming(project: Path) -> list[str]:
+    """`<pid> <command line>` of every running process whose command line names `project`."""
+    running: list[Path] = list(filter(lambda entry: entry.name.isdigit(), Path("/proc").iterdir()))
+    commands: list[str] = [f"{entry.name} {_command_line(entry)}" for entry in running]
+    return list(filter(lambda command: str(project) in command, commands))
+
+
+def reap_development(process: subprocess.Popen[bytes], project: Path) -> list[str]:
+    """Kill `process` if it still runs, then any process left naming `project`; return those."""
+    process.kill()
+    _ = process.wait(timeout=5)
+    time.sleep(0.5)
+    left: list[str] = processes_naming(project)
+    for line in left:
+        with suppress(ProcessLookupError):
+            os.kill(int(line.split()[0]), signal.SIGKILL)
+    return left
+
+
+def statement_started(control: Path) -> bool:
+    """Whether a worker has sent the endless `range(10000000000)` statement to the warehouse."""
+    with sqlite3.connect(control) as store:
+        return (
+            store.execute(
+                "SELECT 1 FROM recall_artifacts WHERE CAST(content AS TEXT) LIKE ?",
+                ("%range(10000000000)%",),
+            ).fetchone()
+            is not None
+        )
+
+
+# DuckDB whose statement cancellation leaves a mark, so a test sees the cancel path run.
+CANCEL_MARKING_ADAPTER: str = (
+    "import os\nfrom pathlib import Path\n"
+    "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
+    "class DuckDbCancelMarkingAdapter(DuckDbAdapter):\n"
+    "    adapter_name = 'duckdb_cancel_marking'\n\n"
+    "    def interrupt_connection(self, connection):\n"
+    "        with Path(os.environ['ORDERS_CANCELS']).open('a') as cancels:\n"
+    "            cancels.write(f'{os.getpid()}\\n')\n"
+    "        return super().interrupt_connection(connection)\n"
+)
+
+# A model whose one statement runs until it is cancelled.
+ENDLESS_ORDERS: str = (
+    "MODEL (description 'Typed orders.',\n"
+    "  columns (order_id (type INTEGER), amount (type BIGINT)),\n"
+    ");\n\n"
+    "SELECT CAST(1 AS INTEGER) AS order_id, CAST(sum(sin(value)) AS BIGINT) AS amount\n"
+    "FROM range(10000000000) t(value)\n"
+)
+
+
+def endless_build_files(project_toml: str) -> dict[str, str]:
+    """A dev project whose job runs one endless statement on a DuckDB that marks its cancels."""
+    return PUBLISHABLE_FILES | {
+        "sqlbuild_project.toml": project_toml.replace(
+            'adapter = "duckdb"', 'adapter = "duckdb_cancel_marking"'
+        ),
+        "adapters/duckdb_cancel_marking.py": CANCEL_MARKING_ADAPTER,
+        "models/orders.sql": ENDLESS_ORDERS,
+        **duckshop_orchestration("development_orders"),
+    }
+
+
+def request_development_run(project: Path, environment: dict[str, str]) -> tuple[Path, str]:
+    """Queue `annual_orders_job` in `project`'s running `sqb dev`: its control store and the run."""
+    control: Path = project / ".sqlbuild/control.sqlite3"
+    run_id: str = str(uuid4())
+    with closing(sqlite3.connect(control)) as store:
+        (location_id,) = store.execute(
+            "SELECT location_id FROM sqb_development_locations"
+        ).fetchone()
+    requested: subprocess.CompletedProcess[str] = subprocess.run(
+        [
+            str(Path(sys.executable).with_name("sqb")),
+            "--project-dir",
+            str(project),
+            "admin",
+            "request-run",
+            str(location_id),
+            "annual_orders_job",
+            "--target",
+            "development",
+            "--run-id",
+            run_id,
+            "--reason",
+            "A build to stop",
+        ],
+        env=environment | {"SQLBUILD_CONTROL_DATABASE_URL": str(control)},
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert requested.returncode == 0, requested.stderr
+    return control, run_id
+
+
+def development_run_state(control: Path, run_id: str) -> tuple[str, list[str]]:
+    """The run's status and the nodes it still holds write claims on."""
+    with closing(sqlite3.connect(control)) as store:
+        (status,) = store.execute(
+            "SELECT status FROM sqb_runs WHERE run_id = ?", (run_id,)
+        ).fetchone()
+        claims: list[str] = [
+            node
+            for (node,) in store.execute(
+                "SELECT node_key FROM sqb_write_claims WHERE run_id = ?", (run_id,)
+            ).fetchall()
+        ]
+    return status, claims
+
+
+def uncooperative_worker_pid(worker: ScheduledWorker) -> int:
+    """The process ID the uncooperative launcher's worker writes once it has started."""
+    pidfile: Path = worker.project / "worker.pid"
+    deadline: float = time.monotonic() + 15
+    while not pidfile.exists():
+        assert worker.process.poll() is None, worker.log.read_text()
+        assert time.monotonic() < deadline, worker.log.read_text()
+        time.sleep(0.02)
+    return int(pidfile.read_text())
+
+
+def request_identified_run(
+    executable: str, project: Path, identity: str, environment: dict[str, str]
+) -> str:
+    """Request a run of `annual_orders_job` from the development store; its run ID."""
+    run_id: str = str(uuid4())
+    requested: subprocess.CompletedProcess[str] = subprocess.run(
+        [
+            executable,
+            "--project-dir",
+            str(project),
+            "admin",
+            "request-run",
+            identity,
+            "annual_orders_job",
+            "--target",
+            "development",
+            "--run-id",
+            run_id,
+            "--reason",
+            "Development secret reload",
+        ],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert requested.returncode == 0, requested.stderr
+    return run_id
+
+
+def linked_project(project: Path) -> Path:
+    """A symlink to the project, beside it."""
+    link: Path = project.with_name(f"{project.name}_link")
+    link.symlink_to(project, target_is_directory=True)
+    return link
+
+
+def latest_redraw(shown: str) -> str:
+    """The rows the live screen drew last, uncoloured: everything after its last clear."""
+    return re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", shown.rsplit("\x1b[J", 1)[-1])
+
+
+def worker_printed(control_store: Path, run_id: str) -> tuple[str, frozenset[str]]:
+    """What the run's workers printed, both streams in order, and their Recall event types."""
+    invocations: str = (
+        "SELECT invocation_id FROM recall_invocations WHERE invocation_id LIKE 'worker/%' "
+        "AND json_extract(external_context, '$.run_id')=?"
+    )
+    with sqlite3.connect(control_store) as control:
+        printed: str = "".join(
+            data
+            for (data,) in control.execute(
+                "SELECT CAST(data AS TEXT) FROM recall_output "
+                f"WHERE invocation_id IN ({invocations}) ORDER BY occurred_at, sequence",
+                (run_id,),
+            ).fetchall()
+        )
+        events: frozenset[str] = frozenset(
+            event_type
+            for (event_type,) in control.execute(
+                "SELECT DISTINCT event_type FROM recall_events "
+                f"WHERE invocation_id IN ({invocations})",
+                (run_id,),
+            ).fetchall()
+        )
+    return printed, events
+
+
+def launch_adhoc(worker: ScheduledWorker, command: list[str]) -> dict[str, Any]:
+    """Launch `command` as an admin's ad-hoc run on `worker`'s location: the run once it ends."""
+    admin: dict[str, Any] = provision_person(
+        worker.control_store.parent.parent, "create-user", "orders-admin"
+    )
+    session: tuple[str, str] = person_login(worker.api, admin["name"])
+    run_id: str = str(uuid4())
+    assert person_request(
+        worker.api,
+        "/api/control/runs/adhoc",
+        body={
+            "location_id": worker.api.location_id,
+            "target": "development",
+            "run_id": run_id,
+            "command": command,
+            "reason": "Check the worker's output",
+            "priority": 0,
+        },
+        session=session,
+    ) == {"applied": True}
+    return wait_for_run(worker.api, worker.process, worker.log, run_id=run_id)

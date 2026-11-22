@@ -37,6 +37,7 @@ pub async fn read_person_job(
         return Ok(None);
     };
     let (transaction, definitions) = frozen_definitions(transaction, snapshot_id).await?;
+    let definitions = definitions?;
     let (kind, job, members) = match (
         definitions.jobs.get(job_key),
         definitions.groups.get(job_key),

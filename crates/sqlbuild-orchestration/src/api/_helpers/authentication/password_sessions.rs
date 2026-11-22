@@ -14,8 +14,9 @@ use crate::api::errors::ApiError;
 use crate::api::main::parse_origin::parse_origin;
 use crate::api::models::{
     AuthenticationDenial, BrowserLoginMethod, BrowserOrigin, PasswordChangeRequest,
-    PasswordLoginRequest, PasswordSessionResponse,
+    PasswordLoginRequest, PasswordPersonRequest, PasswordSessionResponse, PersonCreated,
 };
+use crate::authorization::main::people::create_password_person::create_password_person;
 use crate::credentials::constants::LOGIN_WINDOW_SECONDS;
 use crate::credentials::main::{
     audit::reserve_authentication_attempt::reserve_authentication_attempt,
@@ -193,6 +194,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_reads::sensor_state),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/sensors/{name}/events",
+            get(crate::api::_helpers::resources::person_reads::sensor_events),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/snapshots",
             get(crate::api::_helpers::resources::person_reads::snapshots),
         )
@@ -315,6 +320,7 @@ pub(crate) fn router(
     let protected = protected(store).merge(
         Router::new()
             .route("/api/auth/password", post(change_password))
+            .route("/api/auth/password/people", post(create_person))
             .route_layer(middleware::from_fn_with_state(store.clone(), authenticate)),
     );
     Ok(protected
@@ -433,6 +439,27 @@ pub(crate) async fn change_password(
     )
     .await?;
     clear_cookies()
+}
+
+#[utoipa::path(post, path = "/api/auth/password/people", operation_id = "createPasswordPerson",
+    params(("x-sqb-csrf" = String, Header, description = "Session CSRF token")),
+    request_body = PasswordPersonRequest,
+    responses((status = 200, body = PersonCreated), (status = 400, body = crate::api::models::ApiErrorBody),
+        (status = 401, body = AuthenticationDenial), (status = 403, body = crate::api::models::ApiErrorBody)),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn create_person(
+    State(store): State<ControlStore>,
+    Extension(context): Extension<AuditContext>,
+    Extension(identity): Extension<SessionIdentity>,
+    Json(request): Json<PasswordPersonRequest>,
+) -> Result<Json<PersonCreated>, ApiError> {
+    let principal_id = create_password_person(
+        &store,
+        (&context, identity.principal_id),
+        (&request.name, &request.password, request.role),
+    )
+    .await?;
+    Ok(Json(PersonCreated { principal_id }))
 }
 
 fn clear_cookies() -> Result<Response, ApiError> {

@@ -9,10 +9,8 @@ _REASON_SUFFIX: str = "."
 
 
 @sensor(
-    "shipment_backlog_sensor",
     description="Rebuild shipments when the backlog grows.",
-    run="restock_shipments_job",
     minimum_interval_seconds=60,
 )
-def shipment_backlog(ctx: SensorContext) -> SkipReason:
+def shipment_backlog_sensor(ctx: SensorContext[None]) -> SkipReason:
     return SkipReason(prefixed(BACKLOG_REASON) + _REASON_SUFFIX)

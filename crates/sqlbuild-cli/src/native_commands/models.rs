@@ -1,5 +1,6 @@
 //! Python-free commands, the invocation facts they run with and what they print.
 
+use sqlbuild_orchestration::platform::models::PublishedGeneration;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -9,6 +10,7 @@ use sqlbuild_orchestration::credentials::models::CredentialScope;
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWorkRequest, WarehouseReadFailure};
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
+use sqlbuild_orchestration::sensors::models::SensorEventChoice;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
     MetadataBatch, StatisticsRead, WarehouseHistoryFailure, WarehouseHistoryKind,
@@ -18,7 +20,6 @@ use uuid::{NoContext, Timestamp, Uuid};
 
 use crate::argv::models::Namespace;
 use crate::native_commands::constants::{METADATA_FAILURE_LIMIT, METADATA_POLL_SECONDS};
-use crate::native_commands::types::LocationPublication;
 
 /// Privileged local operations require direct ownership of the control database.
 pub(crate) enum ControlAdmin {
@@ -200,7 +201,7 @@ pub(crate) struct LocationCompileRequest {
 /// The runtime's reply to a generation: its publication, or the rule findings that failed its compile.
 #[derive(Debug, serde::Deserialize)]
 pub(crate) struct LocationLoad {
-    pub(crate) published: Option<LocationPublication>,
+    pub(crate) published: Option<PublishedGeneration>,
     pub(crate) rules: Option<sqlbuild_orchestration::platform::models::LocationRuleFailure>,
 }
 
@@ -287,6 +288,8 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) applied: bool,
     /// The generation was published after the last plan of what changed, which waits for this sync.
     pub(crate) replan: bool,
+    /// Per state location, the pause table's change token after a resume pass left no hold open.
+    pub(crate) dynamic_quiet_tokens: std::collections::BTreeMap<WarehouseStateLocation, String>,
 }
 
 /// Rows delivered and time taken by the current synchronization and its current table.
@@ -574,6 +577,11 @@ pub(crate) struct PlanKey {
     pub(crate) select: Vec<String>,
     /// Whether the plan read the copy's consumption.
     pub(crate) consumption: bool,
+    /// The jobs the request pins, with the nodes and settings each gives.
+    pub(crate) jobs:
+        std::collections::BTreeMap<String, sqlbuild_orchestration::runs::models::PinnedJob>,
+    /// The settings the request's command gives, which replace the pinned jobs' own.
+    pub(crate) given: std::collections::BTreeSet<String>,
 }
 
 /// One finished plan, kept as the JSON text of its document and of the diffs beside it.
@@ -612,4 +620,38 @@ pub(crate) struct HeldCopy {
     pub(crate) version: String,
     pub(crate) consumption: bool,
     pub(crate) path: PathBuf,
+}
+
+/// SIGINT, SIGTERM and SIGHUP, listened for from the first request to stop until the process ends, so a second is never missed.
+#[derive(Debug)]
+pub(crate) struct ShutdownSignals {
+    #[cfg(unix)]
+    pub(crate) interrupt: tokio::signal::unix::Signal,
+    #[cfg(unix)]
+    pub(crate) terminate: tokio::signal::unix::Signal,
+    #[cfg(unix)]
+    pub(crate) hangup: tokio::signal::unix::Signal,
+}
+
+/// Where the events come from: a server through the saved session, or a local `sqb dev` store.
+#[derive(Clone, Debug)]
+pub(crate) enum EventSource {
+    Server {
+        origin: String,
+        ca: Option<PathBuf>,
+        location_id: uuid::Uuid,
+    },
+    Development {
+        store_url: String,
+    },
+}
+
+/// One trial: the sensor, the project and target its code runs for, and how the event is chosen.
+#[derive(Clone, Debug)]
+pub(crate) struct SensorTrialArguments {
+    pub(crate) sensor: String,
+    pub(crate) project_dir: PathBuf,
+    pub(crate) target: String,
+    pub(crate) choice: SensorEventChoice,
+    pub(crate) source: EventSource,
 }

@@ -5,6 +5,7 @@ use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, ControlTransaction};
+use crate::store_migrations::_helpers::old_form_sensors::drop_old_form_sensors;
 use crate::store_migrations::_helpers::recall_schema::recall_schema;
 use crate::store_migrations::constants::{
     BASELINE_VERSION, POSTGRES_BASELINE_CHECKSUMS, SQLITE_BASELINE_CHECKSUMS,
@@ -19,16 +20,25 @@ pub(crate) const MIGRATIONS: &[StoreMigration] = &[
         name: "large_project_server",
         sqlite: include_str!("../sql/0002_large_project_server.sqlite.sql"),
         postgres: include_str!("../sql/0002_large_project_server.postgres.sql"),
+        step: None,
     },
     StoreMigration {
         name: "attention_acknowledgement_index",
         sqlite: include_str!("../sql/0003_attention_acknowledgement_index.sqlite.sql"),
         postgres: include_str!("../sql/0003_attention_acknowledgement_index.postgres.sql"),
+        step: None,
     },
     StoreMigration {
         name: "drop_concurrency_source",
         sqlite: include_str!("../sql/0004_drop_concurrency_source.sqlite.sql"),
         postgres: include_str!("../sql/0004_drop_concurrency_source.postgres.sql"),
+        step: None,
+    },
+    StoreMigration {
+        name: "sensor_functions",
+        sqlite: include_str!("../sql/0005_sensor_functions.sqlite.sql"),
+        postgres: include_str!("../sql/0005_sensor_functions.postgres.sql"),
+        step: Some(drop_old_form_sensors),
     },
 ];
 

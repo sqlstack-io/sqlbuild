@@ -8,7 +8,13 @@ from datetime import datetime
 from typing import Literal
 
 from sqlbuild._native import declaration_site
-from sqlbuild.orchestration_declarations.types import NodeEventKind, PlatformEventKind, RunEventKind
+from sqlbuild.orchestration_declarations.types import (
+    CheckEventKind,
+    NodeEventKind,
+    PlatformEventKind,
+    RunEventKind,
+    SensorResult,
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -64,6 +70,15 @@ class NodeEventCondition:
 
 
 @dataclass(frozen=True, kw_only=True)
+class CheckEventCondition:
+    """Match each check, audit or SQL test on the selected nodes failing or warning in a run."""
+
+    select: str
+    kinds: Sequence[CheckEventKind]
+    kind: Literal["check_event"] = field(default="check_event", init=False)
+
+
+@dataclass(frozen=True, kw_only=True)
 class SourceNewDataCondition:
     """Match the first non-null source version and later changed versions, in receipt order."""
 
@@ -80,45 +95,47 @@ class SourceStaleCondition:
     kind: Literal["source_stale"] = field(default="source_stale", init=False)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, kw_only=True, eq=False)
 class Sensor:
-    """Start a job for each matching event; event identity deduplicates replayed requests."""
+    """Decorate a function the location calls per event `when` matches, else every interval."""
 
-    name: str
-    description: str = field(kw_only=True)
+    description: str
     when: (
         PlatformEventCondition
         | RunEventCondition
         | NodeEventCondition
+        | CheckEventCondition
         | SourceNewDataCondition
         | SourceStaleCondition
         | None
-    ) = field(default=None, kw_only=True)
-    run: str = field(kw_only=True)
-    minimum_interval_seconds: int = field(default=30, kw_only=True)
-    default_status: Literal["running", "paused"] = field(default="running", kw_only=True)
-    targets: tuple[str, ...] = field(default=(), kw_only=True)
-    function: Callable[..., Iterable[RunRequest] | SkipReason] | None = field(
-        default=None, repr=False, kw_only=True
-    )
+    ) = None
+    name: str | None = None
+    minimum_interval_seconds: int = 30
+    timeout_seconds: int = 60
+    default_status: Literal["running", "paused"] = "running"
+    targets: tuple[str, ...] = ()
+    function: Callable[..., SensorResult] | None = field(default=None, repr=False)
     _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "_declared_at", declaration_site())
 
-    def __call__(self, function: Callable[..., Iterable[RunRequest] | SkipReason]) -> Sensor:
-        return replace(self, function=function)
+    def __call__(self, function: Callable[..., SensorResult]) -> Sensor:
+        return replace(
+            self, function=function, name=self.name or getattr(function, "__name__", None)
+        )
 
 
 @dataclass(frozen=True, kw_only=True)
 class RunRequest:
-    """A sensor-local key deduplicates requests across evaluations and retries."""
+    """Start `job` once per `run_key`, which defaults to the event's ID and the job."""
 
-    run_key: str
+    job: str
+    run_key: str | None = None
 
 
 @dataclass(frozen=True)
 class SkipReason:
-    """Complete an evaluation without starting a run."""
+    """Handle the event, or this poll, without starting a run, and say why."""
 
     reason: str

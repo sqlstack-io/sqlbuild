@@ -1,4 +1,4 @@
-//! One call depth for Polyglot and SQLQuack's shared and Snowflake parsers, not per-dialect ones.
+//! One call depth for Polyglot, SQLQuack's shared and Snowflake parsers and SQLClean's lint.
 
 pub mod constants;
 pub mod main;

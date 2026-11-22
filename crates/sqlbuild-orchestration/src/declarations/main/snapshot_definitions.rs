@@ -13,7 +13,7 @@ use crate::store::errors::ControlError;
 
 /// Names, references and resolved selections are checked again at the native trust boundary.
 pub fn snapshot_definitions(input: &SnapshotInput) -> Result<Definitions, ControlError> {
-    let definitions = decode_definitions(&input.documents)?;
+    let definitions = decode_definitions(&input.documents).map_err(ControlError::Invalid)?;
     limits_and_reasons(&definitions, input)?;
     for (name, job) in &definitions.jobs {
         if name.trim().is_empty()

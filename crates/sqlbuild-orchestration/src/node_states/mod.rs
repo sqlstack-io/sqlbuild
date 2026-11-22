@@ -4,4 +4,7 @@ pub(crate) mod _helpers;
 pub mod constants;
 pub mod main;
 pub mod models;
+#[cfg(test)]
+#[path = "../../tests/node_states/test_contracts.rs"]
+mod tests;
 pub(crate) mod types;

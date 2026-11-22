@@ -66,6 +66,7 @@ pub(crate) fn vocabulary(publication: &IndexedPublication) -> SelectionVocabular
     }
     let jobs: BTreeMap<String, u64> = publication
         .jobs
+        .selections
         .iter()
         .map(|(name, keys)| (name.clone(), keys.len() as u64))
         .collect();

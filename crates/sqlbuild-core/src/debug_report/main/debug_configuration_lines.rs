@@ -1,5 +1,6 @@
 //! The configuration section of `sqb debug`.
 
+use crate::debug_report::_helpers::env_file_line::env_file_line;
 use crate::debug_report::constants::{NOT_CONFIGURED, NOT_PRESENT};
 use crate::debug_report::models::{DebugLine, DebugProjectFacts, DebugStatus, WarehouseCheck};
 
@@ -53,6 +54,9 @@ pub fn debug_configuration_lines(
                 NOT_PRESENT
             },
         ),
+    ];
+    lines.extend(facts.env_file.as_ref().map(env_file_line));
+    lines.extend([
         resolved("project", &facts.project_name, "loaded"),
         resolved("adapter", &facts.adapter_name, "found"),
         resolved(
@@ -75,7 +79,7 @@ pub fn debug_configuration_lines(
             facts.schema.as_deref().unwrap_or(NOT_CONFIGURED),
             "resolved",
         ),
-    ];
+    ]);
     lines.extend(warehouses.iter().map(warehouse_line));
     lines
 }

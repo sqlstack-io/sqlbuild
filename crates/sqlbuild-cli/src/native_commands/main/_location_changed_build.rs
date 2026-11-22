@@ -1,6 +1,6 @@
 //! After each publish and each completed sync the location plans the web UI's "Build what changed" with the plan page's own path, from the synced copy, and reports what it runs.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 
 use sqlbuild_orchestration::node_states::constants::MAX_FAILING_REASON_CHARS;
@@ -47,7 +47,11 @@ pub(super) async fn report_changed_build(
     report("Planning what changed from the synced warehouse copy...\n");
     let Some(((document, diffs), keep)) = plan_location(
         (options, runtime),
-        (&BTreeSet::new(), &settings, false),
+        (
+            (&BTreeSet::new(), &BTreeMap::new()),
+            (&settings, &BTreeSet::new()),
+            false,
+        ),
         (client, session_id, generation),
         stopped,
     )

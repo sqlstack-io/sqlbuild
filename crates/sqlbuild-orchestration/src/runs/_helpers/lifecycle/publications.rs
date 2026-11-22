@@ -12,8 +12,10 @@ use crate::authorization::main::decisions::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::runs::constants::PUBLICATIONS_PER_TARGET;
-use crate::runs::models::{CachedPublication, PlannerResource, SnapshotSlot, SnapshotSlots};
-use crate::runs::types::{CommandPlanner, PublishedJobs};
+use crate::runs::models::{
+    CachedPublication, PlannerResource, PublishedJobs, SnapshotSlot, SnapshotSlots,
+};
+use crate::runs::types::CommandPlanner;
 use crate::snapshots::main::reads::read_current_record::read_current_record;
 use crate::snapshots::main::reads::read_kind_nodes::read_kind_nodes;
 use crate::snapshots::main::reads::read_snapshot_keys::read_snapshot_keys;
@@ -183,17 +185,30 @@ async fn read_publication(
     let (transaction, node_keys) = read_snapshot_keys(transaction, snapshot_id).await?;
     let (transaction, nodes) = read_kind_nodes(transaction, snapshot_id, &PLANNED_KINDS).await?;
     let (transaction, definitions) = frozen_definitions(transaction, snapshot_id).await?;
-    let jobs: PublishedJobs = definitions
-        .jobs
-        .into_iter()
-        .map(|(name, job)| (name, job.selection))
-        .chain(
-            definitions
-                .groups
-                .into_iter()
-                .map(|(name, group)| (name, group.job.selection)),
-        )
-        .collect();
+    let definitions = definitions?;
+    let jobs = PublishedJobs {
+        selections: definitions
+            .jobs
+            .iter()
+            .map(|(name, job)| (name.clone(), job.selection.clone()))
+            .chain(
+                definitions
+                    .groups
+                    .iter()
+                    .map(|(name, group)| (name.clone(), group.job.selection.clone())),
+            )
+            .collect(),
+        groups: definitions
+            .groups
+            .iter()
+            .map(|(name, group)| (name.clone(), group.jobs.keys().cloned().collect()))
+            .collect(),
+        settings: definitions
+            .jobs
+            .into_iter()
+            .map(|(name, job)| (name, job.settings))
+            .collect(),
+    };
     Ok((
         transaction,
         CachedPublication {

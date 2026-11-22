@@ -1,11 +1,15 @@
-//! Response bodies are serialized once, off the async workers: the node list once per snapshot, which also tags it, and the states once per view.
+//! Response bodies are serialized once, off the async workers: the node list once per snapshot, which also tags it, the states once per view, and the check list once per change, tagged by its content.
 
 use std::sync::Arc;
 
 use axum::body::Bytes;
+use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
+use uuid::Uuid;
 
+use crate::node_states::constants::CHECKS_TAG_DIGEST_CHARS;
 use crate::node_states::models::{CachedJson, NodeStatesRecord, TargetView};
 use crate::store::errors::ControlError;
+use crate::warehouse_history::models::CheckResult;
 
 /// The snapshot's node list without states; an empty list before the first publication.
 pub(crate) async fn nodes_json(view: &Arc<TargetView>) -> Result<CachedJson, ControlError> {
@@ -34,6 +38,28 @@ pub(crate) async fn states_json(view: &Arc<TargetView>) -> Result<CachedJson, Co
         .await?
         .clone();
     Ok(CachedJson { etag: None, body })
+}
+
+/// The check list, tagged by its snapshot and a digest of the body, so the same results give the same tag on any server.
+pub(crate) async fn checks_json(
+    snapshot_id: Option<Uuid>,
+    checks: Vec<CheckResult>,
+) -> Result<CachedJson, ControlError> {
+    let (body, digest) = tokio::task::spawn_blocking(move || {
+        let body = serde_json::to_vec(&checks)
+            .map_err(|error| ControlError::Invalid(error.to_string()))?;
+        let digest = sha256_hex(&body);
+        Ok::<_, ControlError>((Bytes::from(body), digest))
+    })
+    .await??;
+    let digest = &digest[..CHECKS_TAG_DIGEST_CHARS];
+    Ok(CachedJson {
+        etag: Some(match snapshot_id {
+            Some(snapshot_id) => format!("\"{snapshot_id}:{digest}\""),
+            None => format!("\"{digest}\""),
+        }),
+        body,
+    })
 }
 
 async fn serialized(

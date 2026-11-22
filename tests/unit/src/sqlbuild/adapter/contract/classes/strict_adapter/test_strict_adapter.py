@@ -96,6 +96,7 @@ def test_given_first_class_adapters_when_checking_contract_then_no_method_comes_
                     "render_drop_schema",
                     "render_dynamic_operation",
                     "render_track_changes",
+                    "session_schema",
                     "session_warehouse",
                     "use_session_warehouse",
                     "current_session_warehouse",
@@ -133,6 +134,7 @@ def test_given_strict_adapter_when_reading_optional_methods_then_defaults_keep_i
     assert temporary is test_case.expected_temporary_function
     assert drop_error.value.code == "A714"
     assert adapter.session_warehouse(connection=None) is None
+    assert adapter.session_schema(connection=None) is None
     with pytest.raises(AdapterUserError) as dynamic_error:
         adapter.render_create_dynamic(
             destination="main.daily_totals",

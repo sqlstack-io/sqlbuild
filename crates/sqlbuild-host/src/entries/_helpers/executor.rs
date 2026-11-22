@@ -859,4 +859,9 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         kind: HostKind::Function,
         edge: HostEdge::Executor,
     },
+    HostEntry {
+        name: "resume_expired_holds",
+        kind: HostKind::Function,
+        edge: HostEdge::Executor,
+    },
 ];
