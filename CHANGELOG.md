@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.258.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.257.0...v0.258.0) (2026-11-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* sensors as functions, provider secrets and a reworked sqb dev ([#1615](https://github.com/sqlstack-io/sqlbuild/issues/1615))
+* **deps:** This release changes sensors, provider settings, sqb dev, the control API and custom Rules.
+    - Sensors: `@sensor(description=..., when=...)` is always a decorator on the function it runs. The `sensor(..., run=...)` form, `run=` and the positional name are removed. The sensor is named after the function (or `name=`), returns `RunRequest(job=...)`, and its `SensorContext` carries `event`. Every sensor needs a serving location.
+    - Sensors: migration 0005 deletes old-form sensors' tick history and pending work, hides them until their location publishes again, and makes run keys unique per job.
+    - Provider settings: a default `.env` the parser rejects fails every command with exit 1. A provider field without a default counts as a required secret, whatever its type. Secret-typed fields with a default no longer appear in `sqb debug`.
+    - Location health: reports require the provider list, so the server rejects a report from an older location.
+    - Ad-hoc runs: run requests and plan work carry the named job's settings. An older location refuses those plans and runs such builds without the job's settings.
+    - Job concurrency: a published job's `resolved_concurrency` is `{limit}`. Its `source` and the `ConcurrencySource` schema are removed, and `sqb build --verbose` no longer names the source. Until a location publishes again, its job pages, group runs and ad-hoc runs fail.
+    - sqb dev: stopping cancels runs in flight, which can take up to 30 seconds. A second Ctrl+C or Ctrl+\ forces the stop. Ctrl+Z is unsupported. Exit statuses are 0 for q, 130 for Ctrl+C, 143 for SIGTERM, 129 for SIGHUP, 2 when it didn't start (including a failed first warehouse connection) and 1 when a service failed after it was ready.
+    - sqb dev: plain output uses the live screen's step, problem and event lines. NO_COLOR only turns colour off; use --plain for plain output. Typed sign-in input isn't echoed.
+    - sqb server: local workers run in their own process groups. A terminal's Ctrl+C reaches only the server, which stops them, and SIGHUP stops the server and scheduler like SIGTERM.
+    - Custom Rules: the syntax tree's kinds are snake_case, such as `cte`, `join`, `subquery` and `star`, `nodes(kind=...)` matches them exactly, and clause nodes are new parents of their contents.
+    - SQLClean: PostgreSQL, BigQuery and Databricks SQL nested more than 512 levels is reported as rules-unevaluated.
+
+### Features
+
+* **dev:** rework the sqb dev terminal, with prompt stops and full errors ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+* **location:** resume dynamic models whose build went silent after each completed sync ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+* **providers:** load provider settings from the project .env and stop runs that miss required secrets before they reach the warehouse ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+* **rules:** add clause nodes to the custom-rule syntax tree ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+* sensors as functions, provider secrets and a reworked sqb dev ([#1615](https://github.com/sqlstack-io/sqlbuild/issues/1615)) ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+* **sensors:** sensors are decorated functions, with operator skip, a trial command, masked provider secrets and per-sensor failure isolation ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+* **server:** apply a job's settings and permissions to ad-hoc builds and plan previews that name it ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+* **ui:** add people who sign in with passwords, edit roles inline, title every page and quiet the lineage hover ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+
+
+### Bug Fixes
+
+* **format:** format models whose whole body is one macro call on Snowflake ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+* **functions:** let Rules read partitioned Python table function calls ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+* **scheduler:** isolate unreadable snapshots, triggers and requests so each fails on its own ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+* **test:** test a function's current code or fail with T006, and read a partitioned call's fixture once ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+* **ui:** draw a plan's graph and fit the Checks list ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+* **worker:** refuse a run request the worker can't fully read and keep the JSON report out of run output ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+
+
+### Performance Improvements
+
+* **ui:** share and revalidate one check list per location ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+
+
+### Build System
+
+* **deps:** pin SQLQuack 0.22.1 and SQLClean 0.11.1 ([061df0f](https://github.com/sqlstack-io/sqlbuild/commit/061df0fb09a7b8f1c10f0be089d3f5d406b8d7aa))
+
 ## [0.257.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.256.0...v0.257.0) (2026-11-21)
 
 
