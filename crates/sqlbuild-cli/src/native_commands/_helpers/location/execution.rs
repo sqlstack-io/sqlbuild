@@ -352,20 +352,25 @@ pub(crate) async fn compile_generation(
                     "Location compiler failed; generation {generation} may already be published: {error}\n"
                 ),
             )]));
-            dev_failure(dev_events, generation, error);
+            dev_failure(dev_events, generation, error.clone());
             LocationLoad {
                 published: None,
                 rules: None,
                 discovered: Default::default(),
                 discover_files: Default::default(),
+                error: Some(error),
             }
         }
     };
     let Some((record, refresh, locations)) = load.published else {
-        if let Some(rules) = &load.rules {
-            dev_failure(dev_events, generation, rule_failure_text(rules));
+        let rules_text: Option<String> = load.rules.as_ref().map(rule_failure_text);
+        if let Some(text) = &rules_text {
+            dev_failure(dev_events, generation, text.clone());
         }
-        return Ok(Some(Err(load.rules)));
+        let error: String = rules_text.or(load.error).unwrap_or_else(|| {
+            "the compile failed; the location's output has the error".to_owned()
+        });
+        return Ok(Some(Err((load.rules, error))));
     };
     let refresh_at = refresh
         .map(|deadline| Instant::now() + (deadline - Utc::now()).to_std().unwrap_or_default());
@@ -388,7 +393,7 @@ pub(crate) async fn compile_generation(
             record.snapshot_id
         )));
     }
-    Ok(Some(Ok((refresh_at, locations))))
+    Ok(Some(Ok((refresh_at, locations, record.snapshot_id))))
 }
 
 /// Under `sqb dev`, tell the screen a generation failed; the last good generation keeps serving.
@@ -1866,8 +1871,8 @@ pub(crate) async fn finish_compile(
 ) -> Result<Option<Settled>, ControlError> {
     tokio::pin!(stopped);
     let (refresh_at, locations) = match load {
-        Ok(published) => published,
-        Err(rules) => {
+        Ok((refresh_at, locations, _)) => (refresh_at, locations),
+        Err((rules, _)) => {
             watch.retry_at = Some(Instant::now() + Duration::from_secs(30));
             tokio::select! {
                 result = &mut stopped => { result?; return Ok(None); },

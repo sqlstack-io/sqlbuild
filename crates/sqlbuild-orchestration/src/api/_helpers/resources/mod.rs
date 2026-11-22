@@ -16,6 +16,7 @@ pub(crate) mod person_node_sql;
 pub(crate) mod person_operations;
 pub(crate) mod person_plans;
 pub(crate) mod person_reads;
+pub(crate) mod person_republish;
 pub(crate) mod person_selection;
 pub(crate) mod plain_http;
 pub(crate) mod request_json;

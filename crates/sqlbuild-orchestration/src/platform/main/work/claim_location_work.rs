@@ -3,7 +3,7 @@
 use chrono::Duration;
 use uuid::Uuid;
 
-use crate::platform::constants::{PLAN_LEASE_SECONDS, WORK_LEASE_SECONDS};
+use crate::platform::constants::{PLAN_LEASE_SECONDS, REPUBLISH_LEASE_SECONDS, WORK_LEASE_SECONDS};
 use crate::platform::main::installation::require_instance::require_instance;
 use crate::platform::main::work::read_location_work::read_location_work;
 use crate::platform::models::{LocationWork, LocationWorkClaim, LocationWorkPoll};
@@ -28,16 +28,18 @@ pub async fn claim_location_work(
         "SELECT w.request_id FROM sqb_location_work w WHERE w.location_id=$1 AND w.target=$2 \
          AND w.expires_at>$3 AND w.completed_at IS NULL \
          AND (w.claimed_until IS NULL OR w.claimed_until<=$3 OR w.session_id=$4) \
-         AND (w.request_json->'work'->>'kind' IN ('check_connection','sync_warehouse','plan') OR EXISTS ( \
+         AND (($5<>'republish_only' AND w.request_json->'work'->>'kind' IN ('check_connection','sync_warehouse','plan')) \
+         OR ($5<>'standard' AND w.request_json->'work'->>'kind'='republish') OR ($5<>'republish_only' AND EXISTS ( \
          SELECT 1 FROM sqb_sensor_evaluation_events e JOIN sqb_triggers t ON t.trigger_id=e.trigger_id \
          JOIN sqb_trigger_state s ON s.trigger_id=t.trigger_id JOIN sqb_scheduler_lease l ON l.name='scheduler' \
          WHERE e.evaluation_id=w.request_id AND e.phase='requested' AND s.status='running' \
          AND t.snapshot_id=w.snapshot_id AND t.removed_in_snapshot_id IS NULL AND l.expires_at>$3 \
          AND l.epoch=CAST(e.fact_json->'request'->>'epoch' AS BIGINT) \
          AND NOT EXISTS (SELECT 1 FROM sqb_sensor_evaluation_events f \
-         WHERE f.evaluation_id=e.evaluation_id AND f.phase<>'requested'))) \
+         WHERE f.evaluation_id=e.evaluation_id AND f.phase<>'requested')))) \
          ORDER BY CASE WHEN w.request_json->'work'->>'kind'='plan' THEN 1 ELSE 0 END, w.requested_at, w.request_id LIMIT 1",
-        vec![Parameter::Id(location_id), Parameter::Text(poll.target.clone()), Parameter::Time(now), Parameter::Id(poll.session_id)]).await?;
+        vec![Parameter::Id(location_id), Parameter::Text(poll.target.clone()), Parameter::Time(now), Parameter::Id(poll.session_id),
+            Parameter::Text(poll.scope.as_str().to_owned())]).await?;
     let Some(row) = rows.first() else {
         commit(transaction).await?;
         return Ok(None);
@@ -48,6 +50,7 @@ pub async fn claim_location_work(
     let stored = stored.ok_or_else(|| ControlError::Invalid("location work disappeared".into()))?;
     let lease = match &stored.record.request_json.work {
         LocationWork::Plan { .. } => PLAN_LEASE_SECONDS,
+        LocationWork::Republish { .. } => REPUBLISH_LEASE_SECONDS,
         LocationWork::EvaluateSensor { evaluation } => {
             (2 * i64::from(evaluation.definition.timeout_seconds.get())).max(WORK_LEASE_SECONDS)
         }

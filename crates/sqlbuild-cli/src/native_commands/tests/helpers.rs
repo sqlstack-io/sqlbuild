@@ -1,3 +1,4 @@
+use sqlbuild_orchestration::platform::models::LocationWorkScope;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -122,6 +123,7 @@ pub(super) fn published_location(
     let poll = LocationWorkPoll {
         session_id: Uuid::nil(),
         target: options.target.clone(),
+        scope: LocationWorkScope::Standard,
     };
     let (_, metadata, _) = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -260,5 +262,6 @@ pub(super) fn discovered_load(ids: &[&str]) -> crate::native_commands::models::L
         )]
         .into(),
         discover_files: [("orders_plan".to_owned(), PLAN_FILE.to_owned())].into(),
+        error: None,
     }
 }

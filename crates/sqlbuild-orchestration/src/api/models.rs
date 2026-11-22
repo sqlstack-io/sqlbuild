@@ -7,8 +7,8 @@ use crate::api::_helpers::authentication::{cli_login, oidc};
 use crate::api::_helpers::resources::{
     administrators, audit, changed_builds, changes, location_health, location_work,
     person_bootstrap, person_checks, person_location_work, person_maintenance, person_node_sql,
-    person_operations, person_plans, person_reads, person_selection, run_reads, runs, snapshots,
-    trigger_reads, warehouse_metadata,
+    person_operations, person_plans, person_reads, person_republish, person_selection, run_reads,
+    runs, snapshots, trigger_reads, warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
@@ -75,6 +75,9 @@ use crate::api::_helpers::resources::{
     person_location_work::request,
     person_location_work::request_sync,
     person_location_work::result,
+    person_republish::request,
+    person_republish::read,
+    person_republish::discovered,
     person_plans::request,
     person_plans::read,
     person_plans::summary,
@@ -141,6 +144,13 @@ pub(crate) struct RunsQuery {
 pub(crate) struct PlatformEventsQuery {
     pub(crate) before: Option<i64>,
     pub(crate) limit: Option<u32>,
+}
+
+/// How long a republish request or read waits for its result, in seconds.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RepublishWaitQuery {
+    pub(crate) wait: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]

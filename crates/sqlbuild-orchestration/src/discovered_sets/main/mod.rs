@@ -1,3 +1,4 @@
+pub mod discovered_readback;
 pub mod discovery_health;
 pub mod discovery_summary;
 pub mod item_node_name;

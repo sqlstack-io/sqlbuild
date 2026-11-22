@@ -1,5 +1,6 @@
 //! A polling sensor's function answers over the real outbound HTTP boundary, which returns data, never scheduler authority.
 
+use crate::platform::models::LocationWorkScope;
 use std::time::Duration;
 
 use chrono::{TimeDelta, Utc};
@@ -94,6 +95,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
             let poll = LocationWorkPoll {
                 session_id: Uuid::now_v7(),
                 target: "development".into(),
+                scope: LocationWorkScope::Standard,
             };
             report_location_health(
                 store,

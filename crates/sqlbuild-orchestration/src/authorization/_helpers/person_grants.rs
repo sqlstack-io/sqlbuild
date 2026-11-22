@@ -12,7 +12,7 @@ use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 use crate::store::types::Row;
 
-const ACTIONS: [Action; 18] = [
+const ACTIONS: [Action; 19] = [
     Action::View,
     Action::ViewSql,
     Action::ViewEvidence,
@@ -28,6 +28,7 @@ const ACTIONS: [Action; 18] = [
     Action::SensorResetCursor,
     Action::RunAdhoc,
     Action::ConnectionTest,
+    Action::LocationRepublish,
     Action::UserManage,
     Action::RoleAssign,
     Action::AuditView,
@@ -41,13 +42,17 @@ pub(crate) enum GrantDecision {
 
 fn role_allows(role: BuiltinRole, action: Action) -> bool {
     use Action::{
-        ConnectionTest, JobRun, RunAdhoc, RunCancel, RunRerun, TriggerToggle, View, ViewSql,
+        ConnectionTest, JobRun, LocationRepublish, RunAdhoc, RunCancel, RunRerun, TriggerToggle,
+        View, ViewSql,
     };
     match role {
         BuiltinRole::Admin => true,
         BuiltinRole::Viewer => action == View,
         BuiltinRole::Operator => {
-            matches!(action, View | JobRun | RunCancel | RunRerun | TriggerToggle)
+            matches!(
+                action,
+                View | JobRun | RunCancel | RunRerun | TriggerToggle | LocationRepublish
+            )
         }
         BuiltinRole::Developer => matches!(
             action,
@@ -58,6 +63,7 @@ fn role_allows(role: BuiltinRole, action: Action) -> bool {
                 | ViewSql
                 | RunAdhoc
                 | ConnectionTest
+                | LocationRepublish
         ),
     }
 }

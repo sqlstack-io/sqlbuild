@@ -109,6 +109,7 @@ fn given_a_turn_of_location_work_when_scheduling_the_next_check_then_only_an_idl
             files: Vec::new(),
             sync: test_case.sync,
             claimed: test_case.claimed,
+            republish: None,
         };
         assert_eq!(
             next_work_check(&turn, now) - now,

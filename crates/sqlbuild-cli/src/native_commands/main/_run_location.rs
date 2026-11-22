@@ -1,5 +1,6 @@
 //! Coalesce source edits and retain the last good publication across isolated compiler failures.
 
+use sqlbuild_orchestration::platform::models::LocationWorkScope;
 use std::future::Future;
 use std::path::Path;
 use std::time::Duration;
@@ -18,12 +19,14 @@ use crate::native_commands::_helpers::command::paths::{
     exclude_location_databases, location_watch, observe_location_inputs,
 };
 use crate::native_commands::_helpers::command::terminal::write_output;
+use crate::native_commands::_helpers::location::execution::request_republish;
 use crate::native_commands::_helpers::location::execution::{
     apply_dev_controls, compile_next_generation, finish_compile,
 };
 use crate::native_commands::_helpers::location::execution::{
     dev_controls, location_clock, location_heartbeats, next_turn, shutdown_signal,
 };
+use crate::native_commands::_helpers::location::republish::{report_republish, republish_outcome};
 use crate::native_commands::_helpers::location::work::next_work_check;
 use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
 use crate::native_commands::main::_location_changed_build::report_changed_build;
@@ -32,6 +35,7 @@ use crate::native_commands::main::_location_metadata::sync_location_metadata;
 use crate::native_commands::main::_location_work::run_location_work;
 use crate::native_commands::models::{
     DevControlState, LocationMetadataSync, LocationRuntimeRequest, LocationServe, LocationWatch,
+    PendingRepublish,
 };
 use crate::native_commands::types::LoadOutcome;
 
@@ -46,12 +50,13 @@ pub(super) async fn run_location(
     let poll = LocationWorkPoll {
         session_id,
         target: options.target.clone(),
+        scope: LocationWorkScope::WithRepublish,
     };
     let (requests, receiver) = mpsc::channel(1);
     let (republisher, controls) = dev_controls(&options);
     let serving = async {
         tokio::select! {
-            result = watch_location(&options, script, (bearer, &client, &poll), (requests, controls)) => result,
+            result = watch_location(&options, script, (bearer, &client, &poll), (requests, controls, &republisher)) => result,
             result = location_heartbeats(&options, bearer, session_id) => result,
         }
     };
@@ -71,12 +76,14 @@ async fn watch_location(
     options: &LocationServe,
     script: &Path,
     (bearer, client, poll): (&str, &LocationWorkClient, &LocationWorkPoll),
-    (requests, mut controls): (
+    (requests, mut controls, republisher): (
         mpsc::Sender<LocationRuntimeRequest>,
         watch::Receiver<DevControlState>,
+        &watch::Sender<DevControlState>,
     ),
 ) -> Result<(), ControlError> {
     let mut watch = location_watch(&options.project_dir);
+    let mut owed: Option<PendingRepublish> = None;
     let mut recompiles: u64 = 0;
     let mut compiled_inputs: Option<Vec<PathStamp>> = None;
     let mut deferred_sync: Option<(Vec<WarehouseStateLocation>, i64)> = None;
@@ -126,6 +133,11 @@ async fn watch_location(
                 return Ok(());
             };
             (watch, work_at, metadata) = idle;
+            if let Some(claimed) = watch.republish.take() {
+                request_republish(republisher, true);
+                watch.retry_at = Some(Instant::now());
+                owed = Some(claimed);
+            }
             continue;
         }
         published_generation = None;
@@ -144,6 +156,14 @@ async fn watch_location(
             watch.retry_at = Some(Instant::now() + Duration::from_secs(5));
             continue;
         };
+        if let Some(claimed) = owed.take() {
+            report_republish(
+                (client, poll.session_id),
+                claimed,
+                republish_outcome(&load, generation),
+            )
+            .await;
+        }
         published_generation = match &load {
             Ok(_) => Some(generation),
             Err(_) => None,
@@ -187,6 +207,7 @@ async fn poll_location(
                 return Ok(None);
             };
             work_at = next_work_check(&turn, Instant::now());
+            watch.republish = turn.republish;
             watch = exclude_location_databases(&options.project_dir, turn.files, watch);
             if turn.sync
                 && let Some(state) = metadata.as_mut()

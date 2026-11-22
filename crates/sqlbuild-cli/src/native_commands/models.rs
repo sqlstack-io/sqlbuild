@@ -58,12 +58,22 @@ pub(crate) enum NativeParse {
     },
 }
 
-/// One turn of named work: the files it wrote, whether metadata should sync, and whether it claimed work.
+/// One turn of named work: the files it wrote, whether metadata should sync, whether it claimed work,
+/// and a republish the location now owes a result.
 #[derive(Debug, Default)]
 pub(crate) struct LocationWorkTurn {
     pub(crate) files: Vec<std::path::PathBuf>,
     pub(crate) sync: bool,
     pub(crate) claimed: bool,
+    pub(crate) republish: Option<PendingRepublish>,
+}
+
+/// A claimed republish: its result is reported after the next compile, before its lease ends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PendingRepublish {
+    pub(crate) request_id: uuid::Uuid,
+    pub(crate) claim_id: uuid::Uuid,
+    pub(crate) deadline: tokio::time::Instant,
 }
 
 /// What `sqb skills` installs.
@@ -190,6 +200,8 @@ pub(crate) struct LocationWatch {
     pub(crate) commit_checked_at: tokio::time::Instant,
     /// Whether a generation has published, so the next publication's connection check is not the startup check.
     pub(crate) checked: bool,
+    /// A republish just claimed, which the watch loop starts and owes a result.
+    pub(crate) republish: Option<PendingRepublish>,
 }
 
 /// A bounded supervisor request; dropping the reply cancels and reaps an active compiler.
@@ -211,6 +223,9 @@ pub(crate) struct LocationLoad {
     /// Each discover function's file, relative to the project.
     #[serde(default)]
     pub(crate) discover_files: std::collections::BTreeMap<String, String>,
+    /// Why nothing was published, redacted; absent after a publication or a rules failure.
+    #[serde(default)]
+    pub(crate) error: Option<String>,
 }
 
 /// A `{"plan": {"argv", "copy"}}` request for the runtime interpreter, answered with its reply.

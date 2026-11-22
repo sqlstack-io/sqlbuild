@@ -1,5 +1,6 @@
 //! People, requests and counts the plan contract builds on.
 
+use crate::platform::models::LocationWorkScope;
 use uuid::Uuid;
 
 use crate::authorization::main::roles::assign_builtin_role::assign_builtin_role;
@@ -82,6 +83,7 @@ pub(crate) async fn register_instance(store: &ControlStore, location: Uuid) -> L
     let poll = LocationWorkPoll {
         session_id: Uuid::now_v7(),
         target: "development".into(),
+        scope: LocationWorkScope::Standard,
     };
     report_location_health(
         store,

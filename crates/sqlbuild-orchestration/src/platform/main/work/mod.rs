@@ -5,4 +5,6 @@ pub mod connect_location_work;
 pub(crate) mod enqueue_location_work;
 pub mod location_work;
 pub(crate) mod read_location_work;
+pub mod read_republish;
 pub mod request_location_work;
+pub mod request_republish;

@@ -23,7 +23,8 @@ use crate::native_commands::_helpers::location::sensor_function::run_sensor_func
 use crate::native_commands::_helpers::location::work::work_error;
 use crate::native_commands::main::_location_plan::plan_location;
 use crate::native_commands::models::{
-    LocationRuntimeRequest, LocationServe, LocationWatch, LocationWorkTurn, PlanToKeep,
+    LocationRuntimeRequest, LocationServe, LocationWatch, LocationWorkTurn, PendingRepublish,
+    PlanToKeep,
 };
 
 /// Retry the exact completed result without rerunning it; a turn's `sync` asks the metadata loop to sync.
@@ -55,6 +56,25 @@ pub(super) async fn run_location_work(
         + (claim.lease_expires_at - Utc::now())
             .to_std()
             .unwrap_or_default();
+    if let LocationWork::Republish { requested_by } = &claim.request.work {
+        drop(write_output(&[(
+            Stream::Stderr,
+            &format!(
+                "Republishing at the request of {requested_by}: {}\n",
+                claim.request.reason
+            ),
+        )]));
+        return Ok(Some(LocationWorkTurn {
+            files: Vec::new(),
+            sync: false,
+            claimed: true,
+            republish: Some(PendingRepublish {
+                request_id: claim.request.request_id,
+                claim_id: claim.claim_id,
+                deadline,
+            }),
+        }));
+    }
     let mut files: Vec<PathBuf> = Vec::new();
     let outcome = if generation == Some(claim.generation)
         && location_files(&options.project_dir, &watch.rules, &watch.local_files)
@@ -84,6 +104,7 @@ pub(super) async fn run_location_work(
                 files,
                 sync: false,
                 claimed: true,
+                republish: None,
             }));
         };
         files = local_files;
@@ -126,6 +147,7 @@ pub(super) async fn run_location_work(
                     files,
                     sync,
                     claimed: true,
+                    republish: None,
                 }));
             }
             Err(error) => {
@@ -148,6 +170,7 @@ pub(super) async fn run_location_work(
         files,
         sync,
         claimed: true,
+        republish: None,
     }))
 }
 
@@ -167,9 +190,12 @@ async fn perform_work(
         LocationWork::SyncWarehouse {} => "Synchronizing warehouse history on request...\n",
         LocationWork::EvaluateSensor { .. } => "Running a sensor's function...\n",
         LocationWork::Plan { .. } => "Planning requested command...\n",
+        LocationWork::Republish { .. } => "Republishing on request...\n",
     };
     drop(write_output(&[(Stream::Stderr, message)]));
     Ok(match work {
+        // `run_location_work` hands a republish to the watch loop, which publishes it.
+        LocationWork::Republish { .. } => None,
         LocationWork::SyncWarehouse {} => {
             Some((LocationWorkOutcome::SyncStarted {}, Vec::new(), None))
         }

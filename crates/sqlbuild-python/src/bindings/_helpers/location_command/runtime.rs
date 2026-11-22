@@ -80,6 +80,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     let arguments = location_arguments(py, Some(options.clone()))?;
                     held = None;
                     discover_for_publication(&arguments, publication)?;
+                    let mut error_text: Option<String> = None;
                     let (published, rules) = match publish_location(py, &arguments) {
                         Ok(Ok((published, project))) => {
                             held = Some(project);
@@ -93,6 +94,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                             )?;
                             let failed = generation_failed(generation, error.to_string());
                             py.detach(|| emit_dev_event(&failed))?;
+                            error_text = Some(redact_error_text(&error.to_string()));
                             (None, None)
                         }
                     };
@@ -102,6 +104,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                         "rules": rules,
                         "discovered": discovered,
                         "discover_files": discover_files,
+                        "error": error_text,
                     }))
                 } else if request.get(CHECK_DISCOVERED_KEY).is_some() {
                     let check: DiscoveredSetCheck = serde_json::from_value(request.clone())

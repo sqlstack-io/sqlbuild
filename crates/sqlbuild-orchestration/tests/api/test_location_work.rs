@@ -5,6 +5,7 @@ use crate::platform::main::health::report_location_health::report_location_healt
 use crate::platform::main::work::connect_location_work::connect_location_work;
 use crate::platform::main::work::location_work::location_work;
 use crate::platform::main::work::request_location_work::request_location_work;
+use crate::platform::models::LocationWorkScope;
 use crate::platform::models::{
     LocationHealth, LocationHealthReport, LocationWork, LocationWorkOutcome, LocationWorkPoll,
     LocationWorkRecord, LocationWorkRequest, LocationWorkResult,
@@ -143,6 +144,7 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
             let poll = LocationWorkPoll {
                 session_id: Uuid::now_v7(),
                 target: request.target.clone(),
+                scope: LocationWorkScope::Standard,
             };
             assert!(worker.poll(&poll).await.is_err(), "register before polling");
             for session_id in [poll.session_id, Uuid::nil()] {

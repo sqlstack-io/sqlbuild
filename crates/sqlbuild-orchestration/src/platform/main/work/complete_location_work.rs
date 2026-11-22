@@ -7,17 +7,19 @@ use uuid::Uuid;
 use crate::platform::_helpers::plans::plan_diffs::{
     split_plan_diffs, store_plan_diffs, valid_plan_diffs,
 };
-use crate::platform::constants::PLAN_DOCUMENT_BYTES;
+use crate::platform::constants::{MAX_PUBLISH_ERROR_CHARS, PLAN_DOCUMENT_BYTES};
 use crate::platform::main::installation::require_instance::require_instance;
 use crate::platform::main::work::read_location_work::read_location_work;
-use crate::platform::models::{LocationWork, LocationWorkOutcome, LocationWorkResult};
+use crate::platform::models::{
+    LocationWork, LocationWorkOutcome, LocationWorkRequest, LocationWorkResult,
+};
 use crate::sensors::constants::MAX_SENSOR_RUN_REQUESTS;
 use crate::sensors::models::SensorFunctionOutcome;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::query::query;
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 
 pub async fn complete_location_work(
     store: &ControlStore,
@@ -63,7 +65,9 @@ pub async fn complete_location_work(
     {
         return Err(ControlError::Fenced);
     }
-    let valid = valid_outcome(&stored.record.request_json.work, &result.outcome);
+    let (transaction, published) =
+        published_here(transaction, &stored.record.request_json, &result.outcome).await?;
+    let valid = published && valid_outcome(&stored.record.request_json.work, &result.outcome);
     if !valid {
         return Err(ControlError::Invalid(
             "location result does not match its work".into(),
@@ -78,9 +82,42 @@ pub async fn complete_location_work(
     Ok(true)
 }
 
-/// Warehouse text in a plan's error and warnings, and a sensor's traceback, is redacted before it is compared or stored.
+/// Whether a republish's snapshot is one this location published for the work's target; true for other outcomes.
+async fn published_here(
+    transaction: ControlTransaction,
+    request: &LocationWorkRequest,
+    outcome: &LocationWorkOutcome,
+) -> Result<(ControlTransaction, bool), ControlError> {
+    let LocationWorkOutcome::Published {
+        snapshot_id,
+        generation,
+    } = outcome
+    else {
+        return Ok((transaction, true));
+    };
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT snapshot_id FROM sqb_snapshots WHERE snapshot_id=$1 AND location_id=$2 AND target=$3 AND generation=$4",
+        vec![
+            Parameter::Id(*snapshot_id),
+            Parameter::Id(request.location_id),
+            Parameter::Text(request.target.clone()),
+            Parameter::Integer(*generation),
+        ],
+    )
+    .await?;
+    Ok((transaction, !rows.is_empty()))
+}
+
+/// Warehouse text in a plan's error and warnings, a sensor's traceback and a publish error is redacted before it is compared or stored.
 fn redacted(result: &LocationWorkResult) -> LocationWorkResult {
     let mut result = result.clone();
+    if let LocationWorkOutcome::PublishFailed { error, .. } = &mut result.outcome {
+        *error = redact_error_text(error)
+            .chars()
+            .take(MAX_PUBLISH_ERROR_CHARS)
+            .collect();
+    }
     if let LocationWorkOutcome::SensorEvaluation {
         outcome: SensorFunctionOutcome::Failed { error },
     } = &mut result.outcome
@@ -110,7 +147,11 @@ fn valid_outcome(work: &LocationWork, outcome: &LocationWorkOutcome) -> bool {
     match (work, outcome) {
         (_, LocationWorkOutcome::Superseded {})
         | (LocationWork::CheckConnection {}, LocationWorkOutcome::Connection { .. })
-        | (LocationWork::SyncWarehouse {}, LocationWorkOutcome::SyncStarted {}) => true,
+        | (LocationWork::SyncWarehouse {}, LocationWorkOutcome::SyncStarted {})
+        | (LocationWork::Republish { .. }, LocationWorkOutcome::Published { .. }) => true,
+        (LocationWork::Republish { .. }, LocationWorkOutcome::PublishFailed { error, .. }) => {
+            !error.trim().is_empty()
+        }
         (LocationWork::Plan { .. }, LocationWorkOutcome::Plan { document, .. }) => {
             document
                 .as_object()
