@@ -134,13 +134,11 @@ impl DirectPythonLifecycle {
 
 impl DirectPythonLifecycle {
     fn report(&self, py: Python<'_>, results: &[Bound<'_, PyAny>]) -> PyResult<()> {
-        if results.is_empty() {
-            return Ok(());
-        }
-        for result in results {
-            self.base_on_node_complete.bind(py).call1((result,))?;
-        }
-        write_python_node_results(self.stream.bind(py), &tuple(py, results)?, self.use_color)
+        report_python_results(
+            (self.base_on_node_complete.bind(py), self.stream.bind(py)),
+            &tuple(py, results)?,
+            self.use_color,
+        )
     }
 
     /// Ingress results, then read-side results.
@@ -604,12 +602,11 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
         }
         tracker.call_method0("dispatch_ready_python_nodes")?;
         let initial: Bound<'py, PyAny> = native_field(&tracker, "results")?;
-        for result in initial.try_iter()? {
-            inputs.on_node_complete.call1((result?,))?;
-        }
-        if initial.is_truthy()? {
-            write_python_node_results(&context.stream, &initial, context.use_color)?;
-        }
+        report_python_results(
+            (&inputs.on_node_complete, &context.stream),
+            &initial,
+            context.use_color,
+        )?;
         read_side_tracker = Some(tracker.unbind());
     }
     let (round_trip_gates, round_trip_waits) = round_trip_ordering(&lifecycle, &plan_output)?;
@@ -632,6 +629,21 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             include_python,
         },
     )
+}
+
+/// Tell the build's callback, and through it the run, about finished Python nodes, then print them.
+fn report_python_results(
+    (on_node_complete, stream): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    results: &Bound<'_, PyAny>,
+    use_color: bool,
+) -> PyResult<()> {
+    if !results.is_truthy()? {
+        return Ok(());
+    }
+    for result in results.try_iter()? {
+        on_node_complete.call1((result?,))?;
+    }
+    write_python_node_results(stream, results, use_color)
 }
 
 type RoundTripGates = HashMap<String, Vec<(ObjectKey, bool)>>;
