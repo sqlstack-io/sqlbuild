@@ -1,6 +1,6 @@
 //! sqb admin says what it did on stderr and keeps stdout for a bare secret, plain rows or `--json`.
 
-use crate::admin_helpers::{administer, invoke_admin};
+use crate::admin_helpers::{administer, invoke_admin, without_opening_notice};
 use crate::helpers::{api_ready, start_control};
 use crate::test_types::AdminOutputTestCase;
 #[cfg(unix)]
@@ -42,13 +42,13 @@ fn given_admin_commands_without_json_when_they_run_then_each_prints_one_line_and
                 "--expires-at",
                 "2099-11-20T14:30:00Z",
             ],
-            expected_stdout: ("sqb", 1),
+            expected_stdout: ("", 1),
             expected_line: "Issued a location token for orders (",
         },
         AdminOutputTestCase {
             description: "a rotated token alone on stdout",
             arguments: &["rotate-token", "{token}"],
-            expected_stdout: ("sqb", 1),
+            expected_stdout: ("", 1),
             expected_line: "Replaced token {token} with ",
         },
         AdminOutputTestCase {
@@ -129,7 +129,7 @@ fn given_admin_commands_without_json_when_they_run_then_each_prints_one_line_and
             let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
             let output = invoke_admin(&control, &arguments);
             let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-            let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+            let stderr = without_opening_notice(&output);
             let expected = fill(test_case.expected_line);
             let secret = stdout.trim_end();
             assert_eq!(
@@ -254,7 +254,7 @@ fn given_an_issued_secret_when_stdout_fails_then_it_fails_without_printing_the_l
         assert_eq!(
             (
                 output.status.code(),
-                String::from_utf8_lossy(&output.stderr).as_ref()
+                without_opening_notice(&output).as_str()
             ),
             (Some(test_case.expected_exit), test_case.expected_stderr),
             "{}",

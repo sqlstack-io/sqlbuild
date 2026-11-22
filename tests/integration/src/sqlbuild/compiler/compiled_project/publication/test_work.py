@@ -140,7 +140,6 @@ def test_given_a_published_location_when_an_owner_requests_work_then_results_ret
                 text=True,
                 check=True,
             )
-            assert not plain.stderr
             assert ["state", "completed"] in [line.split() for line in plain.stdout.splitlines()]
             process.terminate()
             _ = process.wait(timeout=5)

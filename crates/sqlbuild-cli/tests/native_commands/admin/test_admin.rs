@@ -227,7 +227,7 @@ fn given_a_committed_admin_operation_when_json_output_is_lost_then_all_response_
             test_case.description
         );
         assert_eq!(
-            String::from_utf8_lossy(&output.stderr),
+            crate::admin_helpers::without_opening_notice(&output),
             "Control administration result delivery failed; changes may already be committed\n",
             "{}",
             test_case.description

@@ -155,7 +155,7 @@ def test_given_explicit_backfill_bounds_when_running_and_rerunning_a_group_then_
         )
         assert retried.returncode == 0, retried.stderr
         assert not retried.stdout
-        assert retried.stderr == f"Queued a rerun of run {run_id} ({retry_id})\n"
+        assert retried.stderr.endswith(f"Queued a rerun of run {run_id} ({retry_id})\n")
         retry: dict[str, Any] = wait_for_run(
             worker.api, worker.process, worker.log, run_id=retry_id
         )

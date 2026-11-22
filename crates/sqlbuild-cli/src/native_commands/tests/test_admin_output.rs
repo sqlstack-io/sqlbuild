@@ -3,14 +3,23 @@
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use uuid::Uuid;
 
-use super::test_types::AdminTextTestCase;
 use crate::native_commands::_helpers::admin::{rows::stdout_text, summaries::summary_line};
 use crate::native_commands::models::AdminDone;
+use crate::native_commands::tests::test_types::AdminTextTestCase;
 
 #[test]
 fn given_an_admin_result_when_printed_without_json_then_one_line_names_what_was_done() {
     let [run, source, event] = [10, 11, 12].map(Uuid::from_u128);
     let test_cases = [
+        AdminTextTestCase {
+            description: "the first admin",
+            done: AdminDone::Bootstrapped {
+                id: run,
+                name: "ada".to_owned(),
+            },
+            expected_line: Some("Created admin user ada (00000000-0000-0000-0000-00000000000a)"),
+            expected_stdout: "",
+        },
         AdminTextTestCase {
             description: "a queued job run",
             done: AdminDone::RunQueued {

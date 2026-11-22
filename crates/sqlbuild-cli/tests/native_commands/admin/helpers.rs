@@ -17,8 +17,14 @@ pub(crate) fn administer(control: &TestControl, arguments: &[&str]) -> Value {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert_eq!(String::from_utf8_lossy(&output.stderr), "");
+    assert_eq!(without_opening_notice(&output), "");
     serde_json::from_slice(&output.stdout).expect("JSON-only admin stdout")
+}
+
+/// Stderr less the notice a slow open adds, which a loaded machine can cause.
+pub(crate) fn without_opening_notice(output: &Output) -> String {
+    String::from_utf8_lossy(&output.stderr)
+        .replace("Opening control store...\nControl store ready\n", "")
 }
 
 pub(crate) fn invoke_admin(control: &TestControl, arguments: &[&str]) -> Output {

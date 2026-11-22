@@ -101,10 +101,7 @@ fn time_text(time: DateTime<Utc>) -> String {
 
 /// Columns two spaces apart, with no header and one line per row.
 fn rows_text(rows: Vec<Vec<String>>) -> String {
-    let cells: Vec<Vec<String>> = rows
-        .iter()
-        .map(|row| row.iter().map(|cell| printable(cell)).collect())
-        .collect();
+    let cells: Vec<Vec<String>> = rows.iter().map(|row| printable_row(row)).collect();
     let mut widths: Vec<usize> = Vec::new();
     for row in &cells {
         widths.resize(widths.len().max(row.len()), 0);
@@ -123,4 +120,8 @@ fn rows_text(rows: Vec<Vec<String>>) -> String {
         text.push('\n');
     }
     text
+}
+
+fn printable_row(row: &[String]) -> Vec<String> {
+    row.iter().map(|cell| printable(cell)).collect()
 }
