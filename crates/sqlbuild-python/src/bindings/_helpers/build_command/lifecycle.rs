@@ -110,7 +110,6 @@ pub(crate) struct DirectPythonLifecycle {
     discovered: Py<PyAny>,
     adapter: Py<PyAny>,
     reporter: Py<PythonNodeReporter>,
-    base_on_node_complete: Py<PyAny>,
     read_side_connection: Mutex<Option<Py<PyAny>>>,
     read_side_tracker: Option<Py<PyAny>>,
     ingress_python_results: Py<PyAny>,
@@ -128,7 +127,11 @@ pub(crate) struct DirectPythonLifecycle {
 impl DirectPythonLifecycle {
     /// Record a finished SQL node, then dispatch newly ready Python nodes, each reported as it finishes.
     fn on_node_complete(&self, py: Python<'_>, node_result: Bound<'_, PyAny>) -> PyResult<()> {
-        self.base_on_node_complete.bind(py).call1((&node_result,))?;
+        self.reporter
+            .get()
+            .on_node_complete
+            .bind(py)
+            .call1((&node_result,))?;
         let Some(tracker) = &self.read_side_tracker else {
             return Ok(());
         };
@@ -311,7 +314,7 @@ impl DirectPythonLifecycle {
             .bind(py)
             .call_method0("finalize_unrun_python_nodes")?;
         for result in finalized.try_iter()? {
-            self.reporter.bind(py).call1((result?,))?;
+            self.reporter.get().__call__(py, result?)?;
         }
         Ok(())
     }
@@ -630,7 +633,6 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             discovered: discovered.unbind(),
             adapter: adapter.clone().unbind(),
             reporter: reporter.unbind(),
-            base_on_node_complete: inputs.on_node_complete.clone().unbind(),
             read_side_connection: Mutex::new(read_side_connection),
             read_side_tracker,
             ingress_python_results: ingress_python.unbind(),
