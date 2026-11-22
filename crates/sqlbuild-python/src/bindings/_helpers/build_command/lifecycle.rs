@@ -568,7 +568,7 @@ pub(crate) fn prepare_direct_python_lifecycle<'py>(
             worker: context.worker.clone(),
         },
     )?;
-    let on_node_cancelled: Bound<'py, PyAny> = native_field(&reporter, "cancelled")?;
+    let on_node_cancelled: Bound<'py, PyAny> = reporter.getattr("cancelled")?;
     let mut ingress_python: Bound<'py, PyAny> = tuple(py, &[])?;
     let mut ingress_loads: Bound<'py, PyAny> = tuple(py, &[])?;
     if ingress_names.is_truthy()? {
