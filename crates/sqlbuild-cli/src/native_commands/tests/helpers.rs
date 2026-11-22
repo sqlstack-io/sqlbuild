@@ -275,8 +275,14 @@ pub(super) fn failed_load(discovered: bool) -> crate::native_commands::models::L
 /// An interpreter that reads nothing and never replies.
 #[cfg(unix)]
 pub(super) fn silent_compiler() -> crate::native_commands::models::LocationCompiler {
-    let mut child = tokio::process::Command::new("sleep")
-        .arg("600")
+    scripted_compiler("exec sleep 600")
+}
+
+/// An interpreter that runs `script` in place of answering.
+#[cfg(unix)]
+pub(super) fn scripted_compiler(script: &str) -> crate::native_commands::models::LocationCompiler {
+    let mut child = tokio::process::Command::new("sh")
+        .args(["-c", script])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .kill_on_drop(true)

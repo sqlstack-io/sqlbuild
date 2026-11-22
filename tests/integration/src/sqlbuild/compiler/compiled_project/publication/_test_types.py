@@ -723,3 +723,11 @@ class RunningItemsTestCase:
     files: dict[str, str]
     expected_running: int
     expected_pending: int
+
+
+@dataclass(frozen=True)
+class WaitingCheckTestCase:
+    description: str
+    check_seconds: int
+    expected_finished: bool
+    expected_restarts: int

@@ -117,6 +117,7 @@ Only a location, including `sqb dev`, calls discover functions. Every other comp
 | `check_every` | The location calls that function without publishing. When the result differs from the saved set, it publishes with the new result |
 
 - `check_every` takes amounts in `d`, `h`, `m` and `s`, largest unit first, such as `15m` or `1h30m`, and at least a minute. Without it, the set is checked only when the location publishes.
+- A check doesn't hold up the location. Once a publish, republish or other request waits for it, the check has 10 seconds to finish. After that the location restarts its interpreter and serves the request, and the set is checked again when it is next due.
 - Runs always execute the nodes of the snapshot they started on. Workers, reruns and the plan page never call discover functions.
 - `sqb dev`'s ready card shows the sets, for example `Discovered  fulfilment_plan 3 items`.
 
