@@ -207,6 +207,7 @@ fn given_a_committed_admin_operation_when_json_output_is_lost_then_all_response_
                 "admin",
                 "create-location",
                 &"x".repeat(test_case.name_bytes),
+                "--json",
             ])
             .current_dir(directory.path())
             .env("PATH", "")
@@ -227,7 +228,7 @@ fn given_a_committed_admin_operation_when_json_output_is_lost_then_all_response_
         );
         assert_eq!(
             String::from_utf8_lossy(&output.stderr),
-            "Opening control store...\nControl store ready\nControl administration JSON result delivery failed; changes may already be committed\n",
+            "Control administration result delivery failed; changes may already be committed\n",
             "{}",
             test_case.description
         );

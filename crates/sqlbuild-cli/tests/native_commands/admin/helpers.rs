@@ -9,17 +9,15 @@ use uuid::Uuid;
 
 use crate::test_types::TestControl;
 
+/// The JSON result, asserting that `--json` prints nothing else.
 pub(crate) fn administer(control: &TestControl, arguments: &[&str]) -> Value {
-    let output = invoke_admin(control, arguments);
+    let output = invoke_admin(control, &[arguments, &["--json"]].concat());
     assert!(
         output.status.success(),
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert_eq!(
-        String::from_utf8_lossy(&output.stderr),
-        "Opening control store...\nControl store ready\nControl administration completed successfully\n"
-    );
+    assert_eq!(String::from_utf8_lossy(&output.stderr), "");
     serde_json::from_slice(&output.stdout).expect("JSON-only admin stdout")
 }
 
@@ -58,7 +56,7 @@ fn admin_command(control: &TestControl, arguments: &[&str]) -> Command {
 }
 
 pub(crate) fn invoke_password(control: &TestControl, principal: &str, input: &[u8]) -> Output {
-    let mut child = admin_command(control, &["set-password", principal])
+    let mut child = admin_command(control, &["set-password", principal, "--json"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

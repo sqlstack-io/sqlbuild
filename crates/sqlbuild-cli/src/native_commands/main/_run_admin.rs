@@ -1,7 +1,6 @@
 //! Direct database ownership authorizes bootstrap, not an untrusted HTTP request or supplied role.
 
 use crate::adhoc::main::adhoc_planner::adhoc_planner;
-use serde_json::{Value, json};
 use sqlbuild_orchestration::authorization::main::people::bootstrap_user::bootstrap_user;
 use sqlbuild_orchestration::authorization::main::roles::grant_admin::grant_admin;
 use sqlbuild_orchestration::credentials::main::identities::create_principal::create_principal;
@@ -22,16 +21,16 @@ use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
+use crate::native_commands::_helpers::admin::store::open_admin_store;
 use crate::native_commands::_helpers::command::admin_actions::{
-    run_service_account_admin, run_token_admin,
+    name_or_id, run_service_account_admin, run_token_admin,
 };
 use crate::native_commands::_helpers::command::decision::control_admin;
-use crate::native_commands::_helpers::location::execution::open_control_store;
-use crate::native_commands::models::ControlAdmin;
+use crate::native_commands::models::{AdminDone, ControlAdmin};
 
-pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlError> {
+pub(crate) async fn run_admin(namespace: &Namespace) -> Result<AdminDone, ControlError> {
     let action = control_admin(namespace)?;
-    let store = open_control_store(namespace, None).await?;
+    let store = open_admin_store(namespace).await?;
     let context = AuditContext {
         actor: "local-control-store-owner".into(),
         granting_role: "control-store-owner".into(),
@@ -39,45 +38,47 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
         ip_address: None,
     };
     match action {
-        ControlAdmin::BootstrapUser(name) => {
-            let id = bootstrap_user(&store, &context, &name).await?;
-            Ok(json!({"principal_id":id,"name":name,"kind":"person","role":"admin"}))
-        }
-        ControlAdmin::CreateLocation(name) => {
-            let id = create_location(&store, &name, &context).await?;
-            Ok(json!({"location_id": id, "name": name}))
-        }
-        ControlAdmin::CreatePrincipal(name) => {
-            let id = create_principal(&store, &context, &name).await?;
-            Ok(json!({"principal_id": id, "name": name}))
-        }
+        ControlAdmin::BootstrapUser(name) => Ok(AdminDone::Bootstrapped {
+            id: bootstrap_user(&store, &context, &name).await?,
+            name,
+        }),
+        ControlAdmin::CreateLocation(name) => Ok(AdminDone::LocationCreated {
+            id: create_location(&store, &name, &context).await?,
+            name,
+        }),
+        ControlAdmin::CreatePrincipal(name) => Ok(AdminDone::PrincipalCreated {
+            id: create_principal(&store, &context, &name).await?,
+            name,
+        }),
         ControlAdmin::Token(action) => run_token_admin(&store, &context, action).await,
-        ControlAdmin::SetPassword(principal_id, password) => {
-            set_password(
-                &store,
-                &context,
-                PasswordAuthority::Operator(principal_id),
-                &password,
-            )
-            .await?;
-            Ok(json!({"principal_id": principal_id, "password_set": true}))
+        ControlAdmin::SetPassword(id, password) => {
+            let name = name_or_id(&store, id).await?;
+            let authority = PasswordAuthority::Operator(id);
+            set_password(&store, &context, authority, &password).await?;
+            Ok(AdminDone::PasswordSet { id, name })
         }
-        ControlAdmin::GrantAdmin(principal_id) => {
-            grant_admin(&store, &context, principal_id).await?;
-            Ok(json!({"principal_id": principal_id, "role": "admin"}))
+        ControlAdmin::GrantAdmin(id) => {
+            let name = name_or_id(&store, id).await?;
+            grant_admin(&store, &context, id).await?;
+            Ok(AdminDone::AdminGranted { id, name })
         }
-        ControlAdmin::RequestJobRun(request) => queue_job_run(&store, &context, &request).await,
-        ControlAdmin::Rerun(request) => {
-            let applied = request_rerun(&store, (&context, None), &request).await?;
-            Ok(json!({"run_id": request.run_id, "applied": applied}))
-        }
-        ControlAdmin::RequestLocationWork(request) => {
-            let applied = request_location_work(&store, (&context, None), &request).await?;
-            Ok(json!({"request_id": request.request_id, "applied": applied}))
-        }
-        ControlAdmin::LocationWork(request_id) => {
-            Ok(json!(location_work(&store, request_id).await?))
-        }
+        ControlAdmin::RequestJobRun(request) => queue_job_run(&store, &context, request).await,
+        ControlAdmin::Rerun(request) => Ok(AdminDone::RerunQueued {
+            run_id: request.run_id,
+            source: request.source_run_id,
+            applied: request_rerun(&store, (&context, None), &request).await?,
+        }),
+        ControlAdmin::RequestLocationWork(request) => Ok(AdminDone::CheckRequested {
+            location: name_or_id(&store, request.location_id).await?,
+            applied: request_location_work(&store, (&context, None), &request).await?,
+            request_id: request.request_id,
+            target: request.target,
+        }),
+        ControlAdmin::LocationWork(request_id) => Ok(AdminDone::WorkRead {
+            request_id,
+            record: location_work(&store, request_id).await?.map(Box::new),
+            now: chrono::Utc::now(),
+        }),
         ControlAdmin::CancelRun {
             event_id,
             run_id,
@@ -97,7 +98,11 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
                 },
             )
             .await?;
-            Ok(json!({"event_id": event_id, "run_id": run_id, "applied": applied}))
+            Ok(AdminDone::CancelRequested {
+                event_id,
+                run_id,
+                applied,
+            })
         }
         ControlAdmin::ChangeTrigger {
             event_id,
@@ -105,19 +110,20 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
             change,
             reason,
         } => {
-            let applied = change_trigger(
-                &store,
-                &context,
-                &TriggerChangeRequest {
-                    event_id,
-                    trigger_id,
-                    actor: context.actor.clone(),
-                    reason,
-                    change,
-                },
-            )
-            .await?;
-            Ok(json!({"event_id": event_id, "trigger_id": trigger_id, "applied": applied}))
+            let request = TriggerChangeRequest {
+                event_id,
+                trigger_id,
+                actor: context.actor.clone(),
+                reason,
+                change,
+            };
+            let applied = change_trigger(&store, &context, &request).await?;
+            Ok(AdminDone::TriggerChanged {
+                event_id,
+                trigger_id,
+                change: request.change,
+                applied,
+            })
         }
         ControlAdmin::ServiceAccount(action) => {
             run_service_account_admin(&store, &context, action).await
@@ -129,9 +135,14 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
 async fn queue_job_run(
     store: &ControlStore,
     context: &AuditContext,
-    request: &JobRunRequest,
-) -> Result<Value, ControlError> {
+    request: JobRunRequest,
+) -> Result<AdminDone, ControlError> {
     let planner = adhoc_planner();
-    let applied = request_job_run(store, (context, Some(planner.as_ref())), request).await?;
-    Ok(json!({"run_id": request.run_id, "applied": applied}))
+    let applied = request_job_run(store, (context, Some(planner.as_ref())), &request).await?;
+    Ok(AdminDone::RunQueued {
+        run_id: request.run_id,
+        job: request.job_key,
+        target: request.target,
+        applied,
+    })
 }

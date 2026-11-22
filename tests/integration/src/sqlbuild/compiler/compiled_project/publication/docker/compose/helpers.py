@@ -224,25 +224,33 @@ class ComposeStack:
     def register(self) -> None:
         self.compose("up", "-d", "--wait", "postgres")
         location: dict[str, Any] = json.loads(
-            self.compose("run", "--rm", "--no-deps", "server", "admin", "create-location", "orders")
-        )
-        self.location_id = location["location_id"]
-        self.environment["SQLBUILD_LOCATION_ID"] = self.location_id
-        expiry: str = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
-        credential: dict[str, Any] = json.loads(
             self.compose(
                 "run",
                 "--rm",
                 "--no-deps",
                 "server",
                 "admin",
-                "issue-location-token",
-                self.location_id,
-                "--expires-at",
-                expiry,
+                "create-location",
+                "orders",
+                "--json",
             )
         )
-        self.environment["SQLBUILD_LOCATION_TOKEN"] = credential["bearer"]
+        self.location_id = location["location_id"]
+        self.environment["SQLBUILD_LOCATION_ID"] = self.location_id
+        expiry: str = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+        bearer: str = self.compose(
+            "run",
+            "--rm",
+            "--no-deps",
+            "-T",
+            "server",
+            "admin",
+            "issue-location-token",
+            self.location_id,
+            "--expires-at",
+            expiry,
+        )
+        self.environment["SQLBUILD_LOCATION_TOKEN"] = bearer.strip()
 
     def redeploy(self, version: str) -> None:
         self.environment["SQLBUILD_LOCATION_IMAGE"] = f"{self.name}:{version}"

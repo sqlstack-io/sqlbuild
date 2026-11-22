@@ -353,3 +353,11 @@ pub(super) struct FastClockScanTestCase {
     /// Whether a table altered a second after the page read is still described live.
     pub(super) expected_described_live: bool,
 }
+
+/// One admin result and what it prints without `--json`.
+pub(crate) struct AdminTextTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) done: crate::native_commands::models::AdminDone,
+    pub(crate) expected_line: Option<&'static str>,
+    pub(crate) expected_stdout: &'static str,
+}

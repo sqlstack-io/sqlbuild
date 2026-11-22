@@ -247,7 +247,7 @@
      "name": "admin",
      "parser": {
       "prog": "sqb admin",
-      "description": "Privileged local administration using direct control database access. Results are JSON; issued bearer credentials appear only once on stdout.",
+      "description": "Privileged local administration using direct control database access. Each command says what it did in one line on stderr; stdout holds only an issued secret, shown once, or the rows of a read, or only the JSON result with --json.",
       "groups": [
        {
         "title": "positional arguments"
@@ -323,7 +323,9 @@
              "required": true,
              "help": "location label; identity is assigned by the control store",
              "group": 0
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -362,7 +364,9 @@
              "required": true,
              "help": "principal label; creation grants no permissions",
              "group": 0
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -374,7 +378,9 @@
            "groups": [{"title": "positional arguments"}, {"title": "options"}],
            "actions": [
             {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
-            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "PRINCIPAL_ID", "required": true, "help": "active person UUID; password is read from the terminal or standard input, never an argument", "group": 0}
+            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "PRINCIPAL_ID", "required": true, "help": "active person UUID; password is read from the terminal or standard input, never an argument", "group": 0},
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -386,7 +392,9 @@
            "groups": [{"title": "positional arguments"}, {"title": "options"}],
            "actions": [
             {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
-            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "NAME", "required": true, "help": "first administrator's person name", "group": 0}
+            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "NAME", "required": true, "help": "first administrator's person name", "group": 0},
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -398,7 +406,9 @@
            "groups": [{"title": "positional arguments"}, {"title": "options"}],
            "actions": [
             {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
-            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "PRINCIPAL_ID", "required": true, "help": "existing person UUID to enable and grant installation admin", "group": 0}
+            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "PRINCIPAL_ID", "required": true, "help": "existing person UUID to enable and grant installation admin", "group": 0},
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -447,7 +457,9 @@
              "required": true,
              "help": "future expiry as an RFC3339 timestamp with timezone",
              "group": 1
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -486,7 +498,9 @@
              "required": true,
              "help": "credential UUID, never its bearer secret",
              "group": 0
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -494,11 +508,13 @@
           "name": "rotate-token",
           "parser": {
            "prog": "sqb admin rotate-token",
-           "description": "Replace a live credential atomically through direct control-store ownership, retaining its exact scope and expiry. Returns the new bearer once as JSON; the old credential immediately stops working.",
+           "description": "Replace a live credential atomically through direct control-store ownership, retaining its exact scope and expiry. Prints the new bearer once, alone on stdout; the old credential immediately stops working.",
            "groups": [{"title": "positional arguments"}, {"title": "options"}],
            "actions": [
             {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
-            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "TOKEN_ID", "required": true, "help": "live credential UUID, never its bearer secret", "group": 0}
+            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "TOKEN_ID", "required": true, "help": "live credential UUID, never its bearer secret", "group": 0},
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -567,7 +583,9 @@
              "required": true,
              "help": "nonblank reason recorded with the security audit",
              "group": 1
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -702,7 +720,9 @@
              "required": true,
              "help": "nonblank reason recorded with the security audit",
              "group": 1
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -757,7 +777,9 @@
              "required": true,
              "help": "nonblank reason recorded with the security audit",
              "group": 1
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -788,7 +810,9 @@
              "required": true,
              "help": "location work request UUID",
              "group": 0
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -848,7 +872,9 @@
              "required": true,
              "help": "nonblank reason recorded with the cancellation fact and security audit",
              "group": 1
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -933,7 +959,9 @@
              "dest": "admin_cursor",
              "help": "RFC3339 timestamp with offset; required only for set-cursor",
              "group": 1
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -941,7 +969,7 @@
           "name": "create-service-account",
           "parser": {
            "prog": "sqb admin create-service-account",
-           "description": "Add a service account with a built-in role everywhere and print its API key once in the JSON result; store it now, it isn't shown again. Only the key's hash is kept.",
+           "description": "Add a service account with a built-in role everywhere and print its API key once, alone on stdout; store it now, it isn't shown again. Only the key's hash is kept.",
            "groups": [
             {
              "title": "positional arguments"
@@ -1008,7 +1036,9 @@
              "metavar": "VAR",
              "help": "import the key held in environment variable VAR instead of generating one, for setups that recreate a control store and must keep the same key: sqbk_ and at least 32 more characters, generated randomly (for example sqbk_ and 40 random letters and digits), since the key is only as strong as you make it; the result then omits the key",
              "group": 1
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -1016,7 +1046,7 @@
           "name": "rotate-service-account",
           "parser": {
            "prog": "sqb admin rotate-service-account",
-           "description": "Issue a service account a new API key, printed once in the JSON result; the replaced key stops now unless --overlap-minutes keeps it working a little longer.",
+           "description": "Issue a service account a new API key, printed once, alone on stdout; the replaced key stops now unless --overlap-minutes keeps it working a little longer.",
            "groups": [
             {
              "title": "positional arguments"
@@ -1058,7 +1088,9 @@
              "type": "int",
              "help": "minutes the replaced key keeps working, 0 to 1440 (default: 0)",
              "group": 1
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -1098,7 +1130,9 @@
              "required": true,
              "help": "service account name",
              "group": 0
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -1138,7 +1172,9 @@
              "required": true,
              "help": "service account name",
              "group": 0
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -1169,7 +1205,9 @@
              },
              "help": "show this help message and exit",
              "group": 1
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          }
@@ -1198,7 +1236,7 @@
          {
           "dest": "issue-location-token",
           "metavar": "issue-location-token",
-          "help": "issue a bounded location credential, returned once as JSON"
+          "help": "issue a bounded location credential, printed once on stdout"
          },
          {
           "dest": "revoke-token",
