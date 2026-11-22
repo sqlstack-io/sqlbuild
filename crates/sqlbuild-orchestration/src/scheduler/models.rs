@@ -166,3 +166,21 @@ impl DueKind {
         }
     }
 }
+
+/// A skipped trigger as the server log names it.
+#[derive(Debug, Deserialize)]
+pub(crate) struct SkippedTrigger {
+    pub(crate) snapshot_id: Uuid,
+    pub(crate) kind: String,
+    pub(crate) name: String,
+    pub(crate) target: String,
+    pub(crate) location: String,
+    pub(crate) checked_at: Option<DateTime<Utc>>,
+}
+
+/// A trigger's new `trigger_skipped` problem: the trigger, and the event that starts the episode.
+#[derive(Debug)]
+pub(crate) struct SkippedEpisode {
+    pub(crate) trigger: SkippedTrigger,
+    pub(crate) episode: Uuid,
+}

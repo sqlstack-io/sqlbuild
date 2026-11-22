@@ -70,7 +70,7 @@ pub(crate) async fn publish_projections(
              ON CONFLICT (trigger_id) DO UPDATE SET status=excluded.status, next_due_at=excluded.next_due_at",
             vec![Parameter::Id(id), Parameter::Text(status.as_str().into()), Parameter::Time(started_at), Parameter::OptionalTime(next)]).await?;
         if !dropped.is_empty() {
-            transaction = record_trigger_problem(
+            (transaction, _) = record_trigger_problem(
                 transaction,
                 (
                     PlatformEvent::CalendarTimesDropped {

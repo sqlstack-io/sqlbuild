@@ -8,6 +8,7 @@ use crate::runs::_helpers::groups::lifecycle::advance_group;
 use crate::runs::_helpers::lifecycle::unreadable::fail_unreadable_group;
 use crate::runs::models::RunDispatch;
 use crate::scheduler::constants::RENEW_INTERVAL_SECONDS;
+use crate::scheduler::main::write_server_log::write_server_log;
 use crate::scheduler::main::{check_lease::check_lease, renew_lease::renew_lease};
 use crate::scheduler::models::SchedulerLease;
 use crate::store::errors::ControlError;
@@ -46,8 +47,16 @@ pub async fn advance_groups<'a>(
                 check_lease(begin(store, TransactionMode::Write).await?, lease).await?;
             match advance_group(transaction, run_id, limits, dispatch.eligible).await {
                 Ok(transaction) => commit(check_lease(transaction, lease).await?).await?,
-                Err(ControlError::UnreadableSnapshot { .. }) => {
-                    fail_unreadable_group(store, lease, run_id).await?;
+                Err(ControlError::UnreadableSnapshot {
+                    snapshot_id,
+                    detail,
+                    ..
+                }) => {
+                    let ended =
+                        fail_unreadable_group(store, lease, (run_id, snapshot_id, &detail)).await?;
+                    if let Some(line) = ended {
+                        write_server_log(&line);
+                    }
                 }
                 Err(error) => return Err(error),
             }

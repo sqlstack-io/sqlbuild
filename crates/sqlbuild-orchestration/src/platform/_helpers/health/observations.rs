@@ -15,8 +15,19 @@ use crate::store::models::{ControlEvent, ControlTransaction, Parameter};
 pub(crate) async fn observe(
     transaction: ControlTransaction,
     installation_id: Uuid,
-    (event, incident): (PlatformEvent, Option<DateTime<Utc>>),
+    observation: (PlatformEvent, Option<DateTime<Utc>>),
 ) -> Result<ControlTransaction, ControlError> {
+    Ok(observe_new(transaction, installation_id, observation)
+        .await?
+        .0)
+}
+
+/// `observe`, with the event's ID when this call recorded it, or none when it was already there.
+pub(crate) async fn observe_new(
+    transaction: ControlTransaction,
+    installation_id: Uuid,
+    (event, incident): (PlatformEvent, Option<DateTime<Utc>>),
+) -> Result<(ControlTransaction, Option<Uuid>), ControlError> {
     let occurred_at = transaction
         .now
         .duration_trunc(TimeDelta::seconds(OBSERVATION_WINDOW_SECONDS))
@@ -39,7 +50,7 @@ pub(crate) async fn observe(
     )
     .await?;
     if !previous.is_empty() {
-        return Ok(transaction);
+        return Ok((transaction, None));
     }
     let (transaction, outcome) = append_control_event(
         transaction,
@@ -59,5 +70,5 @@ pub(crate) async fn observe(
             "platform observation conflicts with a durable fact".into(),
         ));
     }
-    Ok(transaction)
+    Ok((transaction, Some(event_id)))
 }

@@ -3,6 +3,7 @@
 use crate::scheduler::_helpers::unreadable_trigger::{skip_failed_sensor, skip_unreadable_trigger};
 use crate::scheduler::main::_evaluate_trigger::evaluate_trigger;
 use crate::scheduler::main::renew_lease::renew_lease;
+use crate::scheduler::main::write_server_log::write_server_log;
 use crate::scheduler::models::{DueKind, SchedulerLease};
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
 use crate::sensors::main::complete_sensor::complete_sensor;
@@ -37,11 +38,17 @@ pub(crate) async fn drain_due(
                 ticks += taken;
             }
             Ok(None) => {}
-            Err(ControlError::UnreadableSnapshot { .. }) => {
-                skip_unreadable_trigger(store, &lease, trigger_id).await?;
+            Err(ControlError::UnreadableSnapshot { detail, .. }) => {
+                if let Some(line) =
+                    skip_unreadable_trigger(store, &lease, (trigger_id, &detail)).await?
+                {
+                    write_server_log(&line);
+                }
             }
             Err(error) if kind == DueKind::Sensor && !error.ends_cycle() => {
-                skip_failed_sensor(store, &lease, trigger_id, &error).await?;
+                if let Some(line) = skip_failed_sensor(store, &lease, trigger_id, &error).await? {
+                    write_server_log(&line);
+                }
             }
             Err(error) => return Err(error),
         }

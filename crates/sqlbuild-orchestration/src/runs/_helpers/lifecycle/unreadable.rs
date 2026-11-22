@@ -21,12 +21,12 @@ fn failed() -> RunChange {
     }
 }
 
-/// End the unclaimed run `run_id` failed, in its own transaction under the scheduler's lease.
+/// End the unclaimed run `run_id` failed, in its own transaction under the scheduler's lease; the server log line with `detail`.
 pub(crate) async fn fail_unreadable_run(
     store: &ControlStore,
     lease: &SchedulerLease,
-    run_id: Uuid,
-) -> Result<(), ControlError> {
+    (run_id, snapshot_id, detail): (Uuid, Uuid, &str),
+) -> Result<String, ControlError> {
     let transaction = check_lease(begin(store, TransactionMode::Write).await?, lease).await?;
     let (transaction, _) = change_run_in(
         transaction,
@@ -39,15 +39,16 @@ pub(crate) async fn fail_unreadable_run(
         },
     )
     .await?;
-    commit(check_lease(transaction, lease).await?).await
+    commit(check_lease(transaction, lease).await?).await?;
+    Ok(log_line(("run", run_id), (snapshot_id, detail)))
 }
 
-/// Ask each unfinished member of group `group_id` to cancel, in one transaction under the scheduler's lease: one that never launched ends cancelled before launch, a running one is asked to stop. The group ends failed only once no member is open, so a member still running keeps its pool slots until it ends; a later pass, which meets the same unreadable snapshot, finishes the group.
+/// Ask each unfinished member of group `group_id` to cancel, and the log line once the group ends failed, in one transaction under the scheduler's lease: one that never launched ends cancelled before launch, a running one is asked to stop. The group ends failed only once no member is open, so a member still running keeps its pool slots until it ends; a later pass, which meets the same unreadable snapshot, finishes the group.
 pub(crate) async fn fail_unreadable_group(
     store: &ControlStore,
     lease: &SchedulerLease,
-    group_id: Uuid,
-) -> Result<(), ControlError> {
+    (group_id, snapshot_id, detail): (Uuid, Uuid, &str),
+) -> Result<Option<String>, ControlError> {
     let mut transaction = check_lease(begin(store, TransactionMode::Write).await?, lease).await?;
     let members;
     (transaction, members) = query(
@@ -79,8 +80,15 @@ pub(crate) async fn fail_unreadable_group(
         vec![Parameter::Id(group_id)],
     )
     .await?;
-    if !open.is_empty() {
+    let ends = !open.is_empty();
+    if ends {
         transaction = group_change(transaction, group_id, failed()).await?;
     }
-    commit(check_lease(transaction, lease).await?).await
+    commit(check_lease(transaction, lease).await?).await?;
+    Ok(ends.then(|| log_line(("group run", group_id), (snapshot_id, detail))))
+}
+
+/// The server log line for a run that failed because its snapshot can't be read, with what failed to decode.
+fn log_line((what, run_id): (&str, Uuid), (snapshot_id, detail): (Uuid, &str)) -> String {
+    format!("{what} {run_id} failed: its snapshot {snapshot_id} can't be read: {detail}")
 }

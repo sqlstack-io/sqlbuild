@@ -3,17 +3,17 @@
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::platform::_helpers::health::observations::observe;
+use crate::platform::_helpers::health::observations::observe_new;
 use crate::platform::models::PlatformEvent;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::ControlTransaction;
 
-/// Record `event`, a trigger's problem such as `PlatformEvent::TriggerSkipped`; the same payload and `incident` again add nothing.
+/// Record `event`, a trigger's problem such as `PlatformEvent::TriggerSkipped`, and its ID when new; the same payload and `incident` again add nothing.
 pub(crate) async fn record_trigger_problem(
     transaction: ControlTransaction,
     (event, incident): (PlatformEvent, Option<DateTime<Utc>>),
-) -> Result<ControlTransaction, ControlError> {
+) -> Result<(ControlTransaction, Option<Uuid>), ControlError> {
     let (transaction, rows) = query(
         transaction,
         "SELECT installation_id FROM sqb_installation WHERE singleton=1",
@@ -21,9 +21,9 @@ pub(crate) async fn record_trigger_problem(
     )
     .await?;
     let Some(row) = rows.into_iter().next() else {
-        return Ok(transaction);
+        return Ok((transaction, None));
     };
     let installation_id = serde_json::from_value::<Uuid>(row["installation_id"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
-    observe(transaction, installation_id, (event, incident)).await
+    observe_new(transaction, installation_id, (event, incident)).await
 }

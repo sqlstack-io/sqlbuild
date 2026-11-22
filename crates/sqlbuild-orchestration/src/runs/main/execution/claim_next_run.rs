@@ -13,6 +13,7 @@ use crate::runs::_helpers::lifecycle::claims::{publish_claim, reserve_claims};
 use crate::runs::_helpers::lifecycle::unreadable::fail_unreadable_run;
 use crate::runs::models::{QueueCandidate, RunClaim, RunDispatch};
 use crate::scheduler::main::check_lease::check_lease;
+use crate::scheduler::main::write_server_log::write_server_log;
 use crate::scheduler::models::SchedulerLease;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -33,8 +34,13 @@ pub async fn claim_next_run<'a>(
         match claim_once(store, lease, limits, dispatch).await {
             Err(ControlError::UnreadableSnapshot {
                 run_id: Some(run_id),
-                ..
-            }) => fail_unreadable_run(store, lease, run_id).await?,
+                snapshot_id,
+                detail,
+            }) => {
+                let line =
+                    fail_unreadable_run(store, lease, (run_id, snapshot_id, &detail)).await?;
+                write_server_log(&line);
+            }
             claimed => return claimed,
         }
     }

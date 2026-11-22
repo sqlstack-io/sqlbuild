@@ -84,7 +84,7 @@ pub async fn begin_sensor_evaluation(
     let mut transaction =
         append_evaluation(transaction, &request, SensorEvaluationOutcome::Requested).await?;
     if rechecked {
-        transaction = record_trigger_problem(
+        (transaction, _) = record_trigger_problem(
             transaction,
             (
                 PlatformEvent::SensorRechecked {

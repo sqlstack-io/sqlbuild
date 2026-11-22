@@ -176,4 +176,8 @@ pub(crate) struct FailedAttemptsTestCase {
     pub(crate) expected_events: i64,
     /// The triggers the live problems list as skipped, as `name: reason`.
     pub(crate) expected_skipped: &'static [&'static str],
+    /// What the first attempt's server log line names: the sensor, location, target and the full error.
+    pub(crate) expected_logged: &'static [&'static str],
+    /// The second attempt's log line; none, as it is the same episode.
+    pub(crate) expected_logged_again: Option<&'static str>,
 }

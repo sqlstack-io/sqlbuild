@@ -46,6 +46,14 @@ const SKIPPED_EVENTS: &str =
 const RUNNING_REFUSAL: &str = "invalid control-plane data: the sensor's newest tick can't be read; its next tick checks it again from scratch";
 /// The skip refusal while the sensor is paused: no next tick comes.
 const PAUSED_REFUSAL: &str = "invalid control-plane data: the sensor's newest tick can't be read, and the sensor is paused, so no next tick checks it again; resume the sensor, or reset its cursor";
+/// What a skipped sensor's server log line names, the full error included.
+const LOGGED: &[&str] = &[
+    "sensor health_orders in location orders, target development, was skipped: its check failed",
+    "control-plane operation denied: the sensor's role can't queue job orders",
+];
+/// The `trigger_skipped` events' IDs, which start each episode.
+const SKIPPED_EVENT_IDS: &str =
+    "SELECT event_id FROM recall_events WHERE event_type='platform_trigger_skipped'";
 /// Leaves nothing behind, for a sensor that stays readable.
 const NOTHING: &str = "SELECT 1";
 /// The `sensor_rechecked` events recorded so far.
@@ -420,12 +428,16 @@ fn given_a_sensor_failing_with_a_different_id_each_attempt_when_it_is_skipped_th
             backend: Backend::Sqlite,
             expected_events: 1,
             expected_skipped: &[DENIED],
+            expected_logged: LOGGED,
+            expected_logged_again: None,
         },
         FailedAttemptsTestCase {
             description: "PostgreSQL store",
             backend: Backend::Postgres,
             expected_events: 1,
             expected_skipped: &[DENIED],
+            expected_logged: LOGGED,
+            expected_logged_again: None,
         },
     ];
     for test_case in test_cases {
@@ -443,12 +455,15 @@ fn given_a_sensor_failing_with_a_different_id_each_attempt_when_it_is_skipped_th
                 decision_id: uuid::Uuid::now_v7(),
             };
 
-            skip_failed_sensor(store, &lease, trigger_id, &denied())
+            let first = skip_failed_sensor(store, &lease, trigger_id, &denied())
                 .await
-                .expect("first skip");
-            skip_failed_sensor(store, &lease, trigger_id, &denied())
+                .expect("first skip")
+                .unwrap_or_default();
+            let again = skip_failed_sensor(store, &lease, trigger_id, &denied())
                 .await
                 .expect("second skip");
+            let episodes = rows(store, SKIPPED_EVENT_IDS, vec![]).await;
+            let episode = episodes[0]["event_id"].as_str().unwrap_or_default();
 
             assert_eq!(
                 (
@@ -466,6 +481,26 @@ fn given_a_sensor_failing_with_a_different_id_each_attempt_when_it_is_skipped_th
                         .collect::<Vec<_>>(),
                 ),
                 "{}: attempts that differ only in their IDs are one problem, which names the error's kind",
+                test_case.description
+            );
+            assert_eq!(
+                (
+                    test_case
+                        .expected_logged
+                        .iter()
+                        .filter(|part| !first.contains(**part))
+                        .collect::<Vec<_>>(),
+                    first.contains(&format!("problem episode {episode}")),
+                    again.as_deref(),
+                    DENIED.contains("can't queue job orders"),
+                ),
+                (
+                    Vec::<&&str>::new(),
+                    true,
+                    test_case.expected_logged_again,
+                    false
+                ),
+                "{}: the server log has the full error once per episode, and the problem never does: {first}",
                 test_case.description
             );
             close_test_store(fixture).await;
