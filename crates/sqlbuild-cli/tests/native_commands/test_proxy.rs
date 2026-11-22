@@ -32,7 +32,7 @@ fn given_an_owner_configured_proxy_when_requests_carry_a_subject_then_only_expli
         runtime.block_on(async {
             let directory = tempfile::tempdir().expect("prepared proxy installation");
             let provisioned = std::process::Command::new(env!("CARGO_BIN_EXE_sqb"))
-                .args(["admin", "create-principal", "orders-reader"])
+                .args(["admin", "create-principal", "orders-reader", "--json"])
                 .current_dir(directory.path()).env("PATH", "")
                 .env_remove("SQLBUILD_CONTROL_DATABASE_URL").output().expect("native owner provisioning");
             assert!(provisioned.status.success());

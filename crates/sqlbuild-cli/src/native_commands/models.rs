@@ -6,9 +6,13 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use sqlbuild_cache::project_snapshot::models::{PathStamp, SnapshotRules};
-use sqlbuild_orchestration::credentials::models::{CredentialScope, NewServiceAccount};
+use sqlbuild_orchestration::credentials::models::{
+    CredentialScope, IssuedToken, NewServiceAccount, ServiceAccountSummary,
+};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
-use sqlbuild_orchestration::platform::models::{LocationWorkRequest, WarehouseReadFailure};
+use sqlbuild_orchestration::platform::models::{
+    LocationWorkRecord, LocationWorkRequest, WarehouseReadFailure,
+};
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
 use sqlbuild_orchestration::sensors::models::SensorEventChoice;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
@@ -71,6 +75,89 @@ pub(crate) enum ServiceAccountAdmin {
         disabled: bool,
     },
     List,
+}
+
+/// What an admin command did or read; it may hold a secret, so it has no `Debug`.
+pub(crate) enum AdminDone {
+    Bootstrapped {
+        id: Uuid,
+        name: String,
+    },
+    LocationCreated {
+        id: Uuid,
+        name: String,
+    },
+    PrincipalCreated {
+        id: Uuid,
+        name: String,
+    },
+    PasswordSet {
+        id: Uuid,
+        name: String,
+    },
+    AdminGranted {
+        id: Uuid,
+        name: String,
+    },
+    TokenIssued {
+        token: IssuedToken,
+        location: String,
+    },
+    TokenRotated {
+        replaced: Uuid,
+        token: IssuedToken,
+    },
+    TokenRevoked {
+        id: Uuid,
+        revoked: bool,
+    },
+    RunQueued {
+        run_id: Uuid,
+        job: String,
+        target: String,
+        applied: bool,
+    },
+    RerunQueued {
+        run_id: Uuid,
+        source: Uuid,
+        applied: bool,
+    },
+    CheckRequested {
+        request_id: Uuid,
+        location: String,
+        target: String,
+        applied: bool,
+    },
+    WorkRead {
+        request_id: Uuid,
+        record: Option<Box<LocationWorkRecord>>,
+        now: DateTime<Utc>,
+    },
+    CancelRequested {
+        event_id: Uuid,
+        run_id: Uuid,
+        applied: bool,
+    },
+    TriggerChanged {
+        event_id: Uuid,
+        trigger_id: Uuid,
+        change: TriggerChange,
+        applied: bool,
+    },
+    /// `key` is absent when the operator imported their own.
+    AccountCreated {
+        account: ServiceAccountSummary,
+        key: Option<String>,
+    },
+    KeyRotated {
+        account: ServiceAccountSummary,
+        key: String,
+    },
+    AccountSwitched {
+        account: ServiceAccountSummary,
+        disabled: bool,
+    },
+    AccountsListed(Vec<ServiceAccountSummary>),
 }
 
 /// Parsing can finish an invocation before package discovery or any Python handoff.

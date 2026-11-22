@@ -12,6 +12,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 - Stop the server
 - Serve over HTTPS
 - Add people who sign in with passwords
+- Administer the server with sqb admin
 - Call the server from scripts with service accounts
 - Sign in through a reverse proxy
 - Receive platform events
@@ -124,6 +125,28 @@ adds a person from **People → Add person** with their sign-in name, a first pa
 them; they can change it after they sign in. Behind OIDC or a trusted proxy, people appear the
 first time they sign in instead, and the button isn't shown.
 
+## Administer the server with sqb admin
+
+`sqb admin` works on the control database directly, on the server's host. Each command prints one
+line on stderr that names what it did:
+
+```text
+$ sqb admin create-location orders
+Registered location orders (01a1fb47-0b3a-7631-ba35-e44d44d072f2)
+```
+
+| Command | On stdout |
+| --- | --- |
+| Issues a token or key: `issue-location-token`, `rotate-token`, `create-service-account`, `rotate-service-account` | Only the secret, once, so `VALUE="$(sqb admin ...)"` captures it. Nothing for an imported key |
+| Reads: `location-work`, `list-service-accounts` | Plain rows, with no header |
+| Everything else | Nothing |
+| Any command with `--json` | Only the JSON result, with the secret in it when one was issued. The line on stderr is left out |
+
+When a script needs an ID, such as the new location's, use `--json`. `--verbose` also says when the
+control store opens and is ready; without it, `sqb admin` says so only when opening takes more than
+a second, as a migration can. Put both options after the command's name. A command whose output
+can't be written exits with status 1 and says the change may already be committed.
+
 ## Call the server from scripts with service accounts
 
 A service account lets a script, such as a deploy that republishes a project, call the server
@@ -134,8 +157,8 @@ host:
 sqb admin create-service-account orders-deploy --role developer --description "Release pipeline"
 ```
 
-The key is in the JSON result, as `key`, and in the UI's dialog once. Store it now, for example in
-your deploy's secret store: it isn't shown again, and the server keeps only a hash of it. The script
+The key is the only thing on stdout (`key` with `--json`), and the UI shows it once in a dialog.
+Store it now, for example in your deploy's secret store: it isn't shown again, and the server keeps only a hash of it. The script
 sends it in an `Authorization` header:
 
 ```bash
@@ -159,8 +182,8 @@ curl -H "Authorization: Bearer $SQB_SERVICE_KEY" https://control.example.com/api
   `--key-from-env VAR` to `create-service-account`, with the key in the environment variable `VAR`.
   It must start with `sqbk_` and have at least 32 more characters, without spaces. Generate it
   randomly, for example `sqbk_` and 40 random letters and digits: SQLBuild can't tell a guessable key
-  from a strong one, so an imported key is only as strong as you make it. The result then leaves the
-  key out. Only the CLI imports keys; the UI always makes a new one.
+  from a strong one, so an imported key is only as strong as you make it. The command then doesn't print the
+  key. Only the CLI imports keys; the UI always makes a new one.
 - **Any address.** A keyed request is accepted on whatever address the server listens on, with any
   `Host`, so a server behind a sign-in proxy can also listen on the network, such as
   `host = "0.0.0.0"`, for scripts. The proxy's username header is still trusted only from

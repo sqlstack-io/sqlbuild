@@ -52,10 +52,12 @@ use crate::native_commands::constants::{
     METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS,
     UNKNOWN_COMMAND,
 };
+use crate::native_commands::constants::{OPENING_STORE, STORE_READY};
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_control::run_control;
 use crate::native_commands::main::_run_cost::run_cost;
+use crate::native_commands::models::AdminDone;
 use crate::native_commands::models::{
     CommandOutput, DevControlState, InstalledPackage, LocationCompileRequest, LocationCompiler,
     LocationMetadataPage, LocationMetadataSync, LocationServe, LocationWatch, LostStdout,
@@ -1229,7 +1231,7 @@ pub(crate) fn start_platform_roles(
 pub(crate) async fn run_control_action(
     namespace: &Namespace,
     command: &str,
-) -> Result<Option<serde_json::Value>, ControlError> {
+) -> Result<Option<AdminDone>, ControlError> {
     if command == ADMIN_COMMAND {
         return run_admin(namespace).await.map(Some);
     }
@@ -1238,7 +1240,7 @@ pub(crate) async fn run_control_action(
         .map(|()| None)
 }
 
-/// Open and migrate the privileged store, reporting progress without contaminating JSON stdout.
+/// Open and migrate the server's store, reporting progress on stderr.
 pub(crate) async fn open_control_store(
     namespace: &Namespace,
     server: Option<&ServerSection>,
@@ -1247,14 +1249,17 @@ pub(crate) async fn open_control_store(
         namespace,
         &control_database_variable(namespace, server.unwrap_or(&ServerSection::default())),
     )?;
+    drop(write_output(&[(Stream::Stderr, OPENING_STORE)]));
+    let store = open_migrated_store(&url).await?;
+    drop(write_output(&[(Stream::Stderr, STORE_READY)]));
+    Ok(store)
+}
+
+/// The store at `url`, created or migrated to this build's schema.
+pub(crate) async fn open_migrated_store(url: &str) -> Result<ControlStore, ControlError> {
     set_release_version(env!("CARGO_PKG_VERSION"));
-    drop(write_output(&[(
-        Stream::Stderr,
-        "Opening control store...\n",
-    )]));
-    let store = open_store(&url).await?;
+    let store = open_store(url).await?;
     migrate_store(&store).await?;
-    drop(write_output(&[(Stream::Stderr, "Control store ready\n")]));
     Ok(store)
 }
 

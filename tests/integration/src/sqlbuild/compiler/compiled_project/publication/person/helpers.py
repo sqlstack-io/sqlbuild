@@ -30,7 +30,7 @@ def provision_person(control: Path, command: str, name: str) -> dict[str, Any]:
     environment.pop("SQLBUILD_CONTROL_DATABASE_URL", None)
     executable: str = str(Path(sys.executable).with_name("sqb"))
     created: subprocess.CompletedProcess[str] = subprocess.run(
-        [executable, "admin", command, name],
+        [executable, "admin", command, name, "--json"],
         cwd=control,
         env=environment,
         capture_output=True,

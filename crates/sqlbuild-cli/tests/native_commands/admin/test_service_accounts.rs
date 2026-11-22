@@ -99,11 +99,11 @@ fn given_a_key_in_an_environment_variable_when_the_owner_imports_it_then_it_call
                 ],
                 (KEY_VARIABLE, test_case.key),
             );
-            let created: Value = serde_json::from_slice(&output.stdout).unwrap_or(Value::Null);
             assert_eq!(
                 (
                     output.status.success(),
-                    created.get("key").is_some(),
+                    !output.stdout.is_empty()
+                        || String::from_utf8_lossy(&output.stderr).contains(test_case.key),
                     keyed_bootstrap_status(&url, test_case.key).await
                 ),
                 (

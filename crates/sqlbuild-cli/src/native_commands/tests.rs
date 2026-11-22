@@ -1,3 +1,5 @@
+#[path = "tests/test_admin_output.rs"]
+mod admin_output;
 #[path = "tests/test_argv_host.rs"]
 mod argv_host;
 #[path = "tests/test_changed_build.rs"]

@@ -404,3 +404,11 @@ pub(super) struct UnsetProviderSecretsTestCase {
     pub(super) providers: Vec<(&'static str, bool, Vec<&'static str>)>,
     pub(super) expected_unset: Vec<(&'static str, Vec<&'static str>)>,
 }
+
+/// One admin result and what it prints without `--json`.
+pub(crate) struct AdminTextTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) done: crate::native_commands::models::AdminDone,
+    pub(crate) expected_line: Option<&'static str>,
+    pub(crate) expected_stdout: &'static str,
+}

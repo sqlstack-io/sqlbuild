@@ -73,7 +73,7 @@ fn given_local_store_ownership_when_create_user_runs_then_only_the_first_process
         }
         let initialized: i64 = connection.query_row("SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.initialized' AND actor='local-control-store-owner'",[],|row| row.get(0)).expect("bootstrap audit");
         assert_eq!(initialized,1);
-        let recovery = invoke_admin(&control, &["grant-admin", id.as_str()]);
+        let recovery = invoke_admin(&control, &["grant-admin", id.as_str(), "--json"]);
         assert!(recovery.status.success(), "{}", String::from_utf8_lossy(&recovery.stderr));
         assert_eq!(serde_json::from_slice::<Value>(&recovery.stdout).expect("JSON-only grant"), json!({"principal_id":id,"role":"admin"}));
         let audits: i64 = connection.query_row("SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.granted'",[],|row| row.get(0)).expect("grant audit");
