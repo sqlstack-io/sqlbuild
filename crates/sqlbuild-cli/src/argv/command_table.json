@@ -168,7 +168,7 @@
      "name": "location",
      "parser": {
       "prog": "sqb location",
-      "description": "Compile and publish a project from its own Python environment. Uses SQLBUILD_LOCATION_TOKEN for scoped HTTP access, never the control database. Results are JSON; progress goes to stderr.",
+      "description": "Compile and publish a project from its own Python environment. Uses SQLBUILD_LOCATION_TOKEN for scoped HTTP access, never the control database; republish instead uses SQLBUILD_API_KEY, over HTTP or HTTPS, or your sqb login session, over HTTPS. Results are JSON; progress goes to stderr.",
       "groups": [
        {
         "title": "positional arguments"
@@ -254,6 +254,7 @@
         "options": ["--wait"],
         "dest": "location_wait",
         "nargs": 0,
+        "const": true,
         "default": false,
         "help": "for republish, wait for the new snapshot or the publish error",
         "group": 1
