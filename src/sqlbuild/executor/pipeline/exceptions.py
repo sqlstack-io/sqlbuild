@@ -59,7 +59,8 @@ class TemporaryTestFunctionError(Exception):
         )
         self.help: str = (
             "Tests call temporary copies of the functions they use, never the built functions; "
-            "check that the target's role may create temporary functions in the function's "
-            "schema, and that the schema exists."
+            "check that the target's role may create temporary functions in the session's "
+            "current schema, or in the function's schema when the session has none, and that the "
+            "schema exists."
         )
         super().__init__(self.message)

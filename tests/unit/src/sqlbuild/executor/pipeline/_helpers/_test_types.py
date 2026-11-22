@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sqlbuild._native import PlanOutput
+
 
 @dataclass(frozen=True)
 class SqlTestFunctionPreflightTestCase:
@@ -217,6 +219,13 @@ class TemporaryTestFunctionTestCase:
     max_concurrency: int
     expected_outcomes: tuple[str, ...]
     expected_error_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RefusedTemporaryCopyTestCase:
+    description: str
+    plan: PlanOutput
+    expected_function: str
 
 
 @dataclass(frozen=True)

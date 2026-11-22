@@ -18,6 +18,7 @@ from sqlbuild._native import (
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.executor.pipeline._helpers import testing as testing_pipeline
 from sqlbuild.executor.pipeline._helpers.testing import run_test_pipeline
+from sqlbuild.executor.pipeline.exceptions import TemporaryTestFunctionError
 from sqlbuild.executor.pipeline.models import TestPipelineCallbacks as PipelineCallbacks
 from sqlbuild.executor.testing.models import SqlTestExecutionResult
 from sqlbuild.executor.testing.types import SqlTestOutcome
@@ -29,6 +30,7 @@ from sqlbuild.observability import (
 )
 from sqlbuild.runtime.execution_limits.models import RunItemTimeouts
 from tests.unit.src.sqlbuild.executor.pipeline._helpers._test_types import (
+    RefusedTemporaryCopyTestCase,
     SqlTestConcurrencyTestCase,
     SqlTestFunctionPreflightTestCase,
     SqlTestOperationLifecycleTestCase,
@@ -162,17 +164,6 @@ def test_given_sql_test_with_missing_function_when_running_pipeline_then_returns
             expected_outcomes=("fail",),
             expected_error_fragments=(),
         ),
-        TemporaryTestFunctionTestCase(
-            description="uncreatable copy reports why and asks for a build",
-            body_sql="order_status = = 'completed'",
-            test_count=1,
-            max_concurrency=1,
-            expected_outcomes=("error",),
-            expected_error_fragments=(
-                "its temporary copy for the test run could not be created",
-                "Run `sqb build` first",
-            ),
-        ),
     ],
     ids=lambda case: case.description,
 )
@@ -219,18 +210,6 @@ def test_given_unbuilt_function_when_running_tests_then_temporary_copy_holds_cur
             expected_outcomes=("pass", "pass"),
             expected_error_fragments=(),
         ),
-        TemporaryTestFunctionTestCase(
-            description="caller without a copyable callee reports the callee",
-            body_sql="order_status = = 'completed'",
-            test_count=1,
-            max_concurrency=1,
-            expected_outcomes=("error",),
-            expected_error_fragments=(
-                "function status_matches, which it calls, has no temporary copy",
-                "status_matches (its temporary copy for the test run could not be created",
-                "Run `sqb build` first",
-            ),
-        ),
     ],
     ids=lambda case: case.description,
 )
@@ -256,6 +235,44 @@ def test_given_unbuilt_callee_when_running_tests_then_callee_copy_holds_current_
         test_case.description,
         messages,
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RefusedTemporaryCopyTestCase(
+            description="refused copy of the tested function stops the run",
+            plan=order_status_function_test_plan(
+                body_sql="order_status = = 'completed'", test_count=1
+            ),
+            expected_function="is_completed_order",
+        ),
+        RefusedTemporaryCopyTestCase(
+            description="refused copy of a callee stops the run and names the callee",
+            plan=order_status_callee_test_plan(
+                callee_body_sql="order_status = = 'completed'", test_count=1
+            ),
+            expected_function="status_matches",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_refused_function_copy_when_running_tests_then_run_stops_with_t006(
+    test_case: RefusedTemporaryCopyTestCase,
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(TemporaryTestFunctionError) as raised:
+        _ = run_test_pipeline(
+            plan=test_case.plan,
+            connection_config={"database": str(tmp_path / "orders.duckdb")},
+            adapter=DuckDbAdapter(),
+        )
+
+    assert raised.value.code == "T006", test_case.description
+    assert (
+        f"copy of function {test_case.expected_function} on" in raised.value.message
+        and "syntax error" in raised.value.message
+    ), (test_case.description, raised.value.message)
 
 
 @pytest.mark.parametrize(
