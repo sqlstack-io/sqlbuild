@@ -90,8 +90,11 @@ pub(crate) async fn check_discovered(
 pub(crate) async fn discovered(
     options: &LocationServe,
     (bearer, session_id): (&str, Uuid),
-    (generation, load): (i64, &LocationLoad),
+    (generation, load, discovery): (i64, &LocationLoad, &LocationDiscovery),
 ) {
+    if !discovery.reports(load) {
+        return;
+    }
     if options.dev_events
         && let Some(summary) = discovery_summary(&load.discovered)
     {
