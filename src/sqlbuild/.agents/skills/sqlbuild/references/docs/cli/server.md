@@ -455,8 +455,9 @@ hold job definitions this release no longer reads, which fail with
 5. Upgrade and restart every location, so each publishes its project again with the new release.
 6. Once every location has published again, resume schedules and sensors.
 
-Until a location has published again, its job pages, group runs and ad hoc runs fail, a group's
-schedule or sensor stops the scheduler, and a job run that fails can't record its failure.
+Until a location whose snapshot this release can't read has published again, its job pages, group
+runs and ad hoc runs fail, and a schedule or sensor that starts a group is skipped and tried again
+every minute. A failed job run on such a snapshot isn't retried.
 
 To see what an upgrade changes before you start the server, run the new release with `--dry-run`:
 
@@ -614,7 +615,9 @@ max_bytes_per_run = "20GB"
   `~/.local/state/sqlbuild/output` of the user that runs the server, or `sqlbuild/output` in
   `XDG_STATE_HOME` when that is an absolute path, whichever directory the server starts in. In the
   server image that is `/home/sqlbuild/.local/state/sqlbuild/output`.
-  [`sqb dev`](dev.md) keeps its output in `.sqlbuild/output`.
+  [`sqb dev`](dev.md) keeps its output in `.sqlbuild/output` with its default control store.
+  With `--control-store-url` it uses an `output` folder beside that SQLite store, or the same folder
+  as above for PostgreSQL.
 - `~` is `HOME` (`USERPROFILE` on Windows), or the account's home directory when that is unset.
 - Servers on different control databases under the same user, including a server on a cloned
   database, should each set their own `store` folder, or one's retention can delete another's
@@ -1217,7 +1220,7 @@ permissions = ["view.evidence"]
 | Permissions | Any non-administrative action; `user.manage`, `role.assign` and `audit.view` are rejected |
 | Runs | `job.run`, `run.rerun` and `run.rewrite_history` need the permission on every node the run writes; an [ad-hoc command](#run-ad-hoc-commands) needs `run.adhoc` and its flags' permissions on every node it selects; a priority above 0 also needs `run.prioritise` |
 | Republish a location | `location.republish` on the location and target; reading its discovered sets back needs `view` |
-| Triggers | `trigger.toggle` (on, off) and `sensor.reset_cursor` (start over, skip an event) need the permission on every node a schedule's job writes, and for a sensor on every node of the target |
+| Triggers | `trigger.toggle` (on, off) and `sensor.reset_cursor` (start over, skip an event) need the permission on every node a schedule's job writes. A sensor needs it on every node of the target, as does pausing or resuming a schedule whose job can't be read |
 | Listings | The catalog, statistics, providers and run list need `view` on every node of the current publication; partial coverage is denied, not filtered |
 | Several roles | Grants add up across a person's roles |
 

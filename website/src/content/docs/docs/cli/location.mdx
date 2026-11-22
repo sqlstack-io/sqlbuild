@@ -13,6 +13,10 @@ export SQLBUILD_LOCATION_TOKEN=...
 sqb location serve --server https://control.example.com --location-id "$LOCATION_ID" --target production
 ```
 
+With a separate `sqb server`, keep a SQLite control database and a local
+[output folder](/docs/cli/server/#keep-run-output) outside the project or under the project's
+`.sqlbuild` folder. Otherwise the location takes their writes for project edits and publishes again.
+
 Create the location and its token with `sqb admin create-location orders` and
 `sqb admin issue-location-token` on the server's host. The token is the only thing on stdout, so
 `export SQLBUILD_LOCATION_TOKEN="$(sqb admin issue-location-token "$LOCATION_ID" --expires-at "$EXPIRY")"`
