@@ -14,8 +14,9 @@ use crate::argv::models::{Namespace, Stream};
 use crate::native_commands::_helpers::command::decision::{control_address, control_api_settings};
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::{
-    open_control_store, open_control_workers, start_platform_roles, supervise_control_roles,
+    open_control_store, open_control_workers, start_platform_roles,
 };
+use crate::native_commands::_helpers::location::shutdown::supervise_control_roles;
 use crate::server_config::main::read_server_config::read_server_config;
 use crate::workers::models::Workers;
 
@@ -78,14 +79,15 @@ pub(crate) async fn run_control(
         )?;
     }
     if facts.scheduler {
-        start_scheduler(&mut tasks, store, shutdown, workers);
+        start_scheduler(&mut tasks, (store, facts.origin.clone()), shutdown, workers);
     }
     supervise_control_roles(tasks, stop).await
 }
 
+/// Start the scheduler, whose sensor events link runs under `origin`.
 fn start_scheduler(
     tasks: &mut JoinSet<Result<(), ControlError>>,
-    store: ControlStore,
+    (store, origin): (ControlStore, Option<String>),
     shutdown: watch::Receiver<bool>,
     workers: Workers,
 ) {
@@ -93,7 +95,7 @@ fn start_scheduler(
     tasks.spawn(async move {
         run_scheduler(
             &store,
-            SchedulerState::new(Uuid::now_v7()),
+            SchedulerState::new(Uuid::now_v7()).with_origin(origin),
             shutdown,
             workers,
         )

@@ -7,7 +7,7 @@ use ruff_text_size::TextSize;
 
 use crate::cpython_tree::models::SourceLines;
 
-/// What a module-level `calendar(...)` or `sensor(...)` call declares.
+/// What a `calendar(...)` call or a `sensor(...)` decorator declares.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PythonDeclarationKind {
     Calendar,
@@ -28,15 +28,30 @@ pub struct LiteralArgument {
     pub position: SourcePosition,
 }
 
+/// How a `sensor` declaration is written; only a call decorating a function declares one.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SensorForm {
+    /// `@sensor(...)` above `def function(...)`.
+    Decorator { function: String },
+    /// `@sensor` with no arguments.
+    BareDecorator,
+    /// `sensor(...)` that decorates no function.
+    Call,
+}
+
 /// One calendar or sensor and the job names it refers to.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PythonDeclaration {
     pub kind: PythonDeclarationKind,
-    /// The `name` argument, or `None` when the call passes no name.
+    /// The `name` argument, else a decorated sensor's function name; `None` when there is neither.
     pub name: Option<LiteralArgument>,
     pub position: SourcePosition,
-    /// `run=` of a sensor, then each `run_event(job=...)`, labelled by the argument.
+    /// Each `run_event(job=...)`, then each literal `RunRequest(job=...)` in a sensor's function, labelled by the call.
     pub job_references: Vec<(&'static str, LiteralArgument)>,
+    /// A sensor's form; `None` for a calendar.
+    pub sensor_form: Option<SensorForm>,
+    /// Where a sensor's first positional argument starts, which it doesn't take.
+    pub positional: Option<SourcePosition>,
     /// A sensor's `targets`: empty when omitted, `None` when not a literal tuple or list of strings.
     pub targets: Option<Vec<String>>,
     /// What a sensor's `when` selects, as far as its own module shows; `None` for a condition that selects no nodes.

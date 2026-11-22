@@ -13,3 +13,5 @@ class DynamicPauseEventType(StrEnum):
     PAUSED = "paused"
     RESUMED = "resumed"
     HEARTBEAT = "heartbeat"
+    RESUMING = "resuming"
+    """A sync's claim on a model it is about to resume, closed by a `RESUMED` row of its run."""

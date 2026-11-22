@@ -1,0 +1,85 @@
+"""A `__table_fn__` fixture stands for a partitioned call's whole output, emitted once."""
+
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from tests.e2e.src.sqlbuild.cli.commands.main.test._test_types import (
+    PartitionedCallFixtureE2ETestCase,
+)
+from tests.e2e.src.sqlbuild.cli.commands.main.test.helpers import partitioned_call_fixture_files
+from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
+
+_INPUT: str = '__ref("payments") AS p'
+_CALL: str = (
+    '__table_fn("smooth_payments")(p.customer_id, p.amount) OVER (PARTITION BY p.customer_id)'
+)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PartitionedCallFixtureE2ETestCase(
+            description="three payments of one customer read the one fixture row once",
+            query=f"SELECT s.customer_id, s.amount_smoothed FROM {_INPUT}, {_CALL} AS s",
+            expected_rows="SELECT 1 AS customer_id, 20.0::DOUBLE AS amount_smoothed",
+            expected_exit_code=0,
+            expected_stdout_fragment="PASS=1",
+        ),
+        PartitionedCallFixtureE2ETestCase(
+            description="a fixture row repeated per input row fails the partitioned call's test",
+            query=f"SELECT s.customer_id, s.amount_smoothed FROM {_INPUT}, {_CALL} AS s",
+            expected_rows=(
+                "SELECT 1 AS customer_id, 20.0::DOUBLE AS amount_smoothed "
+                "FROM (VALUES (1), (2), (3)) AS v (n)"
+            ),
+            expected_exit_code=1,
+            expected_stdout_fragment="FAIL=1",
+        ),
+        PartitionedCallFixtureE2ETestCase(
+            description="the partition column reads the fixture's value, so conditions on it hold",
+            query=(
+                f"SELECT p.customer_id, s.amount_smoothed FROM {_INPUT}, {_CALL} AS s "
+                "WHERE p.customer_id = 1"
+            ),
+            expected_rows="SELECT 1 AS customer_id, 20.0::DOUBLE AS amount_smoothed",
+            expected_exit_code=0,
+            expected_stdout_fragment="PASS=1",
+        ),
+        PartitionedCallFixtureE2ETestCase(
+            description="a join before the call keeps reading its partition column as an input",
+            query=(
+                f'SELECT p.customer_id, s.amount_smoothed FROM {_INPUT} JOIN __ref("payments") '
+                f"AS c ON c.customer_id = p.customer_id, {_CALL} AS s WHERE p.customer_id = 1"
+            ),
+            expected_rows="SELECT 1 AS customer_id, 20.0::DOUBLE AS amount_smoothed",
+            expected_exit_code=0,
+            expected_stdout_fragment="PASS=1",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_partitioned_call_fixture_when_testing_then_model_reads_each_fixture_row_once(
+    test_case: PartitionedCallFixtureE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="payments_fixtures",
+        repo_files=partitioned_call_fixture_files(
+            query=test_case.query, expected_rows=test_case.expected_rows
+        ),
+    )
+
+    tested: subprocess.CompletedProcess[str] = run_sqb(command=("test",), project_dir=project_dir)
+
+    output: str = tested.stdout + tested.stderr
+    assert tested.returncode == test_case.expected_exit_code, (test_case.description, output)
+    assert test_case.expected_stdout_fragment in tested.stdout, (test_case.description, output)
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-vv"])

@@ -3251,9 +3251,15 @@ class SnowflakeAdapter(
     def render_create_temporary_function(
         self, *, name: str, definition: FunctionDefinition
     ) -> TemporaryFunction | None:
-        """Copy a function into a session TEMPORARY function in the session's current schema."""
+        """Copy a function into a session TEMPORARY function in the definition's schema."""
 
-        target: str = self.render_identifier(f"{TEMPORARY_FUNCTION_PREFIX}{name}")
+        identifier: str = self.render_identifier(f"{TEMPORARY_FUNCTION_PREFIX}{name}")
+        target: str = (
+            self.render_qualified_name(
+                database=definition.database, schema=definition.schema, name=identifier
+            )
+            or identifier
+        )
         statements: tuple[str, ...] = self.render_create_function(
             destination=target,
             arguments=definition.arguments,
@@ -3711,6 +3717,19 @@ class SnowflakeAdapter(
     def column_rename_unavailable_reason(self, *, connection: Any, destination: str) -> str | None:
         del connection, destination
         return None
+
+    def session_schema(self, *, connection: Any) -> tuple[str, str] | None:
+        """The session's current database and schema, which hold its temporary functions."""
+
+        rows: tuple[tuple[object, ...], ...] = self.query(
+            connection=connection, sql="SELECT CURRENT_DATABASE(), CURRENT_SCHEMA()", limit=None
+        ).rows
+        if not rows or rows[0][0] is None or rows[0][1] is None:
+            return None
+        return (
+            self.render_exact_identifier(str(rows[0][0])),
+            self.render_exact_identifier(str(rows[0][1])),
+        )
 
     def session_warehouse(self, *, connection: Any) -> str | None:
         """The session's warehouse, which refreshes a dynamic model that names none."""

@@ -98,6 +98,26 @@ pub(super) struct PlanArgumentsTestCase {
     pub(super) expected_refused: bool,
 }
 
+/// The jobs a kept plan pinned, those a new request pins, and whether the kept plan answers it.
+pub(super) struct PinnedReuseTestCase {
+    pub(super) description: &'static str,
+    pub(super) kept:
+        std::collections::BTreeMap<String, sqlbuild_orchestration::runs::models::PinnedJob>,
+    pub(super) asked:
+        std::collections::BTreeMap<String, sqlbuild_orchestration::runs::models::PinnedJob>,
+    /// The settings the kept and the new request's commands give.
+    pub(super) given: (&'static [&'static str], &'static [&'static str]),
+    pub(super) expected_reused: bool,
+}
+
+/// A plan request's settings and pinned jobs' settings, and whether it reads the copy's consumption.
+pub(super) struct PlanChangesTestCase {
+    pub(super) description: &'static str,
+    pub(super) settings: serde_json::Value,
+    pub(super) job_settings: serde_json::Value,
+    pub(super) expected_changes: bool,
+}
+
 /// One kept plan, then one request for a plan.
 pub(super) struct PlanReuseTestCase {
     pub(super) description: &'static str,
@@ -352,4 +372,35 @@ pub(super) struct FastClockScanTestCase {
     pub(super) scans_completed: usize,
     /// Whether a table altered a second after the page read is still described live.
     pub(super) expected_described_live: bool,
+}
+
+/// The token a quiet sync left before the location published again, and the token kept.
+pub(super) struct RepublishTokenTestCase {
+    pub(super) description: &'static str,
+    pub(super) previous_token: Option<&'static str>,
+    pub(super) expected_token: Option<&'static str>,
+}
+
+pub(super) struct DynamicResumeTestCase {
+    pub(super) description: &'static str,
+    /// Whether the synchronization completed, and whether failed reads stopped it.
+    pub(super) idle: bool,
+    pub(super) halted: bool,
+    /// The pause table token the location's last quiet pass left, before this sync finishes.
+    pub(super) quiet_token: Option<&'static str>,
+    /// The runtime's reply line to any request.
+    pub(super) reply: &'static str,
+    /// The request lines the runtime received, and whether the sync still holds its reader.
+    pub(super) expected_requests: &'static [&'static str],
+    pub(super) expected_reader_open: bool,
+    /// The token the next sync sends for the location.
+    pub(super) expected_quiet_token: Option<&'static str>,
+}
+
+/// Providers a health report shows missing secrets, and those `sqb dev` warns about.
+pub(super) struct UnsetProviderSecretsTestCase {
+    pub(super) description: &'static str,
+    /// Each provider, whether the target allows it to miss secrets, and the variables it misses.
+    pub(super) providers: Vec<(&'static str, bool, Vec<&'static str>)>,
+    pub(super) expected_unset: Vec<(&'static str, Vec<&'static str>)>,
 }

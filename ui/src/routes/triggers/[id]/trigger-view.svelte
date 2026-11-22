@@ -47,7 +47,7 @@
 	}
 </script>
 
-<AppTopbar title="Triggers">
+<AppTopbar title="Triggers" subject="{t?.name ?? id} · Trigger">
 	{#if t}
 		{#if app.can('trigger.toggle')}<input class="reason" bind:value={reason} placeholder="Why? (saved in the history)" aria-label="Reason for the change" />{/if}
 		{#if t.state !== t.defaultState}

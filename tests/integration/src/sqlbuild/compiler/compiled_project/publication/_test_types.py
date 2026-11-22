@@ -1,5 +1,6 @@
 """Publication cases and isolated server credentials."""
 
+import signal
 import sqlite3
 from collections.abc import Callable
 from contextlib import AbstractContextManager
@@ -319,10 +320,113 @@ class DevelopmentWarningTestCase:
 @dataclass(frozen=True)
 class DevelopmentTerminalTestCase:
     description: str
-    environment: dict[str, str]
+    arguments: list[str]
     unset: frozenset[str]
+    # How the client reads the code: `sys.stdin.readline()` or `getpass.getpass(...)` on /dev/tty.
+    read_code: str
     expected_ready: str
     expected_sign_ins: list[str]
+    # Whether the typed code is visible: a plain prompt echoes it, a getpass prompt never does.
+    expected_code_shown: bool
+
+
+@dataclass(frozen=True)
+class DevelopmentStartupStopTestCase:
+    description: str
+    keys: bytes
+    expected_exit_code: int
+    expected_result: str
+
+
+@dataclass(frozen=True)
+class DevelopmentHangUpTestCase:
+    description: str
+    expected_exit_code: int
+    expected_status: str
+
+
+@dataclass(frozen=True)
+class ForcedWorkerStopTestCase:
+    description: str
+    first: signal.Signals
+    second: signal.Signals
+    expected_exit_code: int
+    expected_worker_exit_code: int
+
+
+@dataclass(frozen=True)
+class WorkerHangUpTestCase:
+    description: str
+    expected_exit_code: int
+    expected_status: str
+
+
+@dataclass(frozen=True)
+class DevelopmentActiveRunStopTestCase:
+    description: str
+    keys: bytes
+    expected_exit_code: int
+    expected_lines: list[str]
+    expected_status: str
+
+
+@dataclass(frozen=True)
+class DevelopmentKeyStopTestCase:
+    description: str
+    keys: bytes
+    expected_exit_code: int
+    expected_result: str
+
+
+@dataclass(frozen=True)
+class DevelopmentSignalStopTestCase:
+    description: str
+    stop: signal.Signals
+    expected_exit_code: int
+    expected_result: str
+
+
+@dataclass(frozen=True)
+class DevelopmentStartFailureTestCase:
+    description: str
+    configuration: str
+    expected_exit_code: int
+    expected_lines: list[str]
+
+
+@dataclass(frozen=True)
+class DevelopmentEnvFileTestCase:
+    description: str
+    first_env_file: str
+    second_env_file: str
+    expected_card_row: str
+    # The parts of the restart event line, in order of appearance.
+    expected_restart: tuple[str, ...]
+    # The `--project-dir` argument for the project, such as a symlink to it.
+    project_argument: Callable[[Path], Path] = lambda project: project
+
+
+@dataclass(frozen=True)
+class WorkerReportTestCase:
+    description: str
+    execution: WorkerExecutionTestCase
+    # The ad-hoc command an admin launches once the scheduled run ends; that run is the one checked.
+    adhoc: list[str]
+    expected_status: str
+    expected_nodes: list[tuple[str, str]]
+    # A line of the run's human results, which its printed output must hold.
+    expected_results: str
+    # Recall event types the worker always records; the report never fed them.
+    expected_recall_events: frozenset[str]
+
+
+@dataclass(frozen=True)
+class DevelopmentMissingSecretsTestCase:
+    description: str
+    first_env_file: str
+    second_env_file: str
+    # What the warning row shows while the secrets are missing.
+    expected_warning: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -584,8 +688,109 @@ class ChangedBuildPublicationTestCase:
 
 
 @dataclass(frozen=True)
+class NoDynamicAdapterSyncTestCase:
+    description: str
+    fixture: str
+    expected_open_holds: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ChangedBuildReplanTestCase:
     description: str
     edit: tuple[str, str]
     expected_published: dict[str, list[str]]
     expected_rebuilt: dict[str, list[str]]
+
+
+@dataclass(frozen=True)
+class ProviderSecretsHealthTestCase:
+    description: str
+    # Providers the target's allow_missing_secrets lists.
+    allowed: tuple[str, ...]
+    expected_missing: int
+    expected_allowed: bool
+    # What the location prints about them, and what it must not print.
+    expected_output_fragments: tuple[str, ...]
+    unexpected_output_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DevelopmentSecretReloadTestCase:
+    description: str
+    # The project's .env before and after the secret is added.
+    first_env_file: str
+    second_env_file: str
+    expected_first_status: str
+    # (node key, status, error code) of the node that uses the provider in the first run.
+    expected_first_node: tuple[str, str, str | None]
+    expected_second_status: str
+
+
+@dataclass(frozen=True)
+class LocationCantRunTestCase:
+    description: str
+    # The plan request's settings, such as variables that make the location compile again.
+    settings: dict[str, object]
+    expected_cant_run: list[dict[str, object]]
+
+
+@dataclass(frozen=True)
+class DevelopmentInvalidEnvFileTestCase:
+    description: str
+    # The project's .env at start, and the edit the parser rejects.
+    first_env_file: str
+    invalid_env_file: str
+    expected_status: str
+    expected_reason: str
+    # A value in the invalid line, which no output may show.
+    secret_text: str
+
+
+@dataclass(frozen=True)
+class SensorTrialCase:
+    """One `sqb sensor try`: the function's answer, the event choice and what the command says."""
+
+    description: str
+    mode: str
+    # `{event}` and `{run}` stand for the watched run's event ID and run ID.
+    choice: tuple[str, ...]
+    expected_exit: int
+    expected_stdout: str
+
+
+@dataclass(frozen=True)
+class SensorFunctionsTestCase:
+    description: str
+    worker: WorkerExecutionTestCase
+    expected_failure_code: str
+    expected_failure: str
+    expected_started_job: str
+    expected_trials: tuple[SensorTrialCase, ...]
+    # Provider secret values the location's environment sets; no stored tick or trial output
+    # may show them.
+    expected_masked: dict[str, str]
+    # Provider secret values only a `.env` file sets, masked the same way.
+    dotenv_secrets: dict[str, str]
+
+
+class SensorHarness(NamedTuple):
+    """A sensor test's files, sign-in and CLI environment."""
+
+    root: Path
+    origin: str
+    certificate: Path
+    modes: Path
+    calls: Path
+    binary: str
+    environment: dict[str, str]
+
+
+@dataclass(frozen=True)
+class CheckSensorsTestCase:
+    description: str
+    worker: WorkerExecutionTestCase
+    # Each failed or warned check the check sensor is called with, as (check, status).
+    expected_check_events: list[tuple[str, str]]
+    # The run event's failed checks and failed nodes.
+    expected_failed_checks: list[str]
+    expected_failed_nodes: list[str]

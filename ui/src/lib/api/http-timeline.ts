@@ -26,28 +26,30 @@ export function timelineOf(reads: TimelineReads, locationId: string, window: { s
 	const kinds = new Map(reads.jobs.map((j) => [j.job_key, j.kind]));
 	for (const t of reads.triggers) {
 		const due = t.next_due_at;
-		if (!('schedule' in t.definition_json) || t.status !== 'running' || !due || due < window.since || due >= window.until) continue;
+		const job = t.job_key;
+		if (!('schedule' in t.definition_json) || !job || t.status !== 'running' || !due || due < window.since || due >= window.until) continue;
 		bars.push({
 			runId: null,
-			jobKey: t.job_key,
-			kind: kinds.get(t.job_key) === 'group' ? 'group' : 'job',
+			jobKey: job,
+			kind: kinds.get(job) === 'group' ? 'group' : 'job',
 			origin: 'schedule',
 			status: 'projected',
 			triggerName: t.name,
 			start: due,
-			end: new Date(Date.parse(due) + typicalMs(bars, t.job_key)).toISOString()
+			end: new Date(Date.parse(due) + typicalMs(bars, job)).toISOString()
 		});
 	}
 	const triggers = new Map(reads.triggers.map((t) => [t.trigger_id, t]));
 	const markers: TimelineTickMarker[] = reads.ticks.flatMap((tick) => {
 		const trigger = triggers.get(tick.trigger_id);
-		if (!trigger || tick.outcome !== 'covered' || tick.scheduled_for < window.since || tick.scheduled_for >= window.until) return [];
+		const job = trigger?.job_key;
+		if (!trigger || !job || tick.outcome !== 'covered' || tick.scheduled_for < window.since || tick.scheduled_for >= window.until) return [];
 		return [
 			{
 				tickId: tick.tick_id,
 				triggerId: tick.trigger_id,
 				triggerName: trigger.name,
-				jobKey: trigger.job_key,
+				jobKey: job,
 				scheduledFor: tick.scheduled_for,
 				outcome: 'covered',
 				coveredByRunId: tick.covered_by_run_id ?? null,

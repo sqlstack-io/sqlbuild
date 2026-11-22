@@ -48,10 +48,10 @@ _PROJECT_FILES: dict[str, str] = {
     ),
     "orchestration/sensors/overdue_sensor.py": (
         "from pathlib import Path\n"
-        "from sqlbuild.orchestration import PlatformEventKind, platform_event, sensor\n"
+        "from sqlbuild.orchestration import PlatformEventKind, RunRequest, platform_event, sensor\n"
         "Path(__file__).parents[2].joinpath('sensor_imported').write_text('yes')\n"
-        "overdue = sensor('overdue_sensor', description='Catch up.', "
-        "when=platform_event(kinds=[PlatformEventKind.TICK_OVERDUE]), run='nightly_job')\n"
+        "@sensor(description='Catch up.', when=platform_event(kinds=[PlatformEventKind.TICK_OVERDUE]))\n"
+        "def overdue_sensor(ctx):\n    return RunRequest(job='nightly_job')\n"
     ),
 }
 

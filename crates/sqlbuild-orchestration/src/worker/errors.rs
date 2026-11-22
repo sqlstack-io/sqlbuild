@@ -19,6 +19,14 @@ pub enum WorkerError {
     Verification(#[from] crate::store::errors::ControlError),
     #[error("run cancellation was requested before execution")]
     Cancelled,
+    /// Part of the execution this worker's release can't read, such as an unknown field or variant, named with where it is.
+    #[error("the run request has a part this worker can't read: {0}")]
+    UnreadableExecution(String),
+    /// The run request has a part this worker's release can't read, so it can't run all of what was asked.
+    #[error(
+        "this worker runs SQLBuild {version} and can't read a run request from a newer server ({detail}); upgrade the location"
+    )]
+    NewerServer { version: String, detail: String },
 }
 
 impl From<crate::api::errors::ClientError> for WorkerError {

@@ -84,12 +84,15 @@ export interface ApiClient extends PlatformApi {
 	listCatalogNodes(scope: Scope): Promise<CatalogNode[]>;
 	/** Every node's build state at the current status version, for applying `node_status` changes to a listing. */
 	listNodeStates(scope: Scope): Promise<NodeStates>;
-	/** `listing` is a current `listCatalogNodes` result the caller already holds, so it isn't read again. */
-	getCatalogNode(scope: Scope, key: string, listing?: CatalogNode[]): Promise<CatalogNodeDetail | null>;
+	/** `listing` and `checks` are current `listCatalogNodes` and `listChecks` results the caller already holds, so they aren't read again. */
+	getCatalogNode(scope: Scope, key: string, listing?: CatalogNode[], checks?: Check[]): Promise<CatalogNodeDetail | null>;
 	/** The snapshot's column lineage around one node; `listing` as for `getCatalogNode`. */
 	getColumnLineage(scope: Scope, key: string, listing?: CatalogNode[]): Promise<ColumnLineage | null>;
-	/** Every audit and check with its latest result. */
-	listChecks(scope: Scope): Promise<Check[]>;
+	/**
+	 * Every audit and check with its latest result; a repeat the server answers with 304 returns the held list.
+	 * A read already in flight is joined only if it began after `notBefore` (`performance.now()`), such as a change signal.
+	 */
+	listChecks(scope: Scope, notBefore?: number): Promise<Check[]>;
 	getCheck(scope: Scope, id: string): Promise<CheckDetail | null>;
 	/** The latest evaluation's SQL and error texts. `view.sql`; every read is audited. */
 	getCheckSql(scope: Scope, checkId: string): Promise<CheckSql>;
@@ -172,6 +175,8 @@ export interface ApiClient extends PlatformApi {
 	setTriggerStates(scope: Scope, ids: string[], state: TriggerState, reason?: string | null): Promise<Trigger[]>;
 	resetTriggerToDefault(scope: Scope, id: string): Promise<Trigger>;
 	resetSensorCursor(scope: Scope, id: string, reason?: string | null): Promise<TriggerDetail>;
+	/** Mark the event a sensor is stuck on delivered without calling its function; the reason is required. */
+	skipSensorEvent(scope: Scope, id: string, eventId: string, reason: string): Promise<TriggerDetail>;
 	// ---- end OPERATE ----
 
 	listPlatformEvents(query: { activeOnly: boolean }): Promise<PlatformEvent[]>;

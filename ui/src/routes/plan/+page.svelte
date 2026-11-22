@@ -30,6 +30,7 @@
 	import { applySuggestion, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, settledJobCommand, suggest, windowOf, withFullRefresh, withVerb, withWindow, type Suggestion } from '$lib/run/command';
 	import DataRange from '$lib/run/data-range.svelte';
 	import PlanBrowser from '$lib/run/plan-browser.svelte';
+	import { cantRunKeys, cantRunReason, sinkBlocks, withoutNodes } from '$lib/run/cant-run';
 	import PlanTimings from '$lib/run/plan-timings.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
@@ -37,11 +38,12 @@
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { useChecks } from '$lib/state/checks.svelte';
 	import { useCatalogNodes } from '$lib/state/catalog.svelte';
 
 	const snapshotNodes = createResource((client, scope) => client.listSnapshotNodes(scope), ['snapshot']);
 	const catalog = useCatalogNodes();
-	const checkList = createResource((client, scope) => client.listChecks(scope), ['checks']);
+	const checkList = useChecks();
 	// A `--changed` plan names the job whose own run refreshes what it holds back, with that job's schedule.
 	const triggerList = createResource((client, scope) => client.listTriggers(scope), ['triggers']);
 	const schedulerStopped = $derived(app.platformEvents.some((e) => e.active && e.kind === 'scheduler_no_leader'));
@@ -329,7 +331,10 @@
 	let launchError = $state<string | null>(null);
 	const planned = $derived(check?.verb !== 'build' || planCurrent);
 	const allowed = $derived(job ? jobPermissions.every((p) => p.allowed) : !!check?.launchable);
-	const canLaunch = $derived(fresh && !check?.error && !jobProblem && !settled.typing && allowed && planned);
+	/** Nodes the current plan can't run because a provider is missing secrets; Run waits until none are left. */
+	const cantRun = $derived(planCurrent && check?.verb === 'build' ? (plan?.cant_run ?? []) : []);
+	const blockedNodes = $derived(cantRunKeys(cantRun));
+	const canLaunch = $derived(fresh && !check?.error && !jobProblem && !settled.typing && allowed && planned && !cantRun.length);
 	const problem = $derived(jobProblem ?? checkError ?? (fresh ? check?.error : null) ?? (planError?.key === requestKey ? planError.message : null));
 	/** One loading state over the whole result, from the first check until the plan arrives, so the page doesn't rebuild itself in steps. */
 	const waiting = $derived<'check' | 'plan' | null>(
@@ -346,7 +351,15 @@
 					(job
 						? jobPermissions.find((p) => !p.allowed) && "You don't have permission to rebuild or reprocess data (run.rewrite_history)"
 						: check?.permissions.find((p) => !p.allowed)?.reason) ??
-					(planned ? (settled.typing ? 'Finish the option you are typing' : undefined) : (planError?.key === requestKey ? planError.message : 'Waiting for the plan')))
+					(planned
+						? settled.typing
+							? 'Finish the option you are typing'
+							: cantRun.length
+								? cantRunReason(cantRun)
+								: undefined
+						: planError?.key === requestKey
+							? planError.message
+							: 'Waiting for the plan'))
 	);
 
 	/** The banner shows only problems that stop this run or touch what it builds; the rest stay on the Overview. */
@@ -391,9 +404,8 @@
 	];
 </script>
 
-<svelte:head><title>Plan · {cmd.trim() || 'sqb'}</title></svelte:head>
 
-<AppTopbar title="Plan" events={affectsPlan} />
+<AppTopbar title="Plan" subject="Plan · {cmd.trim() || 'sqb'}" events={affectsPlan} />
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="px-4 pt-3 empty:hidden"><SyncingNote what="Plan previews" /></div>
@@ -487,7 +499,20 @@
 				</DataTable>
 				</div>
 			{:else if shown?.verb === 'build' && plan}
-				<PlanBrowser {plan} {refresh} {section} onselect={(key) => (section = key)} more={planRequestId ? morePlan : undefined} load={planRequestId ? findPlanRows : undefined} diff={planRequestId ? planDiff : undefined} />
+				<PlanBrowser
+					{plan}
+					{refresh}
+					{section}
+					onselect={(key) => (section = key)}
+					more={planRequestId ? morePlan : undefined}
+					load={planRequestId ? findPlanRows : undefined}
+					diff={planRequestId ? planDiff : undefined}
+					kindOf={(key) => {
+						const node = byKey.get(key);
+						return node ? kindLine(node) : '';
+					}}
+					upstreamOf={(key) => byKey.get(key)?.upstream ?? []}
+				/>
 			{:else if shown?.verb && shown.verb !== 'build'}
 				<DataTable class="static compact" embedded columns={nodeColumns} rows={picked} key={(key) => key} rowHeight={32} empty="No nodes selected.">
 					{#snippet row(key)}
@@ -520,6 +545,9 @@
 		<div class="why">
 			{#if launchError}<span class="problem">{launchError}</span>{:else if !canLaunch && blockedReason && blockedReason !== problem}<span class="faint">{blockedReason}</span>{/if}
 		</div>
+		{#if blockedNodes.length && !sinkBlocks(cantRun)}
+			<Button variant="outline" size="sm" data-testid="plan-without-blocked" onclick={() => (cmd = withoutNodes(cmd, blockedNodes))}>Plan without {blockedNodes.length === 1 ? 'this node' : `these ${blockedNodes.length} nodes`}</Button>
+		{/if}
 		<GatedButton requires={job ? 'job.run' : 'run.adhoc'} variant={canLaunch ? 'default' : 'outline'} disabled={!canLaunch} reason={blockedReason} busy={launching} onclick={launch}><PlayIcon class="size-3.5 fill-current stroke-none" />Run</GatedButton>
 	</div>
 </div>
@@ -690,7 +718,10 @@
 	.tabs:first-child {
 		margin-left: 0;
 	}
+	/* One grid row that fills the box, so the graph's height: 100% has a definite height to fill; in a plain block it collapsed to its toolbar. */
 	.graph {
+		display: grid;
+		grid-template-rows: minmax(0, 1fr);
 		min-height: 320px;
 		flex: 1;
 		border: 1px solid var(--border);

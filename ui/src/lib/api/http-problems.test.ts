@@ -56,6 +56,63 @@ describe('toPlatformEvents', () => {
 		]);
 	});
 
+	it('groups skipped triggers per location, dated and named by the first one skipped, with its reason', () => {
+		const skipped = (name: string, location: string, skipped_at: string) => ({
+			trigger_id: `s-${name}`,
+			name,
+			location_id: location,
+			location_name: location === 'l1' ? 'orders' : 'inventory',
+			target: 'development',
+			skipped_at,
+			reason: "this trigger's job was published by an earlier SQLBuild release and can't be read; it runs again after its location publishes again"
+		});
+		const events = toPlatformEvents(
+			{
+				scheduler_leader: true,
+				broken_locations: [],
+				overdue_ticks: [],
+				skipped_triggers: [skipped('nightly_orders', 'l1', '2026-11-08T11:30:00Z'), skipped('hourly_orders', 'l1', '2026-11-08T11:00:00Z'), skipped('stock_levels', 'l2', '2026-11-08T11:45:00Z')]
+			},
+			NOW
+		);
+		expect(events.map((e) => [e.kind, e.locationId, e.occurredAt, e.members, e.message])).toEqual([
+			['trigger_skipped', 'l1:development', '2026-11-08T11:00:00Z', ['s-hourly_orders', 's-nightly_orders'], "2 triggers in orders · development need attention, starting with hourly_orders: this trigger's job was published by an earlier SQLBuild release and can't be read; it runs again after its location publishes again."],
+			['trigger_skipped', 'l2:development', '2026-11-08T11:45:00Z', ['s-stock_levels'], "stock_levels in inventory · development: this trigger's job was published by an earlier SQLBuild release and can't be read; it runs again after its location publishes again."]
+		]);
+	});
+
+	it('lists sensors checked again from scratch apart from skipped triggers, under their own kind', () => {
+		const events = toPlatformEvents(
+			{
+				scheduler_leader: true,
+				broken_locations: [],
+				overdue_ticks: [],
+				rechecked_sensors: [{ trigger_id: 's-health', name: 'health_orders', location_id: 'l1', location_name: 'orders', target: 'development', rechecked_at: '2026-11-08T11:30:00Z' }]
+			},
+			NOW
+		);
+		expect(events.map((e) => [e.kind, e.severity, e.locationId, e.members, e.message])).toEqual([
+			['sensor_rechecked', 'info', 'l1:development', ['s-health'], 'health_orders in orders · development is being checked again from scratch: its last check was recorded by an earlier SQLBuild release and can’t be read.']
+		]);
+	});
+
+	it('names the calendar times a republish dropped, under their own kind', () => {
+		const times = Array.from({ length: 12 }, (_, i) => `2026-11-${String(i + 1).padStart(2, '0')}T00:00:00Z`);
+		const [event] = toPlatformEvents(
+			{
+				scheduler_leader: true,
+				broken_locations: [],
+				overdue_ticks: [],
+				dropped_calendar_times: [{ trigger_id: 'c-month', name: 'month_end', location_id: 'l1', location_name: 'orders', target: 'development', dropped_at: '2026-11-08T11:30:00Z', times }]
+			},
+			NOW
+		);
+		expect([event.kind, event.locationId, event.members]).toEqual(['calendar_times_dropped', 'l1:development', ['c-month']]);
+		expect(event.message).toBe(
+			`month_end in orders · development won’t tick ${times.slice(0, 10).join(', ')} and 2 more: its previous definition was published by an earlier SQLBuild release and can’t be read.`
+		);
+	});
+
 	it('groups late ticks per location, dated and named by the oldest', () => {
 		const events = toPlatformEvents(
 			{

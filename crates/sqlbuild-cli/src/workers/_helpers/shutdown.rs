@@ -36,12 +36,9 @@ impl ClaimedWorker {
         }
         let deadline = self.stopping.unwrap_or_else(Instant::now) + Duration::from_secs(60);
         let mut renew = tokio::time::interval(Duration::from_secs(RENEW_INTERVAL_SECONDS));
-        loop {
+        let exit = loop {
             tokio::select! {
-                exit = child.wait() => {
-                    self.exit = Some(exit?);
-                    return Ok(());
-                }
+                exit = child.wait() => break exit?,
                 _ = tokio::time::sleep_until(deadline.into()), if !killed => {
                     child.kill().await?;
                     killed = true;
@@ -54,7 +51,9 @@ impl ClaimedWorker {
                     }
                 }
             }
-        }
+        };
+        self.record_exit(Some(exit));
+        Ok(())
     }
 
     async fn finish_shutdown(
@@ -138,7 +137,7 @@ impl Workers {
                             self.active.swap_remove(index);
                             continue;
                         }
-                        Ok(exit) => self.active[index].exit = exit,
+                        Ok(exit) => self.active[index].record_exit(exit),
                         Err(error) => {
                             failure.get_or_insert(error);
                             continue;

@@ -51,7 +51,8 @@ pub(crate) async fn scheduler_cycle(
         return Ok((state, cycle));
     };
     let phase = Instant::now();
-    let (lease, mut cycle) = drain_due_triggers(store, lease, cycle).await?;
+    let (lease, mut cycle) =
+        drain_due_triggers(store, (lease, state.origin.as_deref()), cycle).await?;
     cycle.timings.triggers = phase.elapsed();
     let phase = Instant::now();
     cycle.unresponsive = monitor_runs(store, &lease).await?;

@@ -1,6 +1,6 @@
 //! Sources, functions and audits are read from their retained native records.
 
-use crate::project_snapshot::main::relative_path::relative_path;
+use crate::project_snapshot::_helpers::snapshot::relative_path::relative_path;
 use std::collections::BTreeMap;
 
 use pyo3::prelude::{PyAnyMethods, PyResult, Python};

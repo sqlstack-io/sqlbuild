@@ -20,6 +20,8 @@ pub struct SchedulerState {
     pub(crate) holder: Uuid,
     pub(crate) lease: Option<SchedulerLease>,
     pub(crate) pruned_at: Option<std::time::Instant>,
+    /// The address people reach the UI at, which sensor events link runs under.
+    pub(crate) origin: Option<String>,
 }
 
 impl SchedulerState {
@@ -29,7 +31,14 @@ impl SchedulerState {
             holder,
             lease: None,
             pruned_at: None,
+            origin: None,
         }
+    }
+
+    /// The state whose sensor events link runs under `origin`, such as `https://sqlbuild.example.com`.
+    #[must_use]
+    pub fn with_origin(self, origin: Option<String>) -> Self {
+        Self { origin, ..self }
     }
 }
 
@@ -139,4 +148,21 @@ pub struct TickRecord {
     pub run_id: Option<Uuid>,
     pub covered_by_run_id: Option<Uuid>,
     pub active_run_id: Option<Uuid>,
+}
+
+/// Which due triggers a scheduler drain evaluates.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DueKind {
+    Schedule,
+    Sensor,
+}
+
+impl DueKind {
+    /// The `sqb_triggers.kind` it reads.
+    pub(crate) fn stored(self) -> &'static str {
+        match self {
+            Self::Schedule => "schedule",
+            Self::Sensor => "sensor",
+        }
+    }
 }

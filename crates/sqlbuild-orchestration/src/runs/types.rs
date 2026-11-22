@@ -1,13 +1,10 @@
 //! The command planner the server is built with; the CLI owns the grammar and the selector resolver.
 
-use std::collections::{BTreeMap, BTreeSet};
-
+use crate::credentials::models::PermissionScope;
 use crate::runs::models::{
-    CommandPlan, PlannerResource, PublicationCache, SelectionProblem, SelectionVocabulary,
+    CommandPlan, PlannerResource, PublicationCache, PublishedJobs, SelectionProblem,
+    SelectionVocabulary,
 };
-
-/// Each published job and job group's exact `kind:name` selection, by name.
-pub type PublishedJobs = BTreeMap<String, BTreeSet<String>>;
 
 /// Index a publication once with the CLI's selector graph, then parse and resolve commands against it.
 pub trait CommandPlanner: Send + Sync {
@@ -48,3 +45,6 @@ pub type RunHandoff = (
     Vec<crate::api::models::DockerImageSource>,
     std::sync::Arc<dyn CommandPlanner>,
 );
+
+/// A permission a launch needs, and the pinned job whose settings it is needed for, if any.
+pub(crate) type ExecutionScope = (PermissionScope, Option<String>);

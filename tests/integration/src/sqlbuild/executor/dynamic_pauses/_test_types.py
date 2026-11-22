@@ -106,3 +106,109 @@ class TakenOverPauseTestCase:
     expected_rival: str
     expected_states: dict[str, str]
     expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class SyncResumeTestCase:
+    description: str
+    holds: tuple[tuple[str, str, int], ...]
+    hand_suspended: tuple[str, ...]
+    pause_table: bool
+    expected_resumed: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]
+    expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class DoubleCloseTestCase:
+    description: str
+    closers: tuple[str, ...]
+    expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class SyncDuringTakeoverTestCase:
+    description: str
+    expected_operations: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]
+
+
+@dataclass(frozen=True)
+class ClaimRaceTestCase:
+    description: str
+    expected_operations: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]
+    expected_open_holds: tuple[str, ...]
+    expected_claims: tuple[tuple[str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class ClaimWaitTestCase:
+    description: str
+    expected_operations: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]
+    expected_claim_reads: int
+    expected_progress: str
+
+
+@dataclass(frozen=True)
+class AbandonedClaimTestCase:
+    description: str
+    claim_age_seconds: int
+    limit_seconds: float
+    expected_waited: bool
+    expected_states: dict[str, str]
+
+
+@dataclass(frozen=True)
+class LongClaimWaitTestCase:
+    description: str
+    grace_seconds: int
+    waited_seconds: int
+    expected_open_holds: tuple[str, ...]
+    expected_states: dict[str, str]
+    expected_released_states: dict[str, str]
+
+
+@dataclass(frozen=True)
+class TwoBuildsTestCase:
+    description: str
+    expected_operations: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]
+    expected_open_holds: tuple[str, ...]
+    expected_claims: tuple[tuple[str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class TwoSyncsTestCase:
+    description: str
+    expected_operations: tuple[tuple[str, str], ...]
+    expected_states: dict[str, str]
+    expected_resumed: tuple[tuple[str, ...], tuple[str, ...]]
+    expected_claims: tuple[tuple[str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class StaleSyncResumeTestCase:
+    description: str
+    expected_states: dict[str, str]
+
+
+@dataclass(frozen=True)
+class RefusedResumeTestCase:
+    description: str
+    refused: frozenset[str]
+    expected_resumed: tuple[tuple[str, str], ...]
+    expected_failures: tuple[str, ...]
+    expected_states: dict[str, str]
+    expected_events: tuple[tuple[str, str, str, str], ...]
+
+
+@dataclass(frozen=True)
+class QuietTokenTestCase:
+    description: str
+    holds: tuple[tuple[str, str, int], ...]
+    tokens: bool
+    quiet: bool
+    expected_resumed: tuple[tuple[str, str], ...]
+    expected_quiet: bool

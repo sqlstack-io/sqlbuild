@@ -3,10 +3,11 @@
 use serde_json::Value;
 use sqlquack_parse::parse_strict;
 use sqlquack_syntax::Expression;
+use sqlquack_syntax::expressions::types::models::DataType;
 use sqlquack_syntax::tokens::models::Dialect;
 
 use crate::parse_guard::main::sqlquack_parse_options::sqlquack_parse_options;
-use crate::warehouse_types::constants::{CAST_KEY, CAST_TARGET_KEY};
+use crate::warehouse_types::constants::{CAST_KEY, CAST_TARGET_KEY, DATA_TYPE_KEY, NAMED_TYPE_TAG};
 
 /// `spelling` read by `sqlquack-syntax-postgres`'s type grammar.
 pub(crate) fn postgres_type(spelling: &str) -> Result<Value, String> {
@@ -40,8 +41,38 @@ fn cast(spelling: &str) -> String {
 fn single_cast_target(spelling: &str, statements: &[Expression]) -> Result<Value, String> {
     let tree: Value = serde_json::to_value(statements).map_err(|error| error.to_string())?;
     match (statements.len(), cast_targets(&tree).as_slice()) {
-        (1, [target]) => Ok((*target).clone()),
+        (1, [target]) => unnamed((*target).clone()),
         _ => Err(format!("`{spelling}` is not a single type name")),
+    }
+}
+
+/// `tree` with every type kept as written, such as Snowflake's `NUMBER(10, 2)`, read as the type it denotes.
+fn unnamed(tree: Value) -> Result<Value, String> {
+    match tree {
+        Value::Object(fields)
+            if fields.get(DATA_TYPE_KEY).and_then(Value::as_str) == Some(NAMED_TYPE_TAG) =>
+        {
+            let written: Value = Value::Object(fields);
+            let data_type: DataType =
+                serde_json::from_value(written.clone()).map_err(|error| error.to_string())?;
+            match data_type.unnamed() {
+                Some(denoted) => serde_json::to_value(denoted).map_err(|error| error.to_string()),
+                None => Ok(written),
+            }
+        }
+        Value::Object(fields) => Ok(Value::Object(
+            fields
+                .into_iter()
+                .map(|(key, value)| Ok((key, unnamed(value)?)))
+                .collect::<Result<_, String>>()?,
+        )),
+        Value::Array(items) => Ok(Value::Array(
+            items
+                .into_iter()
+                .map(unnamed)
+                .collect::<Result<_, String>>()?,
+        )),
+        other => Ok(other),
     }
 }
 

@@ -179,7 +179,7 @@ pub(crate) async fn authorize_member(
 }
 
 /// A denial's reason without its decision ID, or the whole message for any other error.
-fn denial(error: ControlError) -> String {
+pub(crate) fn denial(error: ControlError) -> String {
     let reason = error.to_string();
     let reason = reason.trim_start_matches("control-plane operation denied: ");
     reason

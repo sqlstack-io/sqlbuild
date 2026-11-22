@@ -5,12 +5,20 @@ use uuid::Uuid;
 
 use crate::declarations::models::Schedule;
 use crate::platform::constants::LOCATION_SILENCE_SECONDS;
-use crate::platform::models::{LateTarget, LowCalendar, OverdueTick, ProblemScan, RunningSchedule};
+use std::collections::BTreeSet;
+
+use crate::platform::constants::{OBSERVATION_WINDOW_SECONDS, SKIPPED_TRIGGER_EVENTS};
+use crate::platform::models::{
+    DroppedCalendarTimes, LateTarget, LowCalendar, OverdueTick, PlatformEvent,
+    PlatformEventEnvelope, ProblemScan, PublishedTrigger, RecheckedSensor, RunningSchedule,
+    SkippedTrigger, TriggerProblems,
+};
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
+use crate::store::main::query_records::query_records;
 use crate::store::main::{begin::begin, commit::commit};
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 
 pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, ControlError> {
     let transaction = begin(store, TransactionMode::Read).await?;
@@ -50,6 +58,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
         vec![],
     )
     .await?;
+    let (transaction, problems) = trigger_problems(transaction).await?;
     commit(transaction).await?;
     let schedules: Vec<RunningSchedule> = schedules
         .into_iter()
@@ -72,6 +81,9 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
         .collect();
     Ok(ProblemScan {
         low_calendars,
+        skipped_triggers: problems.skipped,
+        rechecked_sensors: problems.rechecked,
+        dropped_calendar_times: problems.dropped,
         now,
         lease: leases.into_iter().next().map(decode_row).transpose()?,
         broken: locations
@@ -86,6 +98,178 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
             })
             .collect::<Result<_, ControlError>>()?,
     })
+}
+
+/// Each trigger's live problems, all for the snapshot it is still published in: skipped until the location publishes again or, for a sensor, a later check completes; a sensor's re-check from scratch until it or a later check completes; and dropped calendar times until the next successful tick.
+async fn trigger_problems(
+    transaction: ControlTransaction,
+) -> Result<(ControlTransaction, TriggerProblems), ControlError> {
+    let (transaction, skipped) = open_problems(
+        transaction,
+        "platform_trigger_skipped",
+        "NOT EXISTS (SELECT 1 FROM sqb_sensor_evaluation_events e WHERE e.trigger_id=t.trigger_id \
+         AND e.phase='completed' AND e.occurred_at>=$2)",
+    )
+    .await?;
+    let (transaction, rechecked) = open_problems(
+        transaction,
+        "platform_sensor_rechecked",
+        "NOT EXISTS (SELECT 1 FROM sqb_sensor_evaluation_events e WHERE e.trigger_id=t.trigger_id \
+         AND e.phase='completed' AND e.evaluation_id>=$2)",
+    )
+    .await?;
+    let (transaction, dropped) = open_problems(
+        transaction,
+        "platform_calendar_times_dropped",
+        "NOT EXISTS (SELECT 1 FROM sqb_ticks k WHERE k.trigger_id=t.trigger_id \
+         AND k.outcome IN ('requested','covered') AND k.evaluated_at>=p.published_at)",
+    )
+    .await?;
+    let mut problems: TriggerProblems = TriggerProblems::default();
+    for (envelope, trigger) in skipped.into_iter().chain(rechecked).chain(dropped) {
+        let PublishedTrigger {
+            trigger_id,
+            name,
+            location_id,
+            location_name,
+            target,
+            ..
+        } = trigger;
+        let at = envelope.occurred_at;
+        match envelope.payload.platform {
+            PlatformEvent::TriggerSkipped { reason, .. } => problems.skipped.push(SkippedTrigger {
+                trigger_id,
+                name,
+                location_id,
+                location_name,
+                target,
+                skipped_at: at,
+                reason,
+            }),
+            PlatformEvent::SensorRechecked { .. } => problems.rechecked.push(RecheckedSensor {
+                trigger_id,
+                name,
+                location_id,
+                location_name,
+                target,
+                rechecked_at: at,
+            }),
+            PlatformEvent::CalendarTimesDropped { times, .. } => {
+                problems.dropped.push(DroppedCalendarTimes {
+                    trigger_id,
+                    name,
+                    location_id,
+                    location_name,
+                    target,
+                    dropped_at: at,
+                    times,
+                });
+            }
+            _ => {}
+        }
+    }
+    Ok((transaction, problems))
+}
+
+/// Each trigger's newest `event_type` event whose trigger is still published in the event's snapshot and whose `open` condition holds, with `$2` bound to a re-check's evaluation or the end of a skip's observation window.
+async fn open_problems(
+    transaction: ControlTransaction,
+    event_type: &str,
+    open: &str,
+) -> Result<
+    (
+        ControlTransaction,
+        Vec<(PlatformEventEnvelope, PublishedTrigger)>,
+    ),
+    ControlError,
+> {
+    let (mut transaction, events) = newest_events(transaction, event_type).await?;
+    let mut seen: BTreeSet<Uuid> = BTreeSet::new();
+    let mut problems: Vec<(PlatformEventEnvelope, PublishedTrigger)> = Vec::new();
+    for envelope in events {
+        let (trigger_id, snapshot_id, bound) = match &envelope.payload.platform {
+            PlatformEvent::TriggerSkipped {
+                trigger_id,
+                snapshot_id,
+                ..
+            } => (
+                *trigger_id,
+                *snapshot_id,
+                Some(Parameter::Time(
+                    envelope.occurred_at + TimeDelta::seconds(OBSERVATION_WINDOW_SECONDS),
+                )),
+            ),
+            PlatformEvent::SensorRechecked {
+                trigger_id,
+                snapshot_id,
+                evaluation_id,
+            } => (
+                *trigger_id,
+                *snapshot_id,
+                Some(Parameter::Id(*evaluation_id)),
+            ),
+            PlatformEvent::CalendarTimesDropped {
+                trigger_id,
+                snapshot_id,
+                ..
+            } => (*trigger_id, *snapshot_id, None),
+            _ => continue,
+        };
+        if !seen.insert(trigger_id) {
+            continue;
+        }
+        let trigger;
+        (transaction, trigger) =
+            open_trigger(transaction, (trigger_id, snapshot_id), (open, bound)).await?;
+        if let Some(trigger) = trigger {
+            problems.push((envelope, trigger));
+        }
+    }
+    Ok((transaction, problems))
+}
+
+/// The newest `event_type` platform events, newest first; each trigger's first is the one that counts.
+async fn newest_events(
+    transaction: ControlTransaction,
+    event_type: &str,
+) -> Result<(ControlTransaction, Vec<PlatformEventEnvelope>), ControlError> {
+    query_records(
+        transaction,
+        "SELECT storage_id,event_id,occurred_at,payload FROM recall_events WHERE producer='platform' \
+         AND event_type=$2 ORDER BY storage_id DESC LIMIT $1",
+        vec![
+            Parameter::Integer(SKIPPED_TRIGGER_EVENTS),
+            Parameter::Text(event_type.to_owned()),
+        ],
+    )
+    .await
+}
+
+/// Trigger `trigger_id` while it is still published in `snapshot_id` (as `t`, its snapshot as `p`) and the `open` condition holds, with `$2` bound to the given value.
+async fn open_trigger(
+    transaction: ControlTransaction,
+    (trigger_id, snapshot_id): (Uuid, Uuid),
+    (open, bound): (&str, Option<Parameter>),
+) -> Result<(ControlTransaction, Option<PublishedTrigger>), ControlError> {
+    let (transaction, rows) = query(
+        transaction,
+        &format!(
+            "SELECT t.trigger_id, t.name, t.location_id, l.name AS location_name, t.target, t.snapshot_id \
+             FROM sqb_triggers t JOIN sqb_locations l ON l.location_id=t.location_id \
+             JOIN sqb_snapshots p ON p.snapshot_id=t.snapshot_id \
+             WHERE t.trigger_id=$1 AND t.removed_in_snapshot_id IS NULL AND l.archived_at IS NULL AND {open}"
+        ),
+        [Parameter::Id(trigger_id)]
+            .into_iter()
+            .chain(bound)
+            .collect(),
+    )
+    .await?;
+    let trigger: Option<PublishedTrigger> = rows.into_iter().next().map(decode_row).transpose()?;
+    Ok((
+        transaction,
+        trigger.filter(|trigger| trigger.snapshot_id == snapshot_id),
+    ))
 }
 
 /// At most 100 late ticks per target, oldest first.

@@ -14,6 +14,6 @@ def run_parse_guard_check(argv: list[str] | None = None) -> int:
         errors_under=get_parse_guard_errors,
         messages=(
             "Parse with sqlbuild_analysis::parse_guard's options, not a library default:",
-            "Polyglot and SQLQuack's shared and Snowflake parsers all use the shared guard.",
+            "Polyglot, SQLQuack's shared and Snowflake parsers and SQLClean use the shared guard.",
         ),
     )

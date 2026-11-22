@@ -46,6 +46,10 @@ const SQLITE_CHECKSUMS: &[(i64, &str)] = &[
         4,
         "734163e22863ff86fbcf1329540736f279806d4ce5ea04f6d6ecb1703b3468c8",
     ),
+    (
+        5,
+        "48d191962e39b22a3b95b9495da6371067a3fd3cfc51192bcfe0ac0192edcba2",
+    ),
 ];
 const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
     (
@@ -64,6 +68,10 @@ const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
     (
         4,
         "b1250935a5adf1d4691836a2125bb57360c1ff0a2a296a77e4d11bf6a80a99d9",
+    ),
+    (
+        5,
+        "5a86ec47fce6ba3ced0badeb7ddb5b54d5bd2408fbe917b5c11391d362387ebb",
     ),
 ];
 /// A version 1 store mid-run: a child run holding a concurrency slot, a jobs document and an audit result.
@@ -289,6 +297,7 @@ fn given_a_migration_rebuilding_a_referenced_table_when_migrating_then_rows_and_
                 name: "widen_run_status",
                 sqlite: rebuilt_runs_table(store).await,
                 postgres: WIDEN_RUN_STATUS_POSTGRES,
+                step: None,
             };
 
             migrate_with(store, &[migration])
@@ -467,6 +476,7 @@ fn given_a_store_when_planning_its_migration_then_the_plan_is_reported_without_c
                 name: "widen_run_status",
                 sqlite: "",
                 postgres: "",
+                step: None,
             });
             let after = (
                 plan_store_migration(&baseline.store)
@@ -579,6 +589,7 @@ fn given_a_migration_that_breaks_a_reference_when_migrating_then_it_is_refused_u
                 name: "dangling_run_node",
                 sqlite: DANGLING_RUN_NODE,
                 postgres: DANGLING_RUN_NODE,
+                step: None,
             };
 
             let error = migrate_with(store, &[migration])

@@ -1,6 +1,7 @@
 pub mod audit_check_id;
 pub mod audit_execution_json;
 pub mod audit_projection;
+pub mod discard_reports;
 pub mod format_build_execution_json;
 pub mod format_build_execution_json_with;
 pub mod format_clone_execution_json;

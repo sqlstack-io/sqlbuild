@@ -1,16 +1,18 @@
 //! `sqb plan`: compile the plan pipeline and print the plan as text or JSON.
 
 use crate::bindings::_helpers::command_runtime::audit_failures::resolve_ignore_audit_failures;
+use sqlbuild_python_front::discovery::models::SecretPolicy;
 use sqlbuild_python_planner::planner_phases::constants::{BUILD_HISTORY, DISCOVERING, WRITING};
 use sqlbuild_python_planner::planner_phases::main::timing::timed::timed;
 use sqlbuild_python_planner::planner_phases::models::PlanTimingScope;
 use sqlbuild_python_planner::planner_phases::models::PlanTimings;
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python, pyfunction,
 };
-use pyo3::types::{PyBool, PyCFunction, PyDict, PyDictMethods};
+use pyo3::types::{PyBool, PyCFunction, PyDict, PyDictMethods, PyString};
 use pyo3::wrap_pyfunction;
 use sqlbuild_config::command_connection::errors::CommandConnectionError;
 use sqlbuild_core::plan_display::constants::{
@@ -23,7 +25,9 @@ use sqlbuild_state::warehouse_state::models::WarehouseState;
 use crate::bindings::_helpers::command_runtime::invocation::resolve_adapter_connection_context;
 use crate::bindings::_helpers::command_runtime::preview_target::validate_preview_target;
 use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
-use crate::bindings::_helpers::compile_driver::plan_pipeline::planned_project;
+use crate::bindings::_helpers::compile_driver::plan_pipeline::{
+    SecretCheck, planned_project, selectors,
+};
 use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::plan_command::changed::changed_json;
@@ -38,7 +42,13 @@ use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::stages::discover_project_inputs::discover_project_inputs;
+use sqlbuild_python_compile::provider_check::main::cant_run_json::cant_run_json;
+use sqlbuild_python_compile::provider_check::main::cant_run_text::cant_run_text;
+use sqlbuild_python_compile::provider_check::main::selection_secret_blocks::selection_secret_blocks;
+use sqlbuild_python_compile::provider_check::models::SecretBlock;
 use sqlbuild_python_front::compile_attachment::main::build_effective_settings_config::build_effective_settings_config;
+use sqlbuild_python_front::discovery::main::sources::env_file_display::env_file_display;
+use sqlbuild_python_front::discovery::main::sources::secret_places::secret_places;
 use sqlbuild_python_output::build_progress::main::with_verbose_inspection::with_verbose_inspection;
 use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
 use sqlbuild_python_output::build_progress::models::PlanningProgressReporter;
@@ -56,6 +66,8 @@ use sqlbuild_python_planner::planner_warehouse::models::SyncedReads;
 const COMMAND_NAME: &str = "plan";
 /// The plan document's field holding how long each planning step took.
 const TIMINGS_KEY: &str = "timings";
+/// The plan JSON's section of nodes that can't run because a provider is missing secrets.
+const CANT_RUN_KEY: &str = "cant_run";
 /// `timings.planned_from` for a location preview over the synced warehouse state.
 const SYNCED_STATE: &str = "synced_state";
 /// `timings.planned_from` for a plan that read the warehouse.
@@ -166,16 +178,17 @@ fn resolve_invocation<'py>(
     let discovered: Bound<'py, PyAny> = match project {
         PlanProject::Held { discovered, .. } => discovered.clone(),
         PlanProject::Compiled => timed(DISCOVERING, || {
-            discover_project_inputs(
-                py,
-                Some(keywords(
-                    py,
-                    &[
-                        ("project_dir", project_dir.clone()),
-                        ("extract_output_column_locations", flag(py, false)),
-                    ],
-                )?),
-            )
+            let mut options: Vec<(&str, Bound<'py, PyAny>)> = vec![
+                ("project_dir", project_dir.clone()),
+                ("extract_output_column_locations", flag(py, false)),
+            ];
+            if state.is_some() {
+                options.push((
+                    "secret_policy",
+                    PyString::new(py, SecretPolicy::Defer.name()).into_any(),
+                ));
+            }
+            discover_project_inputs(py, Some(keywords(py, &options)?))
         })?,
     };
     validate_preview_target(
@@ -363,6 +376,7 @@ fn compile_pipeline<'py>(
             },
             preview.as_ref(),
         ),
+        SecretCheck::Report,
     )
 }
 
@@ -432,7 +446,17 @@ fn write_output(
         if let Some(decision) = changed {
             options.push((CHANGED_KEY, changed_json(py, decision)?.into_any()));
         }
-        let text: String = format_plan_json(py, Some(keywords(py, &options)?))?;
+        let mut text: String = format_plan_json(py, Some(keywords(py, &options)?))?;
+        let blocks: Vec<SecretBlock> = cant_run(request, invocation, (pipeline, changed))?;
+        if !blocks.is_empty() {
+            let project_dir: std::path::PathBuf = invocation.project_dir.extract()?;
+            let env_file: Option<String> = env_file_display(&project_dir);
+            text = with_field(
+                text,
+                CANT_RUN_KEY,
+                &cant_run_json(&blocks, env_file.as_deref()),
+            );
+        }
         if captured {
             return Ok(Some(text));
         }
@@ -470,6 +494,12 @@ fn write_output(
     }
     let text: String = format_plan(py, Some(keywords(py, &options)?))?;
     print_line(py, &format!("\n{text}"))?;
+    let blocks: Vec<SecretBlock> = cant_run(request, invocation, (pipeline, changed))?;
+    if !blocks.is_empty() {
+        let missing_from: String =
+            secret_places(&invocation.project_dir.extract::<std::path::PathBuf>()?);
+        print_line(py, &cant_run_text(&blocks, &missing_from))?;
+    }
     if let Some(facade) = &invocation.preview {
         print_line(py, &synced_copy_text(&facade.synced))?;
     }
@@ -520,7 +550,7 @@ pub(crate) fn run_plan_command(request: &Bound<'_, PyAny>) -> PyResult<i32> {
     Ok(plan(request, (PlanProject::Compiled, None))?.0)
 }
 
-/// A location's preview from the synced `state`, without rules, which ran at load; vars or a dbt manifest recompile.
+/// A location's preview from the synced `state`, without rules, which ran at load; vars or a dbt manifest recompile, deferring secrets.
 pub(crate) fn location_plan<'py>(
     request: &Bound<'py, PyAny>,
     (held, state): (PlanProject<'_, 'py>, &Arc<WarehouseState>),
@@ -585,13 +615,39 @@ fn plan<'py>(
 
 /// `document` with its `timings` as the first field; the plan is written before its own timings are known.
 fn with_timings(document: String, timings: &serde_json::Value) -> String {
+    with_field(document, TIMINGS_KEY, timings)
+}
+
+/// `document` with `key` as its first field.
+fn with_field(document: String, key: &str, value: &serde_json::Value) -> String {
     match document.strip_prefix('{') {
         Some(fields) if fields.trim_start().starts_with('}') => {
-            format!("{{\"{TIMINGS_KEY}\": {timings}}}")
+            format!("{{\"{key}\": {value}}}")
         }
-        Some(fields) => format!("{{\"{TIMINGS_KEY}\": {timings}, {fields}"),
+        Some(fields) => format!("{{\"{key}\": {value}, {fields}"),
         None => document,
     }
+}
+
+/// The nodes the plan runs that can't, because a provider they use is missing secrets; `--changed` leaves some unbuilt anyway.
+fn cant_run(
+    request: &Bound<'_, PyAny>,
+    invocation: &PlanInvocation<'_>,
+    (pipeline, changed): (&Bound<'_, PyAny>, Option<&ChangedDecision>),
+) -> PyResult<Vec<SecretBlock>> {
+    let not_run: BTreeSet<String> = changed
+        .into_iter()
+        .flat_map(ChangedDecision::not_run)
+        .map(|key| format!("{}:{}", key.kind, key.name))
+        .collect();
+    selection_secret_blocks(
+        (&invocation.discovered, &native_field(pipeline, "project")?),
+        (
+            &selectors(request, "select")?,
+            &selectors(request, "exclude")?,
+        ),
+        &not_run,
+    )
 }
 
 /// Whether any plan finding has error severity, which `sqb build` refuses.

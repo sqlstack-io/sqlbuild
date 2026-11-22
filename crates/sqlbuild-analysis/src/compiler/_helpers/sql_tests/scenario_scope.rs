@@ -42,6 +42,7 @@ fn scenario_fixtures(ctes: &[(String, String)], checks: &[(String, String)]) -> 
         mock_seeds: BTreeMap::new(),
         mock_dbt_refs: BTreeMap::new(),
         mock_table_functions: BTreeMap::new(),
+        mock_table_function_columns: BTreeMap::new(),
         helpers: Vec::new(),
         scope: ScopeGraph::default(),
         expected: BTreeMap::new(),

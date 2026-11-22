@@ -15,7 +15,7 @@ pub(super) const EXPORT_JOB: &str = "name = \"orders_export_job\"\ndescription =
 pub(super) const NIGHTLY_GROUP: &str =
     "name = \"orders_nightly_job_group\"\ndescription = \"d\"\njobs = [\"orders_export_job\"]\n";
 pub(super) const CALENDAR: &str = "from sqlbuild.orchestration import calendar\n\n@calendar(name=\"trading_days_calendar\", description=\"d\", horizon=\"7d\")\ndef trading_days(window):\n    return []\n";
-pub(super) const SENSOR: &str = "from sqlbuild.orchestration import run_event, sensor\n\nstale = sensor(name=\"stock_stale_sensor\", description=\"d\", when=run_event(job=\"orders_export_job\", kinds=[]), run=\"orders_nightly_job_group\")\n";
+pub(super) const SENSOR: &str = "from sqlbuild.orchestration import RunRequest, run_event, sensor\n\n@sensor(description=\"d\", when=run_event(job=\"orders_export_job\", kinds=[]))\ndef stock_stale_sensor(ctx):\n    return RunRequest(job=\"orders_nightly_job_group\")\n";
 
 /// A 1-based line and column.
 pub(super) fn at(line: usize, column: usize) -> FilePosition {

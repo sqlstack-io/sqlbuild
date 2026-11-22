@@ -1,5 +1,6 @@
 //! Python's `attempt_reuse` and `write_compile_entry` over the native store.
 
+use sqlbuild_core::process_environment::main::environment_var_os::environment_var_os;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -50,7 +51,7 @@ fn now_ns() -> i64 {
 fn bypassed(check: &ReuseCheck<'_>) -> bool {
     check.bypass_requested
         || check.rules.disabling_variables.iter().any(|(name, value)| {
-            std::env::var_os(name).is_some_and(|current| current == value.as_str())
+            environment_var_os(name).is_some_and(|current| current == value.as_str())
         })
         || !check
             .rules

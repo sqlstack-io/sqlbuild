@@ -14,11 +14,9 @@ use crate::runs::main::listings::list_runs::list_runs;
 use crate::runs::main::requests::request_rerun::request_rerun;
 use crate::runs::models::{NodeOutcome, RerunRequest, RunKind, RunOrigin, RunOutcome};
 use crate::scheduler::tests::contracts::helpers::{acquire_lease, hold_lease};
-use crate::sensors::main::{
-    begin_sensor_evaluation::begin_sensor_evaluation,
-    complete_builtin_sensor::complete_builtin_sensor,
-};
+use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
 use crate::sensors::tests::helpers::{change, finish_claimed_run, finish_run, snapshot};
+use crate::sensors::tests::helpers::{complete_starting_job, drain_sensor};
 use crate::sensors::tests::test_types::{SensorExecutionTestCase, SensorTestCase};
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::{
@@ -82,7 +80,7 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
             for job_key in ["orders", "daily_orders"] {
                 for selector in selectors {
                     sensors.insert(format!("{job_key}_{selector}"), json!({
-                        "description": "Consume exact terminal outcomes", "job_key": "inventory",
+                        "description": "Consume exact terminal outcomes", "function": "start_inventory", "code_hash": "v1", "timeout_seconds": 60,
                         "when": {"kind": "run_event", "job_key": job_key, "kinds": [selector]},
                         "minimum_interval_seconds": 1
                     }));
@@ -95,7 +93,7 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                     ("orders_completed", "completed", vec!["orders"]),
                 ] {
                     sensors.insert(format!("{job_key}_executed_{name}"), json!({
-                        "description": "Require every selected node to actually succeed", "job_key": "inventory",
+                        "description": "Require every selected node to actually succeed", "function": "start_inventory", "code_hash": "v1", "timeout_seconds": 60,
                         "when": {"kind": "run_event", "job_key": job_key, "kinds": [kind], "executed_successfully": nodes},
                         "minimum_interval_seconds": 1
                     }));
@@ -464,37 +462,56 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                 .await
                 .expect("triggers");
             for trigger in &triggers {
-                let requested = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+                let wanted: BTreeSet<String> = expected
+                    .get(&trigger.name)
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|run_id| format!("run:{run_id}:inventory"))
+                    .collect();
+                let requested = begin_sensor_evaluation(store, &lease, (trigger.trigger_id, None))
                     .await
-                    .expect("request")
-                    .expect("due");
+                    .expect("request");
+                let Some(requested) = requested else {
+                    assert!(
+                        wanted.is_empty(),
+                        "{}: no tick without an event",
+                        trigger.name
+                    );
+                    continue;
+                };
                 assert_eq!(
-                    begin_sensor_evaluation(&replica, &lease, trigger.trigger_id)
+                    begin_sensor_evaluation(&replica, &lease, (trigger.trigger_id, None))
                         .await
                         .expect("recover"),
                     Some(requested.clone())
                 );
                 install_fault(store, &fault).await;
                 assert!(
-                    complete_builtin_sensor(store, &lease, &requested)
+                    complete_starting_job(store, &lease, &requested)
                         .await
                         .is_err()
                 );
                 remove_fault(store, &fault).await;
-                let wanted = expected.get(&trigger.name).cloned().unwrap_or_default();
                 assert_eq!(
-                    complete_builtin_sensor(&replica, &lease, &requested)
+                    complete_starting_job(&replica, &lease, &requested)
                         .await
                         .expect("retry"),
-                    wanted.len(),
+                    1,
                     "{}",
                     trigger.name
                 );
                 assert_eq!(
-                    complete_builtin_sensor(store, &lease, &requested)
+                    complete_starting_job(store, &lease, &requested)
                         .await
                         .expect("duplicate completion"),
                     0
+                );
+                assert_eq!(
+                    drain_sensor(store, &lease, trigger.trigger_id).await,
+                    wanted.len() - 1,
+                    "{}: one tick per remaining matching run",
+                    trigger.name
                 );
                 let transaction = begin(store, TransactionMode::Read)
                     .await
@@ -516,13 +533,7 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
             }
             tokio::time::sleep(Duration::from_secs(1)).await;
             for trigger in &triggers {
-                let replay = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
-                    .await
-                    .expect("reset request")
-                    .expect("due");
-                complete_builtin_sensor(store, &lease, &replay)
-                    .await
-                    .expect("replay deduplicates");
+                drain_sensor(store, &lease, trigger.trigger_id).await;
             }
             let after = list_runs(store, (location, "development"), 500)
                 .await

@@ -30,7 +30,7 @@ from sqlbuild.executor.dynamic_pauses.constants import (
     DYNAMIC_PAUSE_REQUIRED_COLUMNS,
     DYNAMIC_PAUSE_SCHEMA_VERSION,
 )
-from sqlbuild.executor.dynamic_pauses.models import DynamicPauseEvent, OpenHold
+from sqlbuild.executor.dynamic_pauses.models import DynamicPauseEvent, OpenClaim, OpenHold
 from sqlbuild.executor.dynamic_pauses.types import DynamicPauseEventType, StateLocation
 
 
@@ -78,19 +78,89 @@ def open_holds_sql(*, adapter: BaseAdapter, location: StateLocation) -> str:
 
     table: str = pause_table_name(adapter=adapter, location=location)
     now: str = adapter.render_current_utc_timestamp()
+    return _open_rows_sql(
+        table=table,
+        event_type=DynamicPauseEventType.PAUSED,
+        timings=(
+            f"CAST(h.last_seen AS TIMESTAMP), CAST({now} AS TIMESTAMP), "
+            f"CAST(p.{COLUMN_RECORDED_AT} AS TIMESTAMP)"
+        ),
+        join=(
+            f"JOIN (SELECT {COLUMN_RUN_ID}, MAX({COLUMN_RECORDED_AT}) AS last_seen "
+            f"FROM {table} WHERE {COLUMN_RECORDED_BY} = {COLUMN_RUN_ID} GROUP BY {COLUMN_RUN_ID}) "
+            f"h ON h.{COLUMN_RUN_ID} = p.{COLUMN_RUN_ID} "
+        ),
+    )
+
+
+def open_claims_sql(*, adapter: BaseAdapter, location: StateLocation) -> str:
+    """Sync claims no `RESUMED` row of their run closed, with their age by the warehouse clock."""
+
+    now: str = adapter.render_current_utc_timestamp()
+    return _open_rows_sql(
+        table=pause_table_name(adapter=adapter, location=location),
+        event_type=DynamicPauseEventType.RESUMING,
+        timings=f"CAST(p.{COLUMN_RECORDED_AT} AS TIMESTAMP), CAST({now} AS TIMESTAMP)",
+        join="",
+    )
+
+
+def open_claims(*, rows: tuple[tuple[Any, ...], ...]) -> tuple[OpenClaim, ...]:
+    """The open claims of `open_claims_sql` rows."""
+
+    return tuple(
+        OpenClaim(
+            run_id=str(row[0]),
+            relation=_row_relation(row=row),
+            age_seconds=_seconds_between(start=row[4], end=row[5]),
+        )
+        for row in rows
+    )
+
+
+def read_open_claims(
+    *, adapter: BaseAdapter, connection: Any, location: StateLocation
+) -> tuple[OpenClaim, ...]:
+    """The pause table's open resume claims as the warehouse sees them now."""
+
+    return open_claims(
+        rows=tuple(
+            adapter.query(
+                connection=connection,
+                sql=open_claims_sql(adapter=adapter, location=location),
+                limit=None,
+            ).rows
+        )
+    )
+
+
+def _open_rows_sql(
+    *, table: str, event_type: DynamicPauseEventType, timings: str, join: str
+) -> str:
+    """Rows of `event_type` no `RESUMED` row of their run closed: run, relation, then `timings`."""
+
+    return (
+        f"SELECT p.{COLUMN_RUN_ID}, p.{COLUMN_RELATION_DATABASE}, p.{COLUMN_RELATION_SCHEMA}, "
+        f"p.{COLUMN_RELATION_NAME}, {timings} FROM {table} p {join}"
+        f"WHERE p.{COLUMN_EVENT_TYPE} = '{event_type.value}' AND {_not_resumed(table=table)}"
+    )
+
+
+def _row_relation(*, row: tuple[Any, ...]) -> CompiledRelationLocation:
+    return CompiledRelationLocation(
+        database=_optional(row[1]), schema=_optional(row[2]), name=str(row[3]), qualified_name=None
+    )
+
+
+def _not_resumed(*, table: str) -> str:
+    """No `RESUMED` row of row `p`'s run closes it for `p`'s model."""
+
     same_relation: str = " AND ".join(
         f"COALESCE(r.{column}, '') = COALESCE(p.{column}, '')"
         for column in (COLUMN_RELATION_DATABASE, COLUMN_RELATION_SCHEMA, COLUMN_RELATION_NAME)
     )
     return (
-        f"SELECT p.{COLUMN_RUN_ID}, p.{COLUMN_RELATION_DATABASE}, p.{COLUMN_RELATION_SCHEMA}, "
-        f"p.{COLUMN_RELATION_NAME}, CAST(h.last_seen AS TIMESTAMP), CAST({now} AS TIMESTAMP), "
-        f"CAST(p.{COLUMN_RECORDED_AT} AS TIMESTAMP) "
-        f"FROM {table} p JOIN (SELECT {COLUMN_RUN_ID}, MAX({COLUMN_RECORDED_AT}) AS last_seen "
-        f"FROM {table} WHERE {COLUMN_RECORDED_BY} = {COLUMN_RUN_ID} GROUP BY {COLUMN_RUN_ID}) h "
-        f"ON h.{COLUMN_RUN_ID} = p.{COLUMN_RUN_ID} "
-        f"WHERE p.{COLUMN_EVENT_TYPE} = '{DynamicPauseEventType.PAUSED.value}' "
-        f"AND NOT EXISTS (SELECT 1 FROM {table} r "
+        f"NOT EXISTS (SELECT 1 FROM {table} r "
         f"WHERE r.{COLUMN_EVENT_TYPE} = '{DynamicPauseEventType.RESUMED.value}' "
         f"AND r.{COLUMN_RUN_ID} = p.{COLUMN_RUN_ID} AND {same_relation})"
     )
@@ -102,16 +172,27 @@ def open_holds(*, rows: tuple[tuple[Any, ...], ...]) -> tuple[OpenHold, ...]:
     return tuple(
         OpenHold(
             run_id=str(row[0]),
-            relation=CompiledRelationLocation(
-                database=_optional(row[1]),
-                schema=_optional(row[2]),
-                name=str(row[3]),
-                qualified_name=None,
-            ),
+            relation=_row_relation(row=row),
             idle_seconds=_seconds_between(start=row[4], end=row[5]),
             paused_at=row[6].replace(tzinfo=None),
         )
         for row in rows
+    )
+
+
+def read_open_holds(
+    *, adapter: BaseAdapter, connection: Any, location: StateLocation
+) -> tuple[OpenHold, ...]:
+    """The pause table's open holds as the warehouse sees them now."""
+
+    return open_holds(
+        rows=tuple(
+            adapter.query(
+                connection=connection,
+                sql=open_holds_sql(adapter=adapter, location=location),
+                limit=None,
+            ).rows
+        )
     )
 
 
@@ -145,7 +226,7 @@ def _row_literals(*, event: DynamicPauseEvent) -> str:
 
 
 def _event_id(*, event: DynamicPauseEvent) -> str:
-    """Content-addressed: one pause and one resume per run and model, one ID per heartbeat."""
+    """Content-addressed: one per type, run and model, one per heartbeat; each claim is a run."""
 
     relation: CompiledRelationLocation | None = event.relation
     identity: tuple[object, ...] = (

@@ -1,7 +1,6 @@
 //! Location publication assembles catalog data and planner-owned local identities.
 
 use crate::bindings::_helpers::location_command::snapshot_lineage::column_lineage_document;
-use crate::bindings::_helpers::location_command::snapshot_providers::providers_document;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult};
 use pyo3::types::{PyDict, PyDictMethods};
@@ -29,6 +28,7 @@ use sqlbuild_python_project::planner_scope::main::project_graph::project_graph;
 use sqlbuild_python_project::project_snapshot::main::compile_declarations::compile_declarations;
 use sqlbuild_python_project::project_snapshot::main::compile_project_roles::compile_project_roles;
 use sqlbuild_python_project::project_snapshot::main::model_nodes::model_nodes;
+use sqlbuild_python_project::project_snapshot::main::providers_document::providers_document;
 use sqlbuild_python_project::project_snapshot::main::python_declarations::python_declarations;
 use sqlbuild_python_project::project_snapshot::main::resource_nodes::resource_nodes;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;

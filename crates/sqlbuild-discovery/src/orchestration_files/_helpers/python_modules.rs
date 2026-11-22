@@ -2,12 +2,14 @@
 
 use sqlbuild_pysource::orchestration_modules::main::orchestration_module_declarations::orchestration_module_declarations;
 use sqlbuild_pysource::orchestration_modules::models::{
-    LiteralArgument, ModuleDeclarations, PythonDeclaration, PythonDeclarationKind, SourcePosition,
+    LiteralArgument, ModuleDeclarations, PythonDeclaration, PythonDeclarationKind, SensorForm,
+    SourcePosition,
 };
 
 use crate::constants::PYTHON_FILE_SUFFIX;
 use crate::orchestration_files::constants::{
-    CALENDAR_KIND, PRIVATE_PREFIX, ROLE_FOLDER_DEPTH, SENSOR_KIND, TOML_JOBS_HELP,
+    CALENDAR_KIND, PRIVATE_PREFIX, ROLE_FOLDER_DEPTH, SENSOR_DECORATOR_HELP, SENSOR_KIND,
+    SENSOR_NAME_HELP, TOML_JOBS_HELP,
 };
 use crate::orchestration_files::errors::FileError;
 use crate::orchestration_files::models::{FilePosition, NamedModule, Positioned};
@@ -53,6 +55,30 @@ fn literal(argument: LiteralArgument, what: &str) -> Result<Positioned<String>, 
                 "write the {what} as a quoted string, such as \"orders_job\", so the compiler can check it without running the module"
             )),
         )),
+    }
+}
+
+/// A sensor declares itself only as `@sensor(...)` with keyword arguments above a function.
+fn sensor_form(declaration: &PythonDeclaration) -> Result<(), FileError> {
+    if let Some(position) = declaration.positional {
+        return Err(error(
+            position,
+            "sensor takes keyword arguments only".to_owned(),
+            Some(SENSOR_NAME_HELP.to_owned()),
+        ));
+    }
+    match declaration.sensor_form {
+        Some(SensorForm::Call) => Err(error(
+            declaration.position,
+            "sensor(...) must decorate a function".to_owned(),
+            Some(SENSOR_DECORATOR_HELP.to_owned()),
+        )),
+        Some(SensorForm::BareDecorator) => Err(error(
+            declaration.position,
+            "@sensor needs its arguments".to_owned(),
+            Some(SENSOR_DECORATOR_HELP.to_owned()),
+        )),
+        Some(SensorForm::Decorator { .. }) | None => Ok(()),
     }
 }
 
@@ -147,6 +173,7 @@ pub(crate) fn module_declaration(
             Some("remove the leading `_` from the file name".to_owned()),
         ));
     }
+    sensor_form(&declaration)?;
     let name: Positioned<String> = match declaration.name {
         Some(name) => literal(name, &format!("{noun} name"))?,
         None => {
@@ -160,7 +187,7 @@ pub(crate) fn module_declaration(
     let job_references = declaration
         .job_references
         .into_iter()
-        .map(|(argument, value)| Ok((argument, literal(value, &format!("sensor {argument} job"))?)))
+        .map(|(call, value)| Ok((call, literal(value, &format!("sensor {call} job"))?)))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Some(NamedModule {
         name: name.value,

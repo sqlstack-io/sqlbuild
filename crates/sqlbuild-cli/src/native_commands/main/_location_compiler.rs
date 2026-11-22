@@ -10,6 +10,7 @@ use tokio::sync::mpsc;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::command::terminal::write_output;
+use crate::native_commands::_helpers::location::env_reload::reload_env_file;
 use crate::native_commands::_helpers::location::execution::{
     exchange_location_generation, exchange_location_plan,
 };
@@ -62,16 +63,22 @@ async fn publish(
     mut compiler: Option<LocationCompiler>,
     mut request: LocationCompileRequest,
 ) -> Result<(Option<LocationCompiler>, bool), ControlError> {
-    if compiler
+    let env_changed: bool = reload_env_file(options);
+    let python_changed: bool = compiler
         .as_ref()
-        .is_some_and(|compiler| compiler.python_sources != request.python_sources)
-    {
+        .is_some_and(|compiler| compiler.python_sources != request.python_sources);
+    if compiler.is_some() && (python_changed || env_changed) {
         stop_location_runtime(compiler.take()).await?;
         if options.dev_events {
+            let reason: &str = if python_changed {
+                "Python changed"
+            } else {
+                "env file changed"
+            };
             drop(write_output(&[(
                 Stream::Stdout,
                 &dev_event_line(&DevEvent::Restarted {
-                    reason: "Python changed".into(),
+                    reason: reason.into(),
                 }),
             )]));
         }

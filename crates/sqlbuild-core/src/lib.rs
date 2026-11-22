@@ -46,6 +46,7 @@ pub mod number_text;
 pub mod panics;
 pub mod plan_display;
 pub mod posix_path;
+pub mod process_environment;
 pub mod progress;
 pub mod query_command;
 pub mod redaction;

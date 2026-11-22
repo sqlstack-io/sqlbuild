@@ -42,6 +42,8 @@ mod test_node_errors;
 mod test_node_event_resources;
 #[path = "test_permissions.rs"]
 mod test_permissions;
+#[path = "test_pinned_jobs.rs"]
+mod test_pinned_jobs;
 #[path = "test_project_limits.rs"]
 mod test_project_limits;
 #[path = "test_publication_cache.rs"]
@@ -56,5 +58,7 @@ mod test_retries;
 mod test_run_logs;
 #[path = "test_selection.rs"]
 mod test_selection;
+#[path = "test_stored_requests.rs"]
+mod test_stored_requests;
 #[path = "test_types.rs"]
 pub(crate) mod test_types;

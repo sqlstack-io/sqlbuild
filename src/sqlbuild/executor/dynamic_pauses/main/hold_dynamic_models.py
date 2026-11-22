@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from sqlbuild._native import CompiledRelationLocation, PlanOutput, TargetSettings
+from sqlbuild._native import (
+    DYNAMIC_RESUME_SECONDS,
+    CompiledRelationLocation,
+    PlanOutput,
+    TargetSettings,
+)
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.executor.build.models import BuildRuntimeParams
@@ -12,6 +17,7 @@ from sqlbuild.executor.dynamic_pauses.classes.dynamic_heartbeat import (
 )
 from sqlbuild.executor.dynamic_pauses.classes.dynamic_hold import DynamicHold
 from sqlbuild.executor.dynamic_pauses.constants import (
+    CLAIM_POLL_SECONDS,
     HEARTBEAT_SECONDS,
     IGNORE_GRACE_REFUSED_CODE,
 )
@@ -25,8 +31,9 @@ def hold_dynamic_models(
     runtime: BuildRuntimeParams,
     connection_config: dict[str, object],
     heartbeat_seconds: float = HEARTBEAT_SECONDS,
+    claim_wait: tuple[float, float] = (float(DYNAMIC_RESUME_SECONDS), CLAIM_POLL_SECONDS),
 ) -> DynamicHold | None:
-    """The build's hold, unacquired; `--ignore-dynamic-grace` needs `allow_ignore_grace`."""
+    """The build's hold, unacquired; `claim_wait` is a sync claim's age limit and poll interval."""
 
     if runtime.ignore_dynamic_grace and not runtime.allow_ignore_dynamic_grace:
         raise AdapterUserError(
@@ -56,6 +63,7 @@ def hold_dynamic_models(
             write=write,
             interval_seconds=heartbeat_seconds,
         ),
+        claim_wait=claim_wait,
     )
 
 

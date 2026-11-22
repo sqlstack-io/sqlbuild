@@ -459,6 +459,7 @@ export type TriggerDef = {
 	schedule?: ScheduleSpec;
 	sensor?: {
 		condition: string;
+		action: string;
 		nodeConditions: string[];
 		minimumIntervalSeconds: number;
 		timeoutSeconds: number | null;
@@ -596,67 +597,69 @@ def business_days(window, holidays):
 		name: 'on_payments_landed',
 		kind: 'node_sensor',
 		description: 'Refresh the marts when raw__payments has new data',
-		jobKey: 'marts_only',
+		jobKey: null,
 		cadence: 'When raw__payments has new data',
 		defaultState: 'running',
 		state: 'running',
-		sourceFile: 'orchestration/sensors.py',
-		line: 6,
-		code: `on_payments_landed = sensor(
-    "on_payments_landed",
+		sourceFile: 'orchestration/sensors/payments/on_payments_landed.py',
+		line: 4,
+		code: `@sensor(
     description="Refresh the marts when raw__payments has new data",
-    when=source_has_new_data("raw__payments"),
-    run=marts_only,
-    minimum_interval="1m",
-)`,
+    when=source_new_data(select="source:raw__payments"),
+    minimum_interval_seconds=60,
+)
+def on_payments_landed(ctx):
+    return RunRequest(job="marts_only")`,
 		targets: null,
 		catchUp: null,
-		sensor: { condition: 'source_has_new_data("raw__payments")', nodeConditions: [], minimumIntervalSeconds: 60, timeoutSeconds: null }
+		sensor: { condition: 'when source:raw__payments has new data', action: 'on_payments_landed()', nodeConditions: [], minimumIntervalSeconds: 60, timeoutSeconds: 60 }
 	},
 	{
 		name: 'after_core_build',
 		kind: 'job_sensor',
 		description: 'Reporting after a successful core build that rebuilt daily_revenue',
-		jobKey: 'reporting_exports',
+		jobKey: null,
 		cadence: 'When core_build succeeds and daily_revenue executed',
 		defaultState: 'running',
 		state: 'running',
-		sourceFile: 'orchestration/sensors.py',
-		line: 15,
-		code: `after_core_build = sensor(
-    "after_core_build",
+		sourceFile: 'orchestration/sensors/reporting/after_core_build.py',
+		line: 4,
+		code: `@sensor(
     description="Reporting after a successful core build that rebuilt daily_revenue",
-    when=job_succeeded(core_build, nodes=all_executed_successfully(["daily_revenue"])),
-    run=reporting_exports,
-)`,
+    when=run_event(job="core_build", kinds=[RunEventKind.SUCCESS], executed_successfully=("daily_revenue",)),
+    targets=("prod",),
+)
+def after_core_build(ctx: SensorContext[RunEvent]):
+    return RunRequest(job="reporting_exports")`,
 		targets: ['prod'],
 		catchUp: null,
 		sensor: {
-			condition: 'job_succeeded(core_build)',
+			condition: 'when core_build success',
+			action: 'after_core_build()',
 			nodeConditions: ['daily_revenue executed successfully in that run'],
-			minimumIntervalSeconds: 0,
-			timeoutSeconds: null
+			minimumIntervalSeconds: 30,
+			timeoutSeconds: 60
 		}
 	},
 	{
 		name: 'on_fact_orders_rebuilt',
 		kind: 'node_sensor',
 		description: 'Activity models whenever fact_orders is rebuilt, in any run',
-		jobKey: 'activity_microbatch',
+		jobKey: null,
 		cadence: 'When fact_orders is rebuilt successfully (any run)',
 		defaultState: 'running',
 		state: 'running',
-		sourceFile: 'orchestration/sensors.py',
-		line: 23,
-		code: `on_fact_orders_rebuilt = sensor(
-    "on_fact_orders_rebuilt",
+		sourceFile: 'orchestration/sensors/activity/on_fact_orders_rebuilt.py',
+		line: 4,
+		code: `@sensor(
     description="Activity models whenever fact_orders is rebuilt, in any run",
-    when=node_succeeded("fact_orders"),
-    run=activity_microbatch,
-)`,
+    when=node_event(select="fact_orders", kinds=[NodeEventKind.SUCCESS]),
+)
+def on_fact_orders_rebuilt(ctx):
+    return RunRequest(job="activity_microbatch")`,
 		targets: null,
 		catchUp: null,
-		sensor: { condition: 'node_succeeded("fact_orders")', nodeConditions: [], minimumIntervalSeconds: 0, timeoutSeconds: null }
+		sensor: { condition: 'when model:fact_orders success', action: 'on_fact_orders_rebuilt()', nodeConditions: [], minimumIntervalSeconds: 30, timeoutSeconds: 60 }
 	},
 	{
 		name: 'platform_health_webhook',
@@ -666,18 +669,20 @@ def business_days(window, holidays):
 		cadence: 'On tick_overdue, scheduler_no_leader, location_broken, launch_failed',
 		defaultState: 'running',
 		state: 'running',
-		sourceFile: 'orchestration/health.py',
+		sourceFile: 'orchestration/sensors/health/platform_health_webhook.py',
 		line: 4,
-		code: `@sensor(when=platform_event(kinds=[K.TICK_OVERDUE, K.SCHEDULER_NO_LEADER,
-                                    K.LOCATION_BROKEN, K.LAUNCH_FAILED]),
-        description="Post platform events to the team chat room")
-def platform_health_webhook(ctx, chat_webhook):
-    for event in ctx.events:
-        chat_webhook.post(event.summary())`,
+		code: `@sensor(
+    description="Post platform events to the team chat room",
+    when=platform_event(kinds=[K.TICK_OVERDUE, K.SCHEDULER_NO_LEADER, K.LOCATION_BROKEN, K.LAUNCH_FAILED]),
+    timeout_seconds=30,
+)
+def platform_health_webhook(ctx: SensorContext[PlatformEvent], chat_webhook):
+    chat_webhook.post(f"{ctx.event.event}: {ctx.event.details}")`,
 		targets: null,
 		catchUp: null,
 		sensor: {
-			condition: 'platform_event(kinds=[tick_overdue, scheduler_no_leader, location_broken, launch_failed])',
+			condition: 'on platform events: tick_overdue, scheduler_no_leader, location_broken, launch_failed',
+			action: 'platform_health_webhook()',
 			nodeConditions: [],
 			minimumIntervalSeconds: 30,
 			timeoutSeconds: 30
@@ -685,27 +690,28 @@ def platform_health_webhook(ctx, chat_webhook):
 	},
 	{
 		name: 'partner_feed_poll',
-		kind: 'custom_sensor',
+		kind: 'polling_sensor',
 		description: 'Load each new partner order file once',
-		jobKey: 'load_sources',
+		jobKey: null,
 		cadence: 'Every 5 minutes (minimum interval)',
 		defaultState: 'running',
 		state: 'running',
-		sourceFile: 'orchestration/sensors.py',
-		line: 31,
-		code: `@sensor(minimum_interval="5m", timeout="60s",
-        description="Load each new partner order file once")
-def partner_feed_poll(ctx, orders_api):
+		sourceFile: 'orchestration/sensors/partners/partner_feed_poll.py',
+		line: 4,
+		code: `@sensor(
+    description="Load each new partner order file once",
+    minimum_interval_seconds=300,
+)
+def partner_feed_poll(ctx: SensorContext[None], orders_api):
     files = orders_api.list_files(modified_after=ctx.cursor)
     if not files:
         return SkipReason("No new files")
-    for f in files:
-        yield RunRequest(job=load_sources, run_key=f.name)
-    ctx.cursor = files[-1].modified_at`,
+    ctx.cursor = files[-1].modified_at
+    return [RunRequest(job="load_sources", run_key=f.name) for f in files]`,
 		targets: null,
 		catchUp: null,
 		definitionChanged: true,
-		sensor: { condition: 'partner_feed_poll(ctx, orders_api)', nodeConditions: [], minimumIntervalSeconds: 300, timeoutSeconds: 60 }
+		sensor: { condition: 'every 300s', action: 'partner_feed_poll()', nodeConditions: [], minimumIntervalSeconds: 300, timeoutSeconds: 60 }
 	}
 ];
 
@@ -1098,17 +1104,26 @@ export function createOperateFixtures(now: number): OperateFixtures {
 	const evaluations: Record<string, SensorEvaluation[]> = {};
 	const runRequests: Record<string, SensorRunRequest[]> = {};
 	const fingerprint = (name: string, version = 1) => `fp:${name.length.toString(16)}${version}a${(name.charCodeAt(0) * 7919).toString(16)}`;
-	const evalOf = (name: string, seq: number, at: number, outcome: SensorEvaluation['outcome'], extra: Partial<SensorEvaluation> = {}): SensorEvaluation => ({
+	/** Older fixtures name a tick by its phase and run count; the person-facing outcome follows from them. */
+	type Phase = 'requested' | 'completed' | 'failed' | 'timed_out' | 'abandoned';
+	const outcomeOf = (phase: Phase, runs: number, skipReason: string | null | undefined): SensorEvaluation['outcome'] =>
+		phase === 'requested' ? 'running' : phase !== 'completed' ? phase : runs ? 'started' : skipReason ? 'skipped' : 'handled';
+	const evalOf = (name: string, seq: number, at: number, phase: Phase, { runRequests = 0, ...extra }: Partial<SensorEvaluation> & { runRequests?: number } = {}): SensorEvaluation => ({
 		id: `eval-${name.replace(/_/g, '-')}-${seq}`,
-		outcome,
+		outcome: outcomeOf(phase, runRequests, extra.skipReason),
 		requestedAt: new Date(at).toISOString(),
-		finishedAt: outcome === 'requested' ? null : new Date(at + 1400).toISOString(),
+		finishedAt: phase === 'requested' ? null : new Date(at + 1400).toISOString(),
 		cursorBefore: null,
 		cursorAfter: null,
-		runRequests: 0,
+		eventId: null,
+		eventSummary: null,
+		runIds: Array.from({ length: runRequests }, (_, i) => `run-${name.length.toString(16)}${seq.toString(16)}${i}`),
 		skipReason: null,
 		skippedFor: [],
+		failureCode: phase === 'failed' ? 'sensor_function_failed' : phase === 'timed_out' ? 'timed_out' : null,
 		error: null,
+		abandonedBecause: phase === 'abandoned' ? 'superseded' : null,
+		skippedBy: null,
 		definitionFingerprint: fingerprint(name),
 		...extra
 	});

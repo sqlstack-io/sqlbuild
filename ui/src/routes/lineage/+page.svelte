@@ -188,8 +188,8 @@
 		expanded = next.expanded ?? expanded;
 		const selected = new Set(nodes.filter((n) => n.selected).map((n) => n.id));
 		neighbourhoodOnly = false;
-		// The card under the pointer may be gone, and it never reports the pointer leaving.
-		hoveredId = null;
+		// The card or box under the pointer may be gone, and it never reports the pointer leaving.
+		clearPointerState();
 		lastLayoutKey = '';
 		draw(graphOf(data), selected);
 	}
@@ -399,7 +399,87 @@
 	}
 
 	// --- selection + hover driven highlighting ---
+	// A card or a closed folder lights its edges once the pointer rests on it, so sweeping across the
+	// canvas doesn't flash them; leaving clears at once. An open box only outlines on hover: lighting
+	// everything inside a big box was noise. Clicking a box's body selects it and lights its edges.
+	const HOVER_REST_MS = 250;
 	let hoveredId = $state<string | null>(null);
+	let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+	/** The open box under the pointer, outlined. */
+	let hoveredBox = $state<string | null>(null);
+	/** The open box selected by a click on its body. */
+	let pickedBox = $state<string | null>(null);
+
+	function clearHoverTimer() {
+		if (hoverTimer) clearTimeout(hoverTimer);
+		hoverTimer = null;
+	}
+	/** Forget the pointer and the selected box, as when the graph is redrawn. */
+	function clearPointerState() {
+		clearHoverTimer();
+		hoveredId = null;
+		hoveredBox = null;
+		pickedBox = null;
+	}
+	function enterNode(node: Node) {
+		clearHoverTimer();
+		hoveredId = null;
+		if (node.type === 'folderBox') {
+			hoveredBox = node.id;
+			return;
+		}
+		hoveredBox = null;
+		hoverTimer = setTimeout(() => {
+			hoverTimer = null;
+			hoveredId = node.id;
+		}, HOVER_REST_MS);
+	}
+	function leaveNode() {
+		clearHoverTimer();
+		hoveredId = null;
+		hoveredBox = null;
+	}
+	/** A click on an open box's body selects it; its header opens and closes it, and a node a click just removed is ignored. */
+	function clickNode({ node, event }: { node: Node; event: MouseEvent | TouchEvent }) {
+		if (!nodes.some((n) => n.id === node.id)) return;
+		if (node.type === 'folder') {
+			pickedBox = null;
+			openFolder(String(node.data.group));
+			return;
+		}
+		if (node.type !== 'folderBox') {
+			pickedBox = null;
+			return;
+		}
+		if ((event.target as Element | null)?.closest('.folder-head, .head-hit, a, button')) return;
+		pickedBox = pickedBox === node.id ? null : node.id;
+		if (pickedBox) nodes = nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
+	}
+	// Whatever replaces the nodes (a folder opening or closing, expand or collapse all, a reset, a new
+	// listing) may take the hovered or selected box with it; a stale id would dim the whole graph.
+	$effect(() => {
+		const ids = new Set(nodes.map((n) => n.id));
+		untrack(() => {
+			if (hoveredId && !ids.has(hoveredId)) leaveNode();
+			if (hoveredBox && !ids.has(hoveredBox)) hoveredBox = null;
+			if (pickedBox && !ids.has(pickedBox)) pickedBox = null;
+		});
+	});
+	// Outline the hovered box and mark the selected one on their elements, leaving the node array alone.
+	$effect(() => {
+		const panel = graphPanel;
+		const marks: [string | null, string][] = [
+			[hoveredBox, 'box-hovered'],
+			[pickedBox, 'box-picked']
+		];
+		if (!panel) return;
+		const undo = marks.map(([id, cls]) => {
+			const el = id ? panel.querySelector(`.svelte-flow__node[data-id="${CSS.escape(id)}"]`) : null;
+			el?.classList.add(cls);
+			return () => el?.classList.remove(cls);
+		});
+		return () => undo.forEach((u) => u());
+	});
 
 	// ids of currently-selected nodes (Svelte Flow sets node.selected)
 	const selectedIds = $derived(new Set(nodes.filter((n) => n.selected).map((n) => n.id)));
@@ -407,15 +487,23 @@
 	// the lit set: full upstream+downstream path of the selection, or
 	// immediate neighbours of the hovered node when nothing is selected.
 	const lit = $derived.by(() => {
-		if (selectedIds.size > 0) {
-			return tracePath(selectedIds, edges);
-		}
-		if (hoveredId) {
-			// A hovered box lights the edges of everything inside it.
-			return { nodes: new Set([hoveredId]), edges: edgesTouching(hoveredId, edges, nodes) };
-		}
-		return null;
+		const l = litSet();
+		// A lit set that names nothing drawn would only dim everything.
+		const shown = new Set(nodes.filter((n) => !n.hidden).map((n) => n.id));
+		return l && [...l.nodes].some((id) => shown.has(id)) ? l : null;
 	});
+	function litSet(): { nodes: Set<string>; edges: Set<string> } | null {
+		if (selectedIds.size > 0) return tracePath(selectedIds, edges);
+		if (pickedBox) {
+			// A selected box lights every edge of its contents, and both ends of each.
+			const touching = edgesTouching(pickedBox, edges, nodes);
+			const ends = new Set<string>([pickedBox]);
+			for (const e of edges) if (touching.has(e.id)) ends.add(e.source).add(e.target);
+			return { nodes: ends, edges: touching };
+		}
+		if (hoveredId) return { nodes: new Set([hoveredId]), edges: edgesTouching(hoveredId, edges, nodes) };
+		return null;
+	}
 
 
 	// Apply highlight styling back into the bound arrays whenever the lit set
@@ -428,7 +516,7 @@
 			// Thickness keeps saying how many node links an edge stands for, lit or dimmed.
 			const count = (e.data as { count?: number } | undefined)?.count ?? 1;
 			const style = edgeStyle(count, !l ? 'neutral' : l.edges.has(e.id) ? 'on' : 'dim');
-			const animated = !!l && l.edges.has(e.id) && selectedIds.size > 0;
+			const animated = !!l && l.edges.has(e.id) && (selectedIds.size > 0 || !!pickedBox);
 			if (e.style !== style || e.animated !== animated) edgesChanged = true;
 			return { ...e, style, animated };
 		});
@@ -931,14 +1019,17 @@
 			fitViewOptions={{ padding: 0.08, maxZoom: 1, minZoom: scaleMode ? undefined : FIT_FLOOR, includeHiddenNodes: scaleMode }}
 			minZoom={scaleMode ? 0.02 : 0.05}
 			onlyRenderVisibleElements={scaleMode}
-			onpaneclick={onFarClick}
+			onpaneclick={(event) => {
+				pickedBox = null;
+				onFarClick(event);
+			}}
 			elementsSelectable
 			nodesDraggable
 			multiSelectionKey={['Shift', 'Meta', 'Control']}
 			selectionKey="Shift"
-			onnodeclick={({ node }) => node.type === 'folder' && openFolder(String(node.data.group))}
-			onnodepointerenter={({ node }) => (hoveredId = node.id)}
-			onnodepointerleave={() => (hoveredId = null)}
+			onnodeclick={clickNode}
+			onnodepointerenter={({ node }) => enterNode(node)}
+			onnodepointerleave={leaveNode}
 		/>
 		{#if tooMany}
 			<div class="graph-too-many">
@@ -1175,6 +1266,13 @@
 </div>
 
 <style>
+	:global(.svelte-flow__node.box-hovered > .box) {
+		border-color: color-mix(in srgb, var(--primary) 55%, var(--border-strong));
+	}
+	:global(.svelte-flow__node.box-picked > .box) {
+		border-color: var(--primary);
+		box-shadow: 0 0 0 1px var(--primary);
+	}
 	.far-canvas {
 		position: absolute;
 		inset: 0;

@@ -189,14 +189,14 @@ Which target `ctx.target_config` describes depends on what uses the provider:
 | --- | --- |
 | Python nodes in `sqb build`, `sqb check` and `sqb load` | The command's target |
 | Event exporters and command output sinks | The command's target: `--target`, or the project's default target |
-| Orchestration sensors | The target the sensor evaluates for |
+| Orchestration sensors | The target the sensor's tick is for |
 | Orchestration calendars | `None` |
 
 Details:
 
 - When the project can't resolve the target's settings, for example because the target names a connection that isn't defined, every command that uses the target, such as `sqb build`, `sqb compile` or `sqb query`, fails before any exporter or sink provider is set up.
 - Commands that don't use the target, such as `sqb format`, still run, and their exporter and sink providers get `ctx` set to `None`.
-- In a project that defines providers, a sensor evaluation whose target's settings can't be resolved fails, and the sensor's cursor doesn't advance.
+- In a project that defines providers, a sensor tick whose target's settings can't be resolved fails, and its event is retried.
 - Check for `None` in a provider that calendars, exporters or sinks use.
 
 ## Configuration from environment variables
@@ -210,11 +210,18 @@ class SlackNotifier(Provider):
     channel: str = "#builds"  # has a default, environment variable is optional
 ```
 
-See the [pydantic-settings documentation](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) for advanced configuration like custom env prefixes, `.env` file support, and nested settings.
+Put local values in the project's `.env`, which every `sqb` command loads at start-up; variables
+already in the environment win. See [Env file](../project-configuration.md#env-file) for
+another file per target or turning it off.
+
+See the [pydantic-settings documentation](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) for advanced configuration like custom env prefixes and nested settings.
 
 ## Secrets
 
-Declare a secret as a field typed `SecretStr`. Laptops and CI jobs can then compile without production secrets, and builds check only the secrets their selection needs.
+Every setting without a default is a required secret, whatever its type: it is what the provider
+needs from the environment to run. Type a secret `SecretStr` as well, so its value is never shown.
+Laptops and CI jobs can then compile without production secrets, and runs check only the secrets
+their selection needs, before they connect to the warehouse.
 
 ```python
 from pydantic import SecretStr
@@ -226,12 +233,17 @@ class SlackAlerts(Provider):
     slack_webhook_url: SecretStr  # reads SLACK_WEBHOOK_URL
 ```
 
-| Commands | When a required secret is unset |
+SQLBuild looks for each variable in the environment and then in the project's
+[env file](../project-configuration.md#env-file).
+
+| Command | When a required secret is unset |
 | --- | --- |
-| `compile`, `rules run`, `format`, `dag`, `lineage`, `scope` | Error `D012`, unless missing secrets are allowed |
-| `build`, `load`, `check`, and runs on `sqb server` workers | Error before anything runs, only when a selected node or a sink uses the provider |
+| `compile`, `rules run`, `format`, `dag`, `lineage`, `scope` | Error `D012`, unless missing secrets are [allowed](#allowing-missing-secrets) |
+| `build`, `load`, `check` | Error `D012` before connecting to the warehouse, only when a selected node or a sink uses the provider; nothing runs |
+| `sqb plan` | Plans as usual, and lists what [can't run](#plans-and-runs) |
+| Runs on `sqb server` workers | The nodes that use the provider fail with `D012` before the warehouse, and the nodes that read them are skipped |
 | `sqb debug` | Lists the missing secrets as warnings |
-| `sqb location health` | Reports `missing_secrets` and exits `1` |
+| `sqb location health` | Reports `missing_secrets` and exits `1`, unless the target allows every provider missing them |
 
 ```text
 $ sqb compile
@@ -239,26 +251,74 @@ error[D012]: provider 'slack_alerts' (providers/slack_alerts/provider.py) is mis
   = help: set SLACK_WEBHOOK_URL, or pass --allow-missing-secrets where secrets aren't available
 ```
 
-Allow missing secrets for the static commands in any of these ways:
-
-| Where | Setting |
-| --- | --- |
-| Command line | `--allow-missing-secrets` |
-| Environment | `SQLBUILD_ALLOW_MISSING_SECRETS=1` |
-| `sqlbuild_local.toml` | `allow_missing_secrets = true` under `[settings]` |
-
-The command then lists the providers it skipped on stderr, such as
-`1 provider has missing secrets (allowed): slack_alerts`. Settings that aren't secrets are still
-validated. Execution commands accept none of these.
+A run names each variable, the nodes that use the provider and the selected nodes that read them,
+and where it looked:
 
 ```text
-$ sqb build --select python/orders
-error[D012]: selected nodes need secrets that are missing:
-  slack_alerts  SLACK_WEBHOOK_URL  (partner_export_alert)
+$ sqb build --select +partner_orders_report
+error[D012]: selected nodes need secrets that are missing from the environment and from .env:
+  partner_api  PARTNER_API_TOKEN  (raw_partner_orders; read by partner_orders_report)
 nothing was run
+  = help: set each variable in this shell or the project's env file, or narrow the selection
 ```
 
 Run [`sqb debug`](../../cli/debug.md) to see which secrets this machine has.
+
+### Allowing missing secrets
+
+Missing secrets can be expected in two scopes, with the same meaning: the static commands don't fail
+on them. Runs still can't run the nodes that need them.
+
+| Scope | Where | Setting |
+| --- | --- | --- |
+| Any provider, this machine | Command line | `--allow-missing-secrets` |
+| | Environment | `SQLBUILD_ALLOW_MISSING_SECRETS=1` |
+| | `sqlbuild_local.toml` | `allow_missing_secrets = true` under `[settings]` |
+| Listed providers, one target | `sqlbuild_project.toml` | `allow_missing_secrets = ["provider", ...]` under [`[targets.<name>]`](../project-configuration.md#allowed-missing-secrets) |
+
+```toml
+# A laptop's dev target never exports, so it never has the bucket's keys.
+[targets.dev]
+allow_missing_secrets = ["export_bucket"]
+```
+
+The command then lists the providers it skipped on stderr, such as
+`1 provider has missing secrets (allowed): slack_alerts`, or `(allowed on target dev)` for a target's
+list. Invalid settings are still errors. `build`, `load` and `check` accept neither.
+
+On a [location](../../cli/location.md), a provider its target allows is a quiet note on the
+location's page instead of a health problem.
+
+### Plans and runs
+
+`sqb plan` lists what a missing secret stops, after the plan:
+
+```text
+Can't run: provider partner_api needs PARTNER_API_TOKEN (missing from the environment and from .env)
+  needs  raw_partner_orders, and partner_orders_report that read it
+```
+
+`sqb plan --json` carries the same in a `cant_run` list: each provider with its `path`, unset
+`variables`, the `nodes` that use it, the selected `readers` of those, and the `env_file` it looked
+in. Values are never included.
+
+In the web UI, the plan page lists these nodes under **Can't run**, leaves them out of the **Will
+run** count, and disables **Run** until the secret is set. **Plan without these nodes** excludes them
+and plans the rest.
+
+A [sink](../observability/sinks.md) runs with every command, so when its provider is missing
+a secret nothing can run: the plan says `sink <name> needs <VARIABLE>; every run uses sinks`, `sqb
+build` lists the same line in its `D012` error, and there is no selection that leaves the sink out.
+In `--json`, `cant_run` names the sink under `sinks`.
+
+Nobody looks at a plan for a schedule or sensor, so its run checks the same thing on the worker,
+before compiling a plan or connecting. Each node that uses the provider fails with `D012`, the nodes
+that read it are skipped, and the run page shows **Couldn't run** with the provider, its variables
+and the fix: set them in the location's environment or its env file, and restart the location.
+
+The location reports the providers missing secrets each time it publishes. Its page lists them with
+their variables, fields and the nodes that can't run, and the Overview lists the problem for that
+location.
 
 ## Discovery rules
 
@@ -266,7 +326,7 @@ Run [`sqb debug`](../../cli/debug.md) to see which secrets this machine has.
 - Files named `__init__.py` or starting with `_` are skipped
 - Each concrete (non-abstract) subclass of `Provider` is registered
 - Provider names must be globally unique across project resources
-- Settings are validated at discovery time. A missing or invalid setting that isn't a secret is a `D012` error; missing secrets follow [Secrets](#secrets)
+- Settings are validated at discovery time. An invalid setting is a `D012` error; a missing required setting follows [Secrets](#secrets)
 
 ## Plan output
 
@@ -287,7 +347,7 @@ provider with its class and docstring. A provider's page shows:
 
 | Tab | Shows |
 | --- | --- |
-| Settings | Each setting's type, environment variable and whether it is required; secret settings are marked, and flagged **missing** when the location's environment doesn't set them |
+| Settings | Each setting's type, environment variable and whether it is required; secret types are marked, and required settings are flagged **missing** when the location's environment doesn't set them |
 | Used by | The loaders, assets, hooks and other code that take the provider, and the jobs that run that code |
 
 Setting values, defaults included, are never published.

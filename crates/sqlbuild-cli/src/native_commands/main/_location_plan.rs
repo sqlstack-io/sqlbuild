@@ -1,10 +1,10 @@
 //! A requested plan runs in the location's runtime interpreter on frozen node keys, from the synced copy.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::future::Future;
 
 use chrono::{DateTime, Utc};
-use serde_json::{Value, json};
+use serde_json::json;
 use sqlbuild_orchestration::platform::models::LocationWorkClient;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::warehouse_metadata::models::PreviewCopyRead;
@@ -14,30 +14,29 @@ use uuid::Uuid;
 use crate::native_commands::_helpers::location::execution::{plan_failure, without_diffs};
 use crate::native_commands::_helpers::location::held_copy::{HELD_COPY, held_copy, hold_copy};
 use crate::native_commands::_helpers::location::plan_request::{
-    plan_arguments, run_plan, selected_names,
+    given_and_changes, plan_arguments, run_plan, selected_names,
 };
 use crate::native_commands::_helpers::location::plan_reuse::{PLAN_REUSE, reused_plan};
 use crate::native_commands::models::{
     HeldCopy, LocationRuntimeRequest, LocationServe, PlanKey, PlanToKeep,
 };
 use crate::native_commands::types::LocationPlan;
+use crate::native_commands::types::{PlanSelection, PlanSettings};
 
 /// The plan with what to keep once its checks pass, an `{"error": ...}` report, or `None` when stopped first.
 pub(super) async fn plan_location(
     (options, runtime): (&LocationServe, &mpsc::Sender<LocationRuntimeRequest>),
-    (selection, settings, fresh): (&BTreeSet<String>, &BTreeMap<String, Value>, bool),
+    ((selection, jobs), (settings, given), fresh): (PlanSelection<'_>, PlanSettings<'_>, bool),
     (client, session_id, generation): (&LocationWorkClient, Uuid, i64),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<(LocationPlan, Option<PlanToKeep>)>, ControlError> {
     let (argv, select) = match plan_arguments(options, settings)
-        .and_then(|argv| Ok((argv, selected_names(selection)?)))
+        .and_then(|argv| Ok((argv, selected_names(selection, jobs)?)))
     {
         Ok(planned) => planned,
         Err(message) => return Ok(Some((without_diffs(plan_failure(&message)), None))),
     };
-    let consumption: bool = settings
-        .get("changed")
-        .is_some_and(|changed| !matches!(changed, Value::Null | Value::Bool(false)));
+    let (given, consumption): (BTreeSet<String>, bool) = given_and_changes((settings, given), jobs);
     let held: Option<HeldCopy> = held_copy(&HELD_COPY, (&options.target, generation), consumption);
     let read_consumption: bool = consumption || held.as_ref().is_some_and(|held| held.consumption);
     let read = PreviewCopyRead {
@@ -65,6 +64,8 @@ pub(super) async fn plan_location(
         argv: argv.clone(),
         select: select.clone(),
         consumption: planned.consumption,
+        jobs: jobs.clone(),
+        given: given.clone(),
     };
     let planned_at: DateTime<Utc> = Utc::now();
     if !fresh
@@ -83,6 +84,10 @@ pub(super) async fn plan_location(
         "copy": planned.path.to_string_lossy(),
         "version": planned.version,
         "consumption": planned.consumption,
+        "jobs": jobs,
+        "given": given,
+        "project_dir": options.project_dir,
+        "target": options.target,
     }});
     let keep = PlanToKeep {
         generation,

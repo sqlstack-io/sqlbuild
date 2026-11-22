@@ -87,7 +87,8 @@ selection.
 ### Settings when a build names a job
 
 A build or plan whose selection names a job, as `job:nightly_orders_job`, the bare name or a
-`job:` pattern such as `job:nightly_*`, takes the job's `[settings]`. Selecting the same nodes some other way, such as by tag, takes none of them.
+`job:` pattern such as `job:nightly_*`, takes the job's `[settings]`. So do ad-hoc builds and plan
+previews through `sqb server`; see [Run ad-hoc commands](/docs/cli/server#run-ad-hoc-commands). Selecting the same nodes some other way, such as by tag, takes none of them.
 Naming a group names each of its jobs. The first value set wins:
 
 1. A flag on the command line, such as `--vars` or `--concurrency`
@@ -131,6 +132,11 @@ that declares them together fails to compile, with the error a build of the grou
 
 Two named jobs that give one node different values of the same setting fail the build with `S027`,
 naming the node, both jobs and the setting. A setting only one of them sets is no conflict.
+
+`sqb plan --json` names what the jobs give the build: `full_refresh_jobs` lists the jobs whose
+models rebuild from scratch, `job_warehouses` maps each job to the warehouse its nodes run on, and
+`job_concurrency` maps each job to how many of its nodes build at once. `job_concurrency` is left
+out when `--concurrency` turns the per-job limits off.
 
 Select a pipeline by its folder or a tag rather than listing its nodes. Rule `SQBRORCHESTRATION101`
 reports a job or sensor `select` that names more than three nodes one by one; see
@@ -242,41 +248,140 @@ The function receives a `window` with timezone-aware `start` and `end`, in the j
 returns timezone-aware datetimes inside it. Other parameters name
 [providers](/docs/concepts/python-nodes/providers). `horizon` sets how far ahead the window reaches.
 
-## Start a job from a sensor
+## React with a sensor
 
-A sensor starts a job or job group when something happens, named by `run`.
+A sensor is a function SQLBuild calls when something happens, such as a job run failing. The
+function can start runs, send a message through a provider, or both:
 
 ```python
-# orchestration/sensors/orders/new_orders.py
-from sqlbuild.orchestration import sensor, source_new_data
+# orchestration/sensors/orders/orders_failed_sensor.py
+from sqlbuild.orchestration import RunEvent, RunEventKind, RunRequest, SensorContext, run_event, sensor
 
-on_new_orders = sensor(
-    "on_new_orders_sensor",
-    description="Refresh orders for each new source version",
-    when=source_new_data(select="source:raw_orders"),
-    run="orders_refresh_job",
-    minimum_interval_seconds=60,
+
+@sensor(
+    description="Tell the orders team, and rebuild the export, when the nightly orders job fails",
+    when=run_event(job="nightly_orders_job", kinds=[RunEventKind.FAILED]),
 )
+def orders_failed_sensor(ctx: SensorContext[RunEvent], team_chat):
+    team_chat.post(f"{ctx.event.job} failed: {ctx.event.error} {ctx.event.url or ''}")
+    return RunRequest(job="orders_export_job")
 ```
 
-| Condition | Starts a run for |
+`team_chat` is a [provider](/docs/concepts/python-nodes/providers) the project defines; the
+function names it as a parameter, as a Python node does. The sensor is named after its function.
+Pass `name="..."` to choose another name, which must also end in `_sensor`.
+
+| `when` | The function is called once for |
 | --- | --- |
-| `platform_event(kinds=[...])` | Server events, such as an overdue tick |
-| `run_event(job="...", kinds=[...])` | Outcomes of another job or group, including the job's runs inside groups, optionally only when `executed_successfully` nodes ran and succeeded |
+| `run_event(job="...", kinds=[...])` | Each run of the job or group that ends with one of `kinds`, optionally only when `executed_successfully` nodes ran and succeeded |
 | `node_event(select="...", kinds=[...])` | Each success, failure or recovery of the selected nodes in any run |
+| `check_event(select="...", kinds=[...])` | Each check, audit or SQL test on the selected nodes that fails or warns inside a job or job group run, whatever the run's outcome; ad-hoc `sqb test` and `sqb audit` runs don't count |
 | `source_new_data(select="...")` | Each new version of the selected sources |
 | `source_stale(select="...", after_seconds=...)` | Each source version older than `after_seconds` |
+| `platform_event(kinds=[...])` | Each server event of `kinds`, such as an overdue tick or a failed run |
+| Not set | Every `minimum_interval_seconds`: a polling sensor |
 
-A `run_event` on a job also fires for that job's runs inside a job group. Each member of a group
-run ends with its own outcome as soon as it finishes, while the rest of the group may still be
-running, and `executed_successfully` checks that member's nodes. Moving a job into a group therefore
-keeps every sensor that watches it. A sensor on the group fires once, when the whole group run ends.
-`kinds` takes `success`, `warn`, `partial`, `failed`, `cancelled`, `skipped` (a member its group
-did not run) or `completed` for any of them.
+`kinds` take the enums `RunEventKind`, `NodeEventKind`, `CheckEventKind` and `PlatformEventKind`
+from `sqlbuild.orchestration`. `RunEventKind` has `SUCCESS`, `WARN`, `PARTIAL`, `FAILED`,
+`CANCELLED`, `SKIPPED` (a member its group did not run) and `COMPLETED` for any of them.
+`CheckEventKind` has `FAILED` and `WARN`. `check_event` covers checks inside job runs, not
+`sqb test` or `sqb scenario test`.
 
-A sensor without `when` decorates a function that polls and returns `RunRequest(run_key=...)`
-values or a `SkipReason`. A sensor also takes `minimum_interval_seconds` (default 30),
-`default_status` and `targets`.
+### What the function gets and returns
+
+`ctx.event` holds the event, typed by the condition:
+
+| Condition | `ctx.event` | Fields |
+| --- | --- | --- |
+| `run_event` | `RunEvent` | `id`, `occurred_at`, `job`, `run_id`, `status`, `error`, `failed_nodes`, `failed_checks`, `target`, `url` |
+| `node_event` | `NodeEvent` | `id`, `occurred_at`, `run_id`, `job`, `node`, `event`, `target`, `url` |
+| `check_event` | `CheckEvent` | `id`, `occurred_at`, `run_id`, `job`, `check`, `status`, `target`, `url` |
+| `source_new_data` | `SourceNewDataEvent` | `id`, `occurred_at`, `source`, `data_version`, `target` |
+| `source_stale` | `SourceStaleEvent` | `id`, `occurred_at`, `source`, `data_version`, `after_seconds`, `target` |
+| `platform_event` | `PlatformEvent` | `id`, `occurred_at`, `event`, `details` |
+| Not set | `None` | None; keep your place between polls in `ctx.cursor` |
+
+`ctx.cursor` is for polling sensors only. A sensor with a `when` condition always sees `None`,
+and a value it assigns is ignored: the server keeps its place in the events.
+
+`url` links to the run in the UI. It is `None` when the scheduler's configuration sets no sign-in
+origin, such as `[server] password_origin`.
+
+| The function returns | The tick shows |
+| --- | --- |
+| `None` | Handled |
+| `SkipReason("...")` | Skipped, with the reason |
+| `RunRequest(job="...")`, or a list of them | Started, with links to the runs |
+| Nothing: it raises or runs past `timeout_seconds` | Failed, with the traceback |
+
+A `RunRequest` starts its job once per `run_key`; different jobs can share a key. For an event
+the key defaults to the event's `id` and the job, so a repeated delivery starts nothing new. A
+polling sensor must pass `run_key`:
+
+```python
+# orchestration/sensors/orders/partner_files_sensor.py
+from sqlbuild.orchestration import RunRequest, SensorContext, SkipReason, sensor
+
+
+@sensor(description="Load each new partner order file once", minimum_interval_seconds=300)
+def partner_files_sensor(ctx: SensorContext[None], partner_files):
+    files = partner_files.list_after(ctx.cursor)
+    if not files:
+        return SkipReason("No new files")
+    ctx.cursor = files[-1].name
+    return [RunRequest(job="partner_orders_job", run_key=file.name) for file in files]
+```
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `minimum_interval_seconds` | 30 | How often a polling sensor is called, and how long a failed event waits before its retry |
+| `timeout_seconds` | 60 | How long one call may take, at most 600 |
+| `default_status` | `running` | `paused` publishes the sensor switched off |
+| `targets` | Every target | The targets the sensor runs for |
+
+A location calls one sensor function at a time, and while it runs, the location's other work
+waits: its other sensors, plans and sync. Keep functions short; a call that needs longer belongs
+in a job the sensor starts.
+
+### When a tick fails
+
+SQLBuild delivers each event at least once. A failed tick leaves its event undelivered: the event
+is retried after `minimum_interval_seconds`, and later events wait behind it. A function that sends
+messages can use `ctx.event.id` to skip an event it has already handled.
+
+Each tick on the sensor's page shows its event and outcome. People with `view.evidence` also see a
+failed tick's traceback. From the first failed tick, the Overview lists "Sensor `<name>` is
+failing" with the stuck event and since when. The item goes away when a tick succeeds. A
+location that doesn't answer within `timeout_seconds` counts as a failed tick too; a tick cut short
+by a new publication, a pause or a reset doesn't.
+
+To move past an event the function can't handle, use **Skip this event** on the stuck tick, or
+`sqb admin change-trigger <TRIGGER_ID> skip-event --event <event id> --event-id <uuid> --reason
+"..."`. It marks that one event delivered without calling the function, and the tick history
+and audit log record who skipped it and why. It works while a tick for the event is still out,
+as it usually is for a sensor that times out or is paused; that tick's late answer starts nothing.
+**Start over** (`reset-cursor`) instead re-delivers
+every retained event from the start, the skipped one too. Both need `sensor.reset_cursor`.
+
+### Try a sensor
+
+[`sqb sensor try`](/docs/cli/sensor) calls a sensor's function from your local code with a real
+event. It starts no runs and records no tick:
+
+```bash
+sqb sensor try orders_failed_sensor --latest --server https://control.example.com --location-id <uuid>
+```
+
+Details:
+
+- The function runs in the code location with the target's providers, so `sqb location serve` or
+  `sqb dev` must be running for sensors to tick.
+- A `run_event` on a job also fires for that job's runs inside a job group, as soon as the member
+  finishes, and `executed_successfully` checks that member's nodes. A sensor on the group fires
+  once, when the whole group run ends.
+- A literal `RunRequest(job="...")` is checked when the project compiles. A job name built at run
+  time is checked when the function returns, and an unknown job fails the tick.
+- Pausing a sensor or resetting its cursor needs the permission on every node of the target.
 
 ## Rename models in jobs
 
@@ -312,14 +417,17 @@ Every problem with an orchestration file is a `D017` error at its file, line and
 | --- | --- |
 | ``orchestration/jobs/nightly_orders_job.toml:4:11: unknown variant `coalesce`, expected `queue` or `skip` `` | Use one of the listed values |
 | `files cannot sit directly in orchestration/` | Move jobs and groups to TOML files in `orchestration/jobs/` or `orchestration/job_groups/` |
-| `` `job` was removed from sqlbuild.orchestration`` | Declare the job in TOML and name it in the sensor's `run` |
+| `` `job` was removed from sqlbuild.orchestration`` | Declare the job in TOML and start it with `RunRequest(job="...")` |
+| `sensor(...) must decorate a function` | Write `@sensor(description=..., when=...)` above the function's `def` |
+| `sensor takes keyword arguments only` | Remove the positional name: the sensor is named after its function, or pass `name="..."` |
+| `sensor 'orders_sensor' names 'orders_missing_job', which is not a declared job or job group` | Fix the job name in `RunRequest(job=...)` |
 | `declares a second sensor; each module declares exactly one` | Split the module |
 | `schedule cron: invalid cron expression: Pattern must have 5 fields when seconds are disallowed.` | Write a five-field cron, such as `0 2 * * *` |
 | `job nightly_orders_job resources: cpus must be a positive number` | Set `cpus` above zero |
 | `job 'nightly_orders_job' uses pool 'warehouse_hevy', which [pools] in sqlbuild_project.toml does not declare` | Fix the name, or declare the pool in [`[pools]`](/docs/concepts/project-configuration#pools) |
 | `job 'nightly_orders_job' takes 2 slots of pool 'supplier_api', more than its limit of 1 on target 'production'` | Take fewer slots, or raise the limit in `[targets.production.pools]` |
 | `jobs orders_job and crm_job set vars differently ({"amount":"5"} and {"amount":"9"}); a build applies vars to everything it runs; group daily_job_group builds its jobs together` | Give the group's jobs the same `vars` and `changed`, or move one job to another group |
-| `sensor 'orders_sensor' is declared here, but importing the module does not define it` | Assign the sensor to a module-level name or list, not a dictionary or function body |
+| `sensor 'orders_sensor' is declared here, but importing the module does not define it` | Declare the sensor at module level, not inside a function or an `if` |
 | `group dependencies contain a cycle in job group daily_orders_job_group: orders_marts_job waits for staging_orders_job (model:orders reads model:stg_orders); staging_orders_job waits for orders_marts_job (model:stg_orders reads seed:regions)` | Move each node to one job, and give seeds and nodes that several members read their own job that runs first |
 
 Details:

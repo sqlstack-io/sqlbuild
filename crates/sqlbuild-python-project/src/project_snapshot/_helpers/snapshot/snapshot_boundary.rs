@@ -1,6 +1,6 @@
 //! Discovery files and authored test payloads remain the Python host's boundary.
 
-use crate::project_snapshot::main::relative_path::relative_path;
+use crate::project_snapshot::_helpers::snapshot::relative_path::relative_path;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;

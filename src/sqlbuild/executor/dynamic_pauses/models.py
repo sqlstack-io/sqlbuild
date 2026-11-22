@@ -21,6 +21,15 @@ class DynamicPauseEvent:
 
 
 @dataclass(frozen=True)
+class OpenClaim:
+    """A sync's claim on a model it may be resuming, and its age by the warehouse clock."""
+
+    run_id: str
+    relation: CompiledRelationLocation
+    age_seconds: float
+
+
+@dataclass(frozen=True)
 class OpenHold:
     """A model a run paused and nobody resumed, when it paused, and how long the run is silent."""
 
@@ -28,3 +37,20 @@ class OpenHold:
     relation: CompiledRelationLocation
     idle_seconds: float
     paused_at: datetime
+
+
+@dataclass(frozen=True)
+class HoldsResumed:
+    """The holds whose models resumed and were closed, and each hold that failed with its error."""
+
+    resumed: tuple[OpenHold, ...]
+    failures: tuple[tuple[OpenHold, Exception], ...]
+
+
+@dataclass(frozen=True)
+class ResumeOutcome:
+    """A pass's resumed holds and failures, and the pause table's token when it left none open."""
+
+    resumed: tuple[OpenHold, ...]
+    failures: tuple[str, ...]
+    quiet_token: str | None

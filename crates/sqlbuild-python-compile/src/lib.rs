@@ -17,6 +17,7 @@ pub mod input_loops;
 pub mod lineage;
 pub mod manifest;
 pub mod project_assembly;
+pub mod provider_check;
 pub mod rules;
 pub mod scopes;
 pub mod semantic_checks;

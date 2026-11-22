@@ -142,20 +142,20 @@ copies disappear when the test connections close.
 |---|---|
 | DuckDB, MotherDuck | `CREATE TEMP MACRO`, called as `temp.main.<name>`. Python UDFs are registered on each test connection |
 | PostgreSQL | SQL function in the session's `pg_temp` schema, called as `pg_temp.<name>` |
-| Snowflake | `CREATE TEMPORARY FUNCTION __sqb_test__<name>` in the session's current schema, for SQL and Python UDFs and table functions |
+| Snowflake | `CREATE TEMPORARY FUNCTION <database>.<schema>.__sqb_test__<name>` in the session's current database and schema, or the function's own when the session has none, for SQL and Python UDFs and table functions |
 | Databricks | `CREATE TEMPORARY FUNCTION __sqb_test__<name>` for SQL functions |
 | BigQuery, SQL Server, ClickHouse | No copy; tests call the built function (ClickHouse functions are server-wide) |
 | SQLite | Not applicable; SQLite has no SQL functions |
 
-When a copy can't be made, because the adapter doesn't support it (a Databricks Python UDF, for
-example) or the warehouse refuses (the role lacks permission, or the Snowflake session has no
-current schema), the test calls the built function. If that function isn't built either, the test
-fails with an error naming the function and the reason, and asks you to run `sqb build` first. A
-function whose callee has no copy calls the built functions too, so a test never mixes copies and
-built functions.
+When the adapter doesn't support a copy (a Databricks Python UDF, for example), the test calls the
+built function. If that function isn't built either, the test fails with an error naming the
+function and the reason, and asks you to run `sqb build` first. A function whose callee has no copy
+calls the built functions too, so a test never mixes copies and built functions.
 
-Every test connection gets the same copies as the first one. If a later connection can't create a
-copy, `sqb test` stops with `T006`, naming the function and the connection.
+When the adapter supports a copy but the warehouse refuses to create it (the role lacks permission,
+or the schema doesn't exist), `sqb test` stops with `T006`, naming the function, the connection and
+the warehouse's reason. It never tests the built function instead. Every test connection gets the
+same copies as the first one, and the same error applies to each of them.
 
 On PostgreSQL, the copies live in one server session. Run `sqb test` for projects with functions
 through a direct connection or a session-mode pool, not a transaction-mode connection pooler.

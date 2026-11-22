@@ -329,6 +329,12 @@ class StrictAdapter(
         del connection
         return None
 
+    def session_schema(self, *, connection: Any) -> tuple[str, str] | None:
+        """Optional: the session's current database and schema as SQL, or None without both."""
+
+        del connection
+        return None
+
     def use_session_warehouse(self, *, connection: Any, warehouse: str) -> None:
         """Optional: run the session's next statements on `warehouse`, where the adapter has one."""
 

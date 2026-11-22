@@ -4,6 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use serde_json::{Value as Json, json};
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use sqlbuild_analysis::graph::errors::SelectorError;
 use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
 use sqlbuild_analysis::planner_selection::main::split_unit_test_selectors::split_unit_test_selectors;
 use sqlbuild_analysis::planner_selection::models::SelectorGroups;
@@ -12,12 +14,14 @@ use sqlbuild_analysis::python_selection::main::resolve_python_sql_run_selection:
 use sqlbuild_analysis::python_selection::models::SqlSelectionGraph;
 use sqlbuild_core::text::main::python_str_repr::python_str_repr;
 use sqlbuild_orchestration::runs::models::{
-    CommandPlan, PlannerResource, PublicationCache, SelectionProblem, SelectionVocabulary,
+    CommandPlan, PinnedJob, PlannerResource, PublicationCache, PublishedJobs, SelectionProblem,
+    SelectionVocabulary,
 };
-use sqlbuild_orchestration::runs::types::{CommandPlanner, PreparedPublication, PublishedJobs};
+use sqlbuild_orchestration::runs::types::{CommandPlanner, PreparedPublication};
 
 use crate::adhoc::_helpers::evaluation::{evaluate, vocabulary};
-use crate::adhoc::_helpers::publication::IndexedPublication;
+use crate::adhoc::_helpers::job_pins::{named_job_settings, pinned_jobs};
+use crate::adhoc::_helpers::publication::{IndexedPublication, python_kind};
 use crate::adhoc::models::Refusal;
 
 use crate::adhoc::constants::{
@@ -65,6 +69,11 @@ impl PreparedPublication for IndexedPublication {
         let mut select: Vec<String> = selectors.remove("select").unwrap_or_default();
         select.extend(selectors.remove("positional_select").unwrap_or_default());
         let exclude: Vec<String> = selectors.remove("exclude").unwrap_or_default();
+        let (named, job_settings) = if verb == BUILD_VERB {
+            named_job_settings(self, &select, &settings)?
+        } else {
+            (Vec::new(), BTreeMap::new())
+        };
         let selection: BTreeSet<String> = match verb.as_str() {
             SEED_VERB => {
                 let seeds: BTreeSet<String> = resolve(self, &select, &exclude)?
@@ -78,16 +87,25 @@ impl PreparedPublication for IndexedPublication {
             }
             FRESHNESS_VERB => freshness_sources(self, &select, &exclude)?,
             LOAD_VERB => managed_sources(self, &select, &exclude)?,
-            _ => {
-                let python = verb == BUILD_VERB
-                    && settings.get(INCLUDE_PYTHON_DEST) != Some(&Json::Bool(false));
-                resolve_with_tests((&verb, python), self, &select, &exclude)?
-            }
+            _ => resolve_with_tests(
+                (&verb, runs_python(&verb, (&settings, &job_settings))),
+                self,
+                &select,
+                &exclude,
+            )?,
+        };
+        let jobs: BTreeMap<String, PinnedJob> = if named.is_empty() {
+            BTreeMap::new()
+        } else {
+            let python = runs_python(&verb, (&settings, &job_settings));
+            pinned_jobs(self, (&select, &exclude), (&settings, python), &selection)?
         };
         Ok(CommandPlan {
             verb,
             selection,
             settings,
+            jobs,
+            job_settings,
         })
     }
 
@@ -98,6 +116,18 @@ impl PreparedPublication for IndexedPublication {
     fn vocabulary(&self) -> SelectionVocabulary {
         self.vocabulary.get_or_init(|| vocabulary(self)).clone()
     }
+}
+
+/// Whether a command runs Python nodes: a build does unless its flags or named jobs turn them off.
+fn runs_python(
+    verb: &str,
+    (settings, job_settings): (&BTreeMap<String, Json>, &BTreeMap<String, Json>),
+) -> bool {
+    verb == BUILD_VERB
+        && settings
+            .get(INCLUDE_PYTHON_DEST)
+            .or_else(|| job_settings.get(INCLUDE_PYTHON_DEST))
+            != Some(&Json::Bool(false))
 }
 
 /// A command's verb, selectors by destination and validated settings.
@@ -313,6 +343,27 @@ fn resolved(
     exclude: &[String],
     include_python: bool,
 ) -> Result<BTreeSet<String>, Refusal> {
+    Ok(selected_keys(publication, select, exclude, include_python)?
+        .iter()
+        .map(|key| key_text(publication, key))
+        .collect())
+}
+
+/// A selected graph key as a frozen node key; a loader's Python key names the source it loads.
+pub(crate) fn key_text(publication: &IndexedPublication, (kind, name): &ObjectKey) -> String {
+    if python_kind(&format!("{kind}:{name}")).is_some() {
+        return python_run_key(&publication.sources, (kind, name));
+    }
+    format!("{kind}:{name}")
+}
+
+/// The graph keys the selectors match, SQL and Python alike.
+pub(crate) fn selected_keys(
+    publication: &IndexedPublication,
+    select: &[String],
+    exclude: &[String],
+    include_python: bool,
+) -> Result<BTreeSet<ObjectKey>, SelectorError> {
     let python = publication.python(include_python);
     let selectors: Vec<String> = select.iter().chain(exclude).cloned().collect();
     let node_names: Vec<&str> = python.names.iter().map(String::as_str).collect();
@@ -335,13 +386,12 @@ fn resolved(
     Ok(selection
         .sql_keys
         .into_iter()
-        .map(|(kind, name)| format!("{kind}:{name}"))
-        .chain(selection.python_node_names.iter().filter_map(|name| {
-            Some(python_run_key(
-                sources,
-                (python.kinds.get(name.as_str())?, name),
-            ))
-        }))
+        .chain(
+            selection
+                .python_node_names
+                .iter()
+                .filter_map(|name| Some((python.kinds.get(name.as_str())?.clone(), name.clone()))),
+        )
         .collect())
 }
 

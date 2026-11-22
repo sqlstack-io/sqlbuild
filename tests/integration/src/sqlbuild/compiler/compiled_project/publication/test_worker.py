@@ -33,26 +33,40 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     CheckExecutionTestCase,
     ClaimedLoadTestCase,
     ClaimedWorker,
+    ForcedWorkerStopTestCase,
     GroupExecutionTestCase,
+    ProviderSecretsHealthTestCase,
     SnapshotWorkerTestCase,
     UnclaimedLoadTestCase,
     WorkerExecutionTestCase,
+    WorkerHangUpTestCase,
+    WorkerReportTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     INTERMEDIATE_LOADER_FILES,
     LOADED_ORDER_FILES,
+    REGION_PROVIDER_FILES,
     cancel_running_statement,
     claimed_worker,
+    launch_adhoc,
+    processes_naming,
+    provider_secrets_health,
     run_write_set,
     running_statement,
     scheduled_worker,
     snapshot_api,
+    uncooperative_worker_pid,
     wait_for_log,
     wait_for_run,
     without_loads,
+    worker_printed,
     worker_result,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+
+ENV_FILE_REGION_FILES: dict[str, str] = {
+    ".env": "WORKER_ENV_REGION_CODE=42\nWORKER_ENV_TOKEN=worker-token\n"
+} | REGION_PROVIDER_FILES
 
 
 @pytest.mark.parametrize(
@@ -91,10 +105,10 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
                     'jobs = ["marts_job", "staging_job"]\n'
                 ),
                 "orchestration/sensors/health_orders_sensor.py": (
-                    "from sqlbuild.orchestration import PlatformEventKind, platform_event, sensor\n"
-                    "health_orders = sensor('health_orders_sensor', description='Refresh on platform heartbeat.', "
-                    "when=platform_event(kinds=[PlatformEventKind.HEARTBEAT]), run='annual_orders_job_group', "
-                    "minimum_interval_seconds=60)\n"
+                    "from sqlbuild.orchestration import PlatformEventKind, RunRequest, platform_event, sensor\n"
+                    "@sensor(description='Refresh on platform heartbeat.', "
+                    "when=platform_event(kinds=[PlatformEventKind.HEARTBEAT]), minimum_interval_seconds=60)\n"
+                    "def health_orders_sensor(ctx):\n    return RunRequest(job='annual_orders_job_group')\n"
                 ),
             },
         ),
@@ -883,10 +897,10 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
                     'name = "annual_orders_job"\ndescription = "Build orders."\nselect = "orders"\n'
                 ),
                 "orchestration/sensors/health_orders_sensor.py": (
-                    "from sqlbuild.orchestration import PlatformEventKind, platform_event, sensor\n"
-                    "health_orders = sensor('health_orders_sensor', description='Refresh on platform heartbeat.', "
-                    "when=platform_event(kinds=[PlatformEventKind.HEARTBEAT]), run='annual_orders_job', "
-                    "minimum_interval_seconds=60)\n"
+                    "from sqlbuild.orchestration import PlatformEventKind, RunRequest, platform_event, sensor\n"
+                    "@sensor(description='Refresh on platform heartbeat.', "
+                    "when=platform_event(kinds=[PlatformEventKind.HEARTBEAT]), minimum_interval_seconds=60)\n"
+                    "def health_orders_sensor(ctx):\n    return RunRequest(job='annual_orders_job')\n"
                 ),
             },
         ),
@@ -1003,6 +1017,16 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
             [(0,)],
         ),
         WorkerExecutionTestCase(
+            "a worker reads provider settings from the project env file",
+            'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")',
+            "SELECT amount FROM orders",
+            "success",
+            [(42,)],
+            expected_node_count=2,
+            default_job_files={},
+            files=ENV_FILE_REGION_FILES | duckshop_orchestration("upstream_loaded_orders"),
+        ),
+        WorkerExecutionTestCase(
             "scalar function dependency is claimed and executed",
             'SELECT __udf("order_total")(23) AS amount',
             "SELECT amount FROM orders",
@@ -1039,6 +1063,50 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         run: dict[str, Any] = worker_result(worker, test_case)
         assert run["status"] == test_case.expected_status, worker.log.read_text()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
+            "a scheduled run whose provider is missing secrets fails before the warehouse",
+            'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")',
+            "",
+            "failed",
+            [],
+            default_job_files={},
+            files=REGION_PROVIDER_FILES | duckshop_orchestration("upstream_loaded_orders"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_provider_missing_secrets_when_a_scheduled_run_starts_then_it_fails_before_the_warehouse(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders_job"
+        )
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        assert run["status_reason"] == (
+            "Couldn't run: provider region needs WORKER_ENV_REGION_CODE, WORKER_ENV_TOKEN "
+            "(missing from the location's environment and from .env); nothing ran"
+        ), worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            nodes: list[tuple[str, str, str | None, str | None, bool]] = [
+                (key, status, code, cause, started is not None)
+                for key, status, code, cause, started in control.execute(
+                    "SELECT node_key, status, error_code, skipped_because_of, started_at "
+                    "FROM sqb_run_nodes WHERE run_id=? AND kind='node' ORDER BY node_key",
+                    (run["run_id"],),
+                )
+            ]
+        assert nodes == [
+            ("model:orders", "skipped", None, "source:raw_regions", False),
+            ("source:raw_regions", "failed", "D012", None, False),
+        ], worker.log.read_text()
+        # Nothing connected: the run never opened, so never created, the DuckDB warehouse.
+        assert not (worker.project / "warehouse.duckdb").exists(), worker.log.read_text()
 
 
 @pytest.mark.parametrize(
@@ -1308,6 +1376,20 @@ def test_given_an_attached_check_when_a_worker_executes_then_its_own_outcome_is_
                 "models/inventory.sql": "inventory",
             },
         ),
+        WorkerExecutionTestCase(
+            "a check_event on the model reaches its attached check",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM inventory",
+            "success",
+            [(59,)],
+            files={
+                "python/checks/orders.py": "failed",
+                "orchestration/jobs/annual_orders_job.toml": "on_failure_job",
+                "orchestration/jobs/refresh_inventory_job.toml": "on_failure_destination",
+                "orchestration/sensors/failed_orders_sensor.py": "on_check_event_sensor",
+                "models/inventory.sql": "inventory",
+            },
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -1330,7 +1412,12 @@ def test_given_an_attached_check_failure_when_a_sensor_observes_it_then_its_dest
         )
         assert destination["status"] == test_case.expected_status, worker.log.read_text()
         assert destination["selection_json"] == ["model:inventory"]
-        assert destination["snapshot_id"] == source["snapshot_id"]
+        with sqlite3.connect(worker.control_store) as control:
+            generations: dict[str, int] = dict(
+                control.execute("SELECT snapshot_id, generation FROM sqb_snapshots").fetchall()
+            )
+        # The serving location that runs the sensor's function republishes the same code.
+        assert generations[destination["snapshot_id"]] >= generations[source["snapshot_id"]]
         assert source["selection_json"] == ["model:orders"]
         with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
             assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
@@ -1378,18 +1465,22 @@ def test_given_an_attached_check_query_when_cancelled_then_it_cannot_trigger_fai
                 (run["run_id"],),
             ).fetchall()
             assert outcomes == [("cancelled",)]
-            completed_query: str = (
-                "SELECT count(*) FROM sqb_sensor_evaluation_events WHERE phase='completed'"
+            due_query: str = (
+                "SELECT s.next_due_at FROM sqb_trigger_state s "
+                "JOIN sqb_triggers t ON t.trigger_id=s.trigger_id "
+                "WHERE t.name='failed_orders_sensor'"
             )
-            # Two more completions mean at least one evaluation started after the outcome.
-            target: int = control.execute(completed_query).fetchone()[0] + 2
+            # A scan with no matching event moves the next due time on; two mean one started after the outcome.
+            seen: set[str] = {control.execute(due_query).fetchone()[0]}
             deadline: float = time.monotonic() + 15
-            evaluated: int = 0
-            while evaluated < target:
+            while len(seen) < 3:
                 assert worker.process.poll() is None, worker.log.read_text()
                 assert time.monotonic() < deadline, worker.log.read_text()
-                evaluated = control.execute(completed_query).fetchone()[0]
+                seen.add(control.execute(due_query).fetchone()[0])
                 time.sleep(0.02)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_sensor_evaluation_events"
+            ).fetchone() == (0,), "a cancelled check is no event, so no tick is recorded"
             assert control.execute("SELECT count(*) FROM sqb_run_requests").fetchone() == (0,)
             assert control.execute(
                 "SELECT count(*) FROM sqb_runs WHERE job_key='refresh_inventory'"
@@ -1425,10 +1516,11 @@ def test_given_an_attached_check_query_when_cancelled_then_it_cannot_trigger_fai
                     "\n[settings]\nreload = true\n"
                 ),
                 "orchestration/sensors/on_group_sensor.py": (
-                    "from sqlbuild.orchestration import RunEventKind, run_event, sensor\n"
-                    "on_group = sensor('on_group_sensor', description='Refresh after group completion.', "
+                    "from sqlbuild.orchestration import RunEventKind, RunRequest, run_event, sensor\n"
+                    "@sensor(description='Refresh after group completion.', "
                     "when=run_event(job='source_job_group', kinds=[RunEventKind.COMPLETED, RunEventKind.SUCCESS], executed_successfully=('orders',)), "
-                    "run='annual_orders_job', minimum_interval_seconds=1)\n"
+                    "minimum_interval_seconds=1)\n"
+                    "def on_group_sensor(ctx):\n    return RunRequest(job='annual_orders_job')\n"
                 ),
             },
         )
@@ -1448,9 +1540,11 @@ def test_given_a_real_group_completion_when_a_run_sensor_matches_then_one_destin
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute("SELECT run_key,run_id FROM sqb_run_requests").fetchall() == [
                 (
-                    control.execute(
+                    "run:"
+                    + control.execute(
                         "SELECT run_id FROM sqb_runs WHERE job_key='source_job_group'"
-                    ).fetchone()[0],
+                    ).fetchone()[0]
+                    + ":annual_orders_job",
                     destination["run_id"],
                 )
             ]
@@ -1491,10 +1585,10 @@ def test_given_a_real_group_completion_when_a_run_sensor_matches_then_one_destin
                     "\n[settings]\nreload = true\n"
                 ),
                 "orchestration/sensors/on_node_sensor.py": (
-                    "from sqlbuild.orchestration import NodeEventKind, node_event, sensor\n"
-                    "on_node = sensor('on_node_sensor', description='React to actual orders rebuilds.', "
-                    "when=node_event(select='orders', kinds=[NodeEventKind.SUCCESS]), "
-                    "run='annual_orders_job', minimum_interval_seconds=1)\n"
+                    "from sqlbuild.orchestration import NodeEventKind, RunRequest, node_event, sensor\n"
+                    "@sensor(description='React to actual orders rebuilds.', "
+                    "when=node_event(select='orders', kinds=[NodeEventKind.SUCCESS]), minimum_interval_seconds=1)\n"
+                    "def on_node_sensor(ctx):\n    return RunRequest(job='annual_orders_job')\n"
                 ),
             },
         )
@@ -1521,10 +1615,11 @@ def test_given_a_real_group_child_rebuild_when_a_node_sensor_matches_then_only_t
                 "SELECT q.run_key,q.run_id FROM sqb_run_requests q"
             ).fetchall() == [
                 (
-                    control.execute(
+                    "node:"
+                    + control.execute(
                         "SELECT run_id FROM sqb_runs WHERE job_key='source_orders_job'"
                     ).fetchone()[0]
-                    + "/model:orders",
+                    + ":model:orders:annual_orders_job",
                     destination["run_id"],
                 )
             ]
@@ -1809,13 +1904,7 @@ def test_given_an_uncooperative_worker_when_scheduler_stops_then_the_fence_and_c
     test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
-        pidfile: Path = worker.project / "worker.pid"
-        deadline: float = time.monotonic() + 15
-        while not pidfile.exists():
-            assert worker.process.poll() is None, worker.log.read_text()
-            assert time.monotonic() < deadline, worker.log.read_text()
-            time.sleep(0.02)
-        pid: int = int(pidfile.read_text())
+        pid: int = uncooperative_worker_pid(worker)
         worker.process.send_signal(signal.SIGTERM)
         time.sleep(32)
         assert worker.process.poll() is None, worker.log.read_text()
@@ -1845,3 +1934,269 @@ def test_given_an_uncooperative_worker_when_scheduler_stops_then_the_fence_and_c
                 "SELECT json_extract(payload, '$.change.change.exit_code') FROM recall_events "
                 "WHERE event_type='run_terminated'"
             ).fetchone() == (137,)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX signals and process groups")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ForcedWorkerStopTestCase(
+            "SIGINT during the shutdown SIGTERM began kills the worker's group at once",
+            signal.SIGTERM,
+            signal.SIGINT,
+            0,
+            137,
+        ),
+        ForcedWorkerStopTestCase(
+            "Ctrl+C twice does the same",
+            signal.SIGINT,
+            signal.SIGINT,
+            0,
+            137,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_uncooperative_worker_when_the_scheduler_is_signalled_twice_then_it_is_killed_at_once(
+    test_case: ForcedWorkerStopTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    execution: WorkerExecutionTestCase = WorkerExecutionTestCase(
+        "a worker that ignores SIGTERM",
+        "SELECT 23 AS amount",
+        "",
+        "failed",
+        [],
+        launcher="uncooperative",
+    )
+    with scheduled_worker(tmp_path, monkeypatch, execution) as worker:
+        pid: int = uncooperative_worker_pid(worker)
+        worker.process.send_signal(test_case.first)
+        time.sleep(1)
+        assert worker.process.poll() is None, worker.log.read_text()
+        forced_at: float = time.monotonic()
+        worker.process.send_signal(test_case.second)
+        exit_code: int = worker.process.wait(timeout=20)
+        stopped_in: float = time.monotonic() - forced_at
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+        with sqlite3.connect(worker.control_store) as control:
+            claims: tuple[int] = control.execute("SELECT count(*) FROM sqb_write_claims").fetchone()
+            worker_exit: tuple[int] = control.execute(
+                "SELECT json_extract(payload, '$.change.change.exit_code') FROM recall_events "
+                "WHERE event_type='run_terminated'"
+            ).fetchone()
+        log: str = worker.log.read_text()
+
+    assert exit_code == test_case.expected_exit_code, log
+    assert stopped_in < 10, f"{stopped_in:.2f}s\n{log}"
+    assert claims == (0,), log
+    assert worker_exit == (test_case.expected_worker_exit_code,), log
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX signals and process groups")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerHangUpTestCase(
+            "the hang-up a closed terminal sends stops the scheduler and its worker as SIGTERM does",
+            0,
+            "failed",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_running_build_when_the_scheduler_hangs_up_then_its_worker_is_stopped_and_released(
+    test_case: WorkerHangUpTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    execution: WorkerExecutionTestCase = WorkerExecutionTestCase(
+        "an endless build",
+        Path("benchmarks/duckshop/edge_cases/orchestration/local_worker_recovery.sql").read_text(),
+        "",
+        "failed",
+        [],
+    )
+    with scheduled_worker(tmp_path, monkeypatch, execution) as worker:
+        active: dict[str, Any] = running_statement(worker)
+        worker.process.send_signal(signal.SIGHUP)
+        exit_code: int = worker.process.wait(timeout=60)
+        left: list[str] = processes_naming(worker.project)
+        with sqlite3.connect(worker.control_store) as control:
+            status: tuple[str] = control.execute(
+                "SELECT status FROM sqb_runs WHERE run_id=?", (active["run_id"],)
+            ).fetchone()
+            claims: tuple[int] = control.execute("SELECT count(*) FROM sqb_write_claims").fetchone()
+        log: str = worker.log.read_text()
+
+    assert exit_code == test_case.expected_exit_code, log
+    assert left == [], log
+    assert status == (test_case.expected_status,), log
+    assert claims == (0,), log
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ProviderSecretsHealthTestCase(
+            description="a provider the target doesn't allow to miss secrets is a health problem",
+            allowed=(),
+            expected_missing=2,
+            expected_allowed=False,
+            expected_output_fragments=(
+                "runs that use them stop before the warehouse: "
+                "region WORKER_ENV_TOKEN, region WORKER_ENV_REGION_CODE",
+            ),
+            unexpected_output_fragments=(),
+        ),
+        ProviderSecretsHealthTestCase(
+            description="a provider the target allows to miss secrets is reported but no problem",
+            allowed=("region",),
+            expected_missing=0,
+            expected_allowed=True,
+            expected_output_fragments=(),
+            unexpected_output_fragments=("stop before the warehouse",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_provider_missing_secrets_when_a_location_publishes_then_its_health_names_them(
+    test_case: ProviderSecretsHealthTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    allowed: str = "".join(f'"{name}"' for name in test_case.allowed)
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "duckdb"\n'
+                '[connections.local]\ndatabase = "warehouse.duckdb"\n'
+                f'[targets.development]\nschema = "main"\nallow_missing_secrets = [{allowed}]\n'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Orders.', materialized table);\n"
+                'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")\n'
+            ),
+        }
+        | REGION_PROVIDER_FILES,
+    )
+
+    health, log = provider_secrets_health(tmp_path, project)
+
+    assert health["missing"] == test_case.expected_missing, log
+    assert health["providers"] == [
+        {
+            "provider": "region",
+            "path": "providers/region.py",
+            "settings": [
+                {"field": "token", "variable": "WORKER_ENV_TOKEN", "line": 7},
+                {"field": "code", "variable": "WORKER_ENV_REGION_CODE", "line": 8},
+            ],
+            "nodes": ["loader:raw_regions", "source:raw_regions"],
+            "allowed": test_case.expected_allowed,
+        }
+    ], log
+    for fragment in test_case.expected_output_fragments:
+        assert fragment in log, log
+    for fragment in test_case.unexpected_output_fragments:
+        assert fragment not in log, log
+
+
+FRESHNESS_SOURCES: str = (
+    "sources:\n  - name: raw_orders\n    description: Raw orders\n"
+    "    schema: main\n    table: raw_orders\n    freshness:\n"
+    "      column: loaded_at\n    columns:\n"
+    "      - name: loaded_at\n        type: TIMESTAMP\n"
+)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerReportTestCase(
+            "a build prints its human output and no JSON report",
+            WorkerExecutionTestCase(
+                "a scheduled build",
+                "SELECT 23 AS amount",
+                "SELECT amount FROM orders",
+                "success",
+                [(23,)],
+            ),
+            ["build", "--select", "orders"],
+            "success",
+            [("model:orders", "success")],
+            "Completed successfully",
+            frozenset(
+                {
+                    "invocation_started",
+                    "invocation_completed",
+                    "run_started",
+                    "operation_started",
+                    "operation_completed",
+                }
+            ),
+        ),
+        WorkerReportTestCase(
+            "a failing build prints its failure and no JSON report",
+            WorkerExecutionTestCase(
+                "a failing scheduled build",
+                "SELECT CAST(error('boom') AS INTEGER) AS amount",
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'orders'",
+                "failed",
+                [(0,)],
+            ),
+            ["build", "--select", "orders"],
+            "failed",
+            [("model:orders", "failed")],
+            "FAIL=1",
+            frozenset(
+                {
+                    "invocation_started",
+                    "invocation_failed",
+                    "run_started",
+                    "operation_started",
+                    "resource_attempt_failed",
+                }
+            ),
+        ),
+        WorkerReportTestCase(
+            "a freshness run prints its results and no JSON report",
+            WorkerExecutionTestCase(
+                "a scheduled build, then freshness",
+                "SELECT 23 AS amount",
+                "SELECT amount FROM orders",
+                "success",
+                [(23,)],
+                files={"sources/raw.yml": FRESHNESS_SOURCES},
+            ),
+            ["freshness", "--select", "raw_orders"],
+            "success",
+            [("source:raw_orders", "success")],
+            "OBSERVED=1",
+            frozenset({"invocation_started", "invocation_completed"}),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_worker_run_when_its_output_is_captured_then_it_holds_no_json_report(
+    test_case: WorkerReportTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(
+        tmp_path,
+        monkeypatch,
+        test_case.execution,
+        server_arguments=("--password-origin", "https://control.example.com"),
+    ) as worker:
+        _ = worker_result(worker, test_case.execution)
+        with duckdb.connect(str(worker.project / "warehouse.duckdb")) as warehouse:
+            _ = warehouse.execute("CREATE TABLE raw_orders AS SELECT now() AS loaded_at")
+        run: dict[str, Any] = launch_adhoc(worker, test_case.adhoc)
+        printed, events = worker_printed(worker.control_store, run["run_id"])
+        with sqlite3.connect(worker.control_store) as control:
+            nodes: list[tuple[str, str]] = control.execute(
+                "SELECT node_key, status FROM sqb_run_nodes WHERE run_id=? ORDER BY node_key",
+                (run["run_id"],),
+            ).fetchall()
+    assert run["status"] == test_case.expected_status, printed
+    assert nodes == test_case.expected_nodes, nodes
+    assert test_case.expected_recall_events <= events, sorted(events)
+    assert test_case.expected_results in printed, printed
+    assert "{" not in [line.strip() for line in printed.splitlines()], printed

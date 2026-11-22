@@ -22,8 +22,9 @@ use crate::native_commands::_helpers::location::execution::{
     apply_dev_controls, compile_next_generation, finish_compile,
 };
 use crate::native_commands::_helpers::location::execution::{
-    dev_controls, location_clock, location_heartbeats, next_turn, shutdown_signal,
+    dev_controls, location_clock, location_heartbeats, next_turn,
 };
+use crate::native_commands::_helpers::location::shutdown::shutdown_signal;
 use crate::native_commands::_helpers::location::work::next_work_check;
 use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
 use crate::native_commands::main::_location_changed_build::report_changed_build;

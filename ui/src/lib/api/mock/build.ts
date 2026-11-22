@@ -103,7 +103,7 @@ export class MockBuild {
 		return this.#ctx.reply(SNAPSHOT_NODES.map((sn) => this.#catalogNode(states.get(sn.key)!, checks)));
 	}
 
-	async getCatalogNode(scope: Scope, key: string, _listing?: CatalogNode[]): Promise<CatalogNodeDetail | null> {
+	async getCatalogNode(scope: Scope, key: string, _listing?: CatalogNode[], _checks?: Check[]): Promise<CatalogNodeDetail | null> {
 		const states = this.#states(scope);
 		const state = states.get(key);
 		if (!state) return this.#ctx.reply(null);
@@ -191,7 +191,7 @@ export class MockBuild {
 		);
 	}
 
-	listChecks(scope: Scope): Promise<Check[]> {
+	listChecks(scope: Scope, _notBefore?: number): Promise<Check[]> {
 		return this.#ctx.reply(this.#checks(scope, this.#states(scope)));
 	}
 
