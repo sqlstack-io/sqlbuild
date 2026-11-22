@@ -135,10 +135,9 @@ curl -H "Authorization: Bearer $SQB_SERVICE_KEY" https://control.example.com/api
   `[trusted_proxy]`, service keys are the only way to call its person API. Its sign-in page and
   `sqb login` say so instead of asking for a password, and Settings shows the sign-in as
   service account keys only.
-- **Managing access.** A service account can't add, rotate, stop, disable or enable service
-  accounts, or give or remove anyone's roles, whatever its own role, so a leaked key can't plant
-  access that outlives it. Those changes need a person; a keyed attempt is refused and audited.
 - **Roles.** A service account holds its built-in role everywhere and doesn't get `default_role`.
+  That role decides what its key may do, as a person's does: an `admin` key can also manage service
+  accounts and roles, though it can't remove or disable the last admin who is a person.
   In the UI, changing it needs `role.assign`.
 - **No sign-in.** A service account has no password, browser session or `sqb login`, and a
   `[trusted_proxy.identities]` binding to one is refused.

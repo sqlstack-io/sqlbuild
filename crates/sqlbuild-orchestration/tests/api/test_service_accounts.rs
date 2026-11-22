@@ -18,11 +18,12 @@ use crate::api::tests::service_accounts_helpers::{
     person_get, person_post, rows, script, service_account, with_key, without_key,
 };
 use crate::api::tests::test_types::{
-    ImportedKeyAcceptedTestCase, ImportedKeyTestCase, KeyOnlyTestCase, KeyedManagementTestCase,
+    ImportedKeyAcceptedTestCase, ImportedKeyTestCase, KeyOnlyTestCase, KeyedRoleTestCase,
     LoginModeTestCase, PersonImportTestCase, ProxyBindingTestCase, ProxyKeyTestCase,
     ServiceAccountLifecycleTestCase, ServiceAccountPermissionTestCase, ServiceAccountRoleTestCase,
 };
 use crate::authorization::_helpers::administrator_roles::assign_role_in;
+use crate::authorization::main::roles::grant_admin::grant_admin;
 use crate::authorization::main::service_accounts::create_service_account::create_service_account;
 use crate::credentials::_helpers::service_keys::key_hash;
 use crate::credentials::main::identities::create_principal::create_principal;
@@ -166,15 +167,14 @@ fn given_a_service_account_when_its_key_is_used_rotated_and_disabled_then_only_w
             );
 
             let ops = service_account(store, "ops-bot", BuiltinRole::Admin).await;
-            let sam = password_person(store, "sam").await;
             let added = keyed
-                .post(format!("{url}/api/admin/people/{sam}"))
+                .post(format!("{url}/api/admin/service-accounts"))
                 .header(HOST, NETWORK_HOST)
                 .bearer_auth(&ops.key)
-                .json(&json!("disable"))
+                .json(&json!({"name": "report-export", "role": "viewer"}))
                 .send()
                 .await
-                .expect("keyed change");
+                .expect("keyed create");
             let refused = keyed
                 .get(format!("{url}/api/admin/service-accounts"))
                 .header(HOST, NETWORK_HOST)
@@ -190,7 +190,7 @@ fn given_a_service_account_when_its_key_is_used_rotated_and_disabled_then_only_w
             );
             let (_, audit) = person_get(&client, (url, "/api/control/audit?limit=100"), &ada).await;
             assert!(
-                audited(&audit, ("ops-bot", "principal.disabled"))
+                audited(&audit, ("ops-bot", "service_account.created"))
                     && audited(&audit, ("orders-deploy", "authorization.denied")),
                 "{}: its actions and refusals are audited under its name",
                 test_case.description
@@ -705,50 +705,144 @@ fn given_a_server_without_sign_in_when_person_routes_are_called_then_only_servic
 }
 
 #[test]
-fn given_a_service_account_with_the_admin_role_when_its_key_manages_accounts_or_roles_then_it_is_refused_and_audited()
+fn given_a_service_account_when_its_key_manages_accounts_or_roles_then_its_role_decides_as_for_a_person()
  {
     let test_cases = [
-        KeyedManagementTestCase {
-            description: "adding a service account",
+        KeyedRoleTestCase {
+            description: "an admin key may add a service account",
+            role: BuiltinRole::Admin,
             path: "/api/admin/service-accounts",
-            body: r#"{"name": "planted", "role": "admin"}"#,
-            expected_status: StatusCode::FORBIDDEN,
+            body: r#"{"name": "report-export", "role": "admin"}"#,
+            expected_status: StatusCode::OK,
+            expected_denials: 0,
         },
-        KeyedManagementTestCase {
-            description: "rotating a service account's key",
+        KeyedRoleTestCase {
+            description: "an admin key may rotate a service account's key",
+            role: BuiltinRole::Admin,
+            path: "/api/admin/service-accounts/{target}/keys",
+            body: r#"{"overlap_minutes": 60}"#,
+            expected_status: StatusCode::OK,
+            expected_denials: 0,
+        },
+        KeyedRoleTestCase {
+            description: "an admin key may stop a service account's key",
+            role: BuiltinRole::Admin,
+            path: "/api/admin/service-accounts/{target}/keys/{key}/revoke",
+            body: r#"null"#,
+            expected_status: StatusCode::OK,
+            expected_denials: 0,
+        },
+        KeyedRoleTestCase {
+            description: "an admin key may disable a service account",
+            role: BuiltinRole::Admin,
+            path: "/api/admin/service-accounts/{target}/disabled",
+            body: r#"{"disabled": true}"#,
+            expected_status: StatusCode::OK,
+            expected_denials: 0,
+        },
+        KeyedRoleTestCase {
+            description: "an admin key may change a service account's role",
+            role: BuiltinRole::Admin,
+            path: "/api/admin/service-accounts/{target}/role",
+            body: r#"{"role": "admin"}"#,
+            expected_status: StatusCode::OK,
+            expected_denials: 0,
+        },
+        KeyedRoleTestCase {
+            description: "an admin key may give a person a role",
+            role: BuiltinRole::Admin,
+            path: "/api/admin/roles",
+            body: r#"{"principal_id": "{person}", "role": "developer", "location_id": null, "target": null, "revoke": false}"#,
+            expected_status: StatusCode::OK,
+            expected_denials: 0,
+        },
+        KeyedRoleTestCase {
+            description: "an admin key may make a person an admin",
+            role: BuiltinRole::Admin,
+            path: "/api/admin/people/{person}",
+            body: r#""grant""#,
+            expected_status: StatusCode::OK,
+            expected_denials: 0,
+        },
+        KeyedRoleTestCase {
+            description: "a developer key may not add a service account",
+            role: BuiltinRole::Developer,
+            path: "/api/admin/service-accounts",
+            body: r#"{"name": "report-export", "role": "admin"}"#,
+            expected_status: StatusCode::FORBIDDEN,
+            expected_denials: 1,
+        },
+        KeyedRoleTestCase {
+            description: "a developer key may not rotate a service account's key",
+            role: BuiltinRole::Developer,
             path: "/api/admin/service-accounts/{target}/keys",
             body: r#"{"overlap_minutes": 60}"#,
             expected_status: StatusCode::FORBIDDEN,
+            expected_denials: 1,
         },
-        KeyedManagementTestCase {
-            description: "enabling or disabling a service account",
+        KeyedRoleTestCase {
+            description: "a developer key may not stop a service account's key",
+            role: BuiltinRole::Developer,
+            path: "/api/admin/service-accounts/{target}/keys/{key}/revoke",
+            body: r#"null"#,
+            expected_status: StatusCode::FORBIDDEN,
+            expected_denials: 1,
+        },
+        KeyedRoleTestCase {
+            description: "a developer key may not disable a service account",
+            role: BuiltinRole::Developer,
             path: "/api/admin/service-accounts/{target}/disabled",
             body: r#"{"disabled": true}"#,
             expected_status: StatusCode::FORBIDDEN,
+            expected_denials: 1,
         },
-        KeyedManagementTestCase {
-            description: "changing a service account's role",
+        KeyedRoleTestCase {
+            description: "a developer key may not change a service account's role",
+            role: BuiltinRole::Developer,
             path: "/api/admin/service-accounts/{target}/role",
             body: r#"{"role": "admin"}"#,
             expected_status: StatusCode::FORBIDDEN,
+            expected_denials: 1,
         },
-        KeyedManagementTestCase {
-            description: "stopping a service account's key",
-            path: "/api/admin/service-accounts/{target}/keys/{key}/revoke",
-            body: "null",
-            expected_status: StatusCode::FORBIDDEN,
-        },
-        KeyedManagementTestCase {
-            description: "giving a person a role",
+        KeyedRoleTestCase {
+            description: "a developer key may not give a person a role",
+            role: BuiltinRole::Developer,
             path: "/api/admin/roles",
             body: r#"{"principal_id": "{person}", "role": "developer", "location_id": null, "target": null, "revoke": false}"#,
             expected_status: StatusCode::FORBIDDEN,
+            expected_denials: 1,
         },
-        KeyedManagementTestCase {
-            description: "making a person an admin",
+        KeyedRoleTestCase {
+            description: "a developer key may not make a person an admin",
+            role: BuiltinRole::Developer,
             path: "/api/admin/people/{person}",
             body: r#""grant""#,
             expected_status: StatusCode::FORBIDDEN,
+            expected_denials: 1,
+        },
+        KeyedRoleTestCase {
+            description: "an admin key may not revoke the last person admin",
+            role: BuiltinRole::Admin,
+            path: "/api/admin/people/{sole_admin}",
+            body: r#""revoke""#,
+            expected_status: StatusCode::FORBIDDEN,
+            expected_denials: 1,
+        },
+        KeyedRoleTestCase {
+            description: "an admin key may not disable the last person admin",
+            role: BuiltinRole::Admin,
+            path: "/api/admin/people/{sole_admin}",
+            body: r#""disable""#,
+            expected_status: StatusCode::FORBIDDEN,
+            expected_denials: 1,
+        },
+        KeyedRoleTestCase {
+            description: "an admin key may not take the last person admin role away",
+            role: BuiltinRole::Admin,
+            path: "/api/admin/roles",
+            body: r#"{"principal_id": "{sole_admin}", "role": "admin", "location_id": null, "target": null, "revoke": true}"#,
+            expected_status: StatusCode::FORBIDDEN,
+            expected_denials: 1,
         },
     ];
     for test_case in test_cases {
@@ -758,20 +852,27 @@ fn given_a_service_account_with_the_admin_role_when_its_key_manages_accounts_or_
             };
             let store = &fixture.store;
             migrate_store(store).await.expect("migrate");
+            let sole_admin = create_principal(store, &owner(), "ada")
+                .await
+                .expect("person");
+            grant_admin(store, &owner(), sole_admin)
+                .await
+                .expect("administrator");
             let person = password_person(store, "sam").await;
-            let ops = service_account(store, "ops-bot", BuiltinRole::Admin).await;
+            let caller = service_account(store, "ops-bot", test_case.role).await;
             let target = service_account(store, "orders-deploy", BuiltinRole::Viewer).await;
             let fill = |text: &str| {
                 text.replace("{target}", &target.account.principal_id.to_string())
                     .replace("{key}", &target.account.keys[0].key_id.to_string())
                     .replace("{person}", &person.to_string())
+                    .replace("{sole_admin}", &sole_admin.to_string())
             };
             let api = start_api_with_authentication(store, ApiAuthentication::default()).await;
             let body: Value = serde_json::from_str(&fill(test_case.body)).expect("body");
             let response = script()
                 .post(format!("{}{}", api.url, fill(test_case.path)))
                 .header(HOST, NETWORK_HOST)
-                .bearer_auth(&ops.key)
+                .bearer_auth(&caller.key)
                 .json(&body)
                 .send()
                 .await
@@ -784,12 +885,8 @@ fn given_a_service_account_with_the_admin_role_when_its_key_manages_accounts_or_
                 .filter(|row| row["action"] == json!("authorization.denied"))
                 .count();
             assert_eq!(
-                (
-                    status,
-                    text.contains("a person must make this change"),
-                    denials
-                ),
-                (test_case.expected_status, true, 1),
+                (status, denials),
+                (test_case.expected_status, test_case.expected_denials),
                 "{}: {text}",
                 test_case.description
             );

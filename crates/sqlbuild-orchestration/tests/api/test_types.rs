@@ -557,12 +557,15 @@ pub(crate) struct KeyOnlyTestCase {
     pub(crate) expected_cache_control: &'static str,
 }
 
-pub(crate) struct KeyedManagementTestCase {
+pub(crate) struct KeyedRoleTestCase {
     pub(crate) description: &'static str,
-    /// The route, with `{target}`, `{key}` and `{person}` filled in.
+    /// The role of the service account whose key makes the change.
+    pub(crate) role: crate::credentials::models::BuiltinRole,
+    /// The route, with `{target}`, `{key}`, `{person}` and `{sole_admin}` filled in.
     pub(crate) path: &'static str,
     pub(crate) body: &'static str,
     pub(crate) expected_status: reqwest::StatusCode,
+    pub(crate) expected_denials: usize,
 }
 
 pub(crate) struct ServiceAccountRoleTestCase {

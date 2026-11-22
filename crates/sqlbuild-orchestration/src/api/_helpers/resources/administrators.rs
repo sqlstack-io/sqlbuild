@@ -4,7 +4,6 @@ use axum::extract::{Path, State};
 use axum::{Extension, Json};
 use uuid::Uuid;
 
-use crate::api::_helpers::resources::service_accounts::refuse_keyed;
 use crate::api::errors::ApiError;
 use crate::api::models::{
     LoginMode, MutationResponse, ServerFacts, ServerRetention, ServerSettings,
@@ -14,11 +13,11 @@ use crate::authorization::main::roles::change_administrator::change_administrato
 use crate::authorization::main::roles::list_role_definitions::list_role_definitions;
 use crate::authorization::main::roles::list_role_holdings::list_role_holdings;
 use crate::credentials::main::identities::list_people::list_people;
+use crate::credentials::models::AuthenticatedPerson;
 use crate::credentials::models::{
     AdministratorChange, AuditContext, PersonSummary, RoleAssignmentRequest, RoleHoldings,
     RoleOverview,
 };
-use crate::credentials::models::{AuthenticatedPerson, ServiceKeyIdentity};
 use crate::platform::constants::{
     HEARTBEAT_RETENTION_DAYS, LOCATION_RETENTION_DAYS, PLATFORM_ALERT_RETENTION_DAYS,
     SENSOR_EVALUATION_RETENTION_DAYS,
@@ -34,18 +33,9 @@ use crate::store::models::ControlStore;
 pub(crate) async fn change(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Path(principal_id): Path<Uuid>,
-    (Extension(AuthenticatedPerson(principal, _)), keyed): (
-        Extension<AuthenticatedPerson>,
-        Option<Extension<ServiceKeyIdentity>>,
-    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
     Json(change): Json<AdministratorChange>,
 ) -> Result<Json<MutationResponse>, ApiError> {
-    if matches!(
-        change,
-        AdministratorChange::Grant | AdministratorChange::Revoke
-    ) {
-        refuse_keyed(&store, (&context, &keyed), "role.admin").await?;
-    }
     Ok(Json(MutationResponse {
         applied: change_administrator(&store, (&context, principal), (principal_id, change))
             .await?,
@@ -58,13 +48,9 @@ pub(crate) async fn change(
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn assign(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
-    (Extension(AuthenticatedPerson(principal, _)), keyed): (
-        Extension<AuthenticatedPerson>,
-        Option<Extension<ServiceKeyIdentity>>,
-    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
     Json(request): Json<RoleAssignmentRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
-    refuse_keyed(&store, (&context, &keyed), "role.assign").await?;
     Ok(Json(MutationResponse {
         applied: assign_builtin_role(&store, (&context, principal), &request).await?,
     }))
