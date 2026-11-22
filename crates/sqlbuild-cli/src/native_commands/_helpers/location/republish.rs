@@ -25,7 +25,7 @@ pub(crate) fn republish_outcome(load: &LoadOutcome, generation: i64) -> Location
             generation,
         },
         Err((_, error)) => LocationWorkOutcome::PublishFailed {
-            generation: Some(generation),
+            generation,
             error: error.clone(),
         },
     }

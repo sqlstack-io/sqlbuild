@@ -95,7 +95,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
             let poll = LocationWorkPoll {
                 session_id: Uuid::now_v7(),
                 target: "development".into(),
-                scope: LocationWorkScope::Standard,
+                scope: LocationWorkScope::All,
             };
             report_location_health(
                 store,

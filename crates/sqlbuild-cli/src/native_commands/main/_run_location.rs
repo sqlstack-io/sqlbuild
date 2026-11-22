@@ -50,7 +50,7 @@ pub(super) async fn run_location(
     let poll = LocationWorkPoll {
         session_id,
         target: options.target.clone(),
-        scope: LocationWorkScope::WithRepublish,
+        scope: LocationWorkScope::All,
     };
     let (requests, receiver) = mpsc::channel(1);
     let (republisher, controls) = dev_controls(&options);
@@ -201,7 +201,7 @@ async fn poll_location(
         if Instant::now() >= work_at {
             let poll = LocationWorkPoll {
                 scope: match generation {
-                    Some(_) => LocationWorkScope::WithRepublish,
+                    Some(_) => LocationWorkScope::All,
                     None => LocationWorkScope::RepublishOnly,
                 },
                 ..poll.clone()

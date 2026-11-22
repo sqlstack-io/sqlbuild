@@ -292,36 +292,26 @@ pub struct PersonWorkRequest {
 pub struct LocationWorkPoll {
     pub session_id: Uuid,
     pub target: String,
-    /// Which work this poll takes; older locations leave it out and get no republishes.
-    #[serde(default, skip_serializing_if = "LocationWorkScope::is_standard")]
+    /// Which work this poll takes.
     pub scope: LocationWorkScope,
 }
 
 /// Which work a location takes in one poll.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LocationWorkScope {
-    /// Connection tests, syncs, sensors and plans, as every location takes.
-    #[default]
-    Standard,
-    /// Standard work and republishes.
-    WithRepublish,
+    /// Every kind of work, while the location serves a publication of its current files.
+    All,
     /// Only republishes, while the location has no publication of its current files.
     RepublishOnly,
 }
 
 impl LocationWorkScope {
-    #[must_use]
-    pub fn is_standard(&self) -> bool {
-        *self == Self::Standard
-    }
-
     /// The scope's name as the claim query compares it.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Standard => "standard",
-            Self::WithRepublish => "with_republish",
+            Self::All => "all",
             Self::RepublishOnly => "republish_only",
         }
     }
@@ -363,8 +353,7 @@ pub enum LocationWorkOutcome {
     },
     /// The republish compiled nothing to publish; the last good snapshot keeps serving.
     PublishFailed {
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        generation: Option<i64>,
+        generation: i64,
         error: String,
     },
     Superseded {},

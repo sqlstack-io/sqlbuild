@@ -220,8 +220,7 @@ pub(crate) struct LocationLoad {
     pub(crate) discovered: sqlbuild_orchestration::discovered_sets::types::DiscoveredSets,
     /// Each discover function's file, relative to the project.
     pub(crate) discover_files: std::collections::BTreeMap<String, String>,
-    /// Why nothing was published, redacted; absent after a publication or a rules failure.
-    #[serde(default)]
+    /// Why nothing was published, redacted; null after a publication or a rules failure.
     pub(crate) error: Option<String>,
 }
 

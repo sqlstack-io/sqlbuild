@@ -29,7 +29,7 @@ pub async fn claim_location_work(
          AND w.expires_at>$3 AND w.completed_at IS NULL \
          AND (w.claimed_until IS NULL OR w.claimed_until<=$3 OR w.session_id=$4) \
          AND (($5<>'republish_only' AND w.request_json->'work'->>'kind' IN ('check_connection','sync_warehouse','plan')) \
-         OR ($5<>'standard' AND w.request_json->'work'->>'kind'='republish') OR ($5<>'republish_only' AND EXISTS ( \
+         OR w.request_json->'work'->>'kind'='republish' OR ($5<>'republish_only' AND EXISTS ( \
          SELECT 1 FROM sqb_sensor_evaluation_events e JOIN sqb_triggers t ON t.trigger_id=e.trigger_id \
          JOIN sqb_trigger_state s ON s.trigger_id=t.trigger_id JOIN sqb_scheduler_lease l ON l.name='scheduler' \
          WHERE e.evaluation_id=w.request_id AND e.phase='requested' AND s.status='running' \

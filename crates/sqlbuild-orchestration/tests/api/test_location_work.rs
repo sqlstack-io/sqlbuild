@@ -144,7 +144,7 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
             let poll = LocationWorkPoll {
                 session_id: Uuid::now_v7(),
                 target: request.target.clone(),
-                scope: LocationWorkScope::Standard,
+                scope: LocationWorkScope::All,
             };
             assert!(worker.poll(&poll).await.is_err(), "register before polling");
             for session_id in [poll.session_id, Uuid::nil()] {

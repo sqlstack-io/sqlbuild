@@ -83,7 +83,7 @@ pub(crate) async fn register_instance(store: &ControlStore, location: Uuid) -> L
     let poll = LocationWorkPoll {
         session_id: Uuid::now_v7(),
         target: "development".into(),
-        scope: LocationWorkScope::Standard,
+        scope: LocationWorkScope::All,
     };
     report_location_health(
         store,

@@ -123,7 +123,7 @@ pub(super) fn published_location(
     let poll = LocationWorkPoll {
         session_id: Uuid::nil(),
         target: options.target.clone(),
-        scope: LocationWorkScope::Standard,
+        scope: LocationWorkScope::All,
     };
     let (_, metadata, _) = tokio::runtime::Builder::new_current_thread()
         .enable_all()

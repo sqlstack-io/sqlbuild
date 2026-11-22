@@ -450,6 +450,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/discovered": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readDiscovered"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/fingerprint": {
         parameters: {
             query?: never;
@@ -730,6 +746,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["readPersonProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/republish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["requestRepublish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/republish/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readRepublish"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1655,7 +1703,7 @@ export interface components {
          * @description Closed permission vocabulary; unknown actions fail deserialization.
          * @enum {string}
          */
-        Action: "view" | "view.sql" | "view.evidence" | "job.run" | "run.cancel" | "run.rerun" | "run.rewrite_history" | "run.prioritise" | "run.warehouse" | "run.vars" | "run.load" | "trigger.toggle" | "sensor.reset_cursor" | "run.adhoc" | "connection.test" | "user.manage" | "role.assign" | "audit.view";
+        Action: "view" | "view.sql" | "view.evidence" | "job.run" | "run.cancel" | "run.rerun" | "run.rewrite_history" | "run.prioritise" | "run.warehouse" | "run.vars" | "run.load" | "trigger.toggle" | "sensor.reset_cursor" | "run.adhoc" | "connection.test" | "location.republish" | "user.manage" | "role.assign" | "audit.view";
         /** @description What launching the command would run and whether this person may launch it. */
         AdhocCheck: {
             /** @description Why the command cannot run regardless of permissions, such as a refused flag or an unknown selector. */
@@ -2114,6 +2162,33 @@ export interface components {
             /** @enum {string} */
             status: "unavailable";
         };
+        /** @description The discovered sets of a target's current snapshot; empty when it saved none. */
+        DiscoveredReadback: {
+            /** Format: int64 */
+            generation: number;
+            /** Format: date-time */
+            published_at: string;
+            sets: components["schemas"]["DiscoveredSetReadback"][];
+            /** Format: uuid */
+            snapshot_id: string;
+        };
+        /** @description One discovered set of the current snapshot, as a deploy reads it back. */
+        DiscoveredSetReadback: {
+            /** Format: int64 */
+            check_every_seconds?: number | null;
+            digest?: string | null;
+            error?: string | null;
+            /** Format: date-time */
+            fetched_at?: string | null;
+            /** Format: int64 */
+            items: number;
+            /** Format: date-time */
+            last_good_at?: string | null;
+            name: string;
+            status: components["schemas"]["DiscoveredSetStatus"];
+            /** @description The tags of the result the set serves: its newest, or its last good one after a failure. */
+            tags: Record<string, never>;
+        };
         /**
          * @description How a set's newest attempt went.
          * @enum {string}
@@ -2425,6 +2500,11 @@ export interface components {
             kind: "plan";
             selection: string[];
             settings: Record<string, never>;
+        } | {
+            /** @enum {string} */
+            kind: "republish";
+            /** @description The name of whoever asked, which the location prints with the request's reason. */
+            requested_by: string;
         };
         LocationWorkClaim: {
             /** Format: uuid */
@@ -2457,10 +2537,25 @@ export interface components {
             /** @enum {string} */
             kind: "sync_started";
         } | {
+            /** Format: int64 */
+            generation: number;
+            /** @enum {string} */
+            kind: "published";
+            /** Format: uuid */
+            snapshot_id: string;
+        } | {
+            error: string;
+            /** Format: int64 */
+            generation: number;
+            /** @enum {string} */
+            kind: "publish_failed";
+        } | {
             /** @enum {string} */
             kind: "superseded";
         };
         LocationWorkPoll: {
+            /** @description Which work this poll takes. */
+            scope: components["schemas"]["LocationWorkScope"];
             /** Format: uuid */
             session_id: string;
             target: string;
@@ -2495,6 +2590,11 @@ export interface components {
             /** Format: uuid */
             session_id: string;
         };
+        /**
+         * @description Which work a location takes in one poll.
+         * @enum {string}
+         */
+        LocationWorkScope: "all" | "republish_only";
         /**
          * @description How people sign in to this server.
          * @enum {string}
@@ -3431,6 +3531,33 @@ export interface components {
             /** @enum {string} */
             kind: "blob";
             value: number[];
+        };
+        /**
+         * @description Where a republish request stands.
+         * @enum {string}
+         */
+        RepublishState: "pending" | "published" | "failed" | "expired";
+        /** @description A republish request and its result once the location has one. */
+        RepublishStatus: {
+            /** Format: date-time */
+            completed_at?: string | null;
+            error?: string | null;
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: int64 */
+            generation?: number | null;
+            /** Format: uuid */
+            location_id: string;
+            reason: string;
+            /** Format: uuid */
+            request_id: string;
+            /** Format: date-time */
+            requested_at: string;
+            requested_by: string;
+            /** Format: uuid */
+            snapshot_id?: string | null;
+            state: components["schemas"]["RepublishState"];
+            target: string;
         };
         /** @description A run a sensor's function asked for; the key defaults to the event ID and the job. */
         RequestedRun: {
@@ -5923,6 +6050,43 @@ export interface operations {
             };
         };
     };
+    readDiscovered: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["DiscoveredReadback"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     readPersonFingerprint: {
         parameters: {
             query: {
@@ -6682,6 +6846,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProvidersRead"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    requestRepublish: {
+        parameters: {
+            query?: {
+                /** @description Seconds to wait for the new snapshot or the publish error, at most 60; 0 or absent returns at once */
+                wait?: number;
+            };
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonWorkRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepublishStatus"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readRepublish: {
+        parameters: {
+            query?: {
+                /** @description Seconds to wait while the republish is pending, at most 60 */
+                wait?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["RepublishStatus"];
                 };
             };
             /** @description Session rejected */

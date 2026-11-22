@@ -39,7 +39,7 @@ pub(crate) fn republish_status(
         }
         Some(LocationWorkOutcome::PublishFailed { generation, error }) => {
             status.state = RepublishState::Failed;
-            status.generation = *generation;
+            status.generation = Some(*generation);
             status.error = Some(error.clone());
         }
         Some(_) => {
