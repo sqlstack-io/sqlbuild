@@ -87,7 +87,7 @@ independent of `concurrency`, and every other asset still runs one at a time.
 
 - **Providers used by these steps must be thread-safe.** The steps run on threads of one process and share the provider instances.
 - **A step can't install signal handlers,** as Python allows that only on the main thread.
-- **Each running step has its own warehouse connection.** An in-memory DuckDB or SQLite database belongs to one connection, so its items run one at a time.
+- **Each running step has its own warehouse connection.** An in-memory DuckDB, MotherDuck or SQLite database belongs to one connection, so on those targets items run one at a time, whatever `max_parallel` is. Use a database file to run them in parallel.
 - **Local output can interleave.** A worker still files each line under the node that printed it.
 - **SQL pauses while items run.** New SQL, and steps waiting on SQL, start again once the running items have finished.
 - **A cancel starts no more steps.** It cancels running statements and keeps finished steps succeeded. SQLBuild can't stop other Python code: it waits for those steps before it closes providers, and a worker is ended after a minute. Work a step started on a remote system may outlive the cancel.
