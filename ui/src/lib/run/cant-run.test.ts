@@ -33,9 +33,9 @@ describe('a plan with nodes that cannot run', () => {
 	it('names what the provider stops and how to fix it', () => {
 		expect(needsText(payments)).toBe('raw_payments and the 2 nodes that read it (stg_payments, fct_payments)');
 		expect(fixText(payments, 'plan again')).toBe(
-			"set PAYMENTS_API_TOKEN in the location's environment (or its .env), restart the location, then plan again"
+			'set PAYMENTS_API_TOKEN in .env, then restart the location (in sqb dev, press r), or in the environment the location (or sqb dev) was started with, then restart it; after that, plan again'
 		);
-		expect(fixText({ ...payments, env_file: null }, 'plan again')).toBe("set PAYMENTS_API_TOKEN in the location's environment, restart the location, then plan again");
+		expect(fixText({ ...payments, env_file: null }, 'plan again')).toBe('set PAYMENTS_API_TOKEN in the environment the location (or sqb dev) was started with, then restart it; after that, plan again');
 	});
 
 	it('gives each node its reason, readers naming the blocked node they read', () => {

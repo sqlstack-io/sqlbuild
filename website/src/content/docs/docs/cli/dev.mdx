@@ -99,16 +99,26 @@ interpreter when a value changed, so the next compile and run use the new values
 in the shell that started `sqb dev` still win.
 
 While a provider is missing secrets that the target doesn't
-[allow to be missing](/docs/concepts/project-configuration#allowed-missing-secrets), a **Secrets missing** warning above the
-keys names the provider and the variables it reads, never their values:
+[allow to be missing](/docs/concepts/project-configuration#allowed-missing-secrets), `sqb dev`
+keeps running and prints a warning with each field's file and line, the variable it reads, the
+nodes that need the provider (the first five, then a count) and the fix, never a value:
 
 ```text
-⚠ Secrets missing                region WORKER_TOKEN, REGION_CODE; set them in .env or
-                                 the environment; press r to reload
+⚠ warn   1 provider has missing secrets                          missing secret
+  at     providers/region.py:9   region_token  ← REGION_TOKEN
+         providers/region.py:10  region_code   ← REGION_CODE
+  why    runs that use it stop at the provider check, before the warehouse; 2
+         nodes need it (raw_regions, stg_regions)
+  fix    set them in .env and press r, or set them in the environment you
+         start sqb dev from, then quit and run sqb dev again
 ```
 
-Runs that use the provider stop before they reach the warehouse. The warning clears once the next
-publication finds every secret set; with `--plain`, a `Secrets set` line says so.
+`r` picks up an edit to the env file, which the fix names when the target uses another one. It
+can't pick up a variable exported in a shell afterwards: for that, quit and run `sqb dev` again.
+
+The warning is printed again when the missing variables change, and a **Secrets missing** row stays
+above the keys meanwhile. Once the next publication finds every secret set, the row clears and a
+`Secrets set` line says so.
 
 ## Sign in to the warehouse
 

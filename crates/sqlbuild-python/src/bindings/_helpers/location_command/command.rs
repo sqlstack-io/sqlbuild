@@ -21,6 +21,7 @@ use sqlbuild_orchestration::dev_events::models::{DevPhase, DevStepState};
 use sqlbuild_orchestration::platform::models::LocationRuleFailure;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
+use sqlbuild_python_compile::provider_check::main::key_secret_blocks::key_secret_blocks;
 
 use crate::bindings::_helpers::location_command::constants::EXECUTE_ACTION;
 use crate::bindings::_helpers::location_command::constants::PUBLISH_ACTION;
@@ -297,6 +298,17 @@ pub(super) fn publish_location<'py>(
         .get("providers")
         .map(|providers| missing_provider_secrets(providers, &allowed))
         .unwrap_or_default();
+    let mut secrets_needed_by: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    if missing_secrets.iter().any(|provider| !provider.allowed) {
+        let published: BTreeSet<String> = snapshot.input.nodes.keys().cloned().collect();
+        let project_view: Bound<'py, PyAny> = field(&compiled, "project")?;
+        for block in key_secret_blocks((&project.discovered, &project_view), &published)? {
+            secrets_needed_by.insert(
+                block.provider,
+                block.users.into_iter().chain(block.readers).collect(),
+            );
+        }
+    }
     status(py, "Publishing location snapshot...")?;
     steps(py, &[(DevPhase::Publish, DevStepState::Started)], None)?;
     let record = snapshot.publication(
@@ -320,6 +332,7 @@ pub(super) fn publish_location<'py>(
             refresh_at,
             state_locations: locations.into_iter().collect(),
             missing_secrets,
+            secrets_needed_by,
         },
         (project.discovered, compiled),
     )))

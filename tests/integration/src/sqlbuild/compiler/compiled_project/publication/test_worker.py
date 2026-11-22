@@ -2045,6 +2045,7 @@ def test_given_a_running_build_when_the_scheduler_hangs_up_then_its_worker_is_st
             expected_output_fragments=(
                 "runs that use them stop before the warehouse: "
                 "region WORKER_ENV_TOKEN, region WORKER_ENV_REGION_CODE",
+                "in the environment the location (or sqb dev) was started with, then restart it.",
             ),
             unexpected_output_fragments=(),
         ),

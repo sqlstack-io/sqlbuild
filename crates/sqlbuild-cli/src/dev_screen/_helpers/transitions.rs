@@ -211,7 +211,10 @@ pub(crate) fn child_event(
             );
             failed(screen, problem, now, clock)
         }
-        DevEvent::MissingSecrets { providers } => secrets_reported(screen, providers),
+        DevEvent::MissingSecrets {
+            providers,
+            env_file,
+        } => secrets_reported(screen, providers, env_file),
         DevEvent::Warning { title, detail } => {
             let lines: Vec<String> = render_problem(
                 &Problem {

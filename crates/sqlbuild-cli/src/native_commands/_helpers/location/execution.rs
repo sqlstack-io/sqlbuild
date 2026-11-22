@@ -415,6 +415,7 @@ pub(crate) async fn compile_generation(
         refresh_at: refresh,
         state_locations: locations,
         missing_secrets,
+        secrets_needed_by,
     }) = load.published
     else {
         if let Some(rules) = &load.rules {
@@ -443,7 +444,11 @@ pub(crate) async fn compile_generation(
             record.snapshot_id
         )));
     }
-    Ok(Some(Ok((refresh_at, locations, missing_secrets))))
+    Ok(Some(Ok((
+        refresh_at,
+        locations,
+        (missing_secrets, secrets_needed_by),
+    ))))
 }
 
 /// Under `sqb dev`, tell the screen a generation failed; the last good generation keeps serving.

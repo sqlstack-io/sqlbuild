@@ -42,6 +42,7 @@ use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyAttributeError, PyOSError, PyTypeError, PyUnicodeError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
+use sqlbuild_cli::argv::main::command_takes_option::command_takes_option;
 use sqlbuild_cli::diff_report::errors::DiffUserError;
 use sqlbuild_cli::diff_report::main::parse_diff_name_range::parse_diff_name_range;
 use sqlbuild_cli::dispatch::main::command_dispatch::command_dispatch;
@@ -79,6 +80,9 @@ const RAW_QUERY_ATTRIBUTES: [&str; 4] = [
     "right_query",
     "right_query_file",
 ];
+
+/// The namespace attributes naming a command and the subcommand that can take `--allow-missing-secrets`.
+const COMMAND_PATH_ATTRIBUTES: [&str; 2] = ["command", "rules_command"];
 
 /// The namespace attribute of `--allow-missing-secrets`.
 const ALLOW_MISSING_SECRETS_DEST: &str = "allow_missing_secrets";
@@ -456,6 +460,28 @@ fn run_implementation<'py>(
     code.into_bound_py_any(py)
 }
 
+/// The secrets scope of one parsed command: its flag, whether it takes that flag, and its target.
+fn secrets_scope(args: &Bound<'_, PyAny>) -> PyResult<MissingSecretsScope> {
+    let allowed: bool = args
+        .getattr_opt(ALLOW_MISSING_SECRETS_DEST)?
+        .is_some_and(|allowed| allowed.is_truthy().unwrap_or(false));
+    let mut command: Vec<String> = Vec::new();
+    for attribute in COMMAND_PATH_ATTRIBUTES {
+        let Some(value) = args.getattr_opt(attribute)? else {
+            continue;
+        };
+        command.extend(optional_text(&value)?);
+    }
+    let command: Vec<&str> = command.iter().map(String::as_str).collect();
+    Ok(MissingSecretsScope::enter(
+        (
+            allowed,
+            command_takes_option(&command, ALLOW_MISSING_SECRETS_DEST),
+        ),
+        attribute(args, "target")?,
+    ))
+}
+
 /// Run `body` with the request record a parsed command's route passes, in the scopes `sqb` runs it in but the job scope, which the caller sets.
 pub(crate) fn with_routed_request<'py, T>(
     args: &Bound<'py, PyAny>,
@@ -464,11 +490,7 @@ pub(crate) fn with_routed_request<'py, T>(
     let py: Python<'py> = args.py();
     within(&warehouse_scope(args)?, |_| {
         let invocation = Invocation::new(args)?;
-        let _secrets = MissingSecretsScope::enter(
-            args.getattr_opt(ALLOW_MISSING_SECRETS_DEST)?
-                .is_some_and(|allowed| allowed.is_truthy().unwrap_or(false)),
-            attribute(args, "target")?,
-        );
+        let _secrets = secrets_scope(args)?;
         let route = match command_dispatch(&command_facts(args)?) {
             Dispatch::Run(route, None) => route,
             Dispatch::Run(_, Some(failure)) | Dispatch::Fail(failure) => {
@@ -493,11 +515,7 @@ fn routed_command<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = args.py();
     let invocation = Invocation::new(args)?;
-    let _secrets = MissingSecretsScope::enter(
-        args.getattr_opt(ALLOW_MISSING_SECRETS_DEST)?
-            .is_some_and(|allowed| allowed.is_truthy().unwrap_or(false)),
-        attribute(args, "target")?,
-    );
+    let _secrets = secrets_scope(args)?;
     match command_dispatch(&command_facts(args)?) {
         Dispatch::Nothing => 0.into_bound_py_any(py),
         Dispatch::Fail(failure) => Err(user_error(py, failure)),

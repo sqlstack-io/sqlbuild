@@ -23,6 +23,10 @@ pub(super) struct ScreenTestCase {
 pub(super) struct MissingSecretsTestCase {
     pub(super) description: &'static str,
     pub(super) size: Option<(usize, usize)>,
+    /// The env file the location loads.
+    pub(super) env_file: Option<&'static str>,
+    /// The nodes that need each provider.
+    pub(super) needed_by: &'static [&'static str],
     /// Each health read's providers and the variables they miss, in order.
     pub(super) reports: Vec<Vec<(&'static str, Vec<&'static str>)>>,
     /// The last rows the terminal shows.
