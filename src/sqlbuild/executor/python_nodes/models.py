@@ -28,7 +28,7 @@ from sqlbuild.executor.python_nodes.classes.runtime_relation_guard import Runtim
 from sqlbuild.executor.python_nodes.constants import (
     PYTHON_NODE_RELATION_QUALIFIER_SEPARATOR,
 )
-from sqlbuild.executor.python_nodes.types import PythonIdentityRecorder
+from sqlbuild.executor.python_nodes.types import ExecutablePythonNode, PythonIdentityRecorder
 from sqlbuild.executor.scheduling.classes.session_warehouses import (
     SessionWarehouses,
     configured_warehouse,

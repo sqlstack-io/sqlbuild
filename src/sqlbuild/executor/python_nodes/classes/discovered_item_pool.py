@@ -7,7 +7,7 @@ from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextvars import copy_context
 from dataclasses import replace
 from threading import Lock
-from typing import Any
+from typing import Any, cast
 
 from sqlbuild._native import CommandTerminated, termination_requested
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
@@ -92,16 +92,19 @@ class DiscoveredItemPool:
             if limited is None or running_by_set[limited[0]] >= limited[1]:
                 continue
             slot: ItemSlot = self._take_slot()
-            future: Future[PythonNodeExecutionResult] = threads.submit(
-                copy_context().run,
-                run_ready_python_node,
-                node=node,
-                upstream_results=self._callbacks.upstream_results(node.name),
-                runtime=replace(
-                    self._runtime, connection=slot.connection, result_store=slot.result_store
+            future: Future[PythonNodeExecutionResult] = cast(
+                Future[PythonNodeExecutionResult],
+                threads.submit(
+                    copy_context().run,
+                    run_ready_python_node,
+                    node=node,
+                    upstream_results=self._callbacks.upstream_results(node.name),
+                    runtime=replace(
+                        self._runtime, connection=slot.connection, result_store=slot.result_store
+                    ),
+                    statement_recorder=StatementRecorder(),
+                    run_state=self._run_state,
                 ),
-                statement_recorder=StatementRecorder(),
-                run_state=self._run_state,
             )
             self._running[future] = RunningItem(node=node, set_name=limited[0], slot=slot)
             started.add(node.name)
