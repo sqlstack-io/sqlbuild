@@ -1,12 +1,11 @@
 pub(in crate::platform) mod _read_target_work;
+pub mod call_remote_republish;
 pub mod claim_location_work;
 pub mod complete_location_work;
 pub mod connect_location_work;
 pub(crate) mod enqueue_location_work;
 pub mod location_work;
 pub(crate) mod read_location_work;
-pub mod read_remote_republish;
 pub mod read_republish;
 pub mod request_location_work;
-pub mod request_remote_republish;
 pub mod request_republish;

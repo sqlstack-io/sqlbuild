@@ -2,15 +2,13 @@
 
 use std::io::Error;
 
-use sqlbuild_orchestration::platform::main::work::read_remote_republish::read_remote_republish;
-use sqlbuild_orchestration::platform::main::work::request_remote_republish::request_remote_republish;
-use sqlbuild_orchestration::platform::models::{PersonWorkRequest, RepublishStatus};
+use sqlbuild_orchestration::platform::main::work::call_remote_republish::call_remote_republish;
+use sqlbuild_orchestration::platform::models::{RepublishCall, RepublishStatus};
 use uuid::Uuid;
 
 use crate::native_commands::constants::API_KEY_VARIABLE;
 use crate::native_commands::models::RepublishCaller;
-use crate::person_login::main::read_republish::read_republish;
-use crate::person_login::main::request_republish::request_republish;
+use crate::person_login::main::call_republish::call_republish;
 
 /// The environment's API key when there is one, otherwise the saved `sqb login` session.
 pub(crate) fn republish_caller(
@@ -36,49 +34,21 @@ pub(crate) fn republish_caller(
     Ok(RepublishCaller::Key { server, key })
 }
 
-/// Queue the republish as `caller`.
-pub(crate) fn send_republish(
+/// The republish after `call`, made as `caller`.
+pub(crate) fn call_as(
     caller: &RepublishCaller,
-    (location, target): (Uuid, &str),
-    request: &PersonWorkRequest,
-) -> Result<RepublishStatus, Error> {
-    match caller {
-        RepublishCaller::Key { server, key } => tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()?
-            .block_on(request_remote_republish(
-                (server, key),
-                (location, target),
-                request,
-            ))
-            .map_err(Error::other),
-        RepublishCaller::Session { server, ca } => {
-            request_republish((server, ca.as_deref()), (location, target), request)
-        }
-    }
-}
-
-/// The republish as `caller` reads it, waiting up to `wait` seconds while it is pending.
-pub(crate) fn poll_republish(
-    caller: &RepublishCaller,
-    (location, target, request_id): (Uuid, &str, Uuid),
-    wait: u64,
+    scope: (Uuid, &str),
+    call: RepublishCall<'_>,
 ) -> Result<RepublishStatus, Error> {
     let status: Option<RepublishStatus> = match caller {
         RepublishCaller::Key { server, key } => tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()?
-            .block_on(read_remote_republish(
-                (server, key),
-                (location, target, request_id),
-                wait,
-            ))
+            .block_on(call_remote_republish((server, key), scope, call))
             .map_err(Error::other)?,
-        RepublishCaller::Session { server, ca } => read_republish(
-            (server, ca.as_deref()),
-            (location, target, request_id),
-            wait,
-        )?,
+        RepublishCaller::Session { server, ca } => {
+            call_republish((server, ca.as_deref()), scope, call)?
+        }
     };
     status.ok_or_else(|| Error::other("the server has no such republish request"))
 }

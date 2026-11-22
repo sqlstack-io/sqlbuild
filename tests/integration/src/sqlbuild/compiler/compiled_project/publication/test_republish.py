@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -13,9 +14,24 @@ import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     DevelopmentRepublishTestCase,
+    SessionRepublishTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     wait_for_development_ready,
+)
+from tests.integration.src.sqlbuild.compiler.compiled_project.publication.login.helpers import (
+    authentication_arguments,
+    browser,
+    gateway,
+    pending_login,
+    request,
+    sign_in,
+)
+from tests.integration.src.sqlbuild.compiler.compiled_project.publication.wheel.cli.helpers import (
+    administer,
+    environment,
+    serve,
+    successful,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
@@ -107,3 +123,70 @@ def test_given_a_changed_external_plan_when_republishing_then_the_readback_shows
     finally:
         process.send_signal(signal.SIGINT)
         process.wait(timeout=30)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux owner-only credential storage")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SessionRepublishTestCase(
+            description="a saved login session queues a republish over HTTPS",
+            reason="deploy",
+            expected_exit_code=0,
+            expected_state="pending",
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_saved_login_session_when_republishing_then_the_request_names_the_person(
+    test_case: SessionRepublishTestCase, tmp_path: Path
+) -> None:
+    binary: str | None = shutil.which("sqb")
+    assert binary is not None
+    installation: tuple[Path, Path] = Path(binary), tmp_path
+    home: Path = tmp_path / "home"
+    home.mkdir()
+    values: dict[str, str] = environment({"HOME": str(home)})
+    for name in ("DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "SQLBUILD_API_KEY"):
+        values.pop(name, None)
+    successful(administer(installation, ["create-user", "orders-admin"]))
+    person: dict[str, Any] = successful(
+        administer(installation, ["create-principal", "orders-deploy"])
+    )
+    password: str = "orders-private-password"
+    successful(administer(installation, ["set-password", person["principal_id"]], password))
+    successful(administer(installation, ["grant-admin", person["principal_id"]]))
+    location: dict[str, Any] = successful(administer(installation, ["create-location", "orders"]))
+    with gateway(tmp_path) as (origin, certificate, transport):
+        arguments: tuple[str, ...] = authentication_arguments(
+            "password", origin, certificate, person["principal_id"]
+        )
+        with serve(installation, authentication_arguments=arguments) as backend:
+            transport["backend"] = backend.removeprefix("http://")
+            client, _ = browser(origin, certificate)
+            csrf: str = sign_in(client, origin, "password", person["name"], password)
+            common: list[str] = ["--server", origin, "--ca-cert", str(certificate)]
+            with pending_login(
+                [binary, "login", *common, "--no-browser"], values, tmp_path, tmp_path / "cli.log"
+            ) as (process, url):
+                approval: dict[str, Any] = {"browser_code": url.split("#", 1)[1], "approve": True}
+                approved: int = request(
+                    client, origin + "/api/auth/cli/approve", approval, csrf=csrf
+                )[0]
+                assert approved == 204
+                process.communicate(timeout=20)
+                assert process.returncode == 0
+            republished: subprocess.CompletedProcess[str] = subprocess.run(
+                [binary, "location", "republish", *common, "--target", "production"]
+                + ["--location-id", location["location_id"], "--reason", test_case.reason],
+                cwd=tmp_path,
+                env=values,
+                capture_output=True,
+                text=True,
+                timeout=20,
+                check=False,
+            )
+            assert republished.returncode == test_case.expected_exit_code, republished.stderr
+            status: dict[str, Any] = json.loads(republished.stdout)
+            assert status["requested_by"] == person["name"]
+            assert status["state"] == test_case.expected_state

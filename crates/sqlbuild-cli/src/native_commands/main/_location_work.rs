@@ -19,12 +19,12 @@ use crate::native_commands::_helpers::command::paths::location_files;
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::check_location_connection;
 use crate::native_commands::_helpers::location::plan_reuse::keep_plan;
+use crate::native_commands::_helpers::location::republish::republish_turn;
 use crate::native_commands::_helpers::location::sensor_function::run_sensor_function;
 use crate::native_commands::_helpers::location::work::work_error;
 use crate::native_commands::main::_location_plan::plan_location;
 use crate::native_commands::models::{
-    LocationRuntimeRequest, LocationServe, LocationWatch, LocationWorkTurn, PendingRepublish,
-    PlanToKeep,
+    LocationRuntimeRequest, LocationServe, LocationWatch, LocationWorkTurn, PlanToKeep,
 };
 
 /// Retry the exact completed result without rerunning it; a turn's `sync` asks the metadata loop to sync.
@@ -56,24 +56,8 @@ pub(super) async fn run_location_work(
         + (claim.lease_expires_at - Utc::now())
             .to_std()
             .unwrap_or_default();
-    if let LocationWork::Republish { requested_by } = &claim.request.work {
-        drop(write_output(&[(
-            Stream::Stderr,
-            &format!(
-                "Republishing at the request of {requested_by}: {}\n",
-                claim.request.reason
-            ),
-        )]));
-        return Ok(Some(LocationWorkTurn {
-            files: Vec::new(),
-            sync: false,
-            claimed: true,
-            republish: Some(PendingRepublish {
-                request_id: claim.request.request_id,
-                claim_id: claim.claim_id,
-                deadline,
-            }),
-        }));
+    if let Some(turn) = republish_turn(&claim, deadline) {
+        return Ok(Some(turn));
     }
     let mut files: Vec<PathBuf> = Vec::new();
     let outcome = if generation == Some(claim.generation)
@@ -194,7 +178,6 @@ async fn perform_work(
     };
     drop(write_output(&[(Stream::Stderr, message)]));
     Ok(match work {
-        // `run_location_work` hands a republish to the watch loop, which publishes it.
         LocationWork::Republish { .. } => None,
         LocationWork::SyncWarehouse {} => {
             Some((LocationWorkOutcome::SyncStarted {}, Vec::new(), None))

@@ -103,6 +103,7 @@ pub(crate) struct RepublishTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) publishes: bool,
+    pub(crate) outcome: fn(uuid::Uuid) -> crate::platform::models::LocationWorkOutcome,
     pub(crate) expected_state: crate::platform::models::RepublishState,
     pub(crate) expected_error: Option<&'static str>,
 }
@@ -527,4 +528,20 @@ pub(crate) struct IngestionTurnTestCase {
     pub(crate) pages: usize,
     pub(crate) relations_per_page: usize,
     pub(crate) expected_writer_first: bool,
+}
+
+pub(crate) fn republish_published(
+    snapshot_id: uuid::Uuid,
+) -> crate::platform::models::LocationWorkOutcome {
+    crate::platform::models::LocationWorkOutcome::Published {
+        snapshot_id,
+        generation: 2,
+    }
+}
+
+pub(crate) fn republish_failed(_: uuid::Uuid) -> crate::platform::models::LocationWorkOutcome {
+    crate::platform::models::LocationWorkOutcome::PublishFailed {
+        generation: 2,
+        error: "orders does not parse".into(),
+    }
 }

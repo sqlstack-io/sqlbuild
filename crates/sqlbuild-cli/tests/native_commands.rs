@@ -4,8 +4,6 @@ mod admin_helpers;
 mod helpers;
 #[path = "native_commands/republish/helpers.rs"]
 mod republish_helpers;
-#[path = "native_commands/republish/test_types.rs"]
-mod republish_test_types;
 #[path = "native_commands/admin/test_admin.rs"]
 mod test_admin;
 #[path = "native_commands/test_control.rs"]

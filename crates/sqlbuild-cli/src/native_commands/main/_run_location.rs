@@ -19,14 +19,13 @@ use crate::native_commands::_helpers::command::paths::{
     exclude_location_databases, location_watch, observe_location_inputs,
 };
 use crate::native_commands::_helpers::command::terminal::write_output;
-use crate::native_commands::_helpers::location::execution::request_republish;
 use crate::native_commands::_helpers::location::execution::{
     apply_dev_controls, compile_next_generation, finish_compile,
 };
 use crate::native_commands::_helpers::location::execution::{
     dev_controls, location_clock, location_heartbeats, next_turn, shutdown_signal,
 };
-use crate::native_commands::_helpers::location::republish::{report_republish, republish_outcome};
+use crate::native_commands::_helpers::location::republish::{settle_republish, start_republish};
 use crate::native_commands::_helpers::location::work::next_work_check;
 use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
 use crate::native_commands::main::_location_changed_build::report_changed_build;
@@ -133,11 +132,7 @@ async fn watch_location(
                 return Ok(());
             };
             (watch, work_at, metadata) = idle;
-            if let Some(claimed) = watch.republish.take() {
-                request_republish(republisher, true);
-                watch.retry_at = Some(Instant::now());
-                owed = Some(claimed);
-            }
+            start_republish(republisher, &mut watch, &mut owed);
             continue;
         }
         published_generation = None;
@@ -156,20 +151,14 @@ async fn watch_location(
             watch.retry_at = Some(Instant::now() + Duration::from_secs(5));
             continue;
         };
-        if let Some(claimed) = owed.take() {
-            tokio::select! {
-                result = &mut stopped => return result,
-                () = report_republish(
-                    (client, poll.session_id),
-                    claimed,
-                    republish_outcome(&load, generation),
-                ) => {},
-            }
+        let session = (client, poll.session_id);
+        let compiled = (&load, generation);
+        if let Some(result) =
+            settle_republish(session, owed.take(), compiled, stopped.as_mut()).await
+        {
+            return result;
         }
-        published_generation = match &load {
-            Ok(_) => Some(generation),
-            Err(_) => None,
-        };
+        published_generation = load.is_ok().then_some(generation);
         let Some(settled) = finish_compile(
             (options, script, (bearer, poll.session_id)),
             (load, generation),

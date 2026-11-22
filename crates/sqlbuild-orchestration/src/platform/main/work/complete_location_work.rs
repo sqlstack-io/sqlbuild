@@ -4,22 +4,21 @@ use serde_json::{Value, json};
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use uuid::Uuid;
 
+use crate::platform::_helpers::location::republish_status::published_here;
 use crate::platform::_helpers::plans::plan_diffs::{
     split_plan_diffs, store_plan_diffs, valid_plan_diffs,
 };
 use crate::platform::constants::{MAX_PUBLISH_ERROR_CHARS, PLAN_DOCUMENT_BYTES};
 use crate::platform::main::installation::require_instance::require_instance;
 use crate::platform::main::work::read_location_work::read_location_work;
-use crate::platform::models::{
-    LocationWork, LocationWorkOutcome, LocationWorkRequest, LocationWorkResult,
-};
+use crate::platform::models::{LocationWork, LocationWorkOutcome, LocationWorkResult};
 use crate::sensors::constants::MAX_SENSOR_RUN_REQUESTS;
 use crate::sensors::models::SensorFunctionOutcome;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::query::query;
-use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
+use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 pub async fn complete_location_work(
     store: &ControlStore,
@@ -80,33 +79,6 @@ pub async fn complete_location_work(
     let transaction = store_plan_diffs(transaction, request_id, &diffs).await?;
     commit(transaction).await?;
     Ok(true)
-}
-
-/// Whether a republish's snapshot is one this location published for the work's target; true for other outcomes.
-async fn published_here(
-    transaction: ControlTransaction,
-    request: &LocationWorkRequest,
-    outcome: &LocationWorkOutcome,
-) -> Result<(ControlTransaction, bool), ControlError> {
-    let LocationWorkOutcome::Published {
-        snapshot_id,
-        generation,
-    } = outcome
-    else {
-        return Ok((transaction, true));
-    };
-    let (transaction, rows) = query(
-        transaction,
-        "SELECT snapshot_id FROM sqb_snapshots WHERE snapshot_id=$1 AND location_id=$2 AND target=$3 AND generation=$4",
-        vec![
-            Parameter::Id(*snapshot_id),
-            Parameter::Id(request.location_id),
-            Parameter::Text(request.target.clone()),
-            Parameter::Integer(*generation),
-        ],
-    )
-    .await?;
-    Ok((transaction, !rows.is_empty()))
 }
 
 /// Warehouse text in a plan's error and warnings, a sensor's traceback and a publish error is redacted before it is compared or stored.

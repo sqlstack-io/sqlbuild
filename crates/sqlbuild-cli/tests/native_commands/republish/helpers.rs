@@ -36,9 +36,7 @@ pub(crate) fn republish_through_proxy(
         .env_remove("NO_PROXY")
         .env_remove("no_proxy")
         .env_remove("SQLBUILD_API_KEY");
-    if let Some(key) = key {
-        command.env("SQLBUILD_API_KEY", key);
-    }
+    command.envs(key.map(|value| ("SQLBUILD_API_KEY", value)));
     let output = command.output().expect("run republish");
     (output, received.try_iter().collect())
 }
@@ -47,20 +45,18 @@ fn answer(listener: &std::net::TcpListener, bodies: &[String], sent: &mpsc::Send
     for body in bodies {
         let (stream, _) = listener.accept().expect("accept request");
         let mut reader = BufReader::new(stream);
-        let mut head = String::new();
-        let mut length = 0;
-        loop {
-            let mut line = String::new();
-            reader.read_line(&mut line).expect("request head");
-            if line.trim().is_empty() {
-                break;
-            }
-            let lower = line.to_ascii_lowercase();
-            if let Some(value) = lower.strip_prefix("content-length:") {
-                length = value.trim().parse().expect("content length");
-            }
-            head.push_str(&line);
-        }
+        let lines: Vec<String> = reader
+            .by_ref()
+            .lines()
+            .map(|line| line.expect("request head"))
+            .take_while(|line| !line.trim().is_empty())
+            .collect();
+        let head: String = lines.join("\n");
+        let length: usize = head
+            .to_ascii_lowercase()
+            .lines()
+            .find_map(|line| line.strip_prefix("content-length:"))
+            .map_or(0, |value| value.trim().parse().expect("content length"));
         reader
             .read_exact(&mut vec![0; length])
             .expect("request body");

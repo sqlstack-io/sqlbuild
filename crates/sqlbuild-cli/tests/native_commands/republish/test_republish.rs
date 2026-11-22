@@ -1,7 +1,7 @@
 //! An API key republishes over plain HTTP with one warning; a saved session still needs HTTPS.
 
 use crate::republish_helpers::{NETWORK_ORIGIN, republish_through_proxy};
-use crate::republish_test_types::RepublishCliTestCase;
+use crate::test_types::RepublishCliTestCase;
 
 const KEY: &str = "sqbk_synthetic_orders_deploy_key_0000000000";
 const WARNING: &str = "travels unencrypted over HTTP";

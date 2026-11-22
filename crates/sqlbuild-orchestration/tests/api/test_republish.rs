@@ -6,7 +6,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::api::tests::plans_helpers::{person, register_instance};
-use crate::api::tests::test_types::RepublishTestCase;
+use crate::api::tests::test_types::{RepublishTestCase, republish_failed, republish_published};
 use crate::authorization::main::people::bootstrap_user::bootstrap_user;
 use crate::credentials::models::{AuditContext, BuiltinRole, DefaultRole};
 use crate::credentials::tests::location_helpers::create_location;
@@ -38,6 +38,7 @@ fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_
             description: "SQLite republish that published",
             backend: Backend::Sqlite,
             publishes: true,
+            outcome: republish_published,
             expected_state: RepublishState::Published,
             expected_error: None,
         },
@@ -45,6 +46,7 @@ fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_
             description: "SQLite republish that failed",
             backend: Backend::Sqlite,
             publishes: false,
+            outcome: republish_failed,
             expected_state: RepublishState::Failed,
             expected_error: Some("orders does not parse"),
         },
@@ -52,6 +54,7 @@ fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_
             description: "PostgreSQL republish that published",
             backend: Backend::Postgres,
             publishes: true,
+            outcome: republish_published,
             expected_state: RepublishState::Published,
             expected_error: None,
         },
@@ -59,6 +62,7 @@ fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_
             description: "PostgreSQL republish that failed",
             backend: Backend::Postgres,
             publishes: false,
+            outcome: republish_failed,
             expected_state: RepublishState::Failed,
             expected_error: Some("orders does not parse"),
         },
@@ -194,16 +198,7 @@ fn given_a_republish_when_requested_claimed_and_completed_then_it_is_authorized_
                     "result": {"items": [{"id": "load", "depends_on": [], "args": {}}], "tags": {"release": "0.58.0"}}}}),
             );
             let published = publish_snapshot(store, &input).await.expect("republish");
-            let outcome = match test_case.publishes {
-                true => LocationWorkOutcome::Published {
-                    snapshot_id: published.snapshot_id,
-                    generation: 2,
-                },
-                false => LocationWorkOutcome::PublishFailed {
-                    generation: 2,
-                    error: "orders does not parse".into(),
-                },
-            };
+            let outcome = (test_case.outcome)(published.snapshot_id);
             complete_location_work(
                 store,
                 (location, asked.request_id),

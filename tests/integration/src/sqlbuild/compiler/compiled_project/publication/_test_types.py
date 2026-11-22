@@ -664,3 +664,11 @@ class DevelopmentRepublishTestCase:
     release: str
     expected_exit_code: int
     expected_items: int
+
+
+@dataclass(frozen=True)
+class SessionRepublishTestCase:
+    description: str
+    reason: str
+    expected_exit_code: int
+    expected_state: str

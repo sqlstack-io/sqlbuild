@@ -12,9 +12,9 @@ use crate::argv::models::{Namespace, Stream};
 use crate::native_commands::_helpers::command::decision::text;
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::location_options;
+use crate::native_commands::_helpers::location::republish_command::run_republish;
 use crate::native_commands::main::_run_dev::run_dev;
 use crate::native_commands::main::_run_location::run_location;
-use crate::native_commands::main::_run_republish::run_republish;
 
 /// Health needs no Python CLI; serving and development return `None` without one so the caller reports it.
 pub(crate) fn run_location_invocation(namespace: &Namespace, script: Option<&Path>) -> Option<i32> {

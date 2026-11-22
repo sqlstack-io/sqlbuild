@@ -922,3 +922,10 @@ pub struct DiscoveredReadback {
     pub published_at: DateTime<Utc>,
     pub sets: Vec<DiscoveredSetReadback>,
 }
+
+/// What a republish client sends: a new request, or a read of one that holds open while it is pending.
+#[derive(Clone, Copy, Debug)]
+pub enum RepublishCall<'a> {
+    Request(&'a PersonWorkRequest),
+    Read { request_id: Uuid, wait: u64 },
+}

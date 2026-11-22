@@ -27,7 +27,6 @@ pub(crate) type NextGeneration = (
     Option<Vec<sqlbuild_cache::project_snapshot::models::PathStamp>>,
 );
 
-/// A published generation's refresh deadline and state locations, or the rule findings that failed it.
 /// A publication's refresh, state locations and snapshot; or any rule findings and the error.
 pub(crate) type LoadOutcome = Result<
     (

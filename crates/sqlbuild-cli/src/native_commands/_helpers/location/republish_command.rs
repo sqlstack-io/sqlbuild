@@ -4,19 +4,17 @@ use std::io::Error;
 use std::time::{Duration, Instant};
 
 use sqlbuild_orchestration::platform::models::{
-    PersonWorkRequest, RepublishState, RepublishStatus,
+    PersonWorkRequest, RepublishCall, RepublishState, RepublishStatus,
 };
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream, Value};
 use crate::native_commands::_helpers::command::decision::{flag, text};
 use crate::native_commands::_helpers::command::terminal::write_output;
-use crate::native_commands::_helpers::location::republish_caller::{
-    poll_republish, republish_caller, send_republish,
-};
+use crate::native_commands::_helpers::location::republish_caller::{call_as, republish_caller};
 use crate::native_commands::constants::{REPUBLISH_POLL_SECONDS, REPUBLISH_TIMEOUT_SECONDS};
 
-pub(super) fn run_republish(namespace: &Namespace) -> i32 {
+pub(crate) fn run_republish(namespace: &Namespace) -> i32 {
     drop(write_output(&[(
         Stream::Stderr,
         "Requesting a republish…\n",
@@ -80,17 +78,21 @@ fn republished(namespace: &Namespace, waits: bool) -> Result<RepublishStatus, Er
         reason: text(namespace, "location_reason")
             .unwrap_or_else(|| "Requested from the CLI".to_owned()),
     };
-    let mut status: RepublishStatus = send_republish(&caller, (location, &target), &request)?;
+    let mut status: RepublishStatus = call_as(
+        &caller,
+        (location, &target),
+        RepublishCall::Request(&request),
+    )?;
     while waits && status.state == RepublishState::Pending {
         let left: u64 = deadline.saturating_duration_since(Instant::now()).as_secs();
         if left == 0 {
             break;
         }
-        status = poll_republish(
-            &caller,
-            (location, &target, request.request_id),
-            left.min(REPUBLISH_POLL_SECONDS),
-        )?;
+        let read = RepublishCall::Read {
+            request_id: request.request_id,
+            wait: left.min(REPUBLISH_POLL_SECONDS),
+        };
+        status = call_as(&caller, (location, &target), read)?;
     }
     Ok(status)
 }

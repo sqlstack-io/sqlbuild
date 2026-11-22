@@ -1,24 +1,30 @@
 //! What a republish published, reported back to the server before its claim ends.
 
+use std::future::Future;
 use std::time::Duration;
 
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::platform::models::{
-    LocationWorkClient, LocationWorkOutcome, LocationWorkResult,
+    LocationWork, LocationWorkClaim, LocationWorkClient, LocationWorkOutcome, LocationWorkResult,
 };
+use sqlbuild_orchestration::store::errors::ControlError;
+use tokio::sync::watch;
 use tokio::time::Instant;
 use uuid::Uuid;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::command::terminal::write_output;
-use crate::native_commands::models::PendingRepublish;
+use crate::native_commands::_helpers::location::execution::request_republish;
+use crate::native_commands::models::{
+    DevControlState, LocationWatch, LocationWorkTurn, PendingRepublish,
+};
 use crate::native_commands::types::LoadOutcome;
 
 /// How long one result is retried while the watcher waits.
 const REPORT_RETRY_WINDOW: Duration = Duration::from_secs(30);
 
 /// The outcome a compile gives the republish that asked for it.
-pub(crate) fn republish_outcome(load: &LoadOutcome, generation: i64) -> LocationWorkOutcome {
+fn republish_outcome(load: &LoadOutcome, generation: i64) -> LocationWorkOutcome {
     match load {
         Ok((_, _, snapshot_id)) => LocationWorkOutcome::Published {
             snapshot_id: *snapshot_id,
@@ -31,8 +37,62 @@ pub(crate) fn republish_outcome(load: &LoadOutcome, generation: i64) -> Location
     }
 }
 
+/// The turn that hands a claimed republish to the watch loop, which publishes it; `None` for other work.
+pub(crate) fn republish_turn(
+    claim: &LocationWorkClaim,
+    deadline: Instant,
+) -> Option<LocationWorkTurn> {
+    let LocationWork::Republish { requested_by } = &claim.request.work else {
+        return None;
+    };
+    drop(write_output(&[(
+        Stream::Stderr,
+        &format!(
+            "Republishing at the request of {requested_by}: {}\n",
+            claim.request.reason
+        ),
+    )]));
+    Some(LocationWorkTurn {
+        files: Vec::new(),
+        sync: false,
+        claimed: true,
+        republish: Some(PendingRepublish {
+            request_id: claim.request.request_id,
+            claim_id: claim.claim_id,
+            deadline,
+        }),
+    })
+}
+
+/// Start the compile a claimed republish waits for, and keep the claim until it has finished.
+pub(crate) fn start_republish(
+    republisher: &watch::Sender<DevControlState>,
+    location: &mut LocationWatch,
+    owed: &mut Option<PendingRepublish>,
+) {
+    if let Some(claimed) = location.republish.take() {
+        request_republish(republisher, true);
+        location.retry_at = Some(Instant::now());
+        *owed = Some(claimed);
+    }
+}
+
+/// Report what a compile published to the republish that waits for it; `Some` when shutdown came first.
+pub(crate) async fn settle_republish(
+    session: (&LocationWorkClient, Uuid),
+    owed: Option<PendingRepublish>,
+    (load, generation): (&LoadOutcome, i64),
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Option<Result<(), ControlError>> {
+    let pending: PendingRepublish = owed?;
+    tokio::select! {
+        result = stopped => Some(result),
+        () = report_republish(session, pending, republish_outcome(load, generation)) => None,
+    }
+}
+
 /// Send the result, retrying a lost send briefly so an unreachable server cannot stall the watcher.
-pub(crate) async fn report_republish(
+async fn report_republish(
     (client, session_id): (&LocationWorkClient, Uuid),
     pending: PendingRepublish,
     outcome: LocationWorkOutcome,

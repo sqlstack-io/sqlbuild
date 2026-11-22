@@ -3,8 +3,12 @@
 use chrono::{DateTime, Utc};
 
 use crate::platform::models::{
-    LocationWork, LocationWorkOutcome, LocationWorkRecord, RepublishState, RepublishStatus,
+    LocationWork, LocationWorkOutcome, LocationWorkRecord, LocationWorkRequest, RepublishState,
+    RepublishStatus,
 };
+use crate::store::errors::ControlError;
+use crate::store::main::query::query;
+use crate::store::models::{ControlTransaction, Parameter};
 
 /// `record` as a republish's status at `now`; `None` when it is other work.
 pub(crate) fn republish_status(
@@ -50,4 +54,31 @@ pub(crate) fn republish_status(
         None => {}
     }
     Some(status)
+}
+
+/// Whether a republish's snapshot is one this location published for the work's target; true for other outcomes.
+pub(crate) async fn published_here(
+    transaction: ControlTransaction,
+    request: &LocationWorkRequest,
+    outcome: &LocationWorkOutcome,
+) -> Result<(ControlTransaction, bool), ControlError> {
+    let LocationWorkOutcome::Published {
+        snapshot_id,
+        generation,
+    } = outcome
+    else {
+        return Ok((transaction, true));
+    };
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT snapshot_id FROM sqb_snapshots WHERE snapshot_id=$1 AND location_id=$2 AND target=$3 AND generation=$4",
+        vec![
+            Parameter::Id(*snapshot_id),
+            Parameter::Id(request.location_id),
+            Parameter::Text(request.target.clone()),
+            Parameter::Integer(*generation),
+        ],
+    )
+    .await?;
+    Ok((transaction, !rows.is_empty()))
 }
