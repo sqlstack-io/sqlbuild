@@ -10,6 +10,7 @@ from typing import Any
 
 from sqlbuild._native import CostContext, output_node_scope
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
+from sqlbuild.adapter.contract.models import LifeCycleEvent
 from sqlbuild.compiler.python_nodes.types import (
     PythonNodeFanInAction,
     PythonNodeKind,
@@ -127,7 +128,7 @@ def _execute_ready_node(
             resource_name=node.name,
             run_id=runtime.run_id,
         ) as lifecycle:
-            result, skip_code = _execute_ready_node_in_cost_scope(
+            outcome, skip_code = _execute_ready_node_in_cost_scope(
                 node=node,
                 node_kind=node_kind,
                 upstream_results=upstream_results,
@@ -139,6 +140,9 @@ def _execute_ready_node(
                 sleep=sleep,
                 monotonic=monotonic,
             )
+            result: PythonNodeExecutionResult = replace(
+                outcome, lifecycle_events=_logged_events(statement_recorder)
+            )
             if on_result is not None:
                 on_result(node=node, result=result)
             if result.status == PythonNodeStatus.SKIPPED:
@@ -149,6 +153,12 @@ def _execute_ready_node(
             elif result.status == PythonNodeStatus.FAILED:
                 lifecycle.failed()
             return result
+
+
+def _logged_events(recorder: StatementRecorder) -> tuple[LifeCycleEvent, ...]:
+    """The node's `ctx.log` lines, the only events its result carries."""
+
+    return tuple(event for event in recorder.snapshot() if event.level is not None)
 
 
 def _execute_ready_node_in_cost_scope(

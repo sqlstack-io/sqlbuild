@@ -2109,3 +2109,33 @@ def plan_before_sync(
         request_id: str = request_plan(control, [], settings)
         result: dict[str, Any] = wait_for_location_work(api, request_id, location, log)
     return result["result_json"]["outcome"], log.read_text()
+
+
+# A loader after the items tagged `fulfilment`, which a `+raw_steps` reload runs as ingress.
+INGRESS_JOB_SETTINGS: str = "\n[settings]\nreload = true\n"
+INGRESS_LOADER_FILES: dict[str, str] = {
+    "python/ready.py": (
+        "from sqlbuild.assets import asset\n"
+        "from sqlbuild.refs import tag\n\n\n"
+        '@asset(depends_on=tag("fulfilment"))\n'
+        "def ready(ctx):\n"
+        '    """Wait for every step."""\n'
+    ),
+    "python/loads.py": (
+        "from sqlbuild.loaders import loader\n"
+        "from python.ready import ready\n\n\n"
+        "@loader(depends_on=[ready], write_strategy='table', "
+        "columns=[{'name': 'step', 'type': 'INTEGER'}])\n"
+        "def fetch_steps(ctx):\n"
+        '    """Fetch the steps."""\n'
+        '    return [{"step": 1}]\n\n\n'
+        "@loader(depends_on=[fetch_steps])\n"
+        "def raw_steps(ctx):\n"
+        '    """Load the steps."""\n'
+        '    return [{"step": 1}]\n'
+    ),
+    "sources/raw.yml": (
+        "sources:\n  - name: raw_steps\n    description: Steps.\n"
+        "    managed: true\n    write_strategy: table\n"
+    ),
+}

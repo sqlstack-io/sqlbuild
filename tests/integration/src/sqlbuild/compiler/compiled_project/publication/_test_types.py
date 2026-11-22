@@ -699,3 +699,15 @@ class ParallelItemsTestCase:
     job_select: str
     expected_status: str
     expected_statuses: dict[str, str]
+
+
+@dataclass(frozen=True)
+class ItemLogsTestCase:
+    description: str
+    depends_on: str
+    job_select: str
+    job_settings: str
+    max_parallel: int
+    outcomes: dict[str, str]
+    files: dict[str, str]
+    expected_statuses: dict[str, str]

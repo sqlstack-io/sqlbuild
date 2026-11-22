@@ -12,6 +12,7 @@ from sqlbuild._native import TargetSettings
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.node_logger import NodeLogger
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
+from sqlbuild.adapter.contract.models import LifeCycleEvent
 from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
     resolve_qualified_name_parts,
 )
@@ -110,6 +111,7 @@ class PythonNodeExecutionResult:
     skip_reason: str | None = None
     error_message: str | None = None
     warning_messages: tuple[str, ...] = field(default_factory=tuple)
+    lifecycle_events: tuple[LifeCycleEvent, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
