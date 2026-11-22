@@ -1,5 +1,6 @@
 //! Frozen run requests and the run, node and claim records the control store keeps.
 
+use crate::discovered_sets::types::DiscoveredSets;
 use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Utc};
@@ -182,6 +183,9 @@ pub struct RunRequest {
     /// Which attempt of its member job a group child is, from the second on; the first leaves it unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub member_attempt: Option<u8>,
+    /// The first run of this run's rerun chain, read as `ctx.root_run_id`; unset for the first run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chain_run_id: Option<Uuid>,
 }
 
 /// Which retry of the job's `[retry]` policy a run is, and when it may start.
@@ -607,6 +611,9 @@ pub struct RunExecution {
     /// Derived from completed sibling facts and pinned lineage, never a mutable request rewrite.
     #[serde(default)]
     pub skipped_nodes: BTreeMap<String, String>,
+    /// The discovered sets the run's snapshot saved, which the worker compiles from.
+    #[schema(value_type = Object)]
+    pub discovered: DiscoveredSets,
 }
 
 #[derive(Debug, Deserialize)]

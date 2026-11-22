@@ -10610,11 +10610,13 @@ class DiscoveredPythonAssetMetadata(NativeRecord):
     columns: tuple[SourceColumnEntry, ...]
     column_lineage: dict[str, tuple[ColumnLineageRef, ...]] | None
     retry: RetryPolicy | None
+    discovered: dict[str, object] | None
     def __init__(
         self,
         columns: tuple[SourceColumnEntry, ...] = ...,
         column_lineage: dict[str, tuple[ColumnLineageRef, ...]] | None = ...,
         retry: RetryPolicy | None = ...,
+        discovered: dict[str, object] | None = ...,
     ) -> None: ...
 
 class DiscoveredPythonCheckMetadata(NativeRecord):
@@ -14998,6 +15000,8 @@ class DiscoveredAssetFunction(NativeRecord):
     retry: RetryPolicy | None
     provider_usages: tuple[DiscoveredProviderUsage, ...]
     identity: PythonNodeIdentity | None
+    for_each: str | None
+    discovered: dict[str, object] | None
     def __init__(
         self,
         file_path: Path,
@@ -15014,6 +15018,27 @@ class DiscoveredAssetFunction(NativeRecord):
         retry: RetryPolicy | None = ...,
         provider_usages: tuple[DiscoveredProviderUsage, ...] = ...,
         identity: PythonNodeIdentity | None = ...,
+        for_each: str | None = ...,
+        discovered: dict[str, object] | None = ...,
+    ) -> None: ...
+
+class DiscoveredDiscoverFunction(NativeRecord):
+    """A discovered project function that discovers a set of items at publish."""
+
+    file_path: Path
+    relative_path: Path
+    name: str
+    function: Callable[..., object]
+    check_every_seconds: int | None
+    provider_usages: tuple[DiscoveredProviderUsage, ...]
+    def __init__(
+        self,
+        file_path: Path,
+        relative_path: Path,
+        name: str,
+        function: Callable[..., object],
+        check_every_seconds: int | None = ...,
+        provider_usages: tuple[DiscoveredProviderUsage, ...] = ...,
     ) -> None: ...
 
 class DiscoveredCheckFunction(NativeRecord):
@@ -15195,12 +15220,16 @@ class DiscoveredPythonNodeFunctions(NativeRecord):
     assets: tuple[DiscoveredAssetFunction, ...]
     checks: tuple[DiscoveredCheckFunction, ...]
     audit_factories: tuple[DiscoveredAuditFactory, ...]
+    discover_functions: tuple[DiscoveredDiscoverFunction, ...]
+    for_each_assets: tuple[DiscoveredAssetFunction, ...]
     def __init__(
         self,
         loaders: tuple[DiscoveredLoaderFunction, ...] = ...,
         assets: tuple[DiscoveredAssetFunction, ...] = ...,
         checks: tuple[DiscoveredCheckFunction, ...] = ...,
         audit_factories: tuple[DiscoveredAuditFactory, ...] = ...,
+        discover_functions: tuple[DiscoveredDiscoverFunction, ...] = ...,
+        for_each_assets: tuple[DiscoveredAssetFunction, ...] = ...,
     ) -> None: ...
 
 class DiscoveredProjectInputs(NativeRecord):
@@ -15227,6 +15256,8 @@ class DiscoveredProjectInputs(NativeRecord):
     loader_functions: tuple[DiscoveredLoaderFunction, ...]
     asset_functions: tuple[DiscoveredAssetFunction, ...]
     check_functions: tuple[DiscoveredCheckFunction, ...]
+    discover_functions: tuple[DiscoveredDiscoverFunction, ...]
+    for_each_assets: tuple[DiscoveredAssetFunction, ...]
     audit_factories: tuple[DiscoveredAuditFactory, ...]
     hook_functions: tuple[DiscoveredHookFunction, ...]
     event_exporters: tuple[DiscoveredEventExporter, ...]
@@ -15257,6 +15288,8 @@ class DiscoveredProjectInputs(NativeRecord):
         loader_functions: tuple[DiscoveredLoaderFunction, ...] = ...,
         asset_functions: tuple[DiscoveredAssetFunction, ...] = ...,
         check_functions: tuple[DiscoveredCheckFunction, ...] = ...,
+        discover_functions: tuple[DiscoveredDiscoverFunction, ...] = ...,
+        for_each_assets: tuple[DiscoveredAssetFunction, ...] = ...,
         audit_factories: tuple[DiscoveredAuditFactory, ...] = ...,
         hook_functions: tuple[DiscoveredHookFunction, ...] = ...,
         event_exporters: tuple[DiscoveredEventExporter, ...] = ...,

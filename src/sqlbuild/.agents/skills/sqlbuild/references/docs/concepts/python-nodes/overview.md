@@ -152,7 +152,7 @@ Each node receives a context object as its first argument (`AssetContext`, `Chec
 
 | Helper | Description |
 |--------|-------------|
-| `ctx.run_id` | Unique identifier for this run |
+| `ctx.run_id` | Unique identifier for this run; in a worker, the worker's own ID rather than the server's run ID |
 | `ctx.target` | Active target name |
 | `ctx.target_config` | The active target's database and schemas, as SQLBuild resolves them (see [Target settings](#target-settings)) |
 | `ctx.vars` | Project variables |
@@ -166,7 +166,7 @@ Each node receives a context object as its first argument (`AssetContext`, `Chec
 | `ctx.results_of(node_fn, limit=N)` | Read the last N successful results of an upstream node, newest first |
 | `ctx.providers` | Access discovered [providers](providers.md) by name |
 
-Asset contexts add `ctx.result(...)` and `ctx.skip(...)`. Check contexts add `ctx.pass_(...)`, `ctx.fail(...)`, and `ctx.warn(...)`.
+Asset contexts add `ctx.result(...)`, `ctx.skip(...)`, `ctx.root_run_id` and `ctx.discovered` (see [Discovered nodes](discovered-nodes.md#in-a-node)). Check contexts add `ctx.pass_(...)`, `ctx.fail(...)`, and `ctx.warn(...)`.
 
 Providers can also be injected directly as function parameters by name. See [Providers](providers.md) for details.
 

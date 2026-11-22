@@ -125,6 +125,12 @@ pub(super) struct KeyTestCase {
 }
 
 /// An opened session at one size: what it keeps in the scrollback.
+pub(super) struct DiscoveredRowTestCase {
+    pub(super) description: &'static str,
+    pub(super) summary: &'static str,
+    pub(super) expected_lines: Vec<&'static str>,
+}
+
 pub(super) struct ExposureTestCase {
     pub(super) description: &'static str,
     pub(super) size: Option<(usize, usize)>,

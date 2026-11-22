@@ -28,6 +28,7 @@ use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::{
     SecretCheck, planned_project, selectors,
 };
+use crate::bindings::_helpers::compile_driver::plan_result::PlanUse;
 use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::plan_command::changed::changed_json;
@@ -375,6 +376,7 @@ fn compile_pipeline<'py>(
                 PlanProject::Compiled => None,
             },
             preview.as_ref(),
+            PlanUse::Show,
         ),
         SecretCheck::Report,
     )

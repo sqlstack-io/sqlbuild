@@ -12,6 +12,7 @@ from sqlbuild._native import TargetSettings
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.node_logger import NodeLogger
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
+from sqlbuild.adapter.contract.models import LifeCycleEvent
 from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
     resolve_qualified_name_parts,
 )
@@ -28,7 +29,11 @@ from sqlbuild.executor.python_nodes.classes.runtime_relation_guard import Runtim
 from sqlbuild.executor.python_nodes.constants import (
     PYTHON_NODE_RELATION_QUALIFIER_SEPARATOR,
 )
-from sqlbuild.executor.python_nodes.types import PythonIdentityRecorder
+from sqlbuild.executor.python_nodes.types import (
+    ExecutablePythonNode,
+    OwnedResultCallback,
+    PythonIdentityRecorder,
+)
 from sqlbuild.executor.scheduling.classes.session_warehouses import (
     SessionWarehouses,
     configured_warehouse,
@@ -107,6 +112,7 @@ class PythonNodeExecutionResult:
     error_message: str | None = None
     warning_messages: tuple[str, ...] = field(default_factory=tuple)
     error_detail: str | None = None
+    lifecycle_events: tuple[LifeCycleEvent, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -155,6 +161,8 @@ class PythonNodeRuntime:
     persist_node_results: bool = True
     node_warehouses: Mapping[str, str] = field(default_factory=dict)
     session_warehouses: SessionWarehouses | None = None
+    chain_run_id: str | None = None
+    on_start: Callable[[str], None] | None = None
 
     def __post_init__(self) -> None:
         if self.node_warehouses and self.session_warehouses is None:
@@ -180,7 +188,9 @@ class IngressCallbacks:
 
     use_color: bool = False
     on_node_start: NodeStartCallback | None = None
+    on_asset_start: Callable[[str], None] | None = None
     on_node_complete: Callable[[object], None] | None = None
+    on_node_cancelled: Callable[[str], None] | None = None
     identity_recorder: PythonIdentityRecorder | None = None
 
 
@@ -278,9 +288,27 @@ class BasePythonNodeContext(DependencyResultReader):
         )
 
 
+@dataclass(frozen=True)
+class DiscoveredContext:
+    """The discovered item an asset node runs for, and the tags its set was saved with."""
+
+    set: str
+    item: str
+    tags: Mapping[str, object]
+
+
 @dataclass(frozen=True, kw_only=True)
 class AssetContext(BasePythonNodeContext):
     """Runtime context passed to a SQLBuild asset function."""
+
+    discovered: DiscoveredContext | None = None
+    chain_run_id: str | None = None
+
+    @property
+    def root_run_id(self) -> str:
+        """The server run ID of the rerun chain's first run, or the local run's outside a worker."""
+
+        return self.chain_run_id or self.run_id
 
     def result(
         self,
@@ -354,3 +382,31 @@ class PythonCheckCallbacks:
     identity_recorder: PythonIdentityRecorder | None = None
     on_check_complete: Callable[[PythonCheckExecutionResult], None] | None = None
     on_check_start: Callable[[str], None] | None = None
+
+
+@dataclass(frozen=True)
+class ItemSlot:
+    """The warehouse connection and result store of one slot of a discovered item pool."""
+
+    connection: Any
+    result_store: Any | None
+
+
+@dataclass(frozen=True)
+class RunningItem:
+    """A discovered item on a thread, with its set and the slot it holds."""
+
+    node: ExecutablePythonNode
+    set_name: str
+    slot: ItemSlot
+
+
+@dataclass(frozen=True)
+class DiscoveredItemCallbacks:
+    """What a serial path gives its item pool; each is called only on the calling thread."""
+
+    ready: Callable[[], tuple[ExecutablePythonNode, ...]]
+    upstream_results: Callable[[str], tuple[PythonNodeExecutionResult, ...]]
+    complete: OwnedResultCallback
+    started: Callable[[str], None] | None = None
+    cancelled: Callable[[str], None] | None = None

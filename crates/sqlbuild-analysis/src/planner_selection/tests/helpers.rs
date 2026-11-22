@@ -17,7 +17,7 @@ pub(super) fn name_set(values: &[&str]) -> BTreeSet<String> {
 pub(super) fn selector_names() -> UnitTestSelectorNames {
     UnitTestSelectorNames {
         tests: name_set(&["test_customers", "test_orders"]),
-        resources: name_set(&["customers", "orders"]),
+        resources: name_set(&["customers", "orders", "step[a]", "step[b]"]),
     }
 }
 

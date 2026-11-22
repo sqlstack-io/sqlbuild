@@ -215,6 +215,24 @@ pub(crate) fn child_event(
             providers,
             env_file,
         } => secrets_reported(screen, providers, env_file),
+        DevEvent::Discovered { summary } => {
+            let changed: bool = screen.discovered.as_ref() != Some(&summary);
+            let lines: Vec<String> = if screen.ready && changed {
+                event_lines(
+                    &screen,
+                    event_line(
+                        clock,
+                        EventMark::Succeeded,
+                        "discovered".to_owned(),
+                        summary.clone(),
+                    ),
+                )
+            } else {
+                Vec::new()
+            };
+            screen.discovered = Some(summary);
+            (screen, lines)
+        }
         DevEvent::Warning { title, detail } => {
             let lines: Vec<String> = render_problem(
                 &Problem {

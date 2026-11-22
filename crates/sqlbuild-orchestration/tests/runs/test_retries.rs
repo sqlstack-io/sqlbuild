@@ -128,6 +128,12 @@ fn given_a_job_with_on_failure_when_its_runs_fail_then_retries_rerun_failed_work
                 test_case.description
             );
             assert_eq!(
+                [&retry_one, &retry_two].map(|claim| claim.request.chain_run_id),
+                [Some(source.run_id), Some(source.run_id)],
+                "{}: every retry keeps the first run of the chain as its root",
+                test_case.description
+            );
+            assert_eq!(
                 [&retry_one, &retry_two]
                     .map(|claim| claim.request.retry.as_ref().map(|retry| retry.attempt))
                     .to_vec(),

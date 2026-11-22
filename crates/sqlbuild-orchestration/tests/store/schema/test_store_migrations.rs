@@ -60,10 +60,13 @@ const SQLITE_CHECKSUMS: &[(i64, &str)] = &[
         7,
         "1e804eaedea2c8da1844dfc3fb1cb6286d55fbe1ec39678333e9381168ba297a",
     ),
-    // 0009_service_accounts, the seventh migration until 0008 lands, so version 8 until then.
     (
         8,
-        "7d29a67bda48c4d9bf32bab195f3034073274bd56911ef85d7d6ac6004505113",
+        "2ab0332abd48eff62727418b8a13cefa09737659e2dbd2c2c89b540f4e0aa3d8",
+    ),
+    (
+        9,
+        "95d4b1b2b3428f4f8db50140a7ca08c61b0e700c03a919ce46ed691e5dc6f842",
     ),
 ];
 const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
@@ -96,10 +99,13 @@ const POSTGRES_CHECKSUMS: &[(i64, &str)] = &[
         7,
         "34729be86bb8766ef2cd3dab50202da63dda2f6b32e91aaf1bdf9fc5b1379c62",
     ),
-    // 0009_service_accounts, the seventh migration until 0008 lands, so version 8 until then.
     (
         8,
-        "ad1fdd2fe656103d86a916a4c0e7f653b0fa079ce30a56b7387765255aca9bcc",
+        "2f7f8cda797e4567b42b7a1246807d00d99cea1bae7b4d43849cdc8e6fd04a0a",
+    ),
+    (
+        9,
+        "59d8722927b7f259793ad8359acdc5d9249f22b9b3b85a26cc82ccb6b5deaddc",
     ),
 ];
 /// A version 1 store mid-run: a child run holding a concurrency slot, a jobs document and an audit result.

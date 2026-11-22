@@ -356,3 +356,13 @@ pub(super) fn opened() -> Vec<ScreenMessage> {
     );
     messages
 }
+
+/// Start-up that publishes discovered sets summarised as `summary`, through the ready box.
+pub(super) fn discovered(summary: &str) -> Vec<ScreenMessage> {
+    let mut messages: Vec<ScreenMessage> = signing_in();
+    messages.push(ScreenMessage::Child(DevEvent::Discovered {
+        summary: summary.to_owned(),
+    }));
+    messages.extend(ready().split_off(signing_in().len()));
+    messages
+}

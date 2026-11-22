@@ -1,0 +1,152 @@
+<!-- generated-by: sqlbuild skills -->
+
+# Discovered nodes
+
+> Run a Python asset once per item an external system lists, with @discover and @asset(for_each=...).
+
+Online: https://sqlbuild.com/docs/concepts/python-nodes/discovered-nodes/
+
+## Contents
+
+- Declaring a discovered set
+- Dependencies
+- In a node
+- Selecting discovered nodes
+- Running items in parallel
+- When discovery runs
+- When discovery fails
+- Outside a location
+- Details
+
+A discover function asks an external system which items exist, and an asset with `for_each` runs once per item. The location calls the function when it publishes and saves its result in the snapshot, so every run executes exactly the nodes it published.
+
+```python
+# python/fulfilment/nodes.py
+from sqlbuild.assets import AssetContext, asset
+from sqlbuild.discovery import Discovered, Item, discover
+from sqlbuild.refs import model
+
+@discover(check_every="15m")
+def fulfilment_plan(warehouse_api) -> Discovered:
+    """Steps of today's fulfilment plan."""
+    plan = warehouse_api.todays_plan()
+    return Discovered(
+        items=[
+            Item(id=step["id"], depends_on=step["after"], args={"region": step["region"]})
+            for step in plan["steps"]
+        ],
+        tags={"plan_version": plan["version"]},
+        max_parallel=4,
+    )
+
+@asset(for_each=fulfilment_plan, depends_on=model("orders"))
+def fulfil(ctx: AssetContext, region: str) -> None:
+    """Run one step of the plan."""
+    ctx.log.info(f"step {ctx.discovered.item} for {region}, plan {ctx.discovered.tags['plan_version']}")
+```
+
+With steps `pick`, `pack` and `ship`, where each waits on the one before, the graph is
+`orders → fulfil[pick] → fulfil[pack] → fulfil[ship]`.
+
+## Declaring a discovered set
+
+- **`@discover`** marks a project function under `python/` that returns `Discovered`. Providers are injected by parameter name, as for any Python node. Pass `name=` to name the set something other than the function, and `check_every=` to have the location check it for changes (see [When discovery runs](#when-discovery-runs)).
+- **`Discovered`** is the only return form: `items`, plus optional set-wide `tags` and `max_parallel`.
+- **`Item`** has an `id`, a `depends_on` and `args`.
+  - `id` is unique in the set, at most 200 characters, and uses only letters, digits and `_ . : -`.
+  - `depends_on` lists the IDs of other items of the set. It may also name project nodes with `model()`, `source()`, `seed()`, `job()` or `tag()`.
+  - `args` fill the asset function's own parameters, other than its context and providers.
+- **`@asset(for_each=...)`** names the discover function. It is an ordinary Python asset: it takes every other `@asset` parameter, and one discover function may feed several assets. Each item becomes one node per asset, named `<asset>[<item id>]`.
+
+A set fails as a whole, and keeps its last good items, when:
+
+- the function raises or returns something other than `Discovered`;
+- it returns no items, as an empty answer from a remote system is far more often a fault than a plan with no steps;
+- an ID is invalid or repeated, an item depends on an ID outside the set, or items depend on each other in a cycle;
+- an item's `args` name a parameter the asset doesn't have, or leave a parameter without a default unset;
+- `args` or `tags` aren't JSON data.
+
+## Dependencies
+
+- The asset's own `depends_on` attaches to the set's **roots**, the items that wait on no other item of the set. Every other item waits on a root, so ordering is exact.
+- Other nodes depend on the set with `job()` or `tag()`, which resolve to its last nodes. Nothing needs to name an item.
+
+## In a node
+
+| Attribute | Description |
+|-----------|-------------|
+| `ctx.discovered.item` | The item ID this node runs for |
+| `ctx.discovered.set` | The discover function's name |
+| `ctx.discovered.tags` | The set's tags, as saved at publish |
+| `ctx.root_run_id` | The server's run ID of the first run in the rerun chain. Reruns and automatic retries keep it, so an external pipeline can keep one identity across them. Don't compare it with `ctx.run_id`, which is the worker's own ID and differs on every run. Outside a worker it is the local run's ID |
+
+`ctx.discovered` is `None` for an asset without `for_each`.
+
+## Selecting discovered nodes
+
+| Selector | Selects |
+|----------|---------|
+| `fulfil[pack]` | The one node of item `pack` |
+| `+fulfil[ship]` | Item `ship` and every item and node before it |
+| `fulfil` or `asset:fulfil` | Every node of the asset, whatever the items are |
+
+Jobs select the asset by name, so job files don't change when the items do.
+
+## Running items in parallel
+
+`max_parallel` caps how many of the set's nodes run at once within one run. Assets fed by the same
+discover function share the cap. Without it, or with `1`, the items run one at a time. It is
+independent of `concurrency`, and every other asset still runs one at a time.
+
+- **Providers used by these steps must be thread-safe.** The steps run on threads of one process and share the provider instances.
+- **A step can't install signal handlers,** as Python allows that only on the main thread.
+- **Each running step has its own warehouse connection.** An in-memory DuckDB, MotherDuck or SQLite database belongs to one connection, so on those targets items run one at a time, whatever `max_parallel` is. Use a database file to run them in parallel.
+- **Local output can interleave.** A worker still files each line under the node that printed it.
+- **SQL pauses while items run.** New SQL, and steps waiting on SQL, start again once the running items have finished.
+- **A cancel starts no more steps.** It cancels running statements and keeps finished steps succeeded. SQLBuild can't stop other Python code, so it waits 5 seconds for those steps, then records them cancelled and exits. It doesn't tear down providers that such a step may still be using: their `teardown` doesn't run. Work a step started on a remote system may outlive the cancel.
+
+## When discovery runs
+
+Only a location, including `sqb dev`, calls discover functions. Every other compile uses the result saved in the snapshot, like a lockfile:
+
+| Trigger | What happens |
+|---------|--------------|
+| The location starts (every deploy or restart) | Every discover function runs |
+| `r` in `sqb dev` | Every discover function runs, and the location publishes |
+| A saved project file | The location publishes and reuses the saved sets; a discover function runs again only when its own module changed |
+| `check_every` | The location calls that function without publishing. When the result differs from the saved set, it publishes with the new result |
+
+- `check_every` takes amounts in `d`, `h`, `m` and `s`, largest unit first, such as `15m` or `1h30m`, and at least a minute. Without it, the set is checked only when the location publishes.
+- A check doesn't hold up the location. Once a publish, republish or other request waits for it, the check has 10 seconds to finish. After that the location restarts its interpreter and serves the request, and the set is checked again when it is next due.
+- Runs always execute the nodes of the snapshot they started on. Workers, reruns and the plan page never call discover functions.
+- `sqb dev`'s ready card shows the sets, for example `Discovered  fulfilment_plan 3 items`.
+
+## When discovery fails
+
+- **A set fails on its own.** It keeps its last good items, the location's health shows **Discovery failed** with the set and its error, and everything else publishes normally. A location that restarts reads the last good items from the server's current snapshot.
+- **A set that never succeeded** compiles as its **placeholder node**, `<asset>[*]`. Its `job()` and `tag()` dependants stay valid. A run that reaches it fails that node with `never discovered: <error>`, and its downstream nodes are skipped.
+
+## Outside a location
+
+`sqb compile`, `sqb plan` and `sqb build` never call discover functions by default. Each `for_each` asset compiles as its placeholder, `fulfil[*]`, so lineage and `job()`/`tag()` dependencies stay valid.
+
+Selecting a placeholder to run fails:
+
+```text
+error[S000]: fulfil is discovered at publish; run it from a location or `sqb dev`, or pass --discover
+```
+
+Pass `--discover` to run the discover functions for that one command, with the selected target's providers:
+
+```bash
+sqb build --discover --select +fulfil[ship]
+```
+
+Nothing is written to disk. If a discover function fails under `--discover`, the command stops with its error.
+
+## Details
+
+- Discovered nodes are Python assets only; discovery returns data, never code.
+- To create several sets from one source, use a [factory](factories.md) that returns one discover function and one asset per set.
+- A node's identity includes its item's `args` and the set's `tags`, so a changed argument shows in the plan like a code change.
+- Workers compile the saved sets of the run's snapshot, so a run is unaffected by changes in the external system after it was published.

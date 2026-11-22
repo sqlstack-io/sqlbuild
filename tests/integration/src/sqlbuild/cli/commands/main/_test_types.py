@@ -1613,3 +1613,11 @@ class CursorBoundaryTestCase:
     description: str
     start: str
     expected_sql: str
+
+
+@dataclass(frozen=True)
+class IgnoredCancelTestCase:
+    description: str
+    sent_signal: signal.Signals
+    expected_exit_code: int
+    expected_within_seconds: float

@@ -80,6 +80,8 @@ pub enum DevEvent {
         /// The env file the location loads, relative to the project; `None` when it loads none.
         env_file: Option<String>,
     },
+    /// The discovered sets a publication used, summarised for the ready card.
+    Discovered { summary: String },
 }
 
 /// What `sqb dev` asks its location child to do, one JSON line each on the child's stdin.

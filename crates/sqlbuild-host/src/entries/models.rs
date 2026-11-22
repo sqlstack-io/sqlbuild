@@ -185,6 +185,9 @@ pub enum UserCodeHost {
     RunCommandOutputSinks,
     GetLifecycleEventSinkDefinition,
     InvokeRecallSink,
+    ReadDiscoverDefinition,
+    DiscoveredResultJson,
+    ItemDependencyRefs,
 }
 
 impl UserCodeHost {

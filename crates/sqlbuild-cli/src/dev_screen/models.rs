@@ -160,6 +160,8 @@ pub(crate) struct DevScreen {
     pub(crate) serving: Option<String>,
     /// The last compile's summary, such as `412 python nodes, 2280 models`.
     pub(crate) compile_detail: String,
+    /// The last publication's discovered sets, such as `orders_plan 27 items`.
+    pub(crate) discovered: Option<String>,
     /// The project directory, which error positions link into.
     pub(crate) project_root: String,
     pub(crate) prompt: Option<Prompt>,

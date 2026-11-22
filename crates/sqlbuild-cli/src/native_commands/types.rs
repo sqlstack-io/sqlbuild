@@ -51,3 +51,9 @@ pub(crate) type PlanSettings<'a> = (
     &'a std::collections::BTreeMap<String, serde_json::Value>,
     &'a std::collections::BTreeSet<String>,
 );
+
+/// The republish trigger and the location's credential and session, for discovery's checks and health.
+pub(crate) type DiscoveryControls<'a> = (
+    &'a tokio::sync::watch::Sender<crate::native_commands::models::DevControlState>,
+    (&'a str, uuid::Uuid),
+);

@@ -21,6 +21,7 @@ export const healthTone: Record<LocationHealth, string> = {
 	healthy: 'var(--sb-success)',
 	degraded: 'var(--sb-warning)',
 	missing_secrets: 'var(--sb-error)',
+	discovery_failed: 'var(--sb-warning)',
 	falling_back: 'var(--sb-warning)',
 	broken: 'var(--sb-error)'
 };
@@ -29,6 +30,7 @@ export const healthLabel: Record<LocationHealth, string> = {
 	healthy: 'Healthy',
 	degraded: 'Needs attention',
 	missing_secrets: 'Missing provider secrets',
+	discovery_failed: 'Discovery failed',
 	falling_back: 'Running previous version',
 	broken: 'Broken'
 };
@@ -38,6 +40,7 @@ export const healthHelp: Record<LocationHealth, string> = {
 	healthy: 'Loaded and starting scheduled runs',
 	degraded: 'Running, with open problems',
 	missing_secrets: 'A provider setting is missing from the location environment',
+	discovery_failed: 'A discover function failed at the last publish; its nodes keep their last good items',
 	falling_back: 'The last deploy failed to load; the previous version keeps running',
 	broken: 'Not starting scheduled runs'
 };

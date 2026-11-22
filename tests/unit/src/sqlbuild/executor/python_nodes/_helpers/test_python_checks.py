@@ -51,7 +51,6 @@ from tests.unit.src.sqlbuild.executor.python_nodes._helpers.helpers import (
     PythonNodeContextTestAdapter,
     PythonNodeContextTestResultStore,
     build_python_check_graph,
-    check_upstream_task,
     context_provider_check,
     provider_check,
     python_check_function_for_case,
@@ -324,7 +323,7 @@ def test_given_python_check_when_executing_then_returns_expected_result(
         skip_mode=test_case.upstream_skip_mode,
         skip_reason=test_case.upstream_skip_reason,
     )
-    run_state.record_result(node_function=check_upstream_task, result=upstream_result)
+    run_state.record_result(result=upstream_result)
     result_store: PythonNodeContextTestResultStore = PythonNodeContextTestResultStore(
         {
             (PythonNodeKind.ASSET.value, "upstream_task"): (

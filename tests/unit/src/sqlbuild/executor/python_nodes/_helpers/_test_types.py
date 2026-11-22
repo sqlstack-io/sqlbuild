@@ -283,3 +283,12 @@ class TracebackRedactionTestCase:
     message: str
     expected_kept: str
     expected_absent: str
+
+
+@dataclass(frozen=True)
+class DiscoveredItemNodeTestCase:
+    description: str
+    discovered: dict[str, object] | None
+    expected_args: dict[str, object] | None
+    expected_item: str | None
+    expected_failure: str | None

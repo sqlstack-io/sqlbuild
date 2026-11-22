@@ -4,6 +4,7 @@
 
 import { bigAvailable, bigDownloadUrl, bigIndex, bigPage, bigSearch } from './big-output';
 import { parseCommand } from '$lib/run/command';
+import { isUnfinishedNode } from '$lib/status';
 import { flagSpec, VERBS } from '$lib/run/command-table';
 import { ApiError } from '../client';
 import type { LocalChangeBus } from '../signals';
@@ -151,6 +152,9 @@ export type OperateContext = {
 /** The end-to-end tests' stand-in for a plan recorded without timings: `window.__sqbPlanWithoutTimings`. */
 const withoutTimings = () => typeof window !== 'undefined' && !!(window as unknown as { __sqbPlanWithoutTimings?: boolean }).__sqbPlanWithoutTimings;
 
+/** What a rerun from failure runs, as on the server. */
+const unfinished = (n: RunNode) => isUnfinishedNode(n.status);
+
 /** A location preview's planning steps, as the plan summary reports them. */
 const MOCK_PLAN_TIMINGS: PlanTimings = {
 	total_seconds: 10.6,
@@ -221,7 +225,7 @@ export class MockOperate {
 				lostContactLimitSeconds: PRESUMED_FAILED_MS / 1000,
 				cancelRequestedAt: cancel && !cancel.terminatedAt ? cancel.requestedAt : null,
 				selection: view.kind === 'adhoc' ? rec.script.select : [],
-				rerunFromFailureCount: nodes.filter((n) => n.status === 'failed' || n.status === 'skipped').length
+				rerunFromFailureCount: nodes.filter(unfinished).length
 			};
 		});
 		const next = offset + limit < matching.length ? `c${offset + limit}` : null;
@@ -339,7 +343,7 @@ export class MockOperate {
 			},
 			selection: rec.script.select,
 			waits: rec.run.status === 'queued' ? this.#queue().get(rec.run.id) ?? [] : [],
-			rerunFromFailureNodes: nodes.filter((n) => n.status === 'failed' || n.status === 'skipped').map((n) => n.nodeKey),
+			rerunFromFailureNodes: nodes.filter(unfinished).map((n) => n.nodeKey),
 			rerunOf: rec.run.rerunOfRunId ? ((r) => (r ? this.#view(r, scope) : null))(this.#byId(rec.run.rerunOfRunId)) : null,
 			reruns: this.#records
 				.filter((r) => r.run.rerunOfRunId === rec.run.id)
@@ -656,14 +660,14 @@ export class MockOperate {
 		const now = Date.now();
 		const affected = (rec: RunRecord) =>
 			this.#nodesOf(rec, now)
-				.filter((n) => (mode === 'selected' ? selectedNodes.includes(n.nodeKey) : n.status === 'failed' || n.status === 'skipped'))
+				.filter((n) => (mode === 'selected' ? selectedNodes.includes(n.nodeKey) : unfinished(n)))
 				.map((n) => n.nodeKey);
 		const user = this.#ctx.user();
 		const id = this.#newId();
 		const job = jobDef(source.run.jobKey);
 		if (job?.kind === 'group') {
 			const members = this.#children(source).filter((c) => mode === 'all' || affected(c).length);
-			if (!members.length) throw new ApiError('Nothing to rerun: no node failed or was skipped', 409);
+			if (!members.length) throw new ApiError('Nothing to rerun: no node failed, was cancelled, was skipped or went unreached', 409);
 			const parent = this.#create(scope, { id, origin: 'rerun', jobKey: job.key, rerunOf: runId, by: user, select: [], exclude: [], flags: {}, nodes: [], priority: job.priority });
 			members.forEach((c, i) => {
 				const nodes = mode === 'all' ? c.script.nodes : affected(c);
@@ -674,7 +678,7 @@ export class MockOperate {
 			return this.#ctx.reply(this.#view(parent, scope));
 		}
 		const nodes = mode === 'all' ? source.script.nodes : affected(source);
-		if (!nodes.length) throw new ApiError('Nothing to rerun: no node failed or was skipped', 409);
+		if (!nodes.length) throw new ApiError('Nothing to rerun: no node failed, was cancelled, was skipped or went unreached', 409);
 		const rec = this.#create(scope, {
 			id,
 			origin: 'rerun',

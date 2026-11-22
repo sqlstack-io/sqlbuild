@@ -85,7 +85,7 @@ export type LocationTarget = {
 	connectionSummary: string | null;
 };
 
-export type LocationHealth = 'healthy' | 'degraded' | 'missing_secrets' | 'falling_back' | 'broken';
+export type LocationHealth = 'healthy' | 'degraded' | 'missing_secrets' | 'discovery_failed' | 'falling_back' | 'broken';
 /** A project deployed against exactly one target. Staging and dev are separate locations. */
 export type Location = {
 	/** Opaque server-generated UUID; the name is a mutable label. */

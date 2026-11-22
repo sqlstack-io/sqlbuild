@@ -28,8 +28,8 @@ export function rerunChoices(detail: RunDetail, selected: readonly string[], can
 	choices.push({
 		mode: 'from_failure',
 		label: 'Rerun from failure',
-		help: failures ? `${plural(failures, 'failed or skipped node')}` : 'Nothing failed',
-		disabledReason: common ?? (failures ? null : 'Nothing failed or was skipped in this run')
+		help: failures ? `${plural(failures, 'unfinished node')}` : 'Every node finished',
+		disabledReason: common ?? (failures ? null : 'Nothing failed, was cancelled or was skipped in this run')
 	});
 	choices.push({
 		mode: 'all',

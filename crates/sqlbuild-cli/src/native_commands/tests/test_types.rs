@@ -412,3 +412,63 @@ pub(crate) struct AdminTextTestCase {
     pub(crate) expected_line: Option<&'static str>,
     pub(crate) expected_stdout: &'static str,
 }
+
+/// A publication after a first one, and the discover functions the location calls again.
+pub(super) struct RediscoverTestCase {
+    pub(super) description: &'static str,
+    /// The Python files whose stamps changed since the last publication.
+    pub(super) changed: &'static [&'static str],
+    /// Whether `r` or the republish API asked to discover everything.
+    pub(super) everything: bool,
+    /// `None` when every function is called again.
+    pub(super) expected_rediscover: Option<&'static [&'static str]>,
+}
+
+/// A `check_every` check that finds new items, and what the next publication reuses.
+pub(super) struct DiscoveryCheckTestCase {
+    pub(super) description: &'static str,
+    pub(super) checked_ids: &'static [&'static str],
+    pub(super) changed: bool,
+    pub(super) expected_early_check: bool,
+    pub(super) expected_republish: bool,
+    pub(super) expected_ids: &'static [&'static str],
+}
+
+/// A failed compile between an edit or `r` and the next attempt, which must still discover it.
+pub(super) struct FailedCompileDiscoveryTestCase {
+    pub(super) description: &'static str,
+    pub(super) edited_before_failure: &'static [&'static str],
+    pub(super) edited_after_failure: &'static [&'static str],
+    pub(super) everything: bool,
+    /// Whether the failure came after discovery ran, so the runtime reported sets without files.
+    pub(super) discovered_before_failing: bool,
+    pub(super) expected_rediscover: Option<&'static [&'static str]>,
+}
+
+/// A second publication, and whether the location reports its discovered sets.
+pub(super) struct DiscoveryReportTestCase {
+    pub(super) description: &'static str,
+    pub(super) had_sets: bool,
+    pub(super) has_sets: bool,
+    pub(super) expected_report: bool,
+}
+
+/// A `check_every` check that never answers, and when shutdown closes the compiler's requests.
+#[cfg(unix)]
+pub(super) struct CheckShutdownTestCase {
+    pub(super) description: &'static str,
+    pub(super) closes_after: std::time::Duration,
+    pub(super) expected_within: std::time::Duration,
+    pub(super) expected_compiler: bool,
+}
+
+#[cfg(unix)]
+pub(super) struct CheckGraceTestCase {
+    pub(super) description: &'static str,
+    pub(super) script: &'static str,
+    /// How many requests wait while the check runs.
+    pub(super) waiting: usize,
+    pub(super) expected_at_least: std::time::Duration,
+    pub(super) expected_within: std::time::Duration,
+    pub(super) expected_compiler: bool,
+}

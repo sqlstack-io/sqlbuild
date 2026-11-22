@@ -592,7 +592,7 @@
              "nargs": 0,
              "const": true,
              "default": false,
-             "help": "retry exactly the failed and skipped nodes, excluding successful nodes",
+             "help": "retry exactly the failed, cancelled, skipped and unreached nodes, excluding successful nodes",
              "group": 1
             },
             {
@@ -1293,7 +1293,7 @@
          {
           "dest": "rerun-run",
           "metavar": "rerun-run",
-          "help": "retry a terminal run or exactly its failed and skipped nodes"
+          "help": "retry a terminal run or exactly its unfinished nodes"
          },
          {
           "dest": "cancel-run",
@@ -1696,6 +1696,18 @@
         "const": true,
         "default": false,
         "help": "Bypass the compile analysis cache for this invocation",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--discover"
+        ],
+        "dest": "discover",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Run the project's @discover functions with the target's providers for this command instead of compiling each for_each asset as its placeholder; nothing is saved",
         "group": 1
        },
        {
@@ -2156,6 +2168,18 @@
         "group": 1
        },
        {
+        "kind": "store_true",
+        "options": [
+         "--discover"
+        ],
+        "dest": "discover",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Run the project's @discover functions with the target's providers for this command instead of compiling each for_each asset as its placeholder; nothing is saved",
+        "group": 1
+       },
+       {
         "kind": "store",
         "options": [
          "--defer-to"
@@ -2613,6 +2637,18 @@
         "const": true,
         "default": false,
         "help": "Bypass the compile analysis cache for this invocation",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--discover"
+        ],
+        "dest": "discover",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Run the project's @discover functions with the target's providers for this command instead of compiling each for_each asset as its placeholder; nothing is saved",
         "group": 1
        },
        {

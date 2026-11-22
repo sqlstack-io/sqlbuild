@@ -259,6 +259,12 @@ impl WorkerBuild {
         self.execution.claim.request.run_id
     }
 
+    /// The first server run of this run's rerun chain; the run itself unless it reruns another.
+    pub fn root_run_id(&self) -> uuid::Uuid {
+        let request = &self.execution.claim.request;
+        request.chain_run_id.unwrap_or(request.run_id)
+    }
+
     /// What the runs table records of the server run this build executes.
     pub fn server_run(&self) -> ServerRun {
         let request = &self.execution.claim.request;

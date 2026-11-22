@@ -183,6 +183,28 @@ fn given_ready_rows_when_rendering_the_box_then_parts_wrap_between_labelled_line
             ],
         },
         ReadyBoxTestCase {
+            description: "discovered sets add a row, each set after the first wrapping whole",
+            rows: vec![
+                ui_row(),
+                BoxRow {
+                    label: "Discovered".to_owned(),
+                    parts: vec![
+                        "orders_plan 27 items".to_owned(),
+                        "returns_plan \u{2717} ssh timeout (using last good, 11 items)".to_owned(),
+                    ],
+                    link: None,
+                },
+            ],
+            columns: 80,
+            expected_rows: vec![
+                "\u{256d}\u{2500} ready \u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{256e}",
+                "\u{2502} UI         http://127.0.0.1:8640                                           \u{2502}",
+                "\u{2502} Discovered orders_plan 27 items                                            \u{2502}",
+                "\u{2502}            returns_plan \u{2717} ssh timeout (using last good, 11 items)          \u{2502}",
+                "\u{2570}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{256f}",
+            ],
+        },
+        ReadyBoxTestCase {
             description: "a part wider than the box starts its own line and wraps by words",
             rows: vec![BoxRow {
                 label: "Project".to_owned(),

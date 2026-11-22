@@ -1,5 +1,11 @@
 import { shortName } from '$lib/build-area/labels';
-import type { CheckOutcome, NodeCounts, NodeOutcome, StaleReason, RunKind, RunOrigin, RunStatus, TickOutcome, TriggerState } from '$lib/api/types';
+import type { CheckOutcome, NodeCounts, NodeOutcome, StaleReason, RunKind, RunNodeStatus, RunOrigin, RunStatus, TickOutcome, TriggerState } from '$lib/api/types';
+
+/** The node states a rerun from failure runs, as the server's `UNFINISHED_NODE_STATUSES`. */
+export const UNFINISHED_NODE_STATUSES: readonly RunNodeStatus[] = ['failed', 'skipped', 'cancelled', 'not_run'];
+
+/** Whether a rerun from failure runs a node in this state. */
+export const isUnfinishedNode = (status: RunNodeStatus) => UNFINISHED_NODE_STATUSES.includes(status);
 
 export const runStatusTone: Record<RunStatus, string> = {
 	queued: 'var(--sb-text-faint)',

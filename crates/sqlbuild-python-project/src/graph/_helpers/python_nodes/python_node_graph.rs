@@ -177,7 +177,7 @@ fn kind_metadata<'py>(
             "asset",
             metadata(
                 RecordId::DiscoveredPythonAssetMetadata,
-                &["columns", "column_lineage", "retry"],
+                &["columns", "column_lineage", "retry", "discovered"],
             )?,
         ),
         _ => (

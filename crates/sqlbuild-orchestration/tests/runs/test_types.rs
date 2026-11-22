@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use uuid::Uuid;
 
 use crate::credentials::models::BuiltinRole;
-use crate::runs::models::{RerunRequest, RunOrigin, RunStatus};
+use crate::runs::models::{NodeOutcome, RerunRequest, RunOrigin, RunOutcome, RunStatus};
 
 pub(crate) use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_test_types::Backend;
@@ -443,6 +443,8 @@ pub(crate) struct GroupDependencyTestCase {
 }
 
 pub(crate) struct GroupMemberRetryTestCase {
+    /// How the member's node ended the attempt that retries.
+    pub(crate) first_outcome: crate::runs::models::NodeOutcome,
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     /// The failing member's `retry_delay_seconds`.
@@ -612,4 +614,15 @@ pub(crate) struct LaunchEventTestCase {
     pub(crate) backend: Backend,
     pub(crate) container_id: Option<&'static str>,
     pub(crate) expected_message: &'static str,
+}
+
+pub(crate) struct CancelledRerunTestCase {
+    pub(crate) description: &'static str,
+    /// The outcomes of `customers`, `inventory` and `orders`, in that order.
+    pub(crate) outcomes: [NodeOutcome; 3],
+    pub(crate) run_outcome: RunOutcome,
+    /// How many times a person asked to cancel the run.
+    pub(crate) cancel_requests: usize,
+    pub(crate) expected_retried: Vec<&'static str>,
+    pub(crate) expected_rerun: Vec<&'static str>,
 }

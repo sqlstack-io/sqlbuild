@@ -34,6 +34,20 @@ fn given_selector_groups_when_splitting_unit_tests_then_moves_or_rejects_them() 
             expected_split: Ok(split(&["orders"], &[], true)),
         },
         UnitTestSplitTestCase {
+            description: "a discovered node's bracketed name is that resource, not a pattern",
+            select: texts(&["step[b]"]),
+            exclude: Vec::new(),
+            accepts_unit_tests: true,
+            expected_split: Ok(split(&["step[b]"], &[], true)),
+        },
+        UnitTestSplitTestCase {
+            description: "a for_each asset's name is a resource",
+            select: texts(&["step"]),
+            exclude: Vec::new(),
+            accepts_unit_tests: true,
+            expected_split: Ok(split(&["step"], &[], true)),
+        },
+        UnitTestSplitTestCase {
             description: "commands without unit tests reject them",
             select: texts(&["test_orders"]),
             exclude: Vec::new(),

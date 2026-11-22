@@ -66,6 +66,7 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--exclude` | Remove resources from the selected scope |
 | `--no-sql-analysis` | Turn off SQL syntax, binding, type inference and semantic checks (`--no-sql-validation` is an alias) |
 | `--no-cache` | Compile in full, without reusing earlier compiles or the Rules cache; see [Forcing a fresh compile](#forcing-a-fresh-compile) |
+| `--discover` | Run the project's `@discover` functions with the target's providers for this command, instead of compiling each `for_each` asset as its placeholder; nothing is saved. See [Discovered nodes](../concepts/python-nodes/discovered-nodes.md) |
 | `--allow-missing-secrets` | Run without provider secrets; see [Secrets](../concepts/python-nodes/providers.md#secrets) |
 | `--defer-to` | Resolve unselected model references against another target |
 | `--json` | Print the full compile report as JSON |

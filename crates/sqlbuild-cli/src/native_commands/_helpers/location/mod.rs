@@ -1,9 +1,12 @@
 pub(crate) mod api_start;
 pub(crate) mod changed_build;
+pub(crate) mod compiler_discovery;
+pub(crate) mod compiler_restart;
 pub(crate) mod dev_cancel;
 pub(crate) mod dev_exposure;
 pub(crate) mod dev_start;
 pub(crate) mod dev_supervision;
+pub(crate) mod discovery_state;
 pub(crate) mod dynamic_resume;
 pub(crate) mod env_reload;
 pub(crate) mod execution;

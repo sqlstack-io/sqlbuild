@@ -134,7 +134,7 @@ Providers follow a lazy setup, reverse-teardown lifecycle scoped to the command 
 
 1. **Discovery** - on compile, SQLBuild discovers all `Provider` subclasses under `providers/` and validates their settings (from environment variables or field defaults). Missing [secrets](#secrets) follow the command's rules.
 2. **Lazy setup** - the first time a provider is accessed during a build, SQLBuild reads its settings and calls `setup(ctx)`. Providers that are never used are never set up.
-3. **Teardown** - after the command completes, `teardown()` is called on all providers that were set up, in reverse setup order. Teardown runs even if the build failed.
+3. **Teardown** - after the command completes, `teardown()` is called on all providers that were set up, in reverse setup order. Teardown runs even if the build failed. The exception is a cancel that leaves a step with `max_parallel` running after 5 seconds: providers are then not torn down, as that step may still use them (see [Running items in parallel](/docs/concepts/python-nodes/discovered-nodes#running-items-in-parallel)).
 
 ```python
 class WarehouseClient(Provider):

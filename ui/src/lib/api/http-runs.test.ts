@@ -94,7 +94,7 @@ describe('runs list', () => {
 		expect(rows.find((r) => r.run.id === 'r1')?.cancelRequestedAt).toBe('2026-11-06T10:05:00Z');
 		expect(rows.find((r) => r.run.id === 'r2')?.cancelRequestedAt).toBeNull();
 		expect(rows.find((r) => r.run.id === 'r4')?.rerunFromFailureCount).toBe(5);
-		expect(rows.find((r) => r.run.id === 'r7')?.rerunFromFailureCount).toBe(2);
+		expect(rows.find((r) => r.run.id === 'r7')?.rerunFromFailureCount).toBe(4);
 	});
 
 	it('counts active and queued runs under the filter, ignoring the tab', () => {
@@ -197,7 +197,7 @@ describe('runs past the newest window', () => {
 });
 
 describe('run detail', () => {
-	it('links parent, children and reruns, and reruns from failed, skipped and unreached nodes but not cancelled ones', () => {
+	it('links parent, children and reruns, and reruns from failed, cancelled, skipped and unreached nodes', () => {
 		const wires = [
 			wire('parent', { kind: 'group' }),
 			wire('run', { parent_run_id: 'parent', root_run_id: 'parent', status: 'failed' }),
@@ -214,7 +214,7 @@ describe('run detail', () => {
 		expect(detail.parent?.id).toBe('parent');
 		expect(detail.children.map((r) => r.id)).toEqual(['child-early', 'child-late']);
 		expect(detail.reruns.map((r) => r.id)).toEqual(['retry']);
-		expect(detail.rerunFromFailureNodes).toEqual(['model.n1', 'model.n2', 'model.n4', 'model.n5']);
+		expect(detail.rerunFromFailureNodes).toEqual(['model.n1', 'model.n2', 'model.n3', 'model.n4', 'model.n5']);
 		expect(nodes[4].status).toBe('not_run');
 		expect(nodes[2].skippedBecauseOf).toEqual({ nodeKey: 'model.n1', runId: 'run', jobKey: 'orders_daily' });
 	});

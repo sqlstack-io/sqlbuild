@@ -284,4 +284,19 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         kind: HostKind::Function,
         edge: HostEdge::UserCode,
     },
+    HostEntry {
+        name: "read_discover_definition",
+        kind: HostKind::Function,
+        edge: HostEdge::UserCode,
+    },
+    HostEntry {
+        name: "discovered_result_json",
+        kind: HostKind::Function,
+        edge: HostEdge::UserCode,
+    },
+    HostEntry {
+        name: "item_dependency_refs",
+        kind: HostKind::Function,
+        edge: HostEdge::UserCode,
+    },
 ];

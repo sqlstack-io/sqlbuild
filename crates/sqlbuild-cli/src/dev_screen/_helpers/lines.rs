@@ -126,6 +126,13 @@ pub(crate) fn ready_lines(mut screen: DevScreen) -> (DevScreen, Vec<String>) {
             link: None,
         });
     }
+    if let Some(discovered) = &screen.discovered {
+        rows.push(BoxRow {
+            label: "Discovered".to_owned(),
+            parts: discovered.split(" \u{b7} ").map(str::to_owned).collect(),
+            link: None,
+        });
+    }
     let lines: Vec<String> = render_ready_box(&rows, &screen.facts);
     (screen, lines)
 }

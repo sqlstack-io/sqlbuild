@@ -407,6 +407,8 @@ pub(crate) async fn compile_generation(
             LocationLoad {
                 published: None,
                 rules: None,
+                discovered: Default::default(),
+                discover_files: Default::default(),
             }
         }
     };
@@ -480,15 +482,15 @@ fn rule_failure_text(rules: &LocationRuleFailure) -> String {
     )
 }
 
-/// The child is retained by its owning task while this exchange can be cancelled.
-pub(crate) async fn exchange_location_generation(
+/// Send `request` as a JSON line and read the runtime's reply, a `what`; `sqb dev` events pass on.
+pub(crate) async fn exchange_reply<T: serde::de::DeserializeOwned>(
     compiler: &mut LocationCompiler,
-    generation: i64,
-) -> Result<LocationLoad, ControlError> {
-    compiler
-        .stdin
-        .write_all(format!("{generation}\n").as_bytes())
-        .await?;
+    request: &impl serde::Serialize,
+    what: &str,
+) -> Result<T, ControlError> {
+    let mut line: Vec<u8> = serde_json::to_vec(request).map_err(std::io::Error::other)?;
+    line.push(b'\n');
+    compiler.stdin.write_all(&line).await?;
     compiler.stdin.flush().await?;
     let mut line = String::new();
     loop {
@@ -499,13 +501,12 @@ pub(crate) async fn exchange_location_generation(
             ));
         }
         if parse_dev_event(&line).is_none() {
-            break;
+            return serde_json::from_str(&line).map_err(|_| {
+                ControlError::Invalid(format!("location interpreter returned an invalid {what}"))
+            });
         }
         drop(write_output(&[(Stream::Stdout, &line)]));
     }
-    serde_json::from_str(&line).map_err(|_| {
-        ControlError::Invalid("location interpreter returned an invalid publication record".into())
-    })
 }
 
 /// The caller retains and reaps the child while a cancellable bounded exchange owns its pipes.
@@ -1567,11 +1568,18 @@ pub(crate) async fn next_turn(
 }
 
 /// `sqb dev`'s control lines from stdin; outside `sqb dev`, a fixed connected state. `sqb dev` holds stdin open while it lives, so its end, even after `sqb dev` was killed, stops the location as SIGTERM does.
-pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevControlState> {
+pub(crate) fn dev_controls(
+    options: &LocationServe,
+) -> (
+    watch::Sender<DevControlState>,
+    watch::Receiver<DevControlState>,
+) {
     let (sender, receiver) = watch::channel(DevControlState {
         warehouse: (!options.dev_events).then_some(true),
         recompiles: 0,
+        rediscovers: 0,
     });
+    let republisher: watch::Sender<DevControlState> = sender.clone();
     if options.dev_events {
         tokio::task::spawn_blocking(move || {
             for line in std::io::stdin().lines().map_while(Result::ok) {
@@ -1579,9 +1587,7 @@ pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevContro
                     Some(DevControl::Warehouse { connected }) => {
                         sender.send_modify(|state| state.warehouse = Some(connected));
                     }
-                    Some(DevControl::Recompile) => {
-                        sender.send_modify(|state| state.recompiles += 1);
-                    }
+                    Some(DevControl::Recompile) => request_republish(&sender, true),
                     None => {}
                 }
             }
@@ -1592,7 +1598,15 @@ pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevContro
             );
         });
     }
-    receiver
+    (republisher, receiver)
+}
+
+/// Publish a new generation even when no input changed; `rediscover` calls every discover function again.
+pub(crate) fn request_republish(controls: &watch::Sender<DevControlState>, rediscover: bool) {
+    controls.send_modify(|state| {
+        state.recompiles += 1;
+        state.rediscovers += u64::from(rediscover);
+    });
 }
 
 /// Tell `sqb dev` which inputs changed since the last compile: the first few paths and how many more.
@@ -1906,25 +1920,6 @@ pub(crate) async fn compile_next_generation(
     )
     .await?;
     Ok(load.map(|load| (Some((load, generation)), metadata, compiled_inputs)))
-}
-
-/// Ask the runtime interpreter for one plan preview; its reply is one JSON line.
-pub(crate) async fn exchange_location_plan(
-    compiler: &mut LocationCompiler,
-    request: &serde_json::Value,
-) -> Result<serde_json::Value, ControlError> {
-    let mut line: Vec<u8> = serde_json::to_vec(request).map_err(std::io::Error::other)?;
-    line.push(b'\n');
-    compiler.stdin.write_all(&line).await?;
-    compiler.stdin.flush().await?;
-    let mut reply = String::new();
-    if compiler.stdout.read_line(&mut reply).await? == 0 {
-        return Err(ControlError::Invalid(
-            "location interpreter exited before replying".into(),
-        ));
-    }
-    serde_json::from_str(&reply)
-        .map_err(|_| ControlError::Invalid("location interpreter returned an invalid plan".into()))
 }
 
 /// The safety sync interval from the flag, then the environment, then the project; `None` when unset.

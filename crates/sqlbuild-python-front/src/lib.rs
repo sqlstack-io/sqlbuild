@@ -10,6 +10,7 @@ pub mod compile_driver;
 pub mod contracts;
 pub mod cost_context;
 pub mod cursor;
+pub mod discovered_sets;
 pub mod discovery;
 pub mod execution_history;
 pub mod macro_bridge;

@@ -285,6 +285,8 @@ pub(crate) struct DevControlState {
     /// `None` until `sqb dev` reports its foreground connection; outside `sqb dev`, always connected.
     pub(crate) warehouse: Option<bool>,
     pub(crate) recompiles: u64,
+    /// How many of those recompiles also call every discover function again, as `r` and the republish API do.
+    pub(crate) rediscovers: u64,
 }
 
 /// Retained source observations survive compilation; warehouse exclusions never replace them.
@@ -315,6 +317,10 @@ pub(crate) struct LocationCompileRequest {
 pub(crate) struct LocationLoad {
     pub(crate) published: Option<PublishedGeneration>,
     pub(crate) rules: Option<sqlbuild_orchestration::platform::models::LocationRuleFailure>,
+    /// The discovered sets the compile used; empty in a project without discover functions.
+    pub(crate) discovered: sqlbuild_orchestration::discovered_sets::types::DiscoveredSets,
+    /// Each discover function's file, relative to the project.
+    pub(crate) discover_files: std::collections::BTreeMap<String, String>,
 }
 
 /// A `{"plan": {"argv", "copy"}}` request for the runtime interpreter, answered with its reply.
