@@ -3,6 +3,8 @@
 pub(crate) const NODE_PENDING: &str = "pending";
 pub(crate) const NODE_RUNNING: &str = "running";
 pub(crate) const NODE_FAILED: &str = "failed";
+/// The node states a rerun from failure, an automatic retry and a group treat as unfinished, as a SQL list.
+pub(crate) const UNFINISHED_NODE_STATUSES: &str = "'failed','skipped','cancelled','not_run'";
 
 pub(crate) const HEARTBEAT_TIMEOUT_SECONDS: i64 = 45;
 pub(crate) const MONITOR_BATCH_SIZE: usize = 100;

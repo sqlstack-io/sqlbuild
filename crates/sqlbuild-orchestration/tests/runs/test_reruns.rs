@@ -22,15 +22,14 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::tests::claim_helpers::{slot_counts, succeed};
 use crate::runs::tests::helpers::snapshot;
 use crate::runs::tests::test_types::{
-    RerunExecutionTestCase, RunLifecycleTestCase, TransactionFault,
+    CancelledRerunTestCase, RerunExecutionTestCase, RunLifecycleTestCase, TransactionFault,
 };
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
 #[test]
-fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_nodes_retry_atomically()
- {
+fn given_a_partial_group_when_rerun_after_redeploy_then_only_unfinished_nodes_retry_atomically() {
     let test_cases = [
         RunLifecycleTestCase {
             description: "SQLite pinned group rerun",
@@ -265,10 +264,12 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
             ]);
             for execution in [
                 RerunExecutionTestCase {
-                    description: "failure retry omits successful and cancelled nodes",
+                    description: "failure retry omits only successful nodes",
                     request: retry.clone(),
                     expected_applied: false,
-                    expected_selection: ["orders", "inventory"].map(str::to_owned).into(),
+                    expected_selection: ["orders", "inventory", "customers"]
+                        .map(str::to_owned)
+                        .into(),
                     expected_jobs: &["staging", "marts"],
                 },
                 RerunExecutionTestCase {
@@ -394,5 +395,214 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
             }
             close_test_store(fixture).await;
         });
+    }
+}
+
+#[test]
+fn given_cancelled_nodes_when_rerunning_from_failure_then_every_unfinished_node_runs_and_only_uncancelled_runs_retry()
+ {
+    let test_cases = [
+        CancelledRerunTestCase {
+            description: "a person cancels mid-chain",
+            outcomes: [
+                NodeOutcome::Success,
+                NodeOutcome::Cancelled,
+                NodeOutcome::Cancelled,
+            ],
+            run_outcome: RunOutcome::Cancelled,
+            cancel_requests: 1,
+            expected_retried: vec![],
+            expected_rerun: vec!["inventory", "orders"],
+        },
+        CancelledRerunTestCase {
+            description: "a person cancels after a failure",
+            outcomes: [
+                NodeOutcome::Success,
+                NodeOutcome::Failed,
+                NodeOutcome::Cancelled,
+            ],
+            run_outcome: RunOutcome::Partial,
+            cancel_requests: 1,
+            expected_retried: vec![],
+            expected_rerun: vec!["inventory", "orders"],
+        },
+        CancelledRerunTestCase {
+            description: "a failed run nobody cancelled retries its cancelled node too",
+            outcomes: [
+                NodeOutcome::Failed,
+                NodeOutcome::Cancelled,
+                NodeOutcome::Cancelled,
+            ],
+            run_outcome: RunOutcome::Failed,
+            cancel_requests: 0,
+            expected_retried: vec!["customers", "inventory", "orders"],
+            expected_rerun: vec!["customers", "inventory", "orders"],
+        },
+        CancelledRerunTestCase {
+            description: "a partial run nobody cancelled retries failed and cancelled nodes",
+            outcomes: [
+                NodeOutcome::Success,
+                NodeOutcome::Failed,
+                NodeOutcome::Cancelled,
+            ],
+            run_outcome: RunOutcome::Partial,
+            cancel_requests: 0,
+            expected_retried: vec!["inventory", "orders"],
+            expected_rerun: vec!["inventory", "orders"],
+        },
+        CancelledRerunTestCase {
+            description: "a stopped worker with only cancelled nodes left retries them",
+            outcomes: [
+                NodeOutcome::Success,
+                NodeOutcome::Cancelled,
+                NodeOutcome::Cancelled,
+            ],
+            run_outcome: RunOutcome::Partial,
+            cancel_requests: 0,
+            expected_retried: vec!["inventory", "orders"],
+            expected_rerun: vec!["inventory", "orders"],
+        },
+    ];
+    for test_case in test_cases {
+        for backend in [Backend::Sqlite, Backend::Postgres] {
+            run(async {
+                let Some(fixture) = open_test_store(backend).await else {
+                    return;
+                };
+                let store = &fixture.store;
+                migrate_store(store).await.expect("migrate");
+                let location = create_location(store, "orders", "test-admin")
+                    .await
+                    .expect("location");
+                let context = AuditContext {
+                    actor: "test-operator".into(),
+                    granting_role: "control-store-owner".into(),
+                    request_id: Uuid::now_v7(),
+                    ip_address: None,
+                };
+                let mut input = snapshot(location);
+                input.documents.insert(
+                    "jobs".into(),
+                    json!({"chain": {"description": "Build the chain",
+                        "selection": ["customers", "inventory", "orders"],
+                        "on_failure": {"retries": 1, "retry_delay_seconds": 0}}}),
+                );
+                publish_snapshot(store, &input).await.expect("publish");
+                let lease = acquire_lease(store, Uuid::now_v7())
+                    .await
+                    .expect("elect")
+                    .expect("leader");
+                let source_id = Uuid::now_v7();
+                request_job_run(
+                    store,
+                    (&context, None),
+                    &JobRunRequest {
+                        run_id: source_id,
+                        location_id: location,
+                        target: "development".into(),
+                        job_key: "chain".into(),
+                        reason: "Build the chain".into(),
+                        priority: 0,
+                        window: None,
+                        full_refresh: false,
+                        select: Vec::new(),
+                        exclude: Vec::new(),
+                    },
+                )
+                .await
+                .expect("request the chain");
+                let limits = BTreeMap::new();
+                let scope = (location, "development");
+                let source = claim_next_run(store, &lease, &limits, Some(scope))
+                    .await
+                    .expect("claim")
+                    .expect("source run");
+                let worker = || RunAuthority::Worker {
+                    run_id: source_id,
+                    claim_id: source.claim_id,
+                };
+                let change = |claim_id, change| RunChangeRequest {
+                    event_id: Uuid::now_v7(),
+                    run_id: source_id,
+                    claim_id,
+                    change,
+                };
+                let claimed = Some(source.claim_id);
+                change_run(store, worker(), &change(claimed, RunChange::Started))
+                    .await
+                    .expect("start");
+                for _ in 0..test_case.cancel_requests {
+                    let requested = RunChange::CancelRequested {
+                        actor: "test-operator".into(),
+                        reason: "Stop".into(),
+                    };
+                    change_run(
+                        store,
+                        RunAuthority::Operator(&context),
+                        &change(None, requested),
+                    )
+                    .await
+                    .expect("cancel");
+                }
+                for (node, outcome) in source.request.selection.iter().zip(test_case.outcomes) {
+                    let finished = RunChange::NodeFinished {
+                        node_key: node.clone(),
+                        outcome,
+                        rows_affected: None,
+                        table_rows: None,
+                        no_change_reason: None,
+                        error_code: None,
+                        skipped_because_of: None,
+                        error_message: None,
+                    };
+                    change_run(store, worker(), &change(claimed, finished))
+                        .await
+                        .expect("finish a node");
+                }
+                let ended = RunChange::Finished {
+                    outcome: test_case.run_outcome,
+                    reason: "synthetic worker exit".into(),
+                    exit_code: Some(1),
+                };
+                change_run(store, worker(), &change(claimed, ended))
+                    .await
+                    .expect("finish the run");
+                let retried: Vec<String> = claim_next_run(store, &lease, &limits, Some(scope))
+                    .await
+                    .expect("look for a retry")
+                    .map(|retry| retry.request.selection.into_iter().collect())
+                    .unwrap_or_default();
+                assert_eq!(
+                    retried, test_case.expected_retried,
+                    "{}",
+                    test_case.description
+                );
+                let rerun = RerunRequest {
+                    run_id: Uuid::now_v7(),
+                    source_run_id: source_id,
+                    from_failure: true,
+                    reason: "Finish the chain".into(),
+                    priority: 0,
+                    nodes: Vec::new(),
+                };
+                request_rerun(store, (&context, None), &rerun)
+                    .await
+                    .expect("rerun from failure");
+                let requested = list_runs(store, scope, 20)
+                    .await
+                    .expect("list")
+                    .into_iter()
+                    .find(|run| run.run_id == rerun.run_id)
+                    .expect("the rerun");
+                let selection: BTreeSet<&str> = requested
+                    .selection_json
+                    .iter()
+                    .map(String::as_str)
+                    .collect();
+                let expected: BTreeSet<&str> = test_case.expected_rerun.iter().copied().collect();
+                assert_eq!(selection, expected, "{}", test_case.description);
+                close_test_store(fixture).await;
+            });
+        }
     }
 }

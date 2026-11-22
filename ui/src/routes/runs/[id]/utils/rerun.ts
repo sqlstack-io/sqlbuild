@@ -28,8 +28,8 @@ export function rerunChoices(detail: RunDetail, selected: readonly string[], can
 	choices.push({
 		mode: 'from_failure',
 		label: 'Rerun from failure',
-		help: failures ? `${plural(failures, 'failed or skipped node')}` : 'Nothing failed',
-		disabledReason: common ?? (failures ? null : 'Nothing failed or was skipped in this run')
+		help: failures ? `${plural(failures, 'unfinished node')}` : 'Every node finished',
+		disabledReason: common ?? (failures ? null : 'Nothing failed, was cancelled or was skipped in this run')
 	});
 	choices.push({
 		mode: 'all',
@@ -40,9 +40,9 @@ export function rerunChoices(detail: RunDetail, selected: readonly string[], can
 	return choices;
 }
 
-/** The split button's main action: from failure after a failure, otherwise all. */
+/** The split button's main action: from failure after a failure or cancel, otherwise all. */
 export function primaryChoice(detail: RunDetail, choices: RerunChoice[]): RerunChoice {
-	const failedLike = detail.run.status === 'failed' || detail.run.status === 'partial' || detail.run.status === 'presumed_failed';
+	const failedLike = detail.run.status === 'failed' || detail.run.status === 'partial' || detail.run.status === 'cancelled' || detail.run.status === 'presumed_failed';
 	const wanted = failedLike && detail.rerunFromFailureNodes.length ? 'from_failure' : 'all';
 	return choices.find((c) => c.mode === wanted)!;
 }

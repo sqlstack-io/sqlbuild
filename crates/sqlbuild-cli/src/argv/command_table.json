@@ -573,7 +573,7 @@
              "nargs": 0,
              "const": true,
              "default": false,
-             "help": "retry exactly the failed and skipped nodes, excluding successful nodes",
+             "help": "retry exactly the failed, cancelled, skipped and unreached nodes, excluding successful nodes",
              "group": 1
             },
             {
@@ -1016,7 +1016,7 @@
          {
           "dest": "rerun-run",
           "metavar": "rerun-run",
-          "help": "retry a terminal run or exactly its failed and skipped nodes"
+          "help": "retry a terminal run or exactly its unfinished nodes"
          },
          {
           "dest": "cancel-run",
