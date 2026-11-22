@@ -36,8 +36,11 @@ from urllib.request import Request, urlopen
 from uuid import uuid4
 
 import duckdb
+import psycopg
 import pytest
+from testcontainers.postgres import PostgresContainer
 
+from scripts.native_tests.constants import POSTGRES_IMAGE
 from sqlbuild._native import (
     ColumnMigrationDecision,
     ColumnMigrationEvent,
@@ -772,9 +775,39 @@ def api_address(process: subprocess.Popen[bytes], log: Path) -> str:
     return "http://" + log.read_text().partition("Control API ready: ")[2].splitlines()[0]
 
 
+def control_query(database: str, statement: str, *parameters: object) -> list[tuple[Any, ...]]:
+    """One committed statement's rows, with `?` placeholders, from either kind of control store."""
+
+    def on_sqlite() -> list[tuple[Any, ...]]:
+        with closing(sqlite3.connect(database.removeprefix("sqlite://"))) as control, control:
+            return control.execute(statement, parameters).fetchall()
+
+    def on_postgres() -> list[tuple[Any, ...]]:
+        with psycopg.connect(database) as control:
+            return control.execute(statement.replace("?", "%s"), parameters).fetchall()
+
+    return {True: on_sqlite, False: on_postgres}[database.startswith("sqlite://")]()
+
+
+@contextmanager
+def postgres_database() -> Iterator[str]:
+    """A throwaway PostgreSQL control store."""
+    with PostgresContainer(POSTGRES_IMAGE, driver=None) as postgres:
+        yield postgres.get_connection_url()
+
+
+def control_database(backend: str) -> AbstractContextManager[str | None]:
+    """The store's URL, or None for the SQLite one each server creates."""
+    databases: dict[str, Callable[[], AbstractContextManager[str | None]]] = {
+        "sqlite": partial(nullcontext, None),
+        "postgres": postgres_database,
+    }
+    return databases[backend]()
+
+
 @contextmanager
 def snapshot_api(
-    directory: Path, *, server_arguments: tuple[str, ...] = ()
+    directory: Path, *, server_arguments: tuple[str, ...] = (), database_url: str | None = None
 ) -> Iterator[SnapshotApi]:
     """Only this fixture seeds the control database; the code location uses HTTP exclusively."""
     directory.mkdir()
@@ -783,6 +816,12 @@ def snapshot_api(
     environment.pop("SQLBUILD_CONTROL_DATABASE_URL", None)
     environment.pop("SQLBUILD_PLATFORM_WEBHOOK_URL", None)
     environment.pop("SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL", None)
+    environment["XDG_STATE_HOME"] = str(directory / "state")
+    environment |= {
+        True: {},
+        False: {"SQLBUILD_CONTROL_DATABASE_URL": str(database_url)},
+    }[database_url is None]
+    database: str = database_url or f"sqlite://{directory}/.sqlbuild/control.sqlite3"
     with log.open("wb") as stderr:
         process: subprocess.Popen[bytes] = subprocess.Popen(
             [
@@ -804,25 +843,25 @@ def snapshot_api(
             token_id: str = str(uuid4())
             bearer: str = f"{token_id}.{secrets.token_hex(32)}"
             now: datetime = datetime.now(UTC)
-            with sqlite3.connect(directory / ".sqlbuild/control.sqlite3") as connection:
-                _ = connection.execute(
-                    "INSERT INTO sqb_locations (location_id,name,created_by,created_at) "
-                    "VALUES (?, 'orders', 'test-admin', ?)",
-                    (location_id, now.isoformat()),
-                )
-                _ = connection.execute(
-                    "INSERT INTO sqb_access_tokens "
-                    "(token_id,secret_hash,location_id,scope_json,created_at,expires_at) "
-                    "VALUES (?,?,?,?,?,?)",
-                    (
-                        token_id,
-                        hashlib.sha256(bearer.encode()).hexdigest(),
-                        location_id,
-                        json.dumps({"kind": "location", "location_id": location_id}),
-                        now.isoformat(),
-                        (now + timedelta(hours=1)).isoformat(),
-                    ),
-                )
+            _ = control_query(
+                database,
+                "INSERT INTO sqb_locations (location_id,name,created_by,created_at) "
+                "VALUES (?, 'orders', 'test-admin', ?) RETURNING location_id",
+                location_id,
+                now.isoformat(),
+            )
+            _ = control_query(
+                database,
+                "INSERT INTO sqb_access_tokens "
+                "(token_id,secret_hash,location_id,scope_json,created_at,expires_at) "
+                "VALUES (?,?,?,?,?,?) RETURNING token_id",
+                token_id,
+                hashlib.sha256(bearer.encode()).hexdigest(),
+                location_id,
+                json.dumps({"kind": "location", "location_id": location_id}),
+                now.isoformat(),
+                (now + timedelta(hours=1)).isoformat(),
+            )
             yield SnapshotApi(url=url, location_id=location_id, bearer=bearer)
         finally:
             process.terminate()
@@ -910,6 +949,7 @@ def scheduled_worker(
     server_arguments: tuple[str, ...] = (),
     serve_sensors: bool = True,
     scheduler_settings: dict[str, Any] | None = None,
+    database_url: str | None = None,
 ) -> Iterator[ScheduledWorker]:
     """Declare, publish and schedule isolated DuckDB work without provisioning claims."""
     project: Path = directory / "project"
@@ -944,7 +984,9 @@ def scheduled_worker(
         "uncooperative": uncooperative_launcher,
     }
     with (
-        snapshot_api(directory / "control", server_arguments=server_arguments) as api,
+        snapshot_api(
+            directory / "control", server_arguments=server_arguments, database_url=database_url
+        ) as api,
         launchers[test_case.launcher](directory, executable) as deployment,
     ):
         published: subprocess.CompletedProcess[str] = subprocess.run(
@@ -988,10 +1030,17 @@ def scheduled_worker(
             {"launchers": {deployment.kind: [launcher]}} | (scheduler_settings or {}),
         )
         control_store: Path = directory / "control/.sqlbuild/control.sqlite3"
-        with sqlite3.connect(control_store) as control:
-            _ = control.executescript(test_case.store_setup)
-            test_case.store_edit(control)
-        monkeypatch.setenv("SQLBUILD_SCHEDULER_TEST_STORE", f"sqlite://{control_store}")
+
+        def edit_sqlite_store() -> None:
+            with sqlite3.connect(control_store) as control:
+                _ = control.executescript(test_case.store_setup)
+                test_case.store_edit(control)
+
+        # A case's store edits are SQLite's.
+        {True: edit_sqlite_store, False: lambda: None}[database_url is None]()
+        monkeypatch.setenv(
+            "SQLBUILD_SCHEDULER_TEST_STORE", database_url or f"sqlite://{control_store}"
+        )
         monkeypatch.setenv(
             "SQLBUILD_PLATFORM_WEBHOOK_URL",
             "http://127.0.0.1:1/events?token=synthetic-delivery-credential",

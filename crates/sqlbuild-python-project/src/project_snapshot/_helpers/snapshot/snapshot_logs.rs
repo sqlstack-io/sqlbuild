@@ -58,10 +58,11 @@ pub(crate) fn upload_loss(summary: &UploadSummary) -> Option<(String, RunChange)
     })
 }
 
-/// `message` cut to its limit at a character boundary, ending in an ellipsis when cut.
+/// `message` without NUL, which PostgreSQL refuses in text and JSON, cut to its limit at a character boundary, ending in an ellipsis when cut.
 fn bounded(message: &str) -> String {
+    let message: String = message.replace('\0', "");
     if message.len() <= NODE_LOG_MESSAGE_BYTES {
-        return message.to_owned();
+        return message;
     }
     let room: usize = NODE_LOG_MESSAGE_BYTES - ELLIPSIS.len_utf8();
     let end: usize = (0..=room)

@@ -479,6 +479,9 @@ max_bytes_per_run = "20GB"
   server image that is `/home/sqlbuild/.local/state/sqlbuild/output`.
   [`sqb dev`](dev.md) keeps its output in `.sqlbuild/output`.
 - `~` is `HOME` (`USERPROFILE` on Windows), or the account's home directory when that is unset.
+- Servers on different control databases under the same user, including a server on a cloned
+  database, should each set their own `store` folder, or one's retention can delete another's
+  output.
 - A local folder must be on a persistent volume, not inside the server's container, or recreating
   the container loses every run's output. `compose.yml` and the Podman Quadlet example mount a named
   volume at `/home/sqlbuild/.local/state/sqlbuild/output`. If you set another folder, mount a
@@ -489,6 +492,15 @@ max_bytes_per_run = "20GB"
 - `max_bytes_per_run` is a number of bytes or text such as `"500MB"` or `"2GiB"`. Past it a run
   keeps its first half and its newest half, and the lines in between are counted where they were
   left out. By default a run keeps all of its output.
+
+If the service user's home can't be written, as with systemd's `DynamicUser=`, give the server a
+state folder in its unit. Output then goes to `/var/lib/sqlbuild/sqlbuild/output`:
+
+```ini
+[Service]
+StateDirectory=sqlbuild
+Environment=XDG_STATE_HOME=/var/lib/sqlbuild
+```
 
 The server prints `Run output store: ...` when it starts, with a local folder as an absolute path.
 
