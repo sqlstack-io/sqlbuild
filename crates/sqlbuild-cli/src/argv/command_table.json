@@ -192,8 +192,8 @@
         "options": [],
         "dest": "location_command",
         "required": true,
-        "choices": ["publish", "serve", "health", "runtime", "execute"],
-        "help": "publish one snapshot, watch and reload, check health (exits 1 when the location is down or its last load failed), or run the supervisor's stdio compiler",
+        "choices": ["publish", "serve", "health", "republish", "runtime", "execute"],
+        "help": "publish one snapshot, watch and reload, check health (exits 1 when the location is down or its last load failed), ask a served location to republish, or run the supervisor's stdio compiler",
         "group": 0
        },
        {
@@ -240,6 +240,37 @@
         "options": ["--sync-at-least-every"],
         "dest": "location_sync_at_least_every",
         "help": "for serve, sync the warehouse at least this often, such as 30m; 0 or off turns it off",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--reason"],
+        "dest": "location_reason",
+        "help": "for republish, why, as the audit log and the location record it",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": ["--wait"],
+        "dest": "location_wait",
+        "nargs": 0,
+        "default": false,
+        "help": "for republish, wait for the new snapshot or the publish error",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--timeout"],
+        "dest": "location_timeout",
+        "type": "int",
+        "help": "for republish --wait, seconds to wait (default: 600)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--ca-cert"],
+        "dest": "login_ca",
+        "help": "for republish with a sqb login session, an additional trusted PEM CA certificate",
         "group": 1
        },
        {

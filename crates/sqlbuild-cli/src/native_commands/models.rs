@@ -656,3 +656,25 @@ pub(crate) struct SensorTrialArguments {
     pub(crate) choice: SensorEventChoice,
     pub(crate) source: EventSource,
 }
+
+/// Who a republish is requested as; the key never appears in diagnostics.
+pub(crate) enum RepublishCaller {
+    Key { server: String, key: String },
+    Session { server: String, ca: Option<PathBuf> },
+}
+
+impl std::fmt::Debug for RepublishCaller {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Key { server, .. } => formatter
+                .debug_struct("Key")
+                .field("server", server)
+                .finish_non_exhaustive(),
+            Self::Session { server, ca } => formatter
+                .debug_struct("Session")
+                .field("server", server)
+                .field("ca", ca)
+                .finish(),
+        }
+    }
+}

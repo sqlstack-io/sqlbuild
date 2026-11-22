@@ -7,6 +7,7 @@ pub(crate) mod plan_document;
 pub(crate) mod plan_request;
 pub(crate) mod plan_reuse;
 pub(crate) mod republish;
+pub(crate) mod republish_caller;
 pub(crate) mod sensor_function;
 pub(crate) mod sync_outcomes;
 pub(crate) mod sync_report;

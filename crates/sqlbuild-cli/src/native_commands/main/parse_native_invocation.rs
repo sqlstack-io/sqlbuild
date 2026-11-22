@@ -35,7 +35,7 @@ pub(crate) fn parse_native_invocation(arguments: &[OsString]) -> Result<NativePa
             text(namespace, "command").as_deref() == Some("location")
                 && matches!(
                     text(namespace, "location_command").as_deref(),
-                    Some("serve" | "health")
+                    Some("serve" | "health" | "republish")
                 )
         })
     {

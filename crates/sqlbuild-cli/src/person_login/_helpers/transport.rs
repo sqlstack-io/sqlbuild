@@ -7,7 +7,7 @@ use reqwest::header::{AUTHORIZATION, HeaderValue};
 use sqlbuild_orchestration::api::main::parse_origin::parse_origin;
 use sqlbuild_orchestration::api::models::{ApiErrorBody, MutationResponse};
 use sqlbuild_orchestration::credentials::models::SessionIdentity;
-use sqlbuild_orchestration::platform::models::PersonWorkRequest;
+use sqlbuild_orchestration::platform::models::{PersonWorkRequest, RepublishStatus};
 use sqlbuild_orchestration::sensors::models::{SensorEventChoice, SensorTrialEvents};
 use sqlbuild_orchestration::snapshots::models::NodeSql;
 use uuid::Uuid;
@@ -157,6 +157,45 @@ pub(crate) async fn warehouse_sync(
     )
     .await
     .map(|response| response.applied)
+}
+
+/// The republish's status straight after the server queued it.
+pub(crate) async fn republish(
+    client: &PersonClient,
+    credential: &PersonCredential,
+    (location, target): (Uuid, &str),
+    request: &PersonWorkRequest,
+) -> Result<RepublishStatus, std::io::Error> {
+    let path = target_path(client, (location, target), &["republish"])?;
+    send_json(
+        authorized(client, reqwest::Method::POST, &path, credential)?.json(request),
+        (
+            "request a republish from",
+            "Republish request",
+            "republish response",
+        ),
+    )
+    .await
+}
+
+/// The republish, held open up to `wait` seconds while it is pending.
+pub(crate) async fn republish_status(
+    client: &PersonClient,
+    credential: &PersonCredential,
+    (location, target, request_id): (Uuid, &str, Uuid),
+    wait: u64,
+) -> Result<Option<RepublishStatus>, std::io::Error> {
+    let request_id = request_id.to_string();
+    let path = target_path(client, (location, target), &["republish", &request_id])?;
+    send_json(
+        authorized(client, reqwest::Method::GET, &path, credential)?.query(&[("wait", wait)]),
+        (
+            "read the republish from",
+            "Republish read",
+            "republish status",
+        ),
+    )
+    .await
 }
 
 /// The published sensor and the events `choice` picks; a refusal carries the server's reason.

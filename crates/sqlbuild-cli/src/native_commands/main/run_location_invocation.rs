@@ -14,6 +14,7 @@ use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::location_options;
 use crate::native_commands::main::_run_dev::run_dev;
 use crate::native_commands::main::_run_location::run_location;
+use crate::native_commands::main::_run_republish::run_republish;
 
 /// Health needs no Python CLI; serving and development return `None` without one so the caller reports it.
 pub(crate) fn run_location_invocation(namespace: &Namespace, script: Option<&Path>) -> Option<i32> {
@@ -24,6 +25,9 @@ pub(crate) fn run_location_invocation(namespace: &Namespace, script: Option<&Pat
     }
     if !development && location_command.as_deref() == Some("health") {
         return Some(location_health(namespace));
+    }
+    if !development && location_command.as_deref() == Some("republish") {
+        return Some(run_republish(namespace));
     }
     if !development && location_command.as_deref() != Some("serve") {
         return None;
