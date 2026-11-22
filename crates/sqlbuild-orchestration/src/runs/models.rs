@@ -450,6 +450,9 @@ pub struct RunNodeRecord {
     #[serde(default)]
     pub materialization: Option<String>,
     pub error_code: Option<String>,
+    /// For a node that failed unstarted because a provider was missing secrets, its redacted message naming the provider, variables and places looked; never other error text.
+    #[serde(default)]
+    pub missing_secret: Option<String>,
     pub skipped_because_of: Option<String>,
 }
 

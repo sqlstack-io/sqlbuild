@@ -2,6 +2,7 @@
 
 use uuid::Uuid;
 
+use crate::runs::_helpers::lifecycle::missing_secrets::with_missing_secrets;
 use crate::runs::_helpers::lifecycle::waits::queue_states;
 
 use crate::runs::models::{RunNodeRecord, RunRecord};
@@ -53,13 +54,14 @@ pub(crate) async fn list_runs_in(
     Ok((transaction, runs))
 }
 
-/// The run's nodes, each with the materialization its snapshot gave it when the run was queued.
+/// The run's nodes, each with the materialization its snapshot gave it when the run was queued and, when a missing secret stopped it, that message.
 pub(crate) async fn run_nodes_in(
     transaction: ControlTransaction,
     run_id: Uuid,
 ) -> Result<(ControlTransaction, Vec<RunNodeRecord>), ControlError> {
-    query_records(transaction,
+    let (transaction, nodes) = query_records(transaction,
         "SELECT node_key, status, started_at, ended_at, rows_affected, table_rows, rows_so_far, no_change_reason, \
          materialization, error_code, skipped_because_of FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' ORDER BY node_key",
-        vec![Parameter::Id(run_id)]).await
+        vec![Parameter::Id(run_id)]).await?;
+    with_missing_secrets(transaction, run_id, nodes).await
 }

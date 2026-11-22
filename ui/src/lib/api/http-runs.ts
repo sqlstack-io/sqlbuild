@@ -352,7 +352,8 @@ export function toRunNode(wire: Wire['RunNodeRecord'], run: Run): RunNode {
 		rowsSoFar: wire.rows_so_far ?? null,
 		noChangeReason: wire.no_change_reason ?? null,
 		errorCode: wire.error_code ?? null,
-		errorMessage: null,
+		// The one error the list carries; any other is an audited read of that node's error.
+		errorMessage: wire.missing_secret ?? null,
 		errorLocation: null,
 		errorDetail: null,
 		skippedBecauseOf: wire.skipped_because_of ? { nodeKey: wire.skipped_because_of, runId: run.id, jobKey: run.jobKey } : null,

@@ -1,6 +1,6 @@
 // What a plan can't run because a provider is missing secrets, and the words the plan page shows for it. Pure.
 
-import type { PlanCantRun } from '$lib/api';
+import type { PlanCantRun, Run, RunDetail, RunNode } from '$lib/api';
 import { plural } from '$lib/format/plural';
 import { buildCommand, parseCommand, selectorOf } from './command';
 
@@ -95,28 +95,82 @@ export function cantRunRows(entries: PlanCantRun[], upstreamOf: (key: string) =>
 	return [...rows.values()];
 }
 
-/** A run node's `D012` message, as a worker writes it: `provider X: A, B not set (missing from the location's environment and from .env)`. */
+/**
+ * A run node's `D012` message, as a worker writes it and the server lists it: `provider X: A, B not set (missing from
+ * the location's environment and from .env)`. Error redaction can take a variable of a provider named like a secret
+ * (`orders_api_key: [REDACTED]`), so the variables come from the run's status reason where it has them.
+ */
 const MISSING_SECRET_MESSAGE = /^provider (\S+): (.+) not set \(missing from (.+)\)$/;
 
+/**
+ * The status reason of a run that stopped on missing secrets: `Couldn't run: provider X needs A, B; sink S needs C;
+ * every run uses sinks (missing from the location's environment and from .env); nothing ran`, perhaps with a note after it.
+ */
+const MISSING_SECRET_REASON = /^Couldn't run: (.+) \(missing from (.+)\); nothing ran/;
+
+/** The env file in where a secret was looked for: `.env` in `the location's environment and from .env`. */
+const envFileIn = (places: string) => /environment and from (.+)$/.exec(places)?.[1] ?? null;
+
+type Refusal = { envFile: string | null; providers: Map<string, string[]>; sinks: { name: string; variables: string[] }[] };
+
+function refusalOf(reason: string | null): Refusal | null {
+	const match = MISSING_SECRET_REASON.exec(reason ?? '');
+	if (!match) return null;
+	const refusal: Refusal = { envFile: envFileIn(match[2]), providers: new Map(), sinks: [] };
+	for (const part of match[1].split('; ')) {
+		const provider = /^provider (\S+) needs (.+)$/.exec(part);
+		if (provider) refusal.providers.set(provider[1], provider[2].split(', '));
+		const sink = /^sink (.+) needs (.+)$/.exec(part);
+		if (sink) refusal.sinks.push({ name: sink[1], variables: sink[2].split(', ') });
+	}
+	return refusal.providers.size || refusal.sinks.length ? refusal : null;
+}
+
 /** The run's nodes, as much of them as this needs. */
-type RunNodeFacts = { nodeKey: string; status: string; errorCode: string | null; errorMessage: string | null; skippedBecauseOf: { nodeKey: string } | null };
+type RunNodeFacts = Pick<RunNode, 'runId' | 'nodeKey' | 'status' | 'startedAt' | 'errorCode' | 'errorMessage'> & { skippedBecauseOf: { nodeKey: string } | null };
 
 /**
- * What a run couldn't run because a provider was missing secrets, read from its nodes: each provider's failed
- * nodes, and the nodes skipped because of them, directly or through another skipped node.
+ * What runs couldn't run because providers were missing secrets: from each run's status reason, the providers, their
+ * variables and any sinks, which fail no node; from its failed nodes' messages, who uses which provider; and the
+ * nodes skipped because of those, directly or through another skipped node. Only `runs` the nodes belong to count,
+ * so a member's superseded attempt adds nothing. A sink whose provider no node uses has no provider name to show.
  */
-export function runCantRun(nodes: RunNodeFacts[]): PlanCantRun[] {
-	const byProvider = new Map<string, PlanCantRun>();
+export function runCantRun(nodes: RunNodeFacts[], runs: Pick<Run, 'id' | 'statusReason'>[]): PlanCantRun[] {
+	const shown = new Set(nodes.map((node) => node.runId));
+	const entries = new Map<string, PlanCantRun>();
+	const entryOf = (id: string, provider: string, variables: string[], envFile: string | null) => {
+		const entry = entries.get(id) ?? { reason: 'missing_secret', provider, path: '', variables: [], nodes: [], readers: [], sinks: [], env_file: envFile };
+		entry.variables = [...new Set([...entry.variables, ...variables])];
+		entries.set(id, entry);
+		return entry;
+	};
+	const refusals = new Map<string, Refusal>();
+	for (const run of runs) {
+		const refusal = shown.has(run.id) ? refusalOf(run.statusReason) : null;
+		if (!refusal) continue;
+		refusals.set(run.id, refusal);
+		for (const [provider, variables] of refusal.providers) entryOf(provider, provider, variables, refusal.envFile);
+		for (const { name, variables } of refusal.sinks) {
+			const wanted = variables.join(', ');
+			const provider = [...refusal.providers].find(([, own]) => own.join(', ') === wanted)?.[0] ?? '';
+			const entry = entryOf(provider || `sink:${wanted}`, provider, variables, refusal.envFile);
+			if (!entry.sinks?.includes(name)) entry.sinks = [...(entry.sinks ?? []), name];
+		}
+	}
+	const users = new Map<PlanCantRun, Set<string>>();
 	const owner = new Map<string, PlanCantRun>();
 	for (const node of nodes) {
-		if (node.status !== 'failed' || node.errorCode !== 'D012' || !node.errorMessage) continue;
-		const match = MISSING_SECRET_MESSAGE.exec(node.errorMessage);
-		if (!match) continue;
-		const [, provider, variables, places] = match;
-		const envFile = /and from (.+)$/.exec(places)?.[1] ?? null;
-		const entry = byProvider.get(provider) ?? { reason: 'missing_secret', provider, path: '', variables: variables.split(', '), nodes: [], readers: [], sinks: [], env_file: envFile };
-		entry.nodes.push(node.nodeKey);
-		byProvider.set(provider, entry);
+		if (node.status !== 'failed' || node.errorCode !== 'D012') continue;
+		const refusal = refusals.get(node.runId);
+		const said = node.errorMessage ? MISSING_SECRET_MESSAGE.exec(node.errorMessage) : null;
+		// Without a message, as once history is pruned, only a run missing one provider's secrets says whose it was.
+		const provider = said?.[1] ?? (!node.startedAt && refusal?.providers.size === 1 ? [...refusal.providers.keys()][0] : null);
+		if (!provider) continue;
+		const variables = refusal?.providers.get(provider) ?? said?.[2].split(', ') ?? [];
+		const entry = entryOf(provider, provider, variables, refusal?.envFile ?? (said ? envFileIn(said[3]) : null));
+		const own = users.get(entry) ?? new Set<string>();
+		if (!own.has(node.nodeKey)) entry.nodes.push(node.nodeKey);
+		users.set(entry, own.add(node.nodeKey));
 		owner.set(node.nodeKey, entry);
 	}
 	let added = true;
@@ -131,5 +185,8 @@ export function runCantRun(nodes: RunNodeFacts[]): PlanCantRun[] {
 			added = true;
 		}
 	}
-	return [...byProvider.values()];
+	return [...entries.values()];
 }
+
+/** The run page's Couldn't run blocks: its nodes, with the status reasons of the run and, for a group, its job runs. */
+export const runDetailCantRun = (detail: Pick<RunDetail, 'run' | 'children' | 'nodes'>) => runCantRun(detail.nodes, [detail.run, ...detail.children]);

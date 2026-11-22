@@ -51,13 +51,17 @@ describe('a plan with nodes that cannot run', () => {
 describe('a run that hit missing secrets', () => {
 	it('reads each provider, its failed nodes and what was skipped because of them', () => {
 		const message = "provider payments_api: PAYMENTS_API_TOKEN not set (missing from the location's environment and from .env)";
+		const at = { runId: 'r1', startedAt: null };
 		expect(
-			runCantRun([
-				{ nodeKey: 'source:raw_payments', status: 'failed', errorCode: 'D012', errorMessage: message, skippedBecauseOf: null },
-				{ nodeKey: 'model:stg_payments', status: 'skipped', errorCode: null, errorMessage: null, skippedBecauseOf: { nodeKey: 'source:raw_payments' } },
-				{ nodeKey: 'model:fct_payments', status: 'skipped', errorCode: null, errorMessage: null, skippedBecauseOf: { nodeKey: 'model:stg_payments' } },
-				{ nodeKey: 'model:orders', status: 'failed', errorCode: 'Q001', errorMessage: 'syntax error', skippedBecauseOf: null }
-			])
+			runCantRun(
+				[
+					{ ...at, nodeKey: 'source:raw_payments', status: 'failed', errorCode: 'D012', errorMessage: message, skippedBecauseOf: null },
+					{ ...at, nodeKey: 'model:stg_payments', status: 'skipped', errorCode: null, errorMessage: null, skippedBecauseOf: { nodeKey: 'source:raw_payments' } },
+					{ ...at, nodeKey: 'model:fct_payments', status: 'skipped', errorCode: null, errorMessage: null, skippedBecauseOf: { nodeKey: 'model:stg_payments' } },
+					{ ...at, nodeKey: 'model:orders', status: 'failed', errorCode: 'Q001', errorMessage: 'syntax error', skippedBecauseOf: null }
+				],
+				[{ id: 'r1', statusReason: null }]
+			)
 		).toEqual([{ ...payments, path: '' }]);
 	});
 });

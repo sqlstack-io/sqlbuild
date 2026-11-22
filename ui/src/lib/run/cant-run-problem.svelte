@@ -11,13 +11,18 @@
 <div class="problem" data-testid="cant-run-problem">
 	<div class="head">
 		<span class="mark" aria-hidden="true">✗</span><b>{title}</b>
-		<span>provider <a href={to(`/providers/${encodeURIComponent(entry.provider)}`)} class="provider">{entry.provider}</a> needs <code>{variablesText(entry)}</code></span>
+		{#if entry.provider}
+			<span>provider <a href={to(`/providers/${encodeURIComponent(entry.provider)}`)} class="provider">{entry.provider}</a> needs <code>{variablesText(entry)}</code></span>
+		{:else}
+			<!-- A run's status reason names a sink, not the provider behind it. -->
+			<span>sink <b>{entry.sinks?.join(', ')}</b> needs <code>{variablesText(entry)}</code></span>
+		{/if}
 		<span class="tag">missing secret</span>
 	</div>
 	<dl>
 		{#if entry.nodes.length}
 			<dt>needs</dt>
-			<dd>{needsText(entry)}</dd>
+			<dd class="stopped">{needsText(entry)}</dd>
 		{/if}
 		{#if entry.sinks?.length}
 			<dt>sinks</dt>
@@ -69,6 +74,11 @@
 	}
 	dd {
 		margin: 0;
+	}
+	/* However many nodes one secret stops, the fix below them stays in view. */
+	.stopped {
+		max-height: 7.5em;
+		overflow: auto;
 	}
 	code {
 		font-family: var(--font-mono);

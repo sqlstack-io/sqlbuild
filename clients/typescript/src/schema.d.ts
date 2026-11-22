@@ -3925,6 +3925,8 @@ export interface components {
             error_code?: string | null;
             /** @description The node's materialization in the run's snapshot, such as `table`, `incremental` or `view`. */
             materialization?: string | null;
+            /** @description For a node that failed unstarted because a provider was missing secrets, its redacted message naming the provider, variables and places looked; never other error text. */
+            missing_secret?: string | null;
             /** @description Why a node that ran changed nothing, such as `unchanged since its last build`. */
             no_change_reason?: string | null;
             node_key: string;

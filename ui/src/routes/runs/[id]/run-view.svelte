@@ -7,7 +7,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import FailuresPanel from './failures-panel.svelte';
 	import CantRunProblem from '$lib/run/cant-run-problem.svelte';
-	import { runCantRun } from '$lib/run/cant-run';
+	import { runDetailCantRun } from '$lib/run/cant-run';
 	import IgnoredAuditsPanel from './ignored-audits-panel.svelte';
 	import LiveStatements from './live-statements.svelte';
 	import NodeDrawer from './node-drawer.svelte';
@@ -30,6 +30,7 @@
 	const view = createRunDetailState(runId);
 
 	const detail = $derived(view.detail);
+	const cantRun = $derived(detail ? runDetailCantRun(detail) : []);
 	const nodes = $derived(view.nodes);
 	// Back to the page restores the view and the split as they were.
 	const mem = view.memory;
@@ -100,10 +101,9 @@
 
 	{#if detail}
 		<RunBanners banners={view.banners} />
-		{@const cantRun = runCantRun(view.nodes)}
 		{#if cantRun.length}
 			<div class="cant-run" data-testid="run-cant-run">
-				{#each cantRun as entry (entry.provider)}<CantRunProblem {entry} title="Couldn't run:" then="the next run works" />{/each}
+				{#each cantRun as entry (`${entry.provider}:${entry.variables}`)}<CantRunProblem {entry} title="Couldn't run:" then="the next run works" />{/each}
 			</div>
 		{/if}
 		<FailuresPanel {view} />
@@ -193,12 +193,19 @@
 </div>
 
 <style>
+	/* One secret can stop a thousand nodes, all named: the block scrolls rather than pushing the page away. */
 	.cant-run {
 		display: flex;
+		max-height: 260px;
+		flex: none;
 		flex-direction: column;
 		gap: 8px;
+		overflow: auto;
 		padding: 10px 24px;
 		border-bottom: 1px solid var(--border);
+	}
+	.cant-run > :global(*) {
+		flex: none;
 	}
 	.faint {
 		color: var(--sb-text-faint);

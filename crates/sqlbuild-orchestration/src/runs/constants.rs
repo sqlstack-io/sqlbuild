@@ -66,3 +66,9 @@ pub(crate) const SELECTION_PAGE_MAX: u32 = 10_000;
 
 /// A followed run's repeated output reads are audited at most once per person, run and kind in this window, on each server.
 pub(crate) const REPEATED_READ_AUDIT: std::time::Duration = std::time::Duration::from_secs(600);
+
+/// The code a node fails with when its provider is missing secrets.
+pub(crate) const MISSING_SECRET_ERROR_CODE: &str = "D012";
+/// How a worker's message for such a node starts, and the phrase after its variables.
+pub(crate) const MISSING_SECRET_PREFIX: &str = "provider ";
+pub(crate) const MISSING_SECRET_PHRASE: &str = " not set (missing from ";

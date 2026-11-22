@@ -1106,6 +1106,22 @@ def test_given_a_provider_missing_secrets_when_a_scheduled_run_starts_then_it_fa
             ("model:orders", "skipped", None, "source:raw_regions", False),
             ("source:raw_regions", "failed", "D012", None, False),
         ], worker.log.read_text()
+        nodes_url: str = (
+            f"{worker.api.url}/api/locations/{worker.api.location_id}/targets/development"
+            f"/runs/{run['run_id']}/nodes"
+        )
+        with urlopen(
+            Request(nodes_url, headers={"Authorization": f"Bearer {worker.api.bearer}"}), timeout=5
+        ) as response:
+            listed: list[dict[str, Any]] = json.load(response)
+        assert [(node["node_key"], node["missing_secret"]) for node in listed] == [
+            ("model:orders", None),
+            (
+                "source:raw_regions",
+                "provider region: WORKER_ENV_REGION_CODE, WORKER_ENV_TOKEN not set "
+                "(missing from the location's environment and from .env)",
+            ),
+        ], worker.log.read_text()
         # Nothing connected: the run never opened, so never created, the DuckDB warehouse.
         assert not (worker.project / "warehouse.duckdb").exists(), worker.log.read_text()
 

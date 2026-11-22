@@ -600,6 +600,13 @@ pub(crate) struct NodeResultsTestCase {
     pub(crate) expected_not_run: i64,
 }
 
+/// What a run's node list tells each of its failed nodes about a missing secret.
+pub(crate) struct MissingSecretNodesTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_nodes: &'static [(&'static str, Option<&'static str>)],
+}
+
 pub(crate) struct LaunchEventTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
