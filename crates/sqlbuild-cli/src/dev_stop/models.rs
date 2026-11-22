@@ -10,7 +10,9 @@ use std::time::{Duration, Instant};
 use rustix::termios::Termios;
 use tokio::sync::watch;
 
-use crate::dev_stop::_helpers::processes::{kill_children, restore_termios, signal_group};
+#[cfg(unix)]
+use crate::dev_stop::_helpers::processes::restore_termios;
+use crate::dev_stop::_helpers::processes::{kill_children, signal_group};
 use crate::dev_stop::constants::{
     FORCED_LINE, HANGUP_STATUS, INTERRUPT_STATUS, QUIT_STATUS, STOP_DEADLINE, STOP_GRACE,
     TERMINATE_STATUS,

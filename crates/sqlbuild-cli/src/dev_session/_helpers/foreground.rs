@@ -201,7 +201,15 @@ fn echo_terminal(controller: File, screen: UnboundedSender<ScreenMessage>) {
 fn open_terminal() -> std::io::Result<(File, File)> {
     use rustix::fs::{Mode, OFlags};
     use rustix::pty::{OpenptFlags, grantpt, openpt, ptsname, unlockpt};
+    #[cfg(target_os = "linux")]
     let controller = openpt(OpenptFlags::RDWR | OpenptFlags::NOCTTY | OpenptFlags::CLOEXEC)?;
+    // Elsewhere `openpt` can't open close-on-exec, so it is set straight after.
+    #[cfg(not(target_os = "linux"))]
+    let controller = {
+        let controller = openpt(OpenptFlags::RDWR | OpenptFlags::NOCTTY)?;
+        rustix::io::fcntl_setfd(&controller, rustix::io::FdFlags::CLOEXEC)?;
+        controller
+    };
     grantpt(&controller)?;
     unlockpt(&controller)?;
     let name = ptsname(&controller, Vec::new())?;

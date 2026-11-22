@@ -1,5 +1,6 @@
 //! Keys from the terminal in raw mode: Ctrl+C and `q` stop `sqb dev`, Ctrl+\\ forces the stop, typing at a sign-in prompt goes to the client, and a terminal that hangs up stops it.
 
+#[cfg(unix)]
 use std::io::Write;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;

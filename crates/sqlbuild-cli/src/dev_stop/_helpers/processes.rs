@@ -1,7 +1,9 @@
 //! Signals for the processes `sqb dev` started, and the terminal mode it changed.
 
+#[cfg(target_os = "linux")]
+use rustix::process::kill_process;
 #[cfg(unix)]
-use rustix::process::{Pid, Signal, kill_process, kill_process_group};
+use rustix::process::{Pid, Signal, kill_process_group};
 #[cfg(unix)]
 use rustix::termios::{OptionalActions, Termios, tcsetattr};
 
