@@ -59,8 +59,11 @@ pub(super) async fn run_location_work(
     }
     let mut files: Vec<PathBuf> = Vec::new();
     let outcome = if generation == Some(claim.generation)
-        && location_files(&options.project_dir, &watch.rules, &watch.local_files)
-            == watch.observed.0
+        && location_files(
+            &options.project_dir,
+            &watch.rules,
+            (&watch.local_files, &watch.output_folders),
+        ) == watch.observed.0
     {
         let mut shutting_down = false;
         let expires = async {
@@ -96,7 +99,12 @@ pub(super) async fn run_location_work(
             .retain(|stamp| !files.contains(&options.project_dir.join(&stamp.relative_path)));
         let mut excluded = watch.local_files.clone();
         excluded.extend(files.clone());
-        if location_files(&options.project_dir, &watch.rules, &excluded) == expected.0 {
+        if location_files(
+            &options.project_dir,
+            &watch.rules,
+            (&excluded, &watch.output_folders),
+        ) == expected.0
+        {
             if let LocationWorkOutcome::Plan { document, diffs } = &outcome {
                 keep_plan(keep, (document, diffs));
             }

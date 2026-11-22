@@ -269,3 +269,6 @@ pub(crate) const API_KEY_VARIABLE: &str = "SQLBUILD_API_KEY";
 pub(crate) const REPUBLISH_POLL_SECONDS: u64 = 10;
 /// How long `sqb location republish --wait` waits unless told otherwise.
 pub(crate) const REPUBLISH_TIMEOUT_SECONDS: u64 = 600;
+
+/// How `sqb dev` hands its location the resolved folder of run output, which the watch leaves out.
+pub(crate) const DEVELOPMENT_OUTPUT_FOLDER: &str = "SQLBUILD_DEVELOPMENT_OUTPUT_FOLDER";

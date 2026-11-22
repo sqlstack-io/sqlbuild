@@ -174,6 +174,8 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
             api, process, log, run_id=run_id, target=test_case.target
         )
         assert run["status"] == "success", log.read_text()
+        # The worker uploads its output before it reports the run finished.
+        assert list((control.parent / "output/runs" / run_id).rglob("*.zst")), log.read_text()
         time.sleep(1)
         assert current_snapshot(api, test_case.target)["record"]["generation"] == 1
         with duckdb.connect(str(project / "warehouse.duckdb"), read_only=True) as warehouse:

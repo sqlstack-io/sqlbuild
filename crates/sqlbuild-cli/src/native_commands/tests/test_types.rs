@@ -42,6 +42,14 @@ pub(super) struct ResolveTestCase {
     pub(super) expected_parts: &'static [&'static str],
 }
 
+/// `sqb dev`'s run output folder from the project, a file written afterwards and whether the watch sees it.
+pub(super) struct OutputWatchTestCase {
+    pub(super) description: &'static str,
+    pub(super) folder: Option<&'static str>,
+    pub(super) written: &'static str,
+    pub(super) expected_seen: bool,
+}
+
 /// Project directories and files, and whether an observed command can run without Python.
 pub(super) struct ProjectFactsTestCase {
     pub(super) description: &'static str,

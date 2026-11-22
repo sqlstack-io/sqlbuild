@@ -19,6 +19,14 @@ impl OutputStore {
     pub fn location(&self) -> &str {
         &self.location
     }
+
+    /// The resolved folder of a local store; `None` for S3.
+    #[must_use]
+    pub fn local_folder(&self) -> Option<&std::path::Path> {
+        self.location
+            .strip_prefix(crate::run_output::constants::FILE_SCHEME)
+            .map(std::path::Path::new)
+    }
 }
 
 /// `server.toml`'s `[output]`: the store's URL and the most text kept per run.

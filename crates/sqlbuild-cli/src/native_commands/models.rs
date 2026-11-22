@@ -303,6 +303,8 @@ pub(crate) struct DevControlState {
 pub(crate) struct LocationWatch {
     pub(crate) rules: SnapshotRules,
     pub(crate) local_files: Vec<PathBuf>,
+    /// `sqb dev`'s run output folder where it lies inside the project, left out with everything beneath it.
+    pub(crate) output_folders: Vec<PathBuf>,
     pub(crate) observed: (Vec<PathStamp>, Option<String>),
     pub(crate) attempted: Option<(Vec<PathStamp>, Option<String>)>,
     pub(crate) changed_at: tokio::time::Instant,

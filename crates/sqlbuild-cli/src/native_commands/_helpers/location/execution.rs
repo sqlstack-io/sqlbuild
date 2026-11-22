@@ -48,7 +48,6 @@ use crate::native_commands::_helpers::location::republish::settle_republish;
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_timeout_seconds, rows_text, scan_line,
 };
-use crate::native_commands::constants::PLAN_NOT_PRODUCED;
 use crate::native_commands::constants::{
     ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS, FALLBACK_ROWS,
     METADATA_OVERLAP_SECONDS, METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS,
@@ -56,6 +55,7 @@ use crate::native_commands::constants::{
     METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS,
     UNKNOWN_COMMAND,
 };
+use crate::native_commands::constants::{DEVELOPMENT_OUTPUT_FOLDER, PLAN_NOT_PRODUCED};
 use crate::native_commands::constants::{OPENING_STORE, STORE_READY};
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
@@ -119,7 +119,7 @@ use sqlbuild_orchestration::platform::models::{
     WarehouseSyncFailure,
 };
 use sqlbuild_orchestration::run_output::main::open_output_store::open_output_store;
-use sqlbuild_orchestration::run_output::models::OutputSettings;
+use sqlbuild_orchestration::run_output::models::{OutputSettings, OutputStore};
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
@@ -181,6 +181,7 @@ pub(crate) async fn run_development_roles(
         detail: String::new(),
     }));
     let api_ready = messages.clone();
+    let output: OutputStore = open_output_store(&OutputSettings::default(), &store)?;
     roles.spawn(
         Some("UI server"),
         serve_api(
@@ -195,7 +196,7 @@ pub(crate) async fn run_development_roles(
                 ServerFacts {
                     version: env!("CARGO_PKG_VERSION").into(),
                     scheduler,
-                    output: Some(open_output_store(&OutputSettings::default(), &store)?),
+                    output: Some(output.clone()),
                     ..ServerFacts::default()
                 },
             ),
@@ -217,7 +218,7 @@ pub(crate) async fn run_development_roles(
     let (location, pipes) = development_location_role(
         (&project, &executable),
         (location_id, &target),
-        (&url, &store),
+        (&url, &store, output.local_folder()),
         shutdown.clone(),
     )?;
     roles.spawn(Some("code location"), location);
@@ -281,11 +282,11 @@ async fn development_stopped(mut shutdown: watch::Receiver<bool>) {
     }
 }
 
-/// Hand off only the local file exclusion, never control-store connection credentials.
+/// Hand off only the local file and output folder exclusions, never control-store connection credentials.
 fn development_location_role(
     (project, executable): (&Path, &Path),
     (location_id, target): (Uuid, &str),
-    (url, store): (&str, &ControlStore),
+    (url, store, output): (&str, &ControlStore, Option<&Path>),
     shutdown: watch::Receiver<bool>,
 ) -> Result<
     (
@@ -315,6 +316,7 @@ fn development_location_role(
         .env_remove(SECURITY_AUDIT_WEBHOOK_VARIABLE)
         .env_remove(RUN_TOKEN_VARIABLE)
         .env_remove("SQLBUILD_DEVELOPMENT_CONTROL_FILE")
+        .env_remove(DEVELOPMENT_OUTPUT_FOLDER)
         .env(DEV_EVENTS_VARIABLE, DEV_EVENTS_ON)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -327,6 +329,9 @@ fn development_location_role(
             "SQLBUILD_DEVELOPMENT_CONTROL_FILE",
             std::env::current_dir()?.join(path),
         );
+    }
+    if let Some(folder) = output {
+        command.env(DEVELOPMENT_OUTPUT_FOLDER, folder);
     }
     let mut child = command.spawn()?;
     let group: Option<u32> = child.id();
