@@ -32,7 +32,7 @@ services:
     group_add: ["${DOCKER_GID:?Set DOCKER_GID to the Docker socket group}"]
     volumes:
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
-      - output:/home/sqlbuild/output
+      - output:/home/sqlbuild/.local/state/sqlbuild/output
     configs:
       - source: server
         target: /etc/sqlbuild/server.toml

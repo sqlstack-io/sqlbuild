@@ -131,3 +131,13 @@ pub(crate) struct OutputLocationTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_folder: &'static str,
 }
+
+/// A control store and the user's folders: where output goes with no setting.
+pub(crate) struct OutputDefaultTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) state_home: Option<&'static str>,
+    pub(crate) home: Option<&'static str>,
+    /// Absolute, or within the SQLite store's folder; `None` when there is no default.
+    pub(crate) expected_folder: Option<&'static str>,
+}

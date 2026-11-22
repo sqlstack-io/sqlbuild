@@ -66,6 +66,18 @@ pub const NODE_LOGS_PER_NODE: usize = 200;
 /// The folder an output store defaults to, beside a SQLite control store.
 pub const DEFAULT_OUTPUT_FOLDER: &str = "output";
 
+/// Names the user's state folder when it holds an absolute path.
+pub(crate) const STATE_HOME_VARIABLE: &str = "XDG_STATE_HOME";
+
+/// The user's state folder within their home, when `XDG_STATE_HOME` doesn't name one.
+pub(crate) const HOME_STATE_FOLDER: &str = ".local/state";
+
+/// SQLBuild's folder within the user's state folder.
+pub(crate) const STATE_SUBFOLDER: &str = "sqlbuild";
+
+/// Why run output has no default folder with PostgreSQL.
+pub(crate) const NO_STATE_HOME: &str = "run output has no default folder because this user has no home directory; set HOME or XDG_STATE_HOME to an absolute path, or set [output] store";
+
 /// A worker holds at most this many batches waiting to send; past them the printing thread waits.
 pub const MAX_QUEUED_BATCHES: usize = 4;
 

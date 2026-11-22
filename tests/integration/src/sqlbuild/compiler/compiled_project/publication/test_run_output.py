@@ -7,9 +7,12 @@ from typing import Any
 import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    NulLogTestCase,
     RunOutputTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    control_database,
+    control_query,
     scheduled_worker,
     wait_for_run,
 )
@@ -123,3 +126,80 @@ def test_given_a_node_printing_a_large_log_when_a_worker_runs_it_then_its_lines_
         assert any(node == "run" for node, _ in streams), streams
         assert logs == test_case.expected_logs
         assert any((worker.control_store.parent / "output" / "runs").rglob("*.zst"))
+
+
+NUL_LOG_FILES: dict[str, str] = {
+    "models/orders.sql": (
+        "MODEL (description 'Orders.', materialized table,\n"
+        '  post_hooks [python("raw")]);\n'
+        "SELECT 17 AS amount\n"
+    ),
+    "hooks/python/raw.py": (
+        "from sqlbuild.hooks import hook\n\n\n"
+        "@hook\n"
+        "def raw(ctx):\n"
+        "    '''Log text holding NUL.'''\n"
+        "    ctx.log.info('loaded ' + chr(0) + 'orders')\n"
+        "    ctx.log.warning(chr(0) + 'y' * 4096)\n"
+    ),
+}
+# NUL goes before the cut, so a message that fits without it keeps its last character.
+NUL_LOGS: list[tuple[str, str]] = [("info", "loaded orders"), ("warning", "y" * 4096)]
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        NulLogTestCase(
+            "SQLite",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(17,)],
+            backend="sqlite",
+            files=NUL_LOG_FILES,
+            expected_logs=NUL_LOGS,
+        ),
+        NulLogTestCase(
+            "PostgreSQL",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(17,)],
+            backend="postgres",
+            files=NUL_LOG_FILES,
+            expected_logs=NUL_LOGS,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_nul_in_a_ctx_log_message_when_a_worker_reports_it_then_the_log_and_finish_are_kept(
+    test_case: NulLogTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with (
+        control_database(test_case.backend) as url,
+        scheduled_worker(tmp_path, monkeypatch, test_case, database_url=url) as worker,
+    ):
+        run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
+        database: str = url or f"sqlite://{worker.control_store}"
+        logs: list[tuple[str, str]] = [
+            (level, message)
+            for level, message in control_query(
+                database,
+                "SELECT level, message FROM sqb_run_node_logs "
+                "WHERE node_key='model:orders' ORDER BY logged_at, event_id",
+            )
+        ]
+        nodes: list[tuple[str, bool]] = [
+            (status, finished is not None)
+            for status, finished in control_query(
+                database,
+                "SELECT status, finished_storage_id FROM sqb_run_nodes "
+                "WHERE node_key='model:orders' AND kind='node'",
+            )
+        ]
+        assert (run["status"], nodes, logs) == (
+            test_case.expected_status,
+            [("success", True)],
+            test_case.expected_logs,
+        ), worker.log.read_text()[-4000:]
