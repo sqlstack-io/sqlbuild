@@ -126,3 +126,38 @@ fn given_error_text_with_cut_uris_when_redacting_then_position_tells_a_port_from
         );
     }
 }
+
+#[test]
+fn given_error_text_with_nul_when_redacting_then_no_secret_assignment_gets_through() {
+    let test_cases = [
+        RedactTestCase {
+            description: "NUL inside a key",
+            text: "pass\0word=example-fake-value refused",
+            expected_text: "password=[REDACTED] refused",
+        },
+        RedactTestCase {
+            description: "NUL before the separator",
+            text: "api_key\0=example-fake-value refused",
+            expected_text: "api_key=[REDACTED] refused",
+        },
+        RedactTestCase {
+            description: "NUL inside a URI's scheme separator",
+            text: "postgres:\0//orders:example-fake-value@warehouse.example.test/orders",
+            expected_text: "postgres://orders:[REDACTED]@warehouse.example.test/orders",
+        },
+        RedactTestCase {
+            description: "NUL in text with no secret",
+            text: "refused \0order 17",
+            expected_text: "refused order 17",
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            redact_error_text(test_case.text),
+            test_case.expected_text,
+            "{}",
+            test_case.description
+        );
+    }
+}
