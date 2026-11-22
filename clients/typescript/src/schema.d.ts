@@ -3649,7 +3649,7 @@ export interface components {
         RunExecution: {
             claim: components["schemas"]["RunClaim"];
             /** @description The discovered sets the run's snapshot saved, which the worker compiles from. */
-            discovered?: Record<string, never>;
+            discovered: Record<string, never>;
             environment_hash: string;
             node_hashes: {
                 [key: string]: string;

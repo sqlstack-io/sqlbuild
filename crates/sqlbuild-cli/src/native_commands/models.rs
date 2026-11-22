@@ -205,11 +205,9 @@ pub(crate) struct LocationCompileRequest {
 pub(crate) struct LocationLoad {
     pub(crate) published: Option<LocationPublication>,
     pub(crate) rules: Option<sqlbuild_orchestration::platform::models::LocationRuleFailure>,
-    /// The discovered sets the compile used; empty from a runtime without discover functions.
-    #[serde(default)]
+    /// The discovered sets the compile used; empty in a project without discover functions.
     pub(crate) discovered: sqlbuild_orchestration::discovered_sets::types::DiscoveredSets,
     /// Each discover function's file, relative to the project.
-    #[serde(default)]
     pub(crate) discover_files: std::collections::BTreeMap<String, String>,
 }
 

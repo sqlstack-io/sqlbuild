@@ -50,7 +50,6 @@ pub enum DiscoveredSetStatus {
 #[serde(deny_unknown_fields)]
 pub struct DiscoveredResult {
     pub items: Vec<DiscoveredItem>,
-    #[serde(default)]
     pub tags: BTreeMap<String, Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_parallel: Option<u32>,
@@ -61,9 +60,7 @@ pub struct DiscoveredResult {
 #[serde(deny_unknown_fields)]
 pub struct DiscoveredItem {
     pub id: String,
-    #[serde(default)]
     pub depends_on: Vec<ItemDependency>,
-    #[serde(default)]
     pub args: BTreeMap<String, Value>,
 }
 
@@ -94,13 +91,10 @@ pub struct NodeSetDependency {
 pub struct DiscoveryPublishRequest {
     pub generation: i64,
     /// The discover functions to call again; `None` calls every one.
-    #[serde(default)]
     pub rediscover: Option<BTreeSet<String>>,
     /// The sets of the last publication, reused for every function not called again.
-    #[serde(default)]
     pub previous: DiscoveredSets,
     /// Whether a set that fails with no result of its own reads its last good one from the server.
-    #[serde(default)]
     pub seed: bool,
 }
 
@@ -109,7 +103,6 @@ pub struct DiscoveryPublishRequest {
 #[serde(deny_unknown_fields)]
 pub struct DiscoveredSetCheck {
     pub check_discovered: String,
-    #[serde(default)]
     pub previous: Option<DiscoveredSet>,
 }
 

@@ -57,23 +57,18 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                 };
                 let request: serde_json::Value = serde_json::from_str(&line).map_err(|_| {
                     PyValueError::new_err(
-                        "runtime expects a JSON generation, plan, metadata read, sensor evaluation or sensor trial per line",
+                        "runtime expects a JSON publish request, plan, metadata read, sensor evaluation or sensor trial per line",
                     )
                 })?;
-                let publication: Option<DiscoveryPublishRequest> = match request.as_i64() {
-                    Some(generation) => Some(DiscoveryPublishRequest {
-                        generation,
-                        rediscover: None,
-                        previous: Default::default(),
-                        seed: true,
-                    }),
-                    None if request.get(GENERATION_KEY).is_some() => {
-                        Some(serde_json::from_value(request.clone()).map_err(|_| {
+                let publication: Option<DiscoveryPublishRequest> = request
+                    .get(GENERATION_KEY)
+                    .is_some()
+                    .then(|| {
+                        serde_json::from_value(request.clone()).map_err(|_| {
                             PyValueError::new_err("runtime received an invalid publish request")
-                        })?)
-                    }
-                    None => None,
-                };
+                        })
+                    })
+                    .transpose()?;
                 let output = if let Some(publication) = publication {
                     let generation: i64 = publication.generation;
                     options.set_item("generation", generation)?;

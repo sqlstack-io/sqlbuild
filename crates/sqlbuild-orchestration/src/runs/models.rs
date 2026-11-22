@@ -578,7 +578,6 @@ pub struct RunExecution {
     #[serde(default)]
     pub skipped_nodes: BTreeMap<String, String>,
     /// The discovered sets the run's snapshot saved, which the worker compiles from.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     #[schema(value_type = Object)]
     pub discovered: DiscoveredSets,
 }
