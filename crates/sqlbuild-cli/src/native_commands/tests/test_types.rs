@@ -374,3 +374,22 @@ pub(super) struct DiscoveryCheckTestCase {
     pub(super) expected_republish: bool,
     pub(super) expected_ids: &'static [&'static str],
 }
+
+/// A failed compile between an edit or `r` and the next attempt, which must still discover it.
+pub(super) struct FailedCompileDiscoveryTestCase {
+    pub(super) description: &'static str,
+    pub(super) edited_before_failure: &'static [&'static str],
+    pub(super) edited_after_failure: &'static [&'static str],
+    pub(super) everything: bool,
+    /// Whether the failure came after discovery ran, so the runtime reported sets without files.
+    pub(super) discovered_before_failing: bool,
+    pub(super) expected_rediscover: Option<&'static [&'static str]>,
+}
+
+/// A second publication, and whether the location reports its discovered sets.
+pub(super) struct DiscoveryReportTestCase {
+    pub(super) description: &'static str,
+    pub(super) had_sets: bool,
+    pub(super) has_sets: bool,
+    pub(super) expected_report: bool,
+}

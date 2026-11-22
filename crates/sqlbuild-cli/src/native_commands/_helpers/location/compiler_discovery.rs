@@ -90,9 +90,9 @@ pub(crate) async fn check_discovered(
 pub(crate) async fn discovered(
     options: &LocationServe,
     (bearer, session_id): (&str, Uuid),
-    (generation, load): (i64, &LocationLoad),
+    (generation, load, discovery): (i64, &LocationLoad, &LocationDiscovery),
 ) {
-    if load.discovered.is_empty() || load.published.is_none() {
+    if !discovery.reports(load) {
         return;
     }
     if options.dev_events

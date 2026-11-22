@@ -31,14 +31,15 @@ pub(super) fn discover_for_publication(
         .extract::<String>()?
         .parse()
         .map_err(|_| PyValueError::new_err("location ID must be a UUID"))?;
-    let seed: Option<SeedSource> = request.seed.then(|| SeedSource {
-        server_url: arguments
-            .value("server_url")
-            .and_then(|url| url.extract())
-            .unwrap_or_default(),
-        location_id,
-        target: target.clone(),
-    });
+    let seed: Option<SeedSource> = if request.seed {
+        Some(SeedSource {
+            server_url: arguments.value("server_url")?.extract()?,
+            location_id,
+            target: target.clone(),
+        })
+    } else {
+        None
+    };
     set_discovery_source(DiscoverySource::Live(LiveDiscovery {
         target: Some(target),
         previous: request.previous,
