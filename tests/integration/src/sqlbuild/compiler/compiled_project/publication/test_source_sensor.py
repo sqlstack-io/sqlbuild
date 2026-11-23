@@ -68,7 +68,7 @@ from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
                         "benchmarks/duckshop/edge_cases/orchestration/orders_loader.py"
                     ).read_text(),
                 ),
-                "source_observations.json": Path(
+                ".source_observations.json": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_stale_journey.json"
                 ).read_text(),
             },
@@ -98,7 +98,7 @@ def test_given_external_source_versions_when_a_location_resyncs_then_only_change
 ) -> None:
     data: dict[str, Any] = json.loads(
         test_case.files.get(
-            "source_observations.json",
+            ".source_observations.json",
             Path(
                 "benchmarks/duckshop/edge_cases/orchestration/source_data_sensor.json"
             ).read_text(),
