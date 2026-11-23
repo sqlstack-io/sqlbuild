@@ -24,6 +24,8 @@ def node_module_files(module_path: str, source: str) -> dict[str, str]:
     folder per loader, asset or factory, named for the declaration and holding the kind-named
     file, `checks.py` with the module's checks, and an `__init__.py` re-exporting every node so
     imports of the original module keep working. A module without nodes is written unchanged.
+    Each file gets its own copy of module-level state, so state nodes share must live in a helper
+    module they import.
     """
 
     tree: ast.Module = ast.parse(source)
