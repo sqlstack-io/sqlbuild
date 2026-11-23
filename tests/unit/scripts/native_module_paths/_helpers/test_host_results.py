@@ -20,7 +20,7 @@ from tests.unit.scripts.native_module_paths._helpers.helpers import (
     [
         HostResultMirrorCase(
             description="every mirrored result enum and struct matches its Python values or fields",
-            expected_mirror_count=32,
+            expected_mirror_count=33,
             expected_mismatches=(),
         )
     ],
