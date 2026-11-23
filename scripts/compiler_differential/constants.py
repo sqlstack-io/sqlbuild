@@ -83,6 +83,8 @@ PER_PULL_REQUEST_CORPORA: tuple[str, ...] = (
 CUSTOM_RULE_FILE: str = "rules/order_names.py"
 CUSTOM_RULE_SOURCE: str = """from sqlbuild.rules import Finding, Model, RuleContext, rule
 
+MAX_MODEL_NAME_LENGTH: int = 60
+
 
 @rule(
     code="XSQBRDIFF001",
@@ -90,7 +92,7 @@ CUSTOM_RULE_SOURCE: str = """from sqlbuild.rules import Finding, Model, RuleCont
     remediation="Rename the model.",
 )
 def short_model_names(*, model: Model, ctx: RuleContext) -> list[Finding]:
-    if len(model.name) < 60:
+    if len(model.name) < MAX_MODEL_NAME_LENGTH:
         return []
     return [ctx.finding(subject=model)]
 """
