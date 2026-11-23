@@ -11,6 +11,7 @@ pub mod key_checks;
 pub mod model_files;
 pub mod models;
 pub mod orchestration_files;
+pub mod project_layout;
 pub mod project_validation;
 pub mod python_paths;
 pub mod sql_tests;

@@ -1,5 +1,6 @@
 //! Custom materialization Python files under materializations/.
 
+use sqlbuild_core::constants::MATERIALIZATIONS_PATH;
 use crate::discovery::_helpers::python_files::imported_modules::{
     ProjectDir, discovered, tuple_of,
 };
@@ -22,7 +23,7 @@ pub fn discover_materialization_files<'py>(
     let py: Python<'py> = project_dir.py();
     let project = ProjectDir { path: project_dir };
     if !project
-        .child("materializations")?
+        .child(MATERIALIZATIONS_PATH)?
         .call_method0("is_dir")?
         .is_truthy()?
     {
@@ -33,7 +34,7 @@ pub fn discover_materialization_files<'py>(
         None => PyDict::new(py),
     };
     let mut files: Vec<Bound<'py, PyAny>> = Vec::new();
-    for file_path in project.module_files("materializations", false)? {
+    for file_path in project.module_files(MATERIALIZATIONS_PATH, false)? {
         let materialize: Bound<'py, PyAny> =
             project.load(UserCodeHost::LoadMaterializeFunction, &file_path)?;
         let usages: Bound<'py, PyAny> = if materialize.is_none() {

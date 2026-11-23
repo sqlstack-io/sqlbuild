@@ -2,27 +2,19 @@
 
 use crate::constants::ORCHESTRATION_DIRECTORY;
 
-/// Top-level directories whose Python files are always supported.
-pub(crate) const DIRECT_PYTHON_ROOTS: [&str; 11] = [
-    "adapters",
-    "materializations",
-    "providers",
-    "python",
-    "rules",
-    "sinks",
-    "macros",
-    "enums",
-    "constants",
-    "event_exporters",
-    ORCHESTRATION_DIRECTORY,
+/// Project folders whose Python files are always supported, as path parts.
+pub(crate) const PYTHON_ROOTS: [&[&str]; 8] = [
+    &["python"],
+    &["rules"],
+    &[ORCHESTRATION_DIRECTORY],
+    &["sql", "macros"],
+    &["sql", "enums"],
+    &["sql", "constants"],
+    &["sql", "functions", "python"],
+    &["sql", "hooks", "python"],
 ];
-/// `(root, language)` directory pairs whose Python files are supported.
-pub(crate) const LANGUAGE_PYTHON_ROOTS: [(&str, &str); 2] =
-    [("functions", "python"), ("hooks", "python")];
 /// Top-level directories the walk does not enter.
 pub(crate) const IGNORED_ROOTS: [&str; 4] = ["logs", "target", "tests", "venv"];
-/// Root-level Python files that are supported.
-pub(crate) const SUPPORTED_ROOT_FILES: [&str; 1] = ["adapter.py"];
 /// Directories the walk never enters.
 pub(crate) const PYTHON_CACHE_DIRECTORY: &str = "__pycache__";
 /// Grouped hook roles whose Python files are supported inside an authored tree.
@@ -33,8 +25,8 @@ pub(crate) const GROUPED_PYTHON_HOOK_ROLES: [[&str; 3]; 2] = [
 /// The prefix of a hidden directory the walk skips.
 pub(crate) const HIDDEN_PREFIX: &str = ".";
 /// The folders holding project Python tests, each mirroring the project folder its second part names.
-pub(crate) const PYTHON_TEST_ROOTS: [[&str; 2]; 3] = [
-    ["tests", ORCHESTRATION_DIRECTORY],
-    ["tests", "providers"],
-    ["tests", "python"],
+pub(crate) const PYTHON_TEST_ROOTS: [&[&str]; 3] = [
+    &["tests", ORCHESTRATION_DIRECTORY],
+    &["tests", "python", "providers"],
+    &["tests", "python", "nodes"],
 ];

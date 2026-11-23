@@ -1,5 +1,6 @@
 //! Loaders for `[defaults]`, `[path_defaults]` and `[materialization_defaults]`.
 
+use sqlbuild_core::constants::SQL_DIRECTORY;
 use crate::models::ConfigValue;
 use crate::project::_helpers::durations::parse_duration;
 use crate::project::_helpers::fields::{
@@ -228,12 +229,14 @@ fn normalize_path_key(path_key: &str, file: ConfigFile) -> Loaded<String> {
             "is invalid. Path defaults cannot contain empty path segments.",
         ));
     }
-    if parts[0] == MODELS_DIRECTORY_NAME {
+    if parts[0] == MODELS_DIRECTORY_NAME
+        || (parts[0] == SQL_DIRECTORY && parts.get(1) == Some(&MODELS_DIRECTORY_NAME))
+    {
         return Err(invalid_path_key(
             file,
             path_key,
-            "uses redundant 'models/' prefix. Use a model-relative path such as 'staging' or \
-             'staging/nested'.",
+            "uses a redundant 'sql/models/' prefix. Use a model-relative path such as 'staging' \
+             or 'staging/nested'.",
         ));
     }
     let unsupported: Vec<&str> = parts

@@ -71,9 +71,9 @@ pub const TEST_NAME_KEY: &str = "name";
 pub const TEST_NAME_SEPARATOR: &str = "__";
 /// The prefix of unit test file stems, as in `test_<subject>__<behavior>.sql`.
 pub const TEST_FILE_PREFIX: &str = "test_";
-/// The root that holds unit tests, mirroring model folders below `models/`.
+/// The root that holds unit tests, mirroring model folders below `sql/models/`.
 pub const UNIT_TEST_ROOT: &str = "tests/unit";
-pub const MODELS_ROOT: &str = "models";
+pub const MODELS_ROOT: &str = "sql/models";
 pub const MODEL_MANUAL_HELP: &str = "Pass the model into the macro as an argument, or edit the listed locations, then run the command again.";
 pub const COLUMN_MANUAL_HELP: &str = "Edit the listed locations, then run the command again.";
 /// `RefactorEditError`'s code: two planned edits overlap.
@@ -106,7 +106,7 @@ pub const INVALID_NAME_PATTERN_PREFIX: &str = "invalid name_pattern: ";
 pub const JOB_FILES_DIRECTORY: &str = "orchestration/jobs";
 pub const TOML_SUFFIX: &str = ".toml";
 /// The folder path selectors start from.
-pub const MODEL_ROOT: &str = "models";
+pub const MODEL_ROOT: &str = "sql/models";
 pub const UNREADABLE_JOB_REASON: &str = "this job file cannot be read as UTF-8, so its selectors cannot be updated; fix or remove it first";
 pub const PARTIAL_FOLDER_MOVE_REASON: &str = "this job selects folder '{folder}', and {models} moved out of it; check the job still selects what it should";
 pub const UNWRITABLE_SELECTOR_REASON: &str =

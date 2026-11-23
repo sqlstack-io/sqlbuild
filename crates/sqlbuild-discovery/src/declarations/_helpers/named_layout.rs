@@ -1,8 +1,9 @@
 //! Validate where named declaration roots may appear in the project layout.
 
 use crate::constants::{
-    AUDIT_ROLE_DIRECTORY, DECLARATION_GROUP_DIRECTORY, GLOBAL_DECLARATION_DIRECTORIES,
-    GLOBAL_NAMED_DECLARATION_DIRECTORIES, LOCAL_AUDIT_ROLE_DIRECTORY,
+    AUDIT_ROLE_DIRECTORY, AUDIT_ROLE_PATH, DECLARATION_GROUP_DIRECTORY,
+    GLOBAL_DECLARATION_DIRECTORIES, GLOBAL_NAMED_DECLARATION_DIRECTORIES, GLOBAL_ROLE_PARENT,
+    LOCAL_AUDIT_ROLE_DIRECTORY,
     LOCAL_DECLARATION_DIRECTORIES, SINGULAR_AUDIT_DIRECTORY,
 };
 use crate::declarations::_helpers::declaration_groups::owned_groups;
@@ -29,23 +30,24 @@ struct RoleChildren<'a> {
 pub(crate) fn named_declaration_groups(
     tree: &ProjectTree,
 ) -> Result<Vec<DeclarationGroup>, ScanError> {
-    if tree.is_dir(AUDIT_ROLE_DIRECTORY) {
+    if tree.is_dir(AUDIT_ROLE_PATH) {
         require_role_children(
             tree,
             &RoleChildren {
-                directory: AUDIT_ROLE_DIRECTORY,
+                directory: AUDIT_ROLE_PATH,
                 allowed: AUDIT_ROLES,
-                help_text: "audit files must live in audits/generic/ or audits/singular/",
+                help_text: "audit files must live in sql/audits/generic/ or sql/audits/singular/",
             },
         )?;
     }
     let mut top_levels: Vec<&str> = GLOBAL_NAMED_DECLARATION_DIRECTORIES.to_vec();
     top_levels.sort_unstable();
-    for top_level in top_levels {
-        if !tree.is_dir(top_level) {
+    for name_of_role in top_levels {
+        let top_level: String = join(GLOBAL_ROLE_PARENT, name_of_role);
+        if !tree.is_dir(&top_level) {
             continue;
         }
-        if let Some(nested) = directories(tree, top_level)?
+        if let Some(nested) = directories(tree, &top_level)?
             .into_iter()
             .find(|directory| is_nested_role_directory(name(directory)))
         {

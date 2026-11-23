@@ -384,8 +384,9 @@ fn direct_parent_components(path: &str, root: &str) -> Option<Vec<String>> {
     if path.len() <= root.len() || path.get(..root.len()) != Some(root.as_slice()) {
         return None;
     }
+    let start: usize = usize::from(path.first() == Some(&sqlbuild_core::constants::SQL_DIRECTORY));
     Some(
-        path[..path.len() - 1]
+        path[start..path.len() - 1]
             .iter()
             .map(|value| (*value).to_owned())
             .collect(),

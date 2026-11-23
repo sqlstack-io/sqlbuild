@@ -10,6 +10,7 @@ use crate::scope_index::models::{
 };
 use crate::scope_report::_helpers::context::Context;
 use crate::scope_report::_helpers::paths::safe_scope_path;
+use crate::scope_index::constants::GLOBAL_ROLE_PARENT;
 use crate::scope_report::constants::{ENUM_MEMBER_PREVIEW, GROUP_DIRECTORY, PATH_SEPARATOR};
 use crate::scope_report::models::{
     DeclarationReport, DeclarationValues, MacroValues, Provenance, SourceLocation,
@@ -72,7 +73,7 @@ pub(crate) fn container(record: &DeclarationRecord) -> Container {
     let parts: Vec<&str> = safe.split(PATH_SEPARATOR).collect();
     let mut role_index: usize = match record.owning_path.as_deref() {
         Some(owning) if !owning.is_empty() => owning.split(PATH_SEPARATOR).count(),
-        _ => 0,
+        _ => usize::from(parts.first() == Some(&GLOBAL_ROLE_PARENT)),
     };
     if parts.get(role_index) == Some(&GROUP_DIRECTORY) {
         role_index += 1;

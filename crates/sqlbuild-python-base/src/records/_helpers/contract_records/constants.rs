@@ -541,8 +541,12 @@ const R_PROJECT_CONFIG: RecordSpec = RecordSpec {
             FieldDefault::NativeCall(RecordId::ScenarioConfig),
         ),
         FieldSpec::new("dbt", FieldDefault::NativeCall(RecordId::DbtConfig)),
-        FieldSpec::new("sinks", FieldDefault::NativeCall(RecordId::SinksConfig)),
+        FieldSpec::new(
+            "event_sinks",
+            FieldDefault::NativeCall(RecordId::SinksConfig),
+        ),
         FieldSpec::new("env_file", FieldDefault::None),
+        FieldSpec::new("extra_paths", FieldDefault::EmptyTuple),
     ],
 };
 const R_LOCAL_CONFIG: RecordSpec = RecordSpec {

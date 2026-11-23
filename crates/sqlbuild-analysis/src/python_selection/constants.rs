@@ -19,7 +19,7 @@ pub(crate) const SQL_MODEL_DEPENDENCY_TYPES: [&str; 6] =
 pub(crate) const EXPANSION_MARKER: char = '+';
 pub(crate) const INTERSECTION_SEPARATOR: char = ',';
 pub(crate) const PATTERN_CHARACTERS: [char; 3] = ['*', '?', '['];
-pub(crate) const SQL_MODEL_PATH_ROOT: &str = "models";
+pub(crate) const SQL_MODEL_PATH_ROOT: &str = sqlbuild_core::constants::MODELS_PATH;
 pub(crate) const CURRENT_DIRECTORY: &str = ".";
 pub(crate) const ROOT_DIRECTORY: &str = "/";
 pub(crate) const PLANNER_DEFAULT_CODE: &str = "S000";
@@ -31,7 +31,7 @@ pub(crate) const PATH_BETWEEN_CODE: &str = "S011";
 pub(crate) const PATH_ROOT_CODE: &str = "S012";
 pub(crate) const UNIT_TEST_CODE: &str = "S013";
 pub(crate) const PATH_ROOT_ERROR: &str =
-    "path selectors require an explicit root: use 'models/' or 'python/'";
+    "path selectors require an explicit root: use 'sql/models/' or 'python/nodes/'";
 pub(crate) const UNIT_TEST_ONLY_TEST_AND_BUILD: &str =
     "only `sqb test` and `sqb build` accept unit-test selectors";
 /// Codes `sqb check` ignores for an exclude token that matches no Python node.

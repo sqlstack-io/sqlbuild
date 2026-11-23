@@ -8531,6 +8531,9 @@ class EventExporterDiscoveryError(DiscoveryError):
 class OrchestrationDeclarationError(DiscoveryError):
     """Raised when an orchestration job, job group, calendar or sensor declaration is invalid."""
 
+class ProjectLayoutError(DiscoveryError):
+    """Raised when a project holds an entry outside the SQLBuild project layout."""
+
 class ProjectPythonPathError(DiscoveryError):
     """Raised when project-owned Python lives outside a supported extension root."""
 

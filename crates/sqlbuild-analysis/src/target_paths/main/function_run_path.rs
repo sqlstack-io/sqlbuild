@@ -3,14 +3,14 @@
 use crate::target_paths::_helpers::path_text::with_suffix;
 use crate::target_paths::constants::{FUNCTIONS_DIR, SQL_FILE_SUFFIX};
 
-/// The function's path under `functions/<language>/`, with a `.sql` suffix.
+/// The function's path under `sql/functions/<language>/`, with a `.sql` suffix.
 #[must_use]
 pub fn function_run_path(relative_path: &str, language: &str) -> String {
-    let mut parts = relative_path.split('/');
-    let path: String = if parts.next() == Some(FUNCTIONS_DIR) && parts.next() == Some(language) {
+    let root: String = format!("{FUNCTIONS_DIR}/{language}/");
+    let path: String = if relative_path.starts_with(&root) {
         relative_path.to_owned()
     } else {
-        format!("{FUNCTIONS_DIR}/{language}/{relative_path}")
+        format!("{root}{relative_path}")
     };
     with_suffix(&path, SQL_FILE_SUFFIX)
 }

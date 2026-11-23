@@ -150,6 +150,15 @@ pub(crate) const COMPILER_ERRORS: &[ErrorSpec] = &[
         fixed: &[],
     },
     ErrorSpec {
+        name: "ProjectLayoutError",
+        parent: "DiscoveryError",
+        doc: "Raised when a project holds an entry outside the SQLBuild project layout.",
+        class_attributes: &[("code", ClassValue::Text("D018"))],
+        required: &[],
+        optional: &[],
+        fixed: &[],
+    },
+    ErrorSpec {
         name: "ProjectPythonPathError",
         parent: "DiscoveryError",
         doc: "Raised when project-owned Python lives outside a supported extension root.",

@@ -101,6 +101,8 @@ futures-util = { version = "0.3", default-features = false, features = ["std"] }
 # `sqb` names compute log captures with random ids, as `uuid.uuid4().hex`.
 getrandom = "0.4"
 globset = "0.4"
+# Gitignore matching for the project layout check.
+ignore = "0.4"
 # Windows only: tells NTFS junctions, which Python walks as directories, from symbolic links.
 junction = { version = "2.1.0", default-features = false }
 keyring = { version = "3.6.3", default-features = false }

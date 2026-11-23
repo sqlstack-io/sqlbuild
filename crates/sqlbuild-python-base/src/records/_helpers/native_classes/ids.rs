@@ -625,6 +625,7 @@ native_id_names! {
         ErrorId::OrchestrationDeclaration => "OrchestrationDeclarationError",
         ErrorId::ProjectCompile => "ProjectCompileError",
         ErrorId::ProjectConfig => "ProjectConfigError",
+        ErrorId::ProjectLayout => "ProjectLayoutError",
         ErrorId::ProjectPath => "ProjectPathError",
         ErrorId::ProjectPythonPath => "ProjectPythonPathError",
         ErrorId::ProviderDiscovery => "ProviderDiscoveryError",

@@ -7,12 +7,17 @@ use crate::lint_text::constants::{
 /// Model files outside declaration folders hold one header; every other file may hold several.
 #[must_use]
 pub fn first_header_only(relative_parts: &[String]) -> bool {
-    let Some((first, rest)) = relative_parts.split_first() else {
+    if relative_parts.len() <= MODELS_DIRECTORY.len()
+        || relative_parts
+            .iter()
+            .zip(MODELS_DIRECTORY)
+            .any(|(part, root)| part != root)
+    {
         return false;
-    };
+    }
+    let rest: &[String] = &relative_parts[MODELS_DIRECTORY.len()..];
     let folders: &[String] = rest.split_last().map_or(&[], |(_, folders)| folders);
-    first == MODELS_DIRECTORY
-        && !folders.iter().any(|folder| {
+    !folders.iter().any(|folder| {
             folder == DECLARATION_GROUP_DIRECTORY
                 || SCOPED_DECLARATION_DIRECTORIES.contains(&folder.as_str())
         })
