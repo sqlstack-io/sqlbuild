@@ -129,7 +129,8 @@
 
 	<div class="head">
 		<Glyph size={14} strokeWidth={1.75} class="glyph" />
-		<span class="name" title={d.name}>{d.label ?? d.name}</span>
+		<!-- A name too long gives way at its start, so its distinct end stays. -->
+		<span class="name" title={d.name}><bdi>{d.label ?? d.name}</bdi></span>
 		{#if f.kind}<span class="kind">{kindShort}</span>{/if}
 	</div>
 
@@ -204,6 +205,14 @@
 		font-weight: 600;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	.name {
+		direction: rtl;
+		text-align: left;
+	}
+	.name bdi {
+		direction: ltr;
+		unicode-bidi: isolate;
 	}
 	.kind {
 		flex: 0 0 auto;

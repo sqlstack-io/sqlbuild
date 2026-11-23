@@ -2,6 +2,7 @@
 // resolves selectors against the real snapshot; this stands in for it.
 
 import type { NodeKind, SnapshotNode } from '../types';
+import { DISCOVERED_NODES } from './discovered';
 import type { SelectionProblem, SelectionVocabulary, VocabularyEntry } from '../types/operate';
 
 function node(
@@ -72,7 +73,9 @@ export const SNAPSHOT_NODES: SnapshotNode[] = [
 	// A Python task that fails with a pandas KeyError traceback after printing a few thousand lines.
 	node('score_customers_v2', 'asset', 'ml', ['dim_customers'], { path: 'models/ml/score_customers_v2.py' }),
 	// A notebook runner that prints about 2 million lines (CHI-1597).
-	node('notebook_runner', 'asset', 'ml', ['fact_orders'], { path: 'models/ml/notebook_runner.py' })
+	node('notebook_runner', 'asset', 'ml', ['fact_orders'], { path: 'models/ml/notebook_runner.py' }),
+	// Discovered steps of two forecast plans (discovered.ts).
+	...DISCOVERED_NODES
 ];
 
 const BY_KEY = new Map(SNAPSHOT_NODES.map((n) => [n.key, n]));

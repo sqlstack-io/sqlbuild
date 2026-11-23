@@ -64,13 +64,17 @@ function pillProblems(): string[] {
 		if (Math.abs(box.height - 30) > 1) problems.push(`${full}: its pill is ${box.height.toFixed(1)} px tall`);
 		// One line: never wrapped, one line box.
 		if (getComputedStyle(name).whiteSpace !== 'nowrap' || name.getClientRects().length !== 1 || name.getBoundingClientRect().height > px * 1.6) problems.push(`${full}: its name wraps`);
-		// It fits; cut only once it can shrink no further, and then in its middle, keeping both ends.
+		// It fits; cut only once it can shrink no further, and then in its middle, keeping both ends, or,
+		// when it shares a prefix with a sibling, without that prefix, as "…order_activity" or "…order…vity".
 		const text = name.textContent ?? '';
 		const tail = name.dataset.tail ?? '';
 		const [head, end = ''] = text.split('…');
+		const [restStart, restEnd = ''] = text.startsWith('…') ? text.slice(1).split('…') : [null];
+		const at = restStart ? tail.indexOf(restStart) : -1;
+		const afterPrefix = restStart != null && at > 0 && /[_.[/:-]/.test(tail[at - 1]) && tail.endsWith(restEnd || restStart);
 		if (name.scrollWidth > name.clientWidth + 0.5) problems.push(`${full}: "${text}" overflows its pill`);
 		if (text.includes('…') && px > 12.05) problems.push(`${full}: cut at ${px.toFixed(2)} px, before shrinking to 12`);
-		if (!full.endsWith(tail) || !tail.startsWith(head) || !tail.endsWith(end)) problems.push(`${full}: shows "${text}", not its tail "${tail}" cut in the middle`);
+		if (!full.endsWith(tail) || (!afterPrefix && (!tail.startsWith(head) || !tail.endsWith(end)))) problems.push(`${full}: shows "${text}", not its tail "${tail}" cut in the middle`);
 		const ring = pill.querySelector<HTMLElement>('.ring')!;
 		const want = expected(card);
 		if (want && getComputedStyle(ring).borderTopColor !== want) problems.push(`${full}: its ring is ${getComputedStyle(ring).borderTopColor}, its state ${want}`);
@@ -138,10 +142,18 @@ test('a selected pill stands out from the rest', async ({ page }) => {
 	await page.waitForTimeout(800);
 	await zoomTo(page, 0.5);
 	const pills = page.locator('.cface .pill');
+	// Two pills wholly in view of the graph, so neither sits under the sidebar.
+	const [one, two] = await pills.evaluateAll((all) => {
+		const flow = document.querySelector('.graph-canvas')!.getBoundingClientRect();
+		return all.flatMap((p, i) => {
+			const b = p.getBoundingClientRect();
+			return b.left >= flow.left && b.right <= flow.right && b.top >= flow.top && b.bottom <= flow.bottom ? [i] : [];
+		});
+	});
 	const looks = (i: number) => pills.nth(i).evaluate((p) => ({ border: getComputedStyle(p).borderTopColor, ring: getComputedStyle(p).boxShadow, fill: getComputedStyle(p).backgroundColor }));
-	const before = await looks(1);
-	await pills.nth(1).click();
-	const [selected, other] = [await looks(1), await looks(2)];
+	const before = await looks(one);
+	await pills.nth(one).click();
+	const [selected, other] = [await looks(one), await looks(two)];
 	const primary = await page.evaluate(() => { const i = document.body.appendChild(document.createElement('i')); i.style.color = getComputedStyle(document.documentElement).getPropertyValue('--primary'); const c = getComputedStyle(i).color; i.remove(); return c; });
 	expect(selected.border).toBe(primary);
 	expect(selected.ring).not.toBe('none');

@@ -2,7 +2,7 @@
 	import '@xyflow/svelte/dist/style.css';
 	import { Controls, SvelteFlow, ViewportPortal, type Edge, type Node, type Viewport } from '@xyflow/svelte';
 	import { setContext, untrack } from 'svelte';
-	import { COMPACT_TAILS, compactTitleOf, siblingTails, type CompactTails } from './compact-tails';
+	import { COMPACT_TAILS, compactTitleOf, siblingLeads, siblingTails, type CompactTails } from './compact-tails';
 	import { unzoom } from '$lib/lineage/hit-area';
 	import { obstacles, shareObstacles } from '$lib/lineage/edge-routes';
 	import type { ComponentProps, Snippet } from 'svelte';
@@ -133,7 +133,9 @@
 	const titled = $derived(cardKey ? cardKey.split('\n').map((line) => line.split('\t')).filter(([, , title]) => title).map(([id, parent, title]) => ({ id, parent, title })) : []);
 	const tails = $derived(siblingTails(titled));
 	const parents = $derived(new Map(titled.map((c) => [c.id, c.parent])));
-	setContext<CompactTails>(COMPACT_TAILS, { tail: (id) => tails.get(id), parent: (id) => parents.get(id) });
+	// The prefix each pill name shares with a sibling's, dropped first when it doesn't fit.
+	const leads = $derived(siblingLeads(titled, tails));
+	setContext<CompactTails>(COMPACT_TAILS, { tail: (id) => tails.get(id), parent: (id) => parents.get(id), lead: (id) => leads.get(id) ?? 0 });
 	const compact = $derived(level > 0);
 	const titleUnzoom = $derived(compact ? 1 / Math.max(settledZoom, LABEL_MIN_ZOOM) : 1);
 	const controlScale = $derived(unzoom(settledZoom));
