@@ -24,7 +24,8 @@ from tests.integration.src.sqlbuild.cli.commands.main.helpers import build_argum
             description="a step that ignores the cancel",
             parameters="",
             step_body='(DIRECTORY / f"{ctx.discovered.item}.running").touch(); time.sleep(120)',
-            started_marker="pick.running",
+            started_markers=("pack.running", "pick.running"),
+            started_lines=(),
             sent_signal=signal.SIGTERM,
             expected_exit_code=143,
         ),
@@ -32,7 +33,8 @@ from tests.integration.src.sqlbuild.cli.commands.main.helpers import build_argum
             description="a step in another provider's first setup",
             parameters="gateway_provider: GatewayProvider",
             step_body="gateway_provider.model_dump()",
-            started_marker="setup-started",
+            started_markers=("setup-started",),
+            started_lines=("fulfil[pack] START", "fulfil[pick] START"),
             sent_signal=signal.SIGINT,
             expected_exit_code=130,
         ),
@@ -55,7 +57,10 @@ def test_given_a_sink_sharing_providers_when_a_step_is_abandoned_then_nothing_is
         )
         try:
             deadline: float = time.monotonic() + 60
-            while not (tmp_path / test_case.started_marker).exists():
+            while not (
+                all((tmp_path / marker).exists() for marker in test_case.started_markers)
+                and all(line in log.read_text() for line in test_case.started_lines)
+            ):
                 assert process.poll() is None, log.read_text()
                 assert time.monotonic() < deadline, log.read_text()
                 time.sleep(0.05)
