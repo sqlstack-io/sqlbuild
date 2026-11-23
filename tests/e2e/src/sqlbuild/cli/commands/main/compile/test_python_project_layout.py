@@ -666,7 +666,7 @@ _ASSET_MODULE: str = (
             description="an asset in node.py",
             repo_files={
                 "sqlbuild_project.toml": _LAYOUT_CONFIG,
-                "python/nodes/orders/export/asset.py": _ASSET_MODULE,
+                "python/nodes/orders/export/node.py": _ASSET_MODULE,
             },
             expected_exit_code=1,
             expected_stderr_fragments=(

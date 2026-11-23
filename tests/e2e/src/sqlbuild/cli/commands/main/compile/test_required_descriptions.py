@@ -189,14 +189,14 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         missing_files=(
             ("sql/sources/raw.yml", "sources:\n  - name: raw_customers\n    managed: true\n"),
             (
-                "python/nodes/loaders/raw_customers.py",
+                "python/nodes/loaders/raw_customers/loader.py",
                 python_node_source(module="loaders", decorator="loader", name="raw_customers"),
             ),
         ),
         described_files=(
             ("sql/sources/raw.yml", "sources:\n  - name: raw_customers\n    managed: true\n"),
             (
-                "python/nodes/loaders/raw_customers.py",
+                "python/nodes/loaders/raw_customers/loader.py",
                 python_node_source(
                     module="loaders",
                     decorator="loader",
@@ -208,7 +208,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         expected_diagnostic=("P010", "sql/sources/raw.yml", 2),
         expected_message="source 'raw_customers' has no description",
         expected_help_fragments=(
-            "or describe its loader 'raw_customers' in python/nodes/loaders/raw_customers.py with a "
+            "or describe its loader 'raw_customers' in python/nodes/loaders/raw_customers/loader.py with a "
             'docstring or @loader(description="What one row of raw_customers represents")',
         ),
     ),
@@ -365,13 +365,13 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         description="loader without a source declaration",
         missing_files=(
             (
-                "python/nodes/loaders/raw_returns.py",
+                "python/nodes/loaders/raw_returns/loader.py",
                 python_node_source(module="loaders", decorator="loader", name="raw_returns"),
             ),
         ),
         described_files=(
             (
-                "python/nodes/loaders/raw_returns.py",
+                "python/nodes/loaders/raw_returns/loader.py",
                 python_node_source(
                     module="loaders",
                     decorator="loader",
@@ -380,7 +380,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
                 ),
             ),
         ),
-        expected_diagnostic=("P010", "python/nodes/loaders/raw_returns.py", 4),
+        expected_diagnostic=("P010", "python/nodes/loaders/raw_returns/loader.py", 4),
         expected_message="loader 'raw_returns' has no description",
         expected_help_fragments=('@loader(description="What raw_returns does", ...)',),
     ),
@@ -388,13 +388,13 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         description="asset",
         missing_files=(
             (
-                "python/nodes/assets/order_report.py",
+                "python/nodes/assets/order_report/asset.py",
                 python_node_source(module="assets", decorator="asset", name="order_report"),
             ),
         ),
         described_files=(
             (
-                "python/nodes/assets/order_report.py",
+                "python/nodes/assets/order_report/asset.py",
                 python_node_source(
                     module="assets",
                     decorator="asset",
@@ -403,7 +403,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
                 ),
             ),
         ),
-        expected_diagnostic=("P010", "python/nodes/assets/order_report.py", 4),
+        expected_diagnostic=("P010", "python/nodes/assets/order_report/asset.py", 4),
         expected_message="asset 'order_report' has no description",
         expected_help_fragments=('@asset(description="What order_report does", ...)',),
     ),
@@ -411,7 +411,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         description="check",
         missing_files=(
             (
-                "python/nodes/checks/orders_present.py",
+                "python/nodes/checks/orders_present/checks.py",
                 python_node_source(
                     module="checks",
                     decorator="check",
@@ -423,7 +423,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         ),
         described_files=(
             (
-                "python/nodes/checks/orders_present.py",
+                "python/nodes/checks/orders_present/checks.py",
                 python_node_source(
                     module="checks",
                     decorator="check",
@@ -434,7 +434,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
                 ),
             ),
         ),
-        expected_diagnostic=("P010", "python/nodes/checks/orders_present.py", 5),
+        expected_diagnostic=("P010", "python/nodes/checks/orders_present/checks.py", 5),
         expected_message="check 'orders_present' has no description",
         expected_help_fragments=('@check(description="What orders_present does", ...)',),
     ),
@@ -491,7 +491,7 @@ _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
             description="asset docstring",
             missing_files=(
                 (
-                    "python/nodes/assets/order_report.py",
+                    "python/nodes/assets/order_report/asset.py",
                     python_node_source(
                         module="assets",
                         decorator="asset",
@@ -502,7 +502,7 @@ _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
             ),
             described_files=(
                 (
-                    "python/nodes/assets/order_report.py",
+                    "python/nodes/assets/order_report/asset.py",
                     python_node_source(
                         module="assets",
                         decorator="asset",
@@ -511,7 +511,7 @@ _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
                     ),
                 ),
             ),
-            expected_diagnostic=("P027", "python/nodes/assets/order_report.py", 4),
+            expected_diagnostic=("P027", "python/nodes/assets/order_report/asset.py", 4),
             expected_message="asset 'order_report' description exceeds 10 lines",
             expected_help_fragments=("Shorten the description to 10 lines",),
         ),
@@ -519,7 +519,7 @@ _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
             description="asset description argument",
             missing_files=(
                 (
-                    "python/nodes/assets/order_report.py",
+                    "python/nodes/assets/order_report/asset.py",
                     python_node_source(
                         module="assets",
                         decorator="asset",
@@ -530,7 +530,7 @@ _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
             ),
             described_files=(
                 (
-                    "python/nodes/assets/order_report.py",
+                    "python/nodes/assets/order_report/asset.py",
                     python_node_source(
                         module="assets",
                         decorator="asset",
@@ -539,7 +539,7 @@ _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
                     ),
                 ),
             ),
-            expected_diagnostic=("P027", "python/nodes/assets/order_report.py", 4),
+            expected_diagnostic=("P027", "python/nodes/assets/order_report/asset.py", 4),
             expected_message="asset 'order_report' description exceeds 10 lines",
             expected_help_fragments=("Shorten the description to 10 lines",),
         ),
