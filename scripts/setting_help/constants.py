@@ -22,4 +22,11 @@ YAML_FILE_TEXT_MODULES: frozenset[str] = frozenset(
     }
 )
 RUST_TEST_PATH_MARKER: str = "/tests/"
-RUST_STRING_DELIMITER: str = '"'
+RUST_TOKEN_PATTERN: re.Pattern[str] = re.compile(
+    r"//[^\n]*"
+    r"|/\*.*?\*/"
+    r'|(?<![A-Za-z0-9_])[bc]?r(?P<hashes>#*)"(?P<raw>.*?)"(?P=hashes)'
+    r'|(?<![A-Za-z0-9_])[bc]?"(?P<text>(?:\\.|[^"\\])*)"'
+    r"|(?<![A-Za-z0-9_])b?'(?:\\u\{[0-9a-fA-F]{1,6}\}|\\.|[^\\'\n])'",
+    re.DOTALL,
+)
