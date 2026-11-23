@@ -198,7 +198,7 @@ def test_given_hook_files_when_discovering_then_returns_decorated_hooks(
     )
     assert all(callable(hook.function) for hook in hooks)
     assert (
-        tmp_path / "sql" / "hooks" / "python" / "nodes" / "executed.marker"
+        tmp_path / "sql" / "hooks" / "python" / "executed.marker"
     ).is_file() is test_case.expected_marker_file_exists
 
 

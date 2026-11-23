@@ -29,6 +29,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     query_duckdb,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 PROVIDER_FAILURE_PROJECT_TOML: str = (
     dedent(
@@ -130,8 +131,10 @@ def test_given_provider_usages_when_planning_then_text_and_json_include_selected
                 """
             ).strip()
             + "\n",
-            "python/nodes/loaders/raw_orders.py": dedent(
-                """
+            **node_module_files(
+                "python/nodes/loaders/raw_orders.py",
+                dedent(
+                    """
                 from python.providers.marker import MarkerProvider
                 from sqlbuild.loaders import loader
 
@@ -141,10 +144,13 @@ def test_given_provider_usages_when_planning_then_text_and_json_include_selected
                     '''Test loader raw_orders.'''
                     return [{"order_id": 1, "amount": 10}]
                 """
-            ).strip()
-            + "\n",
-            "python/nodes/tasks/publish_orders.py": dedent(
-                """
+                ).strip()
+                + "\n",
+            ),
+            **node_module_files(
+                "python/nodes/tasks/publish_orders.py",
+                dedent(
+                    """
                 from python.providers.marker import MarkerProvider
                 from sqlbuild.assets import asset
 
@@ -154,8 +160,9 @@ def test_given_provider_usages_when_planning_then_text_and_json_include_selected
                     '''Test task publish_orders.'''
                     marker_provider.label
                 """
-            ).strip()
-            + "\n",
+                ).strip()
+                + "\n",
+            ),
             "sql/hooks/python/mark_pre.py": dedent(
                 """
                 from python.providers.marker import MarkerProvider
@@ -323,8 +330,10 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                 """
             ).strip()
             + "\n",
-            "python/nodes/tasks/provider_task.py": dedent(
-                """
+            **node_module_files(
+                "python/nodes/tasks/provider_task.py",
+                dedent(
+                    """
                 from python.providers.marker import MarkerProvider
                 from sqlbuild.assets import asset
 
@@ -334,10 +343,13 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                     '''Test task provider_task.'''
                     marker_provider.mark(f"run_task:{marker_provider.label}")
                 """
-            ).strip()
-            + "\n",
-            "python/nodes/assets/provider_asset.py": dedent(
-                """
+                ).strip()
+                + "\n",
+            ),
+            **node_module_files(
+                "python/nodes/assets/provider_asset.py",
+                dedent(
+                    """
                 from python.providers.marker import MarkerProvider
                 from sqlbuild.assets import asset
 
@@ -347,10 +359,13 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                     '''Test asset provider_asset.'''
                     marker_provider.mark(f"build_asset:{marker_provider.label}")
                 """
-            ).strip()
-            + "\n",
-            "python/nodes/checks/provider_check.py": dedent(
-                """
+                ).strip()
+                + "\n",
+            ),
+            **node_module_files(
+                "python/nodes/checks/provider_check.py",
+                dedent(
+                    """
                 from python.providers.marker import MarkerProvider
                 from sqlbuild.checks import check
 
@@ -361,10 +376,13 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                     marker_provider.mark(f"check:{marker_provider.label}")
                     return True
                 """
-            ).strip()
-            + "\n",
-            "python/nodes/loaders/provider_loader.py": dedent(
-                """
+                ).strip()
+                + "\n",
+            ),
+            **node_module_files(
+                "python/nodes/loaders/provider_loader.py",
+                dedent(
+                    """
                 from python.providers.marker import MarkerProvider
                 from sqlbuild.loaders import loader
 
@@ -375,8 +393,9 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                     marker_provider.mark(f"load:{marker_provider.label}")
                     return [{"event_id": 1, "label": marker_provider.label}]
                 """
-            ).strip()
-            + "\n",
+                ).strip()
+                + "\n",
+            ),
             "sql/sources/raw.yml": dedent(
                 """
                 sources:
@@ -445,8 +464,10 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
             repo_files={
                 "sqlbuild_project.toml": PROVIDER_FAILURE_PROJECT_TOML,
                 "python/providers/marker.py": PROVIDER_MARKER_FILE,
-                "python/nodes/tasks/failing_task.py": dedent(
-                    """
+                **node_module_files(
+                    "python/nodes/tasks/failing_task.py",
+                    dedent(
+                        """
                     from python.providers.marker import MarkerProvider
                     from sqlbuild.assets import asset
 
@@ -457,8 +478,9 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                         marker_provider.mark("task")
                         raise RuntimeError("intentional provider failure")
                     """
-                ).strip()
-                + "\n",
+                    ).strip()
+                    + "\n",
+                ),
             },
             expected_marker_entries=("setup", "task", "teardown"),
         ),
@@ -468,8 +490,10 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
             repo_files={
                 "sqlbuild_project.toml": PROVIDER_FAILURE_PROJECT_TOML,
                 "python/providers/marker.py": PROVIDER_MARKER_FILE,
-                "python/nodes/assets/failing_asset.py": dedent(
-                    """
+                **node_module_files(
+                    "python/nodes/assets/failing_asset.py",
+                    dedent(
+                        """
                     from python.providers.marker import MarkerProvider
                     from sqlbuild.assets import asset
 
@@ -480,8 +504,9 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                         marker_provider.mark("asset")
                         raise RuntimeError("intentional provider failure")
                     """
-                ).strip()
-                + "\n",
+                    ).strip()
+                    + "\n",
+                ),
             },
             expected_marker_entries=("setup", "asset", "teardown"),
         ),
@@ -491,8 +516,10 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
             repo_files={
                 "sqlbuild_project.toml": PROVIDER_FAILURE_PROJECT_TOML,
                 "python/providers/marker.py": PROVIDER_MARKER_FILE,
-                "python/nodes/checks/failing_check.py": dedent(
-                    """
+                **node_module_files(
+                    "python/nodes/checks/failing_check.py",
+                    dedent(
+                        """
                     from python.providers.marker import MarkerProvider
                     from sqlbuild.checks import check
 
@@ -503,8 +530,9 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                         marker_provider.mark("check")
                         raise RuntimeError("intentional provider failure")
                     """
-                ).strip()
-                + "\n",
+                    ).strip()
+                    + "\n",
+                ),
             },
             expected_marker_entries=("setup", "check", "teardown"),
         ),
@@ -514,8 +542,10 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
             repo_files={
                 "sqlbuild_project.toml": PROVIDER_FAILURE_PROJECT_TOML,
                 "python/providers/marker.py": PROVIDER_MARKER_FILE,
-                "python/nodes/loaders/failing_loader.py": dedent(
-                    """
+                **node_module_files(
+                    "python/nodes/loaders/failing_loader.py",
+                    dedent(
+                        """
                     from python.providers.marker import MarkerProvider
                     from sqlbuild.loaders import loader
 
@@ -526,8 +556,9 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                         marker_provider.mark("load")
                         raise RuntimeError("intentional provider failure")
                     """
-                ).strip()
-                + "\n",
+                    ).strip()
+                    + "\n",
+                ),
                 "sql/sources/raw.yml": dedent(
                     """
                     sources:
@@ -596,8 +627,10 @@ def test_given_provider_project_when_running_compile_or_plan_then_provider_setup
         repo_files={
             "sqlbuild_project.toml": PROVIDER_FAILURE_PROJECT_TOML,
             "python/providers/marker.py": PROVIDER_MARKER_FILE,
-            "python/nodes/tasks/provider_task.py": dedent(
-                """
+            **node_module_files(
+                "python/nodes/tasks/provider_task.py",
+                dedent(
+                    """
                 from python.providers.marker import MarkerProvider
                 from sqlbuild.assets import asset
 
@@ -607,8 +640,9 @@ def test_given_provider_project_when_running_compile_or_plan_then_provider_setup
                     '''Test task provider_task.'''
                     marker_provider.mark("task")
                 """
-            ).strip()
-            + "\n",
+                ).strip()
+                + "\n",
+            ),
             "sql/models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS id\n",
         },
     )
@@ -647,15 +681,17 @@ def test_given_alias_imported_provider_annotation_when_running_command_then_cli_
         repo_files={
             "sqlbuild_project.toml": PROVIDER_FAILURE_PROJECT_TOML,
             "python/providers/marker.py": PROVIDER_MARKER_FILE,
-            "python/nodes/tasks/alias_task.py": dedent(
-                """
+            **node_module_files(
+                "python/nodes/tasks/alias_task.py",
+                dedent(
+                    """
                 import importlib.util
                 import sys
                 from pathlib import Path
 
                 from sqlbuild.assets import asset
 
-                provider_path = Path(__file__).parents[3] / "python" / "nodes" / "python" / "providers" / "marker.py"
+                provider_path = Path(__file__).parents[3] / "python" / "providers" / "marker.py"
                 spec = importlib.util.spec_from_file_location("alias_marker", provider_path)
                 alias_marker = importlib.util.module_from_spec(spec)
                 sys.modules["alias_marker"] = alias_marker
@@ -669,8 +705,9 @@ def test_given_alias_imported_provider_annotation_when_running_command_then_cli_
                     '''Test task alias_task.'''
                     marker_provider.mark("task")
                 """
-            ).strip()
-            + "\n",
+                ).strip()
+                + "\n",
+            ),
         },
     )
 
@@ -798,8 +835,10 @@ def test_given_concurrent_provider_backed_nodes_when_running_command_then_share_
                 """
             ).strip()
             + "\n",
-            "python/nodes/loaders/events.py": dedent(
-                """
+            **node_module_files(
+                "python/nodes/loaders/events.py",
+                dedent(
+                    """
                 from python.providers.concurrent_marker import ConcurrentMarkerProvider
                 from sqlbuild.loaders import loader
 
@@ -817,8 +856,9 @@ def test_given_concurrent_provider_backed_nodes_when_running_command_then_share_
                     concurrent_marker_provider.mark("beta")
                     return [{"event_id": 2}]
                 """
-            ).strip()
-            + "\n",
+                ).strip()
+                + "\n",
+            ),
             "sql/sources/raw.yml": dedent(
                 """
                 sources:
@@ -1419,7 +1459,7 @@ def test_given_alias_imported_provider_annotation_on_hook_when_building_then_cli
 
                 from sqlbuild.hooks import hook
 
-                provider_path = Path(__file__).parents[2] / "python" / "nodes" / "python" / "providers" / "marker.py"
+                provider_path = Path(__file__).parents[2] / "python" / "providers" / "marker.py"
                 spec = importlib.util.spec_from_file_location("alias_marker", provider_path)
                 alias_marker = importlib.util.module_from_spec(spec)
                 sys.modules["alias_marker"] = alias_marker

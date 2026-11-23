@@ -293,7 +293,7 @@ def prepare_clickhouse_waffle_shop(
     project_dir: Path = prepare_waffle_shop(tmp_path)
     (project_dir / "sql" / "functions" / "sql" / "customer_orders.sql").unlink()
     (project_dir / "tests" / "unit" / "test_customer_orders_table_fn.sql").unlink()
-    (project_dir / "sql" / "functions" / "python" / "nodes" / "is_completed_order_py.py").unlink()
+    (project_dir / "sql" / "functions" / "python" / "is_completed_order_py.py").unlink()
     fact_orders_path: Path = project_dir / "sql" / "models" / "marts" / "fact_orders.sql"
     fact_orders_path.write_text(
         fact_orders_path.read_text(encoding="utf-8").replace(
@@ -305,7 +305,7 @@ def prepare_clickhouse_waffle_shop(
     for model_name in ("dim_customers", "fact_orders", "scenario_order_prices"):
         _alias_qualified_columns(project_dir / "sql" / "models" / "marts" / f"{model_name}.sql")
     materialization_path: Path = (
-        project_dir / "python" / "nodes" / "python" / "materializations" / "partition_tracked.py"
+        project_dir / "python" / "materializations" / "partition_tracked.py"
     )
     materialization_path.write_text(
         materialization_path.read_text(encoding="utf-8").replace(
@@ -314,7 +314,7 @@ def prepare_clickhouse_waffle_shop(
         encoding="utf-8",
     )
     time_macros_path: Path = (
-        project_dir / "sql" / "models" / "marts" / "_macros" / "python" / "nodes" / "time.py"
+        project_dir / "sql" / "models" / "marts" / "_macros" / "python" / "time.py"
     )
     time_macros_path.write_text(
         time_macros_path.read_text(encoding="utf-8").replace(

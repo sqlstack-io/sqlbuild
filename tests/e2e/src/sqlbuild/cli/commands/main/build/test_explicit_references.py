@@ -35,6 +35,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     run_sqb,
     table_exists,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _EMITTING_MACROS: str = (
     EXPLICIT_REFERENCE_MACROS
@@ -284,7 +285,7 @@ def test_given_both_way_selector_when_building_then_it_expands_from_the_selected
         tmp_path=tmp_path,
         project_name="explicit_refs",
         repo_files=explicit_reference_project_files(
-            overrides={"python/nodes/tasks/exports.py": _SIBLING_TASKS}
+            overrides={**node_module_files("python/nodes/tasks/exports.py", _SIBLING_TASKS)}
         ),
     )
 
@@ -406,8 +407,9 @@ def test_given_typed_macro_references_and_hook_reads_when_building_then_graph_an
             description="loader literal SQL naming a source fails compile with ctx.source help",
             overrides={
                 "sql/sources/raw.yml": _RAW_SOURCES,
-                "python/nodes/loaders/raw.py": explicit_reference_literal_loader(
-                    table="raw_regions"
+                **node_module_files(
+                    "python/nodes/loaders/raw.py",
+                    explicit_reference_literal_loader(table="raw_regions"),
                 ),
             },
             command=("--no-color", "compile"),
@@ -421,8 +423,9 @@ def test_given_typed_macro_references_and_hook_reads_when_building_then_graph_an
             description="loader literal SQL naming a model fails compile",
             overrides={
                 "sql/sources/raw.yml": _RAW_SOURCES,
-                "python/nodes/loaders/raw.py": explicit_reference_literal_loader(
-                    table="stg_customers"
+                **node_module_files(
+                    "python/nodes/loaders/raw.py",
+                    explicit_reference_literal_loader(table="stg_customers"),
                 ),
             },
             command=("--no-color", "compile"),
@@ -473,8 +476,9 @@ def test_given_implicit_reference_when_running_command_then_it_fails_with_guidan
                 "python/nodes/tasks/export/asset.py": _RUNTIME_TASK,
                 EXPLICIT_REFERENCE_MACRO_PATH: _EMITTING_MACROS,
                 f"{EXPLICIT_REFERENCE_MODELS}/hidden.sql": _EMITTING_MODEL,
-                "python/nodes/tasks/literal.py": _LITERAL_TASK.replace(
-                    "export_orders", "count_customers"
+                **node_module_files(
+                    "python/nodes/tasks/literal.py",
+                    _LITERAL_TASK.replace("export_orders", "count_customers"),
                 ),
             },
             enforce_explicit=False,

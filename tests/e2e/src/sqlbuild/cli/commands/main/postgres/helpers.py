@@ -296,7 +296,7 @@ def prepare_postgres_waffle_shop(*, tmp_path: Path, config: dict[str, object]) -
     project_dir: Path = prepare_waffle_shop(tmp_path)
 
     (project_dir / "sql" / "functions" / "sql" / "customer_orders.sql").unlink(missing_ok=True)
-    (project_dir / "sql" / "functions" / "python" / "nodes" / "is_completed_order_py.py").unlink(
+    (project_dir / "sql" / "functions" / "python" / "is_completed_order_py.py").unlink(
         missing_ok=True
     )
     (project_dir / "tests" / "unit" / "test_customer_orders_table_fn.sql").unlink(missing_ok=True)

@@ -13,6 +13,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.load._test_types import (
     LoaderRelationGuardE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _SOURCES: str = (
     "sources:\n"
@@ -68,7 +69,7 @@ def test_given_loader_hard_codes_a_source_when_loading_then_it_warns_like_build(
                 f"[references]\nenforce_explicit = {str(test_case.enforce_explicit).lower()}\n"
             ),
             "sql/sources/raw.yml": _SOURCES,
-            "python/nodes/loaders/raw.py": _LOADERS,
+            **node_module_files("python/nodes/loaders/raw.py", _LOADERS),
         },
     )
 

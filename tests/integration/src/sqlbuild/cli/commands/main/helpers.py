@@ -46,6 +46,7 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     RepeatedJsonParseTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 from tests.unit.src.sqlbuild.rule_engine._helpers.run.helpers import rebuild_identity
 
 STAGE_CAPTURE_SUFFIX: str = ".json"
@@ -1002,13 +1003,14 @@ def write_provider_asset_project(*, project_dir: Path, annotation: str) -> None:
             '[connection]\ndatabase = "orders.duckdb"\n'
         ),
         "python/providers/orders.py": PROVIDER_SOURCE,
-        "python/nodes/orders.py": (
+        **node_module_files(
+            "python/nodes/orders.py",
             "from python.providers.orders import OrdersProvider\n"
             "from sqlbuild.assets import asset\n\n\n"
             "@asset\n"
             f"def refresh_orders(ctx, orders_provider: {annotation}):\n"
             '    """Refresh the order snapshot."""\n'
-            "    return None\n"
+            "    return None\n",
         ),
     }
     for relative_path, text in files.items():
@@ -2076,8 +2078,9 @@ def sink_project(tmp_path: Path, *, parameters: str, body: str) -> Path:
         project_dir=project,
         files={
             "sqlbuild_project.toml": _SINK_PROJECT_TOML,
-            "python/nodes/steps.py": _SINK_STEPS.format(
-                directory=str(tmp_path), parameters=parameters, body=body
+            **node_module_files(
+                "python/nodes/steps.py",
+                _SINK_STEPS.format(directory=str(tmp_path), parameters=parameters, body=body),
             ),
             "python/providers/journal.py": _SINK_JOURNAL.format(directory=str(tmp_path)),
             "python/providers/gateway.py": _SINK_GATEWAY.format(directory=str(tmp_path)),

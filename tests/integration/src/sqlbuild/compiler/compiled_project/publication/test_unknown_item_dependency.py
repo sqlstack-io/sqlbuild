@@ -23,6 +23,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_log,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _PLAN: str = '''\
 from sqlbuild.assets import AssetContext, asset
@@ -129,7 +130,7 @@ def test_given_an_item_naming_what_the_project_lacks_when_publishing_then_only_i
             '[targets.development]\nschema = "main"\n',
             "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
             "sql/models/inventory.sql": "MODEL (description 'Stock.');\nSELECT 1 AS item_id\n",
-            "python/nodes/plan/nodes.py": first,
+            **node_module_files("python/nodes/plan/nodes.py", first),
             "python/nodes/support/nodes/asset.py": _GOOD,
             "sql/sources/raw.yml": (
                 "sources:\n  - name: raw_orders\n    description: Raw orders.\n    schema: main\n"
@@ -209,7 +210,9 @@ def test_given_an_item_naming_what_the_project_lacks_when_compiling_with_discove
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
             "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/nodes/plan/nodes.py": _PLAN.format(dependency=test_case.dependency),
+            **node_module_files(
+                "python/nodes/plan/nodes.py", _PLAN.format(dependency=test_case.dependency)
+            ),
         },
     )
 
@@ -251,7 +254,9 @@ def test_given_an_item_naming_a_tag_no_node_carries_when_publishing_then_nothing
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
             "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/nodes/plan/nodes.py": _PLAN.format(dependency=test_case.dependency),
+            **node_module_files(
+                "python/nodes/plan/nodes.py", _PLAN.format(dependency=test_case.dependency)
+            ),
             "python/nodes/support/nodes/asset.py": _GOOD.replace(
                 'after = (model("orders"), source("raw_orders"), seed("regions"), job("orders_job"))',
                 'after = (model("orders"),)',

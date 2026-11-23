@@ -270,7 +270,7 @@ def test_given_existing_errors_and_unexpandable_file_when_fixing_then_other_file
     models: Path = tmp_path / "sql" / "models"
     models.mkdir(parents=True)
     (tmp_path / "sql" / "macros" / "python").mkdir(parents=True)
-    (tmp_path / "sql" / "macros" / "python" / "nodes" / "relations.py").write_text(
+    (tmp_path / "sql" / "macros" / "python" / "relations.py").write_text(
         "def orders_relation() -> str:\n    return '__ref(\"orders\")'\n"
     )
     fixable: Path = models / "orders.sql"

@@ -132,7 +132,7 @@ def test_given_macro_side_effect_when_loading_warm_cache_then_module_is_not_exec
             ),
         },
     )
-    marker: Path = tmp_path / "sql" / "macros" / "python" / "nodes" / "executed"
+    marker: Path = tmp_path / "sql" / "macros" / "python" / "executed"
 
     load_or_build_scope_index(project_dir=tmp_path)
     marker.unlink()

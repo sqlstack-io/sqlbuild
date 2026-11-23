@@ -18,6 +18,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     scheduled_worker,
     wait_for_run,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _STEPS: str = '''\
 import os
@@ -110,7 +111,7 @@ def test_given_python_only_steps_when_the_worker_gets_one_ctrl_c_then_each_is_re
             '[connections.local]\ndatabase = "warehouse.duckdb"\n'
             '[targets.development]\nschema = "main"\n',
             "python/adapters/duckdb_unrecorded.py": _ADAPTER,
-            "python/nodes/steps.py": _STEPS.format(directory=str(tmp_path)),
+            **node_module_files("python/nodes/steps.py", _STEPS.format(directory=str(tmp_path))),
             "python/providers/marker.py": _PROVIDER.format(directory=str(tmp_path)),
         },
         default_job_files={

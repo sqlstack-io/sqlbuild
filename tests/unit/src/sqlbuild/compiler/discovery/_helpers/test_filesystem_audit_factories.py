@@ -15,6 +15,7 @@ from sqlbuild._native import (
 from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
     AuditFactoryDiscoveryTestCase,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.parametrize(
@@ -148,7 +149,10 @@ def duplicate_factory():
 """
     write_repo_files(
         tmp_path,
-        {"python/nodes/factories/a.py": source, "python/nodes/factories/nested/b.py": source},
+        {
+            **node_module_files("python/nodes/factories/a.py", source),
+            **node_module_files("python/nodes/factories/nested/b.py", source),
+        },
     )
 
     with pytest.raises(PythonNodeDiscoveryError, match=test_case.expected_error_fragment):

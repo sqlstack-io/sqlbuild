@@ -102,6 +102,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 from tests.integration.src.sqlbuild.executor.audit_results.main.helpers import build_record
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 class RejectedPublicationOutput(StringIO):
@@ -1867,9 +1868,10 @@ LOADED_ORDER_FILES: dict[str, str] = {
     "sql/sources/loaded.yml": Path(
         "benchmarks/duckshop/edge_cases/orchestration/loaded_sources.yml"
     ).read_text(),
-    "python/nodes/loaders/loaded.py": Path(
-        "benchmarks/duckshop/edge_cases/orchestration/loaded_sources.py"
-    ).read_text(),
+    **node_module_files(
+        "python/nodes/loaders/loaded.py",
+        Path("benchmarks/duckshop/edge_cases/orchestration/loaded_sources.py").read_text(),
+    ),
     "sql/models/orders.sql": Path(
         "benchmarks/duckshop/edge_cases/orchestration/loaded_orders.sql"
     ).read_text(),
@@ -1881,9 +1883,12 @@ INTERMEDIATE_LOADER_FILES: dict[str, str] = {
     "sql/sources/shipments.yml": Path(
         "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_sources.yml"
     ).read_text(),
-    "python/nodes/loaders/shipments.py": Path(
-        "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_sources.py"
-    ).read_text(),
+    **node_module_files(
+        "python/nodes/loaders/shipments.py",
+        Path(
+            "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_sources.py"
+        ).read_text(),
+    ),
     "sql/models/orders.sql": Path(
         "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_orders.sql"
     ).read_text(),

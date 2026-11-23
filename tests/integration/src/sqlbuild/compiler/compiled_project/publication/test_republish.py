@@ -43,6 +43,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.wheel.
     successful,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _NODES: str = '''\
 import json
@@ -125,7 +126,7 @@ def test_given_a_changed_external_plan_when_republishing_then_the_readback_shows
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
             "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/nodes/plan/nodes.py": _NODES.format(plan=str(plan)),
+            **node_module_files("python/nodes/plan/nodes.py", _NODES.format(plan=str(plan))),
         },
     )
     executable: str = str(Path(sys.executable).with_name("sqb"))
@@ -293,8 +294,9 @@ def test_given_a_republish_waiting_on_a_check_when_the_grace_passes_then_the_rep
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
             "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/nodes/plan/nodes.py": _CHECKED.format(
-                directory=str(tmp_path), check_seconds=test_case.check_seconds
+            **node_module_files(
+                "python/nodes/plan/nodes.py",
+                _CHECKED.format(directory=str(tmp_path), check_seconds=test_case.check_seconds),
             ),
         },
     )
@@ -386,7 +388,7 @@ def test_given_a_service_account_key_over_network_http_when_republishing_then_it
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
             "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/nodes/plan/nodes.py": _NODES.format(plan=str(plan)),
+            **node_module_files("python/nodes/plan/nodes.py", _NODES.format(plan=str(plan))),
         },
     )
     successful(administer(installation, ["create-user", "orders-admin"]))

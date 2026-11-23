@@ -25,6 +25,7 @@ from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.adapters.postgres.classes.postgres_adapter import PostgresAdapter
 from sqlbuild.compiler.compile.types import CompiledModelView, CompiledProjectView
 from sqlbuild.runtime.contracts.models import ConnectionHooks
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 if TYPE_CHECKING:
     from sqlbuild.compiler.compile.types import AuditInput
@@ -269,10 +270,11 @@ def set_dependency_project(
             'name = "nightly_job"\ndescription = "Nightly."\n'
             'select = "stg_orders orders order_items"\n'
         ),
-        "python/nodes/tasks/report.py": (
+        **node_module_files(
+            "python/nodes/tasks/report.py",
             "from sqlbuild.refs import job, model, tag\nfrom sqlbuild.assets import asset\n\n\n"
             f"@asset(depends_on={depends_on})\n"
-            'def report(ctx):\n    """Test task report."""\n    return None\n'
+            'def report(ctx):\n    """Test task report."""\n    return None\n',
         ),
     }
     files.update(dict(job_files))

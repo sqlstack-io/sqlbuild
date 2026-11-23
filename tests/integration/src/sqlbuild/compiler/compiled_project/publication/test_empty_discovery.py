@@ -18,6 +18,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_log,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _NODES: str = '''\
 from pathlib import Path
@@ -73,7 +74,7 @@ def test_given_no_items_when_checking_and_publishing_then_the_set_fails_and_the_
             "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "python/nodes/plan/nodes.py": nodes,
+            **node_module_files("python/nodes/plan/nodes.py", nodes),
         },
     )
     log: Path = tmp_path / "location.log"

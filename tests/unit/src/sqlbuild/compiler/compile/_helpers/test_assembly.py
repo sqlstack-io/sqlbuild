@@ -38,6 +38,7 @@ from tests.unit.src.sqlbuild.compiler.compile._helpers.helpers import (
 from tests.unit.src.sqlbuild.compiler.compile._test_helpers import (
     base_repo_files,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 if TYPE_CHECKING:
     from sqlbuild._native import CompileInputsView
@@ -369,7 +370,9 @@ sources:
     write_strategy: table
 """.strip()
                 + "\n",
-                "python/nodes/loaders/raw_orders.py": """
+                **node_module_files(
+                    "python/nodes/loaders/raw_orders.py",
+                    """
 from sqlbuild.loaders import loader
 
 @loader
@@ -377,7 +380,8 @@ def raw_orders(ctx):
     '''Test loader raw_orders.'''
     return [{"id": 1}]
 """.strip()
-                + "\n",
+                    + "\n",
+                ),
             },
             expected_model_names=(),
             expected_model_deps=(),

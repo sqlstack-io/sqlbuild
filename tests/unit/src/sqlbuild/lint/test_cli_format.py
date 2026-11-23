@@ -412,7 +412,7 @@ def test_given_macro_expanded_fixture_when_formatting_then_authored_source_is_no
         tmp_path=tmp_path,
         fixture_sql="@py.mock_rows()",
     )
-    macro_file: Path = tmp_path / "sql" / "macros" / "python" / "nodes" / "rows.py"
+    macro_file: Path = tmp_path / "sql" / "macros" / "python" / "rows.py"
     macro_file.parent.mkdir(parents=True)
     macro_file.write_text(
         "def mock_rows() -> str:\n"

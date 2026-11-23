@@ -356,7 +356,7 @@ def test_given_build_with_custom_materialization_when_scheduled_then_routes_corr
         file_path.write_text(contents, encoding="utf-8")
 
     # Also create the python/materializations/ directory with test_custom.py
-    mat_dir: Path = project_dir / "python" / "nodes" / "python" / "materializations"
+    mat_dir: Path = project_dir / "python" / "materializations"
     mat_dir.mkdir(parents=True)
     (mat_dir / "test_custom.py").write_text(
         "def materialize(ctx):\n"

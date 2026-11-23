@@ -26,6 +26,7 @@ from tests.unit.src.sqlbuild.compiler.discovery._test_types import (
     DiscoveryRelevantCountTestCase,
     ProjectPythonPathAcceptanceTestCase,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.parametrize(
@@ -470,7 +471,9 @@ def generated_tasks():
             description="factory returning its own module-level node registers it once",
             repo_files=base_repo_files()
             | {
-                "python/nodes/factories/orders.py": """
+                **node_module_files(
+                    "python/nodes/factories/orders.py",
+                    """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -484,6 +487,7 @@ def orders(ctx):
 def order_nodes():
     return orders
 """,
+                ),
             },
             expected_asset_names=("orders",),
         ),
@@ -863,7 +867,9 @@ def generated_assets():
             description="generated dependency cycle fails validation",
             repo_files=base_repo_files()
             | {
-                "python/nodes/tasks/generated.py": """
+                **node_module_files(
+                    "python/nodes/tasks/generated.py",
+                    """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -879,6 +885,7 @@ def generated_tasks():
     first = asset(name="first", depends_on=[second])(first)
     return [first, second]
 """,
+                ),
             },
             expected_error_fragment="Python node dependency cycle detected",
         ),

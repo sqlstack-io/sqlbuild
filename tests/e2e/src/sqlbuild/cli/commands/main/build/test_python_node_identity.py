@@ -18,6 +18,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     query_duckdb,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _LOADERS_PATH: str = "python/nodes/loaders/orders.py"
 _ASSETS_PATH: str = "python/nodes/assets/exports.py"
@@ -184,17 +185,22 @@ def test_given_helper_package_with_relative_imports_when_editing_helper_then_tas
             + "\n",
             "python/nodes/helpers/__init__.py": "",
             "python/nodes/helpers/values.py": 'STATUS = "shipped"\n',
-            "python/nodes/helpers/clean.py": dedent(
-                """
+            **node_module_files(
+                "python/nodes/helpers/clean.py",
+                dedent(
+                    """
                 from .values import STATUS
 
 
                 def normalize_status(value):
                     return f"{value.strip().lower()}:{STATUS}"
                 """
-            ).lstrip(),
-            "python/nodes/orders.py": dedent(
-                """
+                ).lstrip(),
+            ),
+            **node_module_files(
+                "python/nodes/orders.py",
+                dedent(
+                    """
                 import python.nodes.helpers.clean
                 from sqlbuild.assets import asset
 
@@ -206,7 +212,8 @@ def test_given_helper_package_with_relative_imports_when_editing_helper_then_tas
                         payload={"status": python.helpers.clean.normalize_status(" Shipped ")}
                     )
                 """
-            ).lstrip(),
+                ).lstrip(),
+            ),
         },
     )
     first_build: subprocess.CompletedProcess[str] = run_sqb(

@@ -18,6 +18,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_generation,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _NODES: str = '''\
 import os
@@ -97,7 +98,7 @@ def test_given_a_check_that_never_returns_when_the_location_is_stopped_then_it_e
             "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "python/nodes/plan/nodes.py": nodes,
+            **node_module_files("python/nodes/plan/nodes.py", nodes),
         },
     )
     log: Path = tmp_path / "location.log"
@@ -159,8 +160,9 @@ def test_given_a_running_check_when_a_publish_waits_then_only_a_check_past_its_g
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
             "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/nodes/plan/nodes.py": _SLOW_ONCE.format(
-                directory=str(tmp_path), check_seconds=test_case.check_seconds
+            **node_module_files(
+                "python/nodes/plan/nodes.py",
+                _SLOW_ONCE.format(directory=str(tmp_path), check_seconds=test_case.check_seconds),
             ),
         },
     )

@@ -18,6 +18,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
+
 PYTHON_CLI: Path = Path(sys.executable).with_name("sqlbuild-python")
 NATIVE_SQB: Path = Path(sys.executable).with_name("sqb")
 EMITTED_STDOUT: bytes = b"binary \x00\xff\xfe chunk\n"
@@ -104,7 +106,7 @@ def write_project(project_dir: Path, *, extra_toml: str = "", targets: int = 1) 
     files: dict[str, str] = {
         "sqlbuild_project.toml": toml,
         "sql/models/orders.sql": ORDERS_MODEL,
-        "python/nodes/tasks/emit.py": EMIT_TASK,
+        **node_module_files("python/nodes/tasks/emit.py", EMIT_TASK),
     }
     for relative, contents in files.items():
         path: Path = project_dir / relative

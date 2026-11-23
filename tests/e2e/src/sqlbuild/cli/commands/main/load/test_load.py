@@ -31,6 +31,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     run_sqb,
     table_exists,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.parametrize(
@@ -711,14 +712,15 @@ def test_given_source_loader_reads_unselected_task_payload_when_loading_then_run
                     "        type: INTEGER\n"
                 ),
                 node_files={
-                    "python/nodes/loaders/source_rows.py": (
+                    **node_module_files(
+                        "python/nodes/loaders/source_rows.py",
                         "from sqlbuild.loaders import loader\n"
                         f"from python.nodes.{test_case.dependency_dir}.prepare import prepare_events\n\n"
                         "@loader(depends_on=[prepare_events])\n"
                         "def raw_events(ctx):\n"
                         "    '''Test loader raw_events.'''\n    payload = "
                         "ctx.result_of(node_function=prepare_events).payload\n"
-                        "    return [{'event_id': payload['event_id']}]\n"
+                        "    return [{'event_id': payload['event_id']}]\n",
                     )
                 },
             ),
@@ -1340,7 +1342,9 @@ def test_given_chained_loader_project_when_intermediate_uses_strategy_then_appli
                 "      - name: amount\n"
                 "        type: INTEGER\n"
             ),
-            node_files={"python/nodes/loaders/source_rows.py": test_case.loader_py},
+            node_files={
+                **node_module_files("python/nodes/loaders/source_rows.py", test_case.loader_py)
+            },
         ),
     )
     db_path: Path = project_dir / "source_loader_schema_behavior.duckdb"
@@ -1401,9 +1405,10 @@ def test_given_intermediate_loader_without_write_strategy_when_loading_twice_the
         repo_files=build_schema_behavior_project_files(
             source_yaml=(edge_cases / "intermediate_default_accounts.yml").read_text(),
             node_files={
-                "python/nodes/loaders/source_rows.py": (
-                    edge_cases / "intermediate_default_accounts.py"
-                ).read_text()
+                **node_module_files(
+                    "python/nodes/loaders/source_rows.py",
+                    (edge_cases / "intermediate_default_accounts.py").read_text(),
+                )
             },
         ),
     )

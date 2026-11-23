@@ -13,6 +13,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 TOKEN_VARIABLE: str = "ENVFILE_E2E_TOKEN"
 REGION_VARIABLE: str = "ENVFILE_E2E_REGION"
@@ -34,8 +35,10 @@ PROVIDER_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "python/nodes/assets/report_region.py": dedent(
-        """
+    **node_module_files(
+        "python/nodes/assets/report_region.py",
+        dedent(
+            """
         import os
         from pathlib import Path
 
@@ -48,8 +51,9 @@ PROVIDER_FILES: dict[str, str] = {
             '''Test asset report_region.'''
             Path(os.environ["MARKER_PATH"]).write_text(settings_api.region, encoding="utf-8")
         """
-    ).strip()
-    + "\n",
+        ).strip()
+        + "\n",
+    ),
 }
 ENV_FILE: str = (
     f"# provider settings\n{TOKEN_VARIABLE}={TOKEN_VALUE}\n{REGION_VARIABLE}=from-file\n"

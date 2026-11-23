@@ -704,7 +704,7 @@ def test_given_relative_project_directory_when_diffing_contract_then_private_mac
         encoding="utf-8",
     )
     macro_path: Path = (
-        model_path.parent / "_sqlbuild" / "_macros" / "python" / "nodes" / "order_id.py"
+        model_path.parent / "_sqlbuild" / "_macros" / "python" / "order_id.py"
     )
     macro_path.parent.mkdir(parents=True)
     _ = macro_path.write_text(

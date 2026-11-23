@@ -66,6 +66,7 @@ from tests.integration.src.sqlbuild.adapters.databricks.helpers import (
     build_databricks_connection_config,
     build_unique_schema_name,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.dbt
@@ -404,7 +405,9 @@ def test_given_intermediate_strategy_project_when_loading_twice_on_databricks_th
                 "      - name: amount\n"
                 "        type: INTEGER\n"
             ),
-            loader_py=test_case.loader_py,
+            node_files={
+                **node_module_files("python/nodes/loaders/source_rows.py", test_case.loader_py)
+            },
         ),
     )
     (project_dir / "sqlbuild_project.toml").write_text(

@@ -19,6 +19,7 @@ from tests.integration.src.sqlbuild.executor.build.concurrent.helpers import (
     run_concurrent_build,
     verify_concurrent_warehouse_state,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _PROJECT_YML: str = (
     'name = "demo"\n'
@@ -192,8 +193,10 @@ def test_given_concurrent_provider_backed_loaders_when_executing_then_share_prov
                 """
             ).strip()
             + "\n",
-            "python/nodes/loaders/events.py": dedent(
-                """
+            **node_module_files(
+                "python/nodes/loaders/events.py",
+                dedent(
+                    """
                 from python.providers.concurrent_marker import ConcurrentMarkerProvider
                 from sqlbuild.loaders import loader
 
@@ -211,8 +214,9 @@ def test_given_concurrent_provider_backed_loaders_when_executing_then_share_prov
                     concurrent_marker_provider.mark("beta")
                     return [{"event_id": 2}]
                 """
-            ).strip()
-            + "\n",
+                ).strip()
+                + "\n",
+            ),
             "sql/sources/raw.yml": dedent(
                 """
                 sources:

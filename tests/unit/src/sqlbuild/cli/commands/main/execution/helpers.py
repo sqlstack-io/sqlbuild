@@ -18,7 +18,7 @@ def fail_build_discovery(
 ) -> Mock:
     """Make project discovery fail in a provider module and record debug resource reporting."""
 
-    providers: Path = project_dir / "python" / "nodes" / "python" / "providers"
+    providers: Path = project_dir / "python" / "providers"
     providers.mkdir(parents=True)
     _ = (project_dir / "sqlbuild_project.toml").write_text(
         'name = "shop"\nadapter = "duckdb"\n', encoding="utf-8"

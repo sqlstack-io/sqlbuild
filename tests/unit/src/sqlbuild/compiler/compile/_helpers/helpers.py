@@ -441,12 +441,12 @@ def write_scoped_macro_orders_project(project_dir: Path) -> None:
         encoding="utf-8",
     )
     (project_dir / "sql" / "macros" / "python").mkdir(parents=True)
-    (project_dir / "sql" / "macros" / "python" / "nodes" / "order_filter.py").write_text(
+    (project_dir / "sql" / "macros" / "python" / "order_filter.py").write_text(
         'def order_filter(column: str) -> str:\n    return f"{column} > 0"\n', encoding="utf-8"
     )
     tests_dir: Path = project_dir / "tests" / "unit"
     (tests_dir / "_macros" / "python").mkdir(parents=True)
-    (tests_dir / "_macros" / "python" / "nodes" / "row_limit.py").write_text(
+    (tests_dir / "_macros" / "python" / "row_limit.py").write_text(
         'def row_limit() -> str:\n    return "LIMIT 1"\n', encoding="utf-8"
     )
     (tests_dir / "test_orders.sql").write_text(

@@ -17,6 +17,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     query_duckdb,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 ORDER_COLUMNS: tuple[str, ...] = tuple(f"order_attribute_{index:02d}" for index in range(12))
 
@@ -179,8 +180,10 @@ def audit_meta_project_files(
         "sql/audits/generic/expression_is_true.sql": (
             "AUDIT ();\n\nSELECT * FROM @relation WHERE NOT (@expression)\n"
         ),
-        "python/nodes/factories/order_quality.py": dedent(
-            """
+        **node_module_files(
+            "python/nodes/factories/order_quality.py",
+            dedent(
+                """
             from sqlbuild.audits import AuditCase, AuditSeverity, audit_factory
 
 
@@ -196,7 +199,8 @@ def audit_meta_project_files(
                     )
                 ]
             """
-        ).lstrip(),
+            ).lstrip(),
+        ),
         "sql/models/orders.sql": (
             "MODEL (\n"
             '  description "Test model orders.",\n'

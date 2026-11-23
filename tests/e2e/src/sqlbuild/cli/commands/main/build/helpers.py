@@ -29,6 +29,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     run_sqb,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import duckshop_orchestration
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 def run_replay_command(
@@ -321,8 +322,10 @@ def prepare_build_test_audit_flag_project(*, tmp_path: Path, project_name: str) 
                 """
             ).strip()
             + "\n",
-            "python/nodes/checks/orders.py": dedent(
-                """
+            **node_module_files(
+                "python/nodes/checks/orders.py",
+                dedent(
+                    """
                 from sqlbuild.checks import check
                 from sqlbuild.refs import model
 
@@ -332,7 +335,8 @@ def prepare_build_test_audit_flag_project(*, tmp_path: Path, project_name: str) 
                     '''Test check check_orders_exist.'''
                     return ctx.pass_()
                 """
-            ).lstrip(),
+                ).lstrip(),
+            ),
         },
     )
 
@@ -906,13 +910,15 @@ def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
             "    '''Test loader raw_customers.'''\n"
             "    return [{'customer_id': 99}]\n"
         ),
-        "python/nodes/tasks/counts.py": (
+        **node_module_files(
+            "python/nodes/tasks/counts.py",
             "from sqlbuild.refs import model, source\nfrom sqlbuild.assets import asset\n\n\n"
-            + task_nodes
+            + task_nodes,
         ),
-        "python/nodes/assets/extracts.py": (
+        **node_module_files(
+            "python/nodes/assets/extracts.py",
             "from sqlbuild.assets import asset\nfrom sqlbuild.refs import model, source\n\n\n"
-            + asset_nodes
+            + asset_nodes,
         ),
         "sql/models/orders.sql": orders_sql,
         "sql/models/order_summary.sql": (
@@ -1575,12 +1581,13 @@ def ranking_task_files(body: str) -> dict[str, str]:
     """A second task gating the partner loader, with `body`, and the loader depending on both."""
 
     return {
-        "python/nodes/tasks/ranking.py": (
+        **node_module_files(
+            "python/nodes/tasks/ranking.py",
             "from sqlbuild.refs import model\n"
             "from sqlbuild.assets import asset\n\n\n"
             '@asset(depends_on=model("orders"))\n'
             "def rank_orders(ctx):\n"
-            '    """Rank the orders for the partner."""\n' + body
+            '    """Rank the orders for the partner."""\n' + body,
         ),
         "python/nodes/loaders/partner/loader.py": _TWO_GATE_LOADER,
     }

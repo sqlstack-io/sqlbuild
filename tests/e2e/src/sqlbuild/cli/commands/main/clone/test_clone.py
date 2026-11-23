@@ -35,6 +35,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     query_duckdb,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _CHANGED_CLONE_FIXTURE: Path = REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds_clone"
 _UPSTREAMS: tuple[str, ...] = (
@@ -338,8 +339,10 @@ def test_given_invalid_origin_connection_when_exact_cloning_then_destination_ses
                     """
                 ).strip()
                 + "\n",
-                "python/nodes/loaders/raw.py": dedent(
-                    """
+                **node_module_files(
+                    "python/nodes/loaders/raw.py",
+                    dedent(
+                        """
                     from sqlbuild.loaders import loader
 
                     @loader
@@ -347,8 +350,9 @@ def test_given_invalid_origin_connection_when_exact_cloning_then_destination_ses
                         '''Test loader raw_customers.'''
                         return []
                     """
-                ).strip()
-                + "\n",
+                    ).strip()
+                    + "\n",
+                ),
                 "sql/sources/raw.yml": dedent(
                     """
                     sources:
@@ -420,8 +424,10 @@ def test_given_invalid_origin_connection_when_exact_cloning_then_destination_ses
                     """
                 ).strip()
                 + "\n",
-                "python/nodes/loaders/raw.py": dedent(
-                    """
+                **node_module_files(
+                    "python/nodes/loaders/raw.py",
+                    dedent(
+                        """
                     from sqlbuild.loaders import loader
 
                     @loader
@@ -429,8 +435,9 @@ def test_given_invalid_origin_connection_when_exact_cloning_then_destination_ses
                         '''Test loader raw_customers.'''
                         return []
                     """
-                ).strip()
-                + "\n",
+                    ).strip()
+                    + "\n",
+                ),
                 "sql/sources/raw.yml": dedent(
                     """
                     sources:
@@ -800,8 +807,10 @@ def test_given_destination_source_deferral_when_cloning_then_function_reads_defe
                 """
             ).strip()
             + "\n",
-            "python/nodes/loaders/raw.py": dedent(
-                """
+            **node_module_files(
+                "python/nodes/loaders/raw.py",
+                dedent(
+                    """
                 from sqlbuild.loaders import loader
 
                 @loader
@@ -809,8 +818,9 @@ def test_given_destination_source_deferral_when_cloning_then_function_reads_defe
                     '''Test loader raw_bonus.'''
                     return []
                 """
-            ).strip()
-            + "\n",
+                ).strip()
+                + "\n",
+            ),
             "sql/sources/raw.yml": dedent(
                 """
                 sources:

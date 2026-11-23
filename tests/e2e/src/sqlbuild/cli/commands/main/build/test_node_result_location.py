@@ -26,6 +26,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     query_duckdb,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _EDGE_CASES: Path = Path("benchmarks/duckshop/edge_cases/loaders")
 _LOADER: str = (
@@ -351,7 +352,9 @@ def test_given_results_in_the_adapter_default_when_one_loader_rebuilds_then_both
                 '[connection]\ndatabase = "dev.duckdb"\n\n[targets.dev]\n'
             ),
             "sql/sources/events.yml": (_EDGE_CASES / "loader_results.yml").read_text(),
-            "python/nodes/loaders/events.py": (_EDGE_CASES / "loader_results.py").read_text(),
+            **node_module_files(
+                "python/nodes/loaders/events.py", (_EDGE_CASES / "loader_results.py").read_text()
+            ),
         },
     )
     db_path: Path = project_dir / "dev.duckdb"

@@ -16,6 +16,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.parametrize(
@@ -493,15 +494,18 @@ def test_given_broken_project_nodes_when_debugging_then_only_configuration_and_p
             ).strip()
             + "\n",
             "sql/models/orders.sql": "MODEL (materialized table; SELECT FROM WHERE\n",
-            "python/nodes/customers.py": dedent(
-                """
+            **node_module_files(
+                "python/nodes/customers.py",
+                dedent(
+                    """
                 from pathlib import Path
 
                 Path(__file__).with_name("imported.marker").write_text("imported")
                 raise AssertionError("debug must not import project nodes")
                 """
-            ).strip()
-            + "\n",
+                ).strip()
+                + "\n",
+            ),
         },
     )
 

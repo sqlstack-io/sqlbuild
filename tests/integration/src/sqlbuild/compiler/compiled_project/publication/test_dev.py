@@ -51,6 +51,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_warehouse_sync_health,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")
@@ -258,7 +259,7 @@ def test_given_development_start_when_location_is_ready_then_project_python_is_d
             + PYTHON_PIPELINE_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '[targets.development]\nschema = "main"\n',
-            "python/nodes/probes/import_probe.py": probe,
+            **node_module_files("python/nodes/probes/import_probe.py", probe),
         },
     )
     executable: str = str(Path(sys.executable).with_name("sqb"))

@@ -277,7 +277,7 @@ def prepare_sqlserver_waffle_shop(*, tmp_path: Path, config: dict[str, object]) 
     project_dir: Path = prepare_waffle_shop(tmp_path)
 
     (project_dir / "sql" / "functions" / "sql" / "customer_orders.sql").unlink(missing_ok=True)
-    (project_dir / "sql" / "functions" / "python" / "nodes" / "is_completed_order_py.py").unlink(
+    (project_dir / "sql" / "functions" / "python" / "is_completed_order_py.py").unlink(
         missing_ok=True
     )
     (project_dir / "tests" / "unit" / "test_customer_orders_table_fn.sql").unlink(missing_ok=True)
@@ -288,7 +288,7 @@ def prepare_sqlserver_waffle_shop(*, tmp_path: Path, config: dict[str, object]) 
     (project_dir / "tests" / "unit" / "test_is_completed_order_udf.sql").unlink(missing_ok=True)
 
     macro_path: Path = (
-        project_dir / "sql" / "models" / "marts" / "_macros" / "python" / "nodes" / "time.py"
+        project_dir / "sql" / "models" / "marts" / "_macros" / "python" / "time.py"
     )
     _rewrite(
         macro_path,

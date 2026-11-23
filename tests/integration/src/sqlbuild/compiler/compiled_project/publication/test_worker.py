@@ -64,6 +64,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     worker_result,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 ENV_FILE_REGION_FILES: dict[str, str] = {
     ".env": "WORKER_ENV_REGION_CODE=42\nWORKER_ENV_TOKEN=worker-token\n"
@@ -881,9 +882,12 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
                 "sql/sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/managed_orders.yml"
                 ).read_text(),
-                "python/nodes/loaders/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/orders_loader.py"
-                ).read_text(),
+                **node_module_files(
+                    "python/nodes/loaders/orders.py",
+                    Path(
+                        "benchmarks/duckshop/edge_cases/orchestration/orders_loader.py"
+                    ).read_text(),
+                ),
             },
         ),
         WorkerExecutionTestCase(
@@ -1347,7 +1351,10 @@ def test_given_an_attached_check_when_a_worker_executes_then_its_own_outcome_is_
         Path("benchmarks/duckshop/edge_cases/orchestration/attached_checks.json").read_text()
     )
     test_case = replace(
-        test_case, files={"python/nodes/checks/orders.py": fixture[test_case.description]}
+        test_case,
+        files={
+            **node_module_files("python/nodes/checks/orders.py", fixture[test_case.description])
+        },
     )
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)

@@ -48,6 +48,7 @@ from sqlbuild.compiler.compile.types import (
 )
 from sqlbuild.orchestration import compile_snapshot
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 if TYPE_CHECKING:
     from sqlbuild._native import CompileInputsView
@@ -78,15 +79,24 @@ PYTHON_PIPELINE_FILES: dict[str, str] = {
         "MODEL (description 'Orders.', tags [orders]);\n\n"
         'SELECT order_id FROM __ref("stg_orders")\n'
     ),
-    "python/nodes/orders/partner_export/node.py": Path(
-        "benchmarks/duckshop/edge_cases/orchestration/python_pipeline_partner_export.py"
-    ).read_text(),
-    "python/nodes/fulfillment/carrier_sync/node.py": Path(
-        "benchmarks/duckshop/edge_cases/orchestration/python_pipeline_carrier_sync.py"
-    ).read_text(),
-    "python/nodes/checks/orders_present.py": Path(
-        "benchmarks/duckshop/edge_cases/orchestration/python_pipeline_orders_check.py"
-    ).read_text(),
+    **node_module_files(
+        "python/nodes/orders/partner_export/node.py",
+        Path(
+            "benchmarks/duckshop/edge_cases/orchestration/python_pipeline_partner_export.py"
+        ).read_text(),
+    ),
+    **node_module_files(
+        "python/nodes/fulfillment/carrier_sync/node.py",
+        Path(
+            "benchmarks/duckshop/edge_cases/orchestration/python_pipeline_carrier_sync.py"
+        ).read_text(),
+    ),
+    **node_module_files(
+        "python/nodes/checks/orders_present.py",
+        Path(
+            "benchmarks/duckshop/edge_cases/orchestration/python_pipeline_orders_check.py"
+        ).read_text(),
+    ),
 }
 
 TYPE_PROOF_FILES: dict[str, str] = {

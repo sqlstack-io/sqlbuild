@@ -29,6 +29,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_generation,
     wait_for_run,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.parametrize(
@@ -61,9 +62,12 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
                 "sql/sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/managed_orders.yml"
                 ).read_text(),
-                "python/nodes/loaders/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/orders_loader.py"
-                ).read_text(),
+                **node_module_files(
+                    "python/nodes/loaders/orders.py",
+                    Path(
+                        "benchmarks/duckshop/edge_cases/orchestration/orders_loader.py"
+                    ).read_text(),
+                ),
                 "source_observations.json": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_stale_journey.json"
                 ).read_text(),

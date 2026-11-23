@@ -21,6 +21,7 @@ from tests.unit.src.sqlbuild.compiler.compile._helpers._test_types import (
 from tests.unit.src.sqlbuild.compiler.compile._helpers.helpers import (
     DUCKDB_COMPILE_ADAPTER_CONTEXT,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 if TYPE_CHECKING:
     from sqlbuild._native import CompileInputsView
@@ -120,13 +121,16 @@ def test_given_invalid_factory_attachment_when_building_inputs_then_compile_erro
         {
             "sqlbuild_project.toml": _PROJECT_FILE,
             "sql/models/orders.sql": f"MODEL (description 'Test model orders.', {test_case.model_header}); SELECT 1 AS amount",
-            "python/nodes/factories/quality.py": f"""
+            **node_module_files(
+                "python/nodes/factories/quality.py",
+                f"""
 from sqlbuild.audits import AuditCase, audit_factory
 
 @audit_factory
 def quality():
     {test_case.factory_cases}
 """,
+            ),
         },
     )
 

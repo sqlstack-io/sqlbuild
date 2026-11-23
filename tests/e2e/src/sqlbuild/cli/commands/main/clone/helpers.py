@@ -12,6 +12,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": dedent(
@@ -55,8 +56,10 @@ PROJECT_FILES: dict[str, str] = {
         allow_as_clone_destination = true
         """
     ).lstrip(),
-    "python/nodes/loaders/raw.py": dedent(
-        """
+    **node_module_files(
+        "python/nodes/loaders/raw.py",
+        dedent(
+            """
         from sqlbuild.loaders import loader
 
 
@@ -65,7 +68,8 @@ PROJECT_FILES: dict[str, str] = {
             '''Test loader raw_payments.'''
             return [{"payment_id": 1, "order_id": 1, "amount_cents": 500}]
         """
-    ).lstrip(),
+        ).lstrip(),
+    ),
     "sql/sources/raw.yml": dedent(
         """
         sources:

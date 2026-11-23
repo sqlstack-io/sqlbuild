@@ -30,6 +30,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
     person_request,
     provision_person,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 WAREHOUSE_REFUSAL: str = (
     "the requested warehouse is not configured for this target on this location; "
@@ -324,7 +325,7 @@ def test_given_an_ad_hoc_verb_when_the_checkout_changes_after_verification_then_
             "sql/seeds/regions.csv": "region,label\nEU,Europe\n",
             "sql/seeds/seeds.yml": SEEDS_YML.format(region_type="VARCHAR"),
             "sql/sources/raw.yml": SOURCES_YML.format(table="raw_orders"),
-            "python/nodes/rewrite_checkout.py": REWRITE_CHECKOUT,
+            **node_module_files("python/nodes/rewrite_checkout.py", REWRITE_CHECKOUT),
         }
         | test_case.files,
     )

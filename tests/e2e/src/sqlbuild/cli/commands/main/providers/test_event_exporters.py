@@ -20,6 +20,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.providers._test_types import (
     SnowflakeKeyWarningE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.parametrize(
@@ -608,8 +609,10 @@ def test_given_sink_and_task_sharing_a_provider_when_building_then_it_is_set_up_
                 """
             ).strip()
             + "\n",
-            "python/nodes/tasks/uses_shared.py": dedent(
-                """
+            **node_module_files(
+                "python/nodes/tasks/uses_shared.py",
+                dedent(
+                    """
                 from python.providers.z_shared import SharedProvider
                 from sqlbuild.assets import asset
 
@@ -619,8 +622,9 @@ def test_given_sink_and_task_sharing_a_provider_when_building_then_it_is_set_up_
                     '''Test task uses_shared.'''
                     del ctx, shared_provider
                 """
-            ).strip()
-            + "\n",
+                ).strip()
+                + "\n",
+            ),
         },
     )
 

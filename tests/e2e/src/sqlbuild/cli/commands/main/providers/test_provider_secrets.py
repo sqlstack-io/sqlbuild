@@ -25,6 +25,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 SECRET_VARIABLE: str = "SECRETS_E2E_API_KEY"
 
@@ -71,25 +72,35 @@ PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "python/nodes/tasks/uses_api.py": MARKING_NODE.format(
-        decorator="asset", arguments="", name="uses_api", parameter=USES_API, body=""
+    **node_module_files(
+        "python/nodes/tasks/uses_api.py",
+        MARKING_NODE.format(
+            decorator="asset", arguments="", name="uses_api", parameter=USES_API, body=""
+        ),
     ),
-    "python/nodes/tasks/no_api.py": MARKING_NODE.format(
-        decorator="asset", arguments="", name="no_api", parameter="", body=""
+    **node_module_files(
+        "python/nodes/tasks/no_api.py",
+        MARKING_NODE.format(decorator="asset", arguments="", name="no_api", parameter="", body=""),
     ),
-    "python/nodes/checks/api_check.py": MARKING_NODE.format(
-        decorator="check",
-        arguments="(depends_on=())",
-        name="api_check",
-        parameter=USES_API,
-        body="    return True\n",
+    **node_module_files(
+        "python/nodes/checks/api_check.py",
+        MARKING_NODE.format(
+            decorator="check",
+            arguments="(depends_on=())",
+            name="api_check",
+            parameter=USES_API,
+            body="    return True\n",
+        ),
     ),
-    "python/nodes/loaders/raw_api_events.py": MARKING_NODE.format(
-        decorator="loader",
-        arguments="",
-        name="raw_api_events",
-        parameter=USES_API,
-        body='    return [{"event_id": 1}]\n',
+    **node_module_files(
+        "python/nodes/loaders/raw_api_events.py",
+        MARKING_NODE.format(
+            decorator="loader",
+            arguments="",
+            name="raw_api_events",
+            parameter=USES_API,
+            body='    return [{"event_id": 1}]\n',
+        ),
     ),
     "sql/sources/raw.yml": dedent(
         """
@@ -200,8 +211,10 @@ REQUIRED_SETTING: dict[str, str] = {
     ),
 }
 POST_BUILD_CHECK: dict[str, str] = {
-    "python/nodes/checks/no_api_check.py": dedent(
-        """
+    **node_module_files(
+        "python/nodes/checks/no_api_check.py",
+        dedent(
+            """
         import os
         from pathlib import Path
 
@@ -217,8 +230,9 @@ POST_BUILD_CHECK: dict[str, str] = {
                 marker.write("no_api_check\\n")
             return True
         """
-    ).strip()
-    + "\n",
+        ).strip()
+        + "\n",
+    ),
 }
 
 MISSING_ERROR: str = (

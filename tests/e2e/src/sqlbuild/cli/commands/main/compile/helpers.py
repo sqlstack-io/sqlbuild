@@ -457,7 +457,7 @@ def run_layered_production_compile_benchmark(
         project_dir=project_dir,
         expected_max_seconds=expected_edit_max_seconds,
     )
-    macro_path: Path = project_dir / "sql" / "macros" / "python" / "nodes" / "macro_00000.py"
+    macro_path: Path = project_dir / "sql" / "macros" / "python" / "macro_00000.py"
     _replace_benchmark_text(
         path=macro_path,
         old='return f"({expression} + 0)"',
@@ -4148,7 +4148,7 @@ class RandomEditChain:
     def _macro_edit(self, _model: Path) -> None:
         scale: str = f"_SCALE: int = {2 + self._random.randrange(3)}"
         self._rewrite(
-            self._project_dir / "sql" / "macros" / "python" / "nodes" / "_rounding.py",
+            self._project_dir / "sql" / "macros" / "python" / "_rounding.py",
             lambda contents: re.sub(r"_SCALE: int = \d+", scale, contents),
         )
 

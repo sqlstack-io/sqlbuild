@@ -353,7 +353,7 @@ def test_given_cost_attribution_when_a_build_ends_then_the_invocation_records_ho
         encoding="utf-8",
     )
     adapter: Path = (
-        project_dir / "python" / "nodes" / "python" / "adapters" / "warehouse" / "duckdb_costed.py"
+        project_dir / "python" / "adapters" / "warehouse" / "duckdb_costed.py"
     )
     adapter.parent.mkdir(parents=True)
     _ = adapter.write_text(COSTED_ADAPTER.format(collected=test_case.collected), encoding="utf-8")

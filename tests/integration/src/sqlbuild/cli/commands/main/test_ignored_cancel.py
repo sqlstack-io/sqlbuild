@@ -15,6 +15,7 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     MidSubmitCancelTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _STEPS: str = '''\
 import time
@@ -281,7 +282,7 @@ def test_given_a_cancel_inside_a_steps_submit_when_steps_ignore_it_then_both_are
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
             "python/nodes/steps/asset.py": _STEPS.format(directory=str(tmp_path)),
-            "python/nodes/slow_submit.py": _SLOW_SUBMIT,
+            **node_module_files("python/nodes/slow_submit.py", _SLOW_SUBMIT),
             "python/providers/marker.py": _PROVIDER.format(directory=str(tmp_path)),
         },
     )

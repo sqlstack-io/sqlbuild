@@ -21,6 +21,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     scheduled_worker,
     wait_for_run,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _CHAIN: str = '''\
 import os
@@ -138,7 +139,7 @@ def test_given_a_chain_of_three_when_the_second_is_interrupted_then_the_first_st
         warehouse_query="",
         expected_status="partial",
         expected_rows=[],
-        files={"python/nodes/steps.py": chain} | test_case.files,
+        files={**node_module_files("python/nodes/steps.py", chain)} | test_case.files,
         default_job_files={
             "orchestration/jobs/annual_orders_job.toml": (
                 'name = "annual_orders_job"\n'

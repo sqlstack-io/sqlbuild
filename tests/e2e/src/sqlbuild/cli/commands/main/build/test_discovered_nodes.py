@@ -14,6 +14,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
 _PROJECT: str = (
+    'extra_paths = ["runs.txt"]\n'
     'name = "discovered"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
     '[connection]\ndatabase = "discovered.duckdb"\n\n[targets.dev]\nschema = "dev"\n'
 )
@@ -37,7 +38,7 @@ def plan() -> Discovered:
 @asset(for_each=plan, depends_on=model("orders"))
 def run_step(ctx: AssetContext, step: str) -> None:
     """Run one step."""
-    with (Path(__file__).parents[2] / "runs.txt").open("a") as runs:
+    with (Path(__file__).parents[4] / "runs.txt").open("a") as runs:
         runs.write(f"{ctx.discovered.item}:{step}:{ctx.discovered.tags['release']}\\n")
 '''
 

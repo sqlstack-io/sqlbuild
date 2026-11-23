@@ -20,6 +20,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     scheduled_worker,
     wait_for_run,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _TOGETHER: str = '''\
 import threading
@@ -112,7 +113,11 @@ def test_given_concurrent_steps_using_sql_when_a_worker_runs_them_then_writes_an
         warehouse_query="",
         expected_status=test_case.expected_status,
         expected_rows=[],
-        files={"python/nodes/steps.py": _TOGETHER.format(depends_on=test_case.first_depends_on)},
+        files={
+            **node_module_files(
+                "python/nodes/steps.py", _TOGETHER.format(depends_on=test_case.first_depends_on)
+            )
+        },
         default_job_files={
             "orchestration/jobs/annual_orders_job.toml": (
                 'name = "annual_orders_job"\n'
@@ -191,7 +196,7 @@ def test_given_steps_in_flight_when_cancelled_then_finished_steps_stay_and_are_n
         warehouse_query="",
         expected_status=test_case.expected_status,
         expected_rows=[],
-        files={"python/nodes/steps.py": steps},
+        files={**node_module_files("python/nodes/steps.py", steps)},
         default_job_files={
             "orchestration/jobs/annual_orders_job.toml": (
                 'name = "annual_orders_job"\n'

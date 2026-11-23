@@ -18,6 +18,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     scheduled_worker,
     wait_for_run,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _HELD: str = '''\
 import time
@@ -107,7 +108,7 @@ def test_given_running_steps_when_reading_the_server_then_only_those_with_a_slot
         warehouse_query="",
         expected_status="success",
         expected_rows=[],
-        files={"python/nodes/steps.py": steps} | test_case.files,
+        files={**node_module_files("python/nodes/steps.py", steps)} | test_case.files,
         default_job_files={
             "orchestration/jobs/annual_orders_job.toml": (
                 'name = "annual_orders_job"\n'

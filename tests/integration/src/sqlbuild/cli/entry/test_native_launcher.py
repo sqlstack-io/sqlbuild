@@ -291,7 +291,7 @@ def test_given_cached_compile_when_startup_search_path_changes_then_new_helper_i
     program, startup, new_helpers = startup_install(tmp_path / "environment")
     project_dir: Path = write_project(tmp_path / "project")
     (project_dir / "sql" / "models" / "_macros" / "python").mkdir(parents=True)
-    _ = (project_dir / "sql" / "models" / "_macros" / "python" / "nodes" / "orders.py").write_text(
+    _ = (project_dir / "sql" / "models" / "_macros" / "python" / "orders.py").write_text(
         'import catalog_helper\n\ndef order_value() -> str:\n    """The order value."""\n    return catalog_helper.SQL\n',
         encoding="utf-8",
     )

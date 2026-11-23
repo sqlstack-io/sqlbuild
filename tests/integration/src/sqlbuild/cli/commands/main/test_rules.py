@@ -909,7 +909,7 @@ def test_given_cached_sql_test_rules_when_test_or_macro_changes_then_findings_ar
     model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     tests_dir: Path = tmp_path / "tests" / "unit"
-    macro: Path = tests_dir / "_macros" / "python" / "nodes" / "row_limit.py"
+    macro: Path = tests_dir / "_macros" / "python" / "row_limit.py"
     macro.parent.mkdir(parents=True)
     macro.write_text('def row_limit() -> str:\n    return "LIMIT 1"\n', encoding="utf-8")
     plain: Path = tests_dir / "test_plain_orders.sql"
@@ -960,7 +960,7 @@ def test_given_warm_scoped_macro_sql_test_when_compiling_then_rules_reuse_compil
     model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     tests_dir: Path = tmp_path / "tests" / "unit"
-    macro: Path = tests_dir / "_macros" / "python" / "nodes" / "row_limit.py"
+    macro: Path = tests_dir / "_macros" / "python" / "row_limit.py"
     macro.parent.mkdir(parents=True)
     macro.write_text('def row_limit() -> str:\n    return "LIMIT 1"\n', encoding="utf-8")
     (tests_dir / "test_macro_orders.sql").write_text(
@@ -999,7 +999,7 @@ def test_given_cold_scoped_macro_sql_test_when_compiling_then_early_lint_uses_pr
     model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     tests_dir: Path = tmp_path / "tests" / "unit"
-    macro: Path = tests_dir / "_macros" / "python" / "nodes" / "row_limit.py"
+    macro: Path = tests_dir / "_macros" / "python" / "row_limit.py"
     macro.parent.mkdir(parents=True)
     macro.write_text('def row_limit() -> str:\n    return "LIMIT 1"\n', encoding="utf-8")
     (tests_dir / "test_macro_orders.sql").write_text(

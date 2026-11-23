@@ -200,7 +200,7 @@ def test_given_provider_class_imported_through_alias_when_calling_then_guides_us
     test_case: ProviderInjectionErrorTestCase,
     tmp_path: Path,
 ) -> None:
-    provider_file: Path = tmp_path / "python" / "nodes" / "python" / "providers" / "marker.py"
+    provider_file: Path = tmp_path / "python" / "providers" / "marker.py"
     provider_file.parent.mkdir(parents=True)
     provider_file.write_text(
         "from sqlbuild.providers import Provider\n\nclass MarkerProvider(Provider):\n    '''Test provider MarkerProvider.'''\n    pass\n",

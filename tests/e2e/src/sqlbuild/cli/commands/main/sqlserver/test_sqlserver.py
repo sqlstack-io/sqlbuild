@@ -61,6 +61,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     run_sqb,
     stringify_warehouse_rows,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.parametrize(
@@ -1040,22 +1041,25 @@ def test_given_chained_loader_project_when_loading_on_sqlserver_then_runs_loader
                 "      - name: status\n"
                 "        type: NVARCHAR(100)\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='table', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}, {'event_id': 2}]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                "    cursor = ctx.query(\n"
-                "        f'SELECT event_id FROM {events.destination} ORDER BY event_id'\n"
-                "    )\n"
-                "    rows = cursor.fetchall()\n"
-                "    return [{'event_id': row[0], 'status': 'loaded'} for row in rows]\n"
-            ),
+            node_files={
+                **node_module_files(
+                    "python/nodes/loaders/source_rows.py",
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader(write_strategy='table', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_events(ctx):\n"
+                    "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}, {'event_id': 2}]\n\n"
+                    "@loader(depends_on=[fetch_events])\n"
+                    "def raw_events(ctx):\n"
+                    "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
+                    "    cursor = ctx.query(\n"
+                    "        f'SELECT event_id FROM {events.destination} ORDER BY event_id'\n"
+                    "    )\n"
+                    "    rows = cursor.fetchall()\n"
+                    "    return [{'event_id': row[0], 'status': 'loaded'} for row in rows]\n",
+                )
+            },
         ),
     )
     (project_dir / "sqlbuild_project.toml").write_text(
@@ -1222,7 +1226,9 @@ def test_given_intermediate_strategy_project_when_loading_twice_on_sqlserver_the
                 "      - name: amount\n"
                 "        type: INTEGER\n"
             ),
-            loader_py=test_case.loader_py,
+            node_files={
+                **node_module_files("python/nodes/loaders/source_rows.py", test_case.loader_py)
+            },
         ),
     )
     (project_dir / "sqlbuild_project.toml").write_text(

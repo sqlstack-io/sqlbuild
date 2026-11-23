@@ -172,7 +172,7 @@ def test_given_provider_files_when_discovering_then_returns_provider_classes(
         provider.provider_class for provider in providers
     )
     assert (
-        tmp_path / "python" / "nodes" / "python" / "providers" / "setup.marker"
+        tmp_path / "python" / "providers" / "setup.marker"
     ).is_file() is test_case.expected_marker_file_exists
 
 

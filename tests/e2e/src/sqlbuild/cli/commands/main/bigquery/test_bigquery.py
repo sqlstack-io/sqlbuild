@@ -72,6 +72,7 @@ from tests.integration.src.sqlbuild.adapters.bigquery.helpers import (
     build_bigquery_connection_config,
     build_unique_dataset_name,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.dbt
@@ -1121,14 +1122,17 @@ def test_given_loader_schema_evolution_project_when_loading_twice_on_bigquery_th
                 "      - name: load_seq\n"
                 "        type: INTEGER\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    if ctx.current_cursor_value is None:\n"
-                "        return [{'event_id': 1, 'load_seq': 1}]\n"
-                "    return [{'event_id': 2, 'load_seq': 2, 'note': 'late-note'}]\n"
-            ),
+            node_files={
+                **node_module_files(
+                    "python/nodes/loaders/source_rows.py",
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader\n"
+                    "def raw_events(ctx):\n"
+                    "    '''Test loader raw_events.'''\n    if ctx.current_cursor_value is None:\n"
+                    "        return [{'event_id': 1, 'load_seq': 1}]\n"
+                    "    return [{'event_id': 2, 'load_seq': 2, 'note': 'late-note'}]\n",
+                )
+            },
         ),
     )
     (project_dir / "sqlbuild_project.toml").write_text(
@@ -1200,22 +1204,25 @@ def test_given_chained_loader_project_when_loading_on_bigquery_then_runs_loader_
                 "      - name: status\n"
                 "        type: VARCHAR\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='table', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}, {'event_id': 2}]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                "    cursor = ctx.query(\n"
-                "        f'SELECT event_id FROM {events.destination} ORDER BY event_id'\n"
-                "    )\n"
-                "    rows = cursor.fetchall()\n"
-                "    return [{'event_id': row[0], 'status': 'loaded'} for row in rows]\n"
-            ),
+            node_files={
+                **node_module_files(
+                    "python/nodes/loaders/source_rows.py",
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader(write_strategy='table', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_events(ctx):\n"
+                    "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}, {'event_id': 2}]\n\n"
+                    "@loader(depends_on=[fetch_events])\n"
+                    "def raw_events(ctx):\n"
+                    "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
+                    "    cursor = ctx.query(\n"
+                    "        f'SELECT event_id FROM {events.destination} ORDER BY event_id'\n"
+                    "    )\n"
+                    "    rows = cursor.fetchall()\n"
+                    "    return [{'event_id': row[0], 'status': 'loaded'} for row in rows]\n",
+                )
+            },
         ),
     )
     (project_dir / "sqlbuild_project.toml").write_text(
@@ -1378,7 +1385,9 @@ def test_given_intermediate_strategy_project_when_loading_twice_on_bigquery_then
                 "      - name: amount\n"
                 "        type: INTEGER\n"
             ),
-            loader_py=test_case.loader_py,
+            node_files={
+                **node_module_files("python/nodes/loaders/source_rows.py", test_case.loader_py)
+            },
         ),
     )
     (project_dir / "sqlbuild_project.toml").write_text(

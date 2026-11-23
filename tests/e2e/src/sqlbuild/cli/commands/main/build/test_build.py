@@ -38,13 +38,14 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     run_sqb,
     table_exists,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _TARGET_CONFIG_RECORDER: str = (
     "import dataclasses, json\n"
     "from pathlib import Path\n\n"
     "def record(ctx, node):\n"
     "    line = {'node': node, **dataclasses.asdict(ctx.target_config)}\n"
-    "    with Path(__file__).parents[1].joinpath('target_config.jsonl').open('a') as out:\n"
+    "    with Path(__file__).parents[2].joinpath('target_config.jsonl').open('a') as out:\n"
     "        out.write(json.dumps(line) + '\\n')\n"
 )
 _TARGET_PROBE_SINK: str = (
@@ -1582,6 +1583,7 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
         project_name="python_persisted_result_project",
         repo_files={
             "sqlbuild_project.toml": (
+                'extra_paths = ["consumed.txt"]\n'
                 'name = "python_persisted_result_project"\n'
                 'adapter = "duckdb"\n\n'
                 "[connection]\n"
@@ -1606,7 +1608,7 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
         sql="SELECT run_id FROM _sqlbuild_node_results WHERE node_name = 'produce_result'",
     )
     first_run_id: str = str(first_run_rows[0][0])
-    (project_dir / "python" / "nodes" / "tasks" / "produce.py").write_text(
+    (project_dir / "python" / "nodes" / "tasks" / "produce" / "asset.py").write_text(
         (
             "from sqlbuild.assets import asset\n\n"
             "@asset\n"
@@ -1620,7 +1622,7 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
         command=("--no-color", "build", "--select", "produce_result"),
         project_dir=project_dir,
     )
-    (project_dir / "python" / "nodes" / "tasks" / "produce.py").write_text(
+    (project_dir / "python" / "nodes" / "tasks" / "produce" / "asset.py").write_text(
         (
             "from sqlbuild.assets import asset\n\n"
             "@asset\n"
@@ -1642,7 +1644,9 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
         ),
     )
     failed_run_id: str = str(failed_run_rows[0][0])
-    (project_dir / "python" / "nodes" / "tasks" / "consume.py").write_text(
+    consume_dir: Path = project_dir / "python" / "nodes" / "tasks" / "consume"
+    consume_dir.mkdir(parents=True)
+    (consume_dir / "asset.py").write_text(
         (
             "from pathlib import Path\n"
             "from python.nodes.tasks.produce.asset import produce_result\n"
@@ -1655,7 +1659,7 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
             f"    failed = ctx.result_of(node_function=produce_result, run_id='{failed_run_id}')\n"
             "    history = ctx.results_of(node_function=produce_result, limit=2)\n"
             "    values = ','.join(str(item.payload['value']) for item in history)\n"
-            "    output = Path(__file__).parents[2].joinpath('consumed.txt')\n"
+            "    output = Path(__file__).parents[4].joinpath('consumed.txt')\n"
             "    output.write_text(\n"
             "        f\"{latest.payload['value']}:{first.payload['value']}:\"\n"
             '        f"{failed.status}:{failed.payload is None}:{values}:"\n'
@@ -1962,6 +1966,7 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
         project_name="python_target_config_project",
         repo_files={
             "sqlbuild_project.toml": (
+                'extra_paths = ["target_config.jsonl"]\n'
                 'name = "python_target_config_project"\n'
                 'adapter = "duckdb"\n'
                 'default_target = "dev"\n\n'
@@ -1969,7 +1974,7 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 'database = "python_target_config_project.duckdb"\n\n'
                 "[targets.dev]\n" + test_case.project_target_lines
             ),
-            "python/nodes/recorder.py": _TARGET_CONFIG_RECORDER,
+            **node_module_files("python/nodes/recorder.py", _TARGET_CONFIG_RECORDER),
             "python/providers/target_probe.py": (
                 "from python.nodes.recorder import record\n"
                 "from sqlbuild.providers import Provider\n\n"
@@ -2091,6 +2096,7 @@ def test_given_unresolvable_target_when_running_with_a_sink_then_only_target_fre
         project_name="unresolved_target_project",
         repo_files={
             "sqlbuild_project.toml": (
+                'extra_paths = ["setups.jsonl"]\n'
                 'name = "unresolved_target_project"\n'
                 'adapter = "duckdb"\n'
                 'default_target = "dev"\n\n'
@@ -2111,7 +2117,7 @@ def test_given_unresolvable_target_when_running_with_a_sink_then_only_target_fre
                 "    def setup(self, ctx):\n"
                 "        line = None if ctx is None else ctx.target_config.name\n"
                 "        with "
-                "Path(__file__).parents[1].joinpath('setups.jsonl').open('a') as out:\n"
+                "Path(__file__).parents[2].joinpath('setups.jsonl').open('a') as out:\n"
                 "            out.write(json.dumps(line) + '\\n')\n"
             ),
             "python/event_sinks/events.py": _TARGET_PROBE_SINK,
@@ -2153,6 +2159,7 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
         project_name="ctx_target_project",
         repo_files={
             "sqlbuild_project.toml": (
+                'extra_paths = ["target_config.jsonl"]\n'
                 'name = "ctx_target_project"\n'
                 'adapter = "duckdb"\n'
                 'default_target = "dev"\n\n'
@@ -2162,7 +2169,7 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
                 f'schema = "{test_case.target_schema}"\n'
             ),
             "sql/models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS order_id\n",
-            "python/nodes/recorder.py": _TARGET_CONFIG_RECORDER,
+            **node_module_files("python/nodes/recorder.py", _TARGET_CONFIG_RECORDER),
             "python/nodes/loaders/raw/loader.py": (
                 "from python.nodes.recorder import record\n"
                 "from sqlbuild.loaders import loader\n\n"

@@ -42,6 +42,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     statement_started,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 SIGN_IN_ADAPTER: str = (
     "import getpass, os, sys\nfrom pathlib import Path\n"
@@ -519,7 +520,7 @@ def test_given_an_env_file_when_developing_then_start_up_names_it_and_r_reloads_
             + PUBLISHABLE_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '[targets.development]\nschema = "main"\n',
-            "python/nodes/env_probe.py": ENV_PROBE,
+            **node_module_files("python/nodes/env_probe.py", ENV_PROBE),
         },
     )
     env_file: Path = project / ".env"
