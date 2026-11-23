@@ -141,3 +141,40 @@ export function absolutePosition(nodes: readonly Placed[], id: string): { x: num
 export function anchoredViewport(view: Viewport, before: { x: number; y: number }, after: { x: number; y: number }): Viewport {
 	return { zoom: view.zoom, x: view.x - (after.x - before.x) * view.zoom, y: view.y - (after.y - before.y) * view.zoom };
 }
+
+// ---- mockup: `?cards=new`, staged levels of detail ----
+//
+// Each level is kept while the card's name renders at about 10 px or more on screen:
+// full card (name and status line) down to `NEW_FULL_ZOOM`, where the 11 px status line would read
+// under 9 px; then the same card with its name alone, enlarged up to `NEW_NAME_MAX_PX` canvas px so it
+// stays 10 px on screen, down to `NEW_NAME_ZOOM`; then a pill across the card's full width, down to
+// `NEW_PILL_LEVELS`' last zoom; then a dot.
+
+export const NEW_FULL_ZOOM = 0.8;
+/** The largest a name-only card's name grows, in canvas px: the card's height leaves room for it. */
+export const NEW_NAME_MAX_PX = 26;
+/** The name's size on screen a level keeps. */
+export const NEW_NAME_SCREEN_PX = 10;
+export const NEW_NAME_ZOOM = NEW_NAME_SCREEN_PX / NEW_NAME_MAX_PX;
+/** The pill levels' lowest zooms; below the last, cards are dots. */
+export const NEW_PILL_LEVELS = [0.315] as const;
+
+export type CardStage = 'full' | 'name' | 'pill' | 'dot';
+
+export function newCardStage(zoom: number): CardStage {
+	if (zoom >= NEW_FULL_ZOOM) return 'full';
+	if (zoom >= NEW_NAME_ZOOM) return 'name';
+	return zoom >= NEW_PILL_LEVELS[NEW_PILL_LEVELS.length - 1] ? 'pill' : 'dot';
+}
+
+/**
+ * The canvas's compact level under `cards=new`: 0 for full cards; 1 also through the name-only stage,
+ * where cards other than node cards (folders, member jobs) show their pill; then a level per pill
+ * zoom; past the last, dots.
+ */
+export function newCompactLevel(zoom: number): number {
+	if (zoom >= NEW_FULL_ZOOM) return 0;
+	if (zoom >= NEW_NAME_ZOOM) return 1;
+	const level = NEW_PILL_LEVELS.findIndex((low) => zoom >= low);
+	return level < 0 ? NEW_PILL_LEVELS.length + 1 : level + 1;
+}

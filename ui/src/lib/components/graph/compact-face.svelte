@@ -3,9 +3,11 @@
 	import DiamondIcon from '@lucide/svelte/icons/diamond';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import SquareSquareIcon from '@lucide/svelte/icons/square-square';
-	import { COMPACT_LEVELS } from '$lib/lineage/fit';
+	import { COMPACT_LEVELS, LABEL_MIN_ZOOM, NEW_PILL_LEVELS } from '$lib/lineage/fit';
+	import { labelRule } from '$lib/lineage/label-rule.svelte';
+	import { cardsMode } from './cards-mode.svelte';
 	import { fonts } from './fonts.svelte';
-	import { measureCompact, pillFont, pillRoom, pillText } from './compact-title';
+	import { measureCompact, newPillFont, newPillRoom, newPillText, pillFont, pillRoom, pillText } from './compact-title';
 	import { COMPACT_TAILS, type CompactTails } from './compact-tails';
 
 	// A card's compact form, shown by the graph (the `compact` class on its canvas) when zoomed out too far
@@ -22,13 +24,22 @@
 	 * The name's size on screen at each level, fitted at the level's lowest zoom, where the card is
 	 * narrowest; measured again once the name's font has loaded.
 	 */
+	const mode = $derived(cardsMode());
 	const sizes = $derived(
 		(void fonts.ready,
 		void fonts.version,
-		COMPACT_LEVELS.map((zoom) => {
-			const px = pillFont(tail, pillRoom(zoom), measureCompact);
-			return { px, text: pillText(tail, px, pillRoom(zoom), measureCompact, lead) };
-		}))
+		mode === 'new'
+			? // Mockup (`cards=new`): the pill's full width; the end cut, or a discovered step's shared prefix.
+				NEW_PILL_LEVELS.map((zoom) => {
+					const room = newPillRoom(zoom, LABEL_MIN_ZOOM);
+					const shared = labelRule.on || /\[[^\]]+\]$/.test(tail) ? lead : 0;
+					const px = newPillFont(tail, room, measureCompact);
+					return { px, text: newPillText(tail, px, room, measureCompact, shared) };
+				})
+			: COMPACT_LEVELS.map((zoom) => {
+					const px = pillFont(tail, pillRoom(zoom), measureCompact);
+					return { px, text: pillText(tail, px, pillRoom(zoom), measureCompact, lead) };
+				}))
 	);
 	/** The icon's size on screen. */
 	const ICON = 10;
@@ -128,6 +139,35 @@
 	:global(.graph-canvas[data-compact='2']) .nm[data-level='2'],
 	:global(.graph-canvas[data-compact='3']) .nm[data-level='3'] {
 		display: block;
+	}
+	/* Mockup (`cards=new`): a status dot rather than an icon ring, tighter padding, the name across the
+	   pill's full width; at the dot level, the dot alone. */
+	:global(.graph-canvas.cards-new) .pill {
+		height: min(calc(26px * var(--u)), 100%);
+		gap: calc(6px * var(--u));
+		padding: 0 calc(8px * var(--u)) 0 calc(6px * var(--u));
+	}
+	:global(.graph-canvas.cards-new) .ring {
+		width: calc(10px * var(--u));
+		height: calc(10px * var(--u));
+		border: 0;
+		background: var(--tone);
+	}
+	:global(.graph-canvas.cards-new) .ring :global(svg) {
+		display: none;
+	}
+	:global(.graph-canvas.cards-new[data-stage='dot']) .pill {
+		width: max-content;
+		margin: 0 auto;
+		padding: calc(5px * var(--u));
+	}
+	:global(.graph-canvas.cards-new[data-stage='dot']) .ring {
+		width: calc(14px * var(--u));
+		height: calc(14px * var(--u));
+	}
+	/* Name-only stage: node cards keep their own frame; other cards show their pill. */
+	:global(.graph-canvas.nameonly .svelte-flow__node-asset) .cface {
+		display: none;
 	}
 	/* On the pill's top right, outside the name's room. */
 	.cbadge {

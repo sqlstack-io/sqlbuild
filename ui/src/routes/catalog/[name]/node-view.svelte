@@ -23,7 +23,8 @@
 	import { untrack } from 'svelte';
 	import { formatAgo } from '$lib/format/time';
 	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
-	import { kindLine, kindTabLabel, kindTabOf, nodeIcon, nodeIconKey, shortName, sqlVersions } from '$lib/build-area/labels';
+	import { kindLine, kindTabLabel, kindTabOf, nodeIcon, nodeIconKey, shortName, sqlVersions, nodeIconsFor } from '$lib/build-area/labels';
+	import { cardsMode } from '$lib/components/graph/cards-mode.svelte';
 	import { cardData } from '$lib/lineage/catalog-graph';
 	import OverviewTab from './overview-tab.svelte';
 	import DriftTab from './drift-tab.svelte';
@@ -102,7 +103,7 @@
 	function execute(selection: string[]) {
 		void goto(to(planHref(selection)));
 	}
-	const Glyph = $derived(n ? (nodeIcon[nodeIconKey(n)] ?? nodeIcon.table) : nodeIcon.table);
+	const Glyph = $derived(n ? (nodeIconsFor(cardsMode() === 'new')[nodeIconKey(n)] ?? nodeIcon.table) : nodeIcon.table);
 	const columnColumns: TableColumn[] = [
 		{ id: 'column', label: 'Column', minWidth: 180 },
 		{ id: 'type', label: 'Type', width: '160px' },

@@ -23,6 +23,12 @@
 	import { fonts } from '$lib/components/graph/fonts.svelte';
 	import { fitStatus } from '$lib/lineage/status-line';
 	import { labelRule } from '$lib/lineage/label-rule.svelte';
+	import { cardsMode } from '$lib/components/graph/cards-mode.svelte';
+	import ChartGanttIcon from '@lucide/svelte/icons/chart-gantt';
+	import { getContext } from 'svelte';
+	import { COMPACT_TAILS, type CompactTails } from '$lib/components/graph/compact-tails';
+	import { measureText, newPillText } from '$lib/components/graph/compact-title';
+	import { CARD_WIDTH, NEW_NAME_MAX_PX, NEW_NAME_SCREEN_PX, newCardStage } from '$lib/lineage/fit';
 
 	type AssetData = {
 		name: string;
@@ -94,7 +100,24 @@
 		table_fn: TableProperties,
 		fn: FunctionSquare
 	};
-	const Glyph = $derived(icons[d.icon ?? ''] ?? Table2);
+	// Mockup (`cards=new`): no kind word on the card, so a microbatch model gets its own icon (time slices),
+	// apart from delete+insert's; the full materialization is in the tooltip and the side panel.
+	const cardsNew = $derived(cardsMode() === 'new');
+	// Name-only stage: the name fitted to the card at its enlarged size; a discovered step's shared
+	// prefix gives way first, any other name loses its end.
+	const tails = getContext<CompactTails | undefined>(COMPACT_TAILS);
+	const nameOnlyText = $derived.by(() => {
+		const label = d.label ?? d.name;
+		const zoom = tails?.zoom?.();
+		if (!cardsNew || zoom === undefined || newCardStage(zoom) !== 'name') return label;
+		const font = Math.min(NEW_NAME_MAX_PX, Math.max(12.5, NEW_NAME_SCREEN_PX / zoom));
+		const room = CARD_WIDTH - 2 - 20 - 8 - 14 * Math.min(1 / zoom, 1.8);
+		const lead = labelRule.on || /\[[^\]]+\]$/.test(label) ? (tails?.lead?.(id) ?? 0) : 0;
+		void fonts.ready;
+		const measure = (t: string, px: number) => measureText(t, px, 600);
+		return newPillText(label, font, room, measure, lead);
+	});
+	const Glyph = $derived(cardsNew && d.icon === 'microbatch' ? ChartGanttIcon : (icons[d.icon ?? ''] ?? Table2));
 	const tone = $derived(statusColor[d.status] ?? statusColor.none);
 	const kindShort = $derived(d.kind.split(' · ')[0]);
 	const when = $derived(d.lastBuiltAt ? (d.status === 'src' ? `loaded ${formatAgo(d.lastBuiltAt, app.now)}` : formatAgo(d.lastBuiltAt, app.now)) : '');
@@ -125,14 +148,14 @@
 	);
 </script>
 
-<div class="node" class:selected class:dimmed={d.dimmed}>
+<div class="node" class:selected class:dimmed={d.dimmed} style:--face={faceTone}>
 	<Handle type="target" position={Position.Left} class="node-handle" />
 
 	<div class="head">
 		<Glyph size={14} strokeWidth={1.75} class="glyph" />
 		<!-- Mockup (discovered-node variants): a name too long gives way at its start, so its distinct end stays. -->
-		<span class="name" class:tail-first={labelRule.on} title={d.name}><bdi>{d.label ?? d.name}</bdi></span>
-		{#if f.kind}<span class="kind">{kindShort}</span>{/if}
+		<span class="name" class:tail-first={labelRule.on} title={cardsNew && d.kind ? `${d.name} · ${d.kind}` : d.name}><bdi>{nameOnlyText}</bdi></span>
+		{#if f.kind && !cardsNew}<span class="kind">{kindShort}</span>{/if}
 	</div>
 
 	{#if hasDetail}
@@ -183,6 +206,38 @@
 	.node.selected {
 		border-color: var(--primary);
 		box-shadow: 0 0 0 1px var(--primary);
+	}
+	/* Mockup (`cards=new`), name-only stage: the same card, its status line hidden and its name enlarged
+	   to stay about 10 px on screen; the card keeps its size, so nothing moves. */
+	:global(.graph-canvas.nameonly) .node {
+		border-color: var(--node-border) !important;
+		background: var(--card) !important;
+		overflow: hidden !important;
+	}
+	/* The status the hidden line carried, as a stripe and the icon's colour. */
+	:global(.graph-canvas.nameonly) .node:not(.selected) {
+		box-shadow: inset 3px 0 0 var(--face) !important;
+	}
+	:global(.graph-canvas.nameonly) .head :global(.glyph) {
+		color: var(--face) !important;
+	}
+	:global(.graph-canvas.nameonly) .node.selected {
+		border-color: var(--primary) !important;
+		box-shadow: 0 0 0 1px var(--primary) !important;
+	}
+	:global(.graph-canvas.nameonly) .node:hover {
+		border-color: color-mix(in srgb, var(--foreground) 35%, transparent) !important;
+	}
+	:global(.graph-canvas.nameonly) .head {
+		visibility: visible !important;
+		transform: translateY(13px);
+	}
+	:global(.graph-canvas.nameonly) .name {
+		font-size: clamp(12.5px, calc(10px * var(--sb-inv, 1)), 26px);
+	}
+	:global(.graph-canvas.nameonly) .head :global(.glyph) {
+		width: calc(14px * min(var(--sb-inv, 1), 1.8));
+		height: calc(14px * min(var(--sb-inv, 1), 1.8));
 	}
 	.node.dimmed {
 		opacity: 0.35;

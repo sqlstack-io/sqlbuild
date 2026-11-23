@@ -6,7 +6,8 @@
 	import type { CatalogNode } from '$lib/api';
 	import { folderPaths, folderTree, visibleTreeRows, type FolderNode, type FolderSort, type TreeRow } from '$lib/build-area/folder-tree';
 	import { needsAttention } from '$lib/build-area/overview-panels';
-	import { nodeIcon, nodeIconKey, shortName } from '$lib/build-area/labels';
+	import { nodeIcon, nodeIconKey, shortName, nodeIconsFor } from '$lib/build-area/labels';
+	import { cardsMode } from '$lib/components/graph/cards-mode.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -139,7 +140,7 @@
 				</tr>
 			{:else if r.kind === 'node'}
 				{@const n = r.node}
-				{@const Glyph = nodeIcon[nodeIconKey(n)] ?? nodeIcon.table}
+				{@const Glyph = nodeIconsFor(cardsMode() === 'new')[nodeIconKey(n)] ?? nodeIcon.table}
 				{@const state = nodeState(n)}
 				<tr class="leaf">
 					<td>

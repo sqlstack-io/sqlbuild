@@ -5,6 +5,8 @@ import Download from '@lucide/svelte/icons/download';
 import Eye from '@lucide/svelte/icons/eye';
 import GitMerge from '@lucide/svelte/icons/git-merge';
 import Layers from '@lucide/svelte/icons/layers';
+import ChartGantt from '@lucide/svelte/icons/chart-gantt';
+import Repeat from '@lucide/svelte/icons/repeat';
 import Package from '@lucide/svelte/icons/package';
 import SquareFunction from '@lucide/svelte/icons/square-function';
 import TableProperties from '@lucide/svelte/icons/table-properties';
@@ -86,6 +88,11 @@ export function parseKindTab(value: string | null): KindTab | null {
 export function nodeIconKey(node: Pick<CatalogNode, 'kind' | 'materialization'>): string {
 	if (node.kind === 'incremental') return node.materialization?.includes('microbatch') ? 'microbatch' : node.materialization?.includes('merge') ? 'merge' : 'delete_insert';
 	return node.kind;
+}
+
+/** Mockup (`?cards=new`): icons that tell every incremental strategy apart, as the graph's cards draw them. */
+export function nodeIconsFor(cardsNew: boolean): Record<string, typeof Table2> {
+	return cardsNew ? { ...nodeIcon, delete_insert: Repeat, microbatch: ChartGantt } : nodeIcon;
 }
 
 export const nodeIcon: Record<string, typeof Table2> = {

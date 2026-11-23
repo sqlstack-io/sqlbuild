@@ -90,3 +90,46 @@ function compactFamily(): string {
 	return getComputedStyle(document.documentElement).getPropertyValue('--font-node-compact').trim() || 'sans-serif';
 }
 export const measureCompact: Measure = measureIn(compactFamily, 0.66);
+
+// ---- mockup: `?cards=new` pills ----
+
+/** A `cards=new` pill's parts on screen: a small status dot instead of the icon ring, and tighter padding. */
+export const NEW_PILL = { ring: 10, padLeft: 6, gap: 6, padRight: 8, border: 1, minFont: 10, maxFont: 12.5, weight: 500 } as const;
+
+/** Room for a `cards=new` pill's name on screen at `zoom`: the card's full width less the dot and padding, which shrink with the card below `LABEL_MIN_ZOOM`. */
+export function newPillRoom(zoom: number, labelMinZoom: number): number {
+	const parts = 2 * NEW_PILL.border + NEW_PILL.padLeft + NEW_PILL.ring + NEW_PILL.gap + NEW_PILL.padRight;
+	return CARD_WIDTH * zoom - parts * Math.min(1, zoom / labelMinZoom);
+}
+
+/** The largest size from `NEW_PILL.maxFont` down to `NEW_PILL.minFont` at which `text` fits `room`. */
+export function newPillFont(text: string, room: number, measure: Measure): number {
+	let font: number = NEW_PILL.maxFont;
+	while (font > NEW_PILL.minFont && measure(text, font, NEW_PILL.weight) > room) font -= 0.25;
+	return font;
+}
+
+/**
+ * `text` as it fits `room` on a `cards=new` pill: whole; else, with a shared `lead` (discovered steps),
+ * cut inside the lead so the distinct rest stays whole; else its end cut, keeping its start.
+ */
+export function newPillText(text: string, font: number, room: number, measure: Measure, lead = 0): string {
+	const fits = (t: string) => measure(t, font, NEW_PILL.weight) <= room;
+	if (fits(text)) return text;
+	const endCut = (t: string, before = '') => {
+		let [lo, hi] = [0, t.length - 1];
+		while (lo < hi) {
+			const mid = Math.ceil((lo + hi) / 2);
+			if (fits(`${before}${t.slice(0, mid)}…`)) lo = mid;
+			else hi = mid - 1;
+		}
+		return `${before}${t.slice(0, lo)}…`;
+	};
+	if (lead > 0) {
+		// A discovered key's closing bracket goes with its prefix: `forecast_eu[gbm_gru]` reads `…gbm_gru`.
+		const rest = text.slice(lead).replace(/\]$/, '');
+		for (let k = lead - 1; k >= 0; k--) if (fits(`${text.slice(0, k)}…${rest}`)) return `${text.slice(0, k)}…${rest}`;
+		return endCut(rest, '…');
+	}
+	return endCut(text);
+}

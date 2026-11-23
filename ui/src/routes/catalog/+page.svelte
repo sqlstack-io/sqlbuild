@@ -30,7 +30,8 @@
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
-	import { KIND_TABS, kindLine, kindTabLabel, kindTabOf, nodeIcon, nodeIconKey, parseKindTab, shortName, shortRunId, type KindTab } from '$lib/build-area/labels';
+	import { KIND_TABS, kindLine, kindTabLabel, kindTabOf, nodeIcon, nodeIconKey, parseKindTab, shortName, shortRunId, type KindTab, nodeIconsFor } from '$lib/build-area/labels';
+	import { cardsMode } from '$lib/components/graph/cards-mode.svelte';
 
 	type StatusFilter = 'stale' | 'changed' | 'behind' | 'failed' | 'warn';
 
@@ -173,7 +174,7 @@
 {:else}
 <DataTable class="catalog" columns={tableColumns} rows={filtered} key={(n) => n.key} rowHeight={ROW_H} resource={catalog} empty={all.length ? 'No nodes match the filter.' : 'Nothing deployed yet.'}>
 	{#snippet row(n)}
-				{@const Glyph = nodeIcon[nodeIconKey(n)] ?? nodeIcon.table}
+				{@const Glyph = nodeIconsFor(cardsMode() === 'new')[nodeIconKey(n)] ?? nodeIcon.table}
 				<tr onclick={(e) => linksNodes && openRow(e, `/catalog/${n.key}`)}>
 					<td>
 						<div class="cell-name">
