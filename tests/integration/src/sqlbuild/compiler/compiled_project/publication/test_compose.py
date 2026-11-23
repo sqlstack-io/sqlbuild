@@ -41,7 +41,7 @@ def test_given_packaged_services_when_redeployed_and_restarted_then_pinned_runs_
     test_case: ComposeDeploymentTestCase,
 ) -> None:
     stack: ComposeStack = ComposeStack(tmp_path)
-    with platform_receiver() as (port, events):
+    with platform_receiver() as (port, events, received_at):
         stack.environment["SQLBUILD_PLATFORM_WEBHOOK_URL"] = (
             f"http://host.docker.internal:{port}/events"
         )
@@ -188,7 +188,13 @@ def test_given_packaged_services_when_redeployed_and_restarted_then_pinned_runs_
             prior_events: set[str] = {event["event_id"] for event in events}
             stack.compose("stop", "--timeout", "1", "location")
             stopped_at: datetime = datetime.now(UTC)
-            broken: dict[str, Any] = wait_for_location_outage(events, prior_events)
+            broken: dict[str, Any] = wait_for_location_outage(
+                events,
+                prior_events,
+                received_at,
+                location_id=stack.location_id,
+                stopped_at=stopped_at,
+            )
             assert broken["payload"]["platform"]["location_id"] == stack.location_id
             assert broken["payload"]["platform"]["target"] == "development"
             assert (
