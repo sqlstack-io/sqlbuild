@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { copyText } from '$lib/browser/clipboard';
+	import { createCopyState } from '$lib/browser/copy-state.svelte';
 	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
 	import CopyIcon from '@lucide/svelte/icons/copy';
@@ -52,8 +52,8 @@
 	} = $props();
 
 	let exceptOpen = $state(false);
-	let copied = $state(false);
-	let copyTimer: ReturnType<typeof setTimeout> | undefined;
+	const copier = createCopyState();
+	const copied = $derived(copier.copied);
 
 	const showExcept = $derived(exceptOpen || !!selection.exclude.trim());
 	const problem = $derived(selection.problem);
@@ -70,11 +70,9 @@
 	const canBuild = $derived(app.client.supports('launchAdhocRun'));
 	const blocked = $derived(!!problem || !selection.select.trim());
 
-	async function copy() {
-		copied = await copyText(command);
+	async function copy(e: MouseEvent) {
+		await copier.copy(command, e.currentTarget as Element);
 		selection.remember();
-		clearTimeout(copyTimer);
-		copyTimer = setTimeout(() => (copied = false), 1200);
 	}
 	function buildThese() {
 		selection.remember();

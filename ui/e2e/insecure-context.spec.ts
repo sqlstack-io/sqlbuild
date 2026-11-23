@@ -55,3 +55,20 @@ test('a one-time secret that cannot be copied is selected, with a hint to copy i
 	await expect(issued.getByRole('alert')).toContainText('copy it with Ctrl+C');
 	expect(await page.evaluate(() => String(getSelection()))).toBe(await issued.locator('code').innerText());
 });
+
+test('a key shown in a modal dialog copies without navigator.clipboard, and Copy reads again after a moment', async ({ page }) => {
+	await page.goto('/admin/people?mock&tab=service-accounts&open=ci-runner');
+	const panel = page.getByTestId('service-account-panel');
+	await panel.getByTestId('rotate-key').click({ timeout: 20_000 });
+	const dialog = page.getByTestId('rotate-dialog');
+	await dialog.getByRole('button', { name: 'Rotate key' }).click();
+	const reveal = dialog.getByTestId('key-reveal');
+	const key = (await reveal.locator('code').innerText()).trim();
+	await reveal.getByRole('button', { name: 'Copy' }).click();
+	await expect.poll(() => page.evaluate(() => (window as unknown as { copied: string[] }).copied)).toEqual([key]);
+	await expect(reveal.getByRole('button', { name: 'Copied' })).toBeVisible();
+	await expect(reveal.getByRole('button', { name: 'Copy' })).toBeVisible({ timeout: 5_000 });
+	await reveal.getByRole('button', { name: 'Copy' }).click();
+	await expect.poll(() => page.evaluate(() => (window as unknown as { copied: string[] }).copied)).toEqual([key, key]);
+	await expect(reveal.getByRole('alert')).toHaveCount(0);
+});
