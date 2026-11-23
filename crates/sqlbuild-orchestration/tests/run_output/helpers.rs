@@ -158,6 +158,7 @@ pub(crate) fn page_query(
 }
 
 /// Make the folder holding the run's chunks read-only, or writable again, so deleting them fails or works.
+#[cfg(unix)]
 pub(crate) async fn set_chunks_writable(output: &OutputStore, folder: &Path, writable: bool) {
     use std::os::unix::fs::PermissionsExt;
     let first = output
