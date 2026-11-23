@@ -20,7 +20,6 @@ if [[ "${command}" == sdist ]]; then
 	exec "${venv_python}" -m maturin sdist "$@"
 fi
 case "${RUNNER_OS}-${TARGET}" in
-	macOS-x86_64) triple=x86_64-apple-darwin ;;
 	macOS-aarch64) triple=aarch64-apple-darwin ;;
 	Windows-x86_64) triple=x86_64-pc-windows-msvc ;;
 	*) echo "no host fallback for ${RUNNER_OS} ${TARGET}" >&2; exit 1 ;;

@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 15
     outputs:
       missing: >-
-        ${{ steps.arm64.outputs.cache-hit != 'true' || steps.x86_64.outputs.cache-hit != 'true' }}
+        ${{ steps.arm64.outputs.cache-hit != 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -39,13 +39,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: dist-macos-arm64-dist
-          lookup-only: true
-          save-if: false
-      - name: Look up the macOS x86_64 cache
-        id: x86_64
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: dist-macos-x86_64-dist
           lookup-only: true
           save-if: false
 

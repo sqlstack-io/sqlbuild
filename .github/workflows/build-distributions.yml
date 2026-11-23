@@ -84,8 +84,6 @@ jobs:
                "dependency-cache": "none"},
               {"name": "linux-aarch64", "runner": "ubuntu-24.04-arm", "target": "aarch64",
                "dependency-cache": "none"},
-              {"name": "macos-x86_64", "runner": "macos-15", "target": "x86_64",
-               "python-architecture": "x64", "smoke-arch": "x86_64", "dependency-cache": "restore"},
               {"name": "macos-arm64", "runner": "macos-15", "target": "aarch64",
                "dependency-cache": "restore"},
               {"name": "windows-x86_64", "runner": "windows-2025", "target": "x86_64",
@@ -145,9 +143,8 @@ jobs:
     name: Build wheel (${{ matrix.platform.name }})
     needs: source
     runs-on: ${{ matrix.platform.runner }}
-    # Cold dist builds take up to about 2x the 17-31 minute release-profile jobs on Windows and macOS,
-    # and a cold macOS arm64 dist build has taken an hour.
-    timeout-minutes: 150
+    # Release-profile wheel jobs take about 20-40 minutes; the limit leaves room for a slow runner.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -160,7 +157,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          architecture: ${{ matrix.platform.python-architecture }}
       - uses: dtolnay/rust-toolchain@master
         if: inputs.prebuilt-run-id == ''
         with:
@@ -309,8 +305,6 @@ jobs:
           github-token: ${{ github.token }}
       - name: Smoke test installed wheels and native console entry points
         shell: bash
-        env:
-          SMOKE_ARCH: ${{ matrix.platform.smoke-arch }}
         run: |
           python -m venv "${RUNNER_TEMP}/wheel-smoke"
           if [[ -x "${RUNNER_TEMP}/wheel-smoke/Scripts/python.exe" ]]; then
@@ -318,23 +312,17 @@ jobs:
           else
             smoke_python="${RUNNER_TEMP}/wheel-smoke/bin/python"
           fi
-          # A cross-compiled wheel runs under Rosetta; the cached Python is universal, so force
-          # the wheel's architecture or it starts as arm64 and rejects the wheel.
-          run_as=()
-          if [[ -n "${SMOKE_ARCH}" ]]; then
-            run_as=(arch "-${SMOKE_ARCH}")
-          fi
-          "${run_as[@]}" "${smoke_python}" -m pip install --find-links dist dist/*.whl
+          "${smoke_python}" -m pip install --find-links dist dist/*.whl
           cd "${RUNNER_TEMP}"
-          "${run_as[@]}" "${smoke_python}" -c "import sqlbuild._native"
+          "${smoke_python}" -c "import sqlbuild._native"
           smoke_scripts="$(dirname "${smoke_python}")"
-          "${run_as[@]}" "${smoke_scripts}/sqb" --version
-          "${run_as[@]}" "${smoke_scripts}/sqb" --help
-          "${run_as[@]}" "${smoke_scripts}/sqlbuild" --help
-          "${run_as[@]}" "${smoke_scripts}/sqlbuild" --version
+          "${smoke_scripts}/sqb" --version
+          "${smoke_scripts}/sqb" --help
+          "${smoke_scripts}/sqlbuild" --help
+          "${smoke_scripts}/sqlbuild" --version
           # The sqlbuild forwarder returns sqb's own exit code; an unknown command is a usage error.
           code=0
-          "${run_as[@]}" "${smoke_scripts}/sqlbuild" no-such-command > /dev/null 2>&1 || code=$?
+          "${smoke_scripts}/sqlbuild" no-such-command > /dev/null 2>&1 || code=$?
           if [[ "${code}" != "2" ]]; then
             echo "sqlbuild no-such-command exited ${code}; sqb exits 2" >&2
             exit 1
@@ -351,7 +339,7 @@ jobs:
           } >> "${GITHUB_STEP_SUMMARY}"
           if [[ "${{ inputs.prebuilt-run-id == '' }}" == "true" ]]; then
             cd "${GITHUB_WORKSPACE}"
-            "${run_as[@]}" "${smoke_python}" -m tests.integration.src.sqlbuild.compiler.compiled_project.publication.wheel.helpers \
+            "${smoke_python}" -m tests.integration.src.sqlbuild.compiler.compiled_project.publication.wheel.helpers \
               "${smoke_scripts}/sqb${{ runner.os == 'Windows' && '.exe' || '' }}"
           fi
       - name: Check wheel contents and run a native command
