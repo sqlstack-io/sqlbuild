@@ -11,7 +11,9 @@ use crate::boundary::main::imported::imported;
 use crate::native_host::_helpers::adapter_connects::connects_in_progress;
 use crate::native_host::_helpers::forced_exit::{cancel_statements, force_exit};
 use crate::native_host::_helpers::interrupt::WATCHED_INTERRUPT;
-use crate::native_host::constants::{GRACE, INTERRUPT_BYTE, POLL, STEP_THREAD_PREFIX, STOP_BYTE};
+use crate::native_host::constants::{
+    GRACE, INTERRUPT_BYTE, POLL, RECEIVE_BYTES, STEP_THREAD_PREFIX, STOP_BYTE,
+};
 use crate::native_host::main::host_entry::host_entry;
 use crate::native_host::models::{InterruptPresses, InterruptWatch};
 use crate::native_host::types::WakeupSocket;

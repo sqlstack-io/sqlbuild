@@ -5,6 +5,7 @@ use crate::native_host::_helpers::interrupt::INTERRUPTED;
 use crate::native_host::_helpers::interrupt::SIGINT;
 use crate::native_host::_helpers::interrupt::restore_signal_handler;
 use crate::native_host::types::Syntax;
+use crate::native_host::types::WakeupSocket;
 use pyo3::exceptions::PyAttributeError;
 use pyo3::exceptions::PyKeyboardInterrupt;
 use pyo3::prelude::Bound;
