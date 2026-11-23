@@ -388,7 +388,7 @@ def test_given_typed_macro_references_and_hook_reads_when_building_then_graph_an
             expected_exit_code=1,
             expected_output_fragments=(
                 "error[P008]: asset:export_orders names model:stg_customers as 'stg_customers'",
-                "--> python/nodes/tasks/export.py:8",
+                "--> python/nodes/tasks/export/asset.py:8",
                 "[references]\n            enforce_explicit = false",
             ),
         ),
@@ -399,7 +399,7 @@ def test_given_typed_macro_references_and_hook_reads_when_building_then_graph_an
             expected_exit_code=1,
             expected_output_fragments=(
                 "error[P008]: check:orders_present names model:stg_customers as 'stg_customers'",
-                "--> python/nodes/checks/orders.py:9",
+                "--> python/nodes/checks/orders/checks.py:9",
                 'declare it with depends_on=model("stg_customers")',
             ),
         ),
@@ -609,10 +609,10 @@ def test_given_check_runtime_hard_coded_relation_when_building_then_it_warns_wit
         CollectedCompileDiagnosticsE2ETestCase(
             description="two single-model singular audits and two gating audits all report",
             overrides={
-                f"{_AUDITS}/sql/audits/singular/one_orders.sql": _ONE_MODEL_AUDIT.format(
+                f"{_AUDITS}/audits/singular/one_orders.sql": _ONE_MODEL_AUDIT.format(
                     read="orders_a"
                 ),
-                f"{_AUDITS}/sql/audits/singular/one_customers.sql": _ONE_MODEL_AUDIT.format(
+                f"{_AUDITS}/audits/singular/one_customers.sql": _ONE_MODEL_AUDIT.format(
                     read="customers_b"
                 ),
                 f"{_AUDITS}/_audits/generic/a_check.sql": _AUDIT_READING.format(
@@ -657,7 +657,7 @@ def test_given_check_runtime_hard_coded_relation_when_building_then_it_warns_wit
             overrides={
                 "sql/audits/generic/eu_check.sql": _NULL_AUDIT,
                 "sql/audits/generic/us_check.sql": _NULL_AUDIT,
-                f"{_AUDITS}/sql/audits/generic/unused_check.sql": _NULL_AUDIT,
+                f"{_AUDITS}/audits/generic/unused_check.sql": _NULL_AUDIT,
                 f"{EXPLICIT_REFERENCE_MODELS}/stg_orders_eu.sql": (
                     "MODEL (description 'Test model stg_orders_eu.', materialized table, audits [eu_check]);\n"
                     "SELECT 1 AS order_id, 10 AS amount\n"

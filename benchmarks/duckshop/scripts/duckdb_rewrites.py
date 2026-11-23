@@ -591,7 +591,7 @@ def macro_folder(root: pathlib.Path, folders: list[pathlib.Path]) -> pathlib.Pat
     common = pathlib.Path(os.path.commonpath(folders))
     if common in (root, root / "sql" / "models"):
         return root / "sql" / "macros" / "sql"
-    return common / "_sqlbuild" / "sql" / "macros" / "sql"
+    return common / "_sqlbuild" / "macros" / "sql"
 
 
 def write_shims(root: pathlib.Path) -> None:
