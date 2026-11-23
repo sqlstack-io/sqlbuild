@@ -309,22 +309,29 @@ def test_given_later_batches_succeed_when_one_batch_fails_then_next_run_preserve
         "(7, '2026-01-01 06:30:00', '7')"
     )
     connection.close()
+    completion_events_sql: str = (
+        "SELECT event_id, partition_start FROM main._sqlbuild_microbatches "
+        "WHERE record_type = 'partition_completion'"
+    )
+    initial_completion_ids: set[str] = {
+        row[0] for row in query_duckdb(db_path=db_path, sql=completion_events_sql)
+    }
 
     failed: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build"), project_dir=project_dir
     )
     assert failed.returncode != 0
-    assert (
-        query_duckdb(
-            db_path=db_path,
-            sql=(
-                "SELECT COUNT(*) FROM main._sqlbuild_microbatches "
-                "WHERE record_type = 'partition_completion' "
-                "AND partition_start >= '2026-01-01T03:00:00'"
-            ),
-        )[0][0]
-        == 2
-    )
+    failed_run_completion_starts: set[str] = {
+        row[1]
+        for row in query_duckdb(db_path=db_path, sql=completion_events_sql)
+        if row[0] not in initial_completion_ids
+    }
+    # The failing 02:00 batch records no completion. Its 03:00 sibling is handed to a worker
+    # before the coordinator runs 04:00 itself, and sibling failures are only examined after
+    # 04:00 finishes, so both always complete. Whether 05:00 and 06:00 also start before the
+    # failure is seen depends on runner timing.
+    assert "2026-01-01T02:00:00" not in failed_run_completion_starts
+    assert {"2026-01-01T03:00:00", "2026-01-01T04:00:00"} <= failed_run_completion_starts
 
     connection = duckdb.connect(str(db_path))
     connection.execute("UPDATE raw_events SET payload = '3' WHERE id = 3")

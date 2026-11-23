@@ -277,14 +277,19 @@ class ComposeStack:
 
 
 @contextmanager
-def platform_receiver() -> Iterator[tuple[int, list[dict[str, Any]]]]:
-    """Own the real webhook HTTP boundary even if stack cleanup itself fails."""
+def platform_receiver() -> Iterator[tuple[int, list[dict[str, Any]], dict[str, datetime]]]:
+    """Own the real webhook HTTP boundary even if stack cleanup itself fails.
+
+    Yields the port, the delivered events, and when each event ID was first received.
+    """
     events: list[dict[str, Any]] = []
+    received_at: dict[str, datetime] = {}
 
     class Receiver(BaseHTTPRequestHandler):
         def do_POST(self) -> None:
             event: dict[str, Any] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             assert self.headers["Idempotency-Key"] == event["event_id"]
+            received_at.setdefault(event["event_id"], datetime.now(UTC))
             events.append(event)
             self.send_response(204)
             self.end_headers()
@@ -296,23 +301,64 @@ def platform_receiver() -> Iterator[tuple[int, list[dict[str, Any]]]]:
         thread: Thread = Thread(target=receiver.serve_forever, daemon=True)
         thread.start()
         try:
-            yield receiver.server_port, events
+            yield receiver.server_port, events, received_at
         finally:
             receiver.shutdown()
             thread.join(timeout=5)
             assert not thread.is_alive()
 
 
+# The server's liveness timings, fixed in sqlbuild-orchestration and documented in
+# website/src/content/docs/docs/cli/server.mdx; the compose stack does not override them.
+# A location is broken once it has been silent for over LOCATION_SILENCE_SECONDS.
+LOCATION_SILENCE_SECONDS: float = 90
+# The maintenance loop sleeps this long between health scans, after scanning and retention.
+WATCHDOG_SCAN_SECONDS: float = 30
+# The platform webhook polls for new events this often, and gives up on a request after
+# WEBHOOK_REQUEST_SECONDS, retrying the same event on the next poll.
+WEBHOOK_POLL_SECONDS: float = 5
+WEBHOOK_REQUEST_SECONDS: float = 10
+
+
+def location_outage_deadline_seconds() -> float:
+    """The longest a stopped location's outage can take to reach the webhook receiver.
+
+    The location last reported no later than the stop, so it is silent for long enough
+    LOCATION_SILENCE_SECONDS after it. The next scan follows within one scan interval, and a
+    loaded runner can stretch a scan cycle by as much again. Delivery takes one webhook poll and
+    request, and one retry of both is allowed.
+    """
+    return (
+        LOCATION_SILENCE_SECONDS
+        + 2 * WATCHDOG_SCAN_SECONDS
+        + 2 * (WEBHOOK_POLL_SECONDS + WEBHOOK_REQUEST_SECONDS)
+    )
+
+
 def wait_for_location_outage(
-    events: list[dict[str, Any]], prior_events: set[str]
+    events: list[dict[str, Any]],
+    prior_events: set[str],
+    received_at: dict[str, datetime],
+    *,
+    location_id: str,
+    stopped_at: datetime,
 ) -> dict[str, Any]:
     """Wait for fresh delivery, not an outage already received during a prior restart."""
-    deadline: float = time.monotonic() + 135
+    timeout: float = location_outage_deadline_seconds()
+    deadline: float = time.monotonic() + timeout
     matches: list[dict[str, Any]] = []
     while not matches:
-        assert time.monotonic() < deadline, (
-            "Native platform sink did not report the stopped location"
-        )
+        if time.monotonic() >= deadline:
+            raise AssertionError(
+                _location_outage_failure(
+                    events,
+                    prior_events,
+                    received_at,
+                    location_id=location_id,
+                    stopped_at=stopped_at,
+                    timeout=timeout,
+                )
+            )
         time.sleep(0.5)
         matches = list(
             filter(
@@ -324,3 +370,42 @@ def wait_for_location_outage(
             )
         )
     return matches[0]
+
+
+def _location_outage_failure(
+    events: list[dict[str, Any]],
+    prior_events: set[str],
+    received_at: dict[str, datetime],
+    *,
+    location_id: str,
+    stopped_at: datetime,
+    timeout: float,
+) -> str:
+    """Describe what the receiver heard after the stop, and any earlier outage of the location."""
+
+    def received(event: dict[str, Any]) -> str:
+        at: datetime | None = received_at.get(event["event_id"])
+        if at is None:
+            return "unknown"
+        return f"{(at - stopped_at).total_seconds():+.1f}s"
+
+    after_stop: list[str] = [
+        f"{event['payload']['platform'].get('kind')} at {received(event)}"
+        for event in events
+        if event["event_id"] not in prior_events
+    ]
+    earlier_outages: list[str] = [
+        f"last_seen_at {event['payload']['platform'].get('last_seen_at')} "
+        f"received {received(event)}"
+        for event in events
+        if event["event_id"] in prior_events
+        and event["payload"]["platform"].get("kind") == "location_broken"
+        and event["payload"]["platform"].get("location_id") == location_id
+    ]
+    return (
+        "Native platform sink did not report the stopped location within "
+        f"{timeout:.0f}s of the stop at {stopped_at.isoformat()}. "
+        f"Events received after the stop (relative to it): {after_stop or 'none'}. "
+        "Outages of this location received before the stop, which suppress a repeat with "
+        f"the same last_seen_at: {earlier_outages or 'none'}."
+    )
