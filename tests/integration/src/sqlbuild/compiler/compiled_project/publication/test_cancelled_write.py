@@ -1,4 +1,4 @@
-"""A cancel that kills a finished step's identity write still reports every finished step."""
+"""A cancel reaching every statement leaves the steps that finished succeeded."""
 
 import sqlite3
 import subprocess
@@ -21,7 +21,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_run,
 )
 
-_STEPS: str = '''\
+_STEPS: str = """\
 import time
 from pathlib import Path
 
@@ -32,41 +32,47 @@ from sqlbuild.discovery import Discovered, Item, discover
 
 DIRECTORY = Path({directory!r})
 EXECUTE = DuckDbAdapter._execute
-INTERRUPT = DuckDbAdapter.interrupt_connection
-WRITING_RESULTS = set()
+BUSY = "SELECT max(sqrt(step.range)) FROM range(20000000) step"
 
 
-def slow_identity_write(self, connection, sql):
-    """Once a cancel lands, an identity write takes seconds; a result write stays quick."""
-    if termination_requested() and "_sqlbuild_fingerprints" in sql:
-        sql = "SELECT max(sqrt(step.range)) FROM range(3000000000) step"
-    elif "_sqlbuild_node_results" in sql or "CREATE SCHEMA" in sql:
-        WRITING_RESULTS.add(id(connection))
-    try:
-        return EXECUTE(self, connection=connection, sql=sql)
-    finally:
-        WRITING_RESULTS.discard(id(connection))
+def busy_bookkeeping(self, connection, sql):
+    \"\"\"A finished step's result and identity writes stay busy until just after the cancel lands.\"\"\"
+    inserting = sql.lstrip().upper().startswith("INSERT")
+    if inserting and "_sqlbuild_node_results" in sql:
+        (DIRECTORY / f"writing-{{threading_name()}}").touch()
+    if (
+        inserting
+        and ("_sqlbuild_node_results" in sql or "_sqlbuild_fingerprints" in sql)
+        and not (DIRECTORY / "cancelled").exists()
+    ):
+        until = None
+        while until is None or time.monotonic() < until:
+            if until is None and termination_requested():
+                until = time.monotonic() + 0.5
+            EXECUTE(self, connection=connection, sql=BUSY)
+            if until is None and not (DIRECTORY / "go").exists():
+                break
+    return EXECUTE(self, connection=connection, sql=sql)
 
 
-def cancel_identity_writes_only(self, connection):
-    """A result write is over before a cancel reaches it, so only identity writes get cancelled."""
-    return id(connection) in WRITING_RESULTS or INTERRUPT(self, connection)
+def threading_name():
+    import threading
+    return threading.current_thread().name
 
 
-DuckDbAdapter._execute = slow_identity_write
-DuckDbAdapter.interrupt_connection = cancel_identity_writes_only
+DuckDbAdapter._execute = busy_bookkeeping
 
 
 @discover
 def fulfilment_plan() -> Discovered:
-    """Five steps at once, and one after them."""
+    \"\"\"Five steps at once, and one after them.\"\"\"
     steps = [Item(id=step) for step in ("label", "pack", "pick", "ship", "stuck")]
     return Discovered(items=[*steps, Item(id="bill", depends_on=("pick",))], max_parallel=5)
 
 
 @asset(for_each=fulfilment_plan, tags=["fulfilment"])
 def fulfil(ctx: AssetContext) -> None:
-    """Finish as the cancel lands, but ship 2 seconds later and stuck never."""
+    \"\"\"Three finish before the cancel; ship finishes 2 seconds into it and stuck never.\"\"\"
     step = ctx.discovered.item
     with (DIRECTORY / "ran.txt").open("a") as ran:
         ran.write(f"{{step}}\\n")
@@ -74,10 +80,14 @@ def fulfil(ctx: AssetContext) -> None:
         return
     (DIRECTORY / f"{{step}}.running").touch()
     deadline = time.monotonic() + 60
-    while not termination_requested() and time.monotonic() < deadline:
+    while time.monotonic() < deadline:
+        if step in ("label", "pack", "pick") and (DIRECTORY / "go").exists():
+            return
+        if step == "ship" and termination_requested():
+            time.sleep(2)
+            return
         time.sleep(0.02)
-    time.sleep({{"ship": 2, "stuck": 120}}.get(step, 0))
-'''
+"""
 _STATUSES: dict[str, str] = {
     "asset:fulfil[bill]": "cancelled",
     "asset:fulfil[label]": "success",
@@ -144,6 +154,10 @@ def test_given_steps_finishing_as_a_cancel_lands_when_a_write_is_cancelled_then_
         while len(list(tmp_path.glob("*.running"))) < 5:
             assert time.monotonic() < deadline, worker.log.read_text()
             time.sleep(0.05)
+        (tmp_path / "go").touch()
+        while not list(tmp_path.glob("writing-*")):
+            assert time.monotonic() < deadline, worker.log.read_text()
+            time.sleep(0.02)
         with sqlite3.connect(worker.control_store) as control:
             run_id: str = control.execute("SELECT run_id FROM sqb_runs").fetchone()[0]
         cancelled: subprocess.CompletedProcess[str] = subprocess.run(

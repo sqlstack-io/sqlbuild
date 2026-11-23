@@ -793,3 +793,11 @@ class UnknownDependencyDiscoverTestCase:
     description: str
     dependency: str
     expected_error: str
+
+
+@dataclass(frozen=True)
+class UnknownTagTestCase:
+    description: str
+    dependency: str
+    expected_error: str
+    expected_status: int

@@ -51,6 +51,7 @@ from sqlbuild.python_nodes.models import (
     RetryPolicy,
     SqlResourceRef,
 )
+from sqlbuild.runtime.execution_limits.main.bookkeeping_statements import bookkeeping_statements
 from sqlbuild.runtime.observability.classes.operation_lifecycle import (
     OperationLifecycle,
     publish_retry_scheduled,
@@ -271,40 +272,41 @@ def _persist_python_node_result(
 ) -> None:
     if result_store is None:
         return
-    record: NodeResultRecord = NodeResultRecord(
-        node_type=result.kind.value,
-        node_name=result.node_name,
-        target_database=result_store.database,
-        target_schema=result_store.schema,
-        target_name=None,
-        run_id=run_id,
-        status=result.status.value,
-        payload=result.payload,
-        metadata=result.metadata,
-        error_message=result.error_message or result.skip_reason,
-        materialized=result.materialized,
-    )
-    try:
-        result_store.write(record)
-    except Exception as error:
-        if result.status != PythonNodeStatus.SUCCESS:
-            raise
-        result_store.write(
-            NodeResultRecord(
-                node_type=result.kind.value,
-                node_name=result.node_name,
-                target_database=result_store.database,
-                target_schema=result_store.schema,
-                target_name=None,
-                run_id=run_id,
-                status=NodeResultStatus.FAILED.value,
-                payload=None,
-                metadata={},
-                error_message=str(error),
-                materialized=result.materialized,
-            )
+    with bookkeeping_statements():
+        record: NodeResultRecord = NodeResultRecord(
+            node_type=result.kind.value,
+            node_name=result.node_name,
+            target_database=result_store.database,
+            target_schema=result_store.schema,
+            target_name=None,
+            run_id=run_id,
+            status=result.status.value,
+            payload=result.payload,
+            metadata=result.metadata,
+            error_message=result.error_message or result.skip_reason,
+            materialized=result.materialized,
         )
-        raise
+        try:
+            result_store.write(record)
+        except Exception as error:
+            if result.status != PythonNodeStatus.SUCCESS:
+                raise
+            result_store.write(
+                NodeResultRecord(
+                    node_type=result.kind.value,
+                    node_name=result.node_name,
+                    target_database=result_store.database,
+                    target_schema=result_store.schema,
+                    target_name=None,
+                    run_id=run_id,
+                    status=NodeResultStatus.FAILED.value,
+                    payload=None,
+                    metadata={},
+                    error_message=str(error),
+                    materialized=result.materialized,
+                )
+            )
+            raise
 
 
 def _call_node_with_retry(
