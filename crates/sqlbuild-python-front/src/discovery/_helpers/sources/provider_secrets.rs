@@ -5,6 +5,8 @@ use std::cell::{Cell, RefCell};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 
 use crate::discovery::main::sources::secret_places::secret_places;
+use sqlbuild_core::process_environment::main::env_file_shown::env_file_shown;
+use sqlbuild_core::process_environment::main::shell_secret_fix::shell_secret_fix;
 use sqlbuild_python_base::orchestration_reads::main::missing_secrets::missing_secrets;
 use sqlbuild_python_base::records::main::construct::new_annotated_error::new_annotated_error;
 use sqlbuild_python_base::records::main::fields::field::field;
@@ -16,6 +18,8 @@ pub(crate) const SINK_COLLECTIONS: [&str; 2] = ["event_exporters", "command_outp
 thread_local! {
     /// Whether the invocation running on this thread passed `--allow-missing-secrets`.
     pub(crate) static INVOCATION_ALLOWS_MISSING_SECRETS: Cell<bool> = const { Cell::new(false) };
+    /// Whether the command running on this thread takes `--allow-missing-secrets`.
+    pub(crate) static INVOCATION_TAKES_ALLOW_FLAG: Cell<bool> = const { Cell::new(false) };
     /// The `--target` of the invocation running on this thread.
     pub(crate) static INVOCATION_TARGET: RefCell<Option<String>> = const { RefCell::new(None) };
     /// The target, and the providers its `allow_missing_secrets` lists, for the discovery running on this thread.
@@ -89,8 +93,10 @@ pub(crate) fn require_used_secrets(
         ),
         &[(
             "help",
-            "set each variable in this shell or the project's env file, or narrow the selection"
-                .to_owned(),
+            format!(
+                "{}, or narrow the selection",
+                shell_secret_fix("each variable", env_file_shown().as_deref())
+            ),
         )],
     ))
 }

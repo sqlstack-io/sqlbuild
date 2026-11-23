@@ -29,13 +29,13 @@ pub async fn set_password(
         transaction,
         "SELECT c.credential_id FROM sqb_principals p \
          LEFT JOIN sqb_password_credentials c ON c.principal_id=p.principal_id \
-         WHERE p.principal_id=$1 AND p.disabled_at IS NULL",
+         WHERE p.principal_id=$1 AND p.disabled_at IS NULL AND NOT EXISTS (SELECT 1 FROM sqb_service_accounts s WHERE s.principal_id=p.principal_id)",
         vec![Parameter::Id(principal_id)],
     )
     .await?;
     if rows.is_empty() {
         return Err(ControlError::Invalid(
-            "password requires an active person".into(),
+            "password requires an active person; service accounts sign in only with keys".into(),
         ));
     }
     if let Some((id, session_id)) = expected {

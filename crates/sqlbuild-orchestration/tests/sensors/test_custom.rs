@@ -1,5 +1,6 @@
 //! A polling sensor's function answers over the real outbound HTTP boundary, which returns data, never scheduler authority.
 
+use crate::platform::models::LocationWorkScope;
 use std::time::Duration;
 
 use chrono::{TimeDelta, Utc};
@@ -94,6 +95,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
             let poll = LocationWorkPoll {
                 session_id: Uuid::now_v7(),
                 target: "development".into(),
+                scope: LocationWorkScope::All,
             };
             report_location_health(
                 store,
@@ -336,7 +338,7 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                 CustomSensorResultCase {
                     outcome: SensorFunctionOutcome::Failed {
                         error:
-                            "Traceback (most recent call last):\nValueError: orders feed is down"
+                            "Traceback (most recent call last):\nValueError: orders \0feed is down"
                                 .into(),
                     },
                     expected_phase: "failed",
@@ -392,6 +394,11 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                 let outcome = &facts.last().expect("terminal evaluation phase").outcome;
                 assert_eq!(outcome.phase(), result_case.expected_phase);
                 let payload = serde_json::to_value(outcome).expect("outcome payload");
+                assert!(
+                    !payload.to_string().contains("\\u0000"),
+                    "{}: a traceback is stored without NUL",
+                    test_case.description
+                );
                 assert_eq!(
                     payload["cursor"]["custom"].as_str(),
                     result_case.expected_cursor

@@ -1,6 +1,6 @@
 use crate::python_selection::tests::helpers::{
-    excluded_names, expected_names, expected_run, indexed_folder, node_names,
-    published_orders_graph, run, run_over,
+    discovered_python_graph, excluded_names, expected_names, expected_run, indexed_folder,
+    node_names, published_orders_graph, run, run_over,
 };
 use crate::python_selection::tests::test_types::{
     InventoryTestCase, NodeSelectorTestCase, RunSelectionTestCase,
@@ -316,6 +316,54 @@ fn given_check_exclude_tokens_when_resolving_then_unmatched_tokens_are_skipped()
             "{} {:?}",
             test_case.description,
             test_case.select
+        );
+    }
+}
+
+#[test]
+fn given_discovered_nodes_when_selecting_then_an_exact_name_is_one_node_and_the_asset_is_all() {
+    let test_cases = [
+        RunSelectionTestCase {
+            description: "a bracketed name is that node, not a glob",
+            select: &["step[a]"],
+            exclude: &[],
+            expected_selection: Ok((&[], &["step[a]"])),
+        },
+        RunSelectionTestCase {
+            description: "a bracketed name with downstream",
+            select: &["step[b]+"],
+            exclude: &[],
+            expected_selection: Ok((&[], &["step[b]", "step_total"])),
+        },
+        RunSelectionTestCase {
+            description: "the asset selects every node of its family",
+            select: &["asset:step"],
+            exclude: &[],
+            expected_selection: Ok((&[], &["step[a]", "step[b]"])),
+        },
+        RunSelectionTestCase {
+            description: "the bare asset name selects the family too",
+            select: &["step"],
+            exclude: &["step[a]"],
+            expected_selection: Ok((&[], &["step[b]"])),
+        },
+        RunSelectionTestCase {
+            description: "a glob still matches across names",
+            select: &["step*"],
+            exclude: &[],
+            expected_selection: Ok((&[], &["step[a]", "step[b]", "step_total"])),
+        },
+    ];
+    let graph = discovered_python_graph();
+
+    for test_case in test_cases {
+        let selection = run_over(&graph, test_case.select, test_case.exclude);
+
+        assert_eq!(
+            selection,
+            expected_run(test_case.expected_selection),
+            "{}",
+            test_case.description
         );
     }
 }

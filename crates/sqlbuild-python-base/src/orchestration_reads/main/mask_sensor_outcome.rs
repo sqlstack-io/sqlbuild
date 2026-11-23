@@ -1,7 +1,7 @@
 //! A tick's text with the providers' secret values masked and credential-shaped text redacted, before the location returns it.
 
 use pyo3::prelude::{Bound, PyAny, PyResult};
-use sqlbuild_core::redaction::main::redact_text::redact_text;
+use sqlbuild_core::redaction::main::redact_masked_text::redact_masked_text;
 use sqlbuild_orchestration::sensors::models::SensorFunctionOutcome;
 
 use crate::orchestration_reads::_helpers::instance_secrets::instance_secret_values;
@@ -22,11 +22,11 @@ pub fn mask_sensor_outcome(
     forms.sort_by(|left, right| right.len().cmp(&left.len()).then_with(|| left.cmp(right)));
     forms.dedup();
     let mask = |text: String| {
-        redact_text(
-            &forms
-                .iter()
-                .fold(text, |text, form| text.replace(form.as_str(), SECRET_MASK)),
-        )
+        redact_masked_text(&text, |reading| {
+            forms.iter().fold(reading.to_owned(), |text, form| {
+                text.replace(form.as_str(), SECRET_MASK)
+            })
+        })
     };
     Ok(match outcome {
         SensorFunctionOutcome::Failed { error } => {

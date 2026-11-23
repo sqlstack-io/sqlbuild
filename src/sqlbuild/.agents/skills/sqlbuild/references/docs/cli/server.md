@@ -12,12 +12,15 @@ Online: https://sqlbuild.com/docs/cli/server/
 - Stop the server
 - Serve over HTTPS
 - Add people who sign in with passwords
+- Administer the server with sqb admin
+- Call the server from scripts with service accounts
 - Sign in through a reverse proxy
 - Receive platform events
 - Acknowledge attention items
 - Back up the control database
 - Upgrade
 - Set retention
+- Keep run output
 - Grant roles to OIDC groups (beta)
 - Inspect published SQL
 - Sync from the warehouse now
@@ -69,7 +72,8 @@ executable = "/usr/local/bin/sqb"
 | Section | Keys |
 | --- | --- |
 | `[server]` | `host` (default `127.0.0.1`), `port` (`8000`), `database_env` (`SQLBUILD_CONTROL_DATABASE_URL`), `password_origin`, `default_role` (`none`), `scheduler` (`true`), `attention_snooze` (`"24h"`); see [Acknowledge attention items](#acknowledge-attention-items) |
-| `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`, `state_history_versions`; see [Set retention](#set-retention) |
+| `[retention]` | `statistics_days`, `audit_days`, `snapshot_count`, `run_log_days`, `run_log_count`, `state_history_versions`, `run_output_days`; see [Set retention](#set-retention) |
+| `[output]` | `store` (an `output` folder beside a SQLite control database, or `~/.local/state/sqlbuild/output` with PostgreSQL), `max_bytes_per_run`; see [Keep run output](#keep-run-output) |
 | `[oidc]` | `origin`, `issuer`, `client_id`, `identities`, and optionally `client_secret_env`, `certificate_authority`, `groups_claim` and `group_roles` |
 | `[trusted_proxy]` | `origin`, and optionally `trusted_peers` (`127.0.0.1` and `::1`), `allowed_hosts`, `username_header` (`X-SQB-User`), `display_name_header`, `email_header`, `unknown_users` (`provision_viewer`), `proxy_logout_url` and `identities`; see [Sign in through a reverse proxy](#sign-in-through-a-reverse-proxy) |
 | `[[launchers.docker]]` | `location`, `target`, `server_url`, `max_workers`, `socket`, `location_container`, `executable`, and optional `run` and `pool_caps` tables; see [Limit worker containers](#limit-worker-containers) |
@@ -121,12 +125,104 @@ adds a person from **People → Add person** with their sign-in name, a first pa
 them; they can change it after they sign in. Behind OIDC or a trusted proxy, people appear the
 first time they sign in instead, and the button isn't shown.
 
+## Administer the server with sqb admin
+
+`sqb admin` works on the control database directly, on the server's host. Each command prints one
+line on stderr that names what it did:
+
+```text
+$ sqb admin create-location orders
+Registered location orders (01a1fb47-0b3a-7631-ba35-e44d44d072f2)
+```
+
+| Command | On stdout |
+| --- | --- |
+| Issues a token or key: `issue-location-token`, `rotate-token`, `create-service-account`, `rotate-service-account` | Only the secret, once, so `VALUE="$(sqb admin ...)"` captures it. Nothing for an imported key |
+| Reads: `location-work`, `list-service-accounts` | Plain rows, with no header |
+| Everything else | Nothing |
+| Any command with `--json` | Only the JSON result, with the secret in it when one was issued. The line on stderr is left out |
+
+When a script needs an ID, such as the new location's, use `--json`. `--verbose` also says when the
+control store opens and is ready; without it, `sqb admin` says so only when opening takes more than
+a second, as a migration can. Put both options after the command's name. A command whose output
+can't be written exits with status 1 and says the change may already be committed.
+
+## Call the server from scripts with service accounts
+
+A service account lets a script, such as a deploy that republishes a project, call the server
+with an API key under its own name. Add one in **People → Service accounts**, or on the server's
+host:
+
+```bash
+sqb admin create-service-account orders-deploy --role developer --description "Release pipeline"
+```
+
+The key is the only thing on stdout (`key` with `--json`), and the UI shows it once in a dialog.
+Store it now, for example in your deploy's secret store: it isn't shown again, and the server keeps only a hash of it. The script
+sends it in an `Authorization` header:
+
+```bash
+curl -H "Authorization: Bearer $SQB_SERVICE_KEY" https://control.example.com/api/control/bootstrap
+```
+
+| Command | Does |
+| --- | --- |
+| `sqb admin create-service-account NAME --role ROLE` | Adds the account with a built-in role everywhere (`viewer`, `operator`, `developer` or `admin`) and prints its key. `--description` says what uses it. |
+| `sqb admin rotate-service-account NAME` | Prints a new key. The replaced key stops now, or keeps working for `--overlap-minutes` (at most 1440) while you update the script. |
+| `sqb admin disable-service-account NAME` | Refuses every key of the account at once. |
+| `sqb admin enable-service-account NAME` | Accepts the same keys again. Rotate as well if a key may have leaked. |
+| `sqb admin list-service-accounts` | Lists the accounts, their roles and the prefixes of their working keys, never the keys. |
+
+- **Keys.** A key starts with `sqbk_`, so you can recognise one in a script or a secret scanner.
+  The UI and the list show only its first characters, such as `sqbk_Q7m2xT`.
+- **Rotating.** One old key works at a time: rotating again stops a key that is still in its
+  overlap. **Stop now** in a key's menu stops any key at once, the current one included; the
+  account then has no working key until you rotate.
+- **Importing a key.** To recreate a control store with the same key, pass
+  `--key-from-env VAR` to `create-service-account`, with the key in the environment variable `VAR`.
+  It must start with `sqbk_` and have at least 32 more characters, without spaces. Generate it
+  randomly, for example `sqbk_` and 40 random letters and digits: SQLBuild can't tell a guessable key
+  from a strong one, so an imported key is only as strong as you make it. The command then doesn't print the
+  key. Only the CLI imports keys; the UI always makes a new one.
+- **Any address.** A keyed request is accepted on whatever address the server listens on, with any
+  `Host`, so a server behind a sign-in proxy can also listen on the network, such as
+  `host = "0.0.0.0"`, for scripts. The proxy's username header is still trusted only from
+  `trusted_peers`, so a direct request can't sign in as a person.
+- **TLS.** `sqb server` serves plain HTTP, and a key sent over plain HTTP crosses the network
+  unencrypted. Terminate TLS in front of any network listener, as in
+  [Serve over HTTPS](#serve-over-https), and give scripts its `https://` URL. The server warns at
+  start-up when it accepts keys on an address other than loopback without an `https://` origin.
+- **Without people's sign-in.** On a server with no `password_origin`, `[oidc]` or
+  `[trusted_proxy]`, service keys are the only way to call its person API. Its sign-in page and
+  `sqb login` say so instead of asking for a password, and Settings shows the sign-in as
+  service account keys only.
+- **Roles.** A service account holds its built-in role everywhere and doesn't get `default_role`.
+  That role decides what its key may do, as a person's does: an `admin` key can also manage service
+  accounts and roles, though it can't remove or disable the last admin who is a person.
+  In the UI, changing it needs `role.assign`.
+- **No sign-in.** A service account has no password, browser session or `sqb login`, and a
+  `[trusted_proxy.identities]` binding to one is refused.
+- **Audit.** Its actions appear in the audit log under its name. A request with a key that the
+  account no longer accepts, because the account is disabled or the key was stopped or rotated
+  away, is refused and recorded as `service_account.key_refused`, at most once a minute per key.
+- **Last used.** The Service accounts tab shows when each key last made a request that wasn't
+  refused.
+
+| Action in the UI | Needs |
+| --- | --- |
+| See service accounts | `user.manage` or `role.assign` |
+| Add a service account | `user.manage` and `role.assign` |
+| Rotate, stop a key, disable or enable | `user.manage` |
+| Change the role | `role.assign` |
+
 ## Sign in through a reverse proxy
 
 A reverse proxy such as Apache or nginx can sign people in and tell the server who they are in a
 request header. The server trusts that header only on requests whose socket peer is listed in
 `trusted_peers`, so it never trusts a header that a browser sends straight to the server. With the
-proxy on the same host, bind the server to loopback so that only local processes reach it:
+proxy on the same host, bind the server to loopback so that only local processes reach it, or
+listen on the network as well when [service accounts](#call-the-server-from-scripts-with-service-accounts)
+call it from other hosts:
 
 ```toml
 [server]
@@ -204,7 +300,8 @@ ProxyPassReverse "/" "http://127.0.0.1:8000/"
 - **The CLI.** `sqb login` still needs an `https://` server URL, so that its session token never
   crosses the network unencrypted.
 - **Locations and workers.** They use bearer tokens, not the proxy. On the server's own host, give
-  them `http://127.0.0.1:8000` so their tokens stay on loopback.
+  them `http://127.0.0.1:8000` so their tokens stay on loopback. Service accounts call with their
+  keys too, directly or through the proxy.
 - **Streaming.** The live-update feed sends `Cache-Control: no-cache, no-transform`, which stops
   `mod_deflate` from compressing it, and `X-Accel-Buffering: no`. It sends a keep-alive comment
   every 15 seconds, well within Apache's default 60-second `Timeout`. Long work, such as planning a
@@ -346,18 +443,20 @@ afterwards, so back it up before you upgrade (see
 runs recorded since the upgrade are lost.
 
 A run stays pinned to the snapshot it started on, and a snapshot an earlier release published can
-hold job definitions this release no longer reads, which fail with
-`` jobs: unknown field `source`, expected `limit` ``. Upgrade in this order:
+hold job definitions this release no longer reads. Upgrade in this order:
 
-1. Pause every schedule and sensor, and start no manual runs. Keep the scheduler running: it
-   launches queued runs and advances group runs.
+1. Pause every schedule and sensor, and start no manual runs. Keep the scheduler running through
+   step 2: it launches queued runs and advances group runs.
 2. Let queued and running runs finish, or cancel them.
-3. Upgrade the server.
-4. Upgrade and restart every location, so each publishes its project again with the new release.
-5. Once every location has published again, resume schedules and sensors.
+3. Stop every server process and every separate `sqb scheduler` on the control database before the
+   new release starts, or migrates the database with `sqb server migrate` or `sqb admin`.
+4. Start the servers and schedulers again on the new release.
+5. Upgrade and restart every location, so each publishes its project again with the new release.
+6. Once every location has published again, resume schedules and sensors.
 
-Until a location has published again, its job pages, group runs and ad hoc runs fail, a group's
-schedule or sensor stops the scheduler, and a job run that fails can't record its failure.
+Until a location whose snapshot this release can't read has published again, its job pages, group
+runs and ad hoc runs fail, and a schedule or sensor that starts a group is skipped and tried again
+every minute. A failed job run on such a snapshot isn't retried.
 
 To see what an upgrade changes before you start the server, run the new release with `--dry-run`:
 
@@ -426,6 +525,7 @@ snapshot_count = 20
 run_log_days = 7
 run_log_count = 100
 state_history_versions = 10
+run_output_days = 7
 ```
 
 | Data | `[retention]` key | Option | Default | Range |
@@ -436,6 +536,7 @@ state_history_versions = 10
 | Logs of finished runs | `run_log_days` | `--run-log-retention-days` | `14` | `1`–`65535` |
 | Finished runs per location and target that keep their logs | `run_log_count` | `--run-log-retention-count` | `200` | `1`–`65535` |
 | Builds and check results kept for each node | `state_history_versions` | `--state-history-retention-versions` | `5` on SQLite, `20` on PostgreSQL | `1`–`65535` |
+| Output that finished runs printed | `run_output_days` | None | `run_log_days` | `1`–`65535` |
 | Skipped and covered schedule ticks | None | None | 30 days | Fixed |
 
 Statistics samples older than the horizon disappear from statistics reads at once and are then
@@ -491,6 +592,79 @@ on the latest missed time, so deleted ticks never come back.
 An invalid value stops the server before it opens the control database. Servers that share one
 control database delete at the shortest horizon among them and count only their own audit
 webhook, so give them the same values and webhook.
+
+## Keep run output
+
+Everything a run prints goes to the server's output store, filed under the node that printed it.
+Output printed outside any node, such as the worker's own messages, is filed under `run`. The
+store keeps each node's stdout and stderr in zstd-compressed files of a few MB. The control
+database keeps only a small index: where each node's lines are, and which lines look like errors
+or warnings. A run that prints gigabytes does not grow the control database.
+
+Set the store in the `[output]` section of `server.toml`:
+
+```toml
+[output]
+store = "file:///var/lib/sqlbuild/output"
+max_bytes_per_run = "20GB"
+```
+
+- `store` is a local folder, `file:///path`, or an S3 prefix, `s3://bucket/prefix`. By default it
+  is an `output` folder beside a SQLite control database. With PostgreSQL it is
+  `~/.local/state/sqlbuild/output` of the user that runs the server, or `sqlbuild/output` in
+  `XDG_STATE_HOME` when that is an absolute path, whichever directory the server starts in. In the
+  server image that is `/home/sqlbuild/.local/state/sqlbuild/output`.
+  [`sqb dev`](dev.md) keeps its output in `.sqlbuild/output` with its default control store.
+  With `--control-store-url` it uses an `output` folder beside that SQLite store, or the same folder
+  as above for PostgreSQL.
+- `~` is `HOME` (`USERPROFILE` on Windows), or the account's home directory when that is unset.
+- Servers on different control databases under the same user, including a server on a cloned
+  database, should each set their own `store` folder, or one's retention can delete another's
+  output.
+- A local folder must be on a persistent volume, not inside the server's container, or recreating
+  the container loses every run's output. `compose.yml` and the Podman Quadlet example mount a named
+  volume at `/home/sqlbuild/.local/state/sqlbuild/output`. If you set another folder, mount a
+  volume there that user 10001 can write to.
+- Use an S3 prefix when several servers share one control database, or when a replacement server
+  can't mount the same volume. The server reads AWS credentials from the standard AWS environment
+  variables or from the role it runs under.
+- `max_bytes_per_run` is a number of bytes or text such as `"500MB"` or `"2GiB"`. Past it a run
+  keeps its first half and its newest half, and the lines in between are counted where they were
+  left out. By default a run keeps all of its output.
+
+If the service user's home can't be written, as with systemd's `DynamicUser=`, give the server a
+state folder in its unit. Output then goes to `/var/lib/sqlbuild/sqlbuild/output`:
+
+```ini
+[Service]
+StateDirectory=sqlbuild
+Environment=XDG_STATE_HOME=/var/lib/sqlbuild
+```
+
+The server prints `Run output store: ...` when it starts, with a local folder as an absolute path.
+
+Reading a run's output needs `view.evidence` on every node the run selected. The security audit
+records each search and download. The run page reads a run's lines and index every few seconds while
+it follows the run, so each server records those reads once in 10 minutes for each person, run and
+kind of read. People read a node's output with its stdout and stderr lines in the
+order printed, or one stream of it, or the whole run's output with each line's node. They page
+forwards and backwards, read the last lines, fold runs of similar lines, search in either direction,
+jump to error and warning lines, or download a node's output whole. No read loads a whole log at
+once.
+
+A worker sends what it prints in batches of about 4 MB, or every 2 seconds. When a node prints
+faster than the worker can send, the node waits for the worker. If the server stops accepting
+output for 30 seconds, the worker drops what it cannot send. It prints
+`Run output: N bytes of run output were not stored` to its log, with the reason, and adds the same
+warning to the run.
+
+A finished run's output is deleted `run_output_days` after the run ended; the run, its node results
+and the lines its nodes logged with `ctx.log` stay.
+
+Upgrade the server before its workers. An older server keeps none of a newer worker's output, and
+the worker's log says `the control server is older than this worker and does not accept run output;
+upgrade the server before its workers`. A node that logs with `ctx.log` fails on an older server
+with the same request to upgrade it.
 
 ## Grant roles to OIDC groups (beta)
 
@@ -736,7 +910,7 @@ delay_seconds = 600
 | --- | --- | --- | --- |
 | `owner` | Any non-blank text | None | Shown on the job's page and in the job list |
 | `overlap` | `queue` or `skip` | `queue` | With `skip`, a schedule tick or sensor request that arrives while a run of the job is queued or running starts no run |
-| `retry` | `attempts` from 2 to 11, `delay_seconds` from 0 to 86400 | None | A failed or partial run reruns its failed and skipped nodes after the delay, until it succeeds or has run `attempts` times in all |
+| `retry` | `attempts` from 2 to 11, `delay_seconds` from 0 to 86400 | None | A failed or partial run nobody cancelled reruns its failed, cancelled and skipped nodes, and those it never reached, after the delay, until it succeeds or has run `attempts` times in all |
 
 A skipped tick shows as **skipped** in the trigger's tick log, with the run it yielded to, and
 creates no run. A sensor tick lists the requests it skipped the same way.
@@ -758,7 +932,7 @@ Details:
   again after `delay_seconds`, inside the same group run, and the jobs that depend on it wait
   instead of skipping. The group keeps its pool slots meanwhile.
 - A group's own `[retry]` is a final sweep: after the group run ends `failed` or `partial`, it
-  queues one new linked rerun of the group's failed and skipped nodes.
+  queues one new linked rerun of the group's failed, cancelled and skipped nodes, and those it never reached.
 - So a retry of a whole run, a job's or a group's, is a new linked run, and a retry of a member
   stays inside its group run.
 - Sensors and alerts see a member's final attempt only. The group run's timeline shows each retry,
@@ -1044,7 +1218,8 @@ permissions = ["view.evidence"]
 | No matching nodes | Publication succeeds with a warning; the grant gives nothing |
 | Permissions | Any non-administrative action; `user.manage`, `role.assign` and `audit.view` are rejected |
 | Runs | `job.run`, `run.rerun` and `run.rewrite_history` need the permission on every node the run writes; an [ad-hoc command](#run-ad-hoc-commands) needs `run.adhoc` and its flags' permissions on every node it selects; a priority above 0 also needs `run.prioritise` |
-| Triggers | `trigger.toggle` (on, off) and `sensor.reset_cursor` (start over, skip an event) need the permission on every node a schedule's job writes, and for a sensor on every node of the target |
+| Republish a location | `location.republish` on the location and target; reading its discovered sets back needs `view` |
+| Triggers | `trigger.toggle` (on, off) and `sensor.reset_cursor` (start over, skip an event) need the permission on every node a schedule's job writes. A sensor needs it on every node of the target, as does pausing or resuming a schedule whose job can't be read |
 | Listings | The catalog, statistics, providers and run list need `view` on every node of the current publication; partial coverage is denied, not filtered |
 | Several roles | Grants add up across a person's roles |
 

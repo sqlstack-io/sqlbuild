@@ -1,9 +1,12 @@
 pub mod apply_environment_overlay;
 pub mod env_file_marker;
+pub mod env_file_shown;
 pub mod environment_overlay;
 pub mod environment_var_os;
 pub mod environment_vars_os;
 pub mod environment_without_env_file;
 pub mod install_environment_overlay;
+pub mod location_secret_fix;
 pub mod marker_json;
 pub mod project_relative_path;
+pub mod shell_secret_fix;

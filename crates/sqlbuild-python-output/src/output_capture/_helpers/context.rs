@@ -9,6 +9,7 @@ use pyo3::prelude::{
 use pyo3::sync::PyOnceLock;
 use pyo3::types::PyTuple;
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_orchestration::run_output::main::enter_output_node::enter_output_node;
 
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::boundary::main::context_variable::context_variable;
@@ -79,4 +80,45 @@ pub(crate) fn current_context(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 #[pyfunction]
 pub(crate) fn current_output_capture_context(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     current_context(py)
+}
+
+/// `with output_node_scope("model:orders"):` files what this thread prints under that node until the block ends.
+#[pyclass(module = "sqlbuild._native", frozen)]
+pub(crate) struct OutputNodeScope {
+    node_key: String,
+    previous: Mutex<Option<Option<String>>>,
+}
+
+#[pymethods]
+impl OutputNodeScope {
+    fn __enter__(&self) -> PyResult<()> {
+        *self
+            .previous
+            .lock()
+            .map_err(|_| PyRuntimeError::new_err("output node scope lock is poisoned"))? =
+            Some(enter_output_node(Some(self.node_key.clone())));
+        Ok(())
+    }
+
+    #[pyo3(signature = (*_exc_info))]
+    fn __exit__(&self, _exc_info: &Bound<'_, PyTuple>) -> PyResult<bool> {
+        let previous = self
+            .previous
+            .lock()
+            .map_err(|_| PyRuntimeError::new_err("output node scope lock is poisoned"))?
+            .take();
+        if let Some(previous) = previous {
+            enter_output_node(previous);
+        }
+        Ok(false)
+    }
+}
+
+/// A scope filing what this thread prints under `node_key`, keyed `<kind>:<name>`.
+#[pyfunction]
+pub(crate) fn output_node_scope(node_key: String) -> OutputNodeScope {
+    OutputNodeScope {
+        node_key,
+        previous: Mutex::new(None),
+    }
 }

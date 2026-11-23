@@ -36,6 +36,8 @@ mod plans_helpers;
 mod proxy_provisioning_helpers;
 #[path = "recall/helpers.rs"]
 mod recall_helpers;
+#[path = "service_accounts/helpers.rs"]
+mod service_accounts_helpers;
 #[path = "state_history/helpers.rs"]
 mod state_history_helpers;
 #[path = "statistics/eligibility/helpers.rs"]
@@ -70,6 +72,8 @@ mod test_custom_roles;
 mod test_denials;
 #[path = "test_development.rs"]
 mod test_development;
+#[path = "test_development_hosts.rs"]
+mod test_development_hosts;
 #[path = "test_external_sessions.rs"]
 mod test_external_sessions;
 #[path = "test_ingestion_turns.rs"]
@@ -114,12 +118,16 @@ mod test_proxy_provisioning;
 mod test_publish_encoding;
 #[path = "test_reads.rs"]
 mod test_reads;
+#[path = "test_republish.rs"]
+mod test_republish;
 #[path = "test_resource_costs.rs"]
 mod test_resource_costs;
 #[path = "test_run_ids.rs"]
 mod test_run_ids;
 #[path = "test_server_errors.rs"]
 mod test_server_errors;
+#[path = "test_service_accounts.rs"]
+mod test_service_accounts;
 #[path = "test_state_history_retention.rs"]
 mod test_state_history_retention;
 #[path = "test_statistics_recovery.rs"]

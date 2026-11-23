@@ -406,21 +406,25 @@ impl<'py> AuditScope<'_, 'py> {
         if let Some(column) = column {
             implicit.push((COLUMN_ARGUMENT.to_owned(), column.to_owned()));
         }
-        let rendering: AuditRendering = render_attached_audit(&AuditAttachment {
-            owner_label: owner_file.to_owned(),
-            definition_name: definition_name.clone(),
-            definition_path: (!definition.builtin).then(|| definition.file.relative_path.clone()),
-            sql_body: definition.block.sql_body.clone(),
-            evidence_sql: definition.block.evidence_sql.clone(),
-            implicit_arguments: implicit,
-            explicit_arguments: instance.arguments()?,
-            has_thresholds,
-            threshold_error,
-            instance_severity,
-            default_severity: self.settings.default_severity.clone(),
-            instance_run_scope: instance.field("run_scope")?.extract()?,
-            default_run_scope: self.settings.default_run_scope.clone(),
-        });
+        let rendering: AuditRendering = render_attached_audit(
+            &AuditAttachment {
+                owner_label: owner_file.to_owned(),
+                definition_name: definition_name.clone(),
+                definition_path: (!definition.builtin)
+                    .then(|| definition.file.relative_path.clone()),
+                sql_body: definition.block.sql_body.clone(),
+                evidence_sql: definition.block.evidence_sql.clone(),
+                implicit_arguments: implicit,
+                explicit_arguments: instance.arguments()?,
+                has_thresholds,
+                threshold_error,
+                instance_severity,
+                default_severity: self.settings.default_severity.clone(),
+                instance_run_scope: instance.field("run_scope")?.extract()?,
+                default_run_scope: self.settings.default_run_scope.clone(),
+            },
+            Some(&self.model_loop.syntax),
+        );
         let rendered = match rendering {
             AuditRendering::Failed(message) => {
                 return Err(compile_error(self.context.classes, &message, None));

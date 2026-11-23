@@ -1,6 +1,6 @@
 use crate::build_progress::models::{
     BatchProgressText, BuildResultText, ModelResultText, NameWidthInputs, PythonNodeText,
-    SchedulerStateText, SpinnerRow, TestResultText,
+    RunningNodeText, SchedulerStateText, SpinnerRow, TestResultText,
 };
 
 pub(super) struct FooterTestCase {
@@ -55,4 +55,16 @@ pub(super) struct BatchProgressTestCase {
     pub(super) description: &'static str,
     pub(super) batch: BatchProgressText,
     pub(super) expected_text: &'static str,
+}
+
+pub(super) struct HeartbeatTestCase {
+    pub(super) description: &'static str,
+    pub(super) running: Vec<RunningNodeText>,
+    pub(super) expected_text: &'static str,
+}
+
+pub(super) struct HeartbeatIntervalTestCase {
+    pub(super) description: &'static str,
+    pub(super) beats: usize,
+    pub(super) expected_seconds: u64,
 }

@@ -56,7 +56,7 @@ CREATE TABLE sqb_snapshot_sources (
 );
 CREATE TABLE sqb_snapshot_documents (
     snapshot_id {uuid} NOT NULL REFERENCES sqb_snapshots(snapshot_id),
-    kind TEXT NOT NULL CHECK (kind IN ('jobs', 'groups', 'triggers', 'roles', 'lineage', 'columns', 'providers', 'connection')),
+    kind TEXT NOT NULL CHECK (kind IN ('jobs', 'groups', 'triggers', 'roles', 'lineage', 'columns', 'providers', 'connection', 'discovered')),
     document_hash TEXT NOT NULL REFERENCES sqb_documents(document_hash),
     PRIMARY KEY (snapshot_id, kind)
 );
@@ -178,7 +178,7 @@ CREATE INDEX sqb_runs_active ON sqb_runs(location_id, target, job_key) WHERE sta
 CREATE TABLE sqb_run_nodes (
     run_id {uuid} NOT NULL REFERENCES sqb_runs(run_id),
     node_key TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'success', 'warn', 'failed', 'skipped', 'cancelled')),
+    status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'success', 'warn', 'failed', 'skipped', 'cancelled', 'not_run')),
     writes BOOLEAN NOT NULL,
     started_at {time},
     ended_at {time},
@@ -187,6 +187,10 @@ CREATE TABLE sqb_run_nodes (
     skipped_because_of TEXT,
     kind TEXT NOT NULL DEFAULT 'node' CHECK (kind IN ('node', 'check')),
     finished_storage_id BIGINT,
+    table_rows BIGINT,
+    rows_so_far BIGINT,
+    no_change_reason TEXT,
+    materialization TEXT,
     PRIMARY KEY (run_id, node_key)
 );
 CREATE INDEX sqb_run_nodes_node ON sqb_run_nodes(node_key, run_id);
@@ -194,6 +198,71 @@ CREATE INDEX sqb_run_nodes_finished ON sqb_run_nodes(finished_storage_id)
 WHERE finished_storage_id IS NOT NULL;
 CREATE INDEX sqb_run_nodes_decisive ON sqb_run_nodes(node_key, finished_storage_id)
 WHERE finished_storage_id IS NOT NULL AND status IN ('success', 'failed');
+CREATE TABLE sqb_run_output (
+    run_id {uuid} PRIMARY KEY REFERENCES sqb_runs(run_id),
+    next_chunk BIGINT NOT NULL,
+    line_count BIGINT NOT NULL,
+    head_bytes BIGINT NOT NULL,
+    tail_bytes BIGINT NOT NULL,
+    stored_bytes BIGINT NOT NULL,
+    omitted_bytes BIGINT NOT NULL,
+    omitted_lines BIGINT NOT NULL,
+    dropped_bytes BIGINT NOT NULL
+);
+CREATE TABLE sqb_run_output_chunks (
+    run_id {uuid} NOT NULL REFERENCES sqb_run_output(run_id),
+    chunk BIGINT NOT NULL,
+    claim_id {uuid} NOT NULL,
+    batch BIGINT NOT NULL,
+    object_key TEXT NOT NULL,
+    text_bytes BIGINT NOT NULL,
+    received_at {time} NOT NULL,
+    part TEXT NOT NULL CHECK (part IN ('head', 'tail')),
+    PRIMARY KEY (run_id, chunk),
+    UNIQUE (run_id, claim_id, batch)
+);
+CREATE TABLE sqb_run_output_segments (
+    run_id {uuid} NOT NULL,
+    chunk BIGINT NOT NULL,
+    node_key TEXT NOT NULL,
+    stream TEXT NOT NULL CHECK (stream IN ('stdout', 'stderr')),
+    run_line BIGINT NOT NULL,
+    node_line BIGINT NOT NULL,
+    line_count BIGINT NOT NULL,
+    text_offset BIGINT NOT NULL,
+    text_bytes BIGINT NOT NULL,
+    PRIMARY KEY (run_id, run_line),
+    FOREIGN KEY (run_id, chunk) REFERENCES sqb_run_output_chunks(run_id, chunk)
+);
+CREATE INDEX sqb_run_output_segments_node ON sqb_run_output_segments(run_id, node_key, node_line);
+CREATE INDEX sqb_run_output_segments_chunk ON sqb_run_output_segments(run_id, chunk);
+CREATE TABLE sqb_run_output_streams (
+    run_id {uuid} NOT NULL REFERENCES sqb_run_output(run_id),
+    node_key TEXT NOT NULL,
+    stream TEXT NOT NULL CHECK (stream IN ('stdout', 'stderr')),
+    line_count BIGINT NOT NULL,
+    text_bytes BIGINT NOT NULL,
+    mark_count BIGINT NOT NULL,
+    PRIMARY KEY (run_id, node_key, stream)
+);
+CREATE TABLE sqb_run_output_marks (
+    run_id {uuid} NOT NULL REFERENCES sqb_run_output(run_id),
+    node_key TEXT NOT NULL,
+    node_line BIGINT NOT NULL,
+    stream TEXT NOT NULL CHECK (stream IN ('stdout', 'stderr')),
+    level TEXT NOT NULL CHECK (level IN ('error', 'warning')),
+    text TEXT NOT NULL,
+    PRIMARY KEY (run_id, node_key, node_line)
+);
+CREATE TABLE sqb_run_node_logs (
+    run_id {uuid} NOT NULL REFERENCES sqb_runs(run_id),
+    event_id {uuid} NOT NULL,
+    node_key TEXT NOT NULL,
+    level TEXT NOT NULL CHECK (level IN ('info', 'warning', 'error')),
+    message TEXT NOT NULL,
+    logged_at {time} NOT NULL,
+    PRIMARY KEY (run_id, event_id)
+);
 CREATE TABLE sqb_write_claims (
     target TEXT NOT NULL,
     node_key TEXT NOT NULL,
@@ -367,6 +436,24 @@ CREATE TABLE sqb_sessions (
     revoked_at {time}
 );
 CREATE INDEX sqb_sessions_person ON sqb_sessions(principal_id);
+CREATE TABLE sqb_service_accounts (
+    principal_id {uuid} PRIMARY KEY REFERENCES sqb_principals(principal_id),
+    description TEXT,
+    created_by TEXT NOT NULL
+);
+CREATE TABLE sqb_service_account_keys (
+    key_id {uuid} PRIMARY KEY,
+    principal_id {uuid} NOT NULL REFERENCES sqb_principals(principal_id),
+    secret_hash TEXT NOT NULL UNIQUE,
+    prefix TEXT NOT NULL,
+    origin TEXT NOT NULL CHECK (origin IN ('issued', 'imported')),
+    created_at {time} NOT NULL,
+    created_by TEXT NOT NULL,
+    expires_at {time},
+    revoked_at {time},
+    last_used_at {time}
+);
+CREATE INDEX sqb_service_account_keys_principal ON sqb_service_account_keys(principal_id);
 CREATE TABLE sqb_password_login_attempts (
     attempt_id {uuid} PRIMARY KEY,
     identity_key TEXT NOT NULL,

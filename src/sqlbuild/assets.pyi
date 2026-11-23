@@ -31,5 +31,6 @@ def asset(
     columns: Sequence[PythonNodeColumnSpec | SourceColumnEntry] = (),
     column_lineage: Mapping[str, Sequence[ColumnLineageRefSpec | ColumnLineageRef]] | None = None,
     retry: RetryPolicy | None = None,
+    for_each: Callable[..., object] | None = None,
 ) -> Callable[[Callable[..., object]], Callable[..., object]]: ...
 def get_asset_definition(function: Callable[..., object]) -> AssetDefinition | None: ...

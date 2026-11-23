@@ -3,7 +3,8 @@
 	import logoForDark from '$website/src/assets/logo-dark.png';
 	import logoForLight from '$website/src/assets/logo-light.png';
 	import { page } from '$app/state';
-	import { loginWithPassword } from '$lib/api/http-client';
+	import { onMount } from 'svelte';
+	import { keysOnly, loginWithPassword } from '$lib/api/http-client';
 	import { safeNext } from '$lib/next';
 	import { to } from '$lib/paths';
 
@@ -11,6 +12,9 @@
 	let password = $state('');
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
+	/** A server without sign-in for people says so instead of asking for a password. */
+	let onlyKeys = $state(false);
+	onMount(() => void keysOnly().then((keys) => (onlyKeys = keys), () => {}));
 
 	const problems = {
 		rejected: 'That name and password did not match.',
@@ -45,15 +49,19 @@
 		<img src={logoForLight} alt="SQLBuild" class="mb-2 h-7 w-auto self-start dark:hidden" />
 		<img src={logoForDark} alt="SQLBuild" class="mb-2 hidden h-7 w-auto self-start dark:block" />
 		<h1 class="text-[15px] font-semibold">Sign in</h1>
-		<label class="flex flex-col gap-1 text-[12.5px]">
-			Name
-			<input class="rounded-md border border-border bg-transparent px-2.5 py-1.5 text-[13px]" name="username" autocomplete="username" required bind:value={username} />
-		</label>
-		<label class="flex flex-col gap-1 text-[12.5px]">
-			Password
-			<input class="rounded-md border border-border bg-transparent px-2.5 py-1.5 text-[13px]" name="password" type="password" autocomplete="current-password" required bind:value={password} />
-		</label>
-		{#if problem}<p class="text-[12.5px]" style:color="var(--sb-error)" role="alert">{problem}</p>{/if}
-		<Button type="submit" variant="default" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</Button>
+		{#if onlyKeys}
+			<p class="text-[13px]" data-testid="keys-only">This server has no sign-in for people. Scripts call it with a service account key.</p>
+		{:else}
+			<label class="flex flex-col gap-1 text-[12.5px]">
+				Name
+				<input class="rounded-md border border-border bg-transparent px-2.5 py-1.5 text-[13px]" name="username" autocomplete="username" required bind:value={username} />
+			</label>
+			<label class="flex flex-col gap-1 text-[12.5px]">
+				Password
+				<input class="rounded-md border border-border bg-transparent px-2.5 py-1.5 text-[13px]" name="password" type="password" autocomplete="current-password" required bind:value={password} />
+			</label>
+			{#if problem}<p class="text-[12.5px]" style:color="var(--sb-error)" role="alert">{problem}</p>{/if}
+			<Button type="submit" variant="default" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</Button>
+		{/if}
 	</form>
 </div>

@@ -6,6 +6,12 @@
 
 Online: https://sqlbuild.com/docs/cli/location/
 
+## Contents
+
+- Check a location's health
+- Provide settings and secrets
+- Republish
+
 Run a code location: it compiles the project in its own Python environment, publishes it to the
 server, and publishes again when the project changes:
 
@@ -14,9 +20,15 @@ export SQLBUILD_LOCATION_TOKEN=...
 sqb location serve --server https://control.example.com --location-id "$LOCATION_ID" --target production
 ```
 
+With a separate `sqb server`, keep a SQLite control database and a local
+[output folder](server.md#keep-run-output) outside the project or under the project's
+`.sqlbuild` folder. Otherwise the location takes their writes for project edits and publishes again.
+
 Create the location and its token with `sqb admin create-location orders` and
-`sqb admin issue-location-token` on the server's host. The location reads the token from
-`SQLBUILD_LOCATION_TOKEN` and never opens the control database.
+`sqb admin issue-location-token` on the server's host. The token is the only thing on stdout, so
+`export SQLBUILD_LOCATION_TOKEN="$(sqb admin issue-location-token "$LOCATION_ID" --expires-at "$EXPIRY")"`
+captures it. The location reads it from `SQLBUILD_LOCATION_TOKEN` and never opens the control
+database.
 
 ## Check a location's health
 
@@ -35,6 +47,7 @@ sqb location health --server https://control.example.com --location-id "$LOCATIO
 | `healthy` | An instance checked in within 90 seconds and its last load published | `0` |
 | `degraded` | The warehouse connection check after the last load failed | `0` |
 | `missing_secrets` | A provider [secret](../concepts/python-nodes/providers.md#secrets) is unset in the location's environment, and the target's [`allow_missing_secrets`](../concepts/project-configuration.md#allowed-missing-secrets) doesn't list the provider, so runs that use it fail | `1` |
+| `discovery_failed` | A [discover function](../concepts/python-nodes/discovered-nodes.md) failed at the last publication, so its set serves its last good items, or none | `0` |
 | `falling_back` | The last load failed, so runs use the previous snapshot | `1` |
 | `broken` | No instance has checked in for 90 seconds | `1` |
 
@@ -70,8 +83,8 @@ A `missing_secrets` location publishes and runs jobs whose nodes have their secr
 publishes it reports the providers missing secrets, with their variables and the nodes that use
 them, and prints them in its output. Its page in the UI lists them, and the Overview shows the
 problem. A run that needs one fails those nodes with `D012` before connecting to the warehouse and
-skips the nodes that read them. Set the missing variables in its environment or env file and
-restart it; `sqb debug` in the location lists them too. A provider the target allows to miss its
+skips the nodes that read them. Set the missing variables in its env file or in the environment it
+was started with, then restart it (under `sqb dev`, `r` is enough after editing the env file); `sqb debug` in the location lists them too. A provider the target allows to miss its
 secrets shows as a note on the location's page instead.
 
 ## Provide settings and secrets
@@ -89,3 +102,55 @@ The location stops at start-up with an error naming the file when it doesn't exi
 set in the container or service environment win over the file. After changing the file, restart
 the location so its compiles and plan previews use the new values. Each
 [worker](server.md) reads the file when its run starts.
+
+## Republish
+
+Ask a served location to compile and publish again, for example after a deploy of a system its
+[discover functions](../concepts/python-nodes/discovered-nodes.md) read from. Every discover
+function runs, as with `r` in `sqb dev`.
+
+With an API key, from the environment and never an argument, the server may be `http://` or
+`https://`, so a server on a private network needs no TLS:
+
+```bash
+export SQLBUILD_API_KEY=...
+sqb location republish --server http://control.internal.example.com:8000 --location-id "$LOCATION_ID" \
+  --target production --reason "fulfilment 0.58.0 deployed" --wait
+```
+
+A key sent over plain HTTP to another host prints one warning, because anyone on the network path
+can read it. Without `SQLBUILD_API_KEY` the command uses your [`sqb login`](login.md) session,
+which needs `https://`; `--ca-cert` trusts a private CA for it.
+
+| Outcome | Exit code |
+| --- | --- |
+| Accepted, without `--wait`; or published | `0` |
+| The publish failed, or no location took the request within 15 minutes | `1` |
+| The request was refused or got no answer, or `--wait` ended after `--timeout` seconds (default 600) | `2` |
+
+The JSON result has `requested_by`, `requested_at` and `state` (`pending`, `published`, `failed` or
+`expired`), with `snapshot_id` after a publish or `error` after a failed one.
+
+The same request with `curl`:
+
+```bash
+BASE="http://control.internal.example.com:8000/api/control/locations/$LOCATION_ID/targets/production"
+REQUEST_ID=$(uuidgen)
+
+curl --fail -X POST "$BASE/republish?wait=10" \
+  -H "Authorization: Bearer $SQLBUILD_API_KEY" -H "Content-Type: application/json" \
+  -d "{\"request_id\": \"$REQUEST_ID\", \"reason\": \"fulfilment 0.58.0 deployed\"}"
+
+# While the state is pending, ask again
+curl --fail "$BASE/republish/$REQUEST_ID?wait=10" -H "Authorization: Bearer $SQLBUILD_API_KEY"
+
+# Each discovered set's status, fetch time, digest and tags in the current snapshot
+curl --fail "$BASE/discovered" -H "Authorization: Bearer $SQLBUILD_API_KEY"
+```
+
+- `wait` holds a response open for at most 60 seconds. Reusing a `request_id` queues nothing new.
+- Republishing needs `location.republish`, which the operator, developer and admin roles have.
+  Reading `discovered` needs `view`.
+- A failed discover function doesn't fail the publish, as its set keeps its last good items. Check
+  the set's `status` and `tags` in `discovered` to confirm a deploy.
+- The audit log records who asked and why, and the location prints both.

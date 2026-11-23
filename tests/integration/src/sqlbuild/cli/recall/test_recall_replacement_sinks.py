@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import signal
 import subprocess
 import time
 from pathlib import Path
@@ -230,7 +229,7 @@ def test_given_a_lifecycle_sink_slower_than_the_budget_when_building_then_nothin
             description="Ctrl-C stops the build while the sink sleeps",
             shutdown_seconds=1.0,
             sink_sleep_seconds="30",
-            expected_exit_code=-signal.SIGINT,
+            expected_exit_code=130,
         ),
     ],
     ids=lambda case: case.description,

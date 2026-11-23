@@ -11,14 +11,12 @@ use crate::native_commands::_helpers::command::decision::{
     control_database, control_database_variable, flag,
 };
 use crate::native_commands::_helpers::command::terminal::{finish_lost_stdout, write_output};
+use crate::native_commands::constants::OPENING_STORE;
 use crate::server_config::main::read_server_config::read_server_config;
 
 /// Run `sqb server migrate` on `runtime` and return its exit code.
 pub(crate) fn run_store_migration(namespace: &Namespace, runtime: &tokio::runtime::Runtime) -> i32 {
-    drop(write_output(&[(
-        Stream::Stderr,
-        "Opening control store...\n",
-    )]));
+    drop(write_output(&[(Stream::Stderr, OPENING_STORE)]));
     match runtime.block_on(store_migration(
         namespace,
         flag(namespace, "control_dry_run"),

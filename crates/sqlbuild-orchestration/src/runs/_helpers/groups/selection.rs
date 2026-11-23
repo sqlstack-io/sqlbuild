@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::declarations::models::DependencyFailure;
 use crate::runs::_helpers::groups::context::load_group;
 use crate::runs::constants::SUPERSEDED_CHILD;
+use crate::runs::constants::UNFINISHED_NODE_STATUSES;
 use crate::runs::models::{GroupContext, GroupRun, QueueWait, RunRequest, RunStatus};
 use crate::snapshots::main::reads::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
@@ -131,7 +132,7 @@ pub(crate) async fn skipped_nodes(
     }
     let (transaction, rows) = query(transaction,
         &format!("SELECT n.node_key, n.status, n.skipped_because_of FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
-         WHERE r.parent_run_id=$1 AND r.run_id<>$2 AND n.kind='node' AND n.status IN ('failed','skipped','cancelled') \
+         WHERE r.parent_run_id=$1 AND r.run_id<>$2 AND n.kind='node' AND n.status IN ({UNFINISHED_NODE_STATUSES}) \
          AND NOT {SUPERSEDED_CHILD}"),
         vec![Parameter::Id(parent_id), Parameter::Id(request.run_id)]).await?;
     let failures: BTreeMap<String, String> = rows

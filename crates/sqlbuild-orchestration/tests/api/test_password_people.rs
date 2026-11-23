@@ -140,6 +140,8 @@ fn given_sign_in_without_passwords_when_adding_a_person_then_the_server_has_no_s
                     target: "development".into(),
                     triggers: false,
                     principal_id,
+                    allowed_hosts: Vec::new(),
+                    listens_beyond_loopback: false,
                 })
             },
             expected_status: StatusCode::NOT_FOUND,

@@ -132,6 +132,14 @@ can contain sensitive SQL, output and audit evidence.
 | `abandoned` | Its heartbeats stopped without an end: the process died, for example after SIGKILL or running out of memory |
 | `unknown` | Recall has neither an end nor a heartbeat for it |
 
+Ctrl-C stops a command at any point, also at a prompt such as a warehouse sign-in: it cancels the
+statements it is running, cleans up, prints `error: interrupted (Ctrl+C)` and exits with code 130.
+When nothing can unwind it, such as a driver that asks again or reads on another thread, it is
+ended after 0.6 seconds if it has run no statement or is still opening the connection it was
+waiting for. While [discovered steps](/docs/concepts/python-nodes/discovered-nodes) run, their
+own cancel ends it instead, within 5 seconds. Otherwise press Ctrl-C again to end it. A command ended that way can't record its
+end, so Recall shows it `abandoned`.
+
 A command stopped by SIGTERM, as an orchestrator stops a job, ends the way Ctrl-C ends it: it
 cancels the statements it is running, records its real end time, its output and exit code 143,
 prints `error: terminated by SIGTERM`, and exits with code 143. It does this also when it was

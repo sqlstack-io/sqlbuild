@@ -1,6 +1,7 @@
 <script lang="ts">
 	import XIcon from '@lucide/svelte/icons/x';
 	import type { Account } from '$lib/api';
+	import MenuSelect from '$lib/components/platform/menu-select.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { errorMessage } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
@@ -16,6 +17,10 @@
 	let name = $state('');
 	let password = $state('');
 	let role = $state<BuiltinRole | 'default'>('default');
+	const roleOptions = $derived([
+		{ value: 'default' as const, label: defaultRole ? `Default role only (${defaultRole})` : 'No role' },
+		...BUILTIN_ROLES.map((r) => ({ value: r as BuiltinRole | 'default', label: r }))
+	]);
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 
@@ -51,13 +56,10 @@
 			<span class="hint">At least {MIN_PASSWORD} characters. Share it with them; they can change it after signing in.</span>
 		</label>
 		{#if canAssign}
-			<label>
+			<div class="field">
 				Role everywhere
-				<select name="role" bind:value={role}>
-					<option value="default">{defaultRole ? `Default role only (${defaultRole})` : 'No role'}</option>
-					{#each BUILTIN_ROLES as r (r)}<option value={r}>{r}</option>{/each}
-				</select>
-			</label>
+				<MenuSelect value={role} options={roleOptions} onchange={(r) => (role = r)} label="Role everywhere" block testid="new-person-role" />
+			</div>
 		{/if}
 		{#if error}<p class="err" role="alert">{error}</p>{/if}
 		<div class="actions">
@@ -95,14 +97,14 @@
 		flex-direction: column;
 		gap: 12px;
 	}
-	label {
+	label,
+	.field {
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
 		font-size: 12.5px;
 	}
-	input,
-	select {
+	input {
 		padding: 6px 10px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md, 6px);

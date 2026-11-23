@@ -14,8 +14,10 @@ from tests.e2e.src.sqlbuild.cli.commands.main.providers._test_types import (
     ProjectDirSpellingTestCase,
     ProviderCommandDiagnosticE2ETestCase,
     ProviderSecretE2ETestCase,
+    StrictPlanE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.providers.helpers import (
+    blocked,
     linked_project,
     relative_project,
 )
@@ -155,6 +157,38 @@ TARGET_ALLOWS_API: dict[str, str] = {
         '[connection]\ndatabase = "provider_secret_project.duckdb"\n\n'
         '[targets.dev]\nschema = "main"\nallow_missing_secrets = ["api_provider"]\n'
     ),
+}
+STRICT_TARGET: dict[str, str] = {
+    "sqlbuild_project.toml": (
+        'name = "provider_secret_project"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+        '[connection]\ndatabase = "provider_secret_project.duckdb"\n\n'
+        '[targets.dev]\nschema = "main"\n'
+    ),
+}
+SET_SECRET_VARIABLE: str = "SECRETS_E2E_SIGNING_KEY"
+SET_SECRET_VALUE: str = "signing-key-canary"
+# One secret is missing and one is set, and setting up the provider leaves a mark.
+MARKING_PROVIDER: dict[str, str] = {
+    "providers/api.py": dedent(
+        f"""
+        import os
+        from pathlib import Path
+
+        from pydantic import Field, SecretStr
+        from sqlbuild.providers import Provider
+
+
+        class ApiProvider(Provider):
+            '''Test provider ApiProvider.'''
+            api_key: SecretStr = Field(validation_alias="{SECRET_VARIABLE}")
+            signing_key: SecretStr = Field(validation_alias="{SET_SECRET_VARIABLE}")
+
+            def setup(self, ctx):
+                with Path(os.environ["MARKER_PATH"]).open("a", encoding="utf-8") as marker:
+                    marker.write("setup\\n")
+        """
+    ).strip()
+    + "\n",
 }
 REQUIRED_SETTING: dict[str, str] = {
     "providers/region.py": (
@@ -601,3 +635,88 @@ def test_given_a_changed_plan_when_a_secret_is_missing_then_only_nodes_it_runs_c
     assert changed["unchanged"] == test_case.expected_unchanged, planned.stdout
     assert [entry["nodes"] for entry in cant_run] == [test_case.expected_cant_run_nodes]
     assert [entry["readers"] for entry in cant_run] == [test_case.expected_cant_run_readers]
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        StrictPlanE2ETestCase(
+            description="a selected node uses the provider",
+            select="+api_events",
+            extra_repo_files=READING_MODEL,
+            expected_block=(
+                f"Can't run: provider api_provider needs {SECRET_VARIABLE} "
+                "(missing from the environment and from .env)\n"
+                "  needs  raw_api_events, and api_events that read it\n"
+            ),
+            expected_cant_run=[
+                {
+                    "provider": "api_provider",
+                    "variables": [SECRET_VARIABLE],
+                    "nodes": ["source:raw_api_events"],
+                    "readers": ["model:api_events"],
+                    "sinks": [],
+                }
+            ],
+        ),
+        StrictPlanE2ETestCase(
+            description="only an unselected node uses the provider",
+            select="no_api",
+            extra_repo_files={},
+            expected_block="",
+            expected_cant_run=[],
+        ),
+        StrictPlanE2ETestCase(
+            description="a sink uses the provider",
+            select="no_api",
+            extra_repo_files=API_SINK,
+            expected_block=(
+                f"Can't run: sink export_event needs {SECRET_VARIABLE}; every run uses sinks "
+                "(missing from the environment and from .env)\n"
+            ),
+            expected_cant_run=[
+                {
+                    "provider": "api_provider",
+                    "variables": [SECRET_VARIABLE],
+                    "nodes": [],
+                    "readers": [],
+                    "sinks": ["export_event"],
+                }
+            ],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_strict_target_when_planning_without_a_secret_then_the_plan_lists_what_cant_run(
+    test_case: StrictPlanE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    marker_path: Path = tmp_path / "marker.log"
+    marker_path.write_text("", encoding="utf-8")
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="provider_secret_project",
+        repo_files={
+            **PROJECT_FILES,
+            **STRICT_TARGET,
+            **MARKING_PROVIDER,
+            **test_case.extra_repo_files,
+        },
+    )
+    env: dict[str, str] = {"MARKER_PATH": str(marker_path), SET_SECRET_VARIABLE: SET_SECRET_VALUE}
+    plan: tuple[str, ...] = ("--no-color", "plan", "--select", test_case.select)
+
+    text: subprocess.CompletedProcess[str] = run_sqb(command=plan, project_dir=project_dir, env=env)
+    as_json: subprocess.CompletedProcess[str] = run_sqb(
+        command=(*plan, "--json"), project_dir=project_dir, env=env
+    )
+
+    shown: str = text.stdout + text.stderr + as_json.stdout + as_json.stderr
+    assert (text.returncode, as_json.returncode) == (0, 0), shown
+    _, marked, block = text.stdout.partition("Can't run:")
+    assert marked + block == test_case.expected_block, shown
+    document: dict[str, object] = json.loads(as_json.stdout)
+    cant_run: list[dict[str, object]] = document.get("cant_run", [])  # type: ignore[assignment]
+    assert [blocked(entry) for entry in cant_run] == test_case.expected_cant_run
+    assert SET_SECRET_VALUE not in shown
+    assert marker_path.read_text(encoding="utf-8") == ""

@@ -56,6 +56,7 @@ use sqlbuild_python_front::discovery::main::project::configured_dynamic::configu
 use sqlbuild_python_front::native_host::main::recorder_callbacks::recorder_callbacks;
 use sqlbuild_python_output::build_progress::main::batch_complete_callback::batch_complete_callback;
 use sqlbuild_python_output::build_progress::main::check_callback::check_callback;
+use sqlbuild_python_output::build_progress::main::rows_written_callback::rows_written_callback;
 use sqlbuild_python_output::build_progress::main::write_execution_header::write_execution_header;
 use sqlbuild_python_output::build_progress::models::BuildProgressCallbacks;
 use sqlbuild_python_output::build_progress::models::ConnectionProgressReporter;
@@ -438,6 +439,7 @@ pub(crate) fn execute_build_plan<'py>(
                 native_field(callbacks, "on_sub_progress")?,
             ),
             ("on_batch_complete", batch_complete_callback(callbacks)?),
+            ("on_rows_written", rows_written_callback(callbacks)?),
             (
                 "on_connection_start",
                 native_field(connection, "on_connection_start")?,

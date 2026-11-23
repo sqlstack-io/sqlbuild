@@ -31,7 +31,11 @@ pub(super) async fn report_changed_build(
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<bool>, ControlError> {
     let published = || {
-        location_files(&options.project_dir, &watch.rules, &watch.local_files) == watch.observed.0
+        location_files(
+            &options.project_dir,
+            &watch.rules,
+            (&watch.local_files, &watch.output_folders),
+        ) == watch.observed.0
     };
     let report = |message: &str| drop(write_output(&[(Stream::Stderr, message)]));
     if !published() {

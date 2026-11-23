@@ -160,7 +160,7 @@ def test_given_a_pinned_snapshot_when_container_source_drifts_then_no_warehouse_
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
         assert run["status"] == test_case.expected_status, worker.log.read_text()
-        assert run["node_counts_json"] == {"skipped": 1}
+        assert run["node_counts_json"] == {"not_run": 1}
         assert not (worker.project / "warehouse.duckdb").exists()
         assert worker.docker is not None
         name: str = f"sqlbuild-{worker.api.location_id}-{run['run_id']}"

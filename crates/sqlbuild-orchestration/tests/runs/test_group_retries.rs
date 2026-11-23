@@ -34,6 +34,7 @@ fn given_a_member_with_retry_when_it_fails_in_a_group_then_it_retries_inside_the
         GroupMemberRetryTestCase {
             description: "SQLite member retry",
             backend: Backend::Sqlite,
+            first_outcome: NodeOutcome::Failed,
             delay_seconds: 900,
             expected_messages: &[
                 "staging_job failed, retrying in 15 min (attempt 2 of 3)",
@@ -43,6 +44,27 @@ fn given_a_member_with_retry_when_it_fails_in_a_group_then_it_retries_inside_the
         GroupMemberRetryTestCase {
             description: "PostgreSQL member retry",
             backend: Backend::Postgres,
+            first_outcome: NodeOutcome::Failed,
+            delay_seconds: 0,
+            expected_messages: &[
+                "staging_job failed, retrying now (attempt 2 of 3)",
+                "staging_job succeeded on attempt 2",
+            ],
+        },
+        GroupMemberRetryTestCase {
+            description: "SQLite member retry of a node its stopped worker cancelled",
+            backend: Backend::Sqlite,
+            first_outcome: NodeOutcome::Cancelled,
+            delay_seconds: 0,
+            expected_messages: &[
+                "staging_job failed, retrying now (attempt 2 of 3)",
+                "staging_job succeeded on attempt 2",
+            ],
+        },
+        GroupMemberRetryTestCase {
+            description: "PostgreSQL member retry of a node its stopped worker cancelled",
+            backend: Backend::Postgres,
+            first_outcome: NodeOutcome::Cancelled,
             delay_seconds: 0,
             expected_messages: &[
                 "staging_job failed, retrying now (attempt 2 of 3)",
@@ -115,7 +137,7 @@ fn given_a_member_with_retry_when_it_fails_in_a_group_then_it_retries_inside_the
                 .await
                 .expect("claim staging")
                 .expect("staging ready");
-            finish(store, &first, (NodeOutcome::Failed, RunOutcome::Failed)).await;
+            finish(store, &first, (test_case.first_outcome, RunOutcome::Failed)).await;
             advance_groups(store, &lease, (&limits, scope))
                 .await
                 .expect("advance after the failure");
@@ -253,5 +275,5 @@ fn given_a_member_with_retry_when_it_fails_in_a_group_then_it_retries_inside_the
             close_test_store(fixture).await;
         });
     }
-    assert_eq!(completed, 2, "both backends run");
+    assert_eq!(completed, 4, "both backends run");
 }

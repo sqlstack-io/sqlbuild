@@ -23,11 +23,11 @@ describe('mock selection evaluation', () => {
 
 	it('counts models of every materialization as one kind', () => {
 		expect(mockVocabulary().kinds).toEqual([
-			{ value: 'asset', count: 1 },
-			{ value: 'loader', count: 1 },
-			{ value: 'model', count: 12 },
+			{ value: 'asset', count: 4 },
+			{ value: 'loader', count: 2 },
+			{ value: 'model', count: 31 },
 			{ value: 'seed', count: 1 },
-			{ value: 'source', count: 2 }
+			{ value: 'source', count: 6 }
 		]);
 	});
 });

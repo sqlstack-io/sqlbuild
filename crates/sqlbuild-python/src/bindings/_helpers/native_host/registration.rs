@@ -3,6 +3,9 @@
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult};
 use pyo3::types::PyTuple;
 use sqlbuild_host::entries::main::host_entry_labels::host_entry_labels;
+use sqlbuild_python_front::discovered_sets::main::register_discover_runner::register_discover_runner;
+
+use crate::bindings::_helpers::native_host::discover_runner::run_discover;
 
 use sqlbuild_python_base::native_host::models::Dialect;
 use sqlbuild_python_planner::live_reads::main::register_live_reads::register_live_reads;
@@ -16,5 +19,6 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     register_exception_types(module)?;
     module.add_class::<Dialect>()?;
     register_live_reads(module)?;
+    register_discover_runner(run_discover);
     sqlbuild_python_base::orchestration_reads::main::register_orchestration_declarations::register_orchestration_declarations(module)
 }

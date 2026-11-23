@@ -33,9 +33,9 @@ describe('a plan with nodes that cannot run', () => {
 	it('names what the provider stops and how to fix it', () => {
 		expect(needsText(payments)).toBe('raw_payments and the 2 nodes that read it (stg_payments, fct_payments)');
 		expect(fixText(payments, 'plan again')).toBe(
-			"set PAYMENTS_API_TOKEN in the location's environment (or its .env), restart the location, then plan again"
+			'set PAYMENTS_API_TOKEN in .env, then restart the location (in sqb dev, press r), or in the environment the location (or sqb dev) was started with, then restart it; after that, plan again'
 		);
-		expect(fixText({ ...payments, env_file: null }, 'plan again')).toBe("set PAYMENTS_API_TOKEN in the location's environment, restart the location, then plan again");
+		expect(fixText({ ...payments, env_file: null }, 'plan again')).toBe('set PAYMENTS_API_TOKEN in the environment the location (or sqb dev) was started with, then restart it; after that, plan again');
 	});
 
 	it('gives each node its reason, readers naming the blocked node they read', () => {
@@ -51,13 +51,17 @@ describe('a plan with nodes that cannot run', () => {
 describe('a run that hit missing secrets', () => {
 	it('reads each provider, its failed nodes and what was skipped because of them', () => {
 		const message = "provider payments_api: PAYMENTS_API_TOKEN not set (missing from the location's environment and from .env)";
+		const at = { runId: 'r1', startedAt: null };
 		expect(
-			runCantRun([
-				{ nodeKey: 'source:raw_payments', status: 'failed', errorCode: 'D012', errorMessage: message, skippedBecauseOf: null },
-				{ nodeKey: 'model:stg_payments', status: 'skipped', errorCode: null, errorMessage: null, skippedBecauseOf: { nodeKey: 'source:raw_payments' } },
-				{ nodeKey: 'model:fct_payments', status: 'skipped', errorCode: null, errorMessage: null, skippedBecauseOf: { nodeKey: 'model:stg_payments' } },
-				{ nodeKey: 'model:orders', status: 'failed', errorCode: 'Q001', errorMessage: 'syntax error', skippedBecauseOf: null }
-			])
+			runCantRun(
+				[
+					{ ...at, nodeKey: 'source:raw_payments', status: 'failed', errorCode: 'D012', errorMessage: message, skippedBecauseOf: null },
+					{ ...at, nodeKey: 'model:stg_payments', status: 'skipped', errorCode: null, errorMessage: null, skippedBecauseOf: { nodeKey: 'source:raw_payments' } },
+					{ ...at, nodeKey: 'model:fct_payments', status: 'skipped', errorCode: null, errorMessage: null, skippedBecauseOf: { nodeKey: 'model:stg_payments' } },
+					{ ...at, nodeKey: 'model:orders', status: 'failed', errorCode: 'Q001', errorMessage: 'syntax error', skippedBecauseOf: null }
+				],
+				[{ id: 'r1', statusReason: null }]
+			)
 		).toEqual([{ ...payments, path: '' }]);
 	});
 });

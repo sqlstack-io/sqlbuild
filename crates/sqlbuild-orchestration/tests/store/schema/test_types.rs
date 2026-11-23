@@ -98,3 +98,14 @@ pub(crate) struct BrokenMigrationTestCase {
     pub(crate) expected_fragment: &'static str,
     pub(crate) expected_version: Option<i64>,
 }
+
+/// A store from before the service accounts migration, built from the frozen baseline by the real migrations.
+pub(crate) struct ServiceAccountUpgradeTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static StoreDialect,
+    /// How many versions older than the one just before service accounts the store is.
+    pub(crate) versions_behind: usize,
+    /// Schema objects naming service accounts in the older store.
+    pub(crate) expected_objects_before: usize,
+    pub(crate) expected_version: i64,
+}

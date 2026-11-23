@@ -19,6 +19,7 @@ use crate::native_commands::_helpers::command::paths::location_files;
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::check_location_connection;
 use crate::native_commands::_helpers::location::plan_reuse::keep_plan;
+use crate::native_commands::_helpers::location::republish::republish_turn;
 use crate::native_commands::_helpers::location::sensor_function::run_sensor_function;
 use crate::native_commands::_helpers::location::work::work_error;
 use crate::native_commands::main::_location_plan::plan_location;
@@ -41,24 +42,28 @@ pub(super) async fn run_location_work(
     let claim = tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
         result = client.poll(poll) => match result {
-            Ok(claim) => claim,
+            Ok(Some(claim)) => claim,
+            Ok(None) => return Ok(Some(LocationWorkTurn::default())),
             Err(error) => {
                 work_error(&error)?;
                 return Ok(Some(LocationWorkTurn::default()));
             },
         },
     };
-    let Some(claim) = claim else {
-        return Ok(Some(LocationWorkTurn::default()));
-    };
     let deadline = Instant::now()
         + (claim.lease_expires_at - Utc::now())
             .to_std()
             .unwrap_or_default();
+    if let Some(turn) = republish_turn(&claim, deadline) {
+        return Ok(Some(turn));
+    }
     let mut files: Vec<PathBuf> = Vec::new();
     let outcome = if generation == Some(claim.generation)
-        && location_files(&options.project_dir, &watch.rules, &watch.local_files)
-            == watch.observed.0
+        && location_files(
+            &options.project_dir,
+            &watch.rules,
+            (&watch.local_files, &watch.output_folders),
+        ) == watch.observed.0
     {
         let mut shutting_down = false;
         let expires = async {
@@ -84,6 +89,7 @@ pub(super) async fn run_location_work(
                 files,
                 sync: false,
                 claimed: true,
+                republish: None,
             }));
         };
         files = local_files;
@@ -93,7 +99,12 @@ pub(super) async fn run_location_work(
             .retain(|stamp| !files.contains(&options.project_dir.join(&stamp.relative_path)));
         let mut excluded = watch.local_files.clone();
         excluded.extend(files.clone());
-        if location_files(&options.project_dir, &watch.rules, &excluded) == expected.0 {
+        if location_files(
+            &options.project_dir,
+            &watch.rules,
+            (&excluded, &watch.output_folders),
+        ) == expected.0
+        {
             if let LocationWorkOutcome::Plan { document, diffs } = &outcome {
                 keep_plan(keep, (document, diffs));
             }
@@ -126,6 +137,7 @@ pub(super) async fn run_location_work(
                     files,
                     sync,
                     claimed: true,
+                    republish: None,
                 }));
             }
             Err(error) => {
@@ -148,6 +160,7 @@ pub(super) async fn run_location_work(
         files,
         sync,
         claimed: true,
+        republish: None,
     }))
 }
 
@@ -167,9 +180,11 @@ async fn perform_work(
         LocationWork::SyncWarehouse {} => "Synchronizing warehouse history on request...\n",
         LocationWork::EvaluateSensor { .. } => "Running a sensor's function...\n",
         LocationWork::Plan { .. } => "Planning requested command...\n",
+        LocationWork::Republish { .. } => "Republishing on request...\n",
     };
     drop(write_output(&[(Stream::Stderr, message)]));
     Ok(match work {
+        LocationWork::Republish { .. } => None,
         LocationWork::SyncWarehouse {} => {
             Some((LocationWorkOutcome::SyncStarted {}, Vec::new(), None))
         }

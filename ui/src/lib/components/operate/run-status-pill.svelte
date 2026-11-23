@@ -4,21 +4,31 @@
 	import { plural } from '$lib/format/plural';
 
 	/** `ignored` counts the audit failures a finished run let through: it reads as a success with a warning, never as a failure. */
-	let { status, size = 'sm', ignored = 0 }: { status: RunStatus; size?: 'sm' | 'md'; ignored?: number } = $props();
+	/** `notStarted`: a group's member run that never started, which reads "Not started", never "Skipped". */
+	let { status, size = 'sm', ignored = 0, notStarted = false }: { status: RunStatus; size?: 'sm' | 'md'; ignored?: number; notStarted?: boolean } = $props();
 	const letThrough = $derived(ignoresAuditFailures(status, ignored));
 </script>
 
 <span
 	class="pill {size}"
+	class:hollow={notStarted}
 	class:live={isActiveRun(status) && status !== 'queued'}
-	style:--tone={letThrough ? 'var(--sb-warning)' : runStatusTone[status]}
-	title={letThrough ? `${runStatusLabel[status]}, letting through ${plural(ignored, 'error-severity audit failure')}: audit failures don't stop this job` : runStatusHelp[status]}
+	style:--tone={letThrough ? 'var(--sb-warning)' : notStarted ? 'var(--sb-text-faint)' : runStatusTone[status]}
+	title={notStarted ? 'The group stopped before this member job started' : letThrough ? `${runStatusLabel[status]}, letting through ${plural(ignored, 'error-severity audit failure')}: audit failures don't stop this job` : runStatusHelp[status]}
 	data-testid="run-status"
 >
-	<i></i>{runStatusLabel[status]}{#if letThrough}<span class="ignored-count">{` · ${plural(ignored, 'audit failure')} ignored`}</span>{/if}
+	<i></i>{notStarted ? 'Not started' : runStatusLabel[status]}{#if letThrough}<span class="ignored-count">{` · ${plural(ignored, 'audit failure')} ignored`}</span>{/if}
 </span>
 
 <style>
+	.pill.hollow {
+		background: transparent;
+		box-shadow: inset 0 0 0 1px var(--border);
+	}
+	.pill.hollow i {
+		background: transparent !important;
+		box-shadow: inset 0 0 0 1px var(--sb-text-faint);
+	}
 	.pill {
 		display: inline-flex;
 		align-items: center;

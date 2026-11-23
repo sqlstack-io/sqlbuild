@@ -2620,6 +2620,15 @@ class BigQueryAdapter(
     def format_row_diff_decimal_sql(self, value: Decimal) -> str:
         return format(value, "f")
 
+    def rebuilt_table_row_count(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> int | None:
+        """A table's ``num_rows`` is exact once a query job wrote it, with no streaming buffer."""
+
+        return self.estimate_relation_row_count(
+            connection=connection, database=database, schema=schema, name=name, metadata_only=True
+        ).row_count
+
     def estimate_relation_row_count(
         self,
         *,

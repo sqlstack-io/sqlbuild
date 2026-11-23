@@ -129,10 +129,11 @@
 					<td class="nowrap" title={formatStamp(e.requestedAt)}>{formatAgo(e.requestedAt, app.now)}</td>
 					<td title={e.eventSummary ?? undefined}>{#if e.eventId}<code>{e.eventId}</code>{:else}<span class="faint" title="A polling sensor's tick has no event">Poll</span>{/if}</td>
 					<td title="{evaluationHelp[e.outcome]} · {e.id}"><StatusLabel tone={evaluationTone[e.outcome]} label={evaluationLabel[e.outcome]} /></td>
-					<td class:faint={!e.error}>
+					<td class:faint={!e.error && !e.unreadable}>
 						{#if e.outcome === 'skipped' && !e.skippedBy}{e.skipReason ?? ''}{/if}
 						{#if e.runIds.length}→ {#each e.runIds as id, i (id)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${id}`)} title={id}>{shortRunId(id)}</a>{/each}{/if}
-						{#if e.outcome === 'failed' || e.outcome === 'timed_out'}
+						{#if e.unreadable}<span class="err">{e.unreadable}</span>
+						{:else if e.outcome === 'failed' || e.outcome === 'timed_out'}
 							{#if e.error}<details class="trace"><summary class="err">{e.error.split('\n').at(-1)}</summary><pre>{e.error}</pre></details>{:else}<span class="err" title="The traceback needs view.evidence">{e.failureCode ?? e.outcome}</span>{/if}
 						{/if}
 						{#if e.skippedBy}<span title="Skipped without calling the function">Skipped by {e.skippedBy}{#if e.skipReason}: {e.skipReason}{/if}</span>{/if}

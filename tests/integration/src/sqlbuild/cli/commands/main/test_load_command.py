@@ -626,7 +626,7 @@ from sqlbuild.loaders import loader
 @loader
 def raw_orders(ctx):
     '''Test loader raw_orders.'''
-    ctx.log("loading raw orders")
+    ctx.log.info("loading raw orders")
     return [
         {"order_id": 1, "status": "placed"},
         {"order_id": 2, "status": "shipped"},
@@ -1904,7 +1904,7 @@ from sqlbuild.loaders import loader
 @loader
 def raw_orders(ctx):
     '''Test loader raw_orders.'''
-    ctx.log("loading raw orders")
+    ctx.log.info("loading raw orders")
     return [
         {"order_id": 1, "status": "placed"},
         {"order_id": 2, "status": "shipped"},
@@ -2124,7 +2124,7 @@ from sqlbuild.loaders import loader
 @loader
 def raw_orders(ctx):
     '''Test loader raw_orders.'''
-    ctx.log("loading raw orders")
+    ctx.log.info("loading raw orders")
     return [
         {"order_id": 1, "status": "placed"},
         {"order_id": 2, "status": "shipped"},

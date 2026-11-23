@@ -123,6 +123,7 @@ pub(crate) async fn frozen_publication_request(
                 job_settings: plan.job_settings,
                 retry: None,
                 member_attempt: None,
+                chain_run_id: None,
             },
         )),
     ))

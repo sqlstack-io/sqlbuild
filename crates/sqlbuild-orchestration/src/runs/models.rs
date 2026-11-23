@@ -1,5 +1,6 @@
 //! Frozen run requests and the run, node and claim records the control store keeps.
 
+use crate::discovered_sets::types::DiscoveredSets;
 use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Utc};
@@ -8,6 +9,7 @@ use uuid::Uuid;
 
 use crate::credentials::models::Action;
 use crate::declarations::models::PoolSlots;
+use crate::runs::constants::RUN_LAUNCHED_EVENT;
 use crate::runs::types::{CommandPlanner, PreparedPublication};
 use crate::snapshots::models::WriterNode;
 
@@ -181,6 +183,9 @@ pub struct RunRequest {
     /// Which attempt of its member job a group child is, from the second on; the first leaves it unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub member_attempt: Option<u8>,
+    /// The first run of this run's rerun chain, read as `ctx.root_run_id`; unset for the first run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chain_run_id: Option<Uuid>,
 }
 
 /// Which retry of the job's `[retry]` policy a run is, and when it may start.
@@ -382,6 +387,26 @@ pub struct RunNarrowing {
     pub exclude: Vec<String>,
 }
 
+/// The level of a line a node logged with `ctx.log`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NodeLogLevel {
+    Info,
+    Warning,
+    Error,
+}
+
+impl NodeLogLevel {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Info => "info",
+            Self::Warning => "warning",
+            Self::Error => "error",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum NodeOutcome {
@@ -390,6 +415,8 @@ pub enum NodeOutcome {
     Failed,
     Skipped,
     Cancelled,
+    /// The run stopped before it reached the node: nothing upstream failed or skipped it.
+    NotRun,
 }
 
 impl NodeOutcome {
@@ -401,6 +428,7 @@ impl NodeOutcome {
             Self::Failed => "failed",
             Self::Skipped => "skipped",
             Self::Cancelled => "cancelled",
+            Self::NotRun => "not_run",
         }
     }
 }
@@ -411,8 +439,24 @@ pub struct RunNodeRecord {
     pub status: String,
     pub started_at: Option<DateTime<Utc>>,
     pub ended_at: Option<DateTime<Utc>>,
+    /// Rows a statement inserted, merged or deleted, as the warehouse reported them.
     pub rows_affected: Option<i64>,
+    /// The rows a fully rebuilt table holds, read from the warehouse's metadata where that count is exact.
+    #[serde(default)]
+    pub table_rows: Option<i64>,
+    /// Rows written so far while the node runs, from microbatch batches or a loader's progress.
+    #[serde(default)]
+    pub rows_so_far: Option<i64>,
+    /// Why a node that ran changed nothing, such as `unchanged since its last build`.
+    #[serde(default)]
+    pub no_change_reason: Option<String>,
+    /// The node's materialization in the run's snapshot, such as `table`, `incremental` or `view`.
+    #[serde(default)]
+    pub materialization: Option<String>,
     pub error_code: Option<String>,
+    /// For a node that failed unstarted because a provider was missing secrets, its redacted message naming the provider, variables and places looked; never other error text.
+    #[serde(default)]
+    pub missing_secret: Option<String>,
     pub skipped_because_of: Option<String>,
 }
 
@@ -440,6 +484,15 @@ pub struct RunEventRecord {
     /// A summary the scheduler writes for a group run's member events, such as a member retry; never error or SQL text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// For a check's result: its name as declared, its ID and this result's, and the rows it found; never its SQL or rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_binding_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_result_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_rows: Option<i64>,
 }
 
 /// One error-severity audit failure a run or one of its current members let through; never its SQL or evidence.
@@ -558,6 +611,9 @@ pub struct RunExecution {
     /// Derived from completed sibling facts and pinned lineage, never a mutable request rewrite.
     #[serde(default)]
     pub skipped_nodes: BTreeMap<String, String>,
+    /// The discovered sets the run's snapshot saved, which the worker compiles from.
+    #[schema(value_type = Object)]
+    pub discovered: DiscoveredSets,
 }
 
 #[derive(Debug, Deserialize)]
@@ -609,10 +665,27 @@ pub enum RunChange {
     NodeStarted {
         node_key: String,
     },
+    /// Rows a running node has written so far; a worker sends at most one every few seconds per node.
+    NodeProgress {
+        node_key: String,
+        rows_so_far: i64,
+    },
+    /// A line a node logged with `ctx.log`; a worker sends at most a few hundred per node.
+    NodeLog {
+        node_key: String,
+        level: NodeLogLevel,
+        message: String,
+    },
     NodeFinished {
         node_key: String,
         outcome: NodeOutcome,
         rows_affected: Option<i64>,
+        /// The rows a fully rebuilt table holds, where the warehouse's metadata count is exact.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        table_rows: Option<i64>,
+        /// Why a node that ran changed nothing.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        no_change_reason: Option<String>,
         error_code: Option<String>,
         skipped_because_of: Option<String>,
         /// Redacted and bounded on the way in, whoever sends it; absent from older workers.
@@ -656,10 +729,12 @@ pub enum RunChange {
 impl RunChange {
     pub(crate) const fn event_type(&self) -> &'static str {
         match self {
-            Self::Launched { .. } => "run_launched",
+            Self::Launched { .. } => RUN_LAUNCHED_EVENT,
             Self::LaunchFailed { .. } => "run_launch_failed",
             Self::Started => "run_started",
             Self::NodeStarted { .. } => "run_node_started",
+            Self::NodeProgress { .. } => "run_node_progress",
+            Self::NodeLog { .. } => "run_node_log",
             Self::NodeFinished { .. } => "run_node_finished",
             Self::CheckStarted { .. } => "run_check_started",
             Self::CheckFinished { .. } => "run_check_finished",
@@ -676,6 +751,8 @@ impl RunChange {
     pub(crate) fn node_key(&self) -> Option<&str> {
         match self {
             Self::NodeStarted { node_key }
+            | Self::NodeProgress { node_key, .. }
+            | Self::NodeLog { node_key, .. }
             | Self::NodeFinished { node_key, .. }
             | Self::CheckStarted { node_key }
             | Self::CheckFinished { node_key, .. } => Some(node_key),

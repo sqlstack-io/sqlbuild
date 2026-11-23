@@ -2,6 +2,7 @@ pub mod accepted_settings_arguments;
 pub mod cli_namespace_defaults;
 pub(crate) mod command_project_and_target;
 pub mod command_settings_arguments;
+pub mod command_takes_option;
 pub mod given_setting_dests;
 pub mod job_run_arguments;
 pub mod job_settings_arguments;

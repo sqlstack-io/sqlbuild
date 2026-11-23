@@ -1,5 +1,10 @@
 //! Resolve native invocations and control-service settings from parsed arguments.
 
+use crate::server_config::constants::BYTE_UNITS;
+use crate::server_config::models::ByteCount;
+use sqlbuild_orchestration::run_output::main::open_output_store::open_output_store;
+use sqlbuild_orchestration::run_output::models::{OutputSettings, OutputStore};
+use sqlbuild_orchestration::store::models::ControlStore;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 
@@ -7,7 +12,9 @@ use chrono::{DateTime, Utc};
 use serde_json::json;
 use sqlbuild_orchestration::acknowledgements::models::AttentionSnooze;
 use sqlbuild_orchestration::api::models::{ApiAuthentication, HumanLogin, ServerFacts};
-use sqlbuild_orchestration::credentials::models::{AuditRetention, CredentialScope};
+use sqlbuild_orchestration::credentials::models::{
+    AuditRetention, BuiltinRole, CredentialScope, NewServiceAccount,
+};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
 use sqlbuild_orchestration::runs::models::RunLogRetention;
@@ -20,10 +27,11 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
 use uuid::Uuid;
 
 use crate::argv::constants::{JSON_OPTION, REVIEW_PROG};
-use crate::argv::models::{ArgvOutcome, Namespace, Value};
+use crate::argv::models::{ArgvOutcome, Namespace, Stream, Value};
 use crate::dispatch::main::invocation_policy::invocation_policy;
 use crate::dispatch::models::{CommandFacts, InvocationPolicy};
 use crate::native_commands::_helpers::command::terminal::read_password;
+use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::constants::{
     CLEAN_COMMAND, INIT_COMMAND, RULES_COMMAND, RULES_LIST_ACTION, RULES_SHOW_ACTION,
     SKILLS_COMMAND,
@@ -31,7 +39,7 @@ use crate::native_commands::constants::{
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::{
     ControlAdmin, CostOptions, NativeCommand, NativeInvocation, RulesAction, RulesOptions,
-    SkillsOptions,
+    ServiceAccountAdmin, SkillsOptions, TokenAdmin,
 };
 use crate::server_config::models::{ServerConfig, ServerSection};
 use sqlbuild_core::cost_command::constants::DESCENDING_ORDER;
@@ -70,6 +78,9 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
             return Err(ControlError::Invalid("location name is required".into()));
         }
         return Ok(ControlAdmin::CreateLocation(value));
+    }
+    if let Some(service) = service_account_admin(namespace, action.as_deref(), &value)? {
+        return Ok(service);
     }
     if action.as_deref() == Some("create-principal") {
         if value.trim().is_empty() {
@@ -242,13 +253,13 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                     "token expiry must be in the future".into(),
                 ));
             }
-            Ok(ControlAdmin::IssueToken(
+            Ok(ControlAdmin::Token(TokenAdmin::Issue(
                 CredentialScope::Location { location_id: id },
                 expiry,
-            ))
+            )))
         }
-        Some("revoke-token") => Ok(ControlAdmin::RevokeToken(id)),
-        Some("rotate-token") => Ok(ControlAdmin::RotateToken(id)),
+        Some("revoke-token") => Ok(ControlAdmin::Token(TokenAdmin::Revoke(id))),
+        Some("rotate-token") => Ok(ControlAdmin::Token(TokenAdmin::Rotate(id))),
         Some("set-password") => Ok(ControlAdmin::SetPassword(id, read_password()?)),
         Some("grant-admin") => Ok(ControlAdmin::GrantAdmin(id)),
         _ => Err(ControlError::Invalid(
@@ -342,6 +353,7 @@ pub(crate) fn control_api_settings(
             origin,
             version: env!("CARGO_PKG_VERSION").into(),
             scheduler: scheduler_enabled(namespace, standalone, &config.server),
+            output: None,
             audit,
             statistics,
             snapshots,
@@ -451,8 +463,77 @@ pub(crate) fn control_database(
     }
 }
 
+/// The service account command `action` names, or none for the other admin commands.
+fn service_account_admin(
+    namespace: &Namespace,
+    action: Option<&str>,
+    name: &str,
+) -> Result<Option<ControlAdmin>, ControlError> {
+    let named = || {
+        if name.trim().is_empty() {
+            Err(ControlError::Invalid(
+                "service account name is required".into(),
+            ))
+        } else {
+            Ok(name.trim().to_owned())
+        }
+    };
+    let admin = match action {
+        Some("create-service-account") => ServiceAccountAdmin::Create {
+            request: NewServiceAccount {
+                name: named()?,
+                description: text(namespace, "admin_description"),
+                role: service_role(namespace)?,
+            },
+            key: imported_key(namespace)?,
+        },
+        Some("rotate-service-account") => ServiceAccountAdmin::Rotate {
+            name: named()?,
+            overlap_minutes: match namespace.get("admin_overlap_minutes") {
+                Some(Value::Int(minutes)) => minutes.parse::<i64>().map_err(|_| {
+                    ControlError::Invalid("--overlap-minutes must be a whole number".into())
+                })?,
+                _ => 0,
+            },
+        },
+        Some("disable-service-account") => ServiceAccountAdmin::SetDisabled {
+            name: named()?,
+            disabled: true,
+        },
+        Some("enable-service-account") => ServiceAccountAdmin::SetDisabled {
+            name: named()?,
+            disabled: false,
+        },
+        Some("list-service-accounts") => ServiceAccountAdmin::List,
+        _ => return Ok(None),
+    };
+    Ok(Some(ControlAdmin::ServiceAccount(admin)))
+}
+
+/// The built-in role `--role` names.
+fn service_role(namespace: &Namespace) -> Result<BuiltinRole, ControlError> {
+    serde_json::from_value(json!(text(namespace, "admin_role").unwrap_or_default()))
+        .map_err(|_| ControlError::Invalid("--role is viewer, operator, developer or admin".into()))
+}
+
+/// The key held in the variable `--key-from-env` names, when it names one.
+fn imported_key(namespace: &Namespace) -> Result<Option<String>, ControlError> {
+    let Some(variable) = text(namespace, "admin_key_env") else {
+        return Ok(None);
+    };
+    match std::env::var(&variable) {
+        Ok(key) if !key.is_empty() => Ok(Some(key)),
+        Ok(_) | Err(std::env::VarError::NotPresent) => Err(ControlError::Invalid(format!(
+            "--key-from-env names {variable}, which is not set"
+        ))),
+        Err(std::env::VarError::NotUnicode(_)) => Err(ControlError::Invalid(format!(
+            "--key-from-env names {variable}, which doesn't hold UTF-8 text"
+        ))),
+    }
+}
+
 /// The strings of a list attribute, or `None` when it holds anything else.
-fn texts(namespace: &Namespace, name: &str) -> Option<Vec<String>> {
+pub(crate) fn texts(namespace: &Namespace, name: &str) -> Option<Vec<String>> {
     match namespace.get(name) {
         None | Some(Value::None) => Some(Vec::new()),
         Some(Value::List(items)) => items
@@ -533,4 +614,69 @@ pub(crate) fn native_invocation(namespace: &Namespace) -> Result<NativeInvocatio
         creates_project: policy.creates_project,
         maintains_skills: policy.maintains_skills,
     })
+}
+
+/// Open the output store `[output]` names into `facts` and report it on stderr; the store and how many days a finished run's output stays in it, for retention.
+pub(crate) fn control_output(
+    namespace: &Namespace,
+    config: &ServerConfig,
+    (store, facts): (&ControlStore, &mut ServerFacts),
+) -> Result<Option<(OutputStore, u16)>, ControlError> {
+    let output = open_output_store(&control_output_settings(config)?, store)?;
+    drop(write_output(&[(
+        Stream::Stderr,
+        &format!("Run output store: {}\n", output.location()),
+    )]));
+    facts.output = Some(output.clone());
+    Ok(Some((
+        output,
+        run_output_days(namespace, config, facts.run_logs)?,
+    )))
+}
+
+/// `[output]`: the output store's URL and the bytes kept per run.
+fn control_output_settings(config: &ServerConfig) -> Result<OutputSettings, ControlError> {
+    Ok(OutputSettings {
+        store: config.output.store.clone(),
+        max_bytes_per_run: match &config.output.max_bytes_per_run {
+            Some(ByteCount::Number(bytes)) => Some(*bytes),
+            Some(ByteCount::Text(text)) => Some(byte_count(text)?),
+            None => None,
+        },
+    })
+}
+
+/// Days a finished run's output stays, `--run-output-retention-days` over `[retention] run_output_days`, by default `run_log_days`.
+fn run_output_days(
+    namespace: &Namespace,
+    config: &ServerConfig,
+    run_logs: RunLogRetention,
+) -> Result<u16, ControlError> {
+    Ok(retention_setting(
+        namespace,
+        "run-output-retention-days",
+        ("run_output_days", config.retention.run_output_days),
+    )?
+    .unwrap_or(run_logs.days()))
+}
+
+/// `20GB`, `500 MB` or `2GiB` as bytes; decimal units step by 1000 and binary ones by 1024.
+fn byte_count(text: &str) -> Result<u64, ControlError> {
+    let invalid = || {
+        ControlError::Invalid(format!(
+            "[output] max_bytes_per_run must be a number of bytes or text such as \"20GB\", not {text:?}"
+        ))
+    };
+    let trimmed: &str = text.trim();
+    let split: usize = trimmed
+        .find(|character: char| !character.is_ascii_digit())
+        .unwrap_or(trimmed.len());
+    let (digits, unit) = trimmed.split_at(split);
+    let count: u64 = digits.parse().map_err(|_| invalid())?;
+    let scale: u64 = BYTE_UNITS
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case(unit.trim()))
+        .map(|(_, scale)| *scale)
+        .ok_or_else(invalid)?;
+    count.checked_mul(scale).ok_or_else(invalid)
 }

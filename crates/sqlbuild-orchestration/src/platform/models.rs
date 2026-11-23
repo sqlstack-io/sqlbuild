@@ -3,6 +3,7 @@
 use crate::api::models::ControlClient;
 use crate::credentials::models::AuditRetention;
 use crate::declarations::models::TriggerDefinition;
+use crate::discovered_sets::models::DiscoveredSetStatus;
 use crate::runs::models::{RunKind, RunLogRetention, RunNodeFailure, RunOutcome};
 use crate::sensors::models::{SensorEvaluationRequest, SensorFunctionOutcome};
 use crate::snapshots::models::{SnapshotRecord, SnapshotRetention};
@@ -12,16 +13,19 @@ use crate::warehouse_metadata::models::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use uuid::Uuid;
 
 /// Every retention horizon one server's maintenance role enforces.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RetentionPolicies {
     pub audit: AuditRetention,
     pub statistics: StatisticsRetention,
     pub snapshots: SnapshotRetention,
     pub run_logs: RunLogRetention,
     pub state_history: StateHistoryRetention,
+    /// The output store and how many days a finished run's output stays in it; `None` keeps no output.
+    pub run_output: Option<(crate::run_output::models::OutputStore, u16)>,
 }
 
 /// One pooled outbound connection; the location never receives a store handle.
@@ -60,6 +64,11 @@ pub enum LocationHealth {
         missing: u64,
         /// Every provider missing a secret, including those the target allows; names only, never values.
         providers: Vec<MissingProviderSecrets>,
+    },
+    /// The discovered sets a publication used; a failed set keeps serving its last good items.
+    Discovery {
+        generation: i64,
+        sets: Vec<DiscoveryHealth>,
     },
     /// Jobs and groups this server's `pool_caps` clamp, derived by the server, never reported by a location.
     PoolCapped {
@@ -104,6 +113,8 @@ pub struct PublishedGeneration {
     pub state_locations: Vec<WarehouseStateLocation>,
     /// The providers whose required secrets the location's environment leaves unset.
     pub missing_secrets: Vec<MissingProviderSecrets>,
+    /// For each provider missing secrets, the node keys that use it and then those that read them.
+    pub secrets_needed_by: BTreeMap<String, Vec<String>>,
 }
 
 /// A provider whose required secrets are unset: what is missing and which nodes need it, never a value.
@@ -127,6 +138,21 @@ pub struct MissingProviderSetting {
     pub field: String,
     pub variable: String,
     pub line: Option<u64>,
+}
+
+/// One discovered set as a location's health names it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiscoveryHealth {
+    pub name: String,
+    pub status: DiscoveredSetStatus,
+    /// Why the newest attempt failed, secrets masked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// How many items the set serves: its newest result, or the last good one after a failure.
+    pub items: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_good_at: Option<DateTime<Utc>>,
 }
 
 /// The stage a warehouse sync failed at; only a failed read also reports its redacted error.
@@ -174,12 +200,14 @@ pub enum LocationState {
     FallingBack,
     /// A provider secret is unset in the location's environment, so runs that use the provider fail.
     MissingSecrets,
+    /// A discover function failed at the last publication, so its set serves its last good items or none.
+    DiscoveryFailed,
     /// No instance has checked in for 90 seconds.
     Broken,
 }
 
 impl LocationState {
-    /// `target`'s state at `now` from observations that may cover several targets: down without a recent check-in, then a failed load, then missing provider secrets, then a failed connection.
+    /// `target`'s state at `now` from observations that may cover several targets: down without a recent check-in, then a failed load, then missing provider secrets, then a failed discover function, then a failed connection.
     #[must_use]
     pub fn of(
         observations: &[LocationHealthObservation],
@@ -200,6 +228,7 @@ impl LocationState {
         let mut failed: Option<(DateTime<Utc>, i64)> = None;
         let mut connection: Option<(DateTime<Utc>, i64, bool)> = None;
         let mut secrets: Option<(DateTime<Utc>, u64)> = None;
+        let mut discovery: Option<(DateTime<Utc>, bool)> = None;
         for observation in own {
             let seen = observation.received_at;
             match observation.report.health {
@@ -220,6 +249,14 @@ impl LocationState {
                 {
                     secrets = Some((seen, missing));
                 }
+                LocationHealth::Discovery { ref sets, .. }
+                    if discovery.is_none_or(|(at, _)| seen > at) =>
+                {
+                    let failing: bool = sets
+                        .iter()
+                        .any(|set| set.status == DiscoveredSetStatus::Failed);
+                    discovery = Some((seen, failing));
+                }
                 _ => {}
             }
         }
@@ -229,6 +266,7 @@ impl LocationState {
             }
             (Some(_), None, _) => Self::FallingBack,
             (_, _, Some((_, missing))) if missing > 0 => Self::MissingSecrets,
+            _ if discovery.is_some_and(|(_, failing)| failing) => Self::DiscoveryFailed,
             (_, Some((_, _, false)), _) => Self::Degraded,
             _ => Self::Healthy,
         }
@@ -260,6 +298,11 @@ pub enum LocationWork {
         /// The settings the command gives, `warehouse` included though a plan never takes it; they replace the pinned jobs' own.
         #[serde(default, skip_serializing_if = "std::collections::BTreeSet::is_empty")]
         given: std::collections::BTreeSet<String>,
+    },
+    /// Compile and publish again, calling every discover function, as `r` does in `sqb dev`.
+    Republish {
+        /// The name of whoever asked, which the location prints with the request's reason.
+        requested_by: String,
     },
 }
 
@@ -296,6 +339,29 @@ pub struct PersonWorkRequest {
 pub struct LocationWorkPoll {
     pub session_id: Uuid,
     pub target: String,
+    /// Which work this poll takes.
+    pub scope: LocationWorkScope,
+}
+
+/// Which work a location takes in one poll.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LocationWorkScope {
+    /// Every kind of work, while the location serves a publication of its current files.
+    All,
+    /// Only republishes, while the location has no publication of its current files.
+    RepublishOnly,
+}
+
+impl LocationWorkScope {
+    /// The scope's name as the claim query compares it.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::RepublishOnly => "republish_only",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -327,6 +393,16 @@ pub enum LocationWorkOutcome {
     },
     /// The location took the request; its next metadata sync reads the warehouse.
     SyncStarted {},
+    /// The republish published this snapshot.
+    Published {
+        snapshot_id: Uuid,
+        generation: i64,
+    },
+    /// The republish compiled nothing to publish; the last good snapshot keeps serving.
+    PublishFailed {
+        generation: i64,
+        error: String,
+    },
     Superseded {},
 }
 
@@ -927,4 +1003,74 @@ pub struct PlanTimings {
 pub struct PlanTimingStep {
     pub name: String,
     pub seconds: f64,
+}
+
+/// Where a republish request stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RepublishState {
+    /// Waiting for the location to take it, or to finish publishing.
+    Pending,
+    Published,
+    Failed,
+    /// No location took it before it expired.
+    Expired,
+}
+
+/// A republish request and its result once the location has one.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RepublishStatus {
+    pub request_id: Uuid,
+    pub location_id: Uuid,
+    pub target: String,
+    pub state: RepublishState,
+    pub requested_by: String,
+    pub reason: String,
+    pub requested_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completed_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snapshot_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generation: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// One discovered set of the current snapshot, as a deploy reads it back.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct DiscoveredSetReadback {
+    pub name: String,
+    pub status: DiscoveredSetStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fetched_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_good_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
+    /// The tags of the result the set serves: its newest, or its last good one after a failure.
+    #[schema(value_type = Object)]
+    pub tags: std::collections::BTreeMap<String, serde_json::Value>,
+    pub items: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_every_seconds: Option<u64>,
+}
+
+/// The discovered sets of a target's current snapshot; empty when it saved none.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct DiscoveredReadback {
+    pub snapshot_id: Uuid,
+    pub generation: i64,
+    pub published_at: DateTime<Utc>,
+    pub sets: Vec<DiscoveredSetReadback>,
+}
+
+/// What a republish client sends: a new request, or a read of one that holds open while it is pending.
+#[derive(Clone, Copy, Debug)]
+pub enum RepublishCall<'a> {
+    Request(&'a PersonWorkRequest),
+    Read { request_id: Uuid, wait: u64 },
 }

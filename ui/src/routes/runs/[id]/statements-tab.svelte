@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick, untrack } from 'svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import DisclosureButton from '$lib/components/disclosure-button.svelte';
@@ -15,7 +16,8 @@
 	import { app } from '$lib/state/app.svelte';
 	import { formatSpan } from './utils';
 
-	let { statements, total, grouped }: { statements: RunStatement[]; total: number; grouped: boolean } = $props();
+	/** `focusId`: a statement to open and scroll to, as when a check's "In Statements" was clicked. */
+	let { statements, total, grouped, focusId = null }: { statements: RunStatement[]; total: number; grouped: boolean; focusId?: string | null } = $props();
 
 	type SqlState = { state: 'loading' } | { state: 'ok'; sql: string | null } | { state: 'error'; message: string };
 	let open = $state<Set<string>>(new Set());
@@ -40,6 +42,17 @@
 		sql = next;
 		void loadSql(st);
 	}
+
+	let focused = '';
+	$effect(() => {
+		const st = focusId ? statements.find((x) => x.id === focusId) : null;
+		if (!st || focused === st.id) return;
+		focused = st.id;
+		untrack(() => {
+			if (!open.has(st.id)) toggle(st);
+		});
+		void tick().then(() => document.querySelector(`tr[data-sid="${st.id}"]`)?.scrollIntoView({ block: 'center' }));
+	});
 
 	function toggle(st: RunStatement) {
 		const next = new Set(open);
@@ -76,7 +89,7 @@
 
 <DataTable class="compact statements" embedded columns={statementColumns} rows={statements} key={(st) => st.id} empty={total ? 'No queries match the filter.' : 'No queries yet.'}>
 	{#snippet row(st)}
-				<tr class="row" class:open={open.has(st.id)} onclick={() => toggle(st)}>
+				<tr class="row" class:open={open.has(st.id)} class:focused={st.id === focusId} data-sid={st.id} onclick={() => toggle(st)}>
 					<td class="caret-col"><DisclosureButton open={open.has(st.id)}><span class="sr-only">{open.has(st.id) ? 'Hide' : 'Show'} statement {st.sequence}</span></DisclosureButton></td>
 					<td class="num faint">{st.sequence}</td>
 					<td class="faint nowrap" title={formatStamp(st.startedAt)}>{clockTime(st.startedAt)}</td>
@@ -130,6 +143,9 @@
 </DataTable>
 
 <style>
+	tr.focused td {
+		background: color-mix(in srgb, var(--primary) 10%, transparent);
+	}
 	td {
 		padding: 6px 12px;
 		border-bottom: 1px solid var(--border-subtle);

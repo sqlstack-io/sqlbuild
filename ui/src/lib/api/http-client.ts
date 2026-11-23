@@ -5,11 +5,13 @@ import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, isUnsupported, type ApiClient } from './client';
 import { applyNodeStates } from './node-states';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
+import { LIVE_OUTPUT_ROWS, SEARCH_PARTS, followedOutput, outputLive, pageQuery, toNodeOutputIndex, toNodeOutputPage, toRunOutputLines, type NodeOutputAt } from './http-output';
 import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage, toNodeStates, toNodeStatusDelta } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
 import { manualConnectionTest, missingSecretsEventOf, snapshotOf, toLocationDetail, toLocationSummary, toWarehouseConnection, warehouseSyncOf } from './http-locations';
 import { toAccount, toRoleAssignments, toServerSettings } from './http-people';
+import { toIssuedKey, toServiceAccount } from './http-service-accounts';
 import { toMaintenanceHistory } from './http-maintenance';
 import { toProviders } from './http-providers';
 import { overviewOf } from './http-overview';
@@ -20,10 +22,10 @@ import { timelineOf } from './http-timeline';
 import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements, toIgnoredAuditFailures, toRunCostRows, toCostSummary, toNodeBuildCosts } from './http-runs';
 import { toSelectionEvaluation, toSelectionVocabulary } from './http-selection';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
-import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, Snapshot, WarehouseSync } from './types';
-import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, NewPasswordAccount, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
+import type { AuthMode, Bootstrap, BuiltInRole, Capability, Location, NavCounts, PlatformEvent, RepublishResult, Scope, Snapshot, WarehouseSync } from './types';
+import type { Account, AuditEntry, AuditQuery, ConnectionTest, IssuedToken, KeyRotation, LocationDetail, NewPasswordAccount, NewServiceAccount, ServiceAccount, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, ProviderConnection, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { Acknowledgement, CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, NodeStates, NodeStatusDelta, Overview, SnapshotChange, ColumnLineage, AttentionAcknowledgement, ConditionShape, AutomaticWithdrawal } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
+import type { NodeOutputIndex, NodeOutputPage, NodeOutputSearch, RunNode, RunOutputFollow, AdhocRunCheck, AdhocRunRequest, BulkRunResult, SelectionEvaluation, SelectionRequest, SelectionVocabulary, PlanDiff, PlanPage, PlanPageSection, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, IgnoredAuditFailure, RunCostRow, CostSummary, NodeBuildCost, StatementSql } from './types/operate';
 import { newRequestId } from '$lib/browser/request-id';
 
 type Wire = components['schemas'];
@@ -84,6 +86,12 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'disableAccount',
 	'enableAccount',
 	'createPasswordAccount',
+	'listServiceAccounts',
+	'createServiceAccount',
+	'rotateServiceAccountKey',
+	'revokeServiceAccountKey',
+	'setServiceAccountDisabled',
+	'setServiceAccountRole',
 	'listLocations',
 	'getLocation',
 	'listPlatformEvents',
@@ -94,6 +102,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getLatestSnapshot',
 	'getWarehouseSync',
 	'requestWarehouseSync',
+	'republish',
 	'maintenanceHistory',
 	'testConnection',
 	'listWarehouseConnections',
@@ -111,6 +120,8 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 
 /** How often a connection test asks for the location's answer, and the longest it waits. */
 const CONNECTION_TEST_POLL_MS = 1000;
+/** How long one republish poll holds open; the server ends the wait once the request expires. */
+const REPUBLISH_WAIT_SECONDS = 20;
 const CONNECTION_TEST_WAIT_MS = 60_000;
 
 /** How often the plan page asks for the location's plan; the server expires a plan after ten minutes. */
@@ -416,9 +427,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		},
 		async listRunEvents(scope: Scope, runId: string, query: { after?: number; limit?: number } = {}): Promise<RunEventPage> {
 			const limit = query.limit ?? 1000;
-			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events', {
-				params: { path: runPath(scope, runId), query: { after: query.after, limit } }
-			});
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events', { params: { path: runPath(scope, runId), query: { after: query.after, limit } } });
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return { events: data.flatMap((e) => toRunEvent(e, runId) ?? []), nextCursor: data.length === limit ? (data.at(-1)?.storage_id ?? null) : null };
@@ -471,12 +480,79 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		async listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]> {
 			const refusal = `${scope.locationId}|${runId}`;
 			if (!evidenceLocations.has(scope.locationId) || outputRefused.has(refusal)) return [];
+			// The output store's newest lines, each with its node; a server that keeps no output store answers from Recall.
+			const [lines, index] = await Promise.all([
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/lines', { params: { path: runPath(scope, runId), query: { tail: true, limit: LIVE_OUTPUT_ROWS } } }),
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index', { params: { path: runPath(scope, runId) } })
+			]);
+			if (lines.response.status === 401) onUnauthorized();
+			if (lines.response.status === 403) outputRefused.add(refusal);
+			if (lines.response.status === 403) return [];
+			if (lines.data && index.data) return toRunOutputLines(lines.data, index.data);
 			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output', { params: { path: runPath(scope, runId) } });
 			if (response.status === 401) onUnauthorized();
-			if (response.status === 403) outputRefused.add(refusal);
 			if (response.status === 403) return [];
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toRunOutput(data);
+		},
+		async followRunOutput(scope: Scope, runId: string, after: number | null): Promise<RunOutputFollow | null> {
+			const refusal = `${scope.locationId}|${runId}`;
+			if (!evidenceLocations.has(scope.locationId) || outputRefused.has(refusal)) return { lines: [], logs: [], last: 0, replaced: true };
+			const lines = (query: { from?: number; tail?: boolean }) =>
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/lines', { params: { path: runPath(scope, runId), query: { ...query, limit: LIVE_OUTPUT_ROWS } } });
+			// The index (each node's totals and its `ctx.log` lines) once, beside the lines since the last read.
+			const [index, page] = await Promise.all([
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index', { params: { path: runPath(scope, runId) } }),
+				lines(after == null ? { tail: true } : { from: after + 1 })
+			]);
+			if (page.response.status === 401) onUnauthorized();
+			if (page.response.status === 403) outputRefused.add(refusal);
+			if (page.response.status === 403) return { lines: [], logs: [], last: 0, replaced: true };
+			// A server that keeps no output store: the caller reads Recall's output instead.
+			if (!page.data || !index.data) return null;
+			// Too many new lines to read on from the last: start again from the newest.
+			const fresh = after != null && page.data.next != null ? (await lines({ tail: true })).data : null;
+			return followedOutput(fresh ?? page.data, index.data, runId, after == null || fresh != null);
+		},
+		async getNodeOutputIndex(scope: Scope, runId: string, nodeKey: string): Promise<NodeOutputIndex | null> {
+			if (!evidenceLocations.has(scope.locationId)) return null;
+			const [{ data, error, response }, nodes] = await Promise.all([
+				http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index', { params: { path: runPath(scope, runId), query: { node: nodeKey } } }),
+				runNodes(scope, runId)
+			]);
+			if (response.status === 401) onUnauthorized();
+			if (response.status === 403 || response.status === 503) return null;
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toNodeOutputIndex(data, nodeKey, outputLive(nodes.map((n) => ({ nodeKey: n.node_key, status: n.status as RunNode['status'] })), nodeKey));
+		},
+		async getNodeOutputPage(scope: Scope, runId: string, nodeKey: string, at: NodeOutputAt): Promise<NodeOutputPage> {
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/lines', {
+				params: { path: runPath(scope, runId), query: pageQuery(nodeKey, at) }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toNodeOutputPage(data);
+		},
+		async searchNodeOutput(scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward', signal?: AbortSignal): Promise<NodeOutputSearch> {
+			// A large output is searched a bounded part at a time: carry on from where each part stopped,
+			// for a few parts, then hand back where to search on. A newer search aborts this one.
+			const searchFrom = async (start: number): Promise<Wire['OutputSearch']> => {
+				const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/search', {
+					params: { path: runPath(scope, runId), query: { node: nodeKey, text: query, from: start, direction } },
+					signal
+				});
+				if (response.status === 401) onUnauthorized();
+				if (!data) throw new ApiError(errorText(error, response), response.status);
+				return data;
+			};
+			let found: Wire['OutputSearch'] = await searchFrom(from);
+			for (let part = 1; part < SEARCH_PARTS && found.line == null && found.continue_from != null; part++) found = await searchFrom(found.continue_from);
+			return { line: found.line ?? null, count: found.count ?? null, rank: found.rank ?? null, continueFrom: found.line == null ? (found.continue_from ?? null) : null };
+		},
+		nodeOutputDownloadUrl(scope: Scope, runId: string, nodeKey: string): string {
+			const { location_id, target, run_id } = runPath(scope, runId);
+			const path = `/api/control/locations/${encodeURIComponent(location_id)}/targets/${encodeURIComponent(target)}/runs/${encodeURIComponent(run_id)}/output/download`;
+			return `${baseUrl}${path}?node=${encodeURIComponent(nodeKey)}`;
 		},
 		async getRunNodeError(scope: Scope, runId: string, nodeKey: string): Promise<RunNodeError> {
 			const refusal = `${scope.locationId}|${runId}|${nodeKey}`;
@@ -684,6 +760,28 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 		},
+		/** Asks the location to publish again, then long-polls until it has or the request expires. */
+		async republish(scope: Scope): Promise<RepublishResult> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const path = { location_id: locationId, target };
+			const requestId = newRequestId();
+			const asked = await http.POST('/api/control/locations/{location_id}/targets/{target}/republish', {
+				body: { request_id: requestId, reason: 'Requested from the web UI' },
+				params: { path, query: { wait: REPUBLISH_WAIT_SECONDS }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (asked.response.status === 401) onUnauthorized();
+			if (!asked.data) throw new ApiError(errorText(asked.error, asked.response), asked.response.status);
+			let status = asked.data;
+			while (status.state === 'pending') {
+				const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/republish/{request_id}', {
+					params: { path: { ...path, request_id: requestId }, query: { wait: REPUBLISH_WAIT_SECONDS } }
+				});
+				if (response.status === 401) onUnauthorized();
+				if (!data) throw new ApiError(errorText(error, response), response.status);
+				status = data;
+			}
+			return { state: status.state, generation: status.generation ?? null, error: status.error ?? null };
+		},
 		/** Asks the location to connect, then waits for its answer until the request expires. */
 		async testConnection(scope: Scope): Promise<ConnectionTest> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
@@ -796,8 +894,10 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			return role ? roleDetailOf(role, assignments, locationId) : null;
 		},
 		async listRoleAssignments(): Promise<RoleAssignment[]> {
-			// Group members come from the people read; without it, SSO-derived roles stay unlisted.
-			return toRoleAssignments(await roleHoldings(), await people().catch(() => []));
+			// Group members come from the people read; without it, SSO-derived roles stay unlisted, and without
+			// the service account read its holders read as people.
+			const [holdings, members, services] = await Promise.all([roleHoldings(), people().catch(() => []), serviceAccounts().catch(() => [])]);
+			return toRoleAssignments(holdings, members, new Set(services.map((s) => s.name)));
 		},
 		async createRoleAssignment(request: RoleAssignmentRequest): Promise<RoleAssignment> {
 			const person = await personNamed(request.principal);
@@ -826,6 +926,51 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return toAccount(await personNamed(request.name));
+		},
+		listServiceAccounts: async (): Promise<ServiceAccount[]> => (await serviceAccounts()).map(toServiceAccount),
+		async createServiceAccount(request: NewServiceAccount): Promise<IssuedToken<ServiceAccount>> {
+			const { data, error, response } = await http.POST('/api/admin/service-accounts', {
+				body: { name: request.name, description: request.description, role: request.role },
+				params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toIssuedKey(data);
+		},
+		async rotateServiceAccountKey(name: string, rotation: KeyRotation): Promise<IssuedToken<ServiceAccount>> {
+			const { data, error, response } = await http.POST('/api/admin/service-accounts/{principal_id}/keys', {
+				body: { overlap_minutes: rotation.overlapMinutes },
+				params: { path: { principal_id: await serviceAccountId(name) }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toIssuedKey(data);
+		},
+		async revokeServiceAccountKey(name: string, keyId: string): Promise<ServiceAccount> {
+			const { data, error, response } = await http.POST('/api/admin/service-accounts/{principal_id}/keys/{key_id}/revoke', {
+				params: { path: { principal_id: await serviceAccountId(name), key_id: keyId }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toServiceAccount(data);
+		},
+		async setServiceAccountDisabled(name: string, disabled: boolean): Promise<ServiceAccount> {
+			const { data, error, response } = await http.POST('/api/admin/service-accounts/{principal_id}/disabled', {
+				body: { disabled },
+				params: { path: { principal_id: await serviceAccountId(name) }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toServiceAccount(data);
+		},
+		async setServiceAccountRole(name: string, role: BuiltInRole): Promise<ServiceAccount> {
+			const { data, error, response } = await http.POST('/api/admin/service-accounts/{principal_id}/role', {
+				body: { role },
+				params: { path: { principal_id: await serviceAccountId(name) }, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toServiceAccount(data);
 		},
 		async getColumnLineage(scope: Scope, ref: string, listing?: CatalogNode[]): Promise<ColumnLineage | null> {
 			const nodes = listing ?? (await listingWithStates(scope));
@@ -1146,6 +1291,20 @@ export function createHttpClient({ baseUrl = '', onUnauthorized, fetch: answer, 
 		return toAccount(await personNamed(name));
 	}
 
+	async function serviceAccounts() {
+		const { data, error, response } = await http.GET('/api/admin/service-accounts');
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	/** The server numbers service accounts; the UI names them, as it does people. */
+	async function serviceAccountId(name: string): Promise<string> {
+		const account = (await serviceAccounts()).find((a) => a.name === name);
+		if (!account) throw new ApiError(`No service account named ${name}`, 404);
+		return account.principal_id;
+	}
+
 	async function people() {
 		const { data, error, response } = await http.GET('/api/admin/people');
 		if (response.status === 401) onUnauthorized();
@@ -1382,6 +1541,13 @@ export async function loginWithPassword(username: string, password: string, base
 	if (response.ok) return 'ok';
 	if (response.status === 429) return 'throttled';
 	return response.status === 401 ? 'rejected' : 'unavailable';
+}
+
+/** Whether the server takes only service account keys, so the sign-in page offers no password. */
+export async function keysOnly(baseUrl = ''): Promise<boolean> {
+	const http = createFetch<paths>({ baseUrl, credentials: 'same-origin' });
+	const { data } = await http.GET('/api/auth/login-mode');
+	return data?.login_mode === 'keys';
 }
 
 export async function logout(baseUrl = ''): Promise<void> {

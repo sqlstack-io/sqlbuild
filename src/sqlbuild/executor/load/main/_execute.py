@@ -169,6 +169,7 @@ def _execute_source_load(
                     connection=connection,
                     staging=staging,
                     statement_recorder=statement_recorder,
+                    on_rows_written=runtime.on_rows_written,
                 )
             adapter = _apply_source_write_strategy(
                 adapter=adapter,
@@ -219,6 +220,7 @@ def _execute_source_load(
         resource_kind=resource_kind,
         staging_relation=staging,
         rows_loaded=rows_loaded,
+        rows_affected=rows_loaded,
         duration_ms=int((time.monotonic() - start) * 1000),
         lifecycle_events=statement_recorder.snapshot(),
     )

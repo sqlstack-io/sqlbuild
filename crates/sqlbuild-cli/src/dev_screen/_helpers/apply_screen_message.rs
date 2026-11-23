@@ -6,8 +6,8 @@ use sqlbuild_core::screen_text::models::PhaseState;
 
 use crate::dev_screen::_helpers::lines::{compose, ready_lines};
 use crate::dev_screen::_helpers::transitions::{
-    child_event, client_text, key_pressed, logged, run_cancelling, run_reported, service_stopped,
-    step_failed, step_finished, step_started, warehouse_settled,
+    child_event, client_text, exposed, key_pressed, logged, run_cancelling, run_reported,
+    service_stopped, step_failed, step_finished, step_started, warehouse_settled,
 };
 use crate::dev_screen::models::{DevScreen, ScreenAction, ScreenMessage, ScreenOutput};
 
@@ -31,6 +31,7 @@ pub(crate) fn apply_screen_message(
         } => step_failed(screen, (step, detail, problem), now),
         ScreenMessage::Child(event) => child_event(screen, event, now, clock),
         ScreenMessage::Location(location) => (DevScreen { location, ..screen }, Vec::new()),
+        ScreenMessage::Exposed(who) => exposed(screen, who),
         ScreenMessage::Triggers(triggers) => (DevScreen { triggers, ..screen }, Vec::new()),
         ScreenMessage::Warehouse { adapter, state } => {
             warehouse_settled(screen, (adapter, state), now, clock)

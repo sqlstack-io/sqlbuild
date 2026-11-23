@@ -1,6 +1,6 @@
 //! Authenticate machine bearers before buffering; scope checks stay in each owning endpoint.
 
-use std::net::SocketAddr;
+use std::sync::Arc;
 
 use axum::extract::{Request, State};
 use axum::http::{HeaderMap, StatusCode, header};
@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::api::_helpers::authentication::password_transport::private_cache_control;
 use crate::api::errors::ApiError;
-use crate::api::models::{DevelopmentScope, ReadResource};
+use crate::api::models::{DevelopmentAuthorities, DevelopmentScope, ReadResource};
 use crate::credentials::main::tokens::authenticate_token::authenticate_token;
 use crate::credentials::models::{CredentialScope, TokenIdentity};
 use crate::store::main::{begin::begin, commit::commit, query::query};
@@ -64,21 +64,24 @@ fn unauthorized() -> ApiError {
 
 /// Reject browser cross-origin and DNS-rebinding requests on the disabled-auth listener.
 pub(crate) async fn local_request(
-    State(address): State<SocketAddr>,
+    State(accepted): State<Arc<DevelopmentAuthorities>>,
     request: Request,
     next: Next,
 ) -> Result<Response, ApiError> {
-    let authorities = [address.to_string(), format!("localhost:{}", address.port())];
     let valid_host = request.headers().get(header::HOST).is_some_and(|value| {
-        value
-            .to_str()
-            .is_ok_and(|host| authorities.iter().any(|allowed| host == allowed))
+        value.to_str().is_ok_and(|host| {
+            accepted
+                .hosts
+                .iter()
+                .any(|allowed| host.eq_ignore_ascii_case(allowed))
+        })
     });
     let valid_origin = request.headers().get(header::ORIGIN).is_none_or(|value| {
         value.to_str().is_ok_and(|origin| {
-            authorities
+            accepted
+                .origins
                 .iter()
-                .any(|host| origin == format!("http://{host}"))
+                .any(|allowed| origin.eq_ignore_ascii_case(allowed))
         })
     });
     if !valid_host || !valid_origin {

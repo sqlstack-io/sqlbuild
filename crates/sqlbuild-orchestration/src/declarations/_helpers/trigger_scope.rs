@@ -1,4 +1,4 @@
-//! A trigger override's permission scope is every node a schedule's job or group writes, or every node of a sensor's target.
+//! A trigger override's permission scope is every node a schedule's job or group writes, or every node of the target for a sensor, and to pause or resume a schedule whose job can't be read.
 
 use std::collections::BTreeSet;
 
@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::authorization::main::decisions::refuse_unknown::refuse_unknown;
 use crate::credentials::models::{Action, AuditContext, PermissionScope};
-use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
+use crate::declarations::models::{JobDefinition, TriggerChange, TriggerChangeRequest};
 use crate::runs::main::requests::frozen_job_request::frozen_job_request;
 use crate::runs::models::JobRunRequest;
 use crate::snapshots::main::write_sets::job_write_set::job_write_set;
@@ -29,7 +29,10 @@ pub(crate) async fn trigger_scope(
         | TriggerChange::SkipEvent { .. } => Action::SensorResetCursor,
     };
     let (transaction, rows) = query(transaction,
-        "SELECT location_id,target,job_key FROM sqb_triggers WHERE trigger_id=$1 AND removed_in_snapshot_id IS NULL",
+        "SELECT t.location_id,t.target,t.job_key,j.definition_json AS job_definition FROM sqb_triggers t \
+         LEFT JOIN sqb_current_snapshots c ON c.location_id=t.location_id AND c.target=t.target \
+         LEFT JOIN sqb_jobs j ON j.location_id=t.location_id AND j.target=t.target AND j.job_key=t.job_key AND j.snapshot_id=c.snapshot_id \
+         WHERE t.trigger_id=$1 AND t.removed_in_snapshot_id IS NULL",
         vec![Parameter::Id(request.trigger_id)]).await?;
     let Some(row) = rows.first() else {
         return refuse_unknown(
@@ -43,7 +46,10 @@ pub(crate) async fn trigger_scope(
     let location_id: Uuid = serde_json::from_value(row["location_id"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let target: String = row["target"].as_str().unwrap_or_default().into();
-    let Some(job_key) = row["job_key"].as_str() else {
+    let without_job: bool = matches!(request.change, TriggerChange::Enable | TriggerChange::Pause)
+        && !row["job_definition"].is_null()
+        && serde_json::from_value::<JobDefinition>(row["job_definition"].clone()).is_err();
+    let Some(job_key) = row["job_key"].as_str().filter(|_| !without_job) else {
         let (transaction, nodes) = target_nodes(transaction, (location_id, &target)).await?;
         return Ok((
             transaction,
@@ -85,7 +91,7 @@ pub(crate) async fn trigger_scope(
     ))
 }
 
-/// Every node the target's current snapshot publishes: a sensor may start any of its jobs.
+/// Every node the target's current snapshot publishes: a sensor may start any of its jobs, and a job that can't be read may write any of its nodes.
 async fn target_nodes(
     transaction: ControlTransaction,
     (location_id, target): (Uuid, &str),

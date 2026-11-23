@@ -114,6 +114,7 @@ pub(crate) fn request(
         job_settings: BTreeMap::new(),
         retry: None,
         member_attempt: None,
+        chain_run_id: None,
     }
 }
 

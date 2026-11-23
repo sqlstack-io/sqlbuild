@@ -520,7 +520,7 @@ def test_given_ready_python_node_when_executing_then_uses_existing_run_state(
             result_store=result_store,
         ),
     )
-    run_state.record_result(node_function=task_node.function, result=task_result)
+    run_state.record_result(result=task_result)
     asset_result: PythonNodeExecutionResult = execute_ready_python_node(
         node=asset_node,
         upstream_results=(task_result,),

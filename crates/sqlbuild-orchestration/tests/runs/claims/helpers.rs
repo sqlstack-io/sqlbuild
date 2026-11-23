@@ -149,6 +149,8 @@ async fn finish_reporting(
                 node_key: node.clone(),
                 outcome: node_outcome,
                 rows_affected: Some(1),
+                table_rows: None,
+                no_change_reason: None,
                 error_code: None,
                 skipped_because_of: None,
                 error_message: None,

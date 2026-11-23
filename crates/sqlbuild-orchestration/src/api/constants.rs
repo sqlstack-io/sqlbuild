@@ -61,6 +61,10 @@ pub(crate) const DOCKER_IMAGE_HEX_LENGTH: usize = 64;
 pub(crate) const HTTPS_SCHEME: &str = "https";
 pub(crate) const HTTP_SCHEME: &str = "http";
 pub(crate) const LOOPBACK_HOST: &str = "localhost";
+/// The port a browser leaves out of an HTTP authority.
+pub(crate) const HTTP_PORT: u16 = 80;
+/// The port a browser leaves out of an HTTPS authority.
+pub(crate) const HTTPS_PORT: u16 = 443;
 pub(crate) const ROOT_PATH: &str = "/";
 pub(crate) const UI_INDEX_PATH: &str = "/index.html";
 pub(crate) const UI_IMMUTABLE_PREFIX: &str = "/_app/immutable/";

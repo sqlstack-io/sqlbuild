@@ -8,7 +8,7 @@ export type SignOut = { kind: 'session' } | { kind: 'link'; href: string } | nul
  * sign-out. Local development has no sign-in.
  */
 export function signOutFor(bootstrap: Pick<Bootstrap, 'authMode' | 'logoutUrl'> | null): SignOut {
-	if (!bootstrap || bootstrap.authMode === 'disabled') return null;
+	if (!bootstrap || bootstrap.authMode === 'disabled' || bootstrap.authMode === 'keys') return null;
 	if (bootstrap.authMode !== 'trusted_proxy') return { kind: 'session' };
 	return bootstrap.logoutUrl ? { kind: 'link', href: bootstrap.logoutUrl } : null;
 }

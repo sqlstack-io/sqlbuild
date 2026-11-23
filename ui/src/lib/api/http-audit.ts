@@ -44,6 +44,7 @@ function allowedSummary(action: string, after: Record<string, unknown>): string 
 		const work = fieldsOf(after.work);
 		const kind = textOf(work.kind) ?? '';
 		if (kind === 'plan' && Array.isArray(work.command)) return `Plan sqb ${work.command.join(' ')}`;
+		if (kind === 'republish') return `Republish requested by ${textOf(work.requested_by) ?? 'unknown'}: ${textOf(after.reason) ?? ''}`;
 		return WORK[kind] ?? kind;
 	}
 	const run = textOf(after.run_id);
@@ -59,7 +60,7 @@ export function toAuditEntry(wire: Wire['SecurityAuditEvent']): AuditEntry {
 	return {
 		id: wire.event_id,
 		at: wire.occurred_at,
-		actor: { kind: wire.actor_name ? 'user' : 'system', name, displayName: name },
+		actor: { kind: wire.actor_kind === 'service' ? 'service' : wire.actor_name ? 'user' : 'system', name, displayName: name },
 		action: denied ? (textOf(scope.action) ?? DENIED) : wire.action,
 		outcome: denied ? 'denied' : 'allowed',
 		scope: scopeOf(scope),

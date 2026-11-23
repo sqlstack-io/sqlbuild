@@ -1423,6 +1423,15 @@ class SnowflakeAdapter(
         statement_recorder.record(statement)
         self.execute(connection=connection, sql=statement)
 
+    def rebuilt_table_row_count(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> int | None:
+        """Snowflake's metadata row count of a standard table is exact."""
+
+        return self.estimate_relation_row_count(
+            connection=connection, database=database, schema=schema, name=name, metadata_only=True
+        ).row_count
+
     def create_table_as_replaces(self) -> bool:
         return True
 

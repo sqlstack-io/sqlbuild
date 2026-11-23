@@ -9,22 +9,38 @@ use uuid::Uuid;
 
 use crate::test_types::TestControl;
 
+/// The JSON result, asserting that `--json` prints nothing else.
 pub(crate) fn administer(control: &TestControl, arguments: &[&str]) -> Value {
-    let output = invoke_admin(control, arguments);
+    let output = invoke_admin(control, &[arguments, &["--json"]].concat());
     assert!(
         output.status.success(),
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert_eq!(
-        String::from_utf8_lossy(&output.stderr),
-        "Opening control store...\nControl store ready\nControl administration completed successfully\n"
-    );
+    assert_eq!(without_opening_notice(&output), "");
     serde_json::from_slice(&output.stdout).expect("JSON-only admin stdout")
+}
+
+/// Stderr less the notice a slow open adds, which a loaded machine can cause.
+pub(crate) fn without_opening_notice(output: &Output) -> String {
+    String::from_utf8_lossy(&output.stderr)
+        .replace("Opening control store...\nControl store ready\n", "")
 }
 
 pub(crate) fn invoke_admin(control: &TestControl, arguments: &[&str]) -> Output {
     admin_command(control, arguments)
+        .output()
+        .expect("native administration process")
+}
+
+/// `invoke_admin` with one more environment variable, such as the one `--key-from-env` names.
+pub(crate) fn invoke_admin_with(
+    control: &TestControl,
+    arguments: &[&str],
+    (name, value): (&str, &str),
+) -> Output {
+    admin_command(control, arguments)
+        .env(name, value)
         .output()
         .expect("native administration process")
 }
@@ -46,7 +62,7 @@ fn admin_command(control: &TestControl, arguments: &[&str]) -> Command {
 }
 
 pub(crate) fn invoke_password(control: &TestControl, principal: &str, input: &[u8]) -> Output {
-    let mut child = admin_command(control, &["set-password", principal])
+    let mut child = admin_command(control, &["set-password", principal, "--json"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -114,4 +130,20 @@ pub(crate) fn audit_actions(control: &TestControl, bearer: &str) -> Vec<String> 
         .expect("read audit")
         .collect::<Result<_, _>>()
         .expect("decode audit")
+}
+
+/// The status of reading the bootstrap with `key` from an address the server doesn't name.
+pub(crate) async fn keyed_bootstrap_status(url: &str, key: &str) -> u16 {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .expect("HTTP client")
+        .get(format!("{url}/api/control/bootstrap"))
+        .header(reqwest::header::HOST, "10.20.30.40:8000")
+        .bearer_auth(key)
+        .send()
+        .await
+        .expect("keyed request")
+        .status()
+        .as_u16()
 }

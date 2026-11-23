@@ -4,7 +4,12 @@
 	import { to } from '$lib/paths';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
+	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import GatedButton from '$lib/components/platform/gated-button.svelte';
+	import ConfirmDialog from '$lib/components/platform/confirm-dialog.svelte';
+	import MenuSelect from '$lib/components/platform/menu-select.svelte';
+	import { buttonVariants } from '$lib/components/ui/button/button.svelte';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import type { Principal, RoleAssignment, RoleDefinition } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { lockedHint, rankAssignments, roleHref, roleSummary, scopeWords } from '$lib/platform/access';
@@ -43,6 +48,8 @@
 		if (!lists.length) return [];
 		return lists[0].filter((r) => r.source === 'built_in' && lists.every((l) => l.some((x) => x.name === r.name)));
 	});
+	const whereOptions = $derived([{ value: '', label: 'Every location' }, ...locations.map((l) => ({ value: l.id, label: l.name }))]);
+	const roleOptions = $derived([{ value: '', label: 'Role…', disabled: true }, ...choices.map((r) => ({ value: r.name, label: r.name, hint: roleSummary(r) }))]);
 	const roleOf = (name: string) => allRoles.find((r) => r.name === name);
 	// A role picked for another place may not be on offer here.
 	$effect(() => {
@@ -69,20 +76,27 @@
 		if (ok) newRole = '';
 	}
 
-	function remove(a: RoleAssignment) {
+	/** The assignment whose removal waits for its confirmation. */
+	let removing = $state<RoleAssignment | null>(null);
+	function removal(a: RoleAssignment) {
 		const where = scopeWords(a.scope.locationId, locations);
-		const message = isOwnLastAdmin(a)
-			? `This is YOUR LAST ADMIN ROLE.\n\nRemoving it would immediately take away your access to people, roles, tokens, locations and the audit log, and nobody could undo it from this account. The server refuses this change; another admin has to make it.\n\nSend the request anyway?`
-			: `Remove ${a.role} from ${principal.displayName} in ${where}?`;
-		if (!confirm(message)) return;
-		void act(a.id, () => app.client.deleteRoleAssignment(a.id));
+		return isOwnLastAdmin(a)
+			? {
+					title: 'Remove your last admin role?',
+					body: 'This is your last admin role. Removing it would immediately take away your access to people, roles, tokens, locations and the audit log, and nobody could undo it from this account. The server refuses this change; another admin has to make it. Send the request anyway?'
+				}
+			: { title: `Remove ${a.role}?`, body: `${principal.displayName} loses ${a.role} in ${where}.` };
+	}
+	async function remove(a: RoleAssignment) {
+		await app.client.deleteRoleAssignment(a.id);
+		onchange();
 	}
 	const tableColumns: TableColumn[] = [
 		{ id: 'role', label: 'Role', minWidth: 220, truncate: false },
 		{ id: 'where', label: 'Where', width: '160px' },
 		{ id: 'from', label: 'From', width: '170px' },
 		{ id: 'since', label: 'Since', width: '140px' },
-		{ id: 'action', label: '', width: '170px', align: 'right' }
+		{ id: 'action', label: '', width: '150px', align: 'right' }
 	];
 </script>
 
@@ -106,7 +120,14 @@
 					</td>
 					<td class="num">
 						{#if a.source === 'manual'}
-							<GatedButton requires="role.assign" size="sm" variant="destructive" busy={busy === a.id} onclick={() => remove(a)}>Remove</GatedButton>
+							{#if app.can('role.assign')}
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })} aria-label="Actions for {a.role} in {scopeWords(a.scope.locationId, locations)}" data-testid="assignment-menu"><EllipsisIcon size={14} /></DropdownMenu.Trigger>
+									<DropdownMenu.Content align="end" class="w-36">
+										<DropdownMenu.Item variant="destructive" onSelect={() => (removing = a)}>Remove…</DropdownMenu.Item>
+									</DropdownMenu.Content>
+								</DropdownMenu.Root>
+							{/if}
 						{:else if a.source === 'sso'}
 							<a class="locked" href={to(`/admin/roles?tab=sso`)} title={hint}>See SSO mapping</a>
 						{:else}
@@ -119,19 +140,18 @@
 
 	{#if app.can('role.assign')}
 		<div class="add">
-			<select class="field" bind:value={newLocation} aria-label="Where">
-				<option value="">Every location</option>
-				{#each locations as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
-			</select>
-			<select class="field" bind:value={newRole} aria-label="Role">
-				<option value="">Role…</option>
-				{#each choices as r (r.name)}<option value={r.name}>{r.name} · {roleSummary(r)}</option>{/each}
-			</select>
+			<MenuSelect value={newLocation} options={whereOptions} onchange={(v) => (newLocation = v)} label="Where" testid="assignment-where" />
+			<MenuSelect value={newRole} options={roleOptions} onchange={(v) => (newRole = v)} label="Role" testid="assignment-role" />
 			<GatedButton requires="role.assign" variant="default" busy={busy === 'add'} disabled={!newRole} title="Pick a role" onclick={add}>Give role</GatedButton>
 		</div>
 	{/if}
 	{#if error}<p class="err">{error}</p>{/if}
 </div>
+{#if removing}
+	{@const question = removal(removing)}
+	{@const target = removing}
+	<ConfirmDialog open title={question.title} body={question.body} confirm="Remove" destructive onconfirm={() => remove(target)} onclose={() => (removing = null)} />
+{/if}
 
 <style>
 	.warn {
@@ -153,15 +173,6 @@
 		align-items: center;
 		gap: 8px;
 		padding: 12px 0 0;
-	}
-	.field {
-		height: 30px;
-		padding: 0 8px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		background: var(--background);
-		color: var(--foreground);
-		font-size: 12.5px;
 	}
 	.err {
 		margin-top: 8px;

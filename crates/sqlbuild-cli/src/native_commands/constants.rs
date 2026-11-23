@@ -87,6 +87,18 @@ pub(crate) const SCHEDULER_COMMAND: &str = "scheduler";
 
 pub(crate) const ADMIN_COMMAND: &str = "admin";
 
+/// How long `sqb admin` opens its store in silence; a migration or a busy store takes longer.
+pub(crate) const ADMIN_OPEN_NOTICE: std::time::Duration = std::time::Duration::from_secs(1);
+/// Printed when opening the control store starts.
+pub(crate) const OPENING_STORE: &str = "Opening control store...\n";
+/// Printed when the control store is open.
+pub(crate) const STORE_READY: &str = "Control store ready\n";
+/// An admin command committed, and its result didn't reach stdout.
+pub(crate) const ADMIN_DELIVERY_FAILED: &str =
+    "Control administration result delivery failed; changes may already be committed\n";
+/// How a table shows a value that is absent.
+pub(crate) const NO_VALUE: &str = "-";
+
 pub(crate) const RULES_COMMAND: &str = "rules";
 
 pub(crate) const RULES_LIST_ACTION: &str = "list";
@@ -250,3 +262,13 @@ pub(crate) const SENSOR_COMMAND: &str = "sensor";
 pub(crate) const SENSOR_USAGE_EXIT: i32 = 2;
 /// Exit status when the function failed, timed out, or there was nothing to call it with.
 pub(crate) const SENSOR_FAILED_EXIT: i32 = 1;
+
+/// The environment variable `sqb location republish` reads an API key from; never an argument.
+pub(crate) const API_KEY_VARIABLE: &str = "SQLBUILD_API_KEY";
+/// How long one `--wait` poll holds its response open, inside both clients' request timeouts.
+pub(crate) const REPUBLISH_POLL_SECONDS: u64 = 10;
+/// How long `sqb location republish --wait` waits unless told otherwise.
+pub(crate) const REPUBLISH_TIMEOUT_SECONDS: u64 = 600;
+
+/// How `sqb dev` hands its location the resolved folder of run output, which the watch leaves out.
+pub(crate) const DEVELOPMENT_OUTPUT_FOLDER: &str = "SQLBUILD_DEVELOPMENT_OUTPUT_FOLDER";

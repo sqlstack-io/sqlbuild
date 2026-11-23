@@ -593,6 +593,11 @@ rule = 3
 note = "Public facade: re-exports plus one-line delegating wrappers (asset, get_asset_definition)."
 
 [[stays]]
+path = "discovery.py"
+rule = 3
+note = "Public facade: re-exports plus one-line delegating wrappers (discover, get_discover_definition)."
+
+[[stays]]
 path = "audits.py"
 rule = 3
 note = "Public facade: re-exports only."

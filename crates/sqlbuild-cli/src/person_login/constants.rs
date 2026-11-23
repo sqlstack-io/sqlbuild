@@ -11,3 +11,6 @@ pub(super) const CONTROL_LOCATION_ENV: &str = "SQLBUILD_CONTROL_LOCATION";
 pub(super) const CONTROL_CA_CERT_ENV: &str = "SQLBUILD_CONTROL_CA_CERT";
 /// A post-build sync request gives up after this long so the build's exit is never held.
 pub(super) const BUILD_SYNC_SECONDS: u64 = 5;
+
+/// The login mode a server without sign-in for people reports.
+pub(super) const KEYS_ONLY_MODE: &str = "keys";

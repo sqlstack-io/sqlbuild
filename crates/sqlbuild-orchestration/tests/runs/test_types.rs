@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use uuid::Uuid;
 
 use crate::credentials::models::BuiltinRole;
-use crate::runs::models::{RerunRequest, RunOrigin, RunStatus};
+use crate::runs::models::{NodeOutcome, RerunRequest, RunOrigin, RunOutcome, RunStatus};
 
 pub(crate) use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_test_types::Backend;
@@ -443,6 +443,8 @@ pub(crate) struct GroupDependencyTestCase {
 }
 
 pub(crate) struct GroupMemberRetryTestCase {
+    /// How the member's node ended the attempt that retries.
+    pub(crate) first_outcome: crate::runs::models::NodeOutcome,
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     /// The failing member's `retry_delay_seconds`.
@@ -561,7 +563,12 @@ pub(crate) struct NodeEventResourcesTestCase {
     pub(crate) backend: Backend,
     /// Each node and check event's type, resource kind and resource name, in the order they happened.
     pub(crate) expected_named: [(&'static str, &'static str, &'static str); 4],
+    /// The check result's name, check ID, result ID and rows found, as the run's events report them.
+    pub(crate) expected_check: CheckFields,
 }
+
+/// A check result's name, check ID, result ID and rows found.
+pub(crate) type CheckFields = (Option<String>, Option<String>, Option<String>, Option<i64>);
 
 pub(crate) struct NodeOfTestCase {
     pub(crate) description: &'static str,
@@ -576,4 +583,46 @@ pub(crate) struct StoredRequestTestCase {
     pub(crate) backend: Backend,
     /// The source's claim, its retry's origin, its person rerun's status and the rerun's cancellation.
     pub(crate) expected_outcomes: (bool, RunOrigin, RunStatus, RunStatus),
+}
+
+/// One run node as the run's node list reads it back.
+pub(crate) type NodeResultRow = (
+    &'static str,
+    &'static str,
+    Option<&'static str>,
+    (Option<i64>, Option<i64>, Option<i64>),
+    Option<&'static str>,
+);
+
+pub(crate) struct NodeResultsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// Each node's key, status, materialization, (rows affected, table rows, rows so far) and why it changed nothing.
+    pub(crate) expected_nodes: &'static [NodeResultRow],
+    pub(crate) expected_not_run: i64,
+}
+
+/// What a run's node list tells each of its failed nodes about a missing secret.
+pub(crate) struct MissingSecretNodesTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_nodes: &'static [(&'static str, Option<&'static str>)],
+}
+
+pub(crate) struct LaunchEventTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) container_id: Option<&'static str>,
+    pub(crate) expected_message: &'static str,
+}
+
+pub(crate) struct CancelledRerunTestCase {
+    pub(crate) description: &'static str,
+    /// The outcomes of `customers`, `inventory` and `orders`, in that order.
+    pub(crate) outcomes: [NodeOutcome; 3],
+    pub(crate) run_outcome: RunOutcome,
+    /// How many times a person asked to cancel the run.
+    pub(crate) cancel_requests: usize,
+    pub(crate) expected_retried: Vec<&'static str>,
+    pub(crate) expected_rerun: Vec<&'static str>,
 }

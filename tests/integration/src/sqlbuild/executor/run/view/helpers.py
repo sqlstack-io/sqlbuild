@@ -47,7 +47,7 @@ def create_python_view_hook_data(ctx: HookContext, value: int) -> None:
     ctx.execute_sql(
         f"CREATE TABLE {ctx.destination.schema}.python_view_data AS SELECT {value} AS val"
     )
-    ctx.log(f"python view pre-hook created data for {ctx.model_name}")
+    ctx.log.info(f"python view pre-hook created data for {ctx.model_name}")
 
 
 def create_python_view_order_step(ctx: HookContext, source: str, target: str) -> None:

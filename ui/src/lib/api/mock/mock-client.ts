@@ -34,6 +34,10 @@ import type {
 	RunListQuery,
 	RunNodeError,
 	RunOutputLine,
+	NodeOutputIndex,
+	NodeOutputPage,
+	NodeOutputSearch,
+	CheckSample,
 	RunStatement,
 	RunCostRow,
 	IgnoredAuditFailure,
@@ -41,7 +45,7 @@ import type {
 	NodeBuildCost,
 	NodeState,
 	NodeStates,
-	Scope,
+	RepublishResult, Scope,
 	Snapshot,
 	SnapshotNode,
 	Timeline,
@@ -69,6 +73,8 @@ export type MockOptions = {
 	connection?: ConnectionState;
 	/** How people sign in (`?signin=password`); SSO by default. */
 	signIn?: AuthMode;
+	/** `none` starts with no service accounts (`?serviceaccounts=none`). */
+	serviceAccounts?: 'default' | 'none';
 };
 
 /** In-memory `ApiClient` with neutral example data. Mutations persist per page load. */
@@ -96,7 +102,8 @@ export class MockApiClient implements ApiClient {
 			latencyMs: options.latencyMs ?? 120,
 			connection: options.connection ?? 'live',
 			still: options.still ?? false,
-			signIn: options.signIn ?? 'oidc'
+			signIn: options.signIn ?? 'oidc',
+			serviceAccounts: options.serviceAccounts ?? 'default'
 		};
 		this.changes.setState(this.#options.connection);
 		this.#fixtures = createFixtures(this.#createdAt);
@@ -117,6 +124,7 @@ export class MockApiClient implements ApiClient {
 			serverVersion: '0.185.0',
 			authMode: this.#options.signIn,
 			user: DEMO_USER,
+			serviceAccounts: this.#options.serviceAccounts,
 			locations: this.#fixtures.locations,
 			changes: this.changes,
 			platformEvents: () => this.#platformEvents(),
@@ -300,6 +308,27 @@ export class MockApiClient implements ApiClient {
 		return this.#operate.listRunOutput(scope, runId);
 	}
 
+	// A node's bulk output, paged as the output store would serve it (prototype, CHI-1597).
+	async getNodeOutputIndex(scope: Scope, runId: string, nodeKey: string): Promise<NodeOutputIndex | null> {
+		this.#location(scope);
+		return this.#operate.getNodeOutputIndex(scope, runId, nodeKey);
+	}
+	async getNodeOutputPage(scope: Scope, runId: string, nodeKey: string, at: { from: number; rows: number; direction: 'forward' | 'backward'; collapse: boolean; stream?: 'all' | 'stdout' | 'stderr'; around?: number }): Promise<NodeOutputPage> {
+		this.#location(scope);
+		return this.#operate.getNodeOutputPage(scope, runId, nodeKey, at);
+	}
+	async searchNodeOutput(scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward'): Promise<NodeOutputSearch> {
+		this.#location(scope);
+		return this.#operate.searchNodeOutput(scope, runId, nodeKey, query, from, direction);
+	}
+	nodeOutputDownloadUrl(scope: Scope, runId: string, nodeKey: string): string {
+		return this.#operate.nodeOutputDownloadUrl(scope, runId, nodeKey);
+	}
+	async getCheckSample(scope: Scope, runId: string, statementId: string): Promise<CheckSample | null> {
+		this.#location(scope);
+		return this.#operate.getCheckSample(scope, runId, statementId);
+	}
+
 	async getRunNodeError(scope: Scope, runId: string, nodeKey: string): Promise<RunNodeError> {
 		const node = (await this.getRunDetail(scope, runId))?.nodes.find((n) => n.runId === runId && n.nodeKey === nodeKey);
 		if (!node) throw new ApiError('node not found in this run', 404);
@@ -478,6 +507,12 @@ export class MockApiClient implements ApiClient {
 		return this.#reply(undefined);
 	}
 
+	async republish(scope: Scope): Promise<RepublishResult> {
+		this.#require('location.republish');
+		this.#location(scope);
+		return this.#reply({ state: 'published', generation: null, error: null });
+	}
+
 	// ---- platform and admin: delegated to MockPlatformApi (mock/platform.ts) ----
 
 	platformHealth(...args: Parameters<PlatformApi['platformHealth']>) {
@@ -527,6 +562,24 @@ export class MockApiClient implements ApiClient {
 	}
 	createPasswordAccount(...args: Parameters<PlatformApi['createPasswordAccount']>) {
 		return this.#platform.createPasswordAccount(...args);
+	}
+	listServiceAccounts(...args: Parameters<PlatformApi['listServiceAccounts']>) {
+		return this.#platform.listServiceAccounts(...args);
+	}
+	createServiceAccount(...args: Parameters<PlatformApi['createServiceAccount']>) {
+		return this.#platform.createServiceAccount(...args);
+	}
+	rotateServiceAccountKey(...args: Parameters<PlatformApi['rotateServiceAccountKey']>) {
+		return this.#platform.rotateServiceAccountKey(...args);
+	}
+	revokeServiceAccountKey(...args: Parameters<PlatformApi['revokeServiceAccountKey']>) {
+		return this.#platform.revokeServiceAccountKey(...args);
+	}
+	setServiceAccountDisabled(...args: Parameters<PlatformApi['setServiceAccountDisabled']>) {
+		return this.#platform.setServiceAccountDisabled(...args);
+	}
+	setServiceAccountRole(...args: Parameters<PlatformApi['setServiceAccountRole']>) {
+		return this.#platform.setServiceAccountRole(...args);
 	}
 	listRoles(...args: Parameters<PlatformApi['listRoles']>) {
 		return this.#platform.listRoles(...args);

@@ -1,5 +1,9 @@
 //! Typed HTTP responses shared with the generated OpenAPI contract.
 
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+
 use serde::{Deserialize, Serialize};
 
 use crate::api::_helpers::authentication::password_sessions;
@@ -7,8 +11,8 @@ use crate::api::_helpers::authentication::{cli_login, oidc};
 use crate::api::_helpers::resources::{
     administrators, audit, changed_builds, changes, location_health, location_work,
     person_bootstrap, person_checks, person_location_work, person_maintenance, person_node_sql,
-    person_operations, person_plans, person_reads, person_selection, run_reads, runs, snapshots,
-    trigger_reads, warehouse_metadata,
+    person_operations, person_plans, person_reads, person_republish, person_selection, run_reads,
+    runs, service_accounts, snapshots, trigger_reads, warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
@@ -19,6 +23,13 @@ use crate::api::_helpers::resources::{
     administrators::holdings,
     administrators::definitions,
     administrators::server,
+    crate::api::_helpers::authentication::service_keys::keys_only_mode,
+    service_accounts::list,
+    service_accounts::create,
+    service_accounts::rotate,
+    service_accounts::revoke,
+    service_accounts::disable,
+    service_accounts::role,
     audit::read,
     person_operations::request_job,
     person_operations::request_adhoc,
@@ -43,6 +54,10 @@ use crate::api::_helpers::resources::{
     person_reads::node_costs,
     person_reads::run_statement_sql,
     person_reads::run_output,
+    person_reads::run_output_index,
+    person_reads::run_output_lines,
+    person_reads::run_output_search,
+    person_reads::run_output_download,
     person_reads::run_node_error,
     person_reads::jobs,
     person_reads::job,
@@ -71,6 +86,9 @@ use crate::api::_helpers::resources::{
     person_location_work::request,
     person_location_work::request_sync,
     person_location_work::result,
+    person_republish::request,
+    person_republish::read,
+    person_republish::discovered,
     person_plans::request,
     person_plans::read,
     person_plans::summary,
@@ -103,6 +121,7 @@ use crate::api::_helpers::resources::{
     runs::report,
     runs::heartbeat,
     runs::output,
+    runs::output_batch,
     runs::recall,
     run_reads::recent,
     run_reads::nodes,
@@ -137,6 +156,13 @@ pub(crate) struct RunsQuery {
 pub(crate) struct PlatformEventsQuery {
     pub(crate) before: Option<i64>,
     pub(crate) limit: Option<u32>,
+}
+
+/// How long a republish request or read waits for its result, in seconds.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RepublishWaitQuery {
+    pub(crate) wait: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -238,6 +264,14 @@ pub enum LoginMode {
     Oidc,
     /// `sqb dev` on loopback: no sign-in, every request acts as the local development person.
     Disabled,
+    /// No sign-in for people: only service account keys call the server.
+    Keys,
+}
+
+/// How a server without a session is signed in to, answered before sign-in only where people can't.
+#[derive(Clone, Copy, Debug, Serialize, utoipa::ToSchema)]
+pub struct LoginModeAnswer {
+    pub login_mode: LoginMode,
 }
 
 /// What the UI needs first: how people sign in, and what this person may see and do.
@@ -280,8 +314,19 @@ pub struct DevelopmentScope {
     pub location_id: uuid::Uuid,
     pub target: String,
     pub triggers: bool,
-    /// The local person every loopback request acts as.
+    /// The local person every accepted request acts as.
     pub principal_id: uuid::Uuid,
+    /// Names taken in `Host` and `Origin` besides the local ones, each `name` or `name:port`.
+    pub allowed_hosts: Vec<String>,
+    /// An explicit opt-in to serve without sign-in beyond loopback.
+    pub listens_beyond_loopback: bool,
+}
+
+/// What a development request's `Host` and `Origin` may say, in lower case.
+#[derive(Clone, Debug)]
+pub(crate) struct DevelopmentAuthorities {
+    pub(crate) hosts: Vec<String>,
+    pub(crate) origins: Vec<String>,
 }
 
 /// The one way people sign in to this server, if any.
@@ -664,6 +709,8 @@ pub struct ServerFacts {
     pub attention_snooze: crate::acknowledgements::models::AttentionSnooze,
     /// The address people reach the server at, which sensor events link runs under; `None` without a sign-in origin.
     pub origin: Option<String>,
+    /// Where run output is kept; `None` on a server that keeps none, which refuses output reads and batches.
+    pub output: Option<crate::run_output::models::OutputStore>,
 }
 
 /// The server's version, storage, sign-in and retention, for administrators.
@@ -695,3 +742,7 @@ pub struct ServerRetention {
     pub location_health_days: i64,
     pub sensor_evaluation_days: i64,
 }
+
+/// When each service key's refusal was last audited, kept per router so the throttle stays local.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct KeyRefusals(pub(crate) Arc<Mutex<HashMap<uuid::Uuid, Instant>>>);

@@ -42,6 +42,7 @@ own option. `--version` works only directly after `sqb`, as in `sqb --version`:
 | `--no-python` | Skip read-side Python assets (loader-side Python still runs for selected sources) |
 | `--no-sql-analysis` | Disable compile-time SQL analysis (`--no-sql-validation` is an alias) |
 | `--no-cache` | Bypass the reusable compile-analysis cache for this invocation |
+| `--discover` | Run the project's `@discover` functions with the target's providers for this command, instead of compiling each `for_each` asset as its placeholder; nothing is saved. See [Discovered nodes](/docs/concepts/python-nodes/discovered-nodes) |
 | `--full-refresh` | Drop and rebuild selected models unless a model sets `full_refresh false`; `full_refresh true` forces a model even without this flag |
 | `--no-job-settings` | Ignore the settings of the jobs the selection names; see [Settings when a build names a job](/docs/concepts/orchestration#settings-when-a-build-names-a-job) |
 | `--changed` | Build only the selected models and seeds that changed, and what they reach downstream; `--changed=definition,source_data` picks what counts. See [Building only what changed](#building-only-what-changed) |
@@ -241,6 +242,17 @@ individual warehouse statements and for steps inside a resource, such as `Create
 Without `--debug`, a statement that is still running after 30 seconds prints a `RUNNING` row every
 30 seconds, with its elapsed time and, when the warehouse reports one, its query ID. A failed
 statement or step still prints its `FAIL` row.
+
+When output isn't a terminal, as in CI logs or a worker's captured output, a node that runs for
+more than 30 seconds also brings one line naming the nodes still running, longest first, with the
+rows a loader or microbatch model has written so far where it reports them:
+
+```
+… still running (3)  stg_inventory 2m10s · stg_shipments 1m50s · raw_events 1m05s (48,210 rows)
+```
+
+It names up to three nodes and counts the rest as `+N more`. While nodes keep running it repeats
+after 1 minute, then 2 minutes, then every 5 minutes. A terminal shows its live view instead.
 
 ## Deferred builds
 

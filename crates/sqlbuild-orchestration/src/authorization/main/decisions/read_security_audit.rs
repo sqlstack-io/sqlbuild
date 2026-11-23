@@ -28,7 +28,10 @@ pub async fn read_security_audit(
     let (transaction, names) = principal_names(transaction).await?;
     commit(transaction).await?;
     for event in &mut events {
-        event.actor_name = names.get(&event.actor).cloned();
+        if let Some((name, kind)) = names.get(&event.actor) {
+            event.actor_name = Some(name.clone());
+            event.actor_kind = Some(*kind);
+        }
     }
     Ok(events)
 }

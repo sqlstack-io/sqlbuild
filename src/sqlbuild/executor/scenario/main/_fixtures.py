@@ -56,7 +56,7 @@ def execute_scenario_fixture(
             )
     except Exception as exc:
         statement_recorder.log(
-            "scenario fixture "
+            message="scenario fixture "
             f"{scenario_name}:{fixture_plan.kind.value}:{fixture_plan.logical_name} "
             f"failed error={exc}"
         )

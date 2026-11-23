@@ -4,10 +4,11 @@ use serde_json::{Value, json};
 use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use uuid::Uuid;
 
+use crate::platform::_helpers::location::republish_status::published_here;
 use crate::platform::_helpers::plans::plan_diffs::{
     split_plan_diffs, store_plan_diffs, valid_plan_diffs,
 };
-use crate::platform::constants::PLAN_DOCUMENT_BYTES;
+use crate::platform::constants::{MAX_PUBLISH_ERROR_CHARS, PLAN_DOCUMENT_BYTES};
 use crate::platform::main::installation::require_instance::require_instance;
 use crate::platform::main::work::read_location_work::read_location_work;
 use crate::platform::models::{LocationWork, LocationWorkOutcome, LocationWorkResult};
@@ -63,7 +64,9 @@ pub async fn complete_location_work(
     {
         return Err(ControlError::Fenced);
     }
-    let valid = valid_outcome(&stored.record.request_json.work, &result.outcome);
+    let (transaction, published) =
+        published_here(transaction, &stored.record.request_json, &result.outcome).await?;
+    let valid = published && valid_outcome(&stored.record.request_json.work, &result.outcome);
     if !valid {
         return Err(ControlError::Invalid(
             "location result does not match its work".into(),
@@ -78,9 +81,15 @@ pub async fn complete_location_work(
     Ok(true)
 }
 
-/// Warehouse text in a plan's error and warnings, and a sensor's traceback, is redacted before it is compared or stored.
+/// Warehouse text in a plan's error and warnings, a sensor's traceback and a publish error is redacted before it is compared or stored.
 fn redacted(result: &LocationWorkResult) -> LocationWorkResult {
     let mut result = result.clone();
+    if let LocationWorkOutcome::PublishFailed { error, .. } = &mut result.outcome {
+        *error = redact_error_text(error)
+            .chars()
+            .take(MAX_PUBLISH_ERROR_CHARS)
+            .collect();
+    }
     if let LocationWorkOutcome::SensorEvaluation {
         outcome: SensorFunctionOutcome::Failed { error },
     } = &mut result.outcome
@@ -110,7 +119,11 @@ fn valid_outcome(work: &LocationWork, outcome: &LocationWorkOutcome) -> bool {
     match (work, outcome) {
         (_, LocationWorkOutcome::Superseded {})
         | (LocationWork::CheckConnection {}, LocationWorkOutcome::Connection { .. })
-        | (LocationWork::SyncWarehouse {}, LocationWorkOutcome::SyncStarted {}) => true,
+        | (LocationWork::SyncWarehouse {}, LocationWorkOutcome::SyncStarted {})
+        | (LocationWork::Republish { .. }, LocationWorkOutcome::Published { .. }) => true,
+        (LocationWork::Republish { .. }, LocationWorkOutcome::PublishFailed { error, .. }) => {
+            !error.trim().is_empty()
+        }
         (LocationWork::Plan { .. }, LocationWorkOutcome::Plan { document, .. }) => {
             document
                 .as_object()

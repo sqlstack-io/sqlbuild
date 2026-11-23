@@ -1,8 +1,9 @@
-//! Control roles are served before Python/package discovery, including their JSON contract.
+//! Control roles are served before Python/package discovery, including what `sqb admin` prints.
 
 use sqlbuild_orchestration::api::main::openapi_document::openapi_document;
 
 use crate::argv::models::{Namespace, Stream};
+use crate::native_commands::_helpers::admin::delivery::deliver_admin_result;
 use crate::native_commands::_helpers::command::decision::{flag, text};
 use crate::native_commands::_helpers::command::store_migration::run_store_migration;
 use crate::native_commands::_helpers::command::terminal::{finish_lost_stdout, write_output};
@@ -53,28 +54,13 @@ pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
     let role = if admin { "administration" } else { "service" };
     let result = runtime.block_on(run_control_action(namespace, &command));
     Some(match result {
-        Ok(output) => {
-            let lost =
-                output.and_then(|value| write_output(&[(Stream::Stdout, &format!("{value}\n"))]));
-            if admin && lost.is_some() {
-                drop(write_output(&[(
-                    Stream::Stderr,
-                    &format!(
-                        "Control {role} JSON result delivery failed; changes may already be committed\n"
-                    ),
-                )]));
-                return Some(1);
-            }
-            let exit_code = finish_lost_stdout(lost.as_ref(), 0);
-            if exit_code == 0 {
-                let message = if admin {
-                    "Control administration completed successfully\n"
-                } else {
-                    "Control service stopped successfully\n"
-                };
-                drop(write_output(&[(Stream::Stderr, message)]));
-            }
-            exit_code
+        Ok(Some(done)) => deliver_admin_result(&done, flag(namespace, "json")),
+        Ok(None) => {
+            drop(write_output(&[(
+                Stream::Stderr,
+                "Control service stopped successfully\n",
+            )]));
+            0
         }
         Err(error) => {
             drop(write_output(&[(

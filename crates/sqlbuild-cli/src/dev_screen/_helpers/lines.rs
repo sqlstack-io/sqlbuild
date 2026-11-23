@@ -45,6 +45,13 @@ pub(crate) fn ready_lines(mut screen: DevScreen) -> (DevScreen, Vec<String>) {
     let parts: Vec<String> = warehouse_parts(&screen.adapter, &warehouse);
     if !screen.live {
         let mut lines: Vec<String> = vec![format!("\u{2713} ready  {}", screen.ui_url)];
+        if !screen.exposure.is_empty() {
+            lines.extend(render_labelled_parts(
+                "access   ",
+                std::slice::from_ref(&screen.exposure),
+                screen.facts.columns,
+            ));
+        }
         lines.extend(render_labelled_parts(
             "warehouse",
             &parts,
@@ -97,6 +104,14 @@ pub(crate) fn ready_lines(mut screen: DevScreen) -> (DevScreen, Vec<String>) {
             link: None,
         },
     ];
+    if !screen.exposure.is_empty() {
+        let access: BoxRow = BoxRow {
+            label: "Access".to_owned(),
+            parts: vec![screen.exposure.clone()],
+            link: None,
+        };
+        rows.insert(1, access);
+    }
     if !screen.triggers.is_empty() {
         rows.push(BoxRow {
             label: "Triggers".to_owned(),
@@ -108,6 +123,13 @@ pub(crate) fn ready_lines(mut screen: DevScreen) -> (DevScreen, Vec<String>) {
         rows.push(BoxRow {
             label: "Env file".to_owned(),
             parts: vec![env_file.clone()],
+            link: None,
+        });
+    }
+    if let Some(discovered) = &screen.discovered {
+        rows.push(BoxRow {
+            label: "Discovered".to_owned(),
+            parts: discovered.split(" \u{b7} ").map(str::to_owned).collect(),
             link: None,
         });
     }

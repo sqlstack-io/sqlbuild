@@ -17,6 +17,7 @@ pub(crate) fn reported_generation(
         LocationHealth::CompileFailed { generation, .. }
         | LocationHealth::Connection { generation, .. }
         | LocationHealth::ProviderSecrets { generation, .. }
+        | LocationHealth::Discovery { generation, .. }
         | LocationHealth::WarehouseSync { generation, .. } => Some(generation),
         LocationHealth::PoolCapped { .. } => {
             return Err(ControlError::Invalid(

@@ -21,7 +21,7 @@ from sqlbuild.python_nodes.types import ColumnLineageRefSpec, PythonNodeColumnSp
 __all__ = ("AssetContext", "SkipMode", "asset", "get_asset_definition")
 
 
-def asset(
+def asset(  # noqa: PLR0913
     function: Callable[..., object] | None = None,
     *,
     name: str | None = None,
@@ -37,8 +37,9 @@ def asset(
     columns: Sequence[PythonNodeColumnSpec | SourceColumnEntry] = (),
     column_lineage: Mapping[str, Sequence[ColumnLineageRefSpec | ColumnLineageRef]] | None = None,
     retry: RetryPolicy | None = None,
+    for_each: Callable[..., object] | None = None,
 ) -> Callable[..., object] | Callable[[Callable[..., object]], Callable[..., object]]:
-    """Mark a Python function as a SQLBuild asset."""
+    """Mark a Python function as a SQLBuild asset; `for_each` makes one node per discovered item."""
 
     return apply_asset(
         function=function,
@@ -51,6 +52,7 @@ def asset(
         columns=columns,
         column_lineage=column_lineage,
         retry=retry,
+        for_each=for_each,
     )
 
 

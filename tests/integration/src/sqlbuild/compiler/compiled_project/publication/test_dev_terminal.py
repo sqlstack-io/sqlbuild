@@ -561,10 +561,25 @@ def test_given_an_env_file_when_developing_then_start_up_names_it_and_r_reloads_
             "a provider missing secrets is warned about until .env sets them and r reloads it",
             "UNRELATED_SETTING=1\n",
             "WORKER_ENV_REGION_CODE=42\nWORKER_ENV_TOKEN=worker-token\n",
+            ".env",
             (
-                "Secrets missing",
-                "region WORKER_ENV_TOKEN, WORKER_ENV_REGION_CODE",
-                "set them in .env or the environment; press r to reload",
+                "1 provider has missing secrets",
+                "providers/region.py:7",
+                "token \u2190 WORKER_ENV_TOKEN",
+                "code \u2190 WORKER_ENV_REGION_CODE",
+                "2 nodes need it (raw_regions, orders)",
+                "set them in .env and press r",
+                "then quit and run sqb dev again",
+            ),
+        ),
+        DevelopmentMissingSecretsTestCase(
+            "the warning names the target's own env file, which r reloads",
+            "UNRELATED_SETTING=1\n",
+            "WORKER_ENV_REGION_CODE=42\nWORKER_ENV_TOKEN=worker-token\n",
+            "development.env",
+            (
+                "set them in development.env and press r",
+                "then quit and run sqb dev again",
             ),
         ),
     ],
@@ -581,6 +596,7 @@ def test_given_a_provider_missing_secrets_when_developing_then_a_warning_names_t
                 'name = "orders"\nadapter = "duckdb"\ndefault_target = "development"\n'
                 '[connections.local]\ndatabase = "warehouse.duckdb"\n'
                 '[targets.development]\nschema = "main"\n'
+                f'env_file = "{test_case.env_file_name}"\n'
             ),
             "models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\n"
@@ -589,7 +605,7 @@ def test_given_a_provider_missing_secrets_when_developing_then_a_warning_names_t
         }
         | REGION_PROVIDER_FILES,
     )
-    env_file: Path = project / ".env"
+    env_file: Path = project / test_case.env_file_name
     _ = env_file.write_text(test_case.first_env_file)
     env_file.chmod(0o600)
     terminal, process = start_development_on_terminal(
@@ -599,7 +615,7 @@ def test_given_a_provider_missing_secrets_when_developing_then_a_warning_names_t
         warned: str = read_terminal_until(
             terminal,
             process,
-            lambda shown: "\u2500 ready " in shown and "press r to reload" in latest_redraw(shown),
+            lambda shown: "\u2500 ready " in shown and "Secrets missing" in latest_redraw(shown),
         )
         _ = env_file.write_text(test_case.second_env_file)
         _ = os.write(terminal, b"r")
@@ -618,7 +634,7 @@ def test_given_a_provider_missing_secrets_when_developing_then_a_warning_names_t
         left: list[str] = reap_development(process, project)
         os.close(terminal)
 
-    warning: str = " ".join(latest_redraw(warned).split())
+    warning: str = " ".join(re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", warned).split())
     assert all(" ".join(part.split()) in warning for part in test_case.expected_warning), warning
     assert "worker-token" not in warned + reloaded
     assert exit_code == 128 + signal.SIGTERM, reloaded

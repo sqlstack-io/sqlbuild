@@ -1595,3 +1595,79 @@ class DynamicRefreshWarehouseTestCase:
     description: str
     argv: tuple[str, ...]
     expected_refresh_warehouses: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ExpansionBoundaryTestCase:
+    """A project whose model splices text beside its own, and the rows a build gives."""
+
+    description: str
+    model_sql: str
+    expected_rows: tuple[tuple[object, ...], ...]
+    model_config: str = ""
+    files: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class CursorBoundaryTestCase:
+    description: str
+    start: str
+    expected_sql: str
+
+
+@dataclass(frozen=True)
+class IgnoredCancelTestCase:
+    description: str
+    sent_signal: signal.Signals
+    expected_exit_code: int
+    expected_line: str
+    expected_within_seconds: float
+    adapter: str = "duckdb"
+
+
+@dataclass(frozen=True)
+class InterruptedCommandTestCase:
+    description: str
+    command: tuple[str, ...]
+    # What the adapter's connect runs before it opens the connection.
+    connect: str
+    # What the terminal shows once the command waits.
+    waiting: str
+    expected_line: str
+    settle_seconds: float = 0.3
+    presses: int = 1
+    files: dict[str, str] = field(default_factory=dict)
+    expected_within_seconds: float = 1.0
+
+
+@dataclass(frozen=True)
+class HungSetupCancelTestCase:
+    description: str
+    sent_signal: signal.Signals
+    expected_exit_code: int
+    expected_within_seconds: float
+
+
+@dataclass(frozen=True)
+class SinkAbandonedStepTestCase:
+    description: str
+    parameters: str
+    step_body: str
+    started_markers: tuple[str, ...]
+    started_lines: tuple[str, ...]
+    sent_signal: signal.Signals
+    expected_exit_code: int
+
+
+@dataclass(frozen=True)
+class SinkNormalRunTestCase:
+    description: str
+    expected_last_line: str
+
+
+@dataclass(frozen=True)
+class MidSubmitCancelTestCase:
+    description: str
+    sent_signal: signal.Signals
+    expected_exit_code: int
+    expected_notice: str

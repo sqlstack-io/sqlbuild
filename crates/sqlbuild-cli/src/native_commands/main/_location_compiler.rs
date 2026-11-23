@@ -3,39 +3,64 @@
 use std::path::Path;
 
 use sqlbuild_cache::project_snapshot::models::PathStamp;
-use sqlbuild_orchestration::dev_events::main::dev_event_line::dev_event_line;
-use sqlbuild_orchestration::dev_events::models::DevEvent;
 use sqlbuild_orchestration::store::errors::ControlError;
 use tokio::sync::mpsc;
+use tokio::time::Instant;
 
-use crate::argv::models::Stream;
-use crate::native_commands::_helpers::command::terminal::write_output;
-use crate::native_commands::_helpers::location::env_reload::reload_env_file;
-use crate::native_commands::_helpers::location::execution::{
-    exchange_location_generation, exchange_location_plan,
+use crate::native_commands::_helpers::location::compiler_discovery::{
+    check_discovered, discovered, sleep_until,
 };
+use crate::native_commands::_helpers::location::compiler_restart::restarted_for_changes;
+use crate::native_commands::_helpers::location::discovery_state::LocationDiscovery;
+use crate::native_commands::_helpers::location::execution::exchange_reply;
 use crate::native_commands::_helpers::location::execution::{
     open_location_runtime, stop_location_runtime,
 };
 use crate::native_commands::models::{
-    LocationCompileRequest, LocationCompiler, LocationPlanRequest, LocationRuntimeRequest,
-    LocationServe,
+    LocationCompileRequest, LocationCompiler, LocationLoad, LocationPlanRequest,
+    LocationRuntimeRequest, LocationServe,
 };
+use crate::native_commands::types::DiscoveryControls;
 
 pub(crate) async fn run_location_compiler(
     options: &LocationServe,
     script: &Path,
     mut requests: mpsc::Receiver<LocationRuntimeRequest>,
+    controls: DiscoveryControls<'_>,
 ) -> Result<(), ControlError> {
     let mut compiler: Option<LocationCompiler> = None;
     let mut sources: Vec<PathStamp> = Vec::new();
+    let mut discovery: LocationDiscovery = LocationDiscovery::default();
     let result = async {
-        while let Some(request) = requests.recv().await {
+        loop {
+            let due: Option<Instant> = discovery.next_due().filter(|_| compiler.is_some());
+            let request: Option<LocationRuntimeRequest> = tokio::select! {
+                request = requests.recv() => match request {
+                    Some(request) => Some(request),
+                    None => break,
+                },
+                () = sleep_until(due) => None,
+            };
+            let Some(request) = request else {
+                compiler = check_discovered(compiler.take(), &mut discovery, (controls, &requests))
+                    .await?;
+                if requests.is_closed() {
+                    break;
+                }
+                continue;
+            };
             let carried_on;
             (compiler, carried_on) = match request {
                 LocationRuntimeRequest::Publish(request) => {
-                    sources.clone_from(&request.python_sources);
-                    publish((options, script), compiler.take(), request).await?
+                    let before: Vec<PathStamp> =
+                        std::mem::replace(&mut sources, request.python_sources.clone());
+                    publish(
+                        (options, script),
+                        compiler.take(),
+                        (request, &before),
+                        (&mut discovery, controls),
+                    )
+                    .await?
                 }
                 LocationRuntimeRequest::Plan(request) => {
                     plan(
@@ -60,37 +85,30 @@ pub(crate) async fn run_location_compiler(
 /// Publish one generation; false when its requester stopped waiting, which only shutdown does.
 async fn publish(
     (options, script): (&LocationServe, &Path),
-    mut compiler: Option<LocationCompiler>,
-    mut request: LocationCompileRequest,
+    compiler: Option<LocationCompiler>,
+    (mut request, before): (LocationCompileRequest, &[PathStamp]),
+    (discovery, (republish, (bearer, session_id))): (&mut LocationDiscovery, DiscoveryControls<'_>),
 ) -> Result<(Option<LocationCompiler>, bool), ControlError> {
-    let env_changed: bool = reload_env_file(options);
-    let python_changed: bool = compiler
-        .as_ref()
-        .is_some_and(|compiler| compiler.python_sources != request.python_sources);
-    if compiler.is_some() && (python_changed || env_changed) {
-        stop_location_runtime(compiler.take()).await?;
-        if options.dev_events {
-            let reason: &str = if python_changed {
-                "Python changed"
-            } else {
-                "env file changed"
-            };
-            drop(write_output(&[(
-                Stream::Stdout,
-                &dev_event_line(&DevEvent::Restarted {
-                    reason: reason.into(),
-                }),
-            )]));
-        }
-    }
+    let compiler: Option<LocationCompiler> =
+        restarted_for_changes(options, compiler, &request.python_sources).await?;
+    let publication = discovery.publish_request(
+        request.generation,
+        (before, &request.python_sources),
+        republish.borrow().rediscovers,
+    );
     let mut active = match compiler {
         Some(active) => active,
-        None => open_location_runtime(options, script, request.python_sources)?,
+        None => open_location_runtime(options, script, request.python_sources.clone())?,
     };
     let result = tokio::select! {
         _ = request.reply.closed() => return Ok((Some(active), false)),
-        result = exchange_location_generation(&mut active, request.generation) => result,
+        result = exchange_reply::<LocationLoad>(&mut active, &publication, "publication record") => result,
     };
+    if let Ok(load) = &result {
+        let session = (bearer, session_id);
+        discovered(options, session, (request.generation, load, &*discovery)).await;
+        discovery.published(load, Instant::now());
+    }
     let failed = result.is_err();
     let _ = request
         .reply
@@ -113,7 +131,7 @@ async fn plan(
         None => open_location_runtime(options, script, sources.to_vec())?,
     };
     let result = {
-        let exchange = exchange_location_plan(&mut active, &request.request);
+        let exchange = exchange_reply::<serde_json::Value>(&mut active, &request.request, "plan");
         tokio::pin!(exchange);
         tokio::select! {
             () = request.reply.closed() => {

@@ -4,35 +4,27 @@
 	import type { Account, RoleAssignment, RoleDefinition } from '$lib/api';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
-	import GatedButton from '$lib/components/platform/gated-button.svelte';
 	import AssignmentList from '$lib/components/admin/assignment-list.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { to } from '$lib/paths';
 	import { personHref } from '$lib/platform/access';
-	import { accountSourceLabel, errorMessage } from '$lib/platform/labels';
+	import { accountSourceLabel } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
-	import { toggleAccount } from './api';
+	import AccountMenu from './account-menu.svelte';
 
 	// A person at a glance beside the list: their roles and enable/disable; their full page keeps effective access.
 	type Props = { account: Account; assignments: RoleAssignment[]; rolesByLocation: Map<string, RoleDefinition[]>; onchange: () => void; onclose: () => void };
 	let { account, assignments, rolesByLocation, onchange, onclose }: Props = $props();
 
-	let busy = $state(false);
-	let error = $state<string | null>(null);
-	async function toggle() {
-		busy = true;
-		error = null;
-		try {
-			if (await toggleAccount(account)) onchange();
-		} catch (e) {
-			error = errorMessage(e);
-		} finally {
-			busy = false;
-		}
+	/** Escape closes the panel, but not when it closes a menu or a dialog first. */
+	function escape(e: KeyboardEvent) {
+		if (e.key !== 'Escape' || e.defaultPrevented) return;
+		if ((e.target as Element | null)?.closest?.('[role="menu"], [role="dialog"]')) return;
+		onclose();
 	}
 </script>
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && onclose()} />
+<svelte:window onkeydown={escape} />
 
 <aside class="panel sb-scroll" aria-label="{account.displayName}" data-testid="person-panel">
 	<header>
@@ -40,20 +32,14 @@
 			<div class="title">{account.displayName}</div>
 			<div class="muted"><code>{account.name}</code> · {account.source ? accountSourceLabel[account.source] : 'no password'}</div>
 		</div>
+		<AccountMenu {account} {onchange} />
 		<Button variant="ghost" size="icon-sm" aria-label="Close" onclick={onclose}><XIcon size={15} /></Button>
 	</header>
 	<div class="status">
 		<StatusLabel tone={account.disabled ? 'var(--sb-text-faint)' : 'var(--sb-success)'} label={account.disabled ? 'Disabled' : 'Active'} muted={account.disabled} />
 		<span class="muted" title={formatStamp(account.lastSeenAt)}>Last active {account.lastSeenAt ? formatAgo(account.lastSeenAt, app.now) : 'never'}</span>
-		<span class="ml-auto">
-			{#if account.name === app.user?.name}
-				<span class="muted">You</span>
-			{:else}
-				<GatedButton requires="user.manage" size="sm" variant={account.disabled ? 'outline' : 'destructive'} {busy} onclick={toggle}>{account.disabled ? 'Enable' : 'Disable'}</GatedButton>
-			{/if}
-		</span>
+		{#if account.name === app.user?.name}<span class="muted ml-auto">You</span>{/if}
 	</div>
-	{#if error}<p class="err">{error}</p>{/if}
 	<section>
 		<h3>Roles</h3>
 		{#if app.can('role.assign')}
@@ -111,11 +97,6 @@
 	code {
 		font-family: var(--font-mono);
 		font-size: 12px;
-	}
-	.err {
-		margin: 0;
-		color: var(--sb-error);
-		font-size: 12.5px;
 	}
 	.full {
 		color: var(--primary);

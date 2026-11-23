@@ -161,6 +161,14 @@ class StrictAdapter(
 
         return False
 
+    def rebuilt_table_row_count(
+        self, *, connection: Any, database: str | None, schema: str | None, name: str
+    ) -> int | None:
+        """Optional: the rows of a table just rebuilt in full, from metadata; None unless exact."""
+
+        del connection, database, schema, name
+        return None
+
     def render_cursor_operand(self, *, expression: str, cursor_type: str | None) -> str:
         """Optional: the cursor-column expression compared with cursor bounds and aggregated."""
 

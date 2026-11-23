@@ -2,7 +2,9 @@
 // its claims, jobs, triggers and sensors. A small loop advances live runs so
 // cancels, launches and claims behave like they do on the server.
 
+import { bigAvailable, bigDownloadUrl, bigIndex, bigPage, bigSearch } from './big-output';
 import { parseCommand } from '$lib/run/command';
+import { isUnfinishedNode } from '$lib/status';
 import { flagSpec, VERBS } from '$lib/run/command-table';
 import { ApiError } from '../client';
 import type { LocalChangeBus } from '../signals';
@@ -39,6 +41,10 @@ import type {
 	RunListQuery,
 	RunNode,
 	RunOutputLine,
+	NodeOutputIndex,
+	NodeOutputPage,
+	NodeOutputSearch,
+	CheckSample,
 	RunRow,
 	RunRowPage,
 	RunRowQuery,
@@ -97,6 +103,8 @@ import {
 	isTerminal,
 	liveness,
 	sqlFor,
+	auditSample,
+	auditSql,
 	statusReason,
 	type RunRecord
 } from './run-detail';
@@ -143,6 +151,9 @@ export type OperateContext = {
 
 /** The end-to-end tests' stand-in for a plan recorded without timings: `window.__sqbPlanWithoutTimings`. */
 const withoutTimings = () => typeof window !== 'undefined' && !!(window as unknown as { __sqbPlanWithoutTimings?: boolean }).__sqbPlanWithoutTimings;
+
+/** What a rerun from failure runs, as on the server. */
+const unfinished = (n: RunNode) => isUnfinishedNode(n.status);
 
 /** A location preview's planning steps, as the plan summary reports them. */
 const MOCK_PLAN_TIMINGS: PlanTimings = {
@@ -214,7 +225,7 @@ export class MockOperate {
 				lostContactLimitSeconds: PRESUMED_FAILED_MS / 1000,
 				cancelRequestedAt: cancel && !cancel.terminatedAt ? cancel.requestedAt : null,
 				selection: view.kind === 'adhoc' ? rec.script.select : [],
-				rerunFromFailureCount: nodes.filter((n) => n.status === 'failed' || n.status === 'skipped').length
+				rerunFromFailureCount: nodes.filter(unfinished).length
 			};
 		});
 		const next = offset + limit < matching.length ? `c${offset + limit}` : null;
@@ -332,7 +343,7 @@ export class MockOperate {
 			},
 			selection: rec.script.select,
 			waits: rec.run.status === 'queued' ? this.#queue().get(rec.run.id) ?? [] : [],
-			rerunFromFailureNodes: nodes.filter((n) => n.status === 'failed' || n.status === 'skipped').map((n) => n.nodeKey),
+			rerunFromFailureNodes: nodes.filter(unfinished).map((n) => n.nodeKey),
 			rerunOf: rec.run.rerunOfRunId ? ((r) => (r ? this.#view(r, scope) : null))(this.#byId(rec.run.rerunOfRunId)) : null,
 			reruns: this.#records
 				.filter((r) => r.run.rerunOfRunId === rec.run.id)
@@ -490,7 +501,41 @@ export class MockOperate {
 		const now = Date.now();
 		const statement = execution(rec, this.#nodesOf(rec, now), now).statements.find((st) => st.id === statementId);
 		if (!statement) throw new ApiError(`Unknown statement ${statementId}`, 404);
-		return this.#ctx.reply({ statementId, sql: statement.sqlRecorded ? sqlFor(statement.nodeKey, statement.kind, this.#ctx.target(scope)) : null });
+		const target = this.#ctx.target(scope);
+		const sql = statement.kind === 'audit' ? auditSql(statement.nodeKey, statementId, target) : sqlFor(statement.nodeKey, statement.kind, target);
+		return this.#ctx.reply({ statementId, sql: statement.sqlRecorded ? sql : null });
+	}
+
+	getCheckSample(_scope: Scope, runId: string, statementId: string): Promise<CheckSample | null> {
+		const rec = this.#require(runId);
+		const now = Date.now();
+		const statement = execution(rec, this.#nodesOf(rec, now), now).statements.find((st) => st.id === statementId);
+		return this.#ctx.reply(statement?.kind === 'audit' && statement.rowsAffected ? auditSample(statement.nodeKey, statementId, statement.rowsAffected) : null);
+	}
+
+	/** How much of a node's bulk output exists now (CHI-1597): only the notebook runner prints enough to page. */
+	#bigOutput(runId: string, nodeKey: string): { available: number; live: boolean } | null {
+		const rec = this.#require(runId);
+		const now = Date.now();
+		const n = this.#nodesOf(rec, now).find((x) => x.nodeKey === nodeKey);
+		return n ? bigAvailable(n, now) : null;
+	}
+	getNodeOutputIndex(_scope: Scope, runId: string, nodeKey: string): Promise<NodeOutputIndex | null> {
+		const big = this.#bigOutput(runId, nodeKey);
+		return this.#ctx.reply(big ? bigIndex(nodeKey, big.available, big.live) : null);
+	}
+	getNodeOutputPage(_scope: Scope, runId: string, nodeKey: string, at: { from: number; rows: number; direction: 'forward' | 'backward'; collapse: boolean; stream?: 'all' | 'stdout' | 'stderr'; around?: number }): Promise<NodeOutputPage> {
+		const big = this.#bigOutput(runId, nodeKey);
+		return this.#ctx.reply(big ? bigPage(nodeKey, big.available, at) : { total: 0, from: at.from, to: at.from, rows: [] });
+	}
+	searchNodeOutput(_scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward'): Promise<NodeOutputSearch> {
+		const big = this.#bigOutput(runId, nodeKey);
+		return this.#ctx.reply(big ? bigSearch(nodeKey, big.available, query, from, direction) : { count: 0, line: null, rank: null });
+	}
+	/** The mock has no file server: the link opens a short note where the server would stream the file. */
+	nodeOutputDownloadUrl(_scope: Scope, runId: string, nodeKey: string): string {
+		const big = this.#bigOutput(runId, nodeKey);
+		return bigDownloadUrl(runId, nodeKey, big?.available ?? 0);
 	}
 
 	listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]> {
@@ -615,14 +660,14 @@ export class MockOperate {
 		const now = Date.now();
 		const affected = (rec: RunRecord) =>
 			this.#nodesOf(rec, now)
-				.filter((n) => (mode === 'selected' ? selectedNodes.includes(n.nodeKey) : n.status === 'failed' || n.status === 'skipped'))
+				.filter((n) => (mode === 'selected' ? selectedNodes.includes(n.nodeKey) : unfinished(n)))
 				.map((n) => n.nodeKey);
 		const user = this.#ctx.user();
 		const id = this.#newId();
 		const job = jobDef(source.run.jobKey);
 		if (job?.kind === 'group') {
 			const members = this.#children(source).filter((c) => mode === 'all' || affected(c).length);
-			if (!members.length) throw new ApiError('Nothing to rerun: no node failed or was skipped', 409);
+			if (!members.length) throw new ApiError('Nothing to rerun: no node failed, was cancelled, was skipped or went unreached', 409);
 			const parent = this.#create(scope, { id, origin: 'rerun', jobKey: job.key, rerunOf: runId, by: user, select: [], exclude: [], flags: {}, nodes: [], priority: job.priority });
 			members.forEach((c, i) => {
 				const nodes = mode === 'all' ? c.script.nodes : affected(c);
@@ -633,7 +678,7 @@ export class MockOperate {
 			return this.#ctx.reply(this.#view(parent, scope));
 		}
 		const nodes = mode === 'all' ? source.script.nodes : affected(source);
-		if (!nodes.length) throw new ApiError('Nothing to rerun: no node failed or was skipped', 409);
+		if (!nodes.length) throw new ApiError('Nothing to rerun: no node failed, was cancelled, was skipped or went unreached', 409);
 		const rec = this.#create(scope, {
 			id,
 			origin: 'rerun',
@@ -818,7 +863,7 @@ export class MockOperate {
 		const now = new Date().toISOString();
 		const actor = this.#ctx.user();
 		this.#fx.evaluations[def.name] = [
-			{ ...stuck, id: `eval-skip-${++this.#seq}`, outcome: 'skipped', requestedAt: now, finishedAt: now, runIds: [], skippedFor: [], failureCode: null, error: null, abandonedBecause: null, skipReason: reason, skippedBy: actor.displayName },
+			{ ...stuck, id: `eval-skip-${++this.#seq}`, outcome: 'skipped', requestedAt: now, finishedAt: now, runIds: [], skippedFor: [], failureCode: null, error: null, abandonedBecause: null, skipReason: reason, skippedBy: actor.displayName, unreadable: null },
 			...(this.#fx.evaluations[def.name] ?? [])
 		];
 		this.#runtime(scope, def.name).history.unshift(this.#stateEvent('event_skipped', reason, eventId));

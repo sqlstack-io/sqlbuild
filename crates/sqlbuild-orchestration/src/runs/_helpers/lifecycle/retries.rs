@@ -11,8 +11,8 @@ use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::declarations::models::OnFailure;
 use crate::runs::_helpers::lifecycle::events::append_run_event;
 use crate::runs::_helpers::requests::rerun::frozen_rerun;
-use crate::runs::constants::NODE_FAILED;
 use crate::runs::constants::{MEMBER_RECOVERED_EVENT, MEMBER_RETRYING_EVENT};
+use crate::runs::constants::{NODE_FAILED, UNFINISHED_NODE_STATUSES};
 use crate::runs::main::requests::queue_run::queue_run;
 use crate::runs::models::{RerunRequest, RunCommand, RunOrigin, RunRequest, RunRetry};
 use crate::snapshots::constants::SOURCE_KEY_PREFIX;
@@ -30,16 +30,18 @@ pub(crate) enum QueuedRetry {
     Member,
 }
 
-/// Rerun the failed and skipped nodes after the policy's delay, unless the run was cancelled, used up its retries, or its retry's ID is already taken.
+/// Rerun the unfinished nodes after the policy's delay, unless a cancel of the run was requested, used up its retries, or its retry's ID is already taken.
 pub(crate) async fn queue_retry(
     transaction: ControlTransaction,
     run_id: Uuid,
 ) -> Result<(ControlTransaction, QueuedRetry), ControlError> {
     let (transaction, rows) = query(
         transaction,
-        "SELECT r.request_json, r.cancel_requested_at, \
-         (SELECT COUNT(*) FROM sqb_run_nodes n WHERE n.run_id=r.run_id AND n.kind='node' AND n.status IN ('failed','skipped')) AS retryable \
-         FROM sqb_runs r WHERE r.run_id=$1",
+        &format!(
+            "SELECT r.request_json, r.cancel_requested_at, \
+             (SELECT COUNT(*) FROM sqb_run_nodes n WHERE n.run_id=r.run_id AND n.kind='node' AND n.status IN ({UNFINISHED_NODE_STATUSES})) AS retryable \
+             FROM sqb_runs r WHERE r.run_id=$1"
+        ),
         vec![Parameter::Id(run_id)],
     )
     .await?;
@@ -130,7 +132,7 @@ async fn not_retried(
     Ok(transaction)
 }
 
-/// The member's next attempt inside its running group: its failed nodes and those it skipped because of them.
+/// The member's next attempt inside its running group: its failed and cancelled nodes and those it skipped because of them.
 async fn queue_member_retry(
     transaction: ControlTransaction,
     source: &RunRequest,
@@ -161,8 +163,10 @@ async fn queue_member_retry(
     }
     let (transaction, rows) = query(
         transaction,
-        "SELECT node_key, status, skipped_because_of FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' \
-         AND status IN ('failed','skipped')",
+        &format!(
+            "SELECT node_key, status, skipped_because_of FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' \
+             AND status IN ({UNFINISHED_NODE_STATUSES})"
+        ),
         vec![Parameter::Id(source.run_id)],
     )
     .await?;
@@ -203,6 +207,7 @@ async fn queue_member_retry(
         run_id: retry_id,
         origin: RunOrigin::Rerun,
         rerun_of_run_id: Some(source.run_id),
+        chain_run_id: Some(source.chain_run_id.unwrap_or(source.run_id)),
         requested_by: "system:retry".into(),
         selection,
         write_set,

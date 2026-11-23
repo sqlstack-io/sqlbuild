@@ -131,3 +131,7 @@ REPLICA_COUNT_SQL: str = (
     "GROUP BY cluster, shard_num)"
 )
 OTHER_REPLICAS_NOTICE: str = "usage read from this server only; other replicas not checked"
+
+EXACT_ROW_COUNT_ENGINES: frozenset[str] = frozenset(
+    {"MergeTree", "ReplicatedMergeTree", "SharedMergeTree"}
+)

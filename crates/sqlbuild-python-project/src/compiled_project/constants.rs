@@ -2,9 +2,18 @@
 
 pub const SKIP_ACTION: &str = "skip";
 
+/// A node's skip mode when it blocks everything downstream of it.
+pub const HARD_SKIP_MODE: &str = "hard";
+
 pub const NO_CHANGE_REASON: &str = "no_change";
 
+/// Why an up-to-date node succeeded without building, as a run's node list shows it.
+pub const UNCHANGED_REASON: &str = "unchanged since its last build";
+
 pub const REPORT_ATTEMPTS: usize = 3;
+
+/// The shortest gap between two progress reports for one running node.
+pub const PROGRESS_INTERVAL: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// The HTTP status a control server answers while its store is busy; reports retry it.
 pub const STORE_BUSY_STATUS: u16 = 503;

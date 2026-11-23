@@ -12,6 +12,7 @@ use crate::argv::models::{Namespace, Stream};
 use crate::native_commands::_helpers::command::decision::text;
 use crate::native_commands::_helpers::command::terminal::write_output;
 use crate::native_commands::_helpers::location::execution::location_options;
+use crate::native_commands::_helpers::location::republish_command::run_republish;
 use crate::native_commands::main::_run_dev::run_development;
 use crate::native_commands::main::_run_location::run_location;
 
@@ -24,6 +25,9 @@ pub(crate) fn run_location_invocation(namespace: &Namespace, script: Option<&Pat
     }
     if !development && location_command.as_deref() == Some("health") {
         return Some(location_health(namespace));
+    }
+    if !development && location_command.as_deref() == Some("republish") {
+        return Some(run_republish(namespace));
     }
     if !development && location_command.as_deref() != Some("serve") {
         return None;
@@ -65,7 +69,7 @@ pub(crate) fn run_location_invocation(namespace: &Namespace, script: Option<&Pat
     })
 }
 
-/// `sqb location health`: 0 when healthy or degraded, 1 when down or falling back, 2 when unanswered.
+/// `sqb location health`: 0 when healthy, degraded or failing discovery, 1 when down or falling back, 2 when unanswered.
 fn location_health(namespace: &Namespace) -> i32 {
     drop(write_output(&[(
         Stream::Stderr,

@@ -14,6 +14,7 @@ use crate::runs::_helpers::groups::context::load_group;
 use crate::runs::_helpers::groups::selection::{failed_upstream, member_dependencies};
 use crate::runs::_helpers::lifecycle::claims::reserve_claims;
 use crate::runs::_helpers::lifecycle::publish_change::publish_change;
+use crate::runs::constants::UNFINISHED_NODE_STATUSES;
 use crate::runs::models::{
     ChangingRun, GroupContext, NodeOutcome, QueueCandidate, RunChange, RunChangeRequest,
     RunNodeRecord, RunOutcome, RunStatus,
@@ -158,8 +159,8 @@ async fn skip_blocked_members(
         let failed_job = failed.request_json.job_key.clone().unwrap_or_default();
         let rows;
         (transaction, rows) = query(transaction,
-            "SELECT n.node_key, n.skipped_because_of FROM sqb_run_nodes n WHERE n.run_id=$1 AND n.kind='node' \
-             AND n.status IN ('failed','skipped','cancelled') ORDER BY CASE n.status WHEN 'failed' THEN 0 ELSE 1 END, n.node_key LIMIT 1",
+            &format!("SELECT n.node_key, n.skipped_because_of FROM sqb_run_nodes n WHERE n.run_id=$1 AND n.kind='node' \
+             AND n.status IN ({UNFINISHED_NODE_STATUSES}) ORDER BY CASE n.status WHEN 'failed' THEN 0 ELSE 1 END, n.node_key LIMIT 1"),
             vec![Parameter::Id(failed.request_json.run_id)]).await?;
         let cause: Option<String> = rows.first().and_then(|row| {
             row["skipped_because_of"]
@@ -175,6 +176,8 @@ async fn skip_blocked_members(
                     node_key: node_key.clone(),
                     outcome: NodeOutcome::Skipped,
                     rows_affected: None,
+                    table_rows: None,
+                    no_change_reason: None,
                     error_code: None,
                     skipped_because_of: cause.clone(),
                     error_message: None,
@@ -237,7 +240,7 @@ async fn finish_group(
     let rank = |status: &str| match status {
         "failed" => 5,
         "cancelled" => 4,
-        "skipped" => 3,
+        "skipped" | "not_run" => 3,
         "warn" => 2,
         "success" => 1,
         _ => 0,
@@ -269,6 +272,8 @@ async fn finish_group(
                 node_key: key.clone(),
                 outcome,
                 rows_affected: node.rows_affected,
+                table_rows: node.table_rows,
+                no_change_reason: node.no_change_reason.clone(),
                 error_code: node.error_code.clone(),
                 skipped_because_of: node.skipped_because_of.clone(),
                 error_message: None,

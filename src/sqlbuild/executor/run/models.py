@@ -32,6 +32,7 @@ from sqlbuild._native import (
 from sqlbuild._native import cursor_compare as compare
 from sqlbuild._native import cursor_parse as parse
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
+from sqlbuild.adapter.contract.classes.node_logger import NodeLogger
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.models import LifeCycleEvent, QueryResult
 from sqlbuild.compiler.python_nodes.types import SkipMode
@@ -133,8 +134,11 @@ class HookContext:
             self.relation_guard.record_resolved(ref)
         return relation
 
-    def log(self, message: str) -> None:
-        self.statement_recorder.log(message)
+    @property
+    def log(self) -> NodeLogger:
+        """`ctx.log.info(...)`, `.warning(...)` or `.error(...)`, kept with the run's events."""
+
+        return NodeLogger(recorder=self.statement_recorder, logger=None)
 
     def skip(self, *, reason: str, mode: SkipMode | str = SkipMode.SOFT) -> HookSkipResult:
         """Return a skip signal for the current hook."""
@@ -175,6 +179,7 @@ class ModelExecutionResult:
     batch_count: int | None = None
     batch_size: str | None = None
     rows_affected: int | None = None
+    table_rows: int | None = None
     cursor_range_start: str | None = None
     cursor_range_end: str | None = None
     cursor_type: str | None = None

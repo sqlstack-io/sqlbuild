@@ -97,7 +97,9 @@ export type WaitPart = { text: string; href?: string; code?: boolean };
 
 /** What went wrong in a finished run, such as "3 failed, 12 skipped"; empty when nothing did. */
 export function outcomeCounts(c: NodeCounts): string {
-	return [c.failed ? `${c.failed} failed` : null, c.skipped ? `${c.skipped} skipped` : null].filter(Boolean).join(', ');
+	const notRun = c.notRun ?? 0;
+	const counted = (count: number, word: string) => (count ? `${count} ${word}` : null);
+	return [counted(c.failed, 'failed'), counted(c.skipped - notRun, 'skipped'), counted(notRun, 'not run')].filter(Boolean).join(', ');
 }
 
 /** `run-4f2a` → `4f2a`, a UUID → its first 8 digits: the short form shown in lists; the full ID stays in links and copies. */

@@ -14,7 +14,7 @@ pub const JOB_SETTING_CONFLICT_CODE: &str = "S027";
 /// How a conflict names a job's `[retry]` table.
 pub const RETRY_SETTING: &str = "[retry]";
 /// Every option of `sqb build`, in the parser's order, as a job setting.
-pub const JOB_SETTINGS: [JobSettingSpec; 53] = [
+pub const JOB_SETTINGS: [JobSettingSpec; 54] = [
     JobSettingSpec {
         name: "help",
         options: &["-h", "--help"],
@@ -39,6 +39,16 @@ pub const JOB_SETTINGS: [JobSettingSpec; 53] = [
         name: "no_cache",
         options: &["--no-cache"],
         scope: Build,
+        python_nodes: false,
+        whole_run: false,
+        command_line: CommandLineValues::OnlyTrue,
+        consumer: None,
+        group: OneBuild,
+    },
+    JobSettingSpec {
+        name: "discover",
+        options: &["--discover"],
+        scope: RunRequest,
         python_nodes: false,
         whole_run: false,
         command_line: CommandLineValues::OnlyTrue,

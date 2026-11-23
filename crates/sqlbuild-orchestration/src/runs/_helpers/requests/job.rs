@@ -60,6 +60,9 @@ pub(crate) async fn frozen_group_children(
             rerun_of_run_id: request
                 .rerun_of_run_id
                 .map(|id| Uuid::new_v5(&id, name.as_bytes())),
+            chain_run_id: request
+                .chain_run_id
+                .map(|id| Uuid::new_v5(&id, name.as_bytes())),
             write_set,
             selection,
             settings,

@@ -49,7 +49,7 @@ def create_python_hook_data(ctx: HookContext, value: int) -> None:
     ctx.execute_sql(
         f"CREATE TABLE {ctx.destination.schema}.python_hook_data AS SELECT {value} AS val"
     )
-    ctx.log(f"python pre-hook created data for {ctx.model_name}")
+    ctx.log.info(f"python pre-hook created data for {ctx.model_name}")
 
 
 def insert_table_hook_log(ctx: HookContext, phase: str) -> None:
@@ -414,3 +414,15 @@ def _verify_present_failure_row_count(*, connection: Any, test_case: TableFailur
 
 
 _FAILURE_ROW_COUNT_VERIFIERS: dict[object, Callable[..., None]] = {None: _ignore_failure_row_count}
+
+
+def counted_rows(**_: object) -> int:
+    """A rebuilt table's row count as an adapter reads it."""
+
+    return 7
+
+
+def unreadable_rows(**_: object) -> int:
+    """A row count read that fails, as when table metadata is unavailable."""
+
+    raise RuntimeError("table metadata is unavailable")

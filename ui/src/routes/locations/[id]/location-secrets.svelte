@@ -40,7 +40,7 @@
 					{/if}
 				</div>
 			{/each}
-			<p>Set each variable in the location's environment (or its env file) and restart the location. Until then, runs that use these providers stop before the warehouse.</p>
+			<p>Set each variable in the location's env file, then restart the location (in sqb dev, press r), or in the environment the location (or sqb dev) was started with, then restart it. Until then, runs that use these providers stop before the warehouse.</p>
 		</div>
 	</details>
 {/if}

@@ -20,19 +20,22 @@ pub(crate) fn proxy_principal_id(username: &str) -> Uuid {
     )
 }
 
-/// Whether `principal_id` exists, and if so whether it is enabled.
+/// Whether `principal_id` exists, and if so whether it is an enabled person; a service account never signs in.
 pub(crate) async fn principal_enabled(
     store: &ControlStore,
     principal_id: Uuid,
 ) -> Result<Option<bool>, ControlError> {
     let (transaction, people) = query(
         begin(store, TransactionMode::Read).await?,
-        "SELECT disabled_at FROM sqb_principals WHERE principal_id=$1",
+        "SELECT p.disabled_at, s.principal_id AS service FROM sqb_principals p \
+         LEFT JOIN sqb_service_accounts s ON s.principal_id=p.principal_id WHERE p.principal_id=$1",
         vec![Parameter::Id(principal_id)],
     )
     .await?;
     commit(transaction).await?;
-    Ok(people.first().map(|person| person["disabled_at"].is_null()))
+    Ok(people
+        .first()
+        .map(|person| person["disabled_at"].is_null() && person["service"].is_null()))
 }
 
 /// Creates the person with the viewer role, or false when a principal's name matches in any case.

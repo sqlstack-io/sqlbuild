@@ -101,6 +101,7 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [Assets](concepts/python-nodes/assets.md) (`concepts/python-nodes/assets`) - Run Python computation, side effects and external artifacts as nodes in the SQLBuild graph.
 - [Checks](concepts/python-nodes/checks.md) (`concepts/python-nodes/checks`) - Validate assets, loaders, and SQL relations with Python checks.
 - [Factories](concepts/python-nodes/factories.md) (`concepts/python-nodes/factories`) - Generate Python nodes programmatically with @factory.
+- [Discovered nodes](concepts/python-nodes/discovered-nodes.md) (`concepts/python-nodes/discovered-nodes`) - Run a Python asset once per item an external system lists, with @discover and @asset(for_each=...).
 - [Providers](concepts/python-nodes/providers.md) (`concepts/python-nodes/providers`) - Shared runtime services for Python nodes and hooks.
 - [SQL References](concepts/python-nodes/sql-references.md) (`concepts/python-nodes/sql-references`) - Read SQL models, sources, and seeds from Python nodes without creating SQL dependencies.
 - [Custom adapters](concepts/adapters/custom.md) (`concepts/adapters/custom`) - Extend a built-in adapter or write one for another database engine in Python.

@@ -1,4 +1,4 @@
-//! Administrators who manage people list every principal with sign-in facts, never secrets.
+//! Administrators who manage people list every person with sign-in facts, never secrets; service accounts list apart.
 
 use std::collections::BTreeMap;
 
@@ -34,7 +34,8 @@ pub async fn list_people(
            (SELECT COUNT(*) FROM sqb_sessions s WHERE s.principal_id=p.principal_id \
               AND s.revoked_at IS NULL AND s.expires_at>$1 AND p.disabled_at IS NULL) AS active_sessions, \
            (SELECT MAX(s.created_at) FROM sqb_sessions s WHERE s.principal_id=p.principal_id) AS last_signed_in_at \
-         FROM sqb_principals p LEFT JOIN sqb_password_credentials c ON c.principal_id=p.principal_id ORDER BY p.name",
+         FROM sqb_principals p LEFT JOIN sqb_password_credentials c ON c.principal_id=p.principal_id \
+         WHERE NOT EXISTS (SELECT 1 FROM sqb_service_accounts s WHERE s.principal_id=p.principal_id) ORDER BY p.name",
         vec![Parameter::Time(now)]).await?;
     let (transaction, memberships) = query(
         transaction,

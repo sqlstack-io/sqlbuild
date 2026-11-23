@@ -80,6 +80,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/service-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Every service account by name with its working keys, never the keys themselves. Needs user.manage or role.assign. */
+        get: operations["listServiceAccounts"];
+        put?: never;
+        /** @description Adds a service account with a built-in role everywhere and returns its first key, only this once. Needs user.manage and role.assign. */
+        post: operations["createServiceAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/service-accounts/{principal_id}/disabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Disabling refuses every key of the account at once; enabling accepts the same keys again. Needs user.manage. */
+        post: operations["setServiceAccountDisabled"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/service-accounts/{principal_id}/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Issues a new key, returned only this once. The replaced key works on for overlap_minutes (at most 1440), else stops now; a key already in an overlap stops now. Needs user.manage. */
+        post: operations["rotateServiceAccountKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/service-accounts/{principal_id}/keys/{key_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Stops one working key now, such as an old key before its overlap ends. Needs user.manage. */
+        post: operations["revokeServiceAccountKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/service-accounts/{principal_id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Gives the account a built-in role everywhere in place of its other built-in roles everywhere. Needs role.assign. */
+        post: operations["setServiceAccountRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/cli/approve": {
         parameters: {
             query?: never;
@@ -122,6 +208,23 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["startCliLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/login-mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Answered only by a server without sign-in for people, so a browser or sqb login can say so instead of offering a password. */
+        get: operations["readLoginMode"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -466,6 +569,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/discovered": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readDiscovered"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/fingerprint": {
         parameters: {
             query?: never;
@@ -754,6 +873,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/republish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["requestRepublish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/republish/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readRepublish"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs": {
         parameters: {
             query?: never;
@@ -858,6 +1009,70 @@ export interface paths {
             cookie?: never;
         };
         get: operations["readPersonRunOutput"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["downloadPersonRunOutput"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonRunOutputIndex"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonRunOutputLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["searchPersonRunOutput"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1554,6 +1769,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/output/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["output_batch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/recall": {
         parameters: {
             query?: never;
@@ -1591,7 +1822,7 @@ export interface components {
          * @description Closed permission vocabulary; unknown actions fail deserialization.
          * @enum {string}
          */
-        Action: "view" | "view.sql" | "view.evidence" | "job.run" | "run.cancel" | "run.rerun" | "run.rewrite_history" | "run.prioritise" | "run.warehouse" | "run.vars" | "run.load" | "trigger.toggle" | "sensor.reset_cursor" | "run.adhoc" | "connection.test" | "user.manage" | "role.assign" | "audit.view";
+        Action: "view" | "view.sql" | "view.evidence" | "job.run" | "run.cancel" | "run.rerun" | "run.rewrite_history" | "run.prioritise" | "run.warehouse" | "run.vars" | "run.load" | "trigger.toggle" | "sensor.reset_cursor" | "run.adhoc" | "connection.test" | "location.republish" | "user.manage" | "role.assign" | "audit.view";
         /** @description What launching the command would run and whether this person may launch it. */
         AdhocCheck: {
             /** @description Why the command cannot run regardless of permissions, such as a refused flag or an unknown selector. */
@@ -2050,6 +2281,52 @@ export interface components {
             /** @enum {string} */
             status: "unavailable";
         };
+        /** @description The discovered sets of a target's current snapshot; empty when it saved none. */
+        DiscoveredReadback: {
+            /** Format: int64 */
+            generation: number;
+            /** Format: date-time */
+            published_at: string;
+            sets: components["schemas"]["DiscoveredSetReadback"][];
+            /** Format: uuid */
+            snapshot_id: string;
+        };
+        /** @description One discovered set of the current snapshot, as a deploy reads it back. */
+        DiscoveredSetReadback: {
+            /** Format: int64 */
+            check_every_seconds?: number | null;
+            digest?: string | null;
+            error?: string | null;
+            /** Format: date-time */
+            fetched_at?: string | null;
+            /** Format: int64 */
+            items: number;
+            /** Format: date-time */
+            last_good_at?: string | null;
+            name: string;
+            status: components["schemas"]["DiscoveredSetStatus"];
+            /** @description The tags of the result the set serves: its newest, or its last good one after a failure. */
+            tags: Record<string, never>;
+        };
+        /**
+         * @description How a set's newest attempt went.
+         * @enum {string}
+         */
+        DiscoveredSetStatus: "ok" | "failed" | "never";
+        /** @description One discovered set as a location's health names it. */
+        DiscoveryHealth: {
+            /** @description Why the newest attempt failed, secrets masked. */
+            error?: string | null;
+            /**
+             * Format: int64
+             * @description How many items the set serves: its newest result, or the last good one after a failure.
+             */
+            items: number;
+            /** Format: date-time */
+            last_good_at?: string | null;
+            name: string;
+            status: components["schemas"]["DiscoveredSetStatus"];
+        };
         /** @description A calendar whose pending past-due times a republish dropped, because its previous definition can't be read; it clears at its next successful tick. */
         DroppedCalendarTimes: {
             /** Format: date-time */
@@ -2122,6 +2399,11 @@ export interface components {
              * @description The database's size on disk now: SQLite's main file, or the whole PostgreSQL database.
              */
             store_bytes: number;
+        };
+        /** @description A service account with a key that is returned only this once; the store keeps only its hash. */
+        IssuedServiceKey: {
+            account: components["schemas"]["ServiceAccountSummary"];
+            key: string;
         };
         /** @description One job or group as declared, for a person who may list the target; free-form setting values are withheld. */
         JobDetailRecord: {
@@ -2272,6 +2554,12 @@ export interface components {
         } | {
             /** Format: int64 */
             generation: number;
+            /** @enum {string} */
+            kind: "discovery";
+            sets: components["schemas"]["DiscoveryHealth"][];
+        } | {
+            /** Format: int64 */
+            generation: number;
             jobs: components["schemas"]["PoolCapWarning"][];
             /** @enum {string} */
             kind: "pool_capped";
@@ -2361,6 +2649,11 @@ export interface components {
             kind: "plan";
             selection: string[];
             settings: Record<string, never>;
+        } | {
+            /** @enum {string} */
+            kind: "republish";
+            /** @description The name of whoever asked, which the location prints with the request's reason. */
+            requested_by: string;
         };
         LocationWorkClaim: {
             /** Format: uuid */
@@ -2393,10 +2686,25 @@ export interface components {
             /** @enum {string} */
             kind: "sync_started";
         } | {
+            /** Format: int64 */
+            generation: number;
+            /** @enum {string} */
+            kind: "published";
+            /** Format: uuid */
+            snapshot_id: string;
+        } | {
+            error: string;
+            /** Format: int64 */
+            generation: number;
+            /** @enum {string} */
+            kind: "publish_failed";
+        } | {
             /** @enum {string} */
             kind: "superseded";
         };
         LocationWorkPoll: {
+            /** @description Which work this poll takes. */
+            scope: components["schemas"]["LocationWorkScope"];
             /** Format: uuid */
             session_id: string;
             target: string;
@@ -2432,10 +2740,19 @@ export interface components {
             session_id: string;
         };
         /**
+         * @description Which work a location takes in one poll.
+         * @enum {string}
+         */
+        LocationWorkScope: "all" | "republish_only";
+        /**
          * @description How people sign in to this server.
          * @enum {string}
          */
-        LoginMode: "password" | "trusted_proxy" | "oidc" | "disabled";
+        LoginMode: "password" | "trusted_proxy" | "oidc" | "disabled" | "keys";
+        /** @description How a server without a session is signed in to, answered before sign-in only where people can't. */
+        LoginModeAnswer: {
+            login_mode: components["schemas"]["LoginMode"];
+        };
         /** @description A running calendar schedule whose last date is at most a day away, or which has none left. */
         LowCalendar: {
             /**
@@ -2554,6 +2871,12 @@ export interface components {
         MutationResponse: {
             applied: boolean;
         };
+        /** @description A service account to add: its name, what uses it, and its built-in role everywhere. */
+        NewServiceAccount: {
+            description?: string | null;
+            name: string;
+            role: components["schemas"]["BuiltinRole"];
+        };
         /** @description One build's estimated query cost of one node, across every warehouse it used. */
         NodeCostRecord: {
             /** Format: double */
@@ -2573,8 +2896,34 @@ export interface components {
         };
         /** @enum {string} */
         NodeEventKind: "success" | "failed" | "recovered";
+        /**
+         * @description The level of a line a node logged with `ctx.log`.
+         * @enum {string}
+         */
+        NodeLogLevel: "info" | "warning" | "error";
+        /** @description One line a node logged with `ctx.log`. */
+        NodeLogLine: {
+            level: string;
+            /** Format: date-time */
+            logged_at: string;
+            message: string;
+            node_key: string;
+        };
         /** @enum {string} */
-        NodeOutcome: "success" | "warn" | "failed" | "skipped" | "cancelled";
+        NodeOutcome: "success" | "warn" | "failed" | "skipped" | "cancelled" | "not_run";
+        /** @description How much one node printed: its lines, numbered across both streams, and its bytes. */
+        NodeOutputSummary: {
+            /** Format: int64 */
+            line_count: number;
+            /** @description The node key, or `run` for lines printed outside any node. */
+            node_key: string;
+            /** Format: int64 */
+            stderr_lines: number;
+            /** Format: int64 */
+            stdout_lines: number;
+            /** Format: int64 */
+            text_bytes: number;
+        };
         /** @description One build attempt of a node by a run in this target; the same metadata as the run's node list. */
         NodeRunRecord: {
             /** Format: date-time */
@@ -2648,6 +2997,19 @@ export interface components {
             /** Format: int32 */
             retry_delay_seconds: number;
         };
+        /** @description What a worker printed in one batch window, a segment per node and stream in the order printed. */
+        OutputBatch: {
+            /**
+             * Format: int64
+             * @description The worker's batch number within its claim, from 0; a retried batch is stored once.
+             */
+            batch: number;
+            segments: components["schemas"]["OutputSegment"][];
+        };
+        /** @description Whether the server stored a batch; a retry of a stored batch is not stored again. */
+        OutputBatchReceipt: {
+            stored: boolean;
+        };
         /** @description One exact-byte output chunk. */
         OutputChunk: {
             /**
@@ -2670,6 +3032,69 @@ export interface components {
             sequence: number;
             stream: components["schemas"]["OutputStream"];
         };
+        /**
+         * @description How a printed line reads: as an error or as a warning.
+         * @enum {string}
+         */
+        OutputLevel: "error" | "warning";
+        /** @description One stored line; lines a size cap left out just before it are counted on it. */
+        OutputLine: {
+            /**
+             * Format: date-time
+             * @description When the server received the batch holding the line, within a few seconds of its printing.
+             */
+            at: string;
+            level?: null | components["schemas"]["OutputLevel"];
+            /** @description The node that printed it, or `run`. */
+            node_key: string;
+            /** Format: int64 */
+            number: number;
+            /** Format: int64 */
+            omitted_before?: number;
+            stream: components["schemas"]["OutputStream"];
+            text: string;
+        };
+        /** @description A line that looks like an error, such as a traceback, or a warning; each stream keeps at most 10,000. */
+        OutputMark: {
+            level: components["schemas"]["OutputLevel"];
+            /**
+             * Format: int64
+             * @description The line in the node's numbering.
+             */
+            line: number;
+            stream: components["schemas"]["OutputStream"];
+            /** @description The line's text, at most 300 bytes. */
+            text: string;
+        };
+        /** @description Rows covering lines `from` up to `to`, and where the pages before and after start. */
+        OutputPage: {
+            /**
+             * Format: int64
+             * @description The first line the rows cover.
+             */
+            from: number;
+            /**
+             * Format: int64
+             * @description The highest line number of the node, or of the run.
+             */
+            line_count: number;
+            /**
+             * Format: int64
+             * @description `from` for the next page, when there are later lines.
+             */
+            next?: number | null;
+            /**
+             * Format: int64
+             * @description `before` for the previous page, when there are earlier lines.
+             */
+            previous?: number | null;
+            rows: components["schemas"]["OutputRow"][];
+            /**
+             * Format: int64
+             * @description The line after the last the rows cover.
+             */
+            to: number;
+        };
         /** @description Differing retries retain conflict evidence while preserving the first output bytes. */
         OutputPublication: {
             /** Format: int32 */
@@ -2679,8 +3104,48 @@ export interface components {
             /** Format: int32 */
             inserted: number;
         };
+        /** @description A line, or a run of lines that are the same but for their numbers, folded into one row. */
+        OutputRow: {
+            /** @enum {string} */
+            kind: "line";
+            line: components["schemas"]["OutputLine"];
+        } | {
+            /** Format: int64 */
+            count: number;
+            /** Format: int64 */
+            from: number;
+            /** @enum {string} */
+            kind: "similar";
+            sample: components["schemas"]["OutputLine"];
+        };
+        /** @description The next match; across the whole output, how many match and which this is, when the output was small enough to scan; or where to continue. */
+        OutputSearch: {
+            /**
+             * Format: int64
+             * @description `from` for the next search in the same direction, when this one stopped before finding a match.
+             */
+            continue_from?: number | null;
+            /** Format: int64 */
+            count?: number | null;
+            /** Format: int64 */
+            line?: number | null;
+            /** Format: int64 */
+            rank?: number | null;
+        };
+        /** @description Complete lines one node printed to one stream, each ending in a newline. */
+        OutputSegment: {
+            /**
+             * Format: int64
+             * @description Bytes the worker dropped just before these lines because it could not send them fast enough.
+             */
+            dropped_bytes?: number;
+            /** @description The node that printed the lines, keyed `<kind>:<name>`; `None` for lines printed outside a node. */
+            node_key?: string | null;
+            stream: components["schemas"]["OutputStream"];
+            text: string;
+        };
         /**
-         * @description A process output stream.
+         * @description One process stream.
          * @enum {string}
          */
         OutputStream: "stdout" | "stderr";
@@ -2802,6 +3267,8 @@ export interface components {
             skipped_by?: string | null;
             /** @description For each requested run the job's `skip` overlap dropped, the run that was active. */
             skipped_for: string[];
+            /** @description Why the tick's details are missing: an earlier release recorded them in a form this one can't read. */
+            unreadable?: string | null;
         };
         /** @description A run key is redacted and withheld like the custom cursor it usually derives from: empty without view.evidence. */
         PersonSensorRunRequest: {
@@ -3141,6 +3608,11 @@ export interface components {
             state_database?: string | null;
             state_schema: string;
         };
+        /**
+         * @description A principal signs in as a person, or calls with an API key as a service account.
+         * @enum {string}
+         */
+        PrincipalKind: "person" | "service";
         /** @description Code that injects a provider: a node (`loader`, `asset`, `check`, `hook` or `materialization`, keyed `kind:name`), an `event_exporter` or a `sink`. */
         ProviderConsumer: {
             kind: string;
@@ -3305,6 +3777,33 @@ export interface components {
             /** Format: uuid */
             trigger_id: string;
         };
+        /**
+         * @description Where a republish request stands.
+         * @enum {string}
+         */
+        RepublishState: "pending" | "published" | "failed" | "expired";
+        /** @description A republish request and its result once the location has one. */
+        RepublishStatus: {
+            /** Format: date-time */
+            completed_at?: string | null;
+            error?: string | null;
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: int64 */
+            generation?: number | null;
+            /** Format: uuid */
+            location_id: string;
+            reason: string;
+            /** Format: uuid */
+            request_id: string;
+            /** Format: date-time */
+            requested_at: string;
+            requested_by: string;
+            /** Format: uuid */
+            snapshot_id?: string | null;
+            state: components["schemas"]["RepublishState"];
+            target: string;
+        };
         /** @description A run a sensor's function asked for; the key defaults to the event ID and the job. */
         RequestedRun: {
             job: string;
@@ -3395,16 +3894,35 @@ export interface components {
             kind: "node_started";
             node_key: string;
         } | {
+            /** @enum {string} */
+            kind: "node_progress";
+            node_key: string;
+            /** Format: int64 */
+            rows_so_far: number;
+        } | {
+            /** @enum {string} */
+            kind: "node_log";
+            level: components["schemas"]["NodeLogLevel"];
+            message: string;
+            node_key: string;
+        } | {
             error_code?: string | null;
             /** @description Redacted and bounded on the way in, whoever sends it; absent from older workers. */
             error_message?: string | null;
             /** @enum {string} */
             kind: "node_finished";
+            /** @description Why a node that ran changed nothing. */
+            no_change_reason?: string | null;
             node_key: string;
             outcome: components["schemas"]["NodeOutcome"];
             /** Format: int64 */
             rows_affected?: number | null;
             skipped_because_of?: string | null;
+            /**
+             * Format: int64
+             * @description The rows a fully rebuilt table holds, where the warehouse's metadata count is exact.
+             */
+            table_rows?: number | null;
         } | {
             /** @enum {string} */
             kind: "check_started";
@@ -3476,6 +3994,12 @@ export interface components {
         RunEventRecord: {
             /** Format: int64 */
             affected_rows?: number | null;
+            check_binding_key?: string | null;
+            /** @description For a check's result: its name as declared, its ID and this result's, and the rows it found; never its SQL or rows. */
+            check_name?: string | null;
+            check_result_id?: string | null;
+            /** Format: int64 */
+            check_rows?: number | null;
             /** Format: double */
             duration_ms?: number | null;
             error_code?: string | null;
@@ -3502,6 +4026,8 @@ export interface components {
         /** @description Workers compile locally and compare against this immutable snapshot, not the current deploy. */
         RunExecution: {
             claim: components["schemas"]["RunClaim"];
+            /** @description The discovered sets the run's snapshot saved, which the worker compiles from. */
+            discovered: Record<string, never>;
             environment_hash: string;
             node_hashes: {
                 [key: string]: string;
@@ -3551,13 +4077,32 @@ export interface components {
             /** Format: date-time */
             ended_at?: string | null;
             error_code?: string | null;
+            /** @description The node's materialization in the run's snapshot, such as `table`, `incremental` or `view`. */
+            materialization?: string | null;
+            /** @description For a node that failed unstarted because a provider was missing secrets, its redacted message naming the provider, variables and places looked; never other error text. */
+            missing_secret?: string | null;
+            /** @description Why a node that ran changed nothing, such as `unchanged since its last build`. */
+            no_change_reason?: string | null;
             node_key: string;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Rows a statement inserted, merged or deleted, as the warehouse reported them.
+             */
             rows_affected?: number | null;
+            /**
+             * Format: int64
+             * @description Rows written so far while the node runs, from microbatch batches or a loader's progress.
+             */
+            rows_so_far?: number | null;
             skipped_because_of?: string | null;
             /** Format: date-time */
             started_at?: string | null;
             status: string;
+            /**
+             * Format: int64
+             * @description The rows a fully rebuilt table holds, read from the warehouse's metadata where that count is exact.
+             */
+            table_rows?: number | null;
         };
         /** @enum {string} */
         RunOrigin: "manual" | "schedule" | "sensor" | "rerun" | "backfill";
@@ -3572,6 +4117,31 @@ export interface components {
             errors: components["schemas"]["RunErrorText"][];
             /** @description The newest captured lines per invocation, oldest first. */
             lines: components["schemas"]["RunOutputLine"][];
+        };
+        /** @description What a run printed, per node, without its text; one node's error and warning lines; and what a size cap left out. */
+        RunOutputIndex: {
+            /**
+             * Format: int64
+             * @description Bytes the worker dropped because it could not send them fast enough.
+             */
+            dropped_bytes: number;
+            /**
+             * Format: int64
+             * @description Lines the whole run printed, numbered in the order printed.
+             */
+            line_count: number;
+            /** @description Lines the run's nodes logged with `ctx.log`, oldest first. */
+            logs: components["schemas"]["NodeLogLine"][];
+            /** @description The named node's lines that look like errors or warnings, by line; empty when no node is named. */
+            marks: components["schemas"]["OutputMark"][];
+            nodes: components["schemas"]["NodeOutputSummary"][];
+            /**
+             * Format: int64
+             * @description Bytes and lines past `max_bytes_per_run` that were dropped between the run's first and last parts.
+             */
+            omitted_bytes: number;
+            /** Format: int64 */
+            omitted_lines: number;
         };
         RunOutputLine: {
             invocation_id: string;
@@ -3665,6 +4235,11 @@ export interface components {
         };
         /** @description The authorized selection and pinned execution inputs are immutable once requested. */
         RunRequest: {
+            /**
+             * Format: uuid
+             * @description The first run of this run's rerun chain, read as `ctx.root_run_id`; unset for the first run.
+             */
+            chain_run_id?: string | null;
             command?: components["schemas"]["RunCommand"];
             image_id?: string | null;
             job_key?: string | null;
@@ -3787,6 +4362,7 @@ export interface components {
         SecurityAuditEvent: {
             action: string;
             actor: string;
+            actor_kind?: null | components["schemas"]["PrincipalKind"];
             /** @description The person's name when `actor` is a principal; person reads set it, exports leave it out. */
             actor_name?: string | null;
             after_json: unknown;
@@ -4095,6 +4671,67 @@ export interface components {
             /** @description Whether this server runs the scheduler; another server may hold the lease. */
             scheduler: boolean;
             version: string;
+        };
+        ServiceAccountRole: {
+            role: components["schemas"]["BuiltinRole"];
+        };
+        ServiceAccountState: {
+            disabled: boolean;
+        };
+        /** @description A service account as administrators see it: its role, state and working keys. */
+        ServiceAccountSummary: {
+            /** Format: date-time */
+            created_at: string;
+            created_by?: string | null;
+            description?: string | null;
+            /**
+             * Format: date-time
+             * @description While set, every key of the account is refused.
+             */
+            disabled_at?: string | null;
+            /** @description Keys that work, or will once the account is enabled: the current key first, then one still in its overlap. */
+            keys: components["schemas"]["ServiceKeySummary"][];
+            /**
+             * Format: date-time
+             * @description The newest last use of any of its keys, stopped ones included.
+             */
+            last_used_at?: string | null;
+            name: string;
+            /** Format: uuid */
+            principal_id: string;
+            role?: null | components["schemas"]["BuiltinRole"];
+        };
+        /**
+         * @description How a service account key came to be: made by SQLBuild, or chosen with the CLI's `--key-from-env`.
+         * @enum {string}
+         */
+        ServiceKeyOrigin: "issued" | "imported";
+        /** @description A rotation: how many minutes the replaced key keeps working, at most a day; none or 0 stops it at once. */
+        ServiceKeyRotation: {
+            /** Format: int64 */
+            overlap_minutes?: number | null;
+        };
+        /** @description One working key of a service account; never the key itself. */
+        ServiceKeySummary: {
+            /** Format: date-time */
+            created_at: string;
+            /** @description Who made it; none when the control-store owner did, with the CLI. */
+            created_by?: string | null;
+            /**
+             * Format: date-time
+             * @description When a key replaced by a rotation stops working; none for the current key.
+             */
+            expires_at?: string | null;
+            /** Format: uuid */
+            key_id: string;
+            /**
+             * Format: date-time
+             * @description The last request this key authenticated that wasn't refused.
+             */
+            last_used_at?: string | null;
+            origin: components["schemas"]["ServiceKeyOrigin"];
+            /** @description The non-secret start of the key, e.g. `sqbk_Q7m2xT`. */
+            prefix: string;
         };
         SessionIdentity: {
             /** Format: date-time */
@@ -4800,6 +5437,290 @@ export interface operations {
             };
         };
     };
+    listServiceAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAccountSummary"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    createServiceAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewServiceAccount"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuedServiceKey"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    setServiceAccountDisabled: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path: {
+                principal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceAccountState"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAccountSummary"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    rotateServiceAccountKey: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path: {
+                principal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceKeyRotation"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuedServiceKey"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    revokeServiceAccountKey: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path: {
+                principal_id: string;
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAccountSummary"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    setServiceAccountRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path: {
+                principal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceAccountRole"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAccountSummary"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     approveCliLogin: {
         parameters: {
             query?: never;
@@ -4894,6 +5815,32 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AuthenticationDenial"];
                 };
+            };
+        };
+    };
+    readLoginMode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginModeAnswer"];
+                };
+            };
+            /** @description People sign in on this server */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -5815,6 +6762,43 @@ export interface operations {
             };
         };
     };
+    readDiscovered: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["DiscoveredReadback"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     readPersonFingerprint: {
         parameters: {
             query: {
@@ -6593,6 +7577,101 @@ export interface operations {
             };
         };
     };
+    requestRepublish: {
+        parameters: {
+            query?: {
+                /** @description Seconds to wait for the new snapshot or the publish error, at most 60; 0 or absent returns at once */
+                wait?: number;
+            };
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonWorkRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepublishStatus"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readRepublish: {
+        parameters: {
+            query?: {
+                /** @description Seconds to wait while the republish is pending, at most 60 */
+                wait?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["RepublishStatus"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     listPersonRuns: {
         parameters: {
             query?: {
@@ -6924,6 +8003,256 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    downloadPersonRunOutput: {
+        parameters: {
+            query: {
+                node: string;
+                stream?: components["schemas"]["OutputStream"];
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The node's whole stream */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.evidence on every node the run selected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The server keeps no run output */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonRunOutputIndex: {
+        parameters: {
+            query?: {
+                node?: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOutputIndex"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.evidence on every node the run selected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readPersonRunOutputLines: {
+        parameters: {
+            query?: {
+                /** @description The node key, or `run`; leave it out to read the whole run's output. */
+                node?: string;
+                /** @description Only this stream's lines, keeping their numbers. */
+                stream?: components["schemas"]["OutputStream"];
+                /** @description Read forwards from this line, from 1. */
+                from?: number;
+                /** @description Read the rows that end just before this line. */
+                before?: number;
+                /** @description Read the last rows. */
+                tail?: boolean;
+                /** @description How many rows to read, at most 2,000. */
+                limit?: number;
+                /** @description Fold four or more lines that are the same but for their numbers into one row. */
+                collapse?: boolean;
+                /** @description A line to keep open, with three lines either side, when folding. */
+                around?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutputPage"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.evidence on every node the run selected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The server keeps no run output */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    searchPersonRunOutput: {
+        parameters: {
+            query: {
+                node: string;
+                stream?: components["schemas"]["OutputStream"];
+                text: string;
+                /** @description Look from this line, which a forward search includes, as a backward one does. */
+                from?: number;
+                direction?: "forward" | "backward";
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutputSearch"];
+                };
+            };
+            /** @description Empty search text */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.evidence on every node the run selected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The server keeps no run output */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
             };
         };
     };
@@ -9045,6 +10374,62 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    output_batch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutputBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutputBatchReceipt"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Run not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The server keeps no run output */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
             };
         };
     };

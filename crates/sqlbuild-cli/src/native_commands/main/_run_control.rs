@@ -1,7 +1,5 @@
 //! Supervise native API/scheduler roles together; a failed role stops its siblings.
 
-use sqlbuild_orchestration::api::main::serve_api::serve_api;
-use sqlbuild_orchestration::platform::models::RetentionPolicies;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::store::errors::ControlError;
@@ -11,22 +9,17 @@ use tokio::task::JoinSet;
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream};
-use crate::native_commands::_helpers::command::decision::{control_address, control_api_settings};
+use crate::native_commands::_helpers::command::decision::{
+    control_address, control_api_settings, control_output,
+};
 use crate::native_commands::_helpers::command::terminal::write_output;
+use crate::native_commands::_helpers::location::api_start::start_api;
 use crate::native_commands::_helpers::location::execution::{
-    open_control_store, open_control_workers, start_platform_roles,
+    open_control_store, open_control_workers,
 };
 use crate::native_commands::_helpers::location::shutdown::supervise_control_roles;
 use crate::server_config::main::read_server_config::read_server_config;
 use crate::workers::models::Workers;
-
-async fn stopped(mut shutdown: watch::Receiver<bool>) {
-    while !*shutdown.borrow_and_update() {
-        if shutdown.changed().await.is_err() {
-            break;
-        }
-    }
-}
 
 pub(crate) async fn run_control(
     namespace: &Namespace,
@@ -36,6 +29,7 @@ pub(crate) async fn run_control(
     let address = control_address(namespace, standalone, &config.server)?;
     let (authentication, mut facts) = control_api_settings(namespace, standalone, &config)?;
     let store = open_control_store(namespace, Some(&config.server)).await?;
+    let run_output = control_output(namespace, &config, (&store, &mut facts))?;
     let (workers, handoff) = open_control_workers(
         (&store, namespace),
         (&config.server, config.launchers),
@@ -46,37 +40,13 @@ pub(crate) async fn run_control(
     let (stop, shutdown) = watch::channel(false);
     let mut tasks = JoinSet::new();
     if let Some(address) = address {
-        drop(write_output(&[(
-            Stream::Stderr,
-            "Starting control API...\n",
-        )]));
-        let listener = tokio::net::TcpListener::bind(address).await?;
-        let address = listener.local_addr()?;
-        tasks.spawn(serve_api(
-            store.clone(),
-            listener,
-            (authentication, handoff, facts.clone()),
-            (
-                move || {
-                    drop(write_output(&[(
-                        Stream::Stderr,
-                        &format!("Control API ready: {address}\n"),
-                    )]));
-                },
-                stopped(shutdown.clone()),
-            ),
-        ));
-        start_platform_roles(
-            &mut tasks,
-            (&store, &shutdown),
-            RetentionPolicies {
-                audit: facts.audit,
-                statistics: facts.statistics,
-                snapshots: facts.snapshots,
-                run_logs: facts.run_logs,
-                state_history: facts.state_history,
-            },
-        )?;
+        tasks = start_api(
+            tasks,
+            (address, &store, &shutdown),
+            (authentication, handoff, &facts),
+            run_output,
+        )
+        .await?;
     }
     if facts.scheduler {
         start_scheduler(&mut tasks, (store, facts.origin.clone()), shutdown, workers);

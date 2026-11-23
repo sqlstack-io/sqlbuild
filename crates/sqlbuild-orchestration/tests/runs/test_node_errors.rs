@@ -193,3 +193,94 @@ fn given_a_failed_node_when_people_read_its_error_then_only_evidence_on_that_nod
         });
     }
 }
+
+#[test]
+fn given_a_nul_in_a_failed_nodes_error_when_reported_then_its_failure_and_message_are_recorded() {
+    let test_cases = [
+        RunNodeErrorTestCase {
+            description: "SQLite",
+            backend: Backend::Sqlite,
+            expected_message: "refused order 17",
+        },
+        RunNodeErrorTestCase {
+            description: "PostgreSQL",
+            backend: Backend::Postgres,
+            expected_message: "refused order 17",
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let roles = role_fixture(store).await;
+            let mut input = snapshot(roles.location_id);
+            input.generation = 2;
+            let published = publish_snapshot(store, &input).await.expect("publish");
+            queue(
+                store,
+                &request(
+                    (roles.location_id, published.snapshot_id),
+                    1,
+                    1,
+                    &["orders"],
+                ),
+            )
+            .await;
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let claim = claim_next_run(store, &lease, &BTreeMap::new(), None)
+                .await
+                .expect("claim")
+                .expect("queued run");
+            let run_id = claim.request.run_id;
+            for change in [
+                json!({"kind": "started"}),
+                json!({"kind": "node_finished", "node_key": "orders", "outcome": "failed",
+                    "rows_affected": null, "error_code": "X000", "skipped_because_of": null,
+                    "error_message": "refused \0order 17"}),
+            ] {
+                let reported: RunChangeRequest = serde_json::from_value(json!({
+                    "event_id": Uuid::now_v7(), "run_id": run_id,
+                    "claim_id": claim.claim_id, "change": change,
+                }))
+                .expect("a worker's report body");
+                let authority = RunAuthority::Worker {
+                    run_id,
+                    claim_id: claim.claim_id,
+                };
+                change_run(store, authority, &reported)
+                    .await
+                    .unwrap_or_else(|error| {
+                        panic!("{}: the report was refused: {error}", test_case.description)
+                    });
+            }
+            let nodes = rows(
+                store,
+                "SELECT status FROM sqb_run_nodes WHERE run_id=$1 AND node_key='orders'",
+                vec![Parameter::Id(run_id)],
+            )
+            .await;
+            let error = read_person_run_node_error(
+                store,
+                (&roles.context, credentials(&roles.administrator)),
+                (roles.location_id, "development"),
+                (run_id, "orders"),
+            )
+            .await
+            .expect("administrator")
+            .expect("orders ran");
+            assert_eq!(
+                (nodes[0]["status"].as_str(), error.message.as_deref()),
+                (Some("failed"), Some(test_case.expected_message)),
+                "{}",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}

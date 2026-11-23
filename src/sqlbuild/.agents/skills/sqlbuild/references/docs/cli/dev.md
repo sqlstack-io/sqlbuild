@@ -9,6 +9,7 @@ Online: https://sqlbuild.com/docs/cli/dev/
 ## Contents
 
 - Options
+- Open it to a proxy or a network
 - Set provider secrets
 - Sign in to the warehouse
 - Keys
@@ -57,12 +58,51 @@ and how to fix it.
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| `--port` | `8000` | Port to listen on, on `127.0.0.1`. `0` picks a free port |
+| `--port` | `8000` | Port to listen on. `0` picks a free port |
+| `--host` | `127.0.0.1` | IP address to listen on; see [Open it to a proxy or a network](#open-it-to-a-proxy-or-a-network) |
+| `--allow-host` | None | Also accept this name in `Host` and `Origin`; repeat it for more names |
 | `--target` | The configured target | Target to compile and run |
 | `--control-store-url` | `.sqlbuild/control.sqlite3` in the project | Control store URL or path |
 | `--no-scheduler` | Off | Serve and reload without running scheduled work |
 | `--triggers` | Off | Keep each trigger's default status and your changes to it, instead of pausing every trigger at start-up |
 | `--plain` | Off, unless stdout or stderr is not a terminal | Print appended lines instead of redrawing the screen; see [Plain output](#plain-output) |
+
+## Open it to a proxy or a network
+
+By default `sqb dev` listens on `127.0.0.1` and answers only requests whose `Host`, and `Origin`
+when there is one, are local. That stops other websites in your browser from using the session,
+which has no sign-in.
+
+:::danger
+With `--host` beyond loopback or with `--allow-host`, anyone who can reach that address or name has
+full access without signing in and with your credentials: they can change and run what the project
+can, against your warehouse. These options don't identify callers. A client other than a browser
+can send any `Host` it likes, so only the network or the proxy limits who gets in.
+:::
+
+Use them only for your own session, or for one shared on purpose with people you would hand your
+credentials to, on a trusted network. Use [`sqb server`](server.md) for anything else: when
+people need their own accounts or roles, or the address is reachable by anyone you don't trust.
+
+Behind a reverse proxy on the same machine, allow the name people browse to:
+
+```bash
+sqb dev --allow-host control.example.com
+```
+
+On a trusted network without a proxy, listen on the network and allow each name or IP address that
+people browse to:
+
+```bash
+sqb dev --host 0.0.0.0 --allow-host buildbox.example.com --allow-host 192.0.2.10
+```
+
+An allowed name works over HTTP and HTTPS on the default ports and on `sqb dev`'s own port. For a
+proxy on another port, include it: `--allow-host control.example.com:8443`. A name given with a
+port works only on that port. Write names without a scheme or path; there are no wildcards. Every
+other name stays refused, including when listening on `0.0.0.0`, so other websites and DNS
+rebinding are still blocked. When either option opens the session, a **No sign-in** warning at
+start-up and the ready box's **Access** row say who gets in.
 
 ## Set provider secrets
 
@@ -73,16 +113,26 @@ interpreter when a value changed, so the next compile and run use the new values
 in the shell that started `sqb dev` still win.
 
 While a provider is missing secrets that the target doesn't
-[allow to be missing](../concepts/project-configuration.md#allowed-missing-secrets), a **Secrets missing** warning above the
-keys names the provider and the variables it reads, never their values:
+[allow to be missing](../concepts/project-configuration.md#allowed-missing-secrets), `sqb dev`
+keeps running and prints a warning with each field's file and line, the variable it reads, the
+nodes that need the provider (the first five, then a count) and the fix, never a value:
 
 ```text
-⚠ Secrets missing                region WORKER_TOKEN, REGION_CODE; set them in .env or
-                                 the environment; press r to reload
+⚠ warn   1 provider has missing secrets                          missing secret
+  at     providers/region.py:9   region_token  ← REGION_TOKEN
+         providers/region.py:10  region_code   ← REGION_CODE
+  why    runs that use it stop at the provider check, before the warehouse; 2
+         nodes need it (raw_regions, stg_regions)
+  fix    set them in .env and press r, or set them in the environment you
+         start sqb dev from, then quit and run sqb dev again
 ```
 
-Runs that use the provider stop before they reach the warehouse. The warning clears once the next
-publication finds every secret set; with `--plain`, a `Secrets set` line says so.
+`r` picks up an edit to the env file, which the fix names when the target uses another one. It
+can't pick up a variable exported in a shell afterwards: for that, quit and run `sqb dev` again.
+
+The warning is printed again when the missing variables change, and a **Secrets missing** row stays
+above the keys meanwhile. Once the next publication finds every secret set, the row clears and a
+`Secrets set` line says so.
 
 ## Sign in to the warehouse
 
@@ -203,8 +253,9 @@ timed reads but not the read after each publication or run.
 
 ## Details
 
-- `sqb dev` listens only on loopback and needs no sign-in. Use [`sqb server`](server.md)
-  for a server other people or machines connect to.
+- `sqb dev` needs no sign-in and listens only on loopback unless you
+  [open it up](#open-it-to-a-proxy-or-a-network). Use [`sqb server`](server.md) for a
+  server other people or machines connect to.
 - The control store keeps runs, trigger changes and history between sessions. Delete
   `.sqlbuild/control.sqlite3` to start again from nothing.
 - The location is named after the project, the `name` in `sqlbuild_project.toml`. When the
