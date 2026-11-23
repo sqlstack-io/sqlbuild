@@ -18,8 +18,8 @@ def write_model_format_project(
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "format_models"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    models_dir: Path = project_dir / "models"
-    models_dir.mkdir()
+    models_dir: Path = project_dir / "sql" / "models"
+    models_dir.mkdir(parents=True)
     for model_index in range(model_count):
         models_dir.joinpath(f"orders_{model_index:05d}.sql").write_text(
             'MODEL (description "Generated order model");\n\n'
