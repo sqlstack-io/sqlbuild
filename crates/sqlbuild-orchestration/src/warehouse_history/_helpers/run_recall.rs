@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 use std::time::Duration;
 
 use serde_json::{Value, json};
+use sqlbuild_core::event_export::constants::INVOCATION_START_EVENT_TYPE as INVOCATION_STARTED_EVENT;
 use sqlbuild_recall::records::constants::AUDIT_COMPLETED_EVENT;
 use uuid::Uuid;
 
@@ -29,6 +30,14 @@ use crate::warehouse_history::_helpers::audit_repeats::{audit_due, record_audit}
 
 /// Events whose node may be named only in their payload: older node and check events, and audit results.
 const NODE_EVENTS: &str = "'run_node_started','run_node_finished','run_check_started','run_check_finished','audit_completed'";
+
+/// An `invocation_started` event's command, target, selection size and version columns.
+const START_FIELDS: [(&str, &str); 4] = [
+    ("started_command", "payload->>'command'"),
+    ("started_target", "payload->>'target'"),
+    ("started_selected", "payload->>'selection_count'"),
+    ("started_version", "producer_version"),
+];
 
 /// The payload fields that name the node of an event in `NODE_EVENTS`, as `(column, JSON path)`.
 const NODE_FIELDS: [(&str, &str); 5] = [
@@ -256,7 +265,7 @@ pub(crate) async fn run_events_in(
                  CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN payload->>'binding_key' END AS check_binding_key, \
                  CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN payload->>'result_id' END AS check_result_id, \
                  CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN CAST(payload->>'violation_count' AS BIGINT) END AS check_rows, \
-                 {} FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", node_columns(), next + 1)
+                 {}, {} FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", node_columns(), start_columns(), next + 1)
             },
             vec![
                 Parameter::Integer(after),
@@ -266,10 +275,14 @@ pub(crate) async fn run_events_in(
         |row: &mut Row| {
             let payload = row.remove("member_payload").unwrap_or(Value::Null);
             let launched = row.get("event_type").and_then(Value::as_str) == Some(RUN_LAUNCHED_EVENT);
+            let started: Option<String> = start_message(row);
+            for (column, _) in START_FIELDS {
+                row.remove(column);
+            }
             let message = if launched {
                 launch_message(&payload)?
             } else {
-                member_message(&payload)?
+                started.or(member_message(&payload)?)
             };
             if let Some(message) = message {
                 row.insert("message".into(), Value::String(message));
@@ -336,6 +349,45 @@ pub(crate) fn node_of(row: &Row) -> Option<(String, String)> {
         _ => (text("attachment_kind")?, text("target_name")?),
     };
     Some((kind.into(), name.into()))
+}
+
+/// What started an invocation, read only from an `invocation_started` event's payload and version.
+fn start_columns() -> String {
+    START_FIELDS
+        .iter()
+        .map(|(column, value)| {
+            format!(
+                "CASE WHEN event_type='{INVOCATION_STARTED_EVENT}' THEN {value} END AS {column}"
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// An invocation's command, target, selection and version, such as `sqb build · target uat · 93 selected · SQLBuild 0.259.0`.
+pub(crate) fn start_message(row: &Row) -> Option<String> {
+    let [command, target, selected, version] =
+        START_FIELDS.map(|(column, _)| row.get(column).and_then(shown));
+    let command = command?;
+    let parts: Vec<String> = [
+        Some(format!("sqb {command}")),
+        target.map(|target| format!("target {target}")),
+        selected.map(|count| format!("{count} selected")),
+        version.map(|version| format!("SQLBuild {version}")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    Some(parts.join(" · "))
+}
+
+/// A text or number column as text; `None` when null or empty.
+fn shown(value: &Value) -> Option<String> {
+    match value {
+        Value::String(text) if !text.is_empty() => Some(text.clone()),
+        Value::Number(number) => Some(number.to_string()),
+        _ => None,
+    }
 }
 
 /// The scheduler's summary of a member retry or recovery on its group run, from its own payload.

@@ -19,6 +19,38 @@ const event = (id: string, at: string, extra: Partial<RunEvent> = {}): RunEvent 
 });
 
 describe('run log', () => {
+	it('says when the worker became ready and how long it took, with the command behind the row', () => {
+		const entries = logEntries(
+			[
+				event('launch', '2026-11-23T10:00:00Z', { type: 'launched', nodeKey: null, message: 'Worker started (local process)' }),
+				event('ready', '2026-11-23T10:00:04Z', { type: 'invocation_started', nodeKey: null, message: 'sqb build · target uat · 93 selected · SQLBuild 0.259.0' })
+			],
+			[]
+		);
+		expect(entries.map((e) => e.text)).toEqual(['Worker started (local process)', 'Worker ready · 4.0 s']);
+		expect(entries[1].details).toEqual([['Command', 'sqb build · target uat · 93 selected · SQLBuild 0.259.0']]);
+	});
+
+	it('gives run-level rows a kind in plain words, left out where the text already says it', () => {
+		const entries = logEntries(
+			[
+				event('q', '2026-11-23T10:00:00Z', { type: 'queued', nodeKey: null }),
+				event('c', '2026-11-23T10:00:01Z', { type: 'claimed', nodeKey: null }),
+				event('r', '2026-11-23T10:00:02Z', { type: 'invocation_started', nodeKey: null }),
+				event('f', '2026-11-23T10:00:03Z', { type: 'invocation_failed', nodeKey: null, level: 'error', message: '1 failed' }),
+				event('t', '2026-11-23T10:00:04Z', { type: 'terminated', nodeKey: null, message: 'Terminated: failed' })
+			],
+			[]
+		);
+		expect(entries.map((e) => [e.text, e.tag?.text, e.tag?.repeats])).toEqual([
+			['Queued', 'queued', true],
+			['Claimed write lock', 'queued', false],
+			['Worker ready', 'ready', true],
+			['sqb finished with failures: 1 failed', 'failed', true],
+			['Finished: failed', 'finished', true]
+		]);
+	});
+
 	it("interleaves a group's events and printed lines by time and keeps each line's run", () => {
 		const entries = logEntries(
 			[event('e2', '2026-11-09T08:17:38Z', { type: 'resource_attempt_failed', level: 'error', message: 'ConversionError: no', runId: 'staging' }), event('e1', '2026-11-09T08:17:35Z', { nodeKey: 'model:orders' })],
