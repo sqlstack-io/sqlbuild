@@ -43,7 +43,7 @@ export function change(credits: number, previous: number): { text: string; tone:
 	return { text: `${pct > 0 ? '+' : '−'}${Math.abs(pct)}%`, tone: pct > 0 ? 'up' : 'down' };
 }
 
-export const sharePct = (part: number, total: number) => (total > 0 ? `${Math.round((part / total) * 100)}%` : '—');
+export const sharePct = (part: number, total: number) => (total <= 0 ? '—' : part > 0 && part / total < 0.005 ? '<1%' : `${Math.round((part / total) * 100)}%`);
 
 export function hours(seconds: number): string {
 	if (seconds < 3600) return `${Math.max(1, Math.round(seconds / 60))}m`;

@@ -27,6 +27,9 @@ export async function loadCost(client: ApiClient, scope: Scope, days: Period, so
 		sizes: s.byWarehouseSize.map((g) => row(g, g.key ?? 'Unknown size')),
 		models: s.byNode.map((g) => ({ ...row(g, g.key ?? ''), folder: '', job: '', queries: 0, bytesScanned: 0 })),
 		runs: [],
-		daily: []
+		daily: [],
+		facts: [],
+		jobDaily: {},
+		jobSize: {}
 	};
 }

@@ -43,6 +43,22 @@ export type CostRun = {
 	size: string;
 };
 
+/** One job's cost on one model over the period (new: the API has jobs and models, not both together). */
+export type CostFact = {
+	job: string;
+	model: string;
+	/** The model's folder path, such as `staging/partners/web`. */
+	folder: string;
+	/** The model's share of each of the job's runs. */
+	share: number;
+	credits: number;
+	previous: number;
+	seconds: number;
+	runs: number;
+	queries: number;
+	bytesScanned: number;
+};
+
 /** One day of the period, split by job and by warehouse size (new). */
 export type CostDay = { date: string; credits: number; byJob: Record<string, number>; bySize: Record<string, number> };
 
@@ -62,7 +78,12 @@ export type CostPage = {
 	models: CostModel[];
 	runs: CostRun[];
 	daily: CostDay[];
+	/** Every job-and-model pair with cost (new). */
+	facts: CostFact[];
+	/** Each job's cost per day, in the order of `daily` (new). */
+	jobDaily: Record<string, number[]>;
+	jobSize: Record<string, string>;
 };
 
-export type Variant = 'a' | 'b' | 'c' | 'd';
+export type Variant = 'a' | 'b' | 'c' | 'd' | 'e' | 'f';
 export type Period = 7 | 30;
