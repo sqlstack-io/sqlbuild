@@ -1,6 +1,6 @@
 """Carrier pickup client."""
 
-from python.nodes.providers.carrier_api.constants import MINIMUM_CHARGE_CENTS
+from python.providers.carrier_api.constants import MINIMUM_CHARGE_CENTS
 
 from sqlbuild.providers import Provider
 

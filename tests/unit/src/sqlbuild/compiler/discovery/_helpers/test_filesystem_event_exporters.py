@@ -74,7 +74,7 @@ class Sink(Provider):
     pass
 """,
             "python/event_sinks/publish.py": """
-from python.nodes.providers.sink import Sink
+from python.providers.sink import Sink
 from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
 
 @lifecycle_event_sink
@@ -256,7 +256,7 @@ class Sink(Provider):
     pass
 """,
             "python/event_sinks/invalid.py": (
-                "from python.nodes.providers.sink import Sink\n"
+                "from python.providers.sink import Sink\n"
                 "from sqlbuild.event_sinks import lifecycle_event_sink\n"
                 "from sqlbuild.providers import Provider\n\n"
                 "class Other(Provider):\n    pass\n\n"

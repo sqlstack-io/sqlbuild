@@ -12,7 +12,7 @@ fn record(handle: usize, path: &str, scope: ScopeKind, owning_path: Option<&str>
             owner: None,
             owning_path: owning_path.map(str::to_owned),
         },
-        ownership_root: "models".to_owned(),
+        ownership_root: "sql/models".to_owned(),
     }
 }
 

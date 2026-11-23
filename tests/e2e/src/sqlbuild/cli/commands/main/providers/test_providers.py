@@ -132,7 +132,7 @@ def test_given_provider_usages_when_planning_then_text_and_json_include_selected
             + "\n",
             "python/nodes/loaders/raw_orders.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.loaders import loader
 
 
@@ -145,7 +145,7 @@ def test_given_provider_usages_when_planning_then_text_and_json_include_selected
             + "\n",
             "python/nodes/tasks/publish_orders.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.assets import asset
 
 
@@ -158,7 +158,7 @@ def test_given_provider_usages_when_planning_then_text_and_json_include_selected
             + "\n",
             "sql/hooks/python/mark_pre.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.hooks import hook
 
 
@@ -171,7 +171,7 @@ def test_given_provider_usages_when_planning_then_text_and_json_include_selected
             + "\n",
             "python/materializations/copy_table.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.executor.custom.models import (
                     MaterializationContext,
                     MaterializationResult,
@@ -325,7 +325,7 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
             + "\n",
             "python/nodes/tasks/provider_task.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.assets import asset
 
 
@@ -338,7 +338,7 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
             + "\n",
             "python/nodes/assets/provider_asset.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.assets import asset
 
 
@@ -351,7 +351,7 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
             + "\n",
             "python/nodes/checks/provider_check.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.checks import check
 
 
@@ -365,7 +365,7 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
             + "\n",
             "python/nodes/loaders/provider_loader.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.loaders import loader
 
 
@@ -447,7 +447,7 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                 "python/providers/marker.py": PROVIDER_MARKER_FILE,
                 "python/nodes/tasks/failing_task.py": dedent(
                     """
-                    from python.nodes.providers.marker import MarkerProvider
+                    from python.providers.marker import MarkerProvider
                     from sqlbuild.assets import asset
 
 
@@ -470,7 +470,7 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                 "python/providers/marker.py": PROVIDER_MARKER_FILE,
                 "python/nodes/assets/failing_asset.py": dedent(
                     """
-                    from python.nodes.providers.marker import MarkerProvider
+                    from python.providers.marker import MarkerProvider
                     from sqlbuild.assets import asset
 
 
@@ -493,7 +493,7 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                 "python/providers/marker.py": PROVIDER_MARKER_FILE,
                 "python/nodes/checks/failing_check.py": dedent(
                     """
-                    from python.nodes.providers.marker import MarkerProvider
+                    from python.providers.marker import MarkerProvider
                     from sqlbuild.checks import check
 
 
@@ -516,7 +516,7 @@ def test_given_project_with_provider_when_running_commands_then_provider_is_inje
                 "python/providers/marker.py": PROVIDER_MARKER_FILE,
                 "python/nodes/loaders/failing_loader.py": dedent(
                     """
-                    from python.nodes.providers.marker import MarkerProvider
+                    from python.providers.marker import MarkerProvider
                     from sqlbuild.loaders import loader
 
 
@@ -598,7 +598,7 @@ def test_given_provider_project_when_running_compile_or_plan_then_provider_setup
             "python/providers/marker.py": PROVIDER_MARKER_FILE,
             "python/nodes/tasks/provider_task.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.assets import asset
 
 
@@ -709,7 +709,7 @@ def test_given_custom_materialization_with_provider_when_it_fails_then_provider_
             "python/providers/marker.py": PROVIDER_MARKER_FILE,
             "python/materializations/marker_mat.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.executor.custom.models import MaterializationContext
 
 
@@ -800,7 +800,7 @@ def test_given_concurrent_provider_backed_nodes_when_running_command_then_share_
             + "\n",
             "python/nodes/loaders/events.py": dedent(
                 """
-                from python.nodes.providers.concurrent_marker import ConcurrentMarkerProvider
+                from python.providers.concurrent_marker import ConcurrentMarkerProvider
                 from sqlbuild.loaders import loader
 
 
@@ -898,7 +898,7 @@ def test_given_python_hooks_with_provider_when_building_then_hooks_use_provider_
             "python/providers/marker.py": PROVIDER_MARKER_FILE,
             "sql/hooks/python/marker_hooks.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.hooks import hook
 
 
@@ -968,7 +968,7 @@ def test_given_view_model_python_hooks_with_provider_when_building_then_hooks_us
             "python/providers/marker.py": PROVIDER_MARKER_FILE,
             "sql/hooks/python/marker_hooks.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.hooks import hook
 
 
@@ -1174,7 +1174,7 @@ def test_given_materialization_hooks_with_provider_when_building_then_hooks_use_
         "python/providers/marker.py": PROVIDER_MARKER_FILE,
         "sql/hooks/python/marker_hooks.py": dedent(
             """
-            from python.nodes.providers.marker import MarkerProvider
+            from python.providers.marker import MarkerProvider
             from sqlbuild.hooks import hook
 
 
@@ -1290,7 +1290,7 @@ def test_given_python_hook_with_provider_when_hook_fails_then_provider_tears_dow
             "python/providers/marker.py": PROVIDER_MARKER_FILE,
             "sql/hooks/python/marker_hooks.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.hooks import hook
 
 
@@ -1352,7 +1352,7 @@ def test_given_python_post_hook_with_provider_when_hook_fails_then_provider_tear
             "python/providers/marker.py": PROVIDER_MARKER_FILE,
             "sql/hooks/python/marker_hooks.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.hooks import hook
 
 
@@ -1494,7 +1494,7 @@ def test_given_provider_annotation_mismatch_on_hook_when_building_then_cli_print
             + "\n",
             "sql/hooks/python/marker_hooks.py": dedent(
                 """
-                from python.nodes.providers.other import OtherProvider
+                from python.providers.other import OtherProvider
                 from sqlbuild.hooks import hook
 
 
@@ -1556,7 +1556,7 @@ def test_given_python_hook_kwarg_matches_provider_when_building_then_cli_prints_
             "python/providers/marker.py": PROVIDER_MARKER_FILE,
             "sql/hooks/python/marker_hooks.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.hooks import hook
 
 
@@ -1642,7 +1642,7 @@ def test_given_python_hook_kwarg_matches_context_when_building_then_cli_prints_c
             "python/providers/marker.py": PROVIDER_MARKER_FILE,
             "sql/hooks/python/marker_hooks.py": dedent(
                 """
-                from python.nodes.providers.marker import MarkerProvider
+                from python.providers.marker import MarkerProvider
                 from sqlbuild.hooks import hook
 
 

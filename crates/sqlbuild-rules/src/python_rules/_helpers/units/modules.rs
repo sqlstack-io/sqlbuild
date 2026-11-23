@@ -1,4 +1,4 @@
-//! The statements a unit's node.py, main.py and checks.py may hold.
+//! The statements a unit's declaration file, main.py and checks.py may hold.
 
 use sqlbuild_pysource::node_units::models::{UnitFunction, UnitPosition, UnitStatementKind};
 
@@ -8,20 +8,22 @@ use crate::python_rules::_helpers::units::project::{
     unit_member,
 };
 use crate::python_rules::constants::{
-    CHECKS_MODULE_SHAPE_CODE, MAIN_MODULE_SHAPE_CODE, MAIN_NAME, MAIN_RESULTS, NODE_MODULE,
-    NODE_MODULE_SHAPE_CODE, UNIT_CHECKS_FILE, UNIT_MAIN_FILE, UNIT_NODE_FILE,
+    CHECKS_MODULE_SHAPE_CODE, MAIN_MODULE_SHAPE_CODE, MAIN_NAME, MAIN_RESULTS, NODE_MODULES,
+    NODE_MODULE_SHAPE_CODE, UNIT_CHECKS_FILE, UNIT_DECLARATION_FILES, UNIT_MAIN_FILE,
 };
 use crate::python_rules::models::{UnitFile, UnitProject};
 
 const FILE_START: UnitPosition = UnitPosition { line: 1, column: 1 };
 const OTHER_STATEMENT: &str = "a statement that is not an import or a function";
 
-/// Statements and functions node.py, main.py and checks.py may not hold.
+/// Statements and functions a declaration file, main.py and checks.py may not hold.
 pub(crate) fn module_shape_faults(project: &UnitProject<'_>) -> Vec<Fault> {
     let mut faults: Vec<Fault> = Vec::new();
     for file in &project.files {
         match unit_file_name(file) {
-            Some(UNIT_NODE_FILE) => faults.extend(node_module_faults(file)),
+            Some(name) if UNIT_DECLARATION_FILES.contains(&name) => {
+                faults.extend(node_module_faults(file));
+            }
             Some(UNIT_MAIN_FILE) => faults.extend(main_module_faults(file, project)),
             Some(UNIT_CHECKS_FILE) => faults.extend(checks_module_faults(file, project)),
             _ => {}
@@ -30,7 +32,7 @@ pub(crate) fn module_shape_faults(project: &UnitProject<'_>) -> Vec<Fault> {
     faults
 }
 
-/// node.py: imports and exactly one node or factory declaration.
+/// A declaration file: imports and exactly one node or factory declaration.
 fn node_module_faults(file: &UnitFile<'_>) -> Vec<Fault> {
     let mut faults: Vec<Fault> = Vec::new();
     let mut declarations: usize = 0;
@@ -139,9 +141,9 @@ fn main_result_detail(function: &UnitFunction, kind: Option<&str>) -> Option<Str
     })
 }
 
-/// The kind of the node the unit's node.py declares, or of the first node its factory generates.
+/// The kind of the node the unit's declaration file declares, or of the first node its factory generates.
 fn node_kind(project: &UnitProject<'_>, unit: &str) -> Option<&'static str> {
-    let node: &UnitFile<'_> = unit_member(project, unit, UNIT_NODE_FILE)?;
+    let node: &UnitFile<'_> = declaration_member(project, unit)?;
     top_functions(node).find_map(|function| match declared(function)? {
         (Declared::Node(kind, _), _) => Some(kind),
         (Declared::Factory, _) => function.inner.iter().find_map(declared_node_kind),
@@ -160,10 +162,10 @@ fn declared_node_kind(function: &UnitFunction) -> Option<&'static str> {
 /// checks.py: imports and checks of the unit's own node that return directly, or one factory.
 fn checks_module_faults(file: &UnitFile<'_>, project: &UnitProject<'_>) -> Vec<Fault> {
     let unit_node: Vec<String> = file.unit.as_deref().map_or_else(Vec::new, |unit| {
-        let mut names: Vec<String> = names_from_unit_modules(file, project, unit, &[NODE_MODULE])
+        let mut names: Vec<String> = names_from_unit_modules(file, project, unit, &NODE_MODULES)
             .into_iter()
             .collect();
-        if let Some(node) = unit_member(project, unit, UNIT_NODE_FILE) {
+        if let Some(node) = declaration_member(project, unit) {
             names.extend(top_functions(node).map(|function| function.name.clone()));
         }
         names
@@ -223,4 +225,11 @@ fn checks_module_faults(file: &UnitFile<'_>, project: &UnitProject<'_>) -> Vec<F
         }));
     }
     faults
+}
+
+/// The unit's declaration file, if it has one.
+fn declaration_member<'p, 'a>(project: &'p UnitProject<'a>, unit: &str) -> Option<&'p UnitFile<'a>> {
+    UNIT_DECLARATION_FILES
+        .iter()
+        .find_map(|name| unit_member(project, unit, name))
 }

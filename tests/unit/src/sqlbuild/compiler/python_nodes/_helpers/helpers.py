@@ -672,7 +672,7 @@ def _node_files(domain: str, index: int) -> dict[str, str]:
     return {
         f"{folder}/node.py": f'''"""Sync {domain} batch {index}."""
 
-from python.nodes.providers.warehouse_api.provider import WarehouseApi
+from python.providers.warehouse_api.provider import WarehouseApi
 from python.nodes.{domain}._helpers.rows import RowBatch
 from python.nodes.{domain}.{name}.main import main
 from sqlbuild.assets import asset

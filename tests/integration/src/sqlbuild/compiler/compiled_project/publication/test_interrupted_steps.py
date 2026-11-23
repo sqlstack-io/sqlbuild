@@ -24,7 +24,7 @@ import os
 import time
 from pathlib import Path
 
-from python.nodes.providers.marker import MarkerProvider
+from python.providers.marker import MarkerProvider
 from sqlbuild.assets import AssetContext, asset
 from sqlbuild.discovery import Discovered, Item, discover
 

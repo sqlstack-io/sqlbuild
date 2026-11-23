@@ -999,7 +999,7 @@ def write_provider_asset_project(*, project_dir: Path, annotation: str) -> None:
         ),
         "python/providers/orders.py": PROVIDER_SOURCE,
         "python/nodes/orders.py": (
-            "from python.nodes.providers.orders import OrdersProvider\n"
+            "from python.providers.orders import OrdersProvider\n"
             "from sqlbuild.assets import asset\n\n\n"
             "@asset\n"
             f"def refresh_orders(ctx, orders_provider: {annotation}):\n"
@@ -1998,8 +1998,8 @@ _SINK_STEPS: str = """\
 import time
 from pathlib import Path
 
-from python.nodes.providers.gateway import GatewayProvider
-from python.nodes.providers.journal import JournalProvider
+from python.providers.gateway import GatewayProvider
+from python.providers.journal import JournalProvider
 from sqlbuild.assets import AssetContext, asset
 from sqlbuild.discovery import Discovered, Item, discover
 
@@ -2048,7 +2048,7 @@ class GatewayProvider(Provider):
         time.sleep(3600)
 """
 _SINK_FUNCTION: str = """\
-from python.nodes.providers.journal import JournalProvider
+from python.providers.journal import JournalProvider
 from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
 
 

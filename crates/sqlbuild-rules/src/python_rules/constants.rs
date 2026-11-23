@@ -15,8 +15,8 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
         applies: PythonFiles::Package,
         enabled_by_default: true,
         options: &[],
-        message: "python/ may hold only domain packages, utils/ and __init__.py",
-        remediation: "Move direct modules into a domain package. Give each node its own unit folder holding node.py and main.py inside its domain, such as python/orders/partner_export/, and keep role folders such as _helpers/ inside the domain or unit.",
+        message: "python/nodes/ may hold only domain packages, utils/ and __init__.py",
+        remediation: "Move direct modules into a domain package. Give each node its own unit folder holding its declaration file and main.py inside its domain, such as python/nodes/orders/partner_export/, and keep role folders such as _helpers/ inside the domain or unit.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON002",
@@ -27,8 +27,8 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
         applies: PythonFiles::Package,
         enabled_by_default: true,
         options: &[],
-        message: "packages under python/ must be named for what they own",
-        remediation: "Rename generic packages such as common/, shared/ or helpers/ after the domain or capability they hold; utils/ is allowed only directly under python/.",
+        message: "packages under python/nodes/ must be named for what they own",
+        remediation: "Rename generic packages such as common/, shared/ or helpers/ after the domain or capability they hold; utils/ is allowed only directly under python/nodes/.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON003",
@@ -39,8 +39,8 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
         applies: PythonFiles::Package,
         enabled_by_default: true,
         options: &[],
-        message: "a unit folder holds node.py, main.py, optional role files and _helpers/ only",
-        remediation: "Add main.py beside node.py, and move any other module into _helpers/ or a named role file: checks.py, models.py, types.py, constants.py or exceptions.py.",
+        message: "a unit folder holds one declaration file, main.py, optional role files and _helpers/ only",
+        remediation: "Add main.py beside the declaration file (loader.py, asset.py, loaders.py, assets.py or factory.py), and move any other module into _helpers/ or a named role file: checks.py, models.py, types.py, constants.py or exceptions.py.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON004",
@@ -51,8 +51,8 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
         applies: PythonFiles::Package,
         enabled_by_default: true,
         options: &[],
-        message: "node.py holds imports and exactly one node or factory declaration",
-        remediation: "Keep one @loader, @asset or @factory function in node.py; move helpers to _helpers/, constants to constants.py and checks to checks.py.",
+        message: "a declaration file holds imports and exactly one node or factory declaration",
+        remediation: "Keep one @loader, @asset or @factory function in the declaration file; move helpers to _helpers/, constants to constants.py and checks to checks.py.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON005",
@@ -64,7 +64,7 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
         enabled_by_default: true,
         options: &[],
         message: "a node declaration's body is `return main(...)` from its unit's main.py, with every argument passed by keyword",
-        remediation: "Move the logic into main() in the unit's main.py, import it with `from .main import main` or its full python. path, and pass each argument as name=value, including ctx.",
+        remediation: "Move the logic into main() in the unit's main.py, import it with `from .main import main` or its full python.nodes. path, and pass each argument as name=value, including ctx.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON006",
@@ -99,8 +99,8 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
         applies: PythonFiles::Package,
         enabled_by_default: true,
         options: &[],
-        message: "a unit imports only its own files, its domain's role files and _helpers/, python/utils/, provider role files, and other units' node.py for depends_on",
-        remediation: "Import shared code from python/utils/<capability>/ or the domain's role files, and name another unit's node only in depends_on; never import another unit's main.py, role files or _helpers/.",
+        message: "a unit imports only its own files, its domain's role files and _helpers/, python/nodes/utils/, provider role files, and other units' declaration files for depends_on",
+        remediation: "Import shared code from python/nodes/utils/<capability>/ or the domain's role files, and name another unit's node only in depends_on; never import another unit's main.py, role files or _helpers/.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON009",
@@ -147,8 +147,8 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
         applies: PythonFiles::Package,
         enabled_by_default: true,
         options: &[],
-        message: "nodes are declared in a unit's node.py, and checks in a unit's checks.py",
-        remediation: "Move the declaration into its own unit folder under its domain, with the implementation in that folder's main.py.",
+        message: "nodes are declared in a unit's file named for their kind: loader.py, asset.py, loaders.py, assets.py, factory.py or checks.py",
+        remediation: "Move the declaration into its own unit folder under its domain, in the file named for what it declares, with the implementation in that folder's main.py.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON013",
@@ -159,8 +159,8 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
         applies: PythonFiles::All,
         enabled_by_default: true,
         options: &[],
-        message: "providers/ holds capability folders, each with provider.py, optional role files, _helpers/ and _classes/ only",
-        remediation: "Move a module directly under providers/ into providers/<capability>/provider.py, add provider.py to each capability folder, and move other modules into _helpers/, _classes/ or a role file: models.py, types.py, constants.py or exceptions.py.",
+        message: "python/providers/ holds capability folders, each with provider.py, optional role files, _helpers/ and _classes/ only",
+        remediation: "Move a module directly under python/providers/ into python/providers/<capability>/provider.py, add provider.py to each capability folder, and move other modules into _helpers/, _classes/ or a role file: models.py, types.py, constants.py or exceptions.py.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON014",
@@ -183,8 +183,8 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
         applies: PythonFiles::All,
         enabled_by_default: true,
         options: &[],
-        message: "a provider's _helpers/ and _classes/ are private to it, and providers import only python/utils/ from the runtime package and nothing from orchestration/",
-        remediation: "Import a provider through provider.py or its role files; move code a provider shares with nodes into python/utils/<capability>/.",
+        message: "a provider's _helpers/ and _classes/ are private to it, and providers import only python/nodes/utils/ from the node package and nothing from orchestration/",
+        remediation: "Import a provider through provider.py or its role files; move code a provider shares with nodes into python/nodes/utils/<capability>/.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON016",
@@ -255,8 +255,8 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
         applies: PythonFiles::Tests,
         enabled_by_default: true,
         options: &[],
-        message: "Python tests must mirror an existing module under python/, providers/ or orchestration/",
-        remediation: "Move the test to tests/python/, tests/providers/ or tests/orchestration/ at the path of the module it tests: tests/python/orders/storefront_import/test_main.py tests python/orders/storefront_import/main.py.",
+        message: "Python tests must mirror an existing module under python/nodes/, python/providers/ or orchestration/",
+        remediation: "Move the test to tests/python/nodes/, tests/python/providers/ or tests/orchestration/ at the path of the module it tests: tests/python/nodes/orders/storefront_import/test_main.py tests python/nodes/orders/storefront_import/main.py.",
     },
     PythonRuleSpec {
         code: "SQBRPYTHON022",
@@ -1354,8 +1354,10 @@ pub(crate) const PYTHON_RULES: [PythonRuleSpec; 108] = [
     },
 ];
 
-/// The project folder that holds the runtime Python package, imported as `python`.
-pub(crate) const PACKAGE_ROOT: &str = "python";
+/// The project folder that holds the node package, imported as `python.nodes`.
+pub(crate) const PACKAGE_ROOT: &str = "python/nodes";
+/// The dotted module of the node package.
+pub(crate) const PACKAGE_MODULE: &str = "python.nodes";
 /// Fensu's scope for runtime code; every carried family applies to it.
 pub(crate) const ROOT_SCOPE: &str = "root";
 pub(crate) const INIT_FILE: &str = "__init__.py";
@@ -1581,11 +1583,12 @@ pub(crate) const ORCHESTRATION_SUPPORT_FOLDER: &str = "_helpers";
 pub(crate) const PRIVATE_PREFIX: &str = "_";
 /// The name a `from module import *` binds.
 pub(crate) const STAR_IMPORT: &str = "*";
-/// The file that declares a unit's node and makes its folder a unit.
-pub(crate) const UNIT_NODE_FILE: &str = "node.py";
+/// The files that declare a unit's nodes and make its folder a unit, one per unit.
+pub(crate) const UNIT_DECLARATION_FILES: [&str; 5] =
+    ["loader.py", "asset.py", "loaders.py", "assets.py", "factory.py"];
 /// The file holding a unit's checks.
 pub(crate) const UNIT_CHECKS_FILE: &str = "checks.py";
-/// The files a unit folder may hold beside `node.py` and `main.py`.
+/// The files a unit folder may hold beside its declaration file and `main.py`.
 pub(crate) const UNIT_ROLE_FILES: [&str; 6] = [
     "checks.py",
     "models.py",
@@ -1600,15 +1603,17 @@ pub(crate) const UNIT_HELPERS_FOLDER: &str = "_helpers";
 pub(crate) const SHARED_ROLE_MODULES: [&str; 4] = ["models", "types", "constants", "exceptions"];
 /// The modules a factory may take its specs from.
 pub(crate) const SPEC_MODULES: [&str; 2] = ["constants", "models"];
-/// The project folder holding providers, imported as `providers`.
-pub(crate) const PROVIDERS_ROOT: &str = "providers";
+/// The project folder holding providers, imported as `python.providers`.
+pub(crate) const PROVIDERS_ROOT: &str = "python/providers";
+/// The dotted module of the providers package.
+pub(crate) const PROVIDERS_MODULE: &str = "python.providers";
 /// The public files of a provider capability a unit may import, as module names.
 pub(crate) const PROVIDER_ROLE_MODULES: [&str; 5] =
     ["provider", "models", "types", "constants", "exceptions"];
 /// The module a node delegates to, and the function it calls.
 pub(crate) const MAIN_NAME: &str = "main";
-/// The module a unit declares its node in.
-pub(crate) const NODE_MODULE: &str = "node";
+/// The modules a unit declares its nodes in.
+pub(crate) const NODE_MODULES: [&str; 5] = ["loader", "asset", "loaders", "assets", "factory"];
 /// The only positional parameter of a node or check.
 pub(crate) const CONTEXT_PARAMETER: &str = "ctx";
 /// The decorator keywords the unit rules read.

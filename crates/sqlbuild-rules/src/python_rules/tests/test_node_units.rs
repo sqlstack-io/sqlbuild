@@ -50,8 +50,8 @@ fn given_node_units_when_evaluating_unit_rules_then_reports_each_broken_conventi
                     "def today() -> str:\n    return ''\n",
                 ),
                 (
-                    "python/nodes/orders/daily/node.py",
-                    r#"from python.nodes.providers.store.provider import Store
+                    "python/nodes/orders/daily/asset.py",
+                    r#"from python.providers.store.provider import Store
 
 from .main import main
 
@@ -66,7 +66,7 @@ def daily(ctx: AssetContext, *, store: Store) -> None:
                     r#""""Daily totals."""
 from sqlbuild import PythonNodeResult, PythonNodeSkipResult
 
-from python.nodes.providers.store.provider import Store
+from python.providers.store.provider import Store
 from python.nodes.orders._helpers.dates import today
 from python.nodes.orders.constants import LIMIT
 from python.nodes.utils.text import clean
@@ -84,7 +84,7 @@ def main(ctx: AssetContext, store: Store) -> PythonNodeResult | PythonNodeSkipRe
                 ),
                 (
                     "python/nodes/orders/daily/checks.py",
-                    r#"from .node import daily
+                    r#"from .asset import daily
 
 
 @check(depends_on=[daily], description="Totals are positive.")
@@ -93,8 +93,8 @@ def totals_positive(ctx: CheckContext) -> bool:
 "#,
                 ),
                 (
-                    "python/nodes/orders/weekly/node.py",
-                    r#"from python.nodes.orders.daily.node import daily
+                    "python/nodes/orders/weekly/asset.py",
+                    r#"from python.nodes.orders.daily.asset import daily
 from python.nodes.orders.weekly.main import main
 
 
@@ -108,7 +108,7 @@ def weekly(ctx: AssetContext) -> None:
                     "def main(ctx: AssetContext) -> PythonNodeResult:\n    return ctx.result()\n",
                 ),
                 (
-                    "python/nodes/orders/raw/node.py",
+                    "python/nodes/orders/raw/loader.py",
                     r#"from .main import main
 
 
@@ -122,7 +122,7 @@ def raw(ctx: LoaderContext) -> list:
                     "def main(ctx: LoaderContext) -> Optional[Iterator[dict]]:\n    return None\n",
                 ),
                 (
-                    "python/nodes/orders/regions/node.py",
+                    "python/nodes/orders/regions/factory.py",
                     r#"from .constants import REGIONS
 from .main import main
 
@@ -155,8 +155,8 @@ def region_exports():
         PythonRunTestCase {
             description: "unit layout: a missing main.py, a stray module and a folder that is not _helpers/",
             files: &[
-                ("python/nodes/orders/daily/node.py", DAILY_ASSET),
-                ("python/nodes/orders/weekly/node.py", ""),
+                ("python/nodes/orders/daily/asset.py", DAILY_ASSET),
+                ("python/nodes/orders/weekly/asset.py", ""),
                 ("python/nodes/orders/weekly/main.py", ""),
                 ("python/nodes/orders/weekly/report.py", ""),
                 ("python/nodes/orders/weekly/sql/query.py", ""),
@@ -164,16 +164,16 @@ def region_exports():
             ],
             config: json!({ "select": ["SQBRPYTHON003"] }),
             expected_faults: vec![
-                ("SQBRPYTHON003", "python/nodes/orders/daily/node.py", 1, 1),
+                ("SQBRPYTHON003", "python/nodes/orders/daily/asset.py", 1, 1),
                 ("SQBRPYTHON003", "python/nodes/orders/weekly/report.py", 1, 1),
                 ("SQBRPYTHON003", "python/nodes/orders/weekly/sql/query.py", 1, 1),
             ],
         },
         PythonRunTestCase {
-            description: "node.py: statements, helpers and a second declaration report; an empty node.py reports at its start",
+            description: "asset.py: statements, helpers and a second declaration report; an empty asset.py reports at its start",
             files: &[
                 (
-                    "python/nodes/orders/daily/node.py",
+                    "python/nodes/orders/daily/asset.py",
                     r#""""Daily."""
 from .main import main
 
@@ -194,21 +194,21 @@ def extra(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#,
                 ),
-                ("python/nodes/orders/weekly/node.py", "from .main import main\n"),
+                ("python/nodes/orders/weekly/asset.py", "from .main import main\n"),
             ],
             config: json!({ "select": ["SQBRPYTHON004"] }),
             expected_faults: vec![
-                ("SQBRPYTHON004", "python/nodes/orders/daily/node.py", 4, 1),
-                ("SQBRPYTHON004", "python/nodes/orders/daily/node.py", 7, 5),
-                ("SQBRPYTHON004", "python/nodes/orders/daily/node.py", 17, 5),
-                ("SQBRPYTHON004", "python/nodes/orders/weekly/node.py", 1, 1),
+                ("SQBRPYTHON004", "python/nodes/orders/daily/asset.py", 4, 1),
+                ("SQBRPYTHON004", "python/nodes/orders/daily/asset.py", 7, 5),
+                ("SQBRPYTHON004", "python/nodes/orders/daily/asset.py", 17, 5),
+                ("SQBRPYTHON004", "python/nodes/orders/weekly/asset.py", 1, 1),
             ],
         },
         PythonRunTestCase {
             description: "delegation: positional arguments, extra statements, unpacking and another unit's main report",
             files: &[
                 (
-                    "python/nodes/orders/daily/node.py",
+                    "python/nodes/orders/daily/asset.py",
                     r#"from python.nodes.orders.daily.main import main
 from python.nodes.orders.weekly.main import main as weekly_main
 
@@ -236,7 +236,7 @@ def unpacked(ctx: AssetContext) -> None:
                 ),
                 ("python/nodes/orders/daily/main.py", ASSET_MAIN),
                 (
-                    "python/nodes/orders/weekly/node.py",
+                    "python/nodes/orders/weekly/asset.py",
                     r#"from python.nodes.orders.daily.main import main
 
 
@@ -249,16 +249,16 @@ def weekly(ctx: AssetContext) -> None:
             ],
             config: json!({ "select": ["SQBRPYTHON005"] }),
             expected_faults: vec![
-                ("SQBRPYTHON005", "python/nodes/orders/daily/node.py", 11, 5),
-                ("SQBRPYTHON005", "python/nodes/orders/daily/node.py", 16, 5),
-                ("SQBRPYTHON005", "python/nodes/orders/daily/node.py", 22, 5),
-                ("SQBRPYTHON005", "python/nodes/orders/weekly/node.py", 5, 5),
+                ("SQBRPYTHON005", "python/nodes/orders/daily/asset.py", 11, 5),
+                ("SQBRPYTHON005", "python/nodes/orders/daily/asset.py", 16, 5),
+                ("SQBRPYTHON005", "python/nodes/orders/daily/asset.py", 22, 5),
+                ("SQBRPYTHON005", "python/nodes/orders/weekly/asset.py", 5, 5),
             ],
         },
         PythonRunTestCase {
             description: "main.py: other statements, a result that does not fit the node kind, and no main()",
             files: &[
-                ("python/nodes/orders/daily/node.py", DAILY_ASSET),
+                ("python/nodes/orders/daily/asset.py", DAILY_ASSET),
                 (
                     "python/nodes/orders/daily/main.py",
                     r#"from sqlbuild import PythonNodeResult
@@ -274,15 +274,15 @@ def helper() -> None:
     pass
 "#,
                 ),
-                ("python/nodes/orders/weekly/node.py", ""),
+                ("python/nodes/orders/weekly/asset.py", ""),
                 (
                     "python/nodes/orders/weekly/main.py",
                     "def run() -> None:\n    pass\n",
                 ),
-                ("python/nodes/orders/stock/node.py", ""),
+                ("python/nodes/orders/stock/asset.py", ""),
                 ("python/nodes/orders/stock/main.py", "def main(ctx):\n    pass\n"),
                 (
-                    "python/nodes/orders/raw/node.py",
+                    "python/nodes/orders/raw/loader.py",
                     "from .main import main\n\n\n@loader\ndef raw(ctx: LoaderContext) -> list:\n    return main(ctx=ctx)\n",
                 ),
                 (
@@ -305,7 +305,7 @@ def helper() -> None:
             description: "signature: ctx missing or mistyped, variadics and unannotated providers report; positional-only ctx does not",
             files: &[
                 (
-                    "python/nodes/orders/daily/node.py",
+                    "python/nodes/orders/daily/asset.py",
                     r#"from .main import main
 
 
@@ -331,7 +331,7 @@ def positional_only(ctx: AssetContext, /) -> None:
                 ),
                 (
                     "python/nodes/orders/daily/checks.py",
-                    r#"from .node import no_ctx
+                    r#"from .asset import no_ctx
 
 
 @check(depends_on=[no_ctx], description="Q.")
@@ -343,10 +343,10 @@ def quality(ctx: AssetContext) -> bool:
             config: json!({ "select": ["SQBRPYTHON007"] }),
             expected_faults: vec![
                 ("SQBRPYTHON007", "python/nodes/orders/daily/checks.py", 5, 5),
-                ("SQBRPYTHON007", "python/nodes/orders/daily/node.py", 5, 5),
-                ("SQBRPYTHON007", "python/nodes/orders/daily/node.py", 10, 5),
-                ("SQBRPYTHON007", "python/nodes/orders/daily/node.py", 15, 5),
-                ("SQBRPYTHON007", "python/nodes/orders/daily/node.py", 15, 5),
+                ("SQBRPYTHON007", "python/nodes/orders/daily/asset.py", 5, 5),
+                ("SQBRPYTHON007", "python/nodes/orders/daily/asset.py", 10, 5),
+                ("SQBRPYTHON007", "python/nodes/orders/daily/asset.py", 15, 5),
+                ("SQBRPYTHON007", "python/nodes/orders/daily/asset.py", 15, 5),
             ],
         },
         PythonRunTestCase {
@@ -361,13 +361,13 @@ def quality(ctx: AssetContext) -> bool:
                     "from python.nodes.orders.weekly.main import main\n",
                 ),
                 ("python/nodes/orders/_helpers/dates.py", ""),
-                ("python/nodes/orders/daily/node.py", DAILY_ASSET),
+                ("python/nodes/orders/daily/asset.py", DAILY_ASSET),
                 ("python/nodes/orders/daily/_helpers/rows.py", ""),
                 (
                     "python/nodes/orders/daily/main.py",
                     r#"import os
 from sqlbuild import PythonNodeResult
-from python.nodes.providers.store.provider import Store
+from python.providers.store.provider import Store
 from python.nodes.utils.text import clean
 from python.nodes.orders.constants import LIMIT
 from python.nodes.orders._helpers.dates import today
@@ -376,8 +376,8 @@ from python.nodes.orders.report import summary
 from python.nodes.orders.weekly.main import main as weekly
 from python.nodes.orders.weekly.constants import WEEK
 from python.nodes.orders.weekly._helpers.x import x
-from python.nodes.billing.invoices.node import invoices
-from python.nodes.providers.store.client import Client
+from python.nodes.billing.invoices.asset import invoices
+from python.providers.store.client import Client
 
 
 def main(ctx: AssetContext) -> PythonNodeResult:
@@ -385,8 +385,8 @@ def main(ctx: AssetContext) -> PythonNodeResult:
 "#,
                 ),
                 (
-                    "python/nodes/orders/weekly/node.py",
-                    r#"from python.nodes.orders.daily.node import daily
+                    "python/nodes/orders/weekly/asset.py",
+                    r#"from python.nodes.orders.daily.asset import daily
 from .main import main
 
 
@@ -398,7 +398,7 @@ def weekly(ctx: AssetContext) -> None:
                 ("python/nodes/orders/weekly/main.py", ASSET_MAIN),
                 ("python/nodes/orders/weekly/constants.py", ""),
                 ("python/nodes/orders/weekly/_helpers/x.py", ""),
-                ("python/nodes/billing/invoices/node.py", ""),
+                ("python/nodes/billing/invoices/asset.py", ""),
                 ("python/nodes/billing/invoices/main.py", ""),
             ],
             config: json!({ "select": ["SQBRPYTHON008"] }),
@@ -414,16 +414,16 @@ def weekly(ctx: AssetContext) -> None:
         PythonRunTestCase {
             description: "checks.py: statements, a check of another unit's node, a check that computes, and a plain function report",
             files: &[
-                ("python/nodes/orders/daily/node.py", DAILY_ASSET),
+                ("python/nodes/orders/daily/asset.py", DAILY_ASSET),
                 (
-                    "python/nodes/orders/weekly/node.py",
+                    "python/nodes/orders/weekly/asset.py",
                     "@asset\ndef weekly(ctx):\n    pass\n",
                 ),
                 (
                     "python/nodes/orders/daily/checks.py",
-                    r#"from python.nodes.orders.weekly.node import weekly
+                    r#"from python.nodes.orders.weekly.asset import weekly
 
-from .node import daily
+from .asset import daily
 
 LIMIT = 3
 
@@ -462,7 +462,7 @@ def helper() -> None:
             files: &[
                 ("python/nodes/orders/constants.py", "MARKETS: tuple = ()\n"),
                 (
-                    "python/nodes/orders/markets/node.py",
+                    "python/nodes/orders/markets/assets.py",
                     r#"from python.nodes.orders.constants import MARKETS
 from .main import main
 
@@ -477,7 +477,7 @@ def market_exports():
 "#,
                 ),
                 (
-                    "python/nodes/orders/once/node.py",
+                    "python/nodes/orders/once/assets.py",
                     r#"from .main import main
 
 
@@ -491,16 +491,16 @@ def once():
             ],
             config: json!({ "select": ["SQBRPYTHON010"] }),
             expected_faults: vec![
-                ("SQBRPYTHON010", "python/nodes/orders/markets/node.py", 6, 5),
-                ("SQBRPYTHON010", "python/nodes/orders/markets/node.py", 10, 13),
-                ("SQBRPYTHON010", "python/nodes/orders/once/node.py", 5, 5),
+                ("SQBRPYTHON010", "python/nodes/orders/markets/assets.py", 6, 5),
+                ("SQBRPYTHON010", "python/nodes/orders/markets/assets.py", 10, 13),
+                ("SQBRPYTHON010", "python/nodes/orders/once/assets.py", 5, 5),
             ],
         },
         PythonRunTestCase {
             description: "descriptions: a docstring, a described loader and an undescribed check report",
             files: &[
                 (
-                    "python/nodes/orders/daily/node.py",
+                    "python/nodes/orders/daily/asset.py",
                     r#"from .main import main
 
 
@@ -517,7 +517,7 @@ def bare(ctx: AssetContext) -> None:
                 ),
                 (
                     "python/nodes/orders/daily/checks.py",
-                    r#"from .node import described
+                    r#"from .asset import described
 
 
 @check(depends_on=[described])
@@ -526,7 +526,7 @@ def quality(ctx: CheckContext) -> bool:
 "#,
                 ),
                 (
-                    "python/nodes/orders/raw/node.py",
+                    "python/nodes/orders/raw/loader.py",
                     r#"from .main import main
 
 
@@ -539,12 +539,12 @@ def raw(ctx: LoaderContext) -> list:
             config: json!({ "select": ["SQBRPYTHON011"] }),
             expected_faults: vec![
                 ("SQBRPYTHON011", "python/nodes/orders/daily/checks.py", 5, 5),
-                ("SQBRPYTHON011", "python/nodes/orders/daily/node.py", 10, 5),
-                ("SQBRPYTHON011", "python/nodes/orders/raw/node.py", 5, 5),
+                ("SQBRPYTHON011", "python/nodes/orders/daily/asset.py", 10, 5),
+                ("SQBRPYTHON011", "python/nodes/orders/raw/loader.py", 5, 5),
             ],
         },
         PythonRunTestCase {
-            description: "declarations outside a unit's node.py or checks.py report; a factory's checks in node.py do not",
+            description: "declarations outside a unit's asset.py or checks.py report; a factory's checks in asset.py do not",
             files: &[
                 (
                     "python/nodes/orders/loaders.py",
@@ -563,7 +563,7 @@ def raw_orders_present(ctx: CheckContext) -> bool:
                     "@asset(description=\"X.\")\ndef stray(ctx: AssetContext) -> None:\n    return None\n",
                 ),
                 (
-                    "python/nodes/orders/daily/node.py",
+                    "python/nodes/orders/daily/asset.py",
                     r#"from .constants import TABLES
 from .main import main
 
@@ -621,14 +621,14 @@ fn given_valid_shapes_and_hidden_mistakes_when_evaluating_unit_rules_then_report
     install_test_identity();
     let test_cases = [
         PythonRunTestCase {
-            description: "a node.py in utils/, a role folder or a unit's _helpers/ is not a unit",
+            description: "a asset.py in utils/, a role folder or a unit's _helpers/ is not a unit",
             files: &[
-                ("python/nodes/utils/graph/node.py", "class Node:\n    pass\n"),
-                ("python/nodes/orders/models/node.py", "class Node:\n    pass\n"),
-                ("python/nodes/orders/daily/node.py", DAILY_ASSET),
+                ("python/nodes/utils/graph/asset.py", "class Node:\n    pass\n"),
+                ("python/nodes/orders/models/asset.py", "class Node:\n    pass\n"),
+                ("python/nodes/orders/daily/asset.py", DAILY_ASSET),
                 ("python/nodes/orders/daily/main.py", ASSET_MAIN),
                 (
-                    "python/nodes/orders/daily/_helpers/node.py",
+                    "python/nodes/orders/daily/_helpers/asset.py",
                     "class Node:\n    pass\n",
                 ),
                 (
@@ -647,7 +647,7 @@ fn given_valid_shapes_and_hidden_mistakes_when_evaluating_unit_rules_then_report
                     "SPECS: dict = {}\nTABLES: tuple = ()\n",
                 ),
                 (
-                    "python/nodes/orders/regions/node.py",
+                    "python/nodes/orders/regions/factory.py",
                     r#"from . import constants
 from .constants import SPECS
 from .main import main
@@ -672,7 +672,7 @@ def region_exports():
                 ("python/nodes/orders/regions/main.py", ASSET_MAIN),
                 ("python/nodes/orders/ranked/constants.py", "SPECS: dict = {}\n"),
                 (
-                    "python/nodes/orders/ranked/node.py",
+                    "python/nodes/orders/ranked/assets.py",
                     r#"from .constants import SPECS
 from .main import main
 
@@ -696,13 +696,13 @@ def ranked_exports():
             files: &[
                 ("python/providers/store/provider.py", ""),
                 (
-                    "python/nodes/orders/daily/node.py",
+                    "python/nodes/orders/daily/asset.py",
                     r#"from typing import TYPE_CHECKING
 
 from .main import main
 
 if TYPE_CHECKING:
-    from python.nodes.providers.store.provider import Store
+    from python.providers.store.provider import Store
     from python.nodes.orders.weekly.main import main as weekly_main
 
 
@@ -712,25 +712,25 @@ def daily(ctx: AssetContext, *, store: "Store") -> None:
 "#,
                 ),
                 ("python/nodes/orders/daily/main.py", ASSET_MAIN),
-                ("python/nodes/orders/weekly/node.py", DAILY_ASSET),
+                ("python/nodes/orders/weekly/asset.py", DAILY_ASSET),
                 ("python/nodes/orders/weekly/main.py", ASSET_MAIN),
             ],
             config: json!({ "select": ["SQBRPYTHON004", "SQBRPYTHON007", "SQBRPYTHON008"] }),
-            expected_faults: vec![("SQBRPYTHON008", "python/nodes/orders/daily/node.py", 7, 43)],
+            expected_faults: vec![("SQBRPYTHON008", "python/nodes/orders/daily/asset.py", 7, 49)],
         },
         PythonRunTestCase {
             description: "a node named through import a.b in depends_on passes; an unused import of a node does not",
             files: &[
-                ("python/nodes/orders/daily/node.py", DAILY_ASSET),
+                ("python/nodes/orders/daily/asset.py", DAILY_ASSET),
                 ("python/nodes/orders/daily/main.py", ASSET_MAIN),
                 (
-                    "python/nodes/orders/weekly/node.py",
+                    "python/nodes/orders/weekly/asset.py",
                     r#"import python.nodes.orders.daily.node
 
 from .main import main
 
 
-@asset(depends_on=[python.orders.daily.node.daily], description="W.")
+@asset(depends_on=[python.nodes.orders.daily.asset.daily], description="W.")
 def weekly(ctx: AssetContext) -> None:
     return main(ctx=ctx)
 "#,
@@ -738,7 +738,7 @@ def weekly(ctx: AssetContext) -> None:
                 ("python/nodes/orders/weekly/main.py", ASSET_MAIN),
                 (
                     "python/nodes/orders/weekly/_helpers/rows.py",
-                    "from python.nodes.orders.daily.node import daily\n",
+                    "from python.nodes.orders.daily.asset import daily\n",
                 ),
             ],
             config: json!({ "select": ["SQBRPYTHON008"] }),
@@ -752,18 +752,18 @@ def weekly(ctx: AssetContext) -> None:
         PythonRunTestCase {
             description: "a quoted union result and a loader's tuple of rows fit their node",
             files: &[
-                ("python/nodes/orders/daily/node.py", DAILY_ASSET),
+                ("python/nodes/orders/daily/asset.py", DAILY_ASSET),
                 (
                     "python/nodes/orders/daily/main.py",
                     "def main(ctx: AssetContext) -> \"PythonNodeResult | PythonNodeSkipResult\":\n    return ctx.result()\n",
                 ),
                 (
-                    "python/nodes/orders/raw/node.py",
+                    "python/nodes/orders/raw/loader.py",
                     "from .main import main\n\n\n@loader\ndef raw(ctx: LoaderContext) -> tuple:\n    return main(ctx=ctx)\n",
                 ),
                 (
                     "python/nodes/orders/raw/main.py",
-                    "def main(ctx: LoaderContext) -> \"tuple[python.orders.raw.types.Row, ...]\":\n    return ()\n",
+                    "def main(ctx: LoaderContext) -> \"tuple[python.nodes.orders.raw.types.Row, ...]\":\n    return ()\n",
                 ),
             ],
             config: json!({ "select": ["SQBRPYTHON006"] }),
@@ -773,13 +773,13 @@ def weekly(ctx: AssetContext) -> None:
             description: "a node that calls the main.py module instead of main() reports",
             files: &[
                 (
-                    "python/nodes/orders/daily/node.py",
+                    "python/nodes/orders/daily/asset.py",
                     "from . import main\n\n\n@asset(description=\"D.\")\ndef daily(ctx: AssetContext) -> None:\n    return main(ctx=ctx)\n",
                 ),
                 ("python/nodes/orders/daily/main.py", ASSET_MAIN),
             ],
             config: json!({ "select": ["SQBRPYTHON005"] }),
-            expected_faults: vec![("SQBRPYTHON005", "python/nodes/orders/daily/node.py", 5, 5)],
+            expected_faults: vec![("SQBRPYTHON005", "python/nodes/orders/daily/asset.py", 5, 5)],
         },
     ];
     for test_case in test_cases {

@@ -98,7 +98,7 @@ class Destination(Provider):
     pass
 """,
             "python/event_sinks/output.py": """
-from python.nodes.providers.destination import Destination
+from python.providers.destination import Destination
 from sqlbuild.event_sinks import command_output_event_sink
 
 @command_output_event_sink

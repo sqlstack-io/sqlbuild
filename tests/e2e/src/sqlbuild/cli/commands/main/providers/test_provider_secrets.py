@@ -40,7 +40,7 @@ MARKING_NODE: str = (
         import os
         from pathlib import Path
 
-        from python.nodes.providers.api import ApiProvider
+        from python.providers.api import ApiProvider
         from sqlbuild.{decorator}s import {decorator}
 
 
@@ -120,7 +120,7 @@ SECRET_FREE_SINK: dict[str, str] = {
     + "\n",
     "python/event_sinks/events.py": dedent(
         """
-        from python.nodes.providers.event_log import EventLog
+        from python.providers.event_log import EventLog
         from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
 
 
@@ -134,7 +134,7 @@ SECRET_FREE_SINK: dict[str, str] = {
 API_SINK: dict[str, str] = {
     "python/event_sinks/events.py": dedent(
         """
-        from python.nodes.providers.api import ApiProvider
+        from python.providers.api import ApiProvider
         from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
 
 
@@ -205,7 +205,7 @@ POST_BUILD_CHECK: dict[str, str] = {
         import os
         from pathlib import Path
 
-        from python.nodes.providers.api import ApiProvider
+        from python.providers.api import ApiProvider
         from python.nodes.tasks.no_api import no_api
         from sqlbuild.checks import check
 

@@ -358,7 +358,14 @@ fn macro_parent_components(
             })?;
         parents.push(match &declaration.owning_path {
             Some(owner) => std::iter::once("macros".to_owned())
-                .chain(owner.split('/').map(str::to_owned))
+                .chain(
+                    owner
+                        .strip_prefix(sqlbuild_core::constants::SQL_DIRECTORY)
+                        .and_then(|rest| rest.strip_prefix('/'))
+                        .unwrap_or(owner)
+                        .split('/')
+                        .map(str::to_owned),
+                )
                 .collect(),
             None => direct_parent_components(&declaration.path, &declaration.ownership_root)?,
         });

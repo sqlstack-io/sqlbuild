@@ -27,7 +27,7 @@ fn given_sensor_and_calendar_modules_when_evaluating_orchestration_rules_then_re
 
 from orchestration.sensors.inventory._constants import STALE_AFTER
 from python.nodes.utils.retries import ATTEMPTS
-from python.nodes.providers.carrier_api.provider import CarrierApi
+from python.providers.carrier_api.provider import CarrierApi
 
 from ._helpers.feed_age import feed_age
 
@@ -189,7 +189,7 @@ for row in []:
                     r#"from orchestration.sensors.inventory._helpers.feed_age import feed_age
 from python.nodes.orders.daily.main import main
 from python.nodes.utils.retries import ATTEMPTS
-from python.nodes.providers.carrier_api.provider import CarrierApi
+from python.providers.carrier_api.provider import CarrierApi
 from ._helpers.window import window
 "#,
                 ),
@@ -197,9 +197,9 @@ from ._helpers.window import window
                 ("orchestration/sensors/inventory/_helpers/feed_age.py", ""),
                 (
                     "orchestration/sensors/inventory/_helpers/age.py",
-                    "from ...orders._helpers.window import window\nfrom python.orders.daily.main import main\n",
+                    "from ...orders._helpers.window import window\nfrom python.nodes.orders.daily.main import main\n",
                 ),
-                ("python/nodes/orders/weekly/node.py", ""),
+                ("python/nodes/orders/weekly/asset.py", ""),
                 (
                     "python/nodes/orders/weekly/main.py",
                     "from orchestration.sensors.orders._helpers.window import window\n",

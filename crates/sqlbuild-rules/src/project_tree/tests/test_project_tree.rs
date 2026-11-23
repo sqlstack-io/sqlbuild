@@ -12,9 +12,9 @@ fn given_project_when_walked_then_links_hidden_and_root_tooling_directories_are_
         description: "links, hidden directories and top-level logs are left out",
         expected_entries: vec![
             ("models", false),
-            ("sql/models/.dot.sql", true),
-            ("sql/models/marts", false),
-            ("sql/models/marts/orders.sql", true),
+            ("models/.dot.sql", true),
+            ("models/marts", false),
+            ("models/marts/orders.sql", true),
             ("readme.md", true),
             ("sub", false),
             ("sub/logs", false),
@@ -45,27 +45,27 @@ fn given_project_paths_when_resolved_then_only_tracked_files_inside_the_project_
     let test_cases = [
         ProjectTreeFileTestCase {
             description: "a regular file",
-            path: "sql/models/marts/orders.sql",
-            expected_file: Ok("sql/models/marts/orders.sql"),
+            path: "models/marts/orders.sql",
+            expected_file: Ok("models/marts/orders.sql"),
         },
         ProjectTreeFileTestCase {
             description: "current, empty and trailing components",
             path: "./models//marts/orders.sql/",
-            expected_file: Ok("sql/models/marts/orders.sql"),
+            expected_file: Ok("models/marts/orders.sql"),
         },
         ProjectTreeFileTestCase {
             description: "a linked file resolves to its target",
-            path: "sql/models/link.sql",
-            expected_file: Ok("sql/models/marts/orders.sql"),
+            path: "models/link.sql",
+            expected_file: Ok("models/marts/orders.sql"),
         },
         ProjectTreeFileTestCase {
             description: "a file under a linked directory",
-            path: "sql/models/linkdir/orders.sql",
-            expected_file: Ok("sql/models/marts/orders.sql"),
+            path: "models/linkdir/orders.sql",
+            expected_file: Ok("models/marts/orders.sql"),
         },
         ProjectTreeFileTestCase {
             description: "a link to an untracked file",
-            path: "sql/models/readme.sql",
+            path: "models/readme.sql",
             expected_file: Err(ProjectTreeFileError::Untracked),
         },
         ProjectTreeFileTestCase {

@@ -132,7 +132,7 @@ REGION_PROVIDER_FILES: dict[str, str] = {
         "        type: BIGINT\n"
     ),
     "python/nodes/loaders/regions.py": (
-        "from python.nodes.providers.region import Region\n"
+        "from python.providers.region import Region\n"
         "from sqlbuild.loaders import loader\n\n\n"
         "@loader\n"
         "def raw_regions(ctx, region: Region):\n"

@@ -26,7 +26,7 @@ fn given_project_python_when_evaluating_python_rules_then_reports_fensu_findings
                 ("python/nodes/loaders/orders.py", "\"\"\"Orders.\"\"\"\n"),
                 ("python/nodes/_helpers/Alpha.py", "\"\"\"Alpha.\"\"\"\n"),
                 ("python/nodes/_helpers/__init__.py", ""),
-                ("python/nodes/orders/daily/node.py", "\"\"\"Daily.\"\"\"\n"),
+                ("python/nodes/orders/daily/asset.py", "\"\"\"Daily.\"\"\"\n"),
                 ("python/nodes/utils/currency/format.py", "\"\"\"Format.\"\"\"\n"),
             ],
             config: json!({ "select": ["SQBRPYTHON001"] }),
@@ -179,7 +179,7 @@ fn given_project_python_when_evaluating_python_rules_then_reports_fensu_findings
             description: "node and hook functions are live, unreferenced helpers are dead, and hooks are never reported",
             files: &[
                 (
-                    "python/nodes/orders/daily/node.py",
+                    "python/nodes/orders/daily/asset.py",
                     "@loader\ndef daily() -> None:\n    pass\n",
                 ),
                 (
@@ -215,7 +215,7 @@ fn given_project_python_when_evaluating_python_rules_then_reports_fensu_findings
                     "TABLES: int = 1\nUNUSED: int = 2\n",
                 ),
                 (
-                    "python/nodes/orders/node.py",
+                    "python/nodes/orders/asset.py",
                     "from python.nodes.orders import _tables\n\n\n@asset\ndef count() -> int:\n    return _tables.TABLES\n",
                 ),
             ],

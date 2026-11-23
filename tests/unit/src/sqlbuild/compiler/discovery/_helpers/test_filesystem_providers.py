@@ -101,7 +101,7 @@ class AbstractProvider(Provider, ABC):
 """.strip()
                 + "\n",
                 "python/providers/public.py": """
-from python.nodes.providers.shared import AbstractProvider, ImportedProvider
+from python.providers.shared import AbstractProvider, ImportedProvider
 from sqlbuild.providers import Provider
 
 
@@ -201,7 +201,7 @@ class ImportedProvider(Provider):
 """.strip()
                 + "\n",
                 "python/providers/public.py": """
-from python.nodes.providers.shared import ImportedProvider
+from python.providers.shared import ImportedProvider
 from sqlbuild.providers import Provider
 
 

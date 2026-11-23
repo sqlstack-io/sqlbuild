@@ -20,7 +20,7 @@ _STEPS: str = '''\
 import time
 from pathlib import Path
 
-from python.nodes.providers.marker import MarkerProvider
+from python.providers.marker import MarkerProvider
 from sqlbuild.assets import AssetContext, asset
 from sqlbuild.discovery import Discovered, Item, discover
 
@@ -66,7 +66,7 @@ class MarkerProvider(Provider):
 '''
 
 _HUNG_STEPS: str = """\
-from python.nodes.providers.gateway import GatewayProvider
+from python.providers.gateway import GatewayProvider
 from sqlbuild.assets import AssetContext, asset
 from sqlbuild.discovery import Discovered, Item, discover
 

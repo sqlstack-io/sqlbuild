@@ -99,7 +99,7 @@ pub(crate) fn scope_with_macros(paths: &[String]) -> Value {
                     "visibility": "exact_owner_private",
                     "role_root": "sql/models/commerce/_macros",
                     "bucket_path": bucket_path,
-                    "ownership_root": "models",
+                    "ownership_root": "sql/models",
                     "owning_path": "sql/models/race",
                     "metadata": {"macro": {
                         "parameters": [],
@@ -147,7 +147,7 @@ pub(crate) fn scope_index() -> Value {
             "kind": "model",
             "name": "orders",
             "path": "sql/models/orders.sql",
-            "ownership_root": "models",
+            "ownership_root": "sql/models",
             "ownership_root_kind": "model"
         }],
         "declarations": [{
@@ -163,7 +163,7 @@ pub(crate) fn scope_index() -> Value {
             "visibility": "project",
             "role_root": "enums",
             "bucket_path": null,
-            "ownership_root": "enums",
+            "ownership_root": "sql/enums",
             "owning_path": null,
             "metadata": {"enum": {
                 "members": [{"name": "OPEN"}],
@@ -182,7 +182,7 @@ pub(crate) fn scope_index() -> Value {
             "visibility": "project",
             "role_root": "macros",
             "bucket_path": null,
-            "ownership_root": "macros",
+            "ownership_root": "sql/macros",
             "owning_path": null,
             "metadata": {"macro": {
                 "parameters": ["status"],

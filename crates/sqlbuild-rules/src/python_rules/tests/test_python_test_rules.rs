@@ -6,7 +6,7 @@ use crate::python_rules::tests::test_types::PythonRunTestCase;
 
 const RUNTIME_FILES: [(&str, &str); 5] = [
     (
-        "python/nodes/orders/storefront_import/node.py",
+        "python/nodes/orders/storefront_import/asset.py",
         r#"from sqlbuild.assets import AssetContext, asset
 
 from python.nodes.orders.storefront_import.main import main
@@ -57,7 +57,7 @@ class RowMappingCase:
 const ROW_MAPPING_TEST: &str = r#"import pytest
 
 from python.nodes.orders.storefront_import._helpers.row_mapping import map_row
-from tests.python.orders.storefront_import._helpers._test_types import RowMappingCase
+from tests.python.nodes.orders.storefront_import._helpers._test_types import RowMappingCase
 
 
 @pytest.mark.parametrize(
@@ -83,8 +83,8 @@ class RegionCase:
 
 const PROVIDER_TEST: &str = r#"import pytest
 
-from python.nodes.providers.storefront_api.provider import StorefrontApi
-from tests.providers.storefront_api._test_types import RegionCase
+from python.providers.storefront_api.provider import StorefrontApi
+from tests.python.providers.storefront_api._test_types import RegionCase
 
 
 @pytest.mark.parametrize(

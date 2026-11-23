@@ -10,58 +10,58 @@ fn given_paths_resolved_together_when_resolving_then_each_resolves_as_alone() {
     let test_cases = [
         RealPathsTestCase {
             description: "plain file",
-            path: "sql/models/marts/orders.sql",
-            expected_resolved: "sql/models/marts/orders.sql",
+            path: "models/marts/orders.sql",
+            expected_resolved: "models/marts/orders.sql",
         },
         RealPathsTestCase {
             description: "linked file",
-            path: "sql/models/link.sql",
-            expected_resolved: "sql/models/marts/orders.sql",
+            path: "models/link.sql",
+            expected_resolved: "models/marts/orders.sql",
         },
         RealPathsTestCase {
             description: "file below a linked folder",
-            path: "sql/models/linkdir/orders.sql",
-            expected_resolved: "sql/models/marts/orders.sql",
+            path: "models/linkdir/orders.sql",
+            expected_resolved: "models/marts/orders.sql",
         },
         RealPathsTestCase {
             description: "file linked out of its folder",
-            path: "sql/models/readme.sql",
+            path: "models/readme.sql",
             expected_resolved: "readme.md",
         },
         RealPathsTestCase {
             description: "missing file",
-            path: "sql/models/missing.sql",
-            expected_resolved: "sql/models/missing.sql",
+            path: "models/missing.sql",
+            expected_resolved: "models/missing.sql",
         },
         RealPathsTestCase {
             description: "parent part before a link",
-            path: "sql/models/marts/../link.sql",
-            expected_resolved: "sql/models/marts/orders.sql",
+            path: "models/marts/../link.sql",
+            expected_resolved: "models/marts/orders.sql",
         },
         RealPathsTestCase {
             description: "trailing current part",
-            path: "sql/models/marts/.",
-            expected_resolved: "sql/models/marts",
+            path: "models/marts/.",
+            expected_resolved: "models/marts",
         },
         RealPathsTestCase {
             description: "trailing current part after a linked folder",
-            path: "sql/models/linkdir/.",
-            expected_resolved: "sql/models/marts",
+            path: "models/linkdir/.",
+            expected_resolved: "models/marts",
         },
         RealPathsTestCase {
             description: "linked folder with a trailing slash",
-            path: "sql/models/linkdir/",
-            expected_resolved: "sql/models/marts",
+            path: "models/linkdir/",
+            expected_resolved: "models/marts",
         },
         RealPathsTestCase {
             description: "parent part after a linked folder",
-            path: "sql/models/linkdir/../readme.sql",
+            path: "models/linkdir/../readme.sql",
             expected_resolved: "readme.md",
         },
         RealPathsTestCase {
             description: "file below a linked project root",
             path: "sub/root_link/models/marts/orders.sql",
-            expected_resolved: "sql/models/marts/orders.sql",
+            expected_resolved: "models/marts/orders.sql",
         },
     ];
     let (_directory, root) = linked_project();

@@ -134,13 +134,13 @@ fn given_a_planned_project_query_when_caching_it_then_its_path_is_relative_to_th
             description: "a POSIX path below the project",
             project_dir: "/work/proj",
             path: "/work/proj/python/inventory",
-            expected_path: "python/nodes/inventory",
+            expected_path: "python/inventory",
         },
         RelativeQueryTestCase {
             description: "a Windows project directory against Fensu's forward-slash path",
             project_dir: "C:\\work\\proj",
             path: "C:/work/proj/python/inventory",
-            expected_path: "python/nodes/inventory",
+            expected_path: "python/inventory",
         },
         RelativeQueryTestCase {
             description: "the project directory itself",

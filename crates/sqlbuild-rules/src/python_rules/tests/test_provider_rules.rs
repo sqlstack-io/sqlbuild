@@ -38,7 +38,7 @@ class StorefrontApi(Provider):
                 ("python/nodes/utils/retries.py", ""),
                 (
                     "python/nodes/orders/daily/main.py",
-                    "from python.nodes.providers.storefront_api.provider import StorefrontApi\n",
+                    "from python.providers.storefront_api.provider import StorefrontApi\n",
                 ),
             ],
             config: json!({ "select": PROVIDER_RULES }),
@@ -276,9 +276,9 @@ class StorefrontApi(Provider):
                     r#"from python.nodes.utils.retries import ATTEMPTS
 from python.nodes.orders.daily.main import main
 from orchestration.sensors.orders import on_orders
-from python.nodes.providers.carrier_api._helpers.auth import token
+from python.providers.carrier_api._helpers.auth import token
 from ._classes.cursor import Cursor
-from python.nodes.providers.carrier_api.provider import CarrierApi
+from python.providers.carrier_api.provider import CarrierApi
 "#,
                 ),
                 ("python/providers/storefront_api/_classes/cursor.py", ""),
@@ -287,12 +287,12 @@ from python.nodes.providers.carrier_api.provider import CarrierApi
                 ("python/nodes/utils/retries.py", ""),
                 (
                     "python/nodes/orders/daily/main.py",
-                    "from python.nodes.providers.storefront_api._classes.cursor import Cursor\n",
+                    "from python.providers.storefront_api._classes.cursor import Cursor\n",
                 ),
                 ("orchestration/sensors/orders.py", ""),
                 (
                     "sql/hooks/python/notify.py",
-                    "import python.nodes.providers.carrier_api._helpers.auth\n",
+                    "import python.providers.carrier_api._helpers.auth\n",
                 ),
             ],
             config: json!({ "select": ["SQBRPYTHON015"] }),

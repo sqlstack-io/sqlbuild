@@ -39,7 +39,7 @@ PROVIDER_FILES: dict[str, str] = {
         import os
         from pathlib import Path
 
-        from python.nodes.providers.settings_api import SettingsApi
+        from python.providers.settings_api import SettingsApi
         from sqlbuild.assets import asset
 
 

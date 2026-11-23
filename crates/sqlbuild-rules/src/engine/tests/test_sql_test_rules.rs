@@ -19,23 +19,23 @@ fn given_sql_test_facts_when_evaluating_project_rules_then_returns_expected_faul
     scope["resources"] = json!([
         {
             "identity": "model:stg_orders", "kind": "model", "name": "stg_orders",
-            "path": "sql/models/commerce/staging/stg_orders.sql", "ownership_root": "models",
+            "path": "sql/models/commerce/staging/stg_orders.sql", "ownership_root": "sql/models",
             "ownership_root_kind": "model"
         },
         {
             "identity": "model:fact_orders", "kind": "model", "name": "fact_orders",
-            "path": "sql/models/commerce/marts/fact_orders.sql", "ownership_root": "models",
+            "path": "sql/models/commerce/marts/fact_orders.sql", "ownership_root": "sql/models",
             "ownership_root_kind": "model"
         },
         {
             "identity": "model:daily_revenue", "kind": "model", "name": "daily_revenue",
-            "path": "sql/models/finance/marts/daily_revenue.sql", "ownership_root": "models",
+            "path": "sql/models/finance/marts/daily_revenue.sql", "ownership_root": "sql/models",
             "ownership_root_kind": "model"
         },
         {
             "identity": "model:commerce__mart_v_order", "kind": "model",
             "name": "commerce__mart_v_order",
-            "path": "sql/models/commerce/marts/commerce__mart_v_order.sql", "ownership_root": "models",
+            "path": "sql/models/commerce/marts/commerce__mart_v_order.sql", "ownership_root": "sql/models",
             "ownership_root_kind": "model"
         }
     ]);
@@ -69,7 +69,7 @@ fn given_sql_test_facts_when_evaluating_project_rules_then_returns_expected_faul
             "visibility": "exact_owner_private",
             "role_root": "sql/models/commerce/staging/_sqlbuild/_macros",
             "bucket_path": null,
-            "ownership_root": "models",
+            "ownership_root": "sql/models",
             "owning_path": "sql/models/commerce/staging",
             "metadata": {"macro": {
                 "parameters": [],

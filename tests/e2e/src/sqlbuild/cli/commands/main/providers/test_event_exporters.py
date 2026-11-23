@@ -89,7 +89,7 @@ def test_given_provider_exporter_when_building_then_receives_redacted_events_bef
             + "\n",
             "python/event_sinks/events.py": dedent(
                 """
-                from python.nodes.providers.event_sink import EventSink
+                from python.providers.event_sink import EventSink
                 from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
                 import os
                 from pathlib import Path
@@ -251,7 +251,7 @@ def test_given_configured_provider_and_sink_when_lineage_runs_then_skips_extensi
                 "        pass\n"
             ),
             "python/event_sinks/output.py": (
-                "from python.nodes.providers.output import OutputProvider\n"
+                "from python.providers.output import OutputProvider\n"
                 "from sqlbuild.event_sinks import command_output_event_sink\n"
                 "@command_output_event_sink\n"
                 "def export_output(record, output_provider: OutputProvider):\n"
@@ -499,7 +499,7 @@ def test_given_sink_call_in_flight_at_shutdown_when_process_exits_then_teardown_
             ).lstrip(),
             "python/event_sinks/publish.py": dedent(
                 """
-                from python.nodes.providers.destination import Destination
+                from python.providers.destination import Destination
                 from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
 
 
@@ -598,7 +598,7 @@ def test_given_sink_and_task_sharing_a_provider_when_building_then_it_is_set_up_
             + "\n",
             "python/event_sinks/events.py": dedent(
                 """
-                from python.nodes.providers.z_shared import SharedProvider
+                from python.providers.z_shared import SharedProvider
                 from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
 
 
@@ -610,7 +610,7 @@ def test_given_sink_and_task_sharing_a_provider_when_building_then_it_is_set_up_
             + "\n",
             "python/nodes/tasks/uses_shared.py": dedent(
                 """
-                from python.nodes.providers.z_shared import SharedProvider
+                from python.providers.z_shared import SharedProvider
                 from sqlbuild.assets import asset
 
 
@@ -673,7 +673,7 @@ def test_given_snowflake_keys_and_a_sink_provider_when_running_then_warns_once(
             + "\n",
             "python/event_sinks/events.py": dedent(
                 """
-                from python.nodes.providers.probe import Probe
+                from python.providers.probe import Probe
                 from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
 
 

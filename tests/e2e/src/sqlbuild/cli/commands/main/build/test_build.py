@@ -48,7 +48,7 @@ _TARGET_CONFIG_RECORDER: str = (
     "        out.write(json.dumps(line) + '\\n')\n"
 )
 _TARGET_PROBE_SINK: str = (
-    "from python.nodes.providers.target_probe import TargetProbe\n"
+    "from python.providers.target_probe import TargetProbe\n"
     "from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink\n\n"
     "@lifecycle_event_sink\n"
     "def probe_events(event: LifecycleEvent, target_probe: TargetProbe) -> None:\n"
@@ -1899,7 +1899,7 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "        record(ctx, 'provider')\n"
             ),
             "python/nodes/tasks/configured.py": (
-                "from python.nodes.providers.target_probe import TargetProbe\n"
+                "from python.providers.target_probe import TargetProbe\n"
                 "from python.nodes.recorder import record\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
@@ -1909,7 +1909,7 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "    return ctx.result()\n"
             ),
             "python/nodes/loaders/raw.py": (
-                "from python.nodes.providers.target_probe import TargetProbe\n"
+                "from python.providers.target_probe import TargetProbe\n"
                 "from python.nodes.recorder import record\n"
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
@@ -1919,7 +1919,7 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "    return [{'order_id': 1}]\n"
             ),
             "python/nodes/checks/configured.py": (
-                "from python.nodes.providers.target_probe import TargetProbe\n"
+                "from python.providers.target_probe import TargetProbe\n"
                 "from python.nodes.recorder import record\n"
                 "from python.nodes.tasks.configured import configured_task\n"
                 "from sqlbuild.checks import check\n\n"

@@ -176,7 +176,7 @@ pub(super) fn scaling_project(
         (
             format!("python/nodes/domain_{}/unit_{unit}/main.py", unit % 50),
             format!(
-                "\"\"\"Unit {unit}.\"\"\"\n\nfrom python.utils.text.join import joined\n\n\ndef run_{unit}(value: str) -> str:\n    \"\"\"Run unit {unit}.\"\"\"\n    return joined(value)\n"
+                "\"\"\"Unit {unit}.\"\"\"\n\nfrom python.nodes.utils.text.join import joined\n\n\ndef run_{unit}(value: str) -> str:\n    \"\"\"Run unit {unit}.\"\"\"\n    return joined(value)\n"
             ),
         )
     });
@@ -202,7 +202,7 @@ pub(super) fn unit_scaling_project(units: usize, undescribed: usize) -> Vec<(Str
         unit_files(
             unit,
             &format!(
-                "from {}.node import node_{previous}\n",
+                "from {}.asset import node_{previous}\n",
                 unit_module(previous)
             ),
             &format!("depends_on=[node_{previous}], description=\"Unit {unit}.\""),
@@ -230,19 +230,19 @@ fn unit_files(unit: usize, upstream: &str, arguments: &str) -> [(String, String)
     let dir = module.replace('.', "/");
     [
         (
-            format!("{dir}/node.py"),
+            format!("{dir}/asset.py"),
             format!(
                 "{upstream}from {module}.main import main\n\n\n@asset({arguments})\ndef node_{unit}(ctx: AssetContext) -> None:\n    return main(ctx=ctx)\n"
             ),
         ),
         (
             format!("{dir}/main.py"),
-            "from sqlbuild import PythonNodeResult\n\nfrom python.utils.text.join import joined\n\n\ndef main(ctx: AssetContext) -> PythonNodeResult:\n    return ctx.result(joined(\"\"))\n".to_owned(),
+            "from sqlbuild import PythonNodeResult\n\nfrom python.nodes.utils.text.join import joined\n\n\ndef main(ctx: AssetContext) -> PythonNodeResult:\n    return ctx.result(joined(\"\"))\n".to_owned(),
         ),
         (
             format!("{dir}/checks.py"),
             format!(
-                "from {module}.node import node_{unit}\n\n\n@check(depends_on=[node_{unit}], description=\"Ran.\")\ndef ran_{unit}(ctx: CheckContext) -> bool:\n    return ctx.ok()\n"
+                "from {module}.asset import node_{unit}\n\n\n@check(depends_on=[node_{unit}], description=\"Ran.\")\ndef ran_{unit}(ctx: CheckContext) -> bool:\n    return ctx.ok()\n"
             ),
         ),
     ]

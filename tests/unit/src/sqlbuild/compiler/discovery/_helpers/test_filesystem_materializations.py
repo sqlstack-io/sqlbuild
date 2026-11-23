@@ -79,7 +79,7 @@ class MarkerProvider(Provider):
 """.strip()
                 + "\n",
                 "python/materializations/copy_table.py": """
-from python.nodes.providers.marker import MarkerProvider
+from python.providers.marker import MarkerProvider
 
 
 def materialize(ctx, marker_provider: MarkerProvider):

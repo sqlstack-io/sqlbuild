@@ -9,7 +9,7 @@ fn given_paths_when_made_project_relative_then_parts_follow_relative_to() {
     let test_cases = [
         RelativePartsTestCase {
             description: "a relative path keeps its parts",
-            path: "sql/models/../a.sql",
+            path: "models/../a.sql",
             resolved: "",
             under: None,
             expected_parts: Ok(vec!["models", "..", "a.sql"]),
@@ -30,7 +30,7 @@ fn given_paths_when_made_project_relative_then_parts_follow_relative_to() {
         },
         RelativePartsTestCase {
             description: "a path outside the requested folder",
-            path: "sql/models/a.sql",
+            path: "models/a.sql",
             resolved: "",
             under: Some("rules"),
             expected_parts: Err(RelativePartsError::NotBeneath),

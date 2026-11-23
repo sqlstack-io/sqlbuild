@@ -2,7 +2,7 @@
 
 import pytest
 from python.nodes.utils.currency import amounts
-from tests.python.utils.currency._test_types import CentsTextTestCase
+from tests.python.nodes.utils.currency._test_types import CentsTextTestCase
 
 
 @pytest.mark.parametrize(

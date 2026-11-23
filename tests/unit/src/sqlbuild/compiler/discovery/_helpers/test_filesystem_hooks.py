@@ -217,7 +217,7 @@ class MarkerProvider(Provider):
 """.strip()
                 + "\n",
                 "sql/hooks/python/marker.py": """
-from python.nodes.providers.marker import MarkerProvider
+from python.providers.marker import MarkerProvider
 from sqlbuild.hooks import hook
 
 

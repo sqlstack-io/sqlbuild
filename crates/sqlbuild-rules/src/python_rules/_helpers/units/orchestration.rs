@@ -8,14 +8,15 @@ use sqlbuild_pysource::orchestration_modules::main::orchestration_module_declara
 use crate::models::{Fault, PythonSource};
 use crate::python_rules::_helpers::engine::faults::catalogue_fault;
 use crate::python_rules::_helpers::units::project::{
-    files_naming, nearest_unit, project_modules, rejected_import_faults, unit_fault, unit_folders,
+    files_naming, module_below, nearest_unit, package_rest, project_modules,
+    rejected_import_faults, unit_fault, unit_folders,
 };
 use crate::python_rules::constants::{
     INIT_FILE, ORCHESTRATION_GENERIC_MODULES, ORCHESTRATION_IMPORT_DIRECTION_CODE,
     ORCHESTRATION_MODULE_PATHS_CODE, ORCHESTRATION_MODULE_SURFACE_CODE,
     ORCHESTRATION_NO_DOCSTRING_CODE, ORCHESTRATION_PRIVATE_SUPPORT_CODE,
     ORCHESTRATION_PYTHON_ROLES, ORCHESTRATION_ROOT, ORCHESTRATION_RULE_CODES,
-    ORCHESTRATION_SUPPORT_FILES, ORCHESTRATION_SUPPORT_FOLDER, PACKAGE_ROOT, PRIVATE_PREFIX,
+    ORCHESTRATION_SUPPORT_FILES, ORCHESTRATION_SUPPORT_FOLDER, PACKAGE_MODULE, PACKAGE_ROOT, PRIVATE_PREFIX,
     PROVIDERS_ROOT, SHARED_UTILITIES_PACKAGE,
 };
 use crate::python_rules::models::ParsedFile;
@@ -36,7 +37,7 @@ pub(crate) fn orchestration_faults(
         return Vec::new();
     }
     let mut faults: Vec<Fault> = sources.iter().filter_map(layout_fault).collect();
-    let files: Vec<ParsedFile<'_>> = files_naming(sources, ORCHESTRATION_ROOT, python_version);
+    let files: Vec<ParsedFile<'_>> = files_naming(sources, (ORCHESTRATION_ROOT, ORCHESTRATION_ROOT), python_version);
     let modules: BTreeSet<String> = project_modules(sources);
     let units: BTreeSet<String> = unit_folders(sources);
     for file in &files {
@@ -206,11 +207,17 @@ fn boundary_detail(
     units: &BTreeSet<String>,
 ) -> Option<(&'static str, String)> {
     let imported: Vec<&str> = module.split('.').collect();
+    let path: String = parts.join("/");
     let Some(rest) = role_folders(parts) else {
-        let in_unit: bool =
-            parts.first() == Some(&PACKAGE_ROOT) && nearest_unit(&parts[1..], units).is_some();
+        let in_unit: bool = package_rest(&path).is_some_and(|below| {
+            let below: Vec<&str> = below.split('/').collect();
+            nearest_unit(&below, units).is_some()
+        });
+        let in_providers: bool = path
+            .strip_prefix(PROVIDERS_ROOT)
+            .is_some_and(|below| below.starts_with('/'));
         let outside: bool = parts.first() != Some(&ORCHESTRATION_ROOT)
-            && parts.first() != Some(&PROVIDERS_ROOT)
+            && !in_providers
             && !in_unit
             && imported.first() == Some(&ORCHESTRATION_ROOT);
         return outside.then(|| {
@@ -220,14 +227,17 @@ fn boundary_detail(
             )
         });
     };
+    if let Some(below) = module_below(module, PACKAGE_MODULE) {
+        return (below.first() != Some(&SHARED_UTILITIES_PACKAGE)).then(|| {
+            (
+                ORCHESTRATION_IMPORT_DIRECTION_CODE,
+                format!(
+                    "but sensors and calendars import only {PACKAGE_ROOT}/{SHARED_UTILITIES_PACKAGE}/ from {PACKAGE_ROOT}/"
+                ),
+            )
+        });
+    }
     match imported.as_slice() {
-        [root, utils, ..] if *root == PACKAGE_ROOT && *utils == SHARED_UTILITIES_PACKAGE => None,
-        [root, ..] if *root == PACKAGE_ROOT => Some((
-            ORCHESTRATION_IMPORT_DIRECTION_CODE,
-            format!(
-                "but sensors and calendars import only {PACKAGE_ROOT}/{SHARED_UTILITIES_PACKAGE}/ from {PACKAGE_ROOT}/"
-            ),
-        )),
         [root, role, domain, support @ ..]
             if *root == ORCHESTRATION_ROOT
                 && is_private(support)
