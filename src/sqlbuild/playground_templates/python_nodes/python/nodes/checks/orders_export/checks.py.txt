@@ -2,7 +2,7 @@
 
 from sqlbuild.checks import check
 
-from python.nodes.assets.orders_export import orders_export
+from python.nodes.assets.orders_export.asset import orders_export
 
 
 @check(depends_on=orders_export, tags=["quality"], group="exports")

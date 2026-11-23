@@ -1,7 +1,7 @@
 """Loader examples for the Python nodes playground."""
 
 from sqlbuild.loaders import loader
-from python.nodes.assets.orders_inputs import prepare_raw_orders
+from python.nodes.assets.prepare_raw_orders.asset import prepare_raw_orders
 
 
 @loader(depends_on=(prepare_raw_orders,))

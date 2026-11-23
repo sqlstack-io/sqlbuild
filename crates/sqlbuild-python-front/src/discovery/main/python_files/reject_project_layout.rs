@@ -7,7 +7,12 @@ use sqlbuild_discovery::project_layout::models::LayoutProblem;
 use std::path::PathBuf;
 
 /// The extra-paths line every layout help ends with.
-const EXTRA_PATHS_HELP: &str = "or list it in extra_paths in sqlbuild_project.toml if it belongs here on purpose";
+const EXTRA_PATHS_HELP: &str =
+    "or list it in extra_paths in sqlbuild_project.toml if it belongs here on purpose";
+/// The indent that lines a help continuation up under the first help line.
+const HELP_CONTINUATION: &str = "\n          ";
+/// The prefix of a further help line.
+const HELP_LINE: &str = "\n  = help: ";
 
 /// Raise `ProjectLayoutError` for each entry of `project_dir` outside the expected layout.
 pub fn reject_project_layout(
@@ -19,30 +24,38 @@ pub fn reject_project_layout(
     if problems.is_empty() {
         return Ok(());
     }
-    let message: String = problems
+    let quoted: Vec<String> = problems
         .iter()
-        .map(|problem| format!("'{}' is not part of a SQLBuild project", problem.path))
-        .collect::<Vec<String>>()
-        .join("\n");
+        .map(|problem| format!("'{}'", problem.path))
+        .collect();
+    let message: String = match quoted.as_slice() {
+        [only] => format!("{only} is not part of a SQLBuild project"),
+        [rest @ .., final_entry] => format!(
+            "{} and {final_entry} are not part of a SQLBuild project",
+            rest.join(", ")
+        ),
+        [] => String::new(),
+    };
     let mut folders: Vec<Option<&str>> = Vec::new();
     for problem in &problems {
         if !folders.contains(&problem.folder) {
             folders.push(problem.folder);
         }
     }
-    let mut help: Vec<String> = folders
+    let lines: Vec<String> = folders
         .iter()
         .filter_map(|folder| {
             let problem: &LayoutProblem = problems.iter().find(|item| item.folder == *folder)?;
-            let place: String = folder.map_or_else(String::new, |name| format!(" in {name}/"));
-            Some(format!("move it under one of{place}: {}", problem.allowed.join(", ")))
+            Some(format!("move it under one of: {},", problem.allowed.join(", ")))
         })
         .collect();
-    help.push(EXTRA_PATHS_HELP.to_owned());
     Err(discovery_error(
         project_dir.py(),
         "project_layout",
         message,
-        Some(help.join(",\n")),
+        Some(format!(
+            "{}{HELP_CONTINUATION}{EXTRA_PATHS_HELP}",
+            lines.join(HELP_LINE)
+        )),
     ))
 }

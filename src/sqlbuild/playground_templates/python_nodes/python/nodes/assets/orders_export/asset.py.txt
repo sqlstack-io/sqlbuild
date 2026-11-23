@@ -3,7 +3,8 @@
 from sqlbuild.assets import asset
 from sqlbuild.refs import model
 
-from python.nodes.assets.orders_inputs import export_window, optional_partner_feed
+from python.nodes.assets.export_window.asset import export_window
+from python.nodes.assets.optional_partner_feed.asset import optional_partner_feed
 
 
 @asset(
