@@ -1039,6 +1039,11 @@ class _TtyStringIO(StringIO):
             description="active UDF row uses spinner glyph instead of ellipsis",
             node_name="is_completed_order",
             node_type=ExecutionResourceKind.UDF,
+            completed_result=FunctionExecutionResult(
+                function_name="is_completed_order",
+                status=ExecutionStatus.SUCCESS,
+                function_kind="udf",
+            ),
             expected_fragments=("udf", "is_completed_order", "⠋"),
             unexpected_fragments=("...",),
         ),
@@ -1046,6 +1051,9 @@ class _TtyStringIO(StringIO):
             description="active view row uses spinner glyph instead of ellipsis",
             node_name="stg_customers",
             node_type=ExecutionResourceKind.VIEW,
+            completed_result=ModelExecutionResult(
+                model_name="stg_customers", status=ExecutionStatus.SUCCESS
+            ),
             expected_fragments=("view", "stg_customers", "⠋"),
             unexpected_fragments=("...",),
         ),
@@ -1053,6 +1061,9 @@ class _TtyStringIO(StringIO):
             description="active snapshot row uses snapshot resource type",
             node_name="customer_snapshot",
             node_type=ExecutionResourceKind.SNAPSHOT,
+            completed_result=ModelExecutionResult(
+                model_name="customer_snapshot", status=ExecutionStatus.SUCCESS
+            ),
             expected_fragments=("snapshot", "customer_snapshot", "⠋"),
             unexpected_fragments=("table",),
         ),
@@ -1071,7 +1082,10 @@ def test_given_active_top_level_node_when_reporting_progress_then_uses_spinner_g
     )
 
     callbacks.on_node_start(name=test_case.node_name, resource_kind=test_case.node_type)
-    output: str = stream.getvalue()
+    try:
+        output: str = stream.getvalue()
+    finally:
+        callbacks.on_node_complete(test_case.completed_result)
 
     expected_fragment: str
     for expected_fragment in test_case.expected_fragments:

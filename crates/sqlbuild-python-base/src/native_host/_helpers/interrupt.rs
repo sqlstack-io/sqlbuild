@@ -2,9 +2,12 @@
 
 use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 use pyo3::exceptions::PyKeyboardInterrupt;
 use pyo3::prelude::{Py, PyAny, PyAnyMethods, PyModule, PyResult, Python};
+
+use crate::native_host::models::InterruptWatch;
 
 thread_local! {
     pub(crate) static INTERRUPTED: Cell<bool> = const { Cell::new(false) };
@@ -12,6 +15,8 @@ thread_local! {
 pub(crate) const SIGINT: i64 = 2;
 /// Whether Ctrl+C reached the `sqb` process's watch, which sees it before any handler runs.
 pub(crate) static WATCHED_INTERRUPT: AtomicBool = AtomicBool::new(false);
+/// The watch of the running command, which a command's end asks to catch up.
+pub(crate) static ACTIVE_WATCH: Mutex<Option<Arc<InterruptWatch>>> = Mutex::new(None);
 
 /// Whether the default handler observed Ctrl+C during the current command.
 pub(crate) fn interrupted() -> bool {

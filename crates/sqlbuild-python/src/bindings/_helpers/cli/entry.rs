@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::time::{Instant, SystemTime};
 
-use pyo3::exceptions::{PyKeyboardInterrupt, PySystemExit};
+use pyo3::exceptions::{PyException, PyKeyboardInterrupt, PySystemExit};
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
@@ -400,8 +400,11 @@ fn exit<'py>(py: Python<'py>, code: i64) -> PyResult<Bound<'py, PyAny>> {
     code.into_bound_py_any(py)
 }
 
-/// The kind of expected failure `error` is, or `None` when it propagates.
+/// The kind of expected failure `error` is, or `None` when it propagates. Every expected failure is an `Exception`, so Ctrl+C and SIGTERM propagate without loading the staying-Python failure classes.
 fn failure_kind(py: Python<'_>, error: &Bound<'_, PyAny>) -> PyResult<Option<CommandFailure>> {
+    if !error.is_instance_of::<PyException>() {
+        return Ok(None);
+    }
     if error.is_instance(&error_class(py, ErrorId::CliUser)?)?
         || error.is_instance(&error_class(py, ErrorId::Rules)?)?
     {
@@ -657,7 +660,7 @@ fn observed_dispatch<'py>(
             &invocation.recall,
         ) {
             Ok(_) if terminated() => Err(CommandTerminated::new_err(TERMINATED_MESSAGE)),
-            _ if !terminated() && interrupted() => Err(PyKeyboardInterrupt::new_err(())),
+            _ if !terminated() && interrupted(py) => Err(PyKeyboardInterrupt::new_err(())),
             dispatched => dispatched,
         };
         match dispatched {

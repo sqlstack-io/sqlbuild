@@ -172,3 +172,11 @@ pub(crate) async fn set_chunks_writable(output: &OutputStore, folder: &Path, wri
     let mode: u32 = [0o555, 0o755][usize::from(writable)];
     std::fs::set_permissions(&chunks, std::fs::Permissions::from_mode(mode)).expect("permissions");
 }
+
+/// A case's path, with a leading `/` read as this platform's root, the temporary folder's, so it is absolute there too.
+pub(crate) fn platform_path(path: &str) -> std::path::PathBuf {
+    let temporary: std::path::PathBuf = std::env::temp_dir();
+    let root: &std::path::Path = temporary.ancestors().last().expect("a filesystem root");
+    path.strip_prefix('/')
+        .map_or_else(|| std::path::PathBuf::from(path), |rest| root.join(rest))
+}

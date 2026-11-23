@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from sqlbuild._native import PlanOutput
-from sqlbuild.executor.build.models import BuildExecutionResult
+from sqlbuild.executor.build.models import BuildExecutionResult, FunctionExecutionResult
 from sqlbuild.executor.load.models import LoadExecutionResult
 from sqlbuild.executor.run.models import ModelExecutionResult
 from sqlbuild.runtime.contracts.types import ExecutionResourceKind
@@ -58,6 +58,7 @@ class BuildProgressActiveSpinnerTestCase:
     description: str
     node_name: str
     node_type: ExecutionResourceKind
+    completed_result: ModelExecutionResult | FunctionExecutionResult
     expected_fragments: tuple[str, ...]
     unexpected_fragments: tuple[str, ...] = field(default_factory=tuple)
 
