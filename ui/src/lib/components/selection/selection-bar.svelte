@@ -24,8 +24,8 @@
 
 	// The selection bar: what `sqb build -s … --exclude …` would select, typed in SQLBuild's syntax
 	// with chips and suggestions, the live node count, the selection in plain words, Copy and Build
-	// these. The except row appears once used. `view` holds view-only filters, drawn apart in a
-	// dashed group: they narrow what is shown and never join the command.
+	// these. The except row appears once used. `view` holds view-only filters, drawn at the end of the
+	// row in a dashed group: they narrow what is shown and never join the command.
 	let {
 		selection,
 		names,
@@ -127,19 +127,20 @@
 			<GatedButton requires="run.adhoc" variant="default" disabled={blocked} reason={problem ? 'Fix the selection first' : 'Select nodes first'} hint="Open the plan for {command}" onclick={buildThese}><HammerIcon />Build these</GatedButton>
 		{/if}
 		{@render trailing?.()}
+		{#if view}
+			<!-- View filters sit at the end of the one row: a second band for them alone left a near-empty strip. -->
+			<div class="sb-view" title="View filters only change what is drawn. They are not part of the selection, are not copied into the command and do not change what Build these runs.">
+				<span class="sb-view-label"><EyeIcon size={13} />View</span>
+				{@render view()}
+			</div>
+		{/if}
 	</div>
-	{#if showExcept || view}
+	{#if showExcept}
 		<div class="sb-row second">
 			{#if showExcept}
 				<span class="sb-lead">Except</span>
 				<SelectionField bind:value={selection.exclude} tone="except" label="Except" placeholder="Leave out: same syntax" vocabulary={selection.vocabulary} {names} problem={exceptProblem} />
 				<Button variant="ghost" size="icon-sm" onclick={clearExcept} aria-label="Remove the except row" title="Remove the except row"><XIcon /></Button>
-			{/if}
-			{#if view}
-				<div class="sb-view" title="View filters only change what is drawn. They are not part of the selection, are not copied into the command and do not change what Build these runs.">
-					<span class="sb-view-label"><EyeIcon size={13} />View</span>
-					{@render view()}
-				</div>
 			{/if}
 		</div>
 	{/if}
@@ -210,9 +211,9 @@
 	}
 	.sb-view {
 		display: inline-flex;
+		flex: none;
 		align-items: center;
 		gap: 2px;
-		margin-left: auto;
 		padding: 0 4px 0 8px;
 		border: 1px dashed var(--border-strong);
 		border-radius: 3px;

@@ -3,9 +3,9 @@ import { createResource } from '$lib/state/resource.svelte';
 import { loadCost } from './api';
 import type { Period, PriceSource, Variant } from './types';
 
-const VARIANTS: readonly Variant[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+const VARIANTS: readonly Variant[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 /** Mockups show the rate sheet in some variants and the list-price estimate in others; `?price=` overrides. */
-const DEFAULT_PRICE: Record<Variant, PriceSource> = { a: 'rate_sheet', b: 'list_price', c: 'rate_sheet', d: 'list_price', e: 'rate_sheet', f: 'list_price', g: 'rate_sheet' };
+const DEFAULT_PRICE: Record<Variant, PriceSource> = { a: 'rate_sheet', b: 'list_price', c: 'rate_sheet', d: 'list_price', e: 'rate_sheet', f: 'list_price', g: 'rate_sheet', h: 'rate_sheet' };
 const PRICE_PARAM: Record<string, PriceSource> = { rate: 'rate_sheet', est: 'list_price', config: 'config' };
 
 export function createCostState() {

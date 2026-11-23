@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import Panel from '$lib/components/platform/panel.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
@@ -36,7 +37,7 @@
 		{/snippet}
 	</DataTable>
 	{#if runs.length > limit}
-		<button class="more" onclick={() => (all = !all)}>{all ? 'Show fewer' : 'Show top 100'}</button>
+		<span class="more-row"><Button variant="ghost" size="inline" onclick={() => (all = !all)}>{all ? 'Show fewer' : 'Show top 100'}</Button></span>
 	{/if}
 </Panel>
 
@@ -57,13 +58,14 @@
 		flex: none;
 		border-radius: 50%;
 	}
-	.more {
+	.more-row {
+		display: block;
 		margin-top: 6px;
 		padding: 2px 0;
 		color: var(--muted-foreground);
 		font-size: 12px;
 	}
-	.more:hover {
+	.more-row :global(button:hover) {
 		color: var(--primary);
 		text-decoration: underline;
 	}

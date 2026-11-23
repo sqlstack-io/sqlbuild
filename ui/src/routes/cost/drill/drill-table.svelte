@@ -111,7 +111,8 @@
 						<Icon size={14} strokeWidth={1.75} class="ficon" />
 						<a href={hrefOf(r, t.id)} title={r.key} data-sveltekit-noscroll>{r.label}</a>
 						{#if r.sub}<small>{r.sub}</small>{:else if r.kind !== 'model'}<small>{r.models.toLocaleString('en')}</small>{/if}
-						{#if onadd}<button class="add" onclick={() => onadd(r, t.id)} title={r.kind === 'job' ? `Add every node of ${r.key} to the selection` : r.kind === 'folder' ? `Add every node in ${r.key} to the selection` : `Add ${r.key} to the selection`} aria-label="Add {r.label} to the selection"><PlusIcon size={12} />Add</button>{/if}
+						{#if onadd}<!-- raw-button: a chip that shows on the row's hover, styled with the row, not a toolbar button -->
+							<button class="add" onclick={() => onadd(r, t.id)} title={r.kind === 'job' ? `Add every node of ${r.key} to the selection` : r.kind === 'folder' ? `Add every node in ${r.key} to the selection` : `Add ${r.key} to the selection`} aria-label="Add {r.label} to the selection"><PlusIcon size={12} />Add</button>{/if}
 					</div>
 				</td>
 				<td title={costTitle(r.credits, cost.price)}>{usd(r.credits, cost.price)}</td>

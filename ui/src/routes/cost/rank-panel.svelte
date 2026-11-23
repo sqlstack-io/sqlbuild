@@ -1,5 +1,6 @@
 <script lang="ts" generics="R extends CostRow">
 	import Panel from '$lib/components/platform/panel.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import { plural } from '$lib/format/plural';
@@ -74,7 +75,7 @@
 		{/snippet}
 	</DataTable>
 	{#if rows.length > limit}
-		<button class="more" onclick={() => (all = !all)}>{all ? 'Show fewer' : `Show all ${rows.length.toLocaleString('en')}`}</button>
+		<span class="more-row"><Button variant="ghost" size="inline" onclick={() => (all = !all)}>{all ? 'Show fewer' : `Show all ${rows.length.toLocaleString('en')}`}</Button></span>
 	{/if}
 </Panel>
 
@@ -118,13 +119,14 @@
 	tr.selected {
 		background: color-mix(in srgb, var(--primary) 10%, transparent);
 	}
-	.more {
+	.more-row {
+		display: block;
 		margin-top: 6px;
 		padding: 2px 0;
 		color: var(--muted-foreground);
 		font-size: 12px;
 	}
-	.more:hover {
+	.more-row :global(button:hover) {
 		color: var(--primary);
 		text-decoration: underline;
 	}

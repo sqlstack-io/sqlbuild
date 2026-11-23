@@ -85,5 +85,5 @@ export type CostPage = {
 	jobSize: Record<string, string>;
 };
 
-export type Variant = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g';
+export type Variant = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h';
 export type Period = 7 | 30;

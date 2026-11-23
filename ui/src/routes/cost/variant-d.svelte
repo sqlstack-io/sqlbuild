@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
 	import Panel from '$lib/components/platform/panel.svelte';
@@ -55,7 +56,7 @@
 					</tr>
 				{/snippet}
 			</DataTable>
-			{#if cost.jobs.length > 12}<button class="more" onclick={() => (allJobs = !allJobs)}>{allJobs ? 'Show fewer' : `Show all ${cost.jobs.length}`}</button>{/if}
+			{#if cost.jobs.length > 12}<span class="more-row"><Button variant="ghost" size="inline" onclick={() => (allJobs = !allJobs)}>{allJobs ? 'Show fewer' : `Show all ${cost.jobs.length}`}</Button></span>{/if}
 		</Panel>
 		<RunsPanel runs={cost.runs} price={cost.price} limit={6} />
 	</div>
@@ -83,6 +84,6 @@
 	.change.up { color: var(--sb-warning); }
 	.change.down { color: var(--sb-success); }
 	.change.flat { color: var(--sb-text-faint); }
-	.more { margin-top: 6px; padding: 2px 0; color: var(--muted-foreground); font-size: 12px; }
-	.more:hover { color: var(--primary); text-decoration: underline; }
+	.more-row { margin-top: 6px; padding: 2px 0; color: var(--muted-foreground); font-size: 12px; }
+	.more-row :global(button:hover) { color: var(--primary); text-decoration: underline; }
 </style>

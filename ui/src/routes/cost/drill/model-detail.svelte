@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button/button.svelte';
 	import { page } from '$app/state';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
@@ -75,7 +76,7 @@
 					</tr>
 				{/snippet}
 			</DataTable>
-			{#if runs.length > 8}<button class="more" onclick={() => (allRuns = !allRuns)}>{allRuns ? 'Show fewer' : 'Show top 100'}</button>{/if}
+			{#if runs.length > 8}<span class="more-row"><Button variant="ghost" size="inline" onclick={() => (allRuns = !allRuns)}>{allRuns ? 'Show fewer' : 'Show top 100'}</Button></span>{/if}
 		</Panel>
 	</div>
 	<div class="col">
@@ -115,7 +116,7 @@
 	.col { min-width: 0; }
 	.run { display: flex; min-width: 0; align-items: center; gap: 8px; }
 	.run i { width: 7px; height: 7px; flex: none; border-radius: 50%; }
-	.more { margin-top: 6px; padding: 2px 0; color: var(--muted-foreground); font-size: 12px; }
-	.more:hover, .catalog:hover { color: var(--primary); text-decoration: underline; }
+	.more-row { margin-top: 6px; padding: 2px 0; color: var(--muted-foreground); font-size: 12px; }
+	.more-row :global(button:hover), .catalog:hover { color: var(--primary); text-decoration: underline; }
 	.catalog { font-size: 12.5px; }
 </style>
