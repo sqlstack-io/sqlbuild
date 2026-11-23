@@ -346,7 +346,7 @@
           "warehouse_type": "TIMESTAMP_NTZ(9)"
         }
       ],
-      "file": "sources/catalogue__categories.jsonl",
+      "file": "sql/sources/catalogue__categories.jsonl",
       "kind": "source",
       "logical_name": "catalogue__categories",
       "row_count": 5

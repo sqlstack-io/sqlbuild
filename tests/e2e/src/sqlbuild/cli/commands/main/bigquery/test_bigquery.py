@@ -168,15 +168,15 @@ def test_given_python_result_when_running_check_on_bigquery_then_persists_node_r
                 project_name="bigquery_node_results",
                 dataset_name=dataset_name,
             ),
-            "python/tasks/results.py": (
+            "python/nodes/tasks/results.py": (
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def produce_result(ctx):\n"
                 "    '''Test task produce_result.'''\n    return ctx.result(payload={'value': 42}, metadata={'source': 'bigquery'})\n"
             ),
-            "python/checks/results.py": (
+            "python/nodes/checks/results.py": (
                 "from sqlbuild.checks import check\n"
-                "from python.tasks.results import produce_result\n\n"
+                "from python.nodes.tasks.results import produce_result\n\n"
                 "@check(depends_on=produce_result)\n"
                 "def check_produce_result(ctx):\n"
                 "    '''Test check check_produce_result.'''\n    return ctx.result_of(node_function=produce_result).payload['value'] == 42\n"
@@ -251,13 +251,13 @@ def test_given_physical_source_without_freshness_when_running_on_bigquery_then_u
                 project_name="bigquery_freshness_metadata",
                 dataset_name=dataset_name,
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 f"    schema: {dataset_name}\n"
                 "    table: raw_orders\n"
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 'MODEL (description "Test model orders.", materialized table);\n\nSELECT id FROM __source("raw_orders")\n'
             ),
         },
@@ -533,7 +533,7 @@ def test_given_source_deferral_env_when_building_on_bigquery_then_reads_prod_and
                 prod_dataset_name=prod_dataset_name,
             ),
             "sqlbuild_local.toml": build_bigquery_local_config(location=location),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
@@ -544,13 +544,13 @@ def test_given_source_deferral_env_when_building_on_bigquery_then_reads_prod_and
                 "      - name: status\n"
                 "        type: STRING\n"
             ),
-            "python/loaders/raw_orders.py": (
+            "python/nodes/loaders/raw_orders.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_orders(ctx):\n"
                 "    '''Test loader raw_orders.'''\n    return [{'order_id': 7, 'status': 'loaded-dev'}]\n"
             ),
-            "models/stg_orders.sql": (
+            "sql/models/stg_orders.sql": (
                 'MODEL (description "Test model stg_orders.", materialized table);\n\nSELECT order_id, status FROM __source("raw_orders")'
             ),
         },
@@ -738,7 +738,7 @@ def test_given_snapshot_project_when_building_on_bigquery_then_scd2_history_is_v
             expected_historical_check_rows=test_case.expected_historical_check_rows,
         )
 
-        (project_dir / "models" / "current_customers.sql").write_text(
+        (project_dir / "sql" / "models" / "current_customers.sql").write_text(
             build_current_customers_model_sql(plan="blocked", updated_at="2026-01-02 00:00:00"),
             encoding="utf-8",
         )
@@ -762,7 +762,7 @@ def test_given_snapshot_project_when_building_on_bigquery_then_scd2_history_is_v
             expected_rows=test_case.expected_current_rows_after_initial_build,
         )
 
-        (project_dir / "models" / "current_customers.sql").write_text(
+        (project_dir / "sql" / "models" / "current_customers.sql").write_text(
             build_current_customers_model_sql(plan="pro", updated_at="2026-01-02 00:00:00"),
             encoding="utf-8",
         )
@@ -839,16 +839,16 @@ def test_given_existing_snapshot_targets_when_building_on_bigquery_then_apply_sq
         )
         assert initial_result.returncode == 0, initial_result.stdout + initial_result.stderr
 
-        (project_dir / "models" / "current_check_customers.sql").write_text(
+        (project_dir / "sql" / "models" / "current_check_customers.sql").write_text(
             build_current_check_customers_model_sql(changed=True), encoding="utf-8"
         )
-        (project_dir / "models" / "current_delete_customers.sql").write_text(
+        (project_dir / "sql" / "models" / "current_delete_customers.sql").write_text(
             build_current_delete_customers_model_sql(changed=True), encoding="utf-8"
         )
-        (project_dir / "models" / "historical_timestamp_extracts.sql").write_text(
+        (project_dir / "sql" / "models" / "historical_timestamp_extracts.sql").write_text(
             build_historical_timestamp_extracts_model_sql(changed=True), encoding="utf-8"
         )
-        (project_dir / "models" / "historical_check_daily.sql").write_text(
+        (project_dir / "sql" / "models" / "historical_check_daily.sql").write_text(
             build_historical_check_daily_model_sql(changed=True), encoding="utf-8"
         )
 
@@ -959,7 +959,7 @@ def test_given_waffle_shop_when_running_full_build_on_bigquery_then_expected_tab
             ),
         )
         assert daily_revenue_rows == test_case.expected_daily_revenue_rows
-        run_dir: Path = project_dir / "target" / "run" / "models"
+        run_dir: Path = project_dir / "target" / "run" / "sql" / "models"
         hourly_sql: str = (run_dir / "marts" / "hourly_order_activity.sql").read_text(
             encoding="utf-8"
         )
@@ -1531,7 +1531,7 @@ def test_given_bigquery_waffle_shop_model_when_building_then_portable_sql_succee
 
         assert result.returncode == test_case.expected_return_code, result.stdout + result.stderr
         compiled_files: tuple[Path, ...] = tuple(
-            (project_dir / "target" / "run" / "models").glob(f"**/{test_case.model_name}.sql")
+            (project_dir / "target" / "run" / "sql" / "models").glob(f"**/{test_case.model_name}.sql")
         )
         assert len(compiled_files) == 1
         assert test_case.expected_sql_fragment in compiled_files[0].read_text(encoding="utf-8")
@@ -1589,7 +1589,7 @@ def test_given_bigquery_invalid_model_when_building_then_underlying_error_is_pre
     project_dir: Path
     dataset_name: str
     project_dir, dataset_name = prepare_bigquery_waffle_shop(tmp_path=tmp_path)
-    broken_model: Path = project_dir / "models" / "marts" / "bigquery_broken_model.sql"
+    broken_model: Path = project_dir / "sql" / "models" / "marts" / "bigquery_broken_model.sql"
     broken_model.write_text(
         "MODEL (description 'Test model bigquery_broken_model.', materialized table);\n\nSELECT missing_column FROM UNNEST([STRUCT(1 AS id)])",
         encoding="utf-8",

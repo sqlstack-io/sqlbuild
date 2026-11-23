@@ -19,7 +19,7 @@ from tests.unit.src.sqlbuild.rule_engine.classes.project_tree.helpers import lin
         TreeQueryTestCase("project root", "", ("models", "rules")),
         TreeQueryTestCase("current directory", ".", ("models", "rules")),
         TreeQueryTestCase(
-            "folder with trailing slash", "models/", ("models/notes.txt", "models/orders.sql")
+            "folder with trailing slash", "sql/models/", ("sql/models/notes.txt", "sql/models/orders.sql")
         ),
         TreeQueryTestCase("nested folder", "./rules//inputs", ("rules/inputs/limits.yaml",)),
         TreeQueryTestCase("missing folder", "missing", ()),
@@ -44,8 +44,8 @@ def test_given_directory_when_listing_children_then_returns_direct_entries(
             "",
             (
                 "models",
-                "models/notes.txt",
-                "models/orders.sql",
+                "sql/models/notes.txt",
+                "sql/models/orders.sql",
                 "rules",
                 "rules/inputs",
                 "rules/inputs/limits.yaml",
@@ -69,7 +69,7 @@ def test_given_directory_when_listing_descendants_then_returns_entries_below_it(
 @pytest.mark.parametrize(
     "test_case",
     (
-        TreeQueryTestCase("star crosses folders", "*.sql", ("models/orders.sql",)),
+        TreeQueryTestCase("star crosses folders", "*.sql", ("sql/models/orders.sql",)),
         TreeQueryTestCase("single character", "rule?", ("rules",)),
         TreeQueryTestCase("negated set", "[!m]*s", ("rules", "rules/inputs")),
         TreeQueryTestCase("no match", "*.py", ()),
@@ -89,8 +89,8 @@ def test_given_pattern_when_globbing_then_returns_fnmatch_matches(
 @pytest.mark.parametrize(
     "test_case",
     (
-        RelativePartsTestCase("relative path", "models/orders.sql", "", ("models", "orders.sql")),
-        RelativePartsTestCase("beneath a folder", "models/orders.sql", "models/", ("orders.sql",)),
+        RelativePartsTestCase("relative path", "sql/models/orders.sql", "", ("models", "orders.sql")),
+        RelativePartsTestCase("beneath a folder", "sql/models/orders.sql", "sql/models/", ("orders.sql",)),
     ),
     ids=lambda case: case.description,
 )
@@ -134,7 +134,7 @@ def test_given_absolute_path_inside_project_when_reading_relative_parts_then_str
 @pytest.mark.parametrize(
     "test_case",
     (
-        RelativePartsTestCase("not beneath", "models/orders.sql", "rules", None, "is not beneath"),
+        RelativePartsTestCase("not beneath", "sql/models/orders.sql", "rules", None, "is not beneath"),
         RelativePartsTestCase("absolute outside", "/", "", None, "escapes the project"),
     ),
     ids=lambda case: case.description,

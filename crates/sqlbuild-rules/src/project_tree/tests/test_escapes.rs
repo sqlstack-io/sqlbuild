@@ -8,7 +8,7 @@ fn given_paths_when_checking_for_escapes_then_absolute_and_parent_paths_escape()
     let test_cases = [
         EscapesTestCase {
             description: "a relative file",
-            path: "models/a.sql",
+            path: "sql/models/a.sql",
             expected_escapes: false,
         },
         EscapesTestCase {

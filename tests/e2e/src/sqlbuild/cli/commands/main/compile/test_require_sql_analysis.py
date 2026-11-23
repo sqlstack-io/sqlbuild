@@ -32,11 +32,11 @@ _COMPILE: tuple[str, ...] = ("--no-color", "compile", "--json", "--no-cache")
             description="a header opt-out on parseable SQL is an error listing its findings",
             repo_files=(
                 ("sqlbuild_project.toml", REQUIRE_SQL_ANALYSIS_PROJECT),
-                ("models/order_flags.sql", PARSEABLE_OPT_OUT_MODEL),
+                ("sql/models/order_flags.sql", PARSEABLE_OPT_OUT_MODEL),
             ),
             command=_COMPILE,
             expected_returncode=1,
-            expected_diagnostics=(("P009", "models/order_flags.sql", 3),),
+            expected_diagnostics=(("P009", "sql/models/order_flags.sql", 3),),
             expected_text_fragments=(
                 "sqlbuild_project.toml sets [settings] require_sql_analysis = true, which only "
                 "allows `sql_analysis false` on SQL that SQLBuild cannot parse; this model "
@@ -54,7 +54,7 @@ _COMPILE: tuple[str, ...] = ("--no-color", "compile", "--json", "--no-cache")
                     REQUIRE_SQL_ANALYSIS_PROJECT
                     + '\n[path_defaults."marts"]\nsql_analysis = false\n',
                 ),
-                ("models/marts/order_epochs.sql", PATH_DEFAULT_MODEL),
+                ("sql/models/marts/order_epochs.sql", PATH_DEFAULT_MODEL),
             ),
             command=_COMPILE,
             expected_returncode=1,
@@ -69,7 +69,7 @@ _COMPILE: tuple[str, ...] = ("--no-color", "compile", "--json", "--no-cache")
             description="an opt-out on SQL the parser rejects is accepted",
             repo_files=(
                 ("sqlbuild_project.toml", REQUIRE_SQL_ANALYSIS_PROJECT),
-                ("models/order_lookup.sql", UNPARSEABLE_OPT_OUT_MODEL),
+                ("sql/models/order_lookup.sql", UNPARSEABLE_OPT_OUT_MODEL),
             ),
             command=_COMPILE,
             expected_returncode=0,
@@ -80,7 +80,7 @@ _COMPILE: tuple[str, ...] = ("--no-color", "compile", "--json", "--no-cache")
             description="without the setting a parseable opt-out keeps today's behaviour",
             repo_files=(
                 ("sqlbuild_project.toml", OPTIONAL_SQL_ANALYSIS_PROJECT),
-                ("models/order_flags.sql", PARSEABLE_OPT_OUT_MODEL),
+                ("sql/models/order_flags.sql", PARSEABLE_OPT_OUT_MODEL),
             ),
             command=_COMPILE,
             expected_returncode=0,
@@ -91,19 +91,19 @@ _COMPILE: tuple[str, ...] = ("--no-color", "compile", "--json", "--no-cache")
             description="a T-SQL cursor stub after a bracket name holding -- is analysed, not skipped",
             repo_files=(
                 ("sqlbuild_project.toml", SQLSERVER_REQUIRE_SQL_ANALYSIS_PROJECT),
-                ("sources/raw.yml", SQLSERVER_EVENTS_SOURCE),
-                ("models/bracketed_events.sql", SQLSERVER_BRACKETED_CURSOR_MODEL),
+                ("sql/sources/raw.yml", SQLSERVER_EVENTS_SOURCE),
+                ("sql/models/bracketed_events.sql", SQLSERVER_BRACKETED_CURSOR_MODEL),
             ),
             command=_COMPILE,
             expected_returncode=0,
-            expected_diagnostics=(("L007", "models/bracketed_events.sql", 18),),
+            expected_diagnostics=(("L007", "sql/models/bracketed_events.sql", 18),),
             expected_text_fragments=(),
         ),
         RequireSqlAnalysisCase(
             description="a single-run --no-sql-analysis still works",
             repo_files=(
                 ("sqlbuild_project.toml", REQUIRE_SQL_ANALYSIS_PROJECT),
-                ("models/order_flags.sql", PARSEABLE_OPT_OUT_MODEL),
+                ("sql/models/order_flags.sql", PARSEABLE_OPT_OUT_MODEL),
             ),
             command=("--no-color", "compile", "--json", "--no-cache", "--no-sql-analysis"),
             expected_returncode=0,
@@ -115,7 +115,7 @@ _COMPILE: tuple[str, ...] = ("--no-color", "compile", "--json", "--no-cache")
             repo_files=(
                 ("sqlbuild_project.toml", REQUIRE_SQL_ANALYSIS_PROJECT),
                 ("sqlbuild_local.toml", "[settings]\nsql_analysis = false\n"),
-                ("models/order_epochs.sql", PATH_DEFAULT_MODEL),
+                ("sql/models/order_epochs.sql", PATH_DEFAULT_MODEL),
             ),
             command=_COMPILE,
             expected_returncode=1,
@@ -134,7 +134,7 @@ _COMPILE: tuple[str, ...] = ("--no-color", "compile", "--json", "--no-cache")
             repo_files=(
                 ("sqlbuild_project.toml", REQUIRE_SQL_ANALYSIS_PROJECT),
                 ("sqlbuild_local.toml", "[settings]\nrequire_sql_analysis = false\n"),
-                ("models/order_epochs.sql", PATH_DEFAULT_MODEL),
+                ("sql/models/order_epochs.sql", PATH_DEFAULT_MODEL),
             ),
             command=_COMPILE,
             expected_returncode=1,
@@ -150,7 +150,7 @@ _COMPILE: tuple[str, ...] = ("--no-color", "compile", "--json", "--no-cache")
             repo_files=(
                 ("sqlbuild_project.toml", OPTIONAL_SQL_ANALYSIS_PROJECT),
                 (
-                    "models/order_lookup.sql",
+                    "sql/models/order_lookup.sql",
                     'MODEL (description "Order lookup");\nSELECT order_id FROM orders WHERE\n',
                 ),
             ),

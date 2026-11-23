@@ -18,7 +18,7 @@ def write_fixture_format_project(
     """Write a contracted two-model project with one SQL fixture."""
 
     (tmp_path / "sqlbuild_project.toml").write_text(project_toml, encoding="utf-8")
-    staging_model: Path = tmp_path / "models" / "stg_rows.sql"
+    staging_model: Path = tmp_path / "sql" / "models" / "stg_rows.sql"
     staging_model.parent.mkdir()
     staging_model.write_text(
         "MODEL (\n"
@@ -32,7 +32,7 @@ def write_fixture_format_project(
         "SELECT 1 AS id, TRUE AS flag\n",
         encoding="utf-8",
     )
-    (tmp_path / "models" / "rows.sql").write_text(
+    (tmp_path / "sql" / "models" / "rows.sql").write_text(
         'MODEL (description "Rows");\n\nSELECT id, flag FROM __ref("stg_rows")\n',
         encoding="utf-8",
     )

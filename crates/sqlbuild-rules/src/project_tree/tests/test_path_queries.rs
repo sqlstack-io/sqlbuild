@@ -8,9 +8,9 @@ use crate::project_tree::tests::test_types::{PathSelectionTestCase, TrackedTextT
 
 const VALUES: [&str; 6] = [
     "models",
-    "models/marts",
-    "models/marts/orders.sql",
-    "models/a.sql",
+    "sql/models/marts",
+    "sql/models/marts/orders.sql",
+    "sql/models/a.sql",
     "rules",
     "readme.md",
 ];
@@ -28,8 +28,8 @@ fn given_listed_paths_when_selecting_then_children_descendants_and_globs_match_p
         PathSelectionTestCase {
             description: "a folder spelled with dots and slashes",
             argument: Some("./models//"),
-            expected_children: vec!["models/marts", "models/a.sql"],
-            expected_descendants: vec!["models/marts", "models/marts/orders.sql", "models/a.sql"],
+            expected_children: vec!["sql/models/marts", "sql/models/a.sql"],
+            expected_descendants: vec!["sql/models/marts", "sql/models/marts/orders.sql", "sql/models/a.sql"],
             expected_glob: vec![],
         },
         PathSelectionTestCase {
@@ -37,7 +37,7 @@ fn given_listed_paths_when_selecting_then_children_descendants_and_globs_match_p
             argument: Some("*.sql"),
             expected_children: vec![],
             expected_descendants: vec![],
-            expected_glob: vec!["models/marts/orders.sql", "models/a.sql"],
+            expected_glob: vec!["sql/models/marts/orders.sql", "sql/models/a.sql"],
         },
         PathSelectionTestCase {
             description: "a negated set",
@@ -78,17 +78,17 @@ fn given_file_names_when_checking_tracked_text_then_only_known_suffixes_count() 
     let test_cases = [
         TrackedTextTestCase {
             description: "a SQL model",
-            path: "models/a.sql",
+            path: "sql/models/a.sql",
             expected_tracked: true,
         },
         TrackedTextTestCase {
             description: "an uppercase suffix",
-            path: "models/A.YML",
+            path: "sql/models/A.YML",
             expected_tracked: true,
         },
         TrackedTextTestCase {
             description: "a hidden name without a suffix",
-            path: "models/.sql",
+            path: "sql/models/.sql",
             expected_tracked: false,
         },
         TrackedTextTestCase {

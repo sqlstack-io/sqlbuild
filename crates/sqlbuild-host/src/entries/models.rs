@@ -140,7 +140,7 @@ pub enum UserCodeHost {
     LoadMaterializeFunction,
     LoadProviderModule,
     LoadPythonNodeModule,
-    LoadSinkModule,
+    LoadEventSinkModule,
     LoadOrchestrationModule,
     ModuleFunctions,
     ModuleProviderClasses,

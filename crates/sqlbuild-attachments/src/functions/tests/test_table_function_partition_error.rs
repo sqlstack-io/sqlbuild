@@ -23,7 +23,7 @@ fn given_table_function_calls_when_checking_partitions_then_first_unpartitioned_
                 ("table_fn", "smooth_readings", false),
             ],
             expected_error: Some(
-                "Model file models/report.sql calls Python table function 'smooth_readings' \
+                "Model file sql/models/report.sql calls Python table function 'smooth_readings' \
                  without OVER (PARTITION BY ...); it receives one whole partition per call, so \
                  add OVER (PARTITION BY <columns>) after the call",
             ),
@@ -38,7 +38,7 @@ fn given_table_function_calls_when_checking_partitions_then_first_unpartitioned_
     for test_case in test_cases {
         assert_eq!(
             table_function_partition_error(
-                "Model file models/report.sql",
+                "Model file sql/models/report.sql",
                 &test_case.calls,
                 &whole_partition
             )

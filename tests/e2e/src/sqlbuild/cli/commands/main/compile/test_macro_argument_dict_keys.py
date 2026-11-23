@@ -69,8 +69,8 @@ def test_given_macro_dict_key_from_nested_call_when_compiling_then_unhashable_ke
                 'name = "shop"\nadapter = "duckdb"\n\n[connection]\ndatabase = "shop.duckdb"\n\n'
                 "[scopes]\nenforce_placement = false\n"
             ),
-            "macros/python/values.py": _MACROS,
-            "models/orders.sql": (
+            "sql/macros/python/values.py": _MACROS,
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.');\n"
                 f"SELECT @py.show({test_case.argument}) AS shown\n"
             ),

@@ -334,7 +334,7 @@ def test_given_debug_command_with_providers_when_running_then_outputs_provider_s
                 'name = "debug_provider_project"\nadapter = "duckdb"\n\n'
                 '[connection]\ndatabase = "debug_provider.duckdb"\n'
             ),
-            "providers/marker.py": dedent(
+            "python/providers/marker.py": dedent(
                 """
                 from sqlbuild.providers import Provider
 
@@ -388,7 +388,7 @@ def test_given_debug_json_with_providers_when_running_then_outputs_provider_summ
                 'name = "debug_provider_json_project"\nadapter = "duckdb"\n\n'
                 '[connection]\ndatabase = "debug_provider_json.duckdb"\n'
             ),
-            "providers/marker.py": dedent(
+            "python/providers/marker.py": dedent(
                 """
                 from sqlbuild.providers import Provider
 
@@ -481,7 +481,7 @@ def test_given_broken_project_nodes_when_debugging_then_only_configuration_and_p
                 'name = "debug_broken_project"\nadapter = "duckdb"\n\n'
                 '[connection]\ndatabase = "debug_broken.duckdb"\n'
             ),
-            "providers/marker.py": dedent(
+            "python/providers/marker.py": dedent(
                 """
                 from sqlbuild.providers import Provider
 
@@ -492,8 +492,8 @@ def test_given_broken_project_nodes_when_debugging_then_only_configuration_and_p
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": "MODEL (materialized table; SELECT FROM WHERE\n",
-            "python/customers.py": dedent(
+            "sql/models/orders.sql": "MODEL (materialized table; SELECT FROM WHERE\n",
+            "python/nodes/customers.py": dedent(
                 """
                 from pathlib import Path
 
@@ -513,4 +513,4 @@ def test_given_broken_project_nodes_when_debugging_then_only_configuration_and_p
     assert result.returncode == test_case.expected_returncode, result.stderr
     assert "Providers:\n  providers: 1 of 1 ready [OK secrets set]\n" in result.stdout
     assert test_case.expected_stdout_fragment in result.stdout
-    assert not (project_dir / "python/imported.marker").exists()
+    assert not (project_dir / "python/nodes/imported.marker").exists()

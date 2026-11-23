@@ -15,7 +15,7 @@ REQUIRED_DOMAIN: RuleOption[str] = RuleOption.string(
     code="XSQBRD001",
     slug="required-domain",
     message="model belongs to the wrong domain",
-    remediation="Move this model beneath models/<required-domain>/ and rename its domain prefix.",
+    remediation="Move this model beneath sql/models/<required-domain>/ and rename its domain prefix.",
     options=(REQUIRED_DOMAIN,),
 )
 def required_domain(*, model: Model, ctx: RuleContext) -> list[Finding]:

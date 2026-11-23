@@ -70,7 +70,7 @@ def test_given_derived_native_facts_when_compiling_then_contract_and_execution_a
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_DERIVED_RELATION_PROJECT)
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', contract enforced, columns (order_id (type BIGINT, nullable false)));\n"
@@ -83,7 +83,7 @@ def test_given_derived_native_facts_when_compiling_then_contract_and_execution_a
 
     assert exit_code == test_case.expected_exit_code
     assert tuple(item["code"] for item in diagnostics) == test_case.expected_diagnostics
-    compiled_sql: str = (tmp_path / "target" / "compiled" / "models" / "orders.sql").read_text()
+    compiled_sql: str = (tmp_path / "target" / "compiled" / "sql" / "models" / "orders.sql").read_text()
     with duckdb.connect() as connection:
         rows: tuple[tuple[int, ...], ...] = tuple(connection.execute(compiled_sql).fetchall())
     assert rows == test_case.expected_rows
@@ -118,7 +118,7 @@ def test_given_star_over_inferred_upstream_when_compiling_then_downstream_bindin
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_DERIVED_RELATION_PROJECT)
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "staged_orders.sql").write_text(
         "MODEL (description 'Test model staged_orders.');\nSELECT 1 AS order_id"
@@ -161,7 +161,7 @@ def test_given_star_over_derived_table_when_compiling_then_lineage_matches_proje
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_DERIVED_RELATION_PROJECT)
-    seeds: Path = tmp_path / "seeds"
+    seeds: Path = tmp_path / "sql" / "seeds"
     seeds.mkdir()
     (seeds / "order_labels.csv").write_text("order_id,label\n1,first\n")
     (seeds / "order_labels.yml").write_text(
@@ -169,7 +169,7 @@ def test_given_star_over_derived_table_when_compiling_then_lineage_matches_proje
         "      - name: order_id\n        type: INTEGER\n"
         "      - name: label\n        type: VARCHAR\n"
     )
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "staged_orders.sql").write_text(
         "MODEL (description 'Test model staged_orders.');\nSELECT 1 AS order_id, CAST(10 AS DOUBLE) AS amount"
@@ -236,7 +236,7 @@ def test_given_snapshot_reader_when_compiling_then_validity_columns_are_known(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "customer_snapshot.sql").write_text(
         "MODEL (description 'Test model customer_snapshot.', materialized snapshot, unique_key [customer_id], snapshot_strategy timestamp, "
@@ -288,7 +288,7 @@ def test_given_duckdb_keyword_function_when_compiling_then_compiled_sql_executes
 
     assert exit_code == test_case.expected_exit_code
     assert codes == test_case.expected_diagnostics
-    compiled_sql: str = (tmp_path / "target" / "compiled" / "models" / "orders.sql").read_text()
+    compiled_sql: str = (tmp_path / "target" / "compiled" / "sql" / "models" / "orders.sql").read_text()
     with duckdb.connect() as connection:
         assert len(connection.execute(compiled_sql).fetchall()) == 1
 
@@ -340,9 +340,9 @@ def test_given_input_and_output_share_name_when_compiling_then_lineage_keeps_inp
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
-    sources: Path = tmp_path / "sources"
+    sources: Path = tmp_path / "sql" / "sources"
     sources.mkdir()
     (sources / "orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    contract: enforced\n"
@@ -373,7 +373,7 @@ def test_given_input_and_output_share_name_when_compiling_then_lineage_keeps_inp
     # order_id, amount, and the physical status column, for five edges in total.
     assert lineage["edge_count"] == test_case.expected_edge_count
     compiled_sql: str = (
-        tmp_path / "target" / "compiled" / "models" / "order_totals.sql"
+        tmp_path / "target" / "compiled" / "sql" / "models" / "order_totals.sql"
     ).read_text()
     with duckdb.connect() as connection:
         connection.execute(
@@ -446,7 +446,7 @@ def test_given_bound_wildcard_or_using_join_when_compiling_then_facts_match_exec
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_DERIVED_RELATION_PROJECT)
-    sources: Path = tmp_path / "sources"
+    sources: Path = tmp_path / "sql" / "sources"
     sources.mkdir()
     (sources / "orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    contract: enforced\n"
@@ -455,7 +455,7 @@ def test_given_bound_wildcard_or_using_join_when_compiling_then_facts_match_exec
         "      - name: category\n        type: VARCHAR\n"
         "      - name: amount\n        type: DOUBLE\n"
     )
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "selected_orders.sql").write_text(
         f"MODEL (description 'Test model selected_orders.', contract enforced, columns ({test_case.output_contract}));\n"
@@ -469,7 +469,7 @@ def test_given_bound_wildcard_or_using_join_when_compiling_then_facts_match_exec
     compiled_models: list[dict[str, object]] = cast(list[dict[str, object]], resources["models"])
     lineage: dict[str, object] = cast(dict[str, object], compiled_models[0]["lineage"])
     assert lineage["edge_count"] == test_case.expected_edges
-    sql: str = (tmp_path / "target" / "compiled" / "models" / "selected_orders.sql").read_text()
+    sql: str = (tmp_path / "target" / "compiled" / "sql" / "models" / "selected_orders.sql").read_text()
     with duckdb.connect() as connection:
         connection.execute(
             "CREATE TABLE orders_input (order_id BIGINT, category VARCHAR, amount DOUBLE)"
@@ -499,7 +499,7 @@ def test_given_object_wildcard_when_compiling_then_lineage_preserves_payload_inp
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "snowflake"\n[defaults]\ndatabase = "warehouse"\nschema = "analytics"\n'
     )
-    sources: Path = tmp_path / "sources"
+    sources: Path = tmp_path / "sql" / "sources"
     sources.mkdir()
     (sources / "orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    contract: enforced\n"
@@ -507,7 +507,7 @@ def test_given_object_wildcard_when_compiling_then_lineage_preserves_payload_inp
         "      - name: order_id\n        type: BIGINT\n"
         "      - name: amount\n        type: DOUBLE\n"
     )
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "selected_orders.sql").write_text(
         "MODEL (description 'Test model selected_orders.', contract enforced, columns (order_id (type BIGINT, nullable true)));\n"

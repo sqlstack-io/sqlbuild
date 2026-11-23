@@ -268,7 +268,7 @@ LIFECYCLE_EVENT_CLASS_NAME: str = "LifecycleEvent"
 DIAGNOSTIC_LOG_CLASS_NAME: str = "DiagnosticLog"
 LIFECYCLE_EVENT_FACTORY_NAME: str = "create_lifecycle_event"
 EVENT_EXPORTER_DECORATOR_NAMES: frozenset[str] = frozenset(
-    {"lifecycle_event_sink", "command_output_sink"}
+    {"lifecycle_event_sink", "command_output_event_sink"}
 )
 OBSERVABILITY_LIFECYCLE_EVENT_MODULES: tuple[tuple[str, ...], ...] = (
     ("sqlbuild", "observability"),

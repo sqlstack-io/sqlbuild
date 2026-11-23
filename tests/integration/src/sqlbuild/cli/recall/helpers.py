@@ -103,8 +103,8 @@ def write_project(project_dir: Path, *, extra_toml: str = "", targets: int = 1) 
         )
     files: dict[str, str] = {
         "sqlbuild_project.toml": toml,
-        "models/orders.sql": ORDERS_MODEL,
-        "python/tasks/emit.py": EMIT_TASK,
+        "sql/models/orders.sql": ORDERS_MODEL,
+        "python/nodes/tasks/emit.py": EMIT_TASK,
     }
     for relative, contents in files.items():
         path: Path = project_dir / relative
@@ -263,7 +263,7 @@ def killed_during_discovery(
 def write_slow_import_sink(project_dir: Path) -> Path:
     """Add a sink module whose import sleeps for `ORDERS_IMPORT_SECONDS`, slowing discovery."""
 
-    sink: Path = project_dir / "sinks" / "slow_import.py"
+    sink: Path = project_dir / "python" / "event_sinks" / "slow_import.py"
     sink.parent.mkdir(parents=True, exist_ok=True)
     _ = sink.write_text(
         "import os\nimport sys\nimport time\n\n"
@@ -503,8 +503,8 @@ def simultaneous_builds(project_dir: Path, targets: tuple[str, ...]) -> list[int
 RECALL_SINK_IMPORTS: str = (
     "from pathlib import Path\n\n"
     "from sqlbuild.recall import RecallWriter\n"
-    "from sqlbuild.sinks import (\n"
-    "    CommandOutputRecord, LifecycleEvent, command_output_sink, lifecycle_event_sink,\n"
+    "from sqlbuild.event_sinks import (\n"
+    "    CommandOutputRecord, LifecycleEvent, command_output_event_sink, lifecycle_event_sink,\n"
     ")\n\n"
 )
 EVENT_LOG_SINK: str = (
@@ -514,7 +514,7 @@ EVENT_LOG_SINK: str = (
     "        log.write(event.event_type + '\\n')\n"
 )
 OUTPUT_LOG_SINK: str = (
-    "@command_output_sink\n"
+    "@command_output_event_sink\n"
     "def output_log(record: CommandOutputRecord) -> None:\n"
     "    with (Path(__file__).parents[1] / 'output.log').open('a') as log:\n"
     "        log.write(record.message)\n"
@@ -531,7 +531,7 @@ FAILING_SINKS: str = (
     "@lifecycle_event_sink\n"
     "def recall_events(event: LifecycleEvent, writer: RecallWriter) -> None:\n"
     "    raise RuntimeError('lifecycle sink failed')\n\n"
-    "@command_output_sink\n"
+    "@command_output_event_sink\n"
     "def recall_output(record: CommandOutputRecord, writer: RecallWriter) -> None:\n"
     "    raise RuntimeError('output sink failed')\n"
 )
@@ -553,7 +553,7 @@ def rewriting_output_sink(replaced: tuple[bytes, bytes]) -> str:
 
     old, new = replaced
     return (
-        "@command_output_sink\n"
+        "@command_output_event_sink\n"
         "def recall_output(record: CommandOutputRecord, writer: RecallWriter) -> None:\n"
         f"    data = record.data.replace({old!r}, {new!r})\n"
         "    writer.publish_command_output(record.replace(data=data))\n"
@@ -561,10 +561,10 @@ def rewriting_output_sink(replaced: tuple[bytes, bytes]) -> str:
 
 
 def write_sinks(project_dir: Path, sinks: dict[str, str]) -> Path:
-    """Add `sinks/<name>.py` modules holding the given sink definitions."""
+    """Add `python/event_sinks/<name>.py` modules holding the given sink definitions."""
 
     for name, source in sinks.items():
-        path: Path = project_dir / "sinks" / f"{name}.py"
+        path: Path = project_dir / "python" / "event_sinks" / f"{name}.py"
         path.parent.mkdir(parents=True, exist_ok=True)
         _ = path.write_text(RECALL_SINK_IMPORTS + source, encoding="utf-8")
     return project_dir

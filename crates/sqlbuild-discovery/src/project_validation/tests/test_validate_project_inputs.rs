@@ -28,7 +28,7 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
             },
             expected_failure: failure(
                 FailureKind::ResourceIdentity,
-                "Invalid model identity 'Orders' in models/Orders.sql; use snake_case 'orders'",
+                "Invalid model identity 'Orders' in sql/models/Orders.sql; use snake_case 'orders'",
             ),
         },
         ValidationTestCase {
@@ -39,7 +39,7 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
             },
             expected_failure: failure(
                 FailureKind::ResourceIdentity,
-                "Invalid model identity '_chain_' in models/_chain_.sql; use snake_case 'chain'",
+                "Invalid model identity '_chain_' in sql/models/_chain_.sql; use snake_case 'chain'",
             ),
         },
         ValidationTestCase {
@@ -47,7 +47,7 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
             facts: ProjectFacts {
                 models: vec![model("orders")],
                 sources: vec![SourceFileFact {
-                    path: "sources/shop.yml".to_owned(),
+                    path: "sql/sources/shop.yml".to_owned(),
                     entries: vec![SourceFact {
                         name: "orders".to_owned(),
                         ..SourceFact::default()
@@ -57,8 +57,8 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
             },
             expected_failure: failure(
                 FailureKind::Conflict,
-                "Logical relation name 'orders' is declared as both model in models/orders.sql \
-                 and source in sources/shop.yml",
+                "Logical relation name 'orders' is declared as both model in sql/models/orders.sql \
+                 and source in sql/sources/shop.yml",
             ),
         },
         ValidationTestCase {
@@ -94,21 +94,21 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
             description: "an undeclared seed CSV",
             facts: ProjectFacts {
                 seeds: vec![SeedFileFact {
-                    file: named("countries", "seeds/countries.csv"),
+                    file: named("countries", "sql/seeds/countries.csv"),
                     absolute_path: "/missing/seeds/countries.csv".to_owned(),
                 }],
                 ..ProjectFacts::default()
             },
             expected_failure: failure(
                 FailureKind::Seed,
-                "Seed CSV seeds/countries.csv has no matching declaration for seed 'countries' \
-                 under seeds/**/*.yml",
+                "Seed CSV sql/seeds/countries.csv has no matching declaration for seed 'countries' \
+                 under sql/seeds/**/*.yml",
             ),
         },
         ValidationTestCase {
             description: "an unmatched path default lists known folders",
             facts: ProjectFacts {
-                models: vec![model_at("orders", "models/marts/orders.sql")],
+                models: vec![model_at("orders", "sql/models/marts/orders.sql")],
                 path_default_keys: vec!["staging".to_owned()],
                 ..ProjectFacts::default()
             },
@@ -121,11 +121,11 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
         ValidationTestCase {
             description: "a path default matching only undiscovered project models passes",
             facts: ProjectFacts {
-                models: vec![model_at("orders", "models/marts/orders.sql")],
+                models: vec![model_at("orders", "sql/models/marts/orders.sql")],
                 path_default_keys: vec!["staging".to_owned()],
                 project_model_paths: Some(vec![
-                    "models/marts/orders.sql".to_owned(),
-                    "models/staging/customers.sql".to_owned(),
+                    "sql/models/marts/orders.sql".to_owned(),
+                    "sql/models/staging/customers.sql".to_owned(),
                 ]),
                 ..ProjectFacts::default()
             },
@@ -139,7 +139,7 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
         ValidationTestCase {
             description: "accepts recursive glob matching nested staging prefix",
             facts: path_default_facts(
-                &["models/commerce/partner_feed/staging/orders.sql"],
+                &["sql/models/commerce/partner_feed/staging/orders.sql"],
                 &["commerce/**/staging"],
             ),
             expected_failure: Ok(()),
@@ -147,7 +147,7 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
         ValidationTestCase {
             description: "accepts recursive glob matching zero segments",
             facts: path_default_facts(
-                &["models/commerce/staging/orders.sql"],
+                &["sql/models/commerce/staging/orders.sql"],
                 &["commerce/**/staging"],
             ),
             expected_failure: Ok(()),
@@ -155,7 +155,7 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
         ValidationTestCase {
             description: "counts broad glob as matched when a literal wins selection",
             facts: path_default_facts(
-                &["models/commerce/partner_feed/staging/orders.sql"],
+                &["sql/models/commerce/partner_feed/staging/orders.sql"],
                 &["commerce/**/staging", "commerce/partner_feed/staging"],
             ),
             expected_failure: Ok(()),
@@ -163,7 +163,7 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
         ValidationTestCase {
             description: "rejects recursive glob matching no model paths",
             facts: path_default_facts(
-                &["models/commerce/partner_feed/marts/orders.sql"],
+                &["sql/models/commerce/partner_feed/marts/orders.sql"],
                 &["commerce/**/staging"],
             ),
             expected_failure: failure(
@@ -175,7 +175,7 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
         ValidationTestCase {
             description: "rejects equally specific matching globs during discovery",
             facts: path_default_facts(
-                &["models/commerce/eu/staging/orders.sql"],
+                &["sql/models/commerce/eu/staging/orders.sql"],
                 &["commerce/*/staging", "commerce/eu/*"],
             ),
             expected_failure: failure(
@@ -210,7 +210,7 @@ fn given_seed_csv_headers_when_validating_then_reports_python_tuple_reprs() {
             declared_columns: &["code"],
             expected_failure: failure(
                 FailureKind::Seed,
-                "seeds/countries.csv header ('code', 'label') does not match declared seed \
+                "sql/seeds/countries.csv header ('code', 'label') does not match declared seed \
                  columns ('code',) for 'countries'",
             ),
         },
@@ -220,7 +220,7 @@ fn given_seed_csv_headers_when_validating_then_reports_python_tuple_reprs() {
             declared_columns: &["code", "code"],
             expected_failure: failure(
                 FailureKind::Seed,
-                "seeds/countries.csv contains duplicate CSV header column 'code'",
+                "sql/seeds/countries.csv contains duplicate CSV header column 'code'",
             ),
         },
         SeedHeaderTestCase {
@@ -229,7 +229,7 @@ fn given_seed_csv_headers_when_validating_then_reports_python_tuple_reprs() {
             declared_columns: &["code"],
             expected_failure: failure(
                 FailureKind::Seed,
-                "seeds/countries.csv must contain a CSV header row",
+                "sql/seeds/countries.csv must contain a CSV header row",
             ),
         },
     ];

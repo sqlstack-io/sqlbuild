@@ -20,7 +20,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
         UnusedCteContextTestCase(
             description="table function argument keeps its input CTE reachable",
             files={
-                "functions/sql/customer_orders.sql": dedent(
+                "sql/functions/sql/customer_orders.sql": dedent(
                     """
                     FUNCTION (description "Test function customer_orders.",
                       arguments (customer_id INTEGER),
@@ -31,7 +31,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
                     """
                 ).strip()
                 + "\n",
-                "models/order_summary.sql": dedent(
+                "sql/models/order_summary.sql": dedent(
                     """
                     MODEL (description "Test model order_summary.", materialized table);
 
@@ -57,13 +57,13 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
         UnusedCteContextTestCase(
             description="generic audit argument may reference its local base CTE",
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Test model orders.',\n  materialized table,\n  audits [\n    order_group_rate (\n"
                     '      evaluation_sql "SELECT 1 AS is_ok FROM base",\n'
                     "      thresholds (error (below 0.5)),\n"
                     "    ),\n  ],\n);\n\nSELECT 1 AS order_id\n"
                 ),
-                "audits/generic/order_group_rate.sql": dedent(
+                "sql/audits/generic/order_group_rate.sql": dedent(
                     """
                     AUDIT (
                       evaluation measurement,
@@ -92,13 +92,13 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
         UnusedCteContextTestCase(
             description="opaque audit SQL does not hide a later dead CTE",
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Test model orders.',\n  materialized table,\n  audits [\n    order_group_rate (\n"
                     '      evaluation_sql "SELECT 1 AS is_ok FROM base",\n'
                     "      thresholds (error (below 0.5)),\n"
                     "    ),\n  ],\n);\n\nSELECT 1 AS order_id\n"
                 ),
-                "audits/generic/order_group_rate.sql": dedent(
+                "sql/audits/generic/order_group_rate.sql": dedent(
                     """
                     AUDIT (
                       evaluation measurement,
@@ -128,10 +128,10 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
         UnusedCteContextTestCase(
             description="test harness output keeps its helper CTE reachable",
             files={
-                "models/raw_orders.sql": (
+                "sql/models/raw_orders.sql": (
                     "MODEL (description 'Test model raw_orders.', materialized table);\n\nSELECT 7 AS order_id, 25 AS amount\n"
                 ),
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     'MODEL (description "Test model orders.", materialized table);\n\nSELECT * FROM __ref("raw_orders")\n'
                 ),
                 "tests/unit/orders_test.sql": dedent(
@@ -156,10 +156,10 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
         UnusedCteContextTestCase(
             description="ordinary audit parameters do not hide a dead CTE",
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Test model orders.', materialized table, audits [order_rows]);\n\nSELECT 1 AS order_id\n"
                 ),
-                "audits/generic/order_rows.sql": dedent(
+                "sql/audits/generic/order_rows.sql": dedent(
                     """
                     AUDIT ();
 

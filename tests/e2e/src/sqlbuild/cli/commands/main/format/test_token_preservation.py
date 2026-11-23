@@ -57,7 +57,7 @@ def test_given_case_sensitive_tokens_when_formatting_then_cli_writes_them_exactl
     test_case: TokenPreservationFormatTestCase, tmp_path: Path
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(test_case.project_toml, encoding="utf-8")
-    model: Path = tmp_path / "models" / f"{test_case.model_name}.sql"
+    model: Path = tmp_path / "sql" / "models" / f"{test_case.model_name}.sql"
     model.parent.mkdir()
     model.write_text(test_case.authored_sql, encoding="utf-8")
 
@@ -100,7 +100,7 @@ def test_given_case_and_line_sensitive_tokens_when_formatting_then_build_keeps_t
     test_case: TokenPreservationBuildTestCase, tmp_path: Path
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_DUCKDB_PROJECT_TOML, encoding="utf-8")
-    model: Path = tmp_path / "models" / "order_lines.sql"
+    model: Path = tmp_path / "sql" / "models" / "order_lines.sql"
     model.parent.mkdir()
     model.write_text(test_case.authored_sql, encoding="utf-8")
 

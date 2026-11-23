@@ -55,8 +55,8 @@ fn given_selectors_when_resolving_then_keys_match_python() {
             expected_keys: &[("model", "orders"), ("udf", "tax")],
         },
         SelectorTestCase {
-            description: "models/mart",
-            select: &["models/mart"],
+            description: "sql/models/mart",
+            select: &["sql/models/mart"],
             exclude: &[],
             expected_keys: &[
                 ("model", "order_items"),
@@ -65,8 +65,8 @@ fn given_selectors_when_resolving_then_keys_match_python() {
             ],
         },
         SelectorTestCase {
-            description: "path:models/staging",
-            select: &["path:models/staging"],
+            description: "path:sql/models/staging",
+            select: &["path:sql/models/staging"],
             exclude: &[],
             expected_keys: &[("model", "customers")],
         },
@@ -112,8 +112,8 @@ fn given_selectors_when_resolving_then_keys_match_python() {
             ],
         },
         SelectorTestCase {
-            description: "tag:daily,models/mart/items",
-            select: &["tag:daily,models/mart/items"],
+            description: "tag:daily,sql/models/mart/items",
+            select: &["tag:daily,sql/models/mart/items"],
             exclude: &[],
             expected_keys: &[("model", "order_items"), ("udf", "tax")],
         },
@@ -251,7 +251,7 @@ fn given_invalid_selectors_when_resolving_then_errors_match_python() {
             exclude: &[],
             expected_error: (
                 "S012",
-                "path selectors require an explicit root: use 'models/' or 'python/'",
+                "path selectors require an explicit root: use 'sql/models/' or 'python/nodes/'",
                 None,
             ),
         },

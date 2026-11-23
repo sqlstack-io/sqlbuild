@@ -55,8 +55,8 @@ def test_given_multiple_missing_source_schemas_when_inspecting_then_metadata_is_
         tmp_path,
         {
             "sqlbuild_project.toml": 'name = "source_batch"\nadapter = "duckdb"\n',
-            "sources/orders.yml": "sources:\n  - name: orders\n    description: Test source orders.\n    table: orders\n  - name: customers\n    description: Test source customers.\n    table: customers\n",
-            "models/combined.sql": 'MODEL (description "Test model combined.");\nSELECT o.id FROM __source("orders") o JOIN __source("customers") c ON o.id = c.id',
+            "sql/sources/orders.yml": "sources:\n  - name: orders\n    description: Test source orders.\n    table: orders\n  - name: customers\n    description: Test source customers.\n    table: customers\n",
+            "sql/models/combined.sql": 'MODEL (description "Test model combined.");\nSELECT o.id FROM __source("orders") o JOIN __source("customers") c ON o.id = c.id',
         },
     )
     adapter: DuckDbAdapter = DuckDbAdapter()
@@ -108,11 +108,11 @@ def test_given_source_schema_case_differs_when_inspecting_then_columns_are_found
         tmp_path,
         {
             "sqlbuild_project.toml": 'name = "source_case"\nadapter = "duckdb"\n',
-            "sources/orders.yml": (
+            "sql/sources/orders.yml": (
                 "sources:\n  - name: orders\n    description: Test source orders.\n"
                 f"    schema: {test_case.declared_schema}\n    table: orders\n"
             ),
-            "models/open_orders.sql": 'MODEL (description "Test model open_orders.");\nSELECT id FROM __source("orders")',
+            "sql/models/open_orders.sql": 'MODEL (description "Test model open_orders.");\nSELECT id FROM __source("orders")',
         },
     )
     adapter: DuckDbAdapter = DuckDbAdapter()

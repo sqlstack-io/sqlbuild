@@ -37,7 +37,7 @@ def build_single_model_project(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="test_model"),
         deps=(),
         name="test_model",
-        relative_path=Path("models/test_model.sql"),
+        relative_path=Path("sql/models/test_model.sql"),
         query_sql="SELECT 1",
         config=CompileModelConfig(),
         destination=CompiledRelationLocation(
@@ -78,7 +78,7 @@ def build_previous_python_identity_map(
             definition='{"source_text": "def prepare_orders(ctx):\\n    return old_helper()\\n"}',
             metadata_json=(
                 '{"dependencies": [{"module": "tasks.helpers", '
-                '"qualname": "old_helper", "source_path": "python/tasks/helpers.py", '
+                '"qualname": "old_helper", "source_path": "python/nodes/tasks/helpers.py", '
                 '"source_text": "def old_helper():\\n    return 1\\n"}]}'
             ),
             ts=datetime(2026, 1, 15, 12, 0, 0),

@@ -14,7 +14,7 @@ fn given_format_report_when_rendering_then_text_and_json_match_python() {
     let test_cases = [ReportTestCase {
         description: "excerpt, wrapped help, location-only warning and a Rule fix",
         report: sample_report(),
-        expected_text: "Formatted files:\n  /p/models/orders.sql\n\nerror[SQLCLEAN004]: Avoid LIMIT\n --> models/orders.sql:2:8\n  |\n2 | SELECT\t1 LIMIT 5\n  |       \t^^^^^^^\n  |\n  = help: Remove the LIMIT clause from the model body because the model must return every row it is\n          expected to produce downstream.\n\nwarning[description-present]: Missing\n --> /other/x.sql:1:1\n\nAPPLIED  SQLCLEAN002  /p/models/orders.sql:4: ok\nCompleted.  FAULT=1  WARN=1  FILES=3\n",
+        expected_text: "Formatted files:\n  /p/models/orders.sql\n\nerror[SQLCLEAN004]: Avoid LIMIT\n --> sql/models/orders.sql:2:8\n  |\n2 | SELECT\t1 LIMIT 5\n  |       \t^^^^^^^\n  |\n  = help: Remove the LIMIT clause from the model body because the model must return every row it is\n          expected to produce downstream.\n\nwarning[description-present]: Missing\n --> /other/x.sql:1:1\n\nAPPLIED  SQLCLEAN002  /p/models/orders.sql:4: ok\nCompleted.  FAULT=1  WARN=1  FILES=3\n",
         expected_json: "{\"faults\":1,\"files_checked\":3,\"formatted_files\":[\"/p/models/orders.sql\"],\"rule_fixes\":[{\"code\":\"SQLCLEAN002\",\"file\":\"/p/models/orders.sql\",\"line\":4,\"reason\":\"ok\",\"status\":\"applied\"}],\"violations\":[{\"code\":\"SQLCLEAN004\",\"column\":8,\"end_column\":15,\"end_line\":2,\"engine\":\"native\",\"file\":\"/p/models/orders.sql\",\"line\":2,\"message\":\"Avoid LIMIT\",\"remediation\":\"Remove the LIMIT clause from the model body because the model must return every row it is expected to produce downstream.\",\"severity\":\"fault\"},{\"code\":\"description-present\",\"column\":1,\"end_column\":null,\"end_line\":null,\"engine\":\"sqlbuild\",\"file\":\"/other/x.sql\",\"line\":1,\"message\":\"Missing\",\"remediation\":null,\"severity\":\"warning\"}],\"warnings\":1}\n",
     }];
 
@@ -40,9 +40,9 @@ fn given_selectors_when_classifying_then_paths_and_models_match_python() {
     let test_cases = [
         SelectorTestCase {
             description: "path selectors and backslashes become prefixes",
-            selectors: texts(&["path:models/staging/ tests\\unit"]),
-            expected_prefixes: Some(texts(&["models/staging", "tests/unit"])),
-            expected_partition: (texts(&["models/staging", "tests/unit"]), Vec::new()),
+            selectors: texts(&["path:sql/models/staging/ tests\\unit"]),
+            expected_prefixes: Some(texts(&["sql/models/staging", "tests/unit"])),
+            expected_partition: (texts(&["sql/models/staging", "tests/unit"]), Vec::new()),
             expected_names: None,
         },
         SelectorTestCase {
@@ -54,10 +54,10 @@ fn given_selectors_when_classifying_then_paths_and_models_match_python() {
         },
         SelectorTestCase {
             description: "graph operators keep a token a model selector",
-            selectors: texts(&["path:models/staging +orders", "models/a.sql"]),
+            selectors: texts(&["path:sql/models/staging +orders", "sql/models/a.sql"]),
             expected_prefixes: None,
             expected_partition: (
-                texts(&["models/staging", "models/a.sql"]),
+                texts(&["sql/models/staging", "sql/models/a.sql"]),
                 texts(&["+orders"]),
             ),
             expected_names: None,

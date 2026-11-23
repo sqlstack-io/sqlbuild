@@ -55,7 +55,7 @@ fn given_function_headers_when_parsing_then_python_values_and_first_error_are_re
             expected_header: FunctionHeader {
                 failure: failure(
                     HeaderStage::Start,
-                    "SQL function file functions/f.sql must declare returns",
+                    "SQL function file sql/functions/f.sql must declare returns",
                 ),
                 ..empty_header()
             },
@@ -75,7 +75,7 @@ fn given_function_headers_when_parsing_then_python_values_and_first_error_are_re
                 arguments: vec![named("id", "id", "INTEGER")],
                 failure: failure(
                     HeaderStage::Arguments,
-                    "SQL function file functions/f.sql argument ' value ' must declare a type",
+                    "SQL function file sql/functions/f.sql argument ' value ' must declare a type",
                 ),
                 ..empty_header()
             },
@@ -89,7 +89,7 @@ fn given_function_headers_when_parsing_then_python_values_and_first_error_are_re
                 returns: Some(FunctionReturns::Table(Vec::new())),
                 failure: failure(
                     HeaderStage::Returns,
-                    "SQL function file functions/f.sql returns must be a type string or table \
+                    "SQL function file sql/functions/f.sql returns must be a type string or table \
                      column declaration",
                 ),
                 ..empty_header()
@@ -113,7 +113,7 @@ fn given_function_headers_when_parsing_then_python_values_and_first_error_are_re
                 returns: Some(FunctionReturns::Table(vec![named("id", "id", "INTEGER")])),
                 failure: failure(
                     HeaderStage::Returns,
-                    "SQL function file functions/f.sql has an invalid return column name",
+                    "SQL function file sql/functions/f.sql has an invalid return column name",
                 ),
                 ..empty_header()
             },
@@ -127,7 +127,7 @@ fn given_function_headers_when_parsing_then_python_values_and_first_error_are_re
                 returns: Some(FunctionReturns::Table(Vec::new())),
                 failure: failure(
                     HeaderStage::Returns,
-                    "SQL function file functions/f.sql returns table must declare at least one \
+                    "SQL function file sql/functions/f.sql returns table must declare at least one \
                      column",
                 ),
                 ..empty_header()
@@ -148,7 +148,7 @@ fn given_function_headers_when_parsing_then_python_values_and_first_error_are_re
             expected_header: FunctionHeader {
                 failure: failure(
                     HeaderStage::Start,
-                    "Python function file functions/f.sql must declare returns",
+                    "Python function file sql/functions/f.sql must declare returns",
                 ),
                 ..empty_header()
             },
@@ -167,7 +167,7 @@ fn given_function_headers_when_parsing_then_python_values_and_first_error_are_re
                 runtime_version: Some("3.12".to_owned()),
                 failure: failure(
                     HeaderStage::PythonValues,
-                    "Python function file functions/f.sql must declare entry_point",
+                    "Python function file sql/functions/f.sql must declare entry_point",
                 ),
                 ..empty_header()
             },
@@ -188,7 +188,7 @@ fn given_function_headers_when_parsing_then_python_values_and_first_error_are_re
                 entry_point: Some("label".to_owned()),
                 failure: failure(
                     HeaderStage::PythonValues,
-                    "Python function file functions/f.sql packages entries must be non-empty \
+                    "Python function file sql/functions/f.sql packages entries must be non-empty \
                      strings",
                 ),
                 ..empty_header()
@@ -207,7 +207,7 @@ fn given_function_headers_when_parsing_then_python_values_and_first_error_are_re
                 returns: Some(FunctionReturns::Type("STRING".to_owned())),
                 failure: failure(
                     HeaderStage::Metadata,
-                    "SQL function file functions/f.sql tags must be a list",
+                    "SQL function file sql/functions/f.sql tags must be a list",
                 ),
                 ..empty_header()
             },
@@ -224,7 +224,7 @@ fn given_function_headers_when_parsing_then_python_values_and_first_error_are_re
                 returns: Some(FunctionReturns::Type("STRING".to_owned())),
                 failure: failure(
                     HeaderStage::Metadata,
-                    "SQL function file functions/f.sql description must be a string",
+                    "SQL function file sql/functions/f.sql description must be a string",
                 ),
                 ..empty_header()
             },
@@ -260,7 +260,7 @@ fn given_function_headers_when_parsing_then_python_values_and_first_error_are_re
                 returns: Some(FunctionReturns::Table(Vec::new())),
                 failure: failure(
                     HeaderStage::Returns,
-                    "Python function file functions/f.sql returns must map each column name to its type",
+                    "Python function file sql/functions/f.sql returns must map each column name to its type",
                 ),
                 ..empty_header()
             },
@@ -274,7 +274,7 @@ fn given_function_headers_when_parsing_then_python_values_and_first_error_are_re
                 returns: Some(FunctionReturns::Table(Vec::new())),
                 failure: failure(
                     HeaderStage::Returns,
-                    "Python function file functions/f.sql returns must map each column name to its type",
+                    "Python function file sql/functions/f.sql returns must map each column name to its type",
                 ),
                 ..empty_header()
             },
@@ -287,7 +287,7 @@ fn given_function_headers_when_parsing_then_python_values_and_first_error_are_re
             expected_header: FunctionHeader {
                 failure: failure(
                     HeaderStage::Start,
-                    "Python function file functions/f.sql must declare returns",
+                    "Python function file sql/functions/f.sql must declare returns",
                 ),
                 ..empty_header()
             },
@@ -300,7 +300,7 @@ fn given_function_headers_when_parsing_then_python_values_and_first_error_are_re
                 &test_case.header,
                 test_case.language,
                 test_case.table_function,
-                "functions/f.sql"
+                "sql/functions/f.sql"
             ),
             test_case.expected_header,
             "{}",

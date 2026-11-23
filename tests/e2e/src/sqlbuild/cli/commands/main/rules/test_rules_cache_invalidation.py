@@ -26,7 +26,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
             "model_sql_edit",
             lambda root: replace_project_text(
                 root,
-                "models/staging/stg_orders.sql",
+                "sql/models/staging/stg_orders.sql",
                 "CAST(10.5 AS DOUBLE)",
                 "CAST(12.5 AS DOUBLE)",
             ),
@@ -34,14 +34,14 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
         RulesCacheEditCase(
             "model_contract_edit",
             lambda root: replace_project_text(
-                root, "models/staging/stg_orders.sql", "  contract enforced,\n", ""
+                root, "sql/models/staging/stg_orders.sql", "  contract enforced,\n", ""
             ),
         ),
         RulesCacheEditCase(
             "model_description_edited",
             lambda root: replace_project_text(
                 root,
-                "models/staging/stg_orders.sql",
+                "sql/models/staging/stg_orders.sql",
                 "Test model stg_orders.",
                 "Staged order rows.",
             ),
@@ -50,7 +50,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
             "model_description_removed",
             lambda root: replace_project_text(
                 root,
-                "models/marts/order_totals.sql",
+                "sql/models/marts/order_totals.sql",
                 "MODEL (description 'Test model order_totals.',\n",
                 "MODEL (\n",
             ),
@@ -64,7 +64,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
             "model_added",
             lambda root: write_project_file(
                 root,
-                "models/marts/order_counts.sql",
+                "sql/models/marts/order_counts.sql",
                 'MODEL (description "Test model order_counts.");\n\nSELECT order_id FROM __ref("stg_orders")\n',
             ),
         ),
@@ -72,7 +72,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
             "consumer_removed",
             lambda root: replace_project_text(
                 root,
-                "models/marts/order_totals.sql",
+                "sql/models/marts/order_totals.sql",
                 'FROM __ref("stg_orders") AS o\n',
                 "FROM (SELECT 1 AS order_id, 1.0 AS amount) AS o\n",
             ),
@@ -89,7 +89,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
         RulesCacheEditCase(
             "macro_edit",
             lambda root: replace_project_text(
-                root, "models/marts/_sqlbuild/_macros/python/amounts.py", "* 0.9", "* 0.8"
+                root, "sql/models/marts/_sqlbuild/_macros/python/amounts.py", "* 0.9", "* 0.8"
             ),
         ),
         RulesCacheEditCase(

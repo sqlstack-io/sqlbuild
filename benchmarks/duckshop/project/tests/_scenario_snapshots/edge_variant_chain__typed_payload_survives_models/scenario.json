@@ -44,7 +44,7 @@
           "warehouse_type": "TIMESTAMP_NTZ(9)"
         }
       ],
-      "file": "sources/edge__partner_payloads.jsonl",
+      "file": "sql/sources/edge__partner_payloads.jsonl",
       "kind": "source",
       "logical_name": "edge__partner_payloads",
       "row_count": 3

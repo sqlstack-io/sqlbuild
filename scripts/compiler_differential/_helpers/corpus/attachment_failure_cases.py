@@ -10,13 +10,13 @@ from scripts.compiler_differential.constants import (
 from scripts.compiler_differential.models import FailureCase
 
 _STAGING_HEADER: str = '"Staged orders",'
-_FLOOR_AUDIT_PATH: str = "models/staging/_sqlbuild/_audits/generic/floor.sql"
+_FLOOR_AUDIT_PATH: str = "sql/models/staging/_sqlbuild/_audits/generic/floor.sql"
 _FLOOR_AUDIT: str = 'AUDIT ();\n\nSELECT *\nFROM __ref("@model")\nWHERE amount < @minimum\n'
 _FRESH_AUDIT: str = (
     'AUDIT ();\n\nSELECT *\nFROM __ref("@model")\nWHERE ordered_at >= __cursor_start()\n'
 )
-_ORDER_LABEL_PATH: str = "functions/sql/order_label.sql"
-_ORDER_FLAG_PATH: str = "functions/python/order_flag.py"
+_ORDER_LABEL_PATH: str = "sql/functions/sql/order_label.sql"
+_ORDER_FLAG_PATH: str = "sql/functions/python/order_flag.py"
 _SCENARIO_PATH: str = "tests/scenarios/orders.sql"
 _SCENARIO_HEADER: str = 'SCENARIO (\n  description "Order flow"\n);\n\n'
 _SOURCE_FIXTURE: str = (
@@ -26,7 +26,7 @@ _SOURCE_FIXTURE: str = (
 )
 _EXPECTED_STAGING: str = "__expected__stg_orders AS (\n  SELECT 1 AS order_id\n)"
 _TEST_PATH: str = "tests/unit/test_stg_orders.sql"
-_SCHEMA_PATH: str = "schemas/orders.sql"
+_SCHEMA_PATH: str = "sql/schemas/orders.sql"
 
 
 def _scenario(*ctes: str, tail: str = "\nSELECT 1\n") -> str:
@@ -70,7 +70,7 @@ def attachment_failure_cases() -> tuple[FailureCase, ...]:
             name="model-schema-extends-unknown",
             expected_code="P001",
             expected_message=(
-                "Schema 'order_row' in schemas/orders.sql extends unknown schema 'base_row'"
+                "Schema 'order_row' in sql/schemas/orders.sql extends unknown schema 'base_row'"
             ),
             files={_SCHEMA_PATH: _schema(name="order_row", extends="base_row", column="id")},
         ),
@@ -87,8 +87,8 @@ def attachment_failure_cases() -> tuple[FailureCase, ...]:
             name="model-schema-redeclared-column",
             expected_code="P001",
             expected_message=(
-                "Schema 'order_row' in schemas/orders.sql redeclares inherited column 'ID' from "
-                "schemas/orders.sql:1; column overrides are not supported"
+                "Schema 'order_row' in sql/schemas/orders.sql redeclares inherited column 'ID' from "
+                "sql/schemas/orders.sql:1; column overrides are not supported"
             ),
             files={
                 _SCHEMA_PATH: _schema(name="base_row", extends=None, column="id")
@@ -118,7 +118,7 @@ def attachment_failure_cases() -> tuple[FailureCase, ...]:
             expected_code="P001",
             expected_message="Audit 'fresh' uses cursor intrinsics",
             files={
-                "models/staging/_sqlbuild/_audits/generic/fresh.sql": _FRESH_AUDIT,
+                "sql/models/staging/_sqlbuild/_audits/generic/fresh.sql": _FRESH_AUDIT,
                 **_staging_audits("fresh"),
             },
         ),
@@ -145,7 +145,7 @@ def attachment_failure_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="sql-function-missing-returns",
             expected_code="P001",
-            expected_message="functions/sql/order_label.sql must declare returns",
+            expected_message="sql/functions/sql/order_label.sql must declare returns",
             files=_order_label('  description "Order label",\n  arguments (p_status VARCHAR),\n'),
         ),
         failure_case(
@@ -172,7 +172,7 @@ def attachment_failure_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="sql-function-arguments-not-a-map",
             expected_code="P001",
-            expected_message="functions/sql/order_label.sql arguments must be a map",
+            expected_message="sql/functions/sql/order_label.sql arguments must be a map",
             files=_order_label(
                 '  description "Order label",\n  arguments [p_status],\n  returns VARCHAR\n'
             ),
@@ -198,13 +198,13 @@ def attachment_failure_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="python-function-missing-runtime-version",
             expected_code="P001",
-            expected_message="functions/python/order_flag.py must declare runtime_version",
+            expected_message="sql/functions/python/order_flag.py must declare runtime_version",
             files=_order_flag(""),
         ),
         failure_case(
             name="python-function-packages-not-a-list",
             expected_code="P001",
-            expected_message="functions/python/order_flag.py packages must be a list",
+            expected_message="sql/functions/python/order_flag.py packages must be a list",
             files=_order_flag('    runtime_version="3.11",\n    packages="numpy",\n'),
         ),
         failure_case(
@@ -346,7 +346,7 @@ def attachment_failure_cases() -> tuple[FailureCase, ...]:
                 "$ or non-ASCII characters are not supported"
             ),
             files={
-                "macros/python/amounts.py": "def doubled(value):\n    return f'{value} * 2'\n",
+                "sql/macros/python/amounts.py": "def doubled(value):\n    return f'{value} * 2'\n",
                 _TEST_PATH: 'TEST (mode macro, name "doubled");\n\nWITH\n'
                 "\"__macro_actual__\" AS (\n  SELECT @py.doubled('1') AS amount\n),\n"
                 "__macro_expected__ AS (\n  SELECT 2 AS amount\n)\nSELECT 1\n",

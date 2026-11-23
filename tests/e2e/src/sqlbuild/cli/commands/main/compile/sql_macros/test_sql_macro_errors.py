@@ -47,37 +47,37 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
             expected_fragments=(
                 "macro call @cents_to_dollars() does not say which kind of macro it calls",
                 "write @sql.cents_to_dollars(...) to call a SQL macro or @py.cents_to_dollars(...) to call a Python macro",
-                "models/marts/orders.sql:4:3",
+                "sql/models/marts/orders.sql:4:3",
             ),
         ),
         SqlMacroErrorTestCase(
             description="python_file_directly_under_macros",
-            files={"macros/currency.py": "def c(x):\n    return x\n"},
+            files={"sql/macros/currency.py": "def c(x):\n    return x\n"},
             expected_code="D013",
             expected_fragments=(
-                "macro file macros/currency.py must live in macros/python/ or macros/sql/",
-                "move it to macros/python/currency.py",
+                "macro file sql/macros/currency.py must live in sql/macros/python/ or sql/macros/sql/",
+                "move it to sql/macros/python/currency.py",
             ),
         ),
         SqlMacroErrorTestCase(
             description="sql_file_in_python_folder",
-            files={"macros/python/c.sql": CENTS_TO_DOLLARS["macros/sql/cents_to_dollars.sql"]},
+            files={"sql/macros/python/c.sql": CENTS_TO_DOLLARS["sql/macros/sql/cents_to_dollars.sql"]},
             expected_code="D013",
             expected_fragments=(
-                "macro file macros/python/c.sql must live in macros/python/ or macros/sql/",
-                "move it to macros/sql/c.sql",
+                "macro file sql/macros/python/c.sql must live in sql/macros/python/ or sql/macros/sql/",
+                "move it to sql/macros/sql/c.sql",
             ),
         ),
         SqlMacroErrorTestCase(
             description="scoped_file_outside_kind_folder",
             files={
-                "models/marts/_sqlbuild/_macros/c.sql": CENTS_TO_DOLLARS[
-                    "macros/sql/cents_to_dollars.sql"
+                "sql/models/marts/_sqlbuild/_macros/c.sql": CENTS_TO_DOLLARS[
+                    "sql/macros/sql/cents_to_dollars.sql"
                 ]
             },
             expected_code="D013",
             expected_fragments=(
-                "models/marts/_sqlbuild/_macros/python/ or models/marts/_sqlbuild/_macros/sql/",
+                "sql/models/marts/_sqlbuild/_macros/python/ or sql/models/marts/_sqlbuild/_macros/sql/",
             ),
         ),
         SqlMacroErrorTestCase(
@@ -115,36 +115,36 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
             description="sql_body_calls_python_macro",
             files={
                 **BRACKET,
-                "macros/sql/x.sql": _X_HEADER.format(args="v BIGINT", returns=", returns BIGINT")
+                "sql/macros/sql/x.sql": _X_HEADER.format(args="v BIGINT", returns=", returns BIGINT")
                 + "@py.bracket(@v) + 1\n",
                 **_CALL_X,
             },
             expected_code="P020",
             expected_fragments=(
                 "SQL macro x() calls Python macro bracket(); SQL and Python macros never call each other",
-                "macros/sql/x.sql:3:1",
+                "sql/macros/sql/x.sql:3:1",
             ),
         ),
         SqlMacroErrorTestCase(
             description="reference_function_in_body",
             files={
-                "macros/sql/bad.sql": 'MACRO (\n  description "Bad",\n);\n\nWITH x AS (SELECT * FROM __ref("stg_orders"))\n',
+                "sql/macros/sql/bad.sql": 'MACRO (\n  description "Bad",\n);\n\nWITH x AS (SELECT * FROM __ref("stg_orders"))\n',
                 **orders_model("WITH @sql.bad()\nSELECT 1 AS a\n"),
             },
             expected_code="P016",
             expected_fragments=(
                 "macro bad() reads model:stg_orders through __ref() in its body",
-                "macros/sql/bad.sql:5:26",
+                "sql/macros/sql/bad.sql:5:26",
             ),
         ),
         SqlMacroErrorTestCase(
             description="macros_calling_each_other",
             files={
-                "macros/sql/a.sql": _X_HEADER.replace("X", "A").format(
+                "sql/macros/sql/a.sql": _X_HEADER.replace("X", "A").format(
                     args="v BIGINT", returns=", returns BIGINT"
                 )
                 + "@sql.b(@v) + 1\n",
-                "macros/sql/b.sql": _X_HEADER.replace("X", "B").format(
+                "sql/macros/sql/b.sql": _X_HEADER.replace("X", "B").format(
                     args="v BIGINT", returns=", returns BIGINT"
                 )
                 + "@sql.a(@v) + 1\n",
@@ -242,7 +242,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
             description="runtime_parameter_forwarded_to_const",
             files={
                 **CENTS_TO_DOLLARS,
-                "macros/sql/x.sql": _X_HEADER.format(
+                "sql/macros/sql/x.sql": _X_HEADER.format(
                     args="v BIGINT, p INT", returns=", returns DECIMAL(18, 2)"
                 )
                 + "@sql.cents_to_dollars(@v, @p)\n",
@@ -258,7 +258,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
             description="wrong_enum",
             files={
                 **IS_OPEN_STATUS,
-                "enums/other.sql": 'ENUM (name other, members (X "x"));\n',
+                "sql/enums/other.sql": 'ENUM (name other, members (X "x"));\n',
                 **orders_model(
                     'SELECT order_id FROM __ref("stg_orders") WHERE @sql.is_open_status(status, @enum("other").X)\n'
                 ),
@@ -343,7 +343,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="returns_that_disagrees_with_the_body_is_reported_at_the_macro_file",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(args="v VARCHAR", returns=", returns BIGINT")
+                "sql/macros/sql/x.sql": _X_HEADER.format(args="v VARCHAR", returns=", returns BIGINT")
                 + "UPPER(@v)\n",
                 **orders_model("SELECT @sql.x('a') AS a\n"),
             },
@@ -351,14 +351,14 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
             expected_fragments=(
                 "macro x() declares returns BIGINT, but its body is VARCHAR\n"
                 "  model: orders\n"
-                "  --> macros/sql/x.sql:3:1",
+                "  --> sql/macros/sql/x.sql:3:1",
                 "declare returns VARCHAR, CAST the body to BIGINT, or remove returns",
             ),
         ),
         SqlMacroErrorTestCase(
             description="untyped_argument",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(args="v", returns=", returns BIGINT")
+                "sql/macros/sql/x.sql": _X_HEADER.format(args="v", returns=", returns BIGINT")
                 + "@v + 1\n",
                 **_CALL_X,
             },
@@ -368,7 +368,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="raw_text_argument",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(args="v RAW", returns=", returns BIGINT")
+                "sql/macros/sql/x.sql": _X_HEADER.format(args="v RAW", returns=", returns BIGINT")
                 + "@v + 1\n",
                 **_CALL_X,
             },
@@ -380,7 +380,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="type_the_adapter_cannot_parse",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(args="v FOO BAR", returns=", returns BIGINT")
+                "sql/macros/sql/x.sql": _X_HEADER.format(args="v FOO BAR", returns=", returns BIGINT")
                 + "@v + 1\n",
                 **_CALL_X,
             },
@@ -392,7 +392,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="list_declared_const",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(
+                "sql/macros/sql/x.sql": _X_HEADER.format(
                     args="codes LIST VARCHAR CONST", returns=", returns BOOLEAN"
                 )
                 + "'GB' IN @codes\n",
@@ -407,7 +407,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="array_declared_const",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(
+                "sql/macros/sql/x.sql": _X_HEADER.format(
                     args="codes VARCHAR[] CONST", returns=", returns BOOLEAN"
                 )
                 + "len(@codes) > 0\n",
@@ -422,7 +422,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="unnamed_column_list_column",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(args="src RELATION (a BIGINT)", returns="")
+                "sql/macros/sql/x.sql": _X_HEADER.format(args="src RELATION (a BIGINT)", returns="")
                 + "SELECT @src.a + 1\n",
                 **orders_model("SELECT @sql.x(o) FROM (SELECT 1 AS a) AS o\n"),
             },
@@ -434,7 +434,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="cte_macro_declaring_returns",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(args="v BIGINT", returns=", returns BIGINT")
+                "sql/macros/sql/x.sql": _X_HEADER.format(args="v BIGINT", returns=", returns BIGINT")
                 + "WITH y AS (SELECT @v AS a)\n",
                 **orders_model("WITH @sql.x(1)\nSELECT * FROM y\n"),
             },
@@ -446,7 +446,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="built_in_parameter_name",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(args="enum BIGINT", returns=", returns BIGINT")
+                "sql/macros/sql/x.sql": _X_HEADER.format(args="enum BIGINT", returns=", returns BIGINT")
                 + "1\n",
                 **_CALL_X,
             },
@@ -456,7 +456,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="undeclared_parameter",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(args="v BIGINT", returns=", returns BIGINT")
+                "sql/macros/sql/x.sql": _X_HEADER.format(args="v BIGINT", returns=", returns BIGINT")
                 + "@v + @w\n",
                 **_CALL_X,
             },
@@ -464,13 +464,13 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
             expected_fragments=(
                 "@w in the body of macro x() names no parameter of the macro",
                 "its parameters are @v",
-                "macros/sql/x.sql:3:6",
+                "sql/macros/sql/x.sql:3:6",
             ),
         ),
         SqlMacroErrorTestCase(
             description="relation_parameter_written_bare",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(
+                "sql/macros/sql/x.sql": _X_HEADER.format(
                     args="src RELATION (order_id BIGINT)", returns=""
                 )
                 + "WITH ids AS (SELECT order_id FROM src)\n",
@@ -484,7 +484,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="relation_parameter_qualifier_written_bare",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(
+                "sql/macros/sql/x.sql": _X_HEADER.format(
                     args="src RELATION (order_id BIGINT)", returns=""
                 )
                 + "SELECT src.order_id\n",
@@ -496,7 +496,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="runtime_parameter_as_limit",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(
+                "sql/macros/sql/x.sql": _X_HEADER.format(
                     args="src RELATION (order_id BIGINT), n BIGINT", returns=""
                 )
                 + "WITH firsts AS (SELECT order_id FROM @src LIMIT @n)\n",
@@ -513,7 +513,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="runtime_parameter_as_interval_unit",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(
+                "sql/macros/sql/x.sql": _X_HEADER.format(
                     args="at TIMESTAMP, unit VARCHAR", returns=", returns TIMESTAMP"
                 )
                 + "@at + INTERVAL 1 @unit\n",
@@ -528,7 +528,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="runtime_parameter_as_pivot_value",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(
+                "sql/macros/sql/x.sql": _X_HEADER.format(
                     args="src RELATION (status VARCHAR, amount_cents BIGINT), first_status VARCHAR",
                     returns="",
                 )
@@ -546,7 +546,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="runtime_parameter_as_round_precision_on_duckdb",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(
+                "sql/macros/sql/x.sql": _X_HEADER.format(
                     args="v DECIMAL(18, 4), places INT", returns=", returns DECIMAL(18, 2)"
                 )
                 + "ROUND(@v, @places)\n",
@@ -563,7 +563,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="runtime_parameter_as_date_trunc_unit",
             files={
-                "macros/sql/x.sql": _X_HEADER.format(
+                "sql/macros/sql/x.sql": _X_HEADER.format(
                     args="at TIMESTAMP, unit VARCHAR", returns=", returns TIMESTAMP"
                 )
                 + "DATE_TRUNC(@unit, @at)\n",
@@ -580,20 +580,20 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="body_constant_not_visible_from_macro_file",
             files={
-                "models/marts/_sqlbuild/_constants/places.sql": "CONSTANT (name price_places, value 2);\n",
-                "macros/sql/x.sql": _X_HEADER.format(
+                "sql/models/marts/_sqlbuild/_constants/places.sql": "CONSTANT (name price_places, value 2);\n",
+                "sql/macros/sql/x.sql": _X_HEADER.format(
                     args="v BIGINT", returns=", returns DECIMAL(18, 2)"
                 )
                 + 'ROUND(@v / 100, @const("price_places"))\n',
                 **orders_model('SELECT @sql.x(amount_cents) AS a FROM __ref("stg_orders")\n'),
             },
             expected_code="S026",
-            expected_fragments=("constant price_places is not visible from macros/sql/x.sql",),
+            expected_fragments=("constant price_places is not visible from sql/macros/sql/x.sql",),
         ),
         SqlMacroErrorTestCase(
             description="scoped_macro_not_visible_from_caller",
             files={
-                "models/staging/_sqlbuild/_macros/sql/x.sql": _X_HEADER.format(
+                "sql/models/staging/_sqlbuild/_macros/sql/x.sql": _X_HEADER.format(
                     args="v BIGINT", returns=", returns BIGINT"
                 )
                 + "@v + 1\n",
@@ -601,39 +601,39 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
             },
             expected_code="S006",
             expected_fragments=(
-                "SQL macro x() defined at models/staging/_sqlbuild/_macros/sql/x.sql is not visible from",
+                "SQL macro x() defined at sql/models/staging/_sqlbuild/_macros/sql/x.sql is not visible from",
             ),
         ),
         SqlMacroErrorTestCase(
             description="folder_local_macro_called_from_a_subfolder_model",
             files={
-                "models/marts/_sqlbuild/_macros/sql/doubled_inner.sql": _X_HEADER.format(
+                "sql/models/marts/_sqlbuild/_macros/sql/doubled_inner.sql": _X_HEADER.format(
                     args="v BIGINT", returns=", returns BIGINT"
                 )
                 + "@v * 2\n",
-                "models/marts/daily/orders.sql": (
+                "sql/models/marts/daily/orders.sql": (
                     'MODEL (description "Orders");\n\nSELECT @sql.doubled_inner(order_id) AS d '
                     'FROM __ref("stg_orders")\n'
                 ),
             },
             expected_code="S006",
             expected_fragments=(
-                "SQL macro doubled_inner() defined at models/marts/_sqlbuild/_macros/sql/doubled_inner.sql is not visible from",
+                "SQL macro doubled_inner() defined at sql/models/marts/_sqlbuild/_macros/sql/doubled_inner.sql is not visible from",
             ),
         ),
         SqlMacroErrorTestCase(
             description="sql_and_python_macro_sharing_a_name",
             files={
-                "macros/sql/same.sql": _X_HEADER.format(args="v BIGINT", returns=", returns BIGINT")
+                "sql/macros/sql/same.sql": _X_HEADER.format(args="v BIGINT", returns=", returns BIGINT")
                 + "@v + 1\n",
-                "macros/python/same.py": "def same(v):\n    return v\n",
+                "sql/macros/python/same.py": "def same(v):\n    return v\n",
                 **orders_model('SELECT @sql.same(amount_cents) AS a FROM __ref("stg_orders")\n'),
             },
             expected_code="P001",
             expected_fragments=(
                 "Macro name collision for 'same'",
-                "macros/python/same.py",
-                "macros/sql/same.sql",
+                "sql/macros/python/same.py",
+                "sql/macros/sql/same.sql",
             ),
         ),
         SqlMacroErrorTestCase(
@@ -650,7 +650,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
                 ),
             },
             expected_code="P017",
-            expected_fragments=("expects INT CONST", "models/marts/orders.sql:5:3"),
+            expected_fragments=("expects INT CONST", "sql/models/marts/orders.sql:5:3"),
         ),
         SqlMacroErrorTestCase(
             description="relation_missing_a_declared_column",
@@ -663,8 +663,8 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
             expected_code="P017",
             expected_fragments=(
                 "argument src of macro clean_orders() needs column is_deleted BOOLEAN; orders_raw has no column is_deleted",
-                "models/marts/orders.sql:4:1",
-                "macros/sql/clean_orders.sql:3:",
+                "sql/models/marts/orders.sql:4:1",
+                "sql/macros/sql/clean_orders.sql:3:",
                 "pass a relation with these columns: order_id BIGINT, updated_at TIMESTAMP, is_deleted BOOLEAN",
             ),
         ),
@@ -695,7 +695,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
             expected_code="P017",
             expected_fragments=(
                 "argument src of macro clean_orders() needs column is_deleted BOOLEAN; orders_raw.is_deleted is VARCHAR",
-                "models/marts/orders.sql:4:1",
+                "sql/models/marts/orders.sql:4:1",
             ),
         ),
         SqlMacroErrorTestCase(
@@ -709,8 +709,8 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
             expected_code="P017",
             expected_fragments=(
                 "slot src.keys groups column email_typo; orders_raw has no column email_typo",
-                "models/marts/orders.sql:4:1",
-                "macros/sql/latest_per_key.sql:",
+                "sql/models/marts/orders.sql:4:1",
+                "sql/macros/sql/latest_per_key.sql:",
             ),
         ),
         SqlMacroErrorTestCase(
@@ -724,8 +724,8 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
             expected_code="P017",
             expected_fragments=(
                 "argument amount_cents of macro cents_to_dollars() expects BIGINT; o.status is VARCHAR",
-                "models/marts/orders.sql:4:3",
-                "macros/sql/cents_to_dollars.sql:3:",
+                "sql/models/marts/orders.sql:4:3",
+                "sql/macros/sql/cents_to_dollars.sql:3:",
             ),
         ),
         SqlMacroErrorTestCase(
@@ -758,15 +758,15 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="same_named_folder_local_macros_in_two_folders",
             files={
-                "models/a/_sqlbuild/_macros/sql/helper.sql": _X_HEADER.format(
+                "sql/models/a/_sqlbuild/_macros/sql/helper.sql": _X_HEADER.format(
                     args="v BIGINT", returns=", returns BIGINT"
                 )
                 + "@v * 2\n",
-                "models/b/_sqlbuild/_macros/sql/helper.sql": _X_HEADER.format(
+                "sql/models/b/_sqlbuild/_macros/sql/helper.sql": _X_HEADER.format(
                     args="v BIGINT", returns=", returns BIGINT"
                 )
                 + "@v * 3\n",
-                "models/a/model_a.sql": (
+                "sql/models/a/model_a.sql": (
                     'MODEL (description "A");\n\nSELECT @sql.helper(order_id) AS x '
                     'FROM __ref("stg_orders")\n'
                 ),
@@ -785,7 +785,7 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
             expected_code="P021",
             expected_fragments=(
                 "column-list macro audit_columns() cannot take an alias",
-                "models/marts/orders.sql:3:20",
+                "sql/models/marts/orders.sql:3:20",
             ),
         ),
     ],
@@ -814,7 +814,7 @@ def test_given_an_invalid_sql_macro_project_when_compiling_then_the_error_names_
                     'SELECT o.order_id, @sql.cents_to_dollars(o.amount_cents) AS d FROM __ref("stg_orders") AS o\n'
                 ),
             },
-            edited_path="macros/sql/cents_to_dollars.sql",
+            edited_path="sql/macros/sql/cents_to_dollars.sql",
             replaced_text=("amount_cents BIGINT", "amount_cents BOOLEAN"),
             expected_code="P017",
             expected_fragment=(
@@ -869,4 +869,4 @@ def test_given_typed_calls_in_every_wave_when_compiling_then_each_model_reports_
     assert result.returncode == 1, printed
     assert printed.count(test_case.expected_finding) == test_case.wave_count, printed
     for level in range(1, test_case.wave_count + 1):
-        assert f"models/marts/level_{level}.sql:5:3" in printed, printed
+        assert f"sql/models/marts/level_{level}.sql:5:3" in printed, printed

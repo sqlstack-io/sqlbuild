@@ -54,7 +54,7 @@ def make_compiled_model(
         key=CompiledObjectKey(CompiledResourceType.MODEL, name),
         deps=(),
         name=name,
-        relative_path=Path(f"models/{name}.sql"),
+        relative_path=Path(f"sql/models/{name}.sql"),
         query_sql=query_sql,
         config=CompileModelConfig(),
         destination=CompiledRelationLocation(
@@ -76,16 +76,16 @@ def make_compiled_seed(*, name: str, columns: tuple[str, ...]) -> CompiledSeedVi
         deps=(),
         name=name,
         seed_file=DiscoveredSeedFile(
-            file_path=Path(f"seeds/{name}.csv"),
-            relative_path=Path(f"seeds/{name}.csv"),
+            file_path=Path(f"sql/seeds/{name}.csv"),
+            relative_path=Path(f"sql/seeds/{name}.csv"),
         ),
         schema_entry=SchemaSeedEntry(
             name=name,
             columns=tuple(SchemaColumn(column_name) for column_name in columns),
         ),
         schema_file=DiscoveredSchemaFile(
-            file_path=Path("seeds/schema.yml"),
-            relative_path=Path("seeds/schema.yml"),
+            file_path=Path("sql/seeds/schema.yml"),
+            relative_path=Path("sql/seeds/schema.yml"),
             contents="",
             model_entries=(),
             seed_entries=(),

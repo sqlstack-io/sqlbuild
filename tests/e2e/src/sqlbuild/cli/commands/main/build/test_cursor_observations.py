@@ -33,8 +33,8 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "seeds/raw_orders.csv": "id,ordered_at\n1,2026-01-01 00:00:00\n2,2026-01-01 01:00:00\n",
-    "seeds/raw_orders.yml": dedent(
+    "sql/seeds/raw_orders.csv": "id,ordered_at\n1,2026-01-01 00:00:00\n2,2026-01-01 01:00:00\n",
+    "sql/seeds/raw_orders.yml": dedent(
         """
         seeds:
           - name: raw_orders
@@ -47,7 +47,7 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "models/orders.sql": dedent(
+    "sql/models/orders.sql": dedent(
         """
         MODEL (description "Orders by timestamp cursor.",
           materialized incremental,
@@ -62,7 +62,7 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "models/order_ids.sql": dedent(
+    "sql/models/order_ids.sql": dedent(
         """
         MODEL (description "Orders by integer cursor.",
           materialized incremental,
@@ -75,7 +75,7 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "sources/raw.yml": dedent(
+    "sql/sources/raw.yml": dedent(
         """
         sources:
           - name: raw_refunds
@@ -91,7 +91,7 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "models/refunds.sql": dedent(
+    "sql/models/refunds.sql": dedent(
         """
         MODEL (description "Refunds.", materialized table);
 
@@ -99,7 +99,7 @@ _PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "models/order_count.sql": dedent(
+    "sql/models/order_count.sql": dedent(
         """
         MODEL (description "Order count without a cursor.", materialized table);
 
@@ -222,7 +222,7 @@ def test_given_wrong_cursor_observation_when_planning_and_building_then_live_max
     database: Path = project_dir / "observations.duckdb"
     first: subprocess.CompletedProcess[str] = run_sqb(command=("build",), project_dir=project_dir)
     assert first.returncode == 0, first.stderr
-    seed: Path = project_dir / "seeds/raw_orders.csv"
+    seed: Path = project_dir / "sql/seeds/raw_orders.csv"
     seed.write_text(seed.read_text() + test_case.added_seed_rows)
 
     honest: subprocess.CompletedProcess[str] = run_sqb(command=("plan",), project_dir=project_dir)

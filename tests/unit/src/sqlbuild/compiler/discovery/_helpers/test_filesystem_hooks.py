@@ -25,7 +25,7 @@ from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
         DiscoverHookFunctionsTestCase(
             description="discovers decorated hook functions",
             repo_files={
-                "hooks/python/notifications.py": """
+                "sql/hooks/python/notifications.py": """
 from sqlbuild.hooks import hook
 
 
@@ -54,7 +54,7 @@ def undecorated(ctx):
     return None
 """.strip()
                 + "\n",
-                "hooks/python/nested/catalog.py": """
+                "sql/hooks/python/nested/catalog.py": """
 from sqlbuild.hooks import hook
 
 
@@ -72,11 +72,11 @@ def publish(ctx):
                 "plain_call",
             ),
             expected_hook_paths=(
-                "hooks/python/nested/catalog.py",
-                "hooks/python/notifications.py",
-                "hooks/python/notifications.py",
-                "hooks/python/notifications.py",
-                "hooks/python/notifications.py",
+                "sql/hooks/python/nested/catalog.py",
+                "sql/hooks/python/notifications.py",
+                "sql/hooks/python/notifications.py",
+                "sql/hooks/python/notifications.py",
+                "sql/hooks/python/notifications.py",
             ),
             expected_hook_descriptions=(
                 None,
@@ -96,7 +96,7 @@ def publish(ctx):
         DiscoverHookFunctionsTestCase(
             description="ignores private files and init files",
             repo_files={
-                "hooks/python/__init__.py": """
+                "sql/hooks/python/__init__.py": """
 from sqlbuild.hooks import hook
 
 
@@ -105,7 +105,7 @@ def package_hook(ctx):
     return None
 """.strip()
                 + "\n",
-                "hooks/python/_private.py": """
+                "sql/hooks/python/_private.py": """
 from sqlbuild.hooks import hook
 
 
@@ -114,7 +114,7 @@ def private_hook(ctx):
     return None
 """.strip()
                 + "\n",
-                "hooks/python/public.py": """
+                "sql/hooks/python/public.py": """
 from sqlbuild.hooks import hook
 
 
@@ -125,14 +125,14 @@ def public_hook(ctx):
                 + "\n",
             },
             expected_hook_names=("public_hook",),
-            expected_hook_paths=("hooks/python/public.py",),
+            expected_hook_paths=("sql/hooks/python/public.py",),
             expected_hook_descriptions=(None,),
             expected_function_names=("public_hook",),
         ),
         DiscoverHookFunctionsTestCase(
             description="does not execute hook functions during discovery",
             repo_files={
-                "hooks/python/no_execute.py": """
+                "sql/hooks/python/no_execute.py": """
 from pathlib import Path
 from sqlbuild.hooks import hook
 
@@ -144,7 +144,7 @@ def no_execute(ctx):
                 + "\n",
             },
             expected_hook_names=("no_execute",),
-            expected_hook_paths=("hooks/python/no_execute.py",),
+            expected_hook_paths=("sql/hooks/python/no_execute.py",),
             expected_hook_descriptions=(None,),
             expected_function_names=("no_execute",),
             expected_marker_file_exists=False,
@@ -152,7 +152,7 @@ def no_execute(ctx):
         DiscoverHookFunctionsTestCase(
             description="ignores imported decorated hooks",
             repo_files={
-                "hooks/python/shared.py": """
+                "sql/hooks/python/shared.py": """
 from sqlbuild.hooks import hook
 
 
@@ -161,7 +161,7 @@ def imported_hook(ctx):
     return None
 """.strip()
                 + "\n",
-                "hooks/python/uses_import.py": """
+                "sql/hooks/python/uses_import.py": """
 from sqlbuild.hooks import hook
 from hooks.python.shared import imported_hook
 
@@ -173,7 +173,7 @@ def local_hook(ctx):
                 + "\n",
             },
             expected_hook_names=("imported", "local_hook"),
-            expected_hook_paths=("hooks/python/shared.py", "hooks/python/uses_import.py"),
+            expected_hook_paths=("sql/hooks/python/shared.py", "sql/hooks/python/uses_import.py"),
             expected_hook_descriptions=(None, None),
             expected_function_names=("imported_hook", "local_hook"),
         ),
@@ -198,7 +198,7 @@ def test_given_hook_files_when_discovering_then_returns_decorated_hooks(
     )
     assert all(callable(hook.function) for hook in hooks)
     assert (
-        tmp_path / "hooks" / "python" / "executed.marker"
+        tmp_path / "sql" / "hooks" / "python" / "nodes" / "executed.marker"
     ).is_file() is test_case.expected_marker_file_exists
 
 
@@ -208,7 +208,7 @@ def test_given_hook_files_when_discovering_then_returns_decorated_hooks(
         DiscoverHookFunctionsTestCase(
             description="records hook provider usage metadata",
             repo_files={
-                "providers/marker.py": """
+                "python/providers/marker.py": """
 from sqlbuild.providers import Provider
 
 
@@ -216,8 +216,8 @@ class MarkerProvider(Provider):
     pass
 """.strip()
                 + "\n",
-                "hooks/python/marker.py": """
-from providers.marker import MarkerProvider
+                "sql/hooks/python/marker.py": """
+from python.nodes.providers.marker import MarkerProvider
 from sqlbuild.hooks import hook
 
 
@@ -228,7 +228,7 @@ def mark(ctx, marker_provider: MarkerProvider):
                 + "\n",
             },
             expected_hook_names=("mark",),
-            expected_hook_paths=("hooks/python/marker.py",),
+            expected_hook_paths=("sql/hooks/python/marker.py",),
             expected_hook_descriptions=(None,),
             expected_function_names=("mark",),
         )
@@ -254,7 +254,7 @@ def test_given_hook_provider_parameter_when_discovering_then_records_provider_us
     assert usage.provider_name == "marker_provider"
     assert usage.parameter_name == "marker_provider"
     assert usage.annotation_class_name == "MarkerProvider"
-    assert usage.annotation_module == "providers.marker"
+    assert usage.annotation_module == "python.providers.marker"
 
 
 @pytest.mark.parametrize(
@@ -263,7 +263,7 @@ def test_given_hook_provider_parameter_when_discovering_then_records_provider_us
         DiscoverHookFunctionsErrorTestCase(
             description="duplicate hook names fail",
             repo_files={
-                "hooks/python/first.py": """
+                "sql/hooks/python/first.py": """
 from sqlbuild.hooks import hook
 
 
@@ -272,7 +272,7 @@ def notify_a(ctx):
     return None
 """.strip()
                 + "\n",
-                "hooks/python/second.py": """
+                "sql/hooks/python/second.py": """
 from sqlbuild.hooks import hook
 
 
@@ -287,12 +287,12 @@ def notify_b(ctx):
         DiscoverHookFunctionsErrorTestCase(
             description="hook import failure identifies file",
             repo_files={
-                "hooks/python/broken.py": """
+                "sql/hooks/python/broken.py": """
 from missing_package import missing_hook
 """.strip()
                 + "\n",
             },
-            expected_error_fragment="Failed to import Python node file hooks/python/broken.py",
+            expected_error_fragment="Failed to import Python node file sql/hooks/python/broken.py",
         ),
     ),
     ids=lambda case: case.description,

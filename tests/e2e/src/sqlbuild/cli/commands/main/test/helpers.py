@@ -23,10 +23,10 @@ _OPTIONAL_CEREMONY_PROJECT_FILES: dict[str, str] = {
         '[connection]\ndatabase = "optional_ceremony.duckdb"\n\n'
         '[defaults]\nmaterialized = "table"\n'
     ),
-    "macros/python/status.py": (
+    "sql/macros/python/status.py": (
         'def normalize_status(value: str) -> str:\n    return f"LOWER(TRIM({value}))"\n'
     ),
-    "sources/raw_orders.yml": (
+    "sql/sources/raw_orders.yml": (
         "sources:\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: main\n"
@@ -35,7 +35,7 @@ _OPTIONAL_CEREMONY_PROJECT_FILES: dict[str, str] = {
         "      - name: order_id\n        type: INTEGER\n"
         "      - name: status\n        type: VARCHAR\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Test model orders.');\n\n"
         'SELECT order_id, @py.normalize_status("status") AS status FROM __source("raw_orders")\n'
     ),
@@ -52,7 +52,7 @@ def build_dynamic_pivot_test_project_files() -> dict[str, str]:
             "[defaults]\n"
             'contract = "enforced"\n'
         ),
-        "models/stg_order_amounts.sql": (
+        "sql/models/stg_order_amounts.sql": (
             "MODEL (description 'Test model stg_order_amounts.',\n"
             "  database analytics,\n"
             "  schema staging,\n"
@@ -68,7 +68,7 @@ def build_dynamic_pivot_test_project_files() -> dict[str, str]:
             "CAST(10.25 AS DECIMAL(12,2)) AS amount, "
             "CAST('US' AS VARCHAR) AS country\n"
         ),
-        "models/customer_category_amounts.sql": (
+        "sql/models/customer_category_amounts.sql": (
             "MODEL (description 'Test model customer_category_amounts.',\n"
             "  database analytics,\n"
             "  schema mart,\n"
@@ -124,7 +124,7 @@ def build_chain_test_project_files(*, sql_analysis_enabled: bool) -> dict[str, s
             "[settings]\n"
             f"sql_analysis = {sql_analysis_value}\n"
         ),
-        "models/stg_orders.sql": (
+        "sql/models/stg_orders.sql": (
             "MODEL (description 'Test model stg_orders.', materialized table);\n\n"
             "SELECT\n"
             "  id,\n"
@@ -134,7 +134,7 @@ def build_chain_test_project_files(*, sql_analysis_enabled: bool) -> dict[str, s
             "  @py.real_status() AS status\n"
             'FROM __source("raw")'
         ),
-        "models/fact_orders.sql": (
+        "sql/models/fact_orders.sql": (
             "MODEL (description 'Test model fact_orders.', materialized table);\n\n"
             "SELECT\n"
             "  id,\n"
@@ -144,7 +144,7 @@ def build_chain_test_project_files(*, sql_analysis_enabled: bool) -> dict[str, s
             "  status\n"
             'FROM __ref("stg_orders")'
         ),
-        "models/_macros/python/test_macros.py": (
+        "sql/models/_macros/python/test_macros.py": (
             "def mocked_amount() -> str:\n"
             '    return "0"\n\n'
             "def mocked_country() -> str:\n"
@@ -154,7 +154,7 @@ def build_chain_test_project_files(*, sql_analysis_enabled: bool) -> dict[str, s
             "def real_status() -> str:\n"
             "    return \"'active'\"\n"
         ),
-        "sources/raw.yml": "sources:\n  - name: raw\n    description: Test source raw.\n"
+        "sql/sources/raw.yml": "sources:\n  - name: raw\n    description: Test source raw.\n"
         "    schema: main\n    table: raw\n",
         "tests/unit/test_chain.sql": (
             "TEST();\n\n"
@@ -186,15 +186,15 @@ def build_parameterized_test_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "parameter_case_demo.duckdb"\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             'MODEL (description "Test model orders.");\n\n'
             'SELECT status FROM __source("raw_orders")\n'
         ),
-        "models/customers.sql": (
+        "sql/models/customers.sql": (
             'MODEL (description "Test model customers.");\n\n'
             'SELECT status FROM __source("raw_orders")\n'
         ),
-        "sources/raw_orders.yml": (
+        "sql/sources/raw_orders.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
@@ -227,14 +227,14 @@ def build_table_function_fixture_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "table_function_fixture_demo.duckdb"\n'
         ),
-        "functions/sql/customer_orders.sql": (
+        "sql/functions/sql/customer_orders.sql": (
             "FUNCTION (description 'Test function customer_orders.',\n"
             "  arguments (customer_id INTEGER),\n"
             "  returns table (order_id INTEGER)\n"
             ");\n\n"
             "SELECT customer_id * 100 AS order_id\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.', columns (order_id (type INTEGER)));\n\n"
             'SELECT order_id FROM __table_fn("customer_orders")(7)\n'
         ),
@@ -259,13 +259,13 @@ def build_mock_boundary_test_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "mock_boundary_demo.duckdb"\n'
         ),
-        "models/stg_orders.sql": "MODEL (description 'Test model stg_orders.');\n\n"
+        "sql/models/stg_orders.sql": "MODEL (description 'Test model stg_orders.');\n\n"
         "SELECT 1 AS order_id\n",
-        "models/int_orders.sql": (
+        "sql/models/int_orders.sql": (
             'MODEL (description "Test model int_orders.");\n\n'
             'SELECT order_id FROM __ref("stg_orders")\n'
         ),
-        "models/fact_orders.sql": (
+        "sql/models/fact_orders.sql": (
             'MODEL (description "Test model fact_orders.");\n\n'
             'SELECT order_id FROM __ref("int_orders")\n'
         ),
@@ -295,7 +295,7 @@ def build_unsatisfied_leaf_test_project_files() -> dict[str, str]:
     """Build a test that omits the source mock required by its real model chain."""
 
     files: dict[str, str] = build_chain_test_project_files(sql_analysis_enabled=True)
-    files["sources/raw.yml"] = (
+    files["sql/sources/raw.yml"] = (
         "sources:\n"
         "  - name: raw\n    description: Test source raw.\n    schema: main\n    table: raw\n"
         "  - name: unused\n    description: Test source unused.\n"
@@ -324,11 +324,11 @@ def build_missing_mock_columns_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "missing_fixture_columns.duckdb"\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             'MODEL (description "Test model orders.");\n\n'
             'SELECT customer_id, status FROM __source("raw_orders")\n'
         ),
-        "sources/raw_orders.yml": (
+        "sql/sources/raw_orders.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n"
@@ -357,11 +357,11 @@ def build_partial_source_fixture_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "partial_source_fixture.duckdb"\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             'MODEL (description "Test model orders.");\n\n'
             'SELECT order_id, status FROM __source("raw_orders")\n'
         ),
-        "sources/raw_orders.yml": (
+        "sql/sources/raw_orders.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n"
@@ -386,7 +386,7 @@ def build_unspecified_nullability_fixture_project_files() -> dict[str, str]:
     """Build a typed partial source fixture whose nullability is unspecified."""
 
     files: dict[str, str] = build_partial_source_fixture_project_files()
-    files["sources/raw_orders.yml"] = files["sources/raw_orders.yml"].replace(
+    files["sql/sources/raw_orders.yml"] = files["sql/sources/raw_orders.yml"].replace(
         "        type: VARCHAR\n        nullable: true\n",
         "        type: VARCHAR\n",
     )
@@ -403,11 +403,11 @@ def build_partial_ref_fixture_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "partial_ref_fixture.duckdb"\n'
         ),
-        "models/stg_orders.sql": (
+        "sql/models/stg_orders.sql": (
             "MODEL (description 'Test model stg_orders.');\n\n"
             "SELECT CAST(1 AS INTEGER) AS order_id, CAST(NULL AS VARCHAR) AS status\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             'MODEL (description "Test model orders.");\n\n'
             'SELECT order_id, status FROM __ref("stg_orders")\n'
         ),
@@ -433,7 +433,7 @@ def build_open_schema_ref_fixture_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "open_schema_ref_fixture.duckdb"\n'
         ),
-        "models/stg_orders.sql": (
+        "sql/models/stg_orders.sql": (
             "MODEL (description 'Test model stg_orders.',\n"
             "  columns (\n"
             "    order_id (type INTEGER),\n"
@@ -441,11 +441,11 @@ def build_open_schema_ref_fixture_project_files() -> dict[str, str]:
             ");\n\n"
             'SELECT * FROM __source("raw_orders")\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             'MODEL (description "Test model orders.");\n\n'
             'SELECT order_id, status FROM __ref("stg_orders")\n'
         ),
-        "sources/raw_orders.yml": (
+        "sql/sources/raw_orders.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
@@ -469,7 +469,7 @@ def build_recursive_ref_fixture_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "recursive_ref_fixture.duckdb"\n'
         ),
-        "models/stg_order_links.sql": (
+        "sql/models/stg_order_links.sql": (
             "MODEL (description 'Test model stg_order_links.',\n"
             "  contract enforced,\n"
             "  columns (\n"
@@ -479,7 +479,7 @@ def build_recursive_ref_fixture_project_files() -> dict[str, str]:
             ");\n\n"
             'SELECT order_id, parent_order_id FROM __source("raw_order_links")\n'
         ),
-        "models/order_roots.sql": (
+        "sql/models/order_roots.sql": (
             "MODEL (description 'Test model order_roots.',\n"
             "  contract enforced,\n"
             "  columns (\n"
@@ -501,7 +501,7 @@ def build_recursive_ref_fixture_project_files() -> dict[str, str]:
             ")\n"
             "SELECT order_id, root_order_id, link_depth FROM order_chain\n"
         ),
-        "sources/raw_order_links.yml": (
+        "sql/sources/raw_order_links.yml": (
             "sources:\n"
             "  - name: raw_order_links\n    description: Test source raw_order_links.\n"
             "    schema: main\n"
@@ -534,12 +534,12 @@ def build_partial_seed_fixture_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "partial_seed_fixture.duckdb"\n'
         ),
-        "models/countries.sql": (
+        "sql/models/countries.sql": (
             'MODEL (description "Test model countries.");\n\n'
             'SELECT country_code, country_name FROM __seed("country_codes")\n'
         ),
-        "seeds/country_codes.csv": "country_code,country_name\nUS,United States\n",
-        "seeds/schema.yml": (
+        "sql/seeds/country_codes.csv": "country_code,country_name\nUS,United States\n",
+        "sql/seeds/schema.yml": (
             "seeds:\n"
             "  - name: country_codes\n    description: Test seed country_codes.\n"
             "    columns:\n"
@@ -562,7 +562,7 @@ def build_irrelevant_omitted_column_project_files() -> dict[str, str]:
     """Build a fixture omitting a known nullable column outside the compiled closure."""
 
     files: dict[str, str] = build_partial_source_fixture_project_files()
-    files["models/orders.sql"] = (
+    files["sql/models/orders.sql"] = (
         'MODEL (description "Test model orders.");\n\nSELECT order_id FROM __source("raw_orders")\n'
     )
     files["tests/unit/test_orders.sql"] = (
@@ -579,7 +579,7 @@ def build_cte_partial_source_fixture_project_files() -> dict[str, str]:
     """Build a partial source fixture read through an import CTE."""
 
     files: dict[str, str] = build_partial_source_fixture_project_files()
-    files["models/orders.sql"] = (
+    files["sql/models/orders.sql"] = (
         "MODEL (description 'Test model orders.');\n\n"
         "WITH staged AS (\n"
         '  SELECT order_id, status FROM __source("raw_orders")\n'
@@ -593,7 +593,7 @@ def build_clause_partial_source_fixture_project_files() -> dict[str, str]:
     """Build a partial source fixture whose omitted column is read only by a filter."""
 
     files: dict[str, str] = build_partial_source_fixture_project_files()
-    files["models/orders.sql"] = (
+    files["sql/models/orders.sql"] = (
         'MODEL (description "Test model orders.");\n\n'
         'SELECT order_id FROM __source("raw_orders") WHERE status IS NULL\n'
     )
@@ -611,10 +611,10 @@ def build_star_partial_fixture_project_files() -> dict[str, str]:
     """Build a contracted star model requiring the complete known source shape."""
 
     files: dict[str, str] = build_partial_source_fixture_project_files()
-    files["sources/raw_orders.yml"] = files["sources/raw_orders.yml"].replace(
+    files["sql/sources/raw_orders.yml"] = files["sql/sources/raw_orders.yml"].replace(
         "    columns:\n", "    contract: enforced\n    columns:\n"
     )
-    files["models/orders.sql"] = (
+    files["sql/models/orders.sql"] = (
         'MODEL (description "Test model orders.");\n\nSELECT * FROM __source("raw_orders")\n'
     )
     return files
@@ -664,7 +664,7 @@ def build_untyped_null_fixture_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "untyped_null_fixture.duckdb"\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.',\n"
             "  contract enforced,\n"
             "  columns (order_year (type BIGINT)),\n"
@@ -672,7 +672,7 @@ def build_untyped_null_fixture_project_files() -> dict[str, str]:
             "SELECT EXTRACT(YEAR FROM ordered_at) AS order_year\n"
             'FROM __source("raw_orders")\n'
         ),
-        "sources/raw_orders.yml": (
+        "sql/sources/raw_orders.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n"
@@ -697,7 +697,7 @@ def build_contract_empty_fixture_project_files() -> dict[str, str]:
     """Build empty input and expected fixtures whose shapes come from contracts."""
 
     files: dict[str, str] = build_partial_source_fixture_project_files()
-    files["models/orders.sql"] = (
+    files["sql/models/orders.sql"] = (
         "MODEL (description 'Test model orders.',\n"
         "  contract enforced,\n"
         "  columns (\n"
@@ -707,7 +707,7 @@ def build_contract_empty_fixture_project_files() -> dict[str, str]:
         ");\n\n"
         'SELECT order_id, status FROM __source("raw_orders")\n'
     )
-    files["sources/raw_orders.yml"] = files["sources/raw_orders.yml"].replace(
+    files["sql/sources/raw_orders.yml"] = files["sql/sources/raw_orders.yml"].replace(
         "    table: raw_orders\n",
         "    table: raw_orders\n    contract: enforced\n",
     )
@@ -741,7 +741,7 @@ def build_open_expected_empty_fixture_project_files() -> dict[str, str]:
     """Build an empty expected fixture without an authoritative model shape."""
 
     files: dict[str, str] = build_partial_source_fixture_project_files()
-    files["models/orders.sql"] = (
+    files["sql/models/orders.sql"] = (
         'MODEL (description "Test model orders.");\n\nSELECT * FROM __source("raw_orders")\n'
     )
     files["tests/unit/test_orders.sql"] = (
@@ -766,15 +766,15 @@ def build_qualified_star_other_relation_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "qualified_star_other_relation.duckdb"\n'
         ),
-        "models/stg_orders.sql": "MODEL (description 'Test model stg_orders.');\n\n"
+        "sql/models/stg_orders.sql": "MODEL (description 'Test model stg_orders.');\n\n"
         "SELECT 1 AS stg_id\n",
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.');\n\n"
             "SELECT stg.*, raw.status\n"
             'FROM __ref("stg_orders") stg\n'
             'JOIN __source("raw_orders") raw ON TRUE\n'
         ),
-        "sources/raw_orders.yml": (
+        "sql/sources/raw_orders.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n"
@@ -799,11 +799,11 @@ def build_mixed_case_partial_fixture_project_files() -> dict[str, str]:
     """Build a completed fixture with an as-written mixed-case unquoted alias."""
 
     files: dict[str, str] = build_partial_source_fixture_project_files()
-    files["models/orders.sql"] = (
+    files["sql/models/orders.sql"] = (
         'MODEL (description "Test model orders.");\n\n'
         'SELECT status, note FROM __source("raw_orders")\n'
     )
-    files["sources/raw_orders.yml"] = (
+    files["sql/sources/raw_orders.yml"] = (
         "sources:\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: main\n"
@@ -834,7 +834,7 @@ def build_upper_case_star_import_partial_fixture_project_files() -> dict[str, st
             "[connection]\n"
             'database = "partial_source_fixture.duckdb"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw__orders\n    description: Raw order records\n"
             "    schema: raw\n"
@@ -844,7 +844,7 @@ def build_upper_case_star_import_partial_fixture_project_files() -> dict[str, st
             "      - name: customer_id\n        type: VARCHAR\n"
             "      - name: status\n        type: VARCHAR\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             'MODEL (description "Orders with their status", materialized table);\n\n'
             "WITH raw__orders AS (\n"
             "  SELECT *\n"
@@ -882,7 +882,7 @@ def build_invalid_partial_fixture_project_files(
     """Build one partial source fixture that cannot be completed safely."""
 
     files: dict[str, str] = build_partial_source_fixture_project_files()
-    files["sources/raw_orders.yml"] = (
+    files["sql/sources/raw_orders.yml"] = (
         "sources:\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: main\n"
@@ -918,11 +918,11 @@ def build_incompatible_fixture_type_project_files(*, adapter_name: str) -> dict[
             'database = "incompatible_fixture_type.duckdb"\n'
             'schema = "main"\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             'MODEL (description "Test model orders.", database "fixture_db", schema "main");\n\n'
             'SELECT item_ids FROM __source("raw_orders")\n'
         ),
-        "sources/raw_orders.yml": (
+        "sql/sources/raw_orders.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n"
@@ -955,11 +955,11 @@ def build_complex_values_fixture_project_files(*, adapter_name: str) -> dict[str
             'paths = ["tests/unit/test_orders.sql"]\n'
             'reason = "The fixtures cover complex strings in a VALUES relation on every dialect."\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             'MODEL (description "Test model orders.", database "fixture_db", schema "main");\n\n'
             'SELECT order_id, mapping_text FROM __source("raw_orders")\n'
         ),
-        "sources/raw_orders.yml": (
+        "sql/sources/raw_orders.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n"
@@ -1014,11 +1014,11 @@ def build_union_distinct_expected_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "union_distinct_expected.duckdb"\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             'MODEL (description "Test model orders.");\n\n'
             'SELECT DISTINCT order_id FROM __source("raw_orders")\n'
         ),
-        "sources/raw_orders.yml": (
+        "sql/sources/raw_orders.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n"
@@ -1052,11 +1052,11 @@ def build_transformed_collection_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "transformed_collection.duckdb"\n'
         ),
-        "models/order_statuses.sql": (
+        "sql/models/order_statuses.sql": (
             'MODEL (description "Test model order_statuses.");\n\n'
             'SELECT list(status) AS statuses FROM __source("raw_orders")\n'
         ),
-        "sources/raw_orders.yml": (
+        "sql/sources/raw_orders.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n"
@@ -1084,7 +1084,7 @@ def build_cte_derived_output_fixture_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "cte_derived_output_fixture.duckdb"\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.');\n\n"
             "WITH raw_orders AS (\n"
             '  SELECT * FROM __source("raw_orders")\n'
@@ -1099,7 +1099,7 @@ def build_cte_derived_output_fixture_project_files() -> dict[str, str]:
             ")\n"
             "SELECT order_id, normalized_status, loaded_at FROM final\n"
         ),
-        "sources/raw_orders.yml": (
+        "sql/sources/raw_orders.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
@@ -1150,11 +1150,11 @@ def build_assertion_test_project_files(*, failing: bool) -> dict[str, str]:
             "[defaults]\n"
             'materialized = "table"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.', materialized table);\n\n"
             "SELECT\n"
             "  id AS order_id,\n"
@@ -1185,10 +1185,10 @@ def build_macro_test_project_files() -> dict[str, str]:
             "[defaults]\n"
             'materialized = "table"\n'
         ),
-        "macros/python/status.py": (
+        "sql/macros/python/status.py": (
             'def normalize_status(value: str) -> str:\n    return f"LOWER(TRIM({value}))"\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.', "
             "materialized table);\n\nSELECT @py.normalize_status(\"'  PAID  '\") AS status\n"
         ),
@@ -1220,26 +1220,26 @@ def build_diamond_chain_test_project_files(*, sql_analysis_enabled: bool) -> dic
             "[defaults]\n"
             'materialized = "table"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
-        "models/stg_orders.sql": (
+        "sql/models/stg_orders.sql": (
             "MODEL (description 'Test model stg_orders.', materialized table);\n\n"
             'SELECT id AS order_id, customer_id, amount FROM __source("raw_orders")\n'
         ),
-        "models/large_orders.sql": (
+        "sql/models/large_orders.sql": (
             "MODEL (description 'Test model large_orders.', materialized table);\n\n"
             'SELECT order_id, customer_id, amount FROM __ref("stg_orders") WHERE amount >= 10\n'
         ),
-        "models/small_orders.sql": (
+        "sql/models/small_orders.sql": (
             "MODEL (description 'Test model small_orders.', materialized table);\n\n"
             "WITH picked AS (\n"
             '  SELECT order_id, customer_id, amount FROM __ref("stg_orders") WHERE amount < 10\n'
             ")\n"
             "SELECT * FROM picked -- small orders only\n"
         ),
-        "models/customer_order_mix.sql": (
+        "sql/models/customer_order_mix.sql": (
             "MODEL (description 'Test model customer_order_mix.', materialized table);\n\n"
             'WITH customers AS (SELECT DISTINCT customer_id FROM __ref("stg_orders"))\n'
             "SELECT customer_id,\n"
@@ -1292,20 +1292,20 @@ def build_deep_shared_missing_mock_project_files(*, layers: int) -> dict[str, st
             "[defaults]\n"
             'materialized = "table"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
             "  - name: raw_customers\n    description: Test source raw_customers.\n"
             "    schema: main\n    table: raw_customers\n"
         ),
-        "models/orders_00_left.sql": (
+        "sql/models/orders_00_left.sql": (
             "MODEL (description 'Test model orders_00_left.', materialized table);\n\n"
             "SELECT o.order_id, o.amount\n"
             'FROM __source("raw_orders") AS o\n'
             'JOIN __source("raw_customers") AS c ON c.customer_id = o.customer_id\n'
         ),
-        "models/orders_00_right.sql": (
+        "sql/models/orders_00_right.sql": (
             'MODEL (description "Test model orders_00_right.", '
             'materialized table);\n\nSELECT order_id, amount FROM __ref("orders_00_left")\n'
         ),
@@ -1314,7 +1314,7 @@ def build_deep_shared_missing_mock_project_files(*, layers: int) -> dict[str, st
         previous_left: str = f"orders_{layer - 1:02d}_left"
         previous_right: str = f"orders_{layer - 1:02d}_right"
         for side in ("left", "right"):
-            files[f"models/orders_{layer:02d}_{side}.sql"] = (
+            files[f"sql/models/orders_{layer:02d}_{side}.sql"] = (
                 "MODEL (description 'Test model.', materialized table);\n\n"
                 "SELECT a.order_id, a.amount + b.amount AS amount\n"
                 f'FROM __ref("{previous_left}") AS a\n'
@@ -1347,11 +1347,11 @@ def build_expected_column_subset_project_files(
             "[defaults]\n"
             'materialized = "table"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.', materialized table);\n\n"
             "SELECT id AS order_id, customer_id, status, amount * 2 AS amount\n"
             'FROM __source("raw_orders")\n'
@@ -1437,15 +1437,15 @@ def build_helper_scope_project_files() -> dict[str, str]:
             "[defaults]\n"
             'materialized = "table"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
-        "models/stg_orders.sql": (
+        "sql/models/stg_orders.sql": (
             "MODEL (description 'Test model stg_orders.', materialized table);\n\n"
             'SELECT id AS order_id, amount FROM __source("raw_orders")\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.', materialized table);\n\n"
             'SELECT order_id, amount * 2 AS amount FROM __ref("stg_orders")\n'
         ),
@@ -1541,14 +1541,14 @@ def build_cursor_window_project_files(*, tests: dict[str, str]) -> dict[str, str
             "[connection]\n"
             'database = "cursor_window_demo.duckdb"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
             "  - name: raw_events\n    description: Test source raw_events.\n"
             "    schema: main\n    table: raw_events\n"
         ),
-        "models/daily_orders.sql": (
+        "sql/models/daily_orders.sql": (
             "MODEL (description 'Test model daily_orders.',\n"
             "  materialized incremental,\n"
             "  incremental_strategy delete_insert,\n"
@@ -1562,7 +1562,7 @@ def build_cursor_window_project_files(*, tests: dict[str, str]) -> dict[str, str
             'FROM __source("raw_orders")\n'
             "WHERE order_date >= __cursor_start() AND order_date < __cursor_end()\n"
         ),
-        "models/order_lookback.sql": (
+        "sql/models/order_lookback.sql": (
             "MODEL (description 'Test model order_lookback.',\n"
             "  materialized incremental,\n"
             "  incremental_strategy delete_insert,\n"
@@ -1578,7 +1578,7 @@ def build_cursor_window_project_files(*, tests: dict[str, str]) -> dict[str, str
             'FROM __source("raw_orders")\n'
             "WHERE order_date >= CAST(__cursor_start() AS DATE) - INTERVAL 7 DAY\n"
         ),
-        "models/event_totals.sql": (
+        "sql/models/event_totals.sql": (
             "MODEL (description 'Test model event_totals.',\n"
             "  materialized incremental,\n"
             "  incremental_strategy delete_insert,\n"
@@ -1591,11 +1591,11 @@ def build_cursor_window_project_files(*, tests: dict[str, str]) -> dict[str, str
             "WHERE event_id >= __cursor_start() AND event_id < __cursor_end()\n"
             "  AND event_id - 1 < __cursor_end() + 1\n"
         ),
-        "models/plain_orders.sql": (
+        "sql/models/plain_orders.sql": (
             'MODEL (description "Test model plain_orders.", '
             'materialized table);\n\nSELECT amount FROM __source("raw_orders")\n'
         ),
-        "models/hourly_orders.sql": (
+        "sql/models/hourly_orders.sql": (
             "MODEL (description 'Test model hourly_orders.',\n"
             "  materialized incremental,\n"
             "  incremental_strategy delete_insert,\n"
@@ -1639,7 +1639,7 @@ def build_cte_scope_project_files(*, queries: tuple[str, ...], expected: str) ->
         "sqlbuild_project.toml": (
             'name = "cte_scope"\nadapter = "duckdb"\n[connection]\ndatabase = "orders.duckdb"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
@@ -1650,7 +1650,7 @@ def build_cte_scope_project_files(*, queries: tuple[str, ...], expected: str) ->
         ),
     }
     for index, query in enumerate(queries):
-        files[f"models/orders_{index}.sql"] = f"MODEL (description 'Test model.');\n{query}"
+        files[f"sql/models/orders_{index}.sql"] = f"MODEL (description 'Test model.');\n{query}"
     return files
 
 
@@ -1681,14 +1681,14 @@ def build_shared_cte_name_chain_project_files(
             'database = "model_inlining.duckdb"\n\n[settings]\n'
             f"sql_analysis = {sql_analysis_value}\n"
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
-        "models/order_lines.sql": (
+        "sql/models/order_lines.sql": (
             f"MODEL (description 'Order lines.');\n\n{ORDER_LINES_MODEL_SQL}\n"
         ),
-        "models/order_totals.sql": (
+        "sql/models/order_totals.sql": (
             f"MODEL (description 'Order totals.');\n\n{ORDER_TOTALS_MODEL_SQL}\n"
         ),
         "tests/unit/order_chain.sql": (
@@ -1745,17 +1745,17 @@ def build_lookup_project_files(*, sql_analysis_enabled: bool) -> dict[str, str]:
             'database = "lookup.duckdb"\n\n[settings]\n'
             f"sql_analysis = {sql_analysis_value}\n"
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
-        "models/matched_orders.sql": (
+        "sql/models/matched_orders.sql": (
             "MODEL (description 'Orders found in the lookup table.');\n\n"
             "WITH lookup_rows AS (SELECT order_id FROM main.lookup_rows)\n"
             'SELECT o.order_id FROM __source("raw_orders") AS o\n'
             "INNER JOIN lookup_rows AS l ON l.order_id = o.order_id\n"
         ),
-        "models/listed_orders.sql": (
+        "sql/models/listed_orders.sql": (
             "MODEL (description 'Orders listed in the physical lookup table.');\n\n"
             'SELECT o.order_id FROM __source("raw_orders") AS o\n'
             "INNER JOIN lookup_rows AS l ON l.order_id = o.order_id\n"
@@ -1972,21 +1972,21 @@ def build_helper_reference_project_files(
             'paths = ["tests/unit/**"]\n'
             'reason = "These SQL tests leave helpers unread to cover reference detection."\n'
         ),
-        "sources/item_returns.yml": (
+        "sql/sources/item_returns.yml": (
             "sources:\n"
             "  - name: item_returns\n"
             "    description: Returned items\n"
             "    expression: SELECT 1 AS item_id\n"
         ),
-        "models/item_extras.sql": (
+        "sql/models/item_extras.sql": (
             "MODEL (description 'Extra item amounts', materialized table);\n\n"
             'SELECT item_id, amount FROM __ref("items")\n'
         ),
-        "models/items.sql": (
+        "sql/models/items.sql": (
             "MODEL (description 'Base items', materialized table);\n\n"
             "SELECT 1 AS item_id, 10 AS amount\n"
         ),
-        "models/item_totals.sql": (
+        "sql/models/item_totals.sql": (
             "MODEL (description 'Doubled item amounts', materialized table);\n\n"
             'SELECT item_id, amount * 2 AS amount_doubled FROM __ref("items")\n'
         ),
@@ -2026,14 +2026,14 @@ def build_order_chain_files(*, chain_length: int) -> dict[str, str]:
 
     files: dict[str, str] = {
         "sqlbuild_project.toml": COST_GUARD_PROJECT_TOML,
-        "sources/raw_orders.yml": COST_GUARD_RAW_ORDERS_SOURCE,
-        "models/order_step_1.sql": (
+        "sql/sources/raw_orders.yml": COST_GUARD_RAW_ORDERS_SOURCE,
+        "sql/models/order_step_1.sql": (
             "MODEL (description 'Order step 1.', materialized table);\n\n"
             'SELECT order_id, amount FROM __source("raw_orders")\n'
         ),
     }
     for step in range(2, chain_length + 1):
-        files[f"models/order_step_{step}.sql"] = (
+        files[f"sql/models/order_step_{step}.sql"] = (
             f"MODEL (description 'Order step {step}.', materialized table);\n\n"
             f'SELECT order_id, amount + 1 AS amount FROM __ref("order_step_{step - 1}")\n'
         )
@@ -2061,16 +2061,16 @@ def slow_model_files(*, max_duration: str) -> dict[str, str]:
 
     return {
         "sqlbuild_project.toml": COST_GUARD_PROJECT_TOML,
-        "models/order_scans.sql": (
+        "sql/models/order_scans.sql": (
             "MODEL (description 'Order scans.', materialized table, "
             f'max_duration "{max_duration}");\n\n'
             f"SELECT 1 AS order_id, {SLOW_SCALAR_SQL} AS scanned\n"
         ),
-        "models/order_scan_summary.sql": (
+        "sql/models/order_scan_summary.sql": (
             "MODEL (description 'Order scan summary.', materialized table);\n\n"
             'SELECT COUNT(*) AS orders FROM __ref("order_scans")\n'
         ),
-        "models/customers.sql": (
+        "sql/models/customers.sql": (
             "MODEL (description 'Customers.', materialized table);\n\nSELECT 100 AS customer_id\n"
         ),
     }
@@ -2097,13 +2097,13 @@ def slow_promotion_files(
         "sqlbuild_project.toml": COST_GUARD_PROJECT_TOML.replace(
             'adapter = "duckdb"', 'adapter = "duckdb_slow_swap"'
         ).replace('database = "warehouse.duckdb"', f'database = "{database}"'),
-        "adapters/duckdb_slow_swap.py": SLOW_SWAP_ADAPTER,
-        "models/order_totals.sql": (
+        "python/adapters/duckdb_slow_swap.py": SLOW_SWAP_ADAPTER,
+        "sql/models/order_totals.sql": (
             "MODEL (description 'Order totals.', materialized table, "
             f'max_duration "{max_duration}");\n\n'
             f"SELECT 1 AS order_id, {order_total} AS total\n"
         ),
-        "models/z_customers.sql": (
+        "sql/models/z_customers.sql": (
             "MODEL (description 'Customers.', materialized table);\n\n"
             f"SELECT {customer_id} AS customer_id\n"
         ),
@@ -2114,7 +2114,7 @@ def order_totals_test_files(total_sql: str) -> dict[str, str]:
     """Return an order_totals model computing ``total_sql`` and a test expecting both models."""
 
     return {
-        "models/order_totals.sql": (
+        "sql/models/order_totals.sql": (
             "MODEL (description 'Test model order_totals.');\n\n"
             f'SELECT order_id, {total_sql} AS total FROM __ref("orders")\n'
         ),
@@ -2137,15 +2137,15 @@ def build_shared_partial_fixture_project_files(
             'name = "shared_partial_fixture"\nadapter = "duckdb"\n\n'
             '[connection]\ndatabase = "shared_partial_fixture.duckdb"\n'
         ),
-        "models/order_lines.sql": (
+        "sql/models/order_lines.sql": (
             'MODEL (description "Test model order_lines.");\n\n'
             "SELECT 1 AS order_id, CAST(1.5 AS DOUBLE) AS amount, CAST(2.5 AS DOUBLE) AS discount\n"
         ),
-        "models/enriched_lines.sql": (
+        "sql/models/enriched_lines.sql": (
             'MODEL (description "Test model enriched_lines.");\n\n'
             f'SELECT order_id, amount, {enriched_column} FROM __ref("order_lines")\n'
         ),
-        "models/line_report.sql": (
+        "sql/models/line_report.sql": (
             'MODEL (description "Test model line_report.");\n\n'
             f"SELECT e.order_id, e.amount, l.{report_column} AS line_discount\n"
             'FROM __ref("enriched_lines") AS e\n'
@@ -2174,11 +2174,11 @@ def build_since_project_files() -> dict[str, str]:
             '[defaults]\nmaterialized = "table"\n'
         ),
         ".gitignore": "target/\n*.duckdb\n*.duckdb.wal\n",
-        "models/_macros/python/money.py": (
+        "sql/models/_macros/python/money.py": (
             "def cents_to_dollars(expression: str) -> str:\n"
             '    return f"CAST({expression} AS DOUBLE) / 100"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Raw orders.\n"
             "    schema: main\n    table: raw_orders\n"
@@ -2187,16 +2187,16 @@ def build_since_project_files() -> dict[str, str]:
             "      - name: status\n        type: VARCHAR\n"
             "      - name: amount_cents\n        type: INTEGER\n"
         ),
-        "models/stg_orders.sql": (
+        "sql/models/stg_orders.sql": (
             "MODEL (description 'Cleaned orders.');\n\n"
             'SELECT order_id, status, amount_cents FROM __source("raw_orders")\n'
         ),
-        "models/order_totals.sql": (
+        "sql/models/order_totals.sql": (
             "MODEL (description 'Order totals in dollars.');\n\n"
             'SELECT order_id, @py.cents_to_dollars("amount_cents") AS amount\n'
             'FROM __ref("stg_orders")\n'
         ),
-        "models/open_orders.sql": (
+        "sql/models/open_orders.sql": (
             "MODEL (description 'Open orders.');\n\n"
             "SELECT order_id FROM __ref(\"stg_orders\") WHERE status = 'open'\n"
         ),
@@ -2236,17 +2236,17 @@ def build_since_sql_macro_files() -> dict[str, str]:
     """Build a model whose scoped SQL macro calls another scoped SQL macro, and its test."""
 
     return {
-        "models/_macros/sql/round_cents.sql": (
+        "sql/models/_macros/sql/round_cents.sql": (
             "MACRO (\n  description 'Cents rounded to whole dollars.',\n"
             "  arguments (cents INTEGER),\n  returns DOUBLE,\n);\n\n"
             "ROUND(CAST(@cents AS DOUBLE) / 100, 0)\n"
         ),
-        "models/_macros/sql/net_dollars.sql": (
+        "sql/models/_macros/sql/net_dollars.sql": (
             "MACRO (\n  description 'Net dollars after a fixed fee.',\n"
             "  arguments (cents INTEGER),\n  returns DOUBLE,\n);\n\n"
             "@sql.round_cents(@cents) - 1\n"
         ),
-        "models/order_net.sql": (
+        "sql/models/order_net.sql": (
             "MODEL (description 'Net order amounts.');\n\n"
             "SELECT order_id, @sql.net_dollars(amount_cents) AS net\n"
             'FROM __ref("stg_orders")\n'
@@ -2268,35 +2268,35 @@ def build_since_indirect_files() -> dict[str, str]:
             base["sqlbuild_project.toml"]
             + '\n[vars]\nmin_amount = "100"\n\n[scopes]\nenforce_placement = false\n'
         ),
-        "python/_rates.py": 'DIVISOR = "100"\n',
-        "models/_macros/python/currency.py": (
+        "python/nodes/_rates.py": 'DIVISOR = "100"\n',
+        "sql/models/_macros/python/currency.py": (
             'def whole_cents(expression: str) -> str:\n    return f"({expression} * 1)"\n'
         ),
-        "models/_macros/python/money.py": (
+        "sql/models/_macros/python/money.py": (
             "from models._macros.python.currency import whole_cents\n"
-            "from python._rates import DIVISOR\n\n\n"
+            "from python.nodes._rates import DIVISOR\n\n\n"
             "def cents_to_dollars(expression: str) -> str:\n"
             '    return f"CAST({whole_cents(expression)} AS DOUBLE) / {DIVISOR}"\n'
         ),
-        "macros/python/taxes.py": (
+        "sql/macros/python/taxes.py": (
             'def with_tax(expression: str) -> str:\n    return f"({expression} + 0)"\n'
         ),
-        "macros/python/pricing.py": (
+        "sql/macros/python/pricing.py": (
             "from macros.python.taxes import with_tax\n\n\n"
             "def gross(expression: str) -> str:\n    return with_tax(expression)\n"
         ),
-        "macros/python/fixture_values.py": "def suffix() -> str:\n    return \"''\"\n",
-        "models/stg_orders.sql": (
+        "sql/macros/python/fixture_values.py": "def suffix() -> str:\n    return \"''\"\n",
+        "sql/models/stg_orders.sql": (
             "MODEL (\n  description 'Cleaned orders.',\n"
             "  columns (order_id (type INTEGER), status (type VARCHAR), "
             "amount_cents (type INTEGER)),\n);\n\n"
             'SELECT order_id, status, amount_cents FROM __source("raw_orders")\n'
         ),
-        "models/order_gross.sql": (
+        "sql/models/order_gross.sql": (
             "MODEL (description 'Gross order amounts.');\n\n"
             'SELECT order_id, @py.gross("amount_cents") AS gross_cents FROM __ref("stg_orders")\n'
         ),
-        "models/order_day.sql": (
+        "sql/models/order_day.sql": (
             "MODEL (description 'The UTC day of a fixed timestamp.');\n\n"
             "SELECT order_id, CAST(TIMESTAMPTZ '2024-01-01 23:30:00+00' AS DATE) AS day\n"
             'FROM __ref("stg_orders")\n'
@@ -2320,48 +2320,48 @@ def build_since_indirect_files() -> dict[str, str]:
             "__expected__stg_orders AS (\n"
             '  SELECT 1 AS order_id, @param("status") || @py.suffix() AS status\n)\nSELECT 1\n'
         ),
-        "audits/generic/at_least.sql": (
+        "sql/audits/generic/at_least.sql": (
             'AUDIT ();\n\nSELECT *\nFROM __ref("@model")\nWHERE @column < @minimum\n'
         ),
-        "models/order_totals.sql": (
+        "sql/models/order_totals.sql": (
             "MODEL (\n  description 'Order totals in dollars.',\n"
             "  audits [at_least (column amount, minimum 0)],\n);\n\n"
             'SELECT order_id, @py.cents_to_dollars("amount_cents") AS amount\n'
             'FROM __ref("stg_orders")\n'
         ),
-        "models/big_orders.sql": (
+        "sql/models/big_orders.sql": (
             "MODEL (description 'Large orders.');\n\n"
             'SELECT order_id FROM __ref("stg_orders") WHERE amount_cents >= @@min_amount\n'
         ),
-        "models/marts/order_counts.sql": (
+        "sql/models/marts/order_counts.sql": (
             "MODEL (description 'Order counts.');\n\n"
             'SELECT COUNT(*) AS order_count FROM __ref("stg_orders")\n'
         ),
-        "seeds/regions.csv": "region_id,region_name\n1,north\n",
-        "seeds/regions.yml": (
+        "sql/seeds/regions.csv": "region_id,region_name\n1,north\n",
+        "sql/seeds/regions.yml": (
             "seeds:\n  - name: regions\n    description: Sales regions.\n    columns:\n"
             "      - name: region_id\n        type: INTEGER\n"
             "      - name: region_name\n        type: VARCHAR\n"
         ),
-        "functions/sql/is_open.sql": (
+        "sql/functions/sql/is_open.sql": (
             "FUNCTION (\n  description 'Whether an order is open.',\n"
             "  arguments (order_status VARCHAR),\n  returns BOOLEAN,\n);\n\n"
             "order_status = 'open'\n"
         ),
-        "models/regional_orders.sql": (
+        "sql/models/regional_orders.sql": (
             "MODEL (description 'Orders with their region.');\n\n"
             "SELECT o.order_id, r.region_id\n"
             'FROM __ref("stg_orders") o CROSS JOIN __seed("regions") r\n'
         ),
-        "models/order_flags.sql": (
+        "sql/models/order_flags.sql": (
             "MODEL (description 'Whether each order is open.');\n\n"
             'SELECT order_id, __udf("is_open")(status) AS is_open FROM __ref("stg_orders")\n'
         ),
-        "models/order_archive.sql": (
+        "sql/models/order_archive.sql": (
             "MODEL (description 'Archived orders.');\n\n"
             'SELECT order_id FROM __ref("stg_orders")\n'
         ),
-        "models/archive_counts.sql": (
+        "sql/models/archive_counts.sql": (
             "MODEL (description 'Archived order count.');\n\n"
             'SELECT COUNT(*) AS archived FROM __ref("order_archive")\n'
         ),
@@ -2372,7 +2372,7 @@ def build_since_indirect_files() -> dict[str, str]:
             "),\n"
             "__expected__archive_counts AS (SELECT 1 AS archived)\nSELECT 1\n"
         ),
-        "python/tasks/report.py": (
+        "python/nodes/tasks/report.py": (
             "from sqlbuild.assets import asset\n\n\n"
             "@asset()\ndef report_orders(ctx):\n"
             '    """Report orders."""\n\n'
@@ -2511,12 +2511,12 @@ def partitioned_call_fixture_files(*, query: str, expected_rows: str) -> dict[st
             'name = "payments_fixtures"\nadapter = "duckdb"\n'
             '[connection]\ndatabase = "payments.duckdb"\n'
         ),
-        "functions/python/smooth_payments.py": _PARTITIONED_FUNCTION,
-        "models/payments.sql": (
+        "sql/functions/python/smooth_payments.py": _PARTITIONED_FUNCTION,
+        "sql/models/payments.sql": (
             "MODEL (description 'Payments.', materialized table);\n"
             "SELECT 1 AS customer_id, 10.0::DOUBLE AS amount\n"
         ),
-        "models/smoothed_payments.sql": (
+        "sql/models/smoothed_payments.sql": (
             f"MODEL (description 'Smoothed payments.', materialized table);\n{query}\n"
         ),
         "tests/unit/test_smoothed_payments.sql": (

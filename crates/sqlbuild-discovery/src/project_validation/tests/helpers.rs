@@ -28,11 +28,11 @@ pub(super) fn seed_header_outcome(csv_text: &str, columns: &[&str]) -> Result<()
     std::fs::write(&csv_path, csv_text).expect("the seed CSV is writable");
     let facts = ProjectFacts {
         seeds: vec![SeedFileFact {
-            file: named("countries", "seeds/countries.csv"),
+            file: named("countries", "sql/seeds/countries.csv"),
             absolute_path: csv_path.to_string_lossy().into_owned(),
         }],
         schemas: vec![SchemaFileFact {
-            path: "seeds/countries.yml".to_owned(),
+            path: "sql/seeds/countries.yml".to_owned(),
             model_names: Vec::new(),
             seeds: vec![SeedEntryFact {
                 name: "countries".to_owned(),
@@ -61,14 +61,14 @@ pub(super) fn model_at(name: &str, path: &str) -> ModelFact {
 }
 
 pub(super) fn model(name: &str) -> ModelFact {
-    model_at(name, &format!("models/{name}.sql"))
+    model_at(name, &format!("sql/models/{name}.sql"))
 }
 
 pub(super) fn node(kind: NodeKind, name: &str, depends_on: Vec<DependencyFact>) -> NodeFact {
     NodeFact {
         kind,
         name: name.to_owned(),
-        path: format!("python/{name}.py"),
+        path: format!("python/nodes/{name}.py"),
         decorator_config: false,
         depends_on,
     }

@@ -32,7 +32,7 @@ from tests.integration.src.sqlbuild.compiler.pipeline.helpers import (
 
 _GROUP_FILES: tuple[tuple[str, str], ...] = (
     (
-        "models/customer_orders.sql",
+        "sql/models/customer_orders.sql",
         "MODEL (description 'Test model customer_orders.', materialized table);\n"
         'SELECT o.id FROM __ref("orders") AS o JOIN __ref("customers") AS c ON o.id = c.id\n',
     ),

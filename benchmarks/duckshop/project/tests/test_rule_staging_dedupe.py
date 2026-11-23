@@ -4,7 +4,7 @@ from sqlbuild.rules import RuleFile
 from sqlbuild.rules.testing import RuleCase, evaluate_rule
 
 _SOURCES = RuleFile(
-    path="sources/shop.yml",
+    path="sql/sources/shop.yml",
     source="""sources:
   - name: shop__orders
     description: Orders change log
@@ -39,7 +39,7 @@ def test_given_change_log_read_without_cdc_latest_when_evaluating_then_reports_i
         test_case=RuleCase(
             description="staging model reads a change log directly",
             source=_RAW_CHANGE_LOG_READ,
-            path="models/staging/shop/stg_orders.sql",
+            path="sql/models/staging/shop/stg_orders.sql",
             files=(_SOURCES,),
             expected_finding_count=1,
         ),
@@ -57,7 +57,7 @@ def test_given_staging_model_reading_append_only_source_when_evaluating_then_pas
             source=_RAW_CHANGE_LOG_READ.replace("shop__orders", "shop__page_views").replace(
                 "order_id", "event_id"
             ),
-            path="models/staging/shop/stg_page_views.sql",
+            path="sql/models/staging/shop/stg_page_views.sql",
             files=(_SOURCES,),
             expected_finding_count=0,
         ),
@@ -72,7 +72,7 @@ def test_given_change_log_read_outside_staging_when_evaluating_then_passes() -> 
         test_case=RuleCase(
             description="snapshots and other layers may read the full change log",
             source=_RAW_CHANGE_LOG_READ,
-            path="models/snapshots/snap_orders.sql",
+            path="sql/models/snapshots/snap_orders.sql",
             files=(_SOURCES,),
             expected_finding_count=0,
         ),

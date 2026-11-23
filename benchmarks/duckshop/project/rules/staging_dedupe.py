@@ -11,7 +11,7 @@ _CHANGE_LOG_MARKER = re.compile(r"^\s+- name: _op\s*$", re.MULTILINE)
 
 def _change_log_sources(ctx: RuleContext) -> set[str]:
     names: set[str] = set()
-    for path in ctx.project.tree.glob("sources/*.yml"):
+    for path in ctx.project.tree.glob("sql/sources/*.yml"):
         text = ctx.project.tree.read_text(path.value)
         for match in _SOURCE_BLOCK.finditer(text):
             if _CHANGE_LOG_MARKER.search(match.group(2)):

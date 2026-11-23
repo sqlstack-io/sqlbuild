@@ -57,7 +57,7 @@ fn given_named_jobs_when_merging_build_settings_then_they_must_agree() {
         },
         BuildJobSettingsTestCase {
             description: "tags, paths and node names name no job",
-            select: &["tag:daily models/marts orders"],
+            select: &["tag:daily sql/models/marts orders"],
             expected_named: vec![],
             expected_settings: Ok(BTreeMap::new()),
         },

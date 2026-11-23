@@ -238,17 +238,17 @@ def prepare_snowflake_diff_project(*, tmp_path: Path) -> tuple[Path, str, str]:
         "allow_as_clone_destination = false\n\n"
         "[defaults]\n"
         'materialized = "table"\n\n'
-        "models/staging/stg_orders.sql: invalid\n"
+        "sql/models/staging/stg_orders.sql: invalid\n"
     )
     project_dir.mkdir(parents=True, exist_ok=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         project_contents.replace(
-            "models/staging/stg_orders.sql: invalid\n",
+            "sql/models/staging/stg_orders.sql: invalid\n",
             "",
         ),
         encoding="utf-8",
     )
-    models_dir: Path = project_dir / "models"
+    models_dir: Path = project_dir / "sql" / "models"
     staging_dir: Path = models_dir / "staging"
     staging_dir.mkdir(parents=True, exist_ok=True)
     (staging_dir / "stg_orders.sql").write_text(
@@ -415,7 +415,7 @@ def build_snowflake_dbt_profiles_yml(*, schema_name: str, config: dict[str, obje
 def write_snowflake_dbt_scenario_date_trunc_model(*, sqlbuild_project_dir: Path) -> None:
     """Write a Snowflake-flavored DATE_TRUNC dbt model and a scenario targeting it."""
 
-    dbt_models_dir: Path = sqlbuild_project_dir.parent / "dbt_project" / "models"
+    dbt_models_dir: Path = sqlbuild_project_dir.parent / "dbt_project" / "sql" / "models"
     dbt_models_dir.joinpath("event_rollup.sql").write_text(
         "select\n"
         "  customer_id,\n"

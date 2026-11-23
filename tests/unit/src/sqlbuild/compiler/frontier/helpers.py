@@ -115,7 +115,7 @@ def _order_lines() -> list[dict[str, object]]:
 def order_line() -> OrderLine:
     """Return one neutral order line."""
 
-    return OrderLine(order_id=7, status=OrderStatus.PLACED, path=PurePosixPath("models/a.sql"))
+    return OrderLine(order_id=7, status=OrderStatus.PLACED, path=PurePosixPath("sql/models/a.sql"))
 
 
 def declaration_scope_build() -> DeclarationScopeBuild:

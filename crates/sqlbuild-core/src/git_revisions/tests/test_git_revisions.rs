@@ -224,13 +224,13 @@ fn given_merge_base_when_exporting_tree_then_writes_base_files_and_leaves_checko
     let test_cases = [
         ExportTreeTestCase {
             description: "an edited model is exported as committed at the base",
-            relative_path: "models/orders.sql",
+            relative_path: "sql/models/orders.sql",
             expected_exported: Some("SELECT 1 AS order_id\n"),
             expected_working_tree: Some("SELECT 3 AS order_id\n"),
         },
         ExportTreeTestCase {
             description: "a model added after the base is not exported",
-            relative_path: "models/customers.sql",
+            relative_path: "sql/models/customers.sql",
             expected_exported: None,
             expected_working_tree: Some("SELECT 1 AS customer_id\n"),
         },

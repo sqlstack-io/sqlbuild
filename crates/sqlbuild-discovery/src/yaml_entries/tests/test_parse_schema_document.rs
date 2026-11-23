@@ -40,7 +40,7 @@ fn given_schema_documents_when_parsing_then_matches_python_seeds_and_errors() {
             in_seeds_directory: false,
             expected_seeds: parse_error(
                 "/project/seeds/countries.yml declares seeds, but seed declarations must live \
-                 under seeds/**/*.yml",
+                 under sql/seeds/**/*.yml",
             ),
         },
         SchemaDocumentTestCase {

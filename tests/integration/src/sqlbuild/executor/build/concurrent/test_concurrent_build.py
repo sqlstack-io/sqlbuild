@@ -38,10 +38,10 @@ _PROJECT_YML: str = (
             max_concurrency=2,
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "models/alpha.sql": (
+                "sql/models/alpha.sql": (
                     "MODEL (description 'Test model alpha.', materialized table);\n\nSELECT 1 AS id, 'alpha' AS name"
                 ),
-                "models/beta.sql": (
+                "sql/models/beta.sql": (
                     "MODEL (description 'Test model beta.', materialized table);\n\nSELECT 2 AS id, 'beta' AS name"
                 ),
             },
@@ -63,18 +63,18 @@ _PROJECT_YML: str = (
             max_concurrency=3,
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "models/staging/stg_raw.sql": (
+                "sql/models/staging/stg_raw.sql": (
                     "MODEL (description 'Test model stg_raw.', materialized view);\n\nSELECT 10 AS id, 'row' AS val"
                 ),
-                "models/branch_a.sql": (
+                "sql/models/branch_a.sql": (
                     "MODEL (description 'Test model branch_a.', materialized table);\n\n"
                     "SELECT id, val || '_a' AS val FROM __ref(\"stg_raw\")"
                 ),
-                "models/branch_b.sql": (
+                "sql/models/branch_b.sql": (
                     "MODEL (description 'Test model branch_b.', materialized table);\n\n"
                     "SELECT id, val || '_b' AS val FROM __ref(\"stg_raw\")"
                 ),
-                "models/merged.sql": (
+                "sql/models/merged.sql": (
                     "MODEL (description 'Test model merged.', materialized table);\n\n"
                     "SELECT a.id, a.val AS a_val, b.val AS b_val "
                     'FROM __ref("branch_a") a '
@@ -95,13 +95,13 @@ _PROJECT_YML: str = (
             max_concurrency=2,
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "models/layer_1.sql": (
+                "sql/models/layer_1.sql": (
                     "MODEL (description 'Test model layer_1.', materialized table);\n\nSELECT 100 AS val"
                 ),
-                "models/layer_2.sql": (
+                "sql/models/layer_2.sql": (
                     'MODEL (description "Test model layer_2.", materialized table);\n\nSELECT val * 2 AS val FROM __ref("layer_1")'
                 ),
-                "models/layer_3.sql": (
+                "sql/models/layer_3.sql": (
                     'MODEL (description "Test model layer_3.", materialized table);\n\nSELECT val + 1 AS val FROM __ref("layer_2")'
                 ),
             },
@@ -163,7 +163,7 @@ def test_given_concurrent_provider_backed_loaders_when_executing_then_share_prov
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT_YML,
-            "providers/concurrent_marker.py": dedent(
+            "python/providers/concurrent_marker.py": dedent(
                 f"""
                 from pathlib import Path
                 from time import sleep
@@ -192,9 +192,9 @@ def test_given_concurrent_provider_backed_loaders_when_executing_then_share_prov
                 """
             ).strip()
             + "\n",
-            "python/loaders/events.py": dedent(
+            "python/nodes/loaders/events.py": dedent(
                 """
-                from providers.concurrent_marker import ConcurrentMarkerProvider
+                from python.nodes.providers.concurrent_marker import ConcurrentMarkerProvider
                 from sqlbuild.loaders import loader
 
 
@@ -213,7 +213,7 @@ def test_given_concurrent_provider_backed_loaders_when_executing_then_share_prov
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": dedent(
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_alpha
@@ -233,10 +233,10 @@ def test_given_concurrent_provider_backed_loaders_when_executing_then_share_prov
                 """
             ).strip()
             + "\n",
-            "models/fact_alpha.sql": (
+            "sql/models/fact_alpha.sql": (
                 'MODEL (description "Test model fact_alpha.", materialized table);\n\nSELECT * FROM __source("raw_alpha")\n'
             ),
-            "models/fact_beta.sql": (
+            "sql/models/fact_beta.sql": (
                 'MODEL (description "Test model fact_beta.", materialized table);\n\nSELECT * FROM __source("raw_beta")\n'
             ),
         },
@@ -275,10 +275,10 @@ def test_given_concurrent_provider_backed_loaders_when_executing_then_share_prov
             max_concurrency=2,
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "models/broken.sql": (
+                "sql/models/broken.sql": (
                     "MODEL (description 'Test model broken.', materialized table);\n\nSELECT * FROM nonexistent_table"
                 ),
-                "models/healthy.sql": (
+                "sql/models/healthy.sql": (
                     "MODEL (description 'Test model healthy.', materialized table);\n\nSELECT 42 AS val"
                 ),
             },
@@ -299,13 +299,13 @@ def test_given_concurrent_provider_backed_loaders_when_executing_then_share_prov
             max_concurrency=2,
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "models/broken.sql": (
+                "sql/models/broken.sql": (
                     "MODEL (description 'Test model broken.', materialized table);\n\nSELECT * FROM nonexistent_table"
                 ),
-                "models/downstream.sql": (
+                "sql/models/downstream.sql": (
                     'MODEL (description "Test model downstream.", materialized table);\n\nSELECT 1 AS id FROM __ref("broken")'
                 ),
-                "models/independent.sql": (
+                "sql/models/independent.sql": (
                     "MODEL (description 'Test model independent.', materialized table);\n\nSELECT 99 AS val"
                 ),
             },
@@ -329,10 +329,10 @@ def test_given_concurrent_provider_backed_loaders_when_executing_then_share_prov
             max_concurrency=1,
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "models/aaa_broken.sql": (
+                "sql/models/aaa_broken.sql": (
                     "MODEL (description 'Test model aaa_broken.', materialized table);\n\nSELECT * FROM nonexistent_table"
                 ),
-                "models/zzz_independent.sql": (
+                "sql/models/zzz_independent.sql": (
                     "MODEL (description 'Test model zzz_independent.', materialized table);\n\nSELECT 1 AS id"
                 ),
             },

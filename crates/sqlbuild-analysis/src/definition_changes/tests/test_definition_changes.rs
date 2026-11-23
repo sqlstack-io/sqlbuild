@@ -428,7 +428,7 @@ fn given_changes_and_selection_when_writing_json_then_lists_nodes_and_reasons() 
 
 #[test]
 fn given_a_sql_macro_when_fingerprinting_definition_then_ignores_layout_comments_and_description() {
-    let path: &str = "macros/sql/net.sql";
+    let path: &str = "sql/macros/sql/net.sql";
     let original: String = sql_macro_definition_digest(
         "net",
         path,

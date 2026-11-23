@@ -26,21 +26,21 @@ _CHECK: str = (
     [
         PythonNamedMoveE2ETestCase(
             description="a move to a folder keeps the name and moves",
-            destination="models/marts/",
+            destination="sql/models/marts/",
             expected_exit_code=0,
-            expected_model_path="models/marts/orders.sql",
+            expected_model_path="sql/models/marts/orders.sql",
         ),
         PythonNamedMoveE2ETestCase(
             description="a move to a file of the same name moves",
-            destination="models/marts/orders.sql",
+            destination="sql/models/marts/orders.sql",
             expected_exit_code=0,
-            expected_model_path="models/marts/orders.sql",
+            expected_model_path="sql/models/marts/orders.sql",
         ),
         PythonNamedMoveE2ETestCase(
             description="a move that renames the model is refused",
-            destination="models/marts/fct_orders.sql",
+            destination="sql/models/marts/fct_orders.sql",
             expected_exit_code=1,
-            expected_model_path="models/orders.sql",
+            expected_model_path="sql/models/orders.sql",
         ),
     ],
     ids=lambda case: case.description,
@@ -56,8 +56,8 @@ def test_given_model_named_by_python_when_moving_then_only_renames_are_refused(
                 'name = "shop"\nadapter = "duckdb"\n\n[connection]\ndatabase = "shop.duckdb"\n\n'
                 "[scopes]\nenforce_placement = false\n"
             ),
-            "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n",
-            "python/checks/orders.py": _CHECK,
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n",
+            "python/nodes/checks/orders.py": _CHECK,
         },
     )
 
@@ -67,4 +67,4 @@ def test_given_model_named_by_python_when_moving_then_only_renames_are_refused(
 
     assert moved.returncode == test_case.expected_exit_code, moved.stdout + moved.stderr
     assert (project_dir / test_case.expected_model_path).is_file()
-    assert (project_dir / "python/checks/orders.py").read_text(encoding="utf-8") == _CHECK
+    assert (project_dir / "python/nodes/checks/orders.py").read_text(encoding="utf-8") == _CHECK

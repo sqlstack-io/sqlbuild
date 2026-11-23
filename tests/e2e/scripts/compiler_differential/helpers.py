@@ -12,7 +12,7 @@ _BROKEN_REF_FILES: dict[str, str] = {
         'name = "broken_orders"\nadapter = "duckdb"\n\n'
         '[connection]\ndatabase = "broken_orders.duckdb"\n'
     ),
-    "models/order_totals.sql": (
+    "sql/models/order_totals.sql": (
         'MODEL (\n  description "Order totals",\n);\n\nSELECT * FROM __ref("nope")\n'
     ),
 }

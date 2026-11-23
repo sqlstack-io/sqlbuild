@@ -54,10 +54,10 @@ def test_given_monthly_producer_with_midmonth_max_when_building_capped_daily_con
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n  - name: raw_meetings\n    description: Test source raw_meetings.\n    schema: main\n    table: raw_meetings\n"
             ),
-            "models/monthly_meetings.sql": dedent(
+            "sql/models/monthly_meetings.sql": dedent(
                 """
                 MODEL (description "Test model monthly_meetings.",
                   materialized incremental,
@@ -78,7 +78,7 @@ def test_given_monthly_producer_with_midmonth_max_when_building_capped_daily_con
                 """
             ).strip()
             + "\n",
-            "models/daily_suffix.sql": dedent(
+            "sql/models/daily_suffix.sql": dedent(
                 """
                 MODEL (description "Test model daily_suffix.",
                   materialized incremental,
@@ -301,7 +301,7 @@ def test_given_cap_from_end_watermark_jump_when_rebuilding_then_producer_leaves_
     tmp_path: Path, test_case: CappedMicrobatchScenarioE2ETestCase
 ) -> None:
     project_files: dict[str, str] = capped_microbatch_project_files(limit_action="cap_from_end")
-    project_files["models/capped_events.sql"] = project_files["models/capped_events.sql"].replace(
+    project_files["sql/models/capped_events.sql"] = project_files["sql/models/capped_events.sql"].replace(
         "cursor_end '2026-01-06'", "cursor_end '2026-01-12'"
     )
     project_dir: Path = prepare_inline_project(
@@ -377,7 +377,7 @@ def test_given_any_watermarks_and_consumer_end_when_capped_winner_is_later_then_
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": dedent(
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_late
@@ -391,7 +391,7 @@ def test_given_any_watermarks_and_consumer_end_when_capped_winner_is_later_then_
                 """
             ).strip()
             + "\n",
-            "models/capped_late.sql": dedent(
+            "sql/models/capped_late.sql": dedent(
                 """
                 MODEL (description "Test model capped_late.",
                   materialized incremental,
@@ -418,14 +418,14 @@ def test_given_any_watermarks_and_consumer_end_when_capped_winner_is_later_then_
                 """
             ).strip()
             + "\n",
-            "models/uncapped_early.sql": dedent(
+            "sql/models/uncapped_early.sql": dedent(
                 """
                 MODEL (description "Test model uncapped_early.", materialized table);
                 SELECT id, event_time FROM __source("raw_early")
                 """
             ).strip()
             + "\n",
-            "models/any_consumer.sql": dedent(
+            "sql/models/any_consumer.sql": dedent(
                 """
                 MODEL (description "Test model any_consumer.",
                   materialized incremental,

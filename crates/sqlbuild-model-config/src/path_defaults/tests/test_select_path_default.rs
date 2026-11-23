@@ -9,7 +9,7 @@ fn given_path_default_keys_when_selecting_then_the_python_choice_is_made() {
     let test_cases = [
         SelectTestCase {
             description: "the deepest literal prefix wins",
-            model_path: "models/staging/orders/orders.sql",
+            model_path: "sql/models/staging/orders/orders.sql",
             keys: &["staging", "staging/orders", "*/orders"],
             expected_choice: PathDefaultChoice::Selected(Some("staging/orders".to_owned())),
         },
@@ -47,13 +47,13 @@ fn given_path_default_keys_when_selecting_then_the_python_choice_is_made() {
         },
         SelectTestCase {
             description: "a single glob consumes exactly one segment",
-            model_path: "models/commerce/eu/partner_feed/staging/orders.sql",
+            model_path: "sql/models/commerce/eu/partner_feed/staging/orders.sql",
             keys: &["commerce/*/staging"],
             expected_choice: PathDefaultChoice::Selected(None),
         },
         SelectTestCase {
             description: "a single glob outranks a recursive glob",
-            model_path: "models/commerce/partner_feed/staging/orders.sql",
+            model_path: "sql/models/commerce/partner_feed/staging/orders.sql",
             keys: &["commerce/**/staging", "commerce/*/staging"],
             expected_choice: PathDefaultChoice::Selected(Some("commerce/*/staging".to_owned())),
         },

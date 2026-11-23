@@ -41,13 +41,13 @@ def test_given_target_retention_default_when_compiling_views_then_only_explicit_
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    (tmp_path / "models").mkdir()
+    (tmp_path / "sql" / "models").mkdir()
     (tmp_path / "sqlbuild_project.toml").write_text(_PROJECT_TOML, encoding="utf-8")
-    (tmp_path / "models" / "orders.sql").write_text(
+    (tmp_path / "sql" / "models" / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id\n",
         encoding="utf-8",
     )
-    (tmp_path / "models" / "order_view.sql").write_text(
+    (tmp_path / "sql" / "models" / "order_view.sql").write_text(
         f'{test_case.view_header}\n\nSELECT order_id FROM __ref("orders")\n', encoding="utf-8"
     )
 

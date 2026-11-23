@@ -1,0 +1,22 @@
+"""Check examples for the Python nodes playground."""
+
+from sqlbuild.checks import check
+
+from python.nodes.assets.orders_export import orders_export
+
+
+@check(depends_on=orders_export, tags=["quality"], group="exports")
+def check_orders_export(ctx):
+    """Validate the Python asset's same-run metadata and payload."""
+
+    result = ctx.result_of(node_function=orders_export)
+    payload = result.payload
+    metadata = result.metadata
+    if payload["order_count"] <= 0:
+        return ctx.fail(message="orders export is empty")
+    if "target_uri" not in metadata:
+        return ctx.warn(message="orders export target URI is missing")
+    return ctx.pass_(
+        message="orders export is ready",
+        metadata={"order_count": payload["order_count"]},
+    )

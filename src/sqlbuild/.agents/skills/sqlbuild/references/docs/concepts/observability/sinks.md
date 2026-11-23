@@ -21,7 +21,7 @@ even when they share a provider and destination.
 ```python
 # sinks/publish.py
 from providers.destination_client import DestinationClient
-from sqlbuild.sinks import (
+from sqlbuild.event_sinks import (
     LifecycleEvent,
     LifecycleEventKind,
     lifecycle_event_sink,
@@ -51,9 +51,9 @@ compacted when complete lifecycle history must remain replayable.
 ## Command-output sink
 
 ```python
-from sqlbuild.sinks import CommandOutputRecord, command_output_sink, command_output_to_json
+from sqlbuild.event_sinks import CommandOutputRecord, command_output_event_sink, command_output_to_json
 
-@command_output_sink(streams={"stdout", "stderr"})
+@command_output_event_sink(streams={"stdout", "stderr"})
 def publish_output(record: CommandOutputRecord, destination_client: DestinationClient) -> None:
     destination_client.publish(
         route="sqlbuild.command_output.v1",

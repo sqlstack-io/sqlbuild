@@ -9,8 +9,8 @@ use crate::artifacts::tests::helpers::{
 use crate::artifacts::tests::test_types::{StampedTreeTestCase, WalkRaceTestCase};
 
 const MANAGED: [&str; 3] = [
-    "models/orders.sql",
-    "models/marts/customers.sql",
+    "sql/models/orders.sql",
+    "sql/models/marts/customers.sql",
     "tests/t.sql",
 ];
 
@@ -26,8 +26,8 @@ fn given_stamped_tree_when_cleaning_again_then_only_changed_trees_are_walked() {
             expected_stamped: true,
             expected_removed: 0,
             expected_files: &[
-                "models/marts/customers.sql",
-                "models/orders.sql",
+                "sql/models/marts/customers.sql",
+                "sql/models/orders.sql",
                 "tests/t.sql",
             ],
         },
@@ -40,8 +40,8 @@ fn given_stamped_tree_when_cleaning_again_then_only_changed_trees_are_walked() {
             expected_stamped: true,
             expected_removed: 1,
             expected_files: &[
-                "models/marts/customers.sql",
-                "models/orders.sql",
+                "sql/models/marts/customers.sql",
+                "sql/models/orders.sql",
                 "tests/t.sql",
             ],
         },
@@ -54,20 +54,20 @@ fn given_stamped_tree_when_cleaning_again_then_only_changed_trees_are_walked() {
             expected_stamped: true,
             expected_removed: 1,
             expected_files: &[
-                "models/marts/customers.sql",
-                "models/orders.sql",
+                "sql/models/marts/customers.sql",
+                "sql/models/orders.sql",
                 "tests/t.sql",
             ],
         },
         StampedTreeTestCase {
             description: "a managed file no longer managed",
             change: |_| {},
-            managed_after: &["models/orders.sql", "models/marts/customers.sql"],
+            managed_after: &["sql/models/orders.sql", "sql/models/marts/customers.sql"],
             racy_window_ns: 0,
             layout: plain_compiled_root,
             expected_stamped: true,
             expected_removed: 1,
-            expected_files: &["models/marts/customers.sql", "models/orders.sql"],
+            expected_files: &["sql/models/marts/customers.sql", "sql/models/orders.sql"],
         },
         StampedTreeTestCase {
             description: "the stamp file damaged",
@@ -81,8 +81,8 @@ fn given_stamped_tree_when_cleaning_again_then_only_changed_trees_are_walked() {
             expected_stamped: true,
             expected_removed: 1,
             expected_files: &[
-                "models/marts/customers.sql",
-                "models/orders.sql",
+                "sql/models/marts/customers.sql",
+                "sql/models/orders.sql",
                 "tests/t.sql",
             ],
         },
@@ -95,8 +95,8 @@ fn given_stamped_tree_when_cleaning_again_then_only_changed_trees_are_walked() {
             expected_stamped: false,
             expected_removed: 1,
             expected_files: &[
-                "models/marts/customers.sql",
-                "models/orders.sql",
+                "sql/models/marts/customers.sql",
+                "sql/models/orders.sql",
                 "tests/t.sql",
             ],
         },
@@ -109,8 +109,8 @@ fn given_stamped_tree_when_cleaning_again_then_only_changed_trees_are_walked() {
             expected_stamped: false,
             expected_removed: 1,
             expected_files: &[
-                "models/marts/customers.sql",
-                "models/orders.sql",
+                "sql/models/marts/customers.sql",
+                "sql/models/orders.sql",
                 "tests/t.sql",
             ],
         },
@@ -124,7 +124,7 @@ fn given_stamped_tree_when_cleaning_again_then_only_changed_trees_are_walked() {
         for path in MANAGED {
             place(&compiled.join(path), b"select 1\n");
         }
-        place(&compiled.join("models/stale.sql"), b"select 0\n");
+        place(&compiled.join("sql/models/stale.sql"), b"select 0\n");
         let first: HashSet<PathBuf> = MANAGED.iter().map(|path| compiled.join(path)).collect();
         let removed =
             remove_stale_unless_unchanged(&compiled, &first, &stamp, test_case.racy_window_ns)
@@ -173,7 +173,7 @@ fn given_folder_changed_during_the_walk_when_recording_then_no_stamp_is_kept() {
     let test_cases = [
         WalkRaceTestCase {
             description: "folder changed after the walk started",
-            change_during_walk: |compiled| place(&compiled.join("models/stray.sql"), b"select 0\n"),
+            change_during_walk: |compiled| place(&compiled.join("sql/models/stray.sql"), b"select 0\n"),
             expected_stamped: false,
         },
         WalkRaceTestCase {
@@ -187,11 +187,11 @@ fn given_folder_changed_during_the_walk_when_recording_then_no_stamp_is_kept() {
         let folder = tempfile::tempdir().expect("target folder");
         let compiled: PathBuf = folder.path().join("compiled");
         let stamp: PathBuf = folder.path().join("cache/compiled-tree.bin");
-        place(&compiled.join("models/orders.sql"), b"select 1\n");
-        let managed: HashSet<PathBuf> = [compiled.join("models/orders.sql")].into_iter().collect();
+        place(&compiled.join("sql/models/orders.sql"), b"select 1\n");
+        let managed: HashSet<PathBuf> = [compiled.join("sql/models/orders.sql")].into_iter().collect();
         std::thread::sleep(std::time::Duration::from_millis(30));
         let since_ns: i64 = now_ns();
-        let folders: Vec<PathBuf> = vec![compiled.clone(), compiled.join("models")];
+        let folders: Vec<PathBuf> = vec![compiled.clone(), compiled.join("sql/models")];
         std::thread::sleep(std::time::Duration::from_millis(30));
         (test_case.change_during_walk)(&compiled);
 

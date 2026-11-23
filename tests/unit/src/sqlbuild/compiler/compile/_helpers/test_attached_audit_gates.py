@@ -44,42 +44,42 @@ _ALLOWED_SEED: str = "seeds:\n  - name: allowed_codes\n    description: Test see
         AttachedAuditGateTestCase(
             "model audit reading a sibling model makes the model wait for it",
             {
-                "audits/generic/code_check.sql": gate_audit(read='__ref("allowed")'),
-                "models/allowed.sql": gate_model(sql="SELECT 'A' AS code"),
-                "models/orders.sql": gate_model(sql="SELECT 'A' AS code", header=_AUDITED_HEADER),
+                "sql/audits/generic/code_check.sql": gate_audit(read='__ref("allowed")'),
+                "sql/models/allowed.sql": gate_model(sql="SELECT 'A' AS code"),
+                "sql/models/orders.sql": gate_model(sql="SELECT 'A' AS code", header=_AUDITED_HEADER),
             },
             (("orders", "allowed"),),
         ),
         AttachedAuditGateTestCase(
             "source audit reading an unrelated model makes the source's dependants wait",
             {
-                "audits/generic/code_check.sql": gate_audit(read='__ref("allowed")'),
-                "sources/raw.yml": _SOURCES_WITH_AUDIT,
-                "models/allowed.sql": gate_model(sql="SELECT 'A' AS code"),
-                "models/staged_orders.sql": gate_model(sql='SELECT * FROM __source("raw_orders")'),
-                "models/other_orders.sql": gate_model(sql='SELECT * FROM __source("raw_orders")'),
+                "sql/audits/generic/code_check.sql": gate_audit(read='__ref("allowed")'),
+                "sql/sources/raw.yml": _SOURCES_WITH_AUDIT,
+                "sql/models/allowed.sql": gate_model(sql="SELECT 'A' AS code"),
+                "sql/models/staged_orders.sql": gate_model(sql='SELECT * FROM __source("raw_orders")'),
+                "sql/models/other_orders.sql": gate_model(sql='SELECT * FROM __source("raw_orders")'),
             },
             (("other_orders", "allowed"), ("staged_orders", "allowed")),
         ),
         AttachedAuditGateTestCase(
             "seed audit reading another seed makes the seed wait for it",
             {
-                "audits/generic/code_check.sql": gate_audit(read='__seed("allowed_codes")'),
-                "seeds/order_codes.yml": _SEED_WITH_AUDIT,
-                "seeds/order_codes.csv": "code\nA\n",
-                "seeds/allowed_codes.yml": _ALLOWED_SEED,
-                "seeds/allowed_codes.csv": "code\nA\n",
+                "sql/audits/generic/code_check.sql": gate_audit(read='__seed("allowed_codes")'),
+                "sql/seeds/order_codes.yml": _SEED_WITH_AUDIT,
+                "sql/seeds/order_codes.csv": "code\nA\n",
+                "sql/seeds/allowed_codes.yml": _ALLOWED_SEED,
+                "sql/seeds/allowed_codes.csv": "code\nA\n",
             },
             (("order_codes", "allowed_codes"),),
         ),
         AttachedAuditGateTestCase(
             "source audit triggered by another audit's read gates that triggering model",
             {
-                "audits/generic/code_check.sql": gate_audit(read='__ref("valid_codes")'),
-                "audits/generic/order_check.sql": gate_audit(read='__source("raw_orders")'),
-                "sources/raw.yml": _SOURCES_WITH_AUDIT,
-                "models/valid_codes.sql": gate_model(sql="SELECT 'A' AS code"),
-                "models/orders.sql": gate_model(
+                "sql/audits/generic/code_check.sql": gate_audit(read='__ref("valid_codes")'),
+                "sql/audits/generic/order_check.sql": gate_audit(read='__source("raw_orders")'),
+                "sql/sources/raw.yml": _SOURCES_WITH_AUDIT,
+                "sql/models/valid_codes.sql": gate_model(sql="SELECT 'A' AS code"),
+                "sql/models/orders.sql": gate_model(
                     sql="SELECT 'A' AS code", header=_ORDER_CHECK_HEADER
                 ),
             },
@@ -106,9 +106,9 @@ def test_given_attached_audit_reading_another_resource_when_compiling_then_it_ad
         AttachedAuditGateCycleTestCase(
             "model audit reading a model built from its target",
             {
-                "audits/generic/code_check.sql": gate_audit(read='__ref("orders_mart")'),
-                "models/orders.sql": gate_model(sql="SELECT 'A' AS code", header=_AUDITED_HEADER),
-                "models/orders_mart.sql": gate_model(sql='SELECT * FROM __ref("orders")'),
+                "sql/audits/generic/code_check.sql": gate_audit(read='__ref("orders_mart")'),
+                "sql/models/orders.sql": gate_model(sql="SELECT 'A' AS code", header=_AUDITED_HEADER),
+                "sql/models/orders_mart.sql": gate_model(sql='SELECT * FROM __ref("orders")'),
             },
             (
                 "[P005]",
@@ -119,9 +119,9 @@ def test_given_attached_audit_reading_another_resource_when_compiling_then_it_ad
         AttachedAuditGateCycleTestCase(
             "source audit reading a model built from the source",
             {
-                "audits/generic/code_check.sql": gate_audit(read='__ref("staged_orders")'),
-                "sources/raw.yml": _SOURCES_WITH_AUDIT,
-                "models/staged_orders.sql": gate_model(sql='SELECT * FROM __source("raw_orders")'),
+                "sql/audits/generic/code_check.sql": gate_audit(read='__ref("staged_orders")'),
+                "sql/sources/raw.yml": _SOURCES_WITH_AUDIT,
+                "sql/models/staged_orders.sql": gate_model(sql='SELECT * FROM __source("raw_orders")'),
             },
             (
                 "[P005]",
@@ -132,10 +132,10 @@ def test_given_attached_audit_reading_another_resource_when_compiling_then_it_ad
         AttachedAuditGateCycleTestCase(
             "seed audit reading a model built from the seed",
             {
-                "audits/generic/code_check.sql": gate_audit(read='__ref("coded_orders")'),
-                "seeds/order_codes.yml": _SEED_WITH_AUDIT,
-                "seeds/order_codes.csv": "code\nA\n",
-                "models/coded_orders.sql": gate_model(sql='SELECT * FROM __seed("order_codes")'),
+                "sql/audits/generic/code_check.sql": gate_audit(read='__ref("coded_orders")'),
+                "sql/seeds/order_codes.yml": _SEED_WITH_AUDIT,
+                "sql/seeds/order_codes.csv": "code\nA\n",
+                "sql/models/coded_orders.sql": gate_model(sql='SELECT * FROM __seed("order_codes")'),
             },
             (
                 "[P005]",
@@ -146,10 +146,10 @@ def test_given_attached_audit_reading_another_resource_when_compiling_then_it_ad
         AttachedAuditGateCycleTestCase(
             "two model audits that each read the other's target",
             {
-                "audits/generic/code_check.sql": gate_audit(read='__ref("customers")'),
-                "audits/generic/order_check.sql": gate_audit(read='__ref("orders")'),
-                "models/orders.sql": gate_model(sql="SELECT 'A' AS code", header=_AUDITED_HEADER),
-                "models/customers.sql": gate_model(
+                "sql/audits/generic/code_check.sql": gate_audit(read='__ref("customers")'),
+                "sql/audits/generic/order_check.sql": gate_audit(read='__ref("orders")'),
+                "sql/models/orders.sql": gate_model(sql="SELECT 'A' AS code", header=_AUDITED_HEADER),
+                "sql/models/customers.sql": gate_model(
                     sql="SELECT 'A' AS code", header=_ORDER_CHECK_HEADER
                 ),
             },
@@ -158,13 +158,13 @@ def test_given_attached_audit_reading_another_resource_when_compiling_then_it_ad
         AttachedAuditGateCycleTestCase(
             "source audit triggered by an audit read that reads its triggering model's dependant",
             {
-                "audits/generic/code_check.sql": gate_audit(read='__ref("order_summary")'),
-                "audits/generic/order_check.sql": gate_audit(read='__source("raw_orders")'),
-                "sources/raw.yml": _SOURCES_WITH_AUDIT,
-                "models/orders.sql": gate_model(
+                "sql/audits/generic/code_check.sql": gate_audit(read='__ref("order_summary")'),
+                "sql/audits/generic/order_check.sql": gate_audit(read='__source("raw_orders")'),
+                "sql/sources/raw.yml": _SOURCES_WITH_AUDIT,
+                "sql/models/orders.sql": gate_model(
                     sql="SELECT 'A' AS code", header=_ORDER_CHECK_HEADER
                 ),
-                "models/order_summary.sql": gate_model(sql='SELECT * FROM __ref("orders")'),
+                "sql/models/order_summary.sql": gate_model(sql='SELECT * FROM __ref("orders")'),
             },
             (
                 "[P005]",

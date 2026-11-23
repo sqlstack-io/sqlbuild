@@ -99,7 +99,7 @@ def test_given_formatted_project_when_checking_warm_edited_and_damaged_then_resu
     cold: subprocess.CompletedProcess[str] = run_sqb(project_dir=project_dir, command=check)
     stored: bytes = store.read_bytes()
     warm: subprocess.CompletedProcess[str] = run_sqb(project_dir=project_dir, command=check)
-    _ = (project_dir / "models" / test_case.edited_model).write_text(
+    _ = (project_dir / "sql" / "models" / test_case.edited_model).write_text(
         FORMAT_CACHE_UNFORMATTED_ORDERS, encoding="utf-8"
     )
     edited: subprocess.CompletedProcess[str] = run_sqb(project_dir=project_dir, command=check)

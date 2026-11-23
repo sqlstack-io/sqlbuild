@@ -1,4 +1,4 @@
-"""E2E coverage for declaration layout Rules over a macro folder's python/ and sql/ kind folders."""
+"""E2E coverage for declaration layout Rules over a macro folder's python/nodes/ and sql/ kind folders."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ _LAYOUT_RULES: dict[str, str] = with_rules("SQBRDECLARATION304", "SQBRDECLARATIO
             expected_returncode=1,
             expected_fragments=(
                 "error[SQBRDECLARATION304]",
-                'declaration container "macros/sql/normalise" has 11 files',
+                'declaration container "sql/macros/sql/normalise" has 11 files',
             ),
         ),
         SqlMacroCommandTestCase(
@@ -60,7 +60,7 @@ _LAYOUT_RULES: dict[str, str] = with_rules("SQBRDECLARATION304", "SQBRDECLARATIO
             expected_fragments=(
                 "error[SQBRDECLARATION306]",
                 "2 sibling SQL macro files",
-                "Move these files into macros/sql/text/name/",
+                "Move these files into sql/macros/sql/text/name/",
                 "each macro keeps its name",
             ),
         ),

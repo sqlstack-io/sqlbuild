@@ -93,7 +93,7 @@ def test_given_authored_function_spelling_when_formatting_then_only_layout_chang
     (tmp_path / "sqlbuild_project.toml").write_text(
         f'name = "orders"\nadapter = "{test_case.adapter}"\n'
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(
         'MODEL (description "Order flags");\n'
@@ -121,7 +121,7 @@ def test_given_commented_lateral_alias_when_formatting_then_canonical_sql_is_wri
 ) -> None:
     """A comment plus generated AS used to decline the entire larger query silently."""
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "snowflake"\n')
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     columns: str = ", ".join(f"parsed.order_attribute_{index}" for index in range(47))
     model.write_text(
@@ -176,7 +176,7 @@ def test_given_typed_null_input_when_fixture_formatting_then_canonical_empty_fix
         '\n[connection]\ndatabase = "orders.duckdb"\n',
         encoding="utf-8",
     )
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "stg_orders.sql").write_text(
         "MODEL (\n"
@@ -239,7 +239,7 @@ def test_given_sql_test_string_when_formatting_then_project_still_compiles(
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(
         'MODEL (description "Orders");\nSELECT order_id, order_label FROM __ref("stg_orders")\n',
@@ -286,7 +286,7 @@ def test_given_table_function_argument_when_formatting_then_intrinsic_restores_a
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    function: Path = tmp_path / "functions" / "sql" / "expand_order.sql"
+    function: Path = tmp_path / "sql" / "functions" / "sql" / "expand_order.sql"
     function.parent.mkdir(parents=True)
     function.write_text(
         """FUNCTION (
@@ -299,7 +299,7 @@ SELECT order_id
 """,
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "expanded_orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "expanded_orders.sql"
     model.parent.mkdir()
     model.write_text(
         'MODEL (description "Expanded orders");\nselect expanded.order_id from orders as '
@@ -333,7 +333,7 @@ def test_given_explicit_null_ordering_when_formatting_then_clause_is_preserved(
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(
         'MODEL (description "Orders");\n'
@@ -371,7 +371,7 @@ def test_given_exact_contract_casts_when_formatting_then_rule_still_passes(
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRCONTRACT105"]\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(
         "MODEL (\n"
@@ -435,7 +435,7 @@ def test_given_description_width_when_formatting_then_wrapped_model_compiles(
         f'name = "orders"\nadapter = "duckdb"\n[format]\nline_width = {test_case.line_width}\n',
         encoding="utf-8",
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(
         f'MODEL (\n  description "{test_case.authored_description}"\n);\nSELECT 1 AS order_id\n',
@@ -474,7 +474,7 @@ def test_given_trailing_comments_when_formatting_twice_then_second_run_changes_n
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     header: str = 'MODEL (description "Orders placed by customers.");\n\n'
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(header + test_case.body, encoding="utf-8")
 
@@ -505,7 +505,7 @@ def test_given_schema_column_when_formatting_then_header_remains_valid_and_idemp
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "catalog"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "catalog_objects.sql"
+    model: Path = tmp_path / "sql" / "models" / "catalog_objects.sql"
     model.parent.mkdir()
     model.write_text(
         "MODEL (\n"
@@ -552,7 +552,7 @@ def test_given_unparseable_file_when_formatting_then_file_is_untouched_and_fault
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(test_case.authored_sql, encoding="utf-8")
 
@@ -596,7 +596,7 @@ def test_given_native_formatter_decline_when_formatting_then_whole_file_is_uncha
     (tmp_path / "sqlbuild_project.toml").write_text(
         f'name = "orders"\nadapter = "{test_case.adapter}"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(
         "MODEL (\n"
@@ -650,7 +650,7 @@ def test_given_inline_typed_null_fixture_when_formatting_then_one_pass_is_idempo
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "customers"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "customers.sql"
+    model: Path = tmp_path / "sql" / "models" / "customers.sql"
     model.parent.mkdir()
     model.write_text(
         "MODEL (\n"
@@ -709,7 +709,7 @@ def test_given_redundant_typed_null_after_multi_projection_when_formatting_then_
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "customer_segments"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "customer_clusters.sql"
+    model: Path = tmp_path / "sql" / "models" / "customer_clusters.sql"
     model.parent.mkdir()
     model.write_text(
         "MODEL (\n"
@@ -876,7 +876,7 @@ def test_given_format_selectors_when_scoping_then_paths_and_default_exclusions_a
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "customers.sql").write_text(
         'MODEL (description "Customers.", materialized table, '
@@ -959,7 +959,7 @@ def test_given_missing_description_when_formatting_then_check_and_write_fault(
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(test_case.authored_sql, encoding="utf-8")
 
@@ -990,51 +990,51 @@ def test_given_missing_description_when_formatting_then_check_and_write_fault(
     [
         FormatPathArgumentsIntegrationTestCase(
             description="positional file formats only that file",
-            arguments=("models/marts/orders.sql",),
+            arguments=("sql/models/marts/orders.sql",),
             expected_exit_code=0,
-            expected_formatted=("models/marts/orders.sql",),
-            expected_unchanged=("models/staging/stg_orders.sql",),
+            expected_formatted=("sql/models/marts/orders.sql",),
+            expected_unchanged=("sql/models/staging/stg_orders.sql",),
             expected_output_fragment="1 files",
         ),
         FormatPathArgumentsIntegrationTestCase(
             description="bare file path in select formats only that file",
-            arguments=("--select", "models/staging/stg_orders.sql"),
+            arguments=("--select", "sql/models/staging/stg_orders.sql"),
             expected_exit_code=0,
-            expected_formatted=("models/staging/stg_orders.sql",),
-            expected_unchanged=("models/marts/orders.sql",),
+            expected_formatted=("sql/models/staging/stg_orders.sql",),
+            expected_unchanged=("sql/models/marts/orders.sql",),
             expected_output_fragment="1 files",
         ),
         FormatPathArgumentsIntegrationTestCase(
             description="positional folder formats every file below it",
             arguments=("models",),
             expected_exit_code=0,
-            expected_formatted=("models/marts/orders.sql", "models/staging/stg_orders.sql"),
+            expected_formatted=("sql/models/marts/orders.sql", "sql/models/staging/stg_orders.sql"),
             expected_unchanged=(),
             expected_output_fragment="2 files",
         ),
         FormatPathArgumentsIntegrationTestCase(
             description="missing positional path is a clear error",
-            arguments=("models/marts/missing.sql",),
+            arguments=("sql/models/marts/missing.sql",),
             expected_exit_code=1,
             expected_formatted=(),
-            expected_unchanged=("models/marts/orders.sql", "models/staging/stg_orders.sql"),
-            expected_output_fragment="format path 'models/marts/missing.sql' does not exist",
+            expected_unchanged=("sql/models/marts/orders.sql", "sql/models/staging/stg_orders.sql"),
+            expected_output_fragment="format path 'sql/models/marts/missing.sql' does not exist",
         ),
         FormatPathArgumentsIntegrationTestCase(
             description="path outside formatted folders lists the valid roots",
             arguments=("sqlbuild_project.toml",),
             expected_exit_code=1,
             expected_formatted=(),
-            expected_unchanged=("models/marts/orders.sql", "models/staging/stg_orders.sql"),
-            expected_output_fragment="use a path under models/, tests/",
+            expected_unchanged=("sql/models/marts/orders.sql", "sql/models/staging/stg_orders.sql"),
+            expected_output_fragment="use a path under sql/models/, tests/",
         ),
         FormatPathArgumentsIntegrationTestCase(
             description="unknown path selector root lists the formatter roots",
             arguments=("--select", "path:seeds"),
             expected_exit_code=1,
             expected_formatted=(),
-            expected_unchanged=("models/marts/orders.sql", "models/staging/stg_orders.sql"),
-            expected_output_fragment="'functions/'",
+            expected_unchanged=("sql/models/marts/orders.sql", "sql/models/staging/stg_orders.sql"),
+            expected_output_fragment="'sql/functions/'",
         ),
     ],
     ids=lambda case: case.description,
@@ -1048,7 +1048,7 @@ def test_given_file_paths_when_formatting_then_only_named_files_change(
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    for relative_path in ("models/marts/orders.sql", "models/staging/stg_orders.sql"):
+    for relative_path in ("sql/models/marts/orders.sql", "sql/models/staging/stg_orders.sql"):
         (tmp_path / relative_path).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / relative_path).write_text(_UNFORMATTED_ORDERS_SQL, encoding="utf-8")
     monkeypatch.chdir(tmp_path)
@@ -1093,7 +1093,7 @@ def test_given_leading_cte_comment_when_formatting_then_comment_rule_still_passe
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN033"]\n',
         encoding="utf-8",
     )
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "raw_orders.sql").write_text(
         'MODEL (description "Test model raw_orders.", materialized view);\n\nSELECT 1 AS order_id, 2 AS customer_id\n',
@@ -1138,14 +1138,14 @@ def test_given_backtick_identifier_apostrophe_when_formatting_then_macro_call_st
     (tmp_path / "sqlbuild_project.toml").write_text(
         f'name = "orders"\nadapter = "{test_case.adapter}"\n', encoding="utf-8"
     )
-    macros: Path = tmp_path / "models" / "_macros" / "python"
+    macros: Path = tmp_path / "sql" / "models" / "_macros" / "python"
     macros.mkdir(parents=True)
     (macros / "labels.py").write_text(
         'def label(expression: str) -> str:\n    """Return one column expression."""\n'
         "    return expression\n",
         encoding="utf-8",
     )
-    model_path: Path = tmp_path / "models" / "orders.sql"
+    model_path: Path = tmp_path / "sql" / "models" / "orders.sql"
     model_path.write_text(
         'MODEL (description "Orders", database warehouse, schema analytics);\n\n'
         'select   `customer\'s id` as customer_id, @py.label("order_id") as order_id '
@@ -1191,7 +1191,7 @@ def test_given_dollar_quoted_apostrophe_when_formatting_then_reference_survives_
         '[targets.prod]\nconnection = "local"\nschema = "prod"\n',
         encoding="utf-8",
     )
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "orders.sql").write_text(
         'MODEL (description "Orders", materialized table);\n\nSELECT 1 AS order_id\n',
@@ -1239,7 +1239,7 @@ def test_given_select_all_and_implicit_aliases_when_formatting_then_only_layout_
     (tmp_path / "sqlbuild_project.toml").write_text(
         f'name = "orders"\nadapter = "{test_case.adapter}"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     authored: str = " ".join(test_case.expected_body.lower().split())
     model.write_text(f'MODEL (description "Orders");\n\n{authored}\n', encoding="utf-8")
@@ -1354,7 +1354,7 @@ def test_given_project_line_width_when_formatting_then_long_lines_wrap_and_proje
         '[targets.prod]\nconnection = "local"\nschema = "prod"\n',
         encoding="utf-8",
     )
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "orders_with_a_long_name.sql").write_text(
         'MODEL (description "Orders", materialized table);\n\n'

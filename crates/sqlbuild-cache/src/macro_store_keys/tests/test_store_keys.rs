@@ -13,7 +13,7 @@ fn given_macro_identity_when_keying_then_matches_python_key_text() {
             description: "name, path, identity and source digest as compact JSON",
             value: array(vec![text("tuple"), array(vec![text("a")])]),
             expected_key: Some(
-                "[\"cents\",\"macros/money.py\",[\"tuple\",[\"a\"]],\"09b7bf2b19ceac419ff40c8cbe965d0c135424c443d286890f788ec6efb5f92d\"]",
+                "[\"cents\",\"sql/macros/money.py\",[\"tuple\",[\"a\"]],\"09b7bf2b19ceac419ff40c8cbe965d0c135424c443d286890f788ec6efb5f92d\"]",
             ),
         },
         StoreKeyTestCase {
@@ -25,7 +25,7 @@ fn given_macro_identity_when_keying_then_matches_python_key_text() {
 
     for test_case in test_cases {
         let key = macro_store_token(
-            (text("cents"), text("macros/money.py")),
+            (text("cents"), text("sql/macros/money.py")),
             test_case.value,
             "SELECT 1",
         )

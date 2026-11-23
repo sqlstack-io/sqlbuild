@@ -287,7 +287,7 @@ def build_seed_plan_entry(*, name: str) -> SeedPlanEntry:
             name=name,
             qualified_name=name,
         ),
-        file_path=Path(f"seeds/{name}.csv"),
+        file_path=Path(f"sql/seeds/{name}.csv"),
         columns=(),
         csv_settings=DEFAULT_SEED_CSV_SETTINGS,
     )
@@ -400,7 +400,7 @@ def order_status_function_test_plan(*, body_sql: str, test_count: int) -> PlanOu
             FunctionPlanEntry(
                 key=function_key,
                 name="is_completed_order",
-                relative_path=Path("functions/sql/is_completed_order.sql"),
+                relative_path=Path("sql/functions/sql/is_completed_order.sql"),
                 destination=destination,
                 arguments=(FunctionArgument(name="order_status", type="VARCHAR"),),
                 returns="BOOLEAN",
@@ -435,7 +435,7 @@ def order_status_callee_test_plan(*, callee_body_sql: str, test_count: int) -> P
             FunctionPlanEntry(
                 key=callee_key,
                 name="status_matches",
-                relative_path=Path("functions/sql/status_matches.sql"),
+                relative_path=Path("sql/functions/sql/status_matches.sql"),
                 destination=callee_destination,
                 arguments=(FunctionArgument(name="order_status", type="VARCHAR"),),
                 returns="BOOLEAN",

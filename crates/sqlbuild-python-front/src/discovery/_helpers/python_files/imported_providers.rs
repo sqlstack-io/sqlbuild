@@ -314,7 +314,7 @@ pub(crate) fn discover_event_exporter_declarations<'py>(
     let mut declarations: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut seen: Vec<(String, Bound<'py, PyAny>)> = Vec::new();
     for file_path in project.module_files(EVENT_SINKS_PATH, true)? {
-        let module: Bound<'py, PyAny> = project.load(UserCodeHost::LoadSinkModule, &file_path)?;
+        let module: Bound<'py, PyAny> = project.load(UserCodeHost::LoadEventSinkModule, &file_path)?;
         let mut seen_functions: HashSet<usize> = HashSet::new();
         for function in module_functions(&module)? {
             if !seen_functions.insert(function.as_ptr() as usize) {

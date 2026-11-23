@@ -91,7 +91,7 @@ def raw_orders(ctx):
 
 _BUILD_RUN_AUTO_LOAD_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _PROJECT_FILE,
-    "sources/raw.yml": """
+    "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -104,7 +104,7 @@ sources:
         type: VARCHAR
 """.strip()
     + "\n",
-    "python/loaders/raw_orders.py": """
+    "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -112,7 +112,7 @@ def raw_orders(ctx):
     '''Test loader raw_orders.'''
     return [{"order_id": 7, "status": "loaded"}]
 """,
-    "models/stg_orders.sql": (
+    "sql/models/stg_orders.sql": (
         'MODEL (description "Test model stg_orders.", materialized table);\n\nSELECT order_id, status FROM __source("raw_orders")'
     ),
 }
@@ -142,11 +142,11 @@ defer_sources_to = "prod"
 schema = "prod"
 """.strip()
     + "\n",
-    "sources/raw.yml": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["sources/raw.yml"],
-    "python/loaders/raw_orders.py": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES[
-        "python/loaders/raw_orders.py"
+    "sql/sources/raw.yml": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["sql/sources/raw.yml"],
+    "python/nodes/loaders/raw_orders.py": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES[
+        "python/nodes/loaders/raw_orders.py"
     ],
-    "models/stg_orders.sql": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["models/stg_orders.sql"],
+    "sql/models/stg_orders.sql": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["sql/models/stg_orders.sql"],
 }
 
 _SOURCE_DEFERRAL_MISSING_PROJECT_FILES: dict[str, str] = {
@@ -227,7 +227,7 @@ database = "demo.duckdb"
 schema = "dev"
 """.strip()
     + "\n",
-    "sources/raw.yml": """
+    "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -238,12 +238,12 @@ sources:
         type: VARCHAR
 """.strip()
     + "\n",
-    "models/stg_orders.sql": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["models/stg_orders.sql"],
+    "sql/models/stg_orders.sql": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["sql/models/stg_orders.sql"],
 }
 
 _SOURCE_DEFERRAL_UNSELECTED_MANAGED_PROJECT_FILES: dict[str, str] = {
     **_SOURCE_DEFERRAL_MISSING_PROJECT_FILES,
-    "models/fact_orders.sql": (
+    "sql/models/fact_orders.sql": (
         'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT order_id, status FROM __ref("stg_orders")'
     ),
 }
@@ -273,7 +273,7 @@ schema = "prod"
 
 _SOURCE_DEFERRAL_LOADER_DAG_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _SOURCE_DEFERRAL_PROJECT_FILES["sqlbuild_project.toml"],
-    "sources/raw.yml": """
+    "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -286,7 +286,7 @@ sources:
         type: VARCHAR
 """.strip()
     + "\n",
-    "python/loaders/raw_orders.py": """
+    "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader(
@@ -308,7 +308,7 @@ def raw_orders(ctx):
     ).fetchall()
     return [{"order_id": row[0], "status": "loaded-" + row[1]} for row in rows]
 """,
-    "models/stg_orders.sql": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["models/stg_orders.sql"],
+    "sql/models/stg_orders.sql": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["sql/models/stg_orders.sql"],
 }
 
 _SOURCE_DEFERRAL_EXPLICIT_SCHEMA_PROJECT_FILES: dict[str, str] = {
@@ -325,7 +325,7 @@ schema = "dev"
 loader_schema = "raw_dev"
 """.strip()
     + "\n",
-    "sources/raw.yml": """
+    "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -340,10 +340,10 @@ sources:
         type: VARCHAR
 """.strip()
     + "\n",
-    "python/loaders/raw_orders.py": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES[
-        "python/loaders/raw_orders.py"
+    "python/nodes/loaders/raw_orders.py": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES[
+        "python/nodes/loaders/raw_orders.py"
     ],
-    "models/stg_orders.sql": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["models/stg_orders.sql"],
+    "sql/models/stg_orders.sql": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["sql/models/stg_orders.sql"],
 }
 
 _SOURCE_LOADER_COLLISION_PROJECT_FILES: dict[str, str] = {
@@ -369,7 +369,7 @@ loader_schema = "shared_raw"
 
 _SOURCE_DEFERRAL_EXPRESSION_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _SOURCE_DEFERRAL_PROJECT_FILES["sqlbuild_project.toml"],
-    "sources/raw.yml": """
+    "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -384,15 +384,15 @@ sources:
         type: VARCHAR
 """.strip()
     + "\n",
-    "python/loaders/raw_orders.py": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES[
-        "python/loaders/raw_orders.py"
+    "python/nodes/loaders/raw_orders.py": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES[
+        "python/nodes/loaders/raw_orders.py"
     ],
-    "models/stg_orders.sql": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["models/stg_orders.sql"],
+    "sql/models/stg_orders.sql": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["sql/models/stg_orders.sql"],
 }
 
 _SOURCE_DEFERRAL_SQL_FUNCTION_PROJECT_FILES: dict[str, str] = {
     **_SOURCE_DEFERRAL_PROJECT_FILES,
-    "functions/sql/order_statuses.sql": """
+    "sql/functions/sql/order_statuses.sql": """
 FUNCTION (description "Test function order_statuses.",
   returns table (
     order_id INTEGER,
@@ -430,7 +430,7 @@ schema = "${source_prefix}_raw"
 
 _SOURCE_DEFERRAL_AUDIT_PROJECT_FILES: dict[str, str] = {
     **_SOURCE_DEFERRAL_PROJECT_FILES,
-    "sources/raw.yml": """
+    "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -444,7 +444,7 @@ sources:
         type: VARCHAR
 """.strip()
     + "\n",
-    "audits/generic/source_status.sql": """
+    "sql/audits/generic/source_status.sql": """
 AUDIT ();
 
 SELECT order_id FROM @relation WHERE status != 'prod-audit'
@@ -454,7 +454,7 @@ SELECT order_id FROM @relation WHERE status != 'prod-audit'
 
 _SOURCE_DEFERRAL_BUILD_WITH_FUNCTION_PROJECT_FILES: dict[str, str] = {
     **_SOURCE_DEFERRAL_PROJECT_FILES,
-    "functions/sql/order_statuses.sql": """
+    "sql/functions/sql/order_statuses.sql": """
 FUNCTION (description "Test function order_statuses.",
   returns table (
     order_id INTEGER,
@@ -503,14 +503,14 @@ SELECT 1
 
 _BUILD_RUN_AUTO_LOAD_SELECTION_PROJECT_FILES: dict[str, str] = {
     **_BUILD_RUN_AUTO_LOAD_PROJECT_FILES,
-    "models/fact_orders.sql": (
+    "sql/models/fact_orders.sql": (
         'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT order_id, status FROM __ref("stg_orders")'
     ),
 }
 
 _BUILD_RUN_AUTO_LOAD_FAILURE_PROJECT_FILES: dict[str, str] = {
     **_BUILD_RUN_AUTO_LOAD_PROJECT_FILES,
-    "python/loaders/raw_orders.py": """
+    "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -522,7 +522,7 @@ def raw_orders(ctx):
 
 _BUILD_RUN_AUTO_LOAD_RELOAD_PROJECT_FILES: dict[str, str] = {
     **_BUILD_RUN_AUTO_LOAD_PROJECT_FILES,
-    "python/loaders/raw_orders.py": """
+    "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -535,7 +535,7 @@ def raw_orders(ctx):
 
 _BUILD_RUN_AUTO_LOAD_TWO_SOURCE_PROJECT_FILES: dict[str, str] = {
     **_BUILD_RUN_AUTO_LOAD_PROJECT_FILES,
-    "sources/raw.yml": """
+    "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -557,7 +557,7 @@ sources:
         type: VARCHAR
 """.strip()
     + "\n",
-    "python/loaders/raw_customers.py": """
+    "python/nodes/loaders/raw_customers.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -565,14 +565,14 @@ def raw_customers(ctx):
     '''Test loader raw_customers.'''
     return [{"customer_id": 10, "name": "Ada"}]
 """,
-    "models/stg_customers.sql": (
+    "sql/models/stg_customers.sql": (
         'MODEL (description "Test model stg_customers.", materialized table);\n\nSELECT customer_id, name FROM __source("raw_customers")'
     ),
 }
 
 _BUILD_RUN_AUTO_LOAD_SELF_MANAGED_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _PROJECT_FILE,
-    "sources/raw.yml": """
+    "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -584,7 +584,7 @@ sources:
         type: VARCHAR
 """.strip()
     + "\n",
-    "python/loaders/raw_orders.py": """
+    "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -595,7 +595,7 @@ def raw_orders(ctx):
         "SELECT 7 AS order_id, 'self-managed' AS status"
     )
 """,
-    "models/stg_orders.sql": (
+    "sql/models/stg_orders.sql": (
         'MODEL (description "Test model stg_orders.", materialized table);\n\nSELECT order_id, status FROM __source("raw_orders")'
     ),
 }
@@ -607,7 +607,7 @@ LOAD_COMMAND_CASE_FIXTURES: list[LoadCommandIntegrationTestCase] = [
             "sqlbuild_project.toml": (
                 'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "demo.duckdb"\n'
             ),
-            "sources/raw.yml": """
+            "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -620,7 +620,7 @@ sources:
         type: VARCHAR
 """.strip()
             + "\n",
-            "python/loaders/raw_orders.py": """
+            "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -659,7 +659,7 @@ def raw_orders(ctx):
             "sqlbuild_project.toml": (
                 'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "demo.duckdb"\n'
             ),
-            "sources/raw.yml": """
+            "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -676,7 +676,7 @@ sources:
     write_strategy: table
 """.strip()
             + "\n",
-            "python/loaders/raw_orders.py": """
+            "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -684,7 +684,7 @@ def raw_orders(ctx):
     '''Test loader raw_orders.'''
     return [{"order_id": 3, "status": "selected"}]
 """,
-            "python/loaders/raw_events.py": """
+            "python/nodes/loaders/raw_events.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -721,7 +721,7 @@ def raw_events(ctx):
                 "[targets.dev.vars]\n"
                 'tier = "dev"\n'
             ),
-            "sources/raw.yml": """
+            "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -734,7 +734,7 @@ sources:
         type: VARCHAR
 """.strip()
             + "\n",
-            "python/loaders/raw_orders.py": """
+            "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -1885,7 +1885,7 @@ def test_given_build_skips_loader_when_manifest_is_written_then_marks_source_aut
                 "sqlbuild_project.toml": (
                     'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "demo.duckdb"\n'
                 ),
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -1898,7 +1898,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw_orders.py": """
+                "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -1937,7 +1937,7 @@ def raw_orders(ctx):
                 "sqlbuild_project.toml": (
                     'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "demo.duckdb"\n'
                 ),
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -1954,7 +1954,7 @@ sources:
     write_strategy: table
 """.strip()
                 + "\n",
-                "python/loaders/raw_orders.py": """
+                "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -1962,7 +1962,7 @@ def raw_orders(ctx):
     '''Test loader raw_orders.'''
     return [{"order_id": 3, "status": "selected"}]
 """,
-                "python/loaders/raw_events.py": """
+                "python/nodes/loaders/raw_events.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -1999,7 +1999,7 @@ def raw_events(ctx):
                     "[targets.dev.vars]\n"
                     'tier = "dev"\n'
                 ),
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -2012,7 +2012,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw_orders.py": """
+                "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2105,7 +2105,7 @@ def test_given_source_loader_when_running_load_then_writes_source_table(
                 "sqlbuild_project.toml": (
                     'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "demo.duckdb"\n'
                 ),
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -2118,7 +2118,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw_orders.py": """
+                "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2157,7 +2157,7 @@ def raw_orders(ctx):
                 "sqlbuild_project.toml": (
                     'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "demo.duckdb"\n'
                 ),
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -2174,7 +2174,7 @@ sources:
     write_strategy: table
 """.strip()
                 + "\n",
-                "python/loaders/raw_orders.py": """
+                "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2182,7 +2182,7 @@ def raw_orders(ctx):
     '''Test loader raw_orders.'''
     return [{"order_id": 3, "status": "selected"}]
 """,
-                "python/loaders/raw_events.py": """
+                "python/nodes/loaders/raw_events.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2219,7 +2219,7 @@ def raw_events(ctx):
                     "[targets.dev.vars]\n"
                     'tier = "dev"\n'
                 ),
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -2232,7 +2232,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw_orders.py": """
+                "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2362,7 +2362,7 @@ WRITE_STRATEGY_CASE_FIXTURES: list[LoadCommandWriteStrategyTestCase] = [
         description="append creates target then appends rows using current cursor value",
         project_files={
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "sources/raw.yml": """
+            "sql/sources/raw.yml": """
 sources:
   - name: raw_append_events
     description: Test source raw_append_events.
@@ -2376,7 +2376,7 @@ sources:
         type: VARCHAR
 """.strip()
             + "\n",
-            "python/loaders/raw.py": """
+            "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2395,7 +2395,7 @@ def raw_append_events(ctx):
         description="merge updates existing rows and inserts new rows using cursor value",
         project_files={
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "sources/raw.yml": """
+            "sql/sources/raw.yml": """
 sources:
   - name: raw_merge_customers
     description: Test source raw_merge_customers.
@@ -2412,7 +2412,7 @@ sources:
         type: INTEGER
 """.strip()
             + "\n",
-            "python/loaders/raw.py": """
+            "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2438,7 +2438,7 @@ def raw_merge_customers(ctx):
         description="merge supports composite unique keys",
         project_files={
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "sources/raw.yml": """
+            "sql/sources/raw.yml": """
 sources:
   - name: raw_merge_composite
     description: Test source raw_merge_composite.
@@ -2457,7 +2457,7 @@ sources:
         type: INTEGER
 """.strip()
             + "\n",
-            "python/loaders/raw.py": """
+            "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2480,7 +2480,7 @@ def raw_merge_composite(ctx):
         description="delete insert replaces loaded cursor range and preserves outside rows",
         project_files={
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "sources/raw.yml": """
+            "sql/sources/raw.yml": """
 sources:
   - name: raw_delete_insert_events
     description: Test source raw_delete_insert_events.
@@ -2494,7 +2494,7 @@ sources:
         type: VARCHAR
 """.strip()
             + "\n",
-            "python/loaders/raw.py": """
+            "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2527,7 +2527,7 @@ def raw_delete_insert_events(ctx):
         description="delete insert supports timestamp cursor ranges",
         project_files={
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "sources/raw.yml": """
+            "sql/sources/raw.yml": """
 sources:
   - name: raw_delete_insert_ts
     description: Test source raw_delete_insert_ts.
@@ -2541,7 +2541,7 @@ sources:
         type: VARCHAR
 """.strip()
             + "\n",
-            "python/loaders/raw.py": """
+            "python/nodes/loaders/raw.py": """
 from datetime import datetime
 
 from sqlbuild.loaders import loader
@@ -2577,7 +2577,7 @@ def raw_delete_insert_ts(ctx):
         description="delete insert empty rerun leaves existing target unchanged",
         project_files={
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "sources/raw.yml": """
+            "sql/sources/raw.yml": """
 sources:
   - name: raw_delete_insert_empty
     description: Test source raw_delete_insert_empty.
@@ -2591,7 +2591,7 @@ sources:
         type: VARCHAR
 """.strip()
             + "\n",
-            "python/loaders/raw.py": """
+            "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2615,7 +2615,7 @@ CURSOR_NONE_CASE_FIXTURES: list[LoadCommandCursorNoneTestCase] = [
         description="current cursor value is none when no cursor column is configured",
         project_files={
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "sources/raw.yml": """
+            "sql/sources/raw.yml": """
 sources:
   - name: raw_no_cursor
     description: Test source raw_no_cursor.
@@ -2628,7 +2628,7 @@ sources:
         type: VARCHAR
 """.strip()
             + "\n",
-            "python/loaders/raw.py": """
+            "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 run_count = 0
@@ -2648,7 +2648,7 @@ def raw_no_cursor(ctx):
         description="current cursor value is none when existing target is empty",
         project_files={
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "sources/raw.yml": """
+            "sql/sources/raw.yml": """
 sources:
   - name: raw_empty_cursor
     description: Test source raw_empty_cursor.
@@ -2662,7 +2662,7 @@ sources:
         type: VARCHAR
 """.strip()
             + "\n",
-            "python/loaders/raw.py": """
+            "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2680,7 +2680,7 @@ def raw_empty_cursor(ctx):
         description="current cursor value is none when target does not exist",
         project_files={
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "sources/raw.yml": """
+            "sql/sources/raw.yml": """
 sources:
   - name: raw_missing_cursor_target
     description: Test source raw_missing_cursor_target.
@@ -2694,7 +2694,7 @@ sources:
         type: VARCHAR
 """.strip()
             + "\n",
-            "python/loaders/raw.py": """
+            "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2713,7 +2713,7 @@ def raw_missing_cursor_target(ctx):
 
 RELOAD_CONTEXT_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _PROJECT_FILE,
-    "sources/raw.yml": """
+    "sql/sources/raw.yml": """
 sources:
   - name: raw_reload_context
     description: Test source raw_reload_context.
@@ -2724,7 +2724,7 @@ sources:
         type: BOOLEAN
 """.strip()
     + "\n",
-    "python/loaders/raw.py": """
+    "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2736,7 +2736,7 @@ def raw_reload_context(ctx):
 
 CURSOR_OVERRIDE_CONTEXT_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _PROJECT_FILE,
-    "sources/raw.yml": """
+    "sql/sources/raw.yml": """
 sources:
   - name: raw_cursor_overrides
     description: Test source raw_cursor_overrides.
@@ -2753,7 +2753,7 @@ sources:
         type: VARCHAR
 """.strip()
     + "\n",
-    "python/loaders/raw.py": """
+    "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2776,7 +2776,7 @@ def raw_cursor_overrides(ctx):
             description="append creates target then appends rows using current cursor value",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_append_events
     description: Test source raw_append_events.
@@ -2790,7 +2790,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2809,7 +2809,7 @@ def raw_append_events(ctx):
             description="merge updates existing rows and inserts new rows using cursor value",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_merge_customers
     description: Test source raw_merge_customers.
@@ -2826,7 +2826,7 @@ sources:
         type: INTEGER
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2852,7 +2852,7 @@ def raw_merge_customers(ctx):
             description="merge supports composite unique keys",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_merge_composite
     description: Test source raw_merge_composite.
@@ -2871,7 +2871,7 @@ sources:
         type: INTEGER
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2894,7 +2894,7 @@ def raw_merge_composite(ctx):
             description="delete insert replaces loaded cursor range and preserves outside rows",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_delete_insert_events
     description: Test source raw_delete_insert_events.
@@ -2908,7 +2908,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -2941,7 +2941,7 @@ def raw_delete_insert_events(ctx):
             description="delete insert supports timestamp cursor ranges",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_delete_insert_ts
     description: Test source raw_delete_insert_ts.
@@ -2955,7 +2955,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from datetime import datetime
 
 from sqlbuild.loaders import loader
@@ -2991,7 +2991,7 @@ def raw_delete_insert_ts(ctx):
             description="delete insert empty rerun leaves existing target unchanged",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_delete_insert_empty
     description: Test source raw_delete_insert_empty.
@@ -3005,7 +3005,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -3298,7 +3298,7 @@ def test_given_source_loader_write_strategy_when_rerunning_then_calls_expected_a
             description="current cursor value is none when no cursor column is configured",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_no_cursor
     description: Test source raw_no_cursor.
@@ -3311,7 +3311,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 run_count = 0
@@ -3331,7 +3331,7 @@ def raw_no_cursor(ctx):
             description="current cursor value is none when existing target is empty",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_empty_cursor
     description: Test source raw_empty_cursor.
@@ -3345,7 +3345,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -3363,7 +3363,7 @@ def raw_empty_cursor(ctx):
             description="current cursor value is none when target does not exist",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_missing_cursor_target
     description: Test source raw_missing_cursor_target.
@@ -3377,7 +3377,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -3584,7 +3584,7 @@ def test_given_cursor_override_flags_when_running_load_then_passes_typed_context
             description="uses bounded concurrent connections and preserves result order",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_a
     description: Test source raw_a.
@@ -3615,7 +3615,7 @@ sources:
         type: BIGINT
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 import threading
 import time
 
@@ -3709,7 +3709,7 @@ def test_given_multiple_source_loaders_when_running_pipeline_then_uses_concurren
             description="runs independent loader branches concurrently before dependent source",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_join
     description: Test source raw_join.
@@ -3720,7 +3720,7 @@ sources:
         type: INTEGER
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 import threading
 import time
 
@@ -3834,7 +3834,7 @@ def test_given_loader_dag_when_running_pipeline_then_independent_branches_overla
             description="loads generator rows with declared missing and inferred extra columns",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_inferred
     description: Test source raw_inferred.
@@ -3847,7 +3847,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from datetime import date, datetime
 
 from sqlbuild.loaders import loader
@@ -3932,7 +3932,7 @@ def test_given_generator_loader_with_inferred_columns_when_running_load_then_wri
             description="decimals keep their precision and declared columns take any value",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_inferred
     description: Test source raw_inferred.
@@ -3943,7 +3943,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from decimal import Decimal
 from uuid import UUID
 
@@ -3963,7 +3963,7 @@ def raw_inferred(ctx):
             description="wide decimals stay exact beside values written with an exponent",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_inferred
     description: Test source raw_inferred.
@@ -3974,7 +3974,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from decimal import Decimal
 
 from sqlbuild.loaders import loader
@@ -4026,7 +4026,7 @@ def test_given_decimal_and_declared_values_when_running_load_then_keeps_their_ty
             description="loads every row yielded by a generator loader",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_multi_yield
     description: Test source raw_multi_yield.
@@ -4039,7 +4039,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4083,7 +4083,7 @@ def test_given_generator_loader_yields_multiple_rows_when_running_load_then_writ
             description="loads generator rows in batches and preserves late extra columns",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_batched_yield
     description: Test source raw_batched_yield.
@@ -4097,7 +4097,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4179,7 +4179,7 @@ def test_given_generator_loader_uses_batch_size_when_running_pipeline_then_appen
             description="loads missing known columns as null in later batches",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_missing_known
     description: Test source raw_missing_known.
@@ -4193,7 +4193,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4213,7 +4213,7 @@ def raw_missing_known(ctx):
             description="loads empty generator into declared table through batched path",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_empty_generator
     description: Test source raw_empty_generator.
@@ -4227,7 +4227,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4247,7 +4247,7 @@ def raw_empty_generator(ctx):
             description="loads late all null column when typed value arrives later",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_late_null
     description: Test source raw_late_null.
@@ -4259,7 +4259,7 @@ sources:
         type: INTEGER
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4279,7 +4279,7 @@ def raw_late_null(ctx):
             description="loads multi-row batches before appending final partial batch",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_batch_size_two
     description: Test source raw_batch_size_two.
@@ -4291,7 +4291,7 @@ sources:
         type: INTEGER
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4313,7 +4313,7 @@ def raw_batch_size_two(ctx):
             description="uses default batch size when source does not declare one",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_default_batch
     description: Test source raw_default_batch.
@@ -4324,7 +4324,7 @@ sources:
         type: INTEGER
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4404,7 +4404,7 @@ def test_given_batched_loader_variants_when_running_pipeline_then_writes_expecte
             description="formats large load row counts with commas in human output",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_many_rows
     description: Test source raw_many_rows.
@@ -4415,7 +4415,7 @@ sources:
         type: INTEGER
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4467,7 +4467,7 @@ def test_given_loader_writes_many_rows_when_running_load_then_formats_human_row_
             description="loads empty returned rows into declared empty table",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_empty
     description: Test source raw_empty.
@@ -4480,7 +4480,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4530,7 +4530,7 @@ def test_given_loader_returns_empty_rows_when_running_load_then_writes_empty_dec
             description="self managed loader can return nothing without write strategy",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_self_managed
     description: Test source raw_self_managed.
@@ -4540,7 +4540,7 @@ sources:
         type: INTEGER
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4586,7 +4586,7 @@ def test_given_self_managed_loader_when_running_load_then_uses_loader_written_ta
             description="fails clearly when returned rows contain conflicting inferred types",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_conflict
     description: Test source raw_conflict.
@@ -4594,7 +4594,7 @@ sources:
     write_strategy: table
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4613,7 +4613,7 @@ def raw_conflict(ctx):
             description="fails clearly when an undeclared column holds an unrecognised type",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_unknown_type
     description: Test source raw_unknown_type.
@@ -4621,7 +4621,7 @@ sources:
     write_strategy: table
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from uuid import UUID
 
 from sqlbuild.loaders import loader
@@ -4642,7 +4642,7 @@ def raw_unknown_type(ctx):
             description="fails clearly when a later batch needs a wider decimal",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_wider_decimal
     description: Test source raw_wider_decimal.
@@ -4651,7 +4651,7 @@ sources:
     load_batch_size: 1
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from decimal import Decimal
 
 from sqlbuild.loaders import loader
@@ -4673,14 +4673,14 @@ def raw_wider_decimal(ctx):
             description="fails when loader returns rows without write strategy",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_missing_strategy
     description: Test source raw_missing_strategy.
     managed: true
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4696,7 +4696,7 @@ def raw_missing_strategy(ctx):
             description="fails when loader returns nothing with write strategy",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_unexpected_none
     description: Test source raw_unexpected_none.
@@ -4704,7 +4704,7 @@ sources:
     write_strategy: table
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4745,7 +4745,7 @@ def test_given_loader_returns_conflicting_types_when_running_load_then_fails_cle
             description="drops staging and preserves target when a later loader batch fails",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_batched_conflict
     description: Test source raw_batched_conflict.
@@ -4754,7 +4754,7 @@ sources:
     load_batch_size: 1
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4777,7 +4777,7 @@ def raw_batched_conflict(ctx):
             description="drops staging when a later loader batch returns non dict row",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_batched_non_dict
     description: Test source raw_batched_non_dict.
@@ -4786,7 +4786,7 @@ sources:
     load_batch_size: 1
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4804,7 +4804,7 @@ def raw_batched_non_dict(ctx):
             description="leaves append target unchanged when a later loader batch fails",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_append_failure
     description: Test source raw_append_failure.
@@ -4816,7 +4816,7 @@ sources:
         type: INTEGER
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4839,7 +4839,7 @@ def raw_append_failure(ctx):
             description="leaves merge target unchanged when a later loader batch fails",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_merge_failure
     description: Test source raw_merge_failure.
@@ -4854,7 +4854,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4877,7 +4877,7 @@ def raw_merge_failure(ctx):
             description="leaves delete insert target unchanged when a later loader batch fails",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_delete_insert_failure
     description: Test source raw_delete_insert_failure.
@@ -4892,7 +4892,7 @@ sources:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "python/loaders/raw.py": """
+                "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -4969,7 +4969,7 @@ def test_given_later_loader_batch_fails_when_running_load_then_drops_staging(
             description="raises when selected source does not exist",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -4977,7 +4977,7 @@ sources:
     write_strategy: table
 """.strip()
                 + "\n",
-                "python/loaders/raw_orders.py": _RAW_ORDERS_LOADER,
+                "python/nodes/loaders/raw_orders.py": _RAW_ORDERS_LOADER,
             },
             select=("missing_source",),
             exclude=(),
@@ -4989,7 +4989,7 @@ sources:
             description="raises when selected source is unmanaged",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_customers
     description: Test source raw_customers.
@@ -5007,7 +5007,7 @@ sources:
             description="raises when excluded source does not exist",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -5015,7 +5015,7 @@ sources:
     write_strategy: table
 """.strip()
                 + "\n",
-                "python/loaders/raw_orders.py": _RAW_ORDERS_LOADER,
+                "python/nodes/loaders/raw_orders.py": _RAW_ORDERS_LOADER,
             },
             select=(),
             exclude=("missing_source",),
@@ -5027,7 +5027,7 @@ sources:
             description="raises when excluded source is unmanaged",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -5038,7 +5038,7 @@ sources:
     expression: SELECT 1 AS customer_id
 """.strip()
                 + "\n",
-                "python/loaders/raw_orders.py": _RAW_ORDERS_LOADER,
+                "python/nodes/loaders/raw_orders.py": _RAW_ORDERS_LOADER,
             },
             select=(),
             exclude=("raw_customers",),
@@ -5076,7 +5076,7 @@ def test_given_invalid_load_selectors_when_running_load_then_it_raises_clear_err
             description="succeeds without connecting when project has no managed sources",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_customers
     description: Test source raw_customers.
@@ -5098,7 +5098,7 @@ sources:
             description="succeeds without connecting when all managed sources are excluded",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_FILE,
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -5106,7 +5106,7 @@ sources:
     write_strategy: table
 """.strip()
                 + "\n",
-                "python/loaders/raw_orders.py": _RAW_ORDERS_LOADER,
+                "python/nodes/loaders/raw_orders.py": _RAW_ORDERS_LOADER,
             },
             select=(),
             exclude=("raw_orders",),

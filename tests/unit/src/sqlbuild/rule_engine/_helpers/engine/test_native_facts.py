@@ -43,7 +43,7 @@ def test_given_compiled_sql_facts_when_evaluating_native_then_exact_safe_rows_ar
 ) -> None:
     project: CompiledProjectView = build_project(
         name="orders",
-        relative_path="models/orders.sql",
+        relative_path="sql/models/orders.sql",
         sql="SELECT 1",
         config_values={},
     )

@@ -42,7 +42,7 @@ _CTE_LIST_TEST: str = (
     "__macro_expected__ AS (SELECT 1 AS order_id, TIMESTAMP '2026-01-02' AS updated_at)\n"
 )
 _ORDERS_CLEAN: dict[str, str] = {
-    "models/marts/orders_clean.sql": (
+    "sql/models/marts/orders_clean.sql": (
         'MODEL (description "Clean orders");\n\n'
         'WITH orders_raw AS (SELECT * FROM __ref("stg_orders")),\n'
         "@sql.clean_orders(orders_raw)\n"
@@ -113,7 +113,7 @@ _MOCK_TEST: str = (
             description="mock_of_a_column_list_call_without_commas_keeps_the_separators",
             files={
                 **ALL_MACROS,
-                "models/marts/orders_audited.sql": (
+                "sql/models/marts/orders_audited.sql": (
                     'MODEL (description "Audited orders");\n\n'
                     "SELECT o.order_id @sql.audit_columns(o) o.status "
                     'FROM __ref("stg_orders") AS o\n'

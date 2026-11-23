@@ -22,7 +22,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_waffle_sh
             description=(
                 "remove column mutation reports query_changed for non-enforced output change"
             ),
-            mutate_file="models/intermediate/order_status_index.sql",
+            mutate_file="sql/models/intermediate/order_status_index.sql",
             before_text="  ordered_at,\n",
             after_text="",
             command=(

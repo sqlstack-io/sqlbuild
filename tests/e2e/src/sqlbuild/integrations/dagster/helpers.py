@@ -29,12 +29,12 @@ def prepare_python_nodes_integration_project(root: Path) -> Path:
     """
 
     project_dir: Path = root / "python_nodes_project"
-    models_dir: Path = project_dir / "models"
-    tasks_dir: Path = project_dir / "python" / "tasks"
-    factories_dir: Path = project_dir / "python" / "factories"
-    assets_dir: Path = project_dir / "python" / "assets"
-    loaders_dir: Path = project_dir / "python" / "loaders"
-    checks_dir: Path = project_dir / "python" / "checks"
+    models_dir: Path = project_dir / "sql" / "models"
+    tasks_dir: Path = project_dir / "python" / "nodes" / "tasks"
+    factories_dir: Path = project_dir / "python" / "nodes" / "factories"
+    assets_dir: Path = project_dir / "python" / "nodes" / "assets"
+    loaders_dir: Path = project_dir / "python" / "nodes" / "loaders"
+    checks_dir: Path = project_dir / "python" / "nodes" / "checks"
     for directory in (models_dir, tasks_dir, factories_dir, assets_dir, loaders_dir, checks_dir):
         directory.mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
@@ -217,7 +217,7 @@ _STDOUT_POLL_OUTCOMES: MappingProxyType[bool, Callable[[str, Event], None]] = Ma
 def add_failing_daily_revenue_audits(*, project_dir: Path) -> None:
     """Add violation and measurement failures to the copied project."""
 
-    audits_dir: Path = project_dir / "models" / "marts" / "_sqlbuild" / "_audits" / "generic"
+    audits_dir: Path = project_dir / "sql" / "models" / "marts" / "_sqlbuild" / "_audits" / "generic"
     audits_dir.mkdir(parents=True, exist_ok=True)
     failing_audit_sql: str = 'AUDIT ();\n\nSELECT *\nFROM __ref("@model")\nWHERE 1 = 1\n'
     (audits_dir / "forced_warning_failure.sql").write_text(
@@ -244,7 +244,7 @@ MEASURE (
 """,
         encoding="utf-8",
     )
-    model_path: Path = project_dir / "models" / "marts" / "daily_revenue.sql"
+    model_path: Path = project_dir / "sql" / "models" / "marts" / "daily_revenue.sql"
     contents: str = model_path.read_text(encoding="utf-8")
     contents = contents.replace(
         """    expression_is_true (
@@ -418,8 +418,8 @@ ATTACHMENT_CHECK_PROJECT_FILES: dict[str, str] = {
         "[connection]\n"
         'database = "attachment_checks.duckdb"\n'
     ),
-    "seeds/products.csv": "product_id,product_name\n1,widget\n2,gadget\n",
-    "seeds/products.yml": (
+    "sql/seeds/products.csv": "product_id,product_name\n1,widget\n2,gadget\n",
+    "sql/seeds/products.yml": (
         "seeds:\n"
         "  - name: products\n"
         "    description: Product catalogue.\n"
@@ -431,7 +431,7 @@ ATTACHMENT_CHECK_PROJECT_FILES: dict[str, str] = {
         "      - name: product_name\n"
         "        type: VARCHAR\n"
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_orders\n"
         "    description: Raw orders.\n"
@@ -446,24 +446,24 @@ ATTACHMENT_CHECK_PROJECT_FILES: dict[str, str] = {
         "      - name: product_id\n"
         "        type: INTEGER\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Orders.',\n"
         "  columns (order_id (), product_id ()),\n"
         "  audits [not_null (column order_id)],\n"
         ");\n\n"
         'SELECT order_id, product_id FROM __source("raw_orders")\n'
     ),
-    "models/customers.sql": (
+    "sql/models/customers.sql": (
         "MODEL (description 'Customers.');\n\nSELECT 1 AS customer_id, 1 AS order_id\n"
     ),
-    "audits/singular/orders_have_customers.sql": (
+    "sql/audits/singular/orders_have_customers.sql": (
         'AUDIT (name "orders_have_customers", severity error);\n\n'
         "SELECT o.order_id\n"
         'FROM __ref("orders") o\n'
         'LEFT JOIN __ref("customers") c ON o.order_id = c.order_id\n'
         "WHERE c.order_id IS NULL AND o.order_id = 1\n"
     ),
-    "audits/singular/orders_match_raw_orders.sql": (
+    "sql/audits/singular/orders_match_raw_orders.sql": (
         'AUDIT (name "orders_match_raw_orders", severity error);\n\n'
         "SELECT o.order_id\n"
         'FROM __ref("orders") o\n'

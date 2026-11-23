@@ -53,9 +53,9 @@ def test_given_parenthesised_join_when_testing_then_both_references_use_their_mo
         project_name="shop",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "models/orders.sql": 'MODEL (description "Orders.");\n\nSELECT 1 AS order_id\n',
-            "models/customers.sql": 'MODEL (description "Customers.");\n\nSELECT 1 AS order_id\n',
-            "models/order_customers.sql": (
+            "sql/models/orders.sql": 'MODEL (description "Orders.");\n\nSELECT 1 AS order_id\n',
+            "sql/models/customers.sql": 'MODEL (description "Customers.");\n\nSELECT 1 AS order_id\n',
+            "sql/models/order_customers.sql": (
                 'MODEL (description "Orders with customers.");\n\n'
                 f"SELECT o.order_id FROM {test_case.model_from}\n"
             ),

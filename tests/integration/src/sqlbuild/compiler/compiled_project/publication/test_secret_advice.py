@@ -71,7 +71,7 @@ def test_given_a_missing_secret_when_a_command_runs_then_the_advice_fits_that_co
                 '[targets.development]\nschema = "main"\n'
                 f'env_file = "{test_case.env_file_name}"\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\n"
                 'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")\n'
             ),

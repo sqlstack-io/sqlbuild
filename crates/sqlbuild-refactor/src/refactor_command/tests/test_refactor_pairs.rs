@@ -8,19 +8,19 @@ fn given_words_and_pair_file_when_reading_pairs_then_every_pair_is_read_in_order
         RefactorPairsTestCase {
             description: "pairs on the command line, then from the file",
             is_move: true,
-            words: &["orders", "models/finance/", "customers", "models/crm/"],
-            file: Some("# moves\n\nrefunds\tmodels/finance/\n  totals   models/marts/t.sql  \n"),
+            words: &["orders", "sql/models/finance/", "customers", "sql/models/crm/"],
+            file: Some("# moves\n\nrefunds\tmodels/finance/\n  totals   sql/models/marts/t.sql  \n"),
             expected_pairs: Ok(&[
-                ("orders", "models/finance/"),
-                ("customers", "models/crm/"),
-                ("refunds", "models/finance/"),
-                ("totals", "models/marts/t.sql"),
+                ("orders", "sql/models/finance/"),
+                ("customers", "sql/models/crm/"),
+                ("refunds", "sql/models/finance/"),
+                ("totals", "sql/models/marts/t.sql"),
             ]),
         },
         RefactorPairsTestCase {
             description: "a target without a destination",
             is_move: true,
-            words: &["orders", "models/finance/", "customers"],
+            words: &["orders", "sql/models/finance/", "customers"],
             file: None,
             expected_pairs: Err("'customers' has no DESTINATION"),
         },
@@ -28,7 +28,7 @@ fn given_words_and_pair_file_when_reading_pairs_then_every_pair_is_read_in_order
             description: "a file line with three words",
             is_move: true,
             words: &[],
-            file: Some("orders models/finance/ extra\n"),
+            file: Some("orders sql/models/finance/ extra\n"),
             expected_pairs: Err(
                 "pairs.tsv:1: expected TARGET and DESTINATION separated by a tab or spaces, \
                  found 3 words",

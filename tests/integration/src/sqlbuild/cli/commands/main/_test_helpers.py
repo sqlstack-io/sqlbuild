@@ -10,14 +10,14 @@ from sqlbuild._native import run_cli as main
 
 _WARM_TARGET_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "shop"\nadapter = "duckdb"\n',
-    "models/sales/orders.sql": (
+    "sql/models/sales/orders.sql": (
         "MODEL (description 'Test model orders.', columns (order_id (type INTEGER, "
         "audits [not_null])));\nSELECT 1 AS order_id\n"
     ),
-    "models/sales/daily/totals.sql": (
+    "sql/models/sales/daily/totals.sql": (
         "MODEL (description 'Test model totals.');\nSELECT order_id FROM __ref(\"orders\")\n"
     ),
-    "models/inventory.sql": "MODEL (description 'Test model inventory.');\nSELECT 2 AS item_id\n",
+    "sql/models/inventory.sql": "MODEL (description 'Test model inventory.');\nSELECT 2 AS item_id\n",
 }
 
 
@@ -69,19 +69,19 @@ def pruned_entries(*, entries: dict[str, Path], names: tuple[str, ...]) -> tuple
 def write_stale_target_entries(*, compiled_dir: Path, outside_dir: Path) -> dict[str, Path]:
     """Add a stale nested artifact, an empty folder, and a link to an outside folder."""
 
-    stale_file: Path = compiled_dir / "models" / "legacy" / "archive" / "returns.sql"
+    stale_file: Path = compiled_dir / "sql" / "models" / "legacy" / "archive" / "returns.sql"
     stale_file.parent.mkdir(parents=True)
     stale_file.write_text("SELECT 'stale'\n", encoding="utf-8")
-    empty_directory: Path = compiled_dir / "models" / "empty" / "nested"
+    empty_directory: Path = compiled_dir / "sql" / "models" / "empty" / "nested"
     empty_directory.mkdir(parents=True)
     outside_dir.mkdir()
     (outside_dir / "kept.sql").write_text("SELECT 'kept'\n", encoding="utf-8")
-    link: Path = compiled_dir / "models" / "linked" / "shared"
+    link: Path = compiled_dir / "sql" / "models" / "linked" / "shared"
     link.parent.mkdir(parents=True)
     link.symlink_to(outside_dir, target_is_directory=True)
     return {
-        "legacy": compiled_dir / "models" / "legacy",
-        "empty": compiled_dir / "models" / "empty",
+        "legacy": compiled_dir / "sql" / "models" / "legacy",
+        "empty": compiled_dir / "sql" / "models" / "empty",
         "link": link,
         "outside_file": outside_dir / "kept.sql",
     }

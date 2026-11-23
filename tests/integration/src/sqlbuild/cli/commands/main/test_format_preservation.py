@@ -101,10 +101,10 @@ def test_given_authored_syntax_when_formatting_then_spelling_and_idempotence_are
     test_case: FormatterSyntaxTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_WINDOW_SYNTAX_PROJECT_TOML)
-    macros: Path = tmp_path / "models" / "_macros" / "python"
+    macros: Path = tmp_path / "sql" / "models" / "_macros" / "python"
     macros.mkdir(parents=True)
     (macros / "orders.py").write_text(test_case.macro_source)
-    model: Path = tmp_path / "models" / "order_summary.sql"
+    model: Path = tmp_path / "sql" / "models" / "order_summary.sql"
     model.write_text(
         'MODEL (description "Order summary", database warehouse, schema analytics);\n-- Order query.\n'
         + test_case.sql
@@ -134,7 +134,7 @@ def test_given_computed_variant_key_when_formatting_then_preserves_syntax_and_co
     test_case: FormatterSyntaxTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "snowflake"\n')
-    model: Path = tmp_path / "models" / "order_summary.sql"
+    model: Path = tmp_path / "sql" / "models" / "order_summary.sql"
     model.parent.mkdir()
     original: str = (
         'MODEL (description "Order summary", database warehouse, schema analytics);   \n'
@@ -202,7 +202,7 @@ def test_given_sqlbuild_call_when_formatting_then_authored_spelling_is_preserved
     test_case: FormatterSyntaxTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    model: Path = tmp_path / "models" / "order_summary.sql"
+    model: Path = tmp_path / "sql" / "models" / "order_summary.sql"
     model.parent.mkdir()
     model.write_text('MODEL (description "Order summary");\n' + test_case.sql + "\n")
     assert main(["--project-dir", str(tmp_path), "format", "--json"]) == 0
@@ -239,7 +239,7 @@ def test_given_cte_macros_and_comments_when_formatting_then_layout_and_rules_sta
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = ["SQLCLEAN033"]\n'
     )
-    macros: Path = tmp_path / "models" / "_macros" / "python"
+    macros: Path = tmp_path / "sql" / "models" / "_macros" / "python"
     macros.mkdir(parents=True)
     (macros / "ctes.py").write_text(
         "def make_ctes(name: str, source: str) -> str:\n"
@@ -247,7 +247,7 @@ def test_given_cte_macros_and_comments_when_formatting_then_layout_and_rules_sta
         "def other_ctes(name: str, source: str) -> str:\n"
         "    return make_ctes(name, source)\n"
     )
-    model: Path = tmp_path / "models" / "order_summary.sql"
+    model: Path = tmp_path / "sql" / "models" / "order_summary.sql"
     model.write_text('MODEL (description "Order summary");\n' + test_case.sql + "\n")
     assert main(["--project-dir", str(tmp_path), "compile", "--no-cache"]) == 0
     capsys.readouterr()
@@ -301,13 +301,13 @@ def test_given_multibyte_text_before_restorations_when_formatting_then_output_is
     test_case: FormatterSyntaxTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "snowflake"\n')
-    macros: Path = tmp_path / "models" / "_macros" / "python"
+    macros: Path = tmp_path / "sql" / "models" / "_macros" / "python"
     macros.mkdir(parents=True)
     (macros / "orders.py").write_text(
         "def copy_orders(name: str, source: str) -> str:\n"
         '    return f"{name} AS (SELECT * FROM {source})"\n'
     )
-    model: Path = tmp_path / "models" / "order_summary.sql"
+    model: Path = tmp_path / "sql" / "models" / "order_summary.sql"
     model.write_text(
         'MODEL (description "Orders é € 😀");\n' + test_case.sql + "\n", encoding="utf-8"
     )
@@ -326,7 +326,7 @@ def test_given_multibyte_text_before_restorations_when_formatting_then_output_is
     [
         ExpressionMacroFormatTestCase(
             "project macro",
-            "macros/sql",
+            "sql/macros/sql",
             # A project macro needs consumers in more than one folder to stay a project macro.
             ("staging", "marts"),
             _NORMALISE_NAME_HEADER + _NORMALISE_NAME_AUTHORED,
@@ -334,14 +334,14 @@ def test_given_multibyte_text_before_restorations_when_formatting_then_output_is
         ),
         ExpressionMacroFormatTestCase(
             "scoped macro",
-            "models/staging/_sqlbuild/_macros/sql",
+            "sql/models/staging/_sqlbuild/_macros/sql",
             ("staging",),
             _NORMALISE_NAME_HEADER + _NORMALISE_NAME_AUTHORED,
             _NORMALISE_NAME_HEADER + _NORMALISE_NAME_FORMATTED,
         ),
         ExpressionMacroFormatTestCase(
             "multi-line string after a backslash-escaped quote",
-            "models/staging/_sqlbuild/_macros/sql",
+            "sql/models/staging/_sqlbuild/_macros/sql",
             ("staging",),
             _NORMALISE_NAME_HEADER
             + "CONCAT(\n  @column_name,\n  'O\\'Brien\n      kept indent',\n  'tail'\n)\n",
@@ -350,7 +350,7 @@ def test_given_multibyte_text_before_restorations_when_formatting_then_output_is
         ),
         ExpressionMacroFormatTestCase(
             "Databricks multi-line string after a backslash-escaped quote",
-            "models/staging/_sqlbuild/_macros/sql",
+            "sql/models/staging/_sqlbuild/_macros/sql",
             ("staging",),
             _NORMALISE_NAME_HEADER
             + "CONCAT(\n  @column_name,\n  'O\\'Brien\n      kept indent',\n  'tail'\n)\n",
@@ -360,7 +360,7 @@ def test_given_multibyte_text_before_restorations_when_formatting_then_output_is
         ),
         ExpressionMacroFormatTestCase(
             "DuckDB multi-line E-string after a backslash-escaped quote",
-            "models/staging/_sqlbuild/_macros/sql",
+            "sql/models/staging/_sqlbuild/_macros/sql",
             ("staging",),
             _NORMALISE_NAME_HEADER
             + "CONCAT(\n  @column_name,\n  E'O\\'Brien\n      kept indent',\n  'tail'\n)\n",
@@ -381,7 +381,7 @@ def test_given_expression_macro_when_formatting_then_body_is_laid_out_once(
     macro.parent.mkdir(parents=True)
     macro.write_text(test_case.authored_macro)
     for folder in test_case.consumer_folders:
-        model: Path = tmp_path / "models" / folder / f"{folder}_customer_names.sql"
+        model: Path = tmp_path / "sql" / "models" / folder / f"{folder}_customer_names.sql"
         model.parent.mkdir(parents=True, exist_ok=True)
         model.write_text(
             'MODEL (description "Customer names", database warehouse, schema analytics);\n'

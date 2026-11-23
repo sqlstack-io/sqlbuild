@@ -63,7 +63,7 @@ _PROJECT_FILES: dict[str, str] = {
         '[connection]\ndatabase = "orders.duckdb"\n\n'
         '[defaults]\nmaterialized = "table"\n'
     ),
-    "sources/raw_orders.yml": (
+    "sql/sources/raw_orders.yml": (
         "sources:\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: main\n"
@@ -72,7 +72,7 @@ _PROJECT_FILES: dict[str, str] = {
         "      - name: order_id\n        type: INTEGER\n"
         "      - name: code\n        type: VARCHAR\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Test model orders.');\n\n"
         'SELECT order_id, TRY_CAST(code AS INTEGER) AS code_number FROM __source("raw_orders")\n'
     ),
@@ -140,7 +140,7 @@ def test_given_output_store_failure_when_testing_then_only_storage_problems_fall
         project_name="orders",
         repo_files={
             **_PROJECT_FILES,
-            "adapters/pruning_duckdb.py": test_case.adapter_source,
+            "python/adapters/pruning_duckdb.py": test_case.adapter_source,
             **test_case.extra_files,
         },
     )

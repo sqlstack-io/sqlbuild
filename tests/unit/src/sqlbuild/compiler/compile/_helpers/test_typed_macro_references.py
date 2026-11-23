@@ -37,8 +37,8 @@ _DEPENDENCY_PROJECT_FILES: dict[str, str] = {
         'name = "demo"\nadapter = "duckdb"\n\n[settings]\nsql_analysis = false\n'
         "sql_validation = false\n"
     ),
-    "models/orders_eu.sql": "MODEL (description 'Test model orders_eu.');\nSELECT 1 AS order_id",
-    "models/orders_us.sql": "MODEL (description 'Test model orders_us.');\nSELECT 2 AS order_id",
+    "sql/models/orders_eu.sql": "MODEL (description 'Test model orders_eu.');\nSELECT 1 AS order_id",
+    "sql/models/orders_us.sql": "MODEL (description 'Test model orders_us.');\nSELECT 2 AS order_id",
 }
 
 
@@ -123,7 +123,7 @@ def test_given_typed_reference_arguments_when_expanding_then_renders_call_site_r
             sql="@py.orders_base()",
             expected_error_fragments=(
                 "model:order_summary depends on model:stg_orders through macro orders_base()",
-                "--> macros/python/common.py",
+                "--> sql/macros/python/common.py",
                 'pass it in: @py.orders_base(__ref("stg_orders"))',
                 "[references]\n            enforce_explicit = false",
             ),
@@ -391,8 +391,8 @@ def test_given_typed_macro_arguments_when_compiling_then_every_argument_is_a_dep
         tmp_path,
         _DEPENDENCY_PROJECT_FILES
         | {
-            "macros/python/common.py": test_case.macro_file_contents,
-            "models/order_summary.sql": f"MODEL (description 'Test model order_summary.');\n{test_case.sql}",
+            "sql/macros/python/common.py": test_case.macro_file_contents,
+            "sql/models/order_summary.sql": f"MODEL (description 'Test model order_summary.');\n{test_case.sql}",
         },
     )
 

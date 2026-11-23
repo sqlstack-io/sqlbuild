@@ -51,19 +51,19 @@ _MOVED: str = "models.finance._sqlbuild._macros.python.cents"
                     "from models.staging._sqlbuild._macros.python import cents as cents_module",
                     body='    assert cents_module.to_cents("1")\n',
                 ),
-                "models/staging/_sqlbuild/_macros/python/totals.py": (
+                "sql/models/staging/_sqlbuild/_macros/python/totals.py": (
                     "from .cents import to_cents\n\n\n"
                     "def order_total(expression: str) -> str:\n"
                     '    return f"SUM({to_cents(expression)})"\n'
                 ),
-                "models/staging/stg_order_totals.sql": (
+                "sql/models/staging/stg_order_totals.sql": (
                     "MODEL (description 'Test model stg_order_totals.',\n  materialized view,\n);\n\n"
                     'SELECT\n  @py.order_total("amount") AS total_cents\nFROM __ref("stg_orders")\n'
                 ),
             },
             expected_fragments={
                 CENTS_CHECK: ("from macros.python import cents as cents_module",),
-                "models/staging/_sqlbuild/_macros/python/totals.py": (
+                "sql/models/staging/_sqlbuild/_macros/python/totals.py": (
                     "from macros.python.cents import to_cents\n",
                 ),
             },
@@ -77,7 +77,7 @@ def test_given_python_imports_of_a_moved_macro_when_moving_then_imports_follow_a
     project_dir: Path = write_orders_project(tmp_path=tmp_path, files=test_case.files)
 
     moved: subprocess.CompletedProcess[str] = sqb(
-        project_dir, "mv", "stg_order_cents", "models/finance/"
+        project_dir, "mv", "stg_order_cents", "sql/models/finance/"
     )
     compiled: subprocess.CompletedProcess[str] = sqb(project_dir, "compile")
     checked: subprocess.CompletedProcess[str] = sqb(project_dir, "build")
@@ -152,7 +152,7 @@ def test_given_unrewritable_python_import_when_moving_then_move_is_refused_namin
     check_before: str = (project_dir / CENTS_CHECK).read_text(encoding="utf-8")
 
     moved: subprocess.CompletedProcess[str] = sqb(
-        project_dir, "mv", "stg_order_cents", "models/finance/"
+        project_dir, "mv", "stg_order_cents", "sql/models/finance/"
     )
 
     output: str = " ".join(moved.stdout.split())

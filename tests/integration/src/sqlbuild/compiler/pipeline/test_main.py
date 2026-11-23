@@ -53,7 +53,7 @@ _FILE_PROJECT_TOML: str = (
             description="typed cte passthrough satisfies the model contract",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_orders\n    description: Test source raw_orders.\n"
                     "    expression: SELECT '12' AS amount\n"
@@ -62,13 +62,13 @@ _FILE_PROJECT_TOML: str = (
                     "        type: VARCHAR\n"
                     "        nullable: false\n"
                 ),
-                "schemas/orders.sql": (
+                "sql/schemas/orders.sql": (
                     "SCHEMA (\n"
                     "  name order_amount,\n"
                     "  columns (amount (type INTEGER, nullable false)),\n"
                     ");\n"
                 ),
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (\n"
                     '  description "Test model orders.",\n'
                     "  contract enforced,\n"
@@ -134,7 +134,7 @@ def test_given_rule_finding_when_running_shared_compile_pipeline_then_planning_i
     (tmp_path / "sqlbuild_project.toml").write_text(
         f'{_PROJECT_TOML}\n[rules]\nselect = ["SQLCLEAN004"]\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(
         'MODEL (description "Orders");\n'
@@ -160,7 +160,7 @@ def test_given_rule_finding_when_running_shared_compile_pipeline_then_planning_i
             description="single table model with no schema defaults to adapter schema",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id"
                 ),
             },
@@ -180,7 +180,7 @@ def test_given_rule_finding_when_running_shared_compile_pipeline_then_planning_i
             description="view materialization produces create or replace view DDL",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/active_orders.sql": (
+                "sql/models/active_orders.sql": (
                     "MODEL (description 'Test model active_orders.', materialized view);\n\nSELECT order_id FROM orders WHERE status = 'active'"
                 ),
             },
@@ -200,7 +200,7 @@ def test_given_rule_finding_when_running_shared_compile_pipeline_then_planning_i
             description="model with explicit schema and database populates manifest target",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Test model orders.',\n  materialized table\n  schema analytics\n"
                     "  database warehouse\n);\n\n"
                     "SELECT 1 AS order_id"
@@ -222,10 +222,10 @@ def test_given_rule_finding_when_running_shared_compile_pipeline_then_planning_i
             description="two models with ref dependency resolves ref to qualified name",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/stg_orders.sql": (
+                "sql/models/stg_orders.sql": (
                     "MODEL (description 'Test model stg_orders.', materialized table);\n\nSELECT 1 AS order_id"
                 ),
-                "models/fact_orders.sql": (
+                "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT order_id FROM __ref("stg_orders")'
                 ),
             },
@@ -252,10 +252,10 @@ def test_given_rule_finding_when_running_shared_compile_pipeline_then_planning_i
             warehouse_setup_sql=("CREATE TABLE main.payments AS SELECT 1 AS payment_id",),
             project_files={
                 "sqlbuild_project.toml": _FILE_PROJECT_TOML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_payments\n    description: Test source raw_payments.\n    schema: main\n    table: payments\n"
                 ),
-                "models/stg_payments.sql": (
+                "sql/models/stg_payments.sql": (
                     'MODEL (description "Test model stg_payments.", materialized table);\n\nSELECT payment_id FROM __source("raw_payments")'
                 ),
             },
@@ -275,10 +275,10 @@ def test_given_rule_finding_when_running_shared_compile_pipeline_then_planning_i
             description="multiple models in subdirectories preserves relative paths",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/staging/stg_orders.sql": (
+                "sql/models/staging/stg_orders.sql": (
                     "MODEL (description 'Test model stg_orders.', materialized view);\n\nSELECT 1 AS order_id"
                 ),
-                "models/marts/fact_orders.sql": (
+                "sql/models/marts/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT order_id FROM __ref("stg_orders")'
                 ),
             },
@@ -304,7 +304,7 @@ def test_given_rule_finding_when_running_shared_compile_pipeline_then_planning_i
             description="Python macro receives constants and enums visible to its caller",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/_constants/policy.sql": (
+                "sql/models/_constants/policy.sql": (
                     "CONSTANT (name minimum_quantity, value 2);\n"
                     'CONSTANT (name regions, value ["north", "south"]);\n'
                     "CONSTANT (name unique_ids, value {2, 1});\n"
@@ -312,10 +312,10 @@ def test_given_rule_finding_when_running_shared_compile_pipeline_then_planning_i
                     'CONSTANT (name adjustment, type decimal, value "2.50");\n'
                     'CONSTANT (name display_name, value "O\'Reilly");\n'
                 ),
-                "models/_enums/status.sql": (
+                "sql/models/_enums/status.sql": (
                     'ENUM (name order_status, members (ACTIVE "active", PAUSED "paused"));\n'
                 ),
-                "models/_macros/python/policy.py": (
+                "sql/models/_macros/python/policy.py": (
                     "from sqlbuild.compiler.compile.models import MacroContext\n\n\n"
                     "def policy_columns(ctx: MacroContext) -> str:\n"
                     "    minimum = ctx.constants['minimum_quantity']\n"
@@ -339,7 +339,7 @@ def test_given_rule_finding_when_running_shared_compile_pipeline_then_planning_i
                     '        f"{optional} AS optional_quantity, {has_closed} AS has_closed"\n'
                     "    )\n"
                 ),
-                "models/policy_summary.sql": (
+                "sql/models/policy_summary.sql": (
                     "MODEL (description 'Test model policy_summary.', materialized view);\n\nSELECT @py.policy_columns()"
                 ),
             },
@@ -434,8 +434,8 @@ def test_given_project_files_when_running_compile_pipeline_then_produces_valid_o
             description="run selector resolves Python task without SQL-only planning",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id",
-                "python/tasks/orders.py": (
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id",
+                "python/nodes/tasks/orders.py": (
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def prepare_orders(ctx):\n"
@@ -476,7 +476,7 @@ def test_given_python_run_selector_when_running_compile_pipeline_then_tracks_pyt
             description="reports compile progress from compile pipeline",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id",
             },
             expected_progress_prefixes=("Compiling project...", "Compiled project."),
         )
@@ -509,7 +509,7 @@ def test_given_progress_callback_when_running_compile_pipeline_then_reports_comp
             description="reports compile progress from project graph build",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id",
             },
             expected_progress_prefixes=("Compiling project...", "Compiled project."),
         )
@@ -553,7 +553,7 @@ def test_given_progress_callback_when_building_project_graph_then_reports_compil
                     'warehouse = "TEST_WH"\n'
                     'schema = "TEST_SCHEMA"\n'
                 ),
-                "models/stg_orders.sql": "MODEL (description 'Test model stg_orders.', materialized view);\n\nSELECT 1 AS order_id\n",
+                "sql/models/stg_orders.sql": "MODEL (description 'Test model stg_orders.', materialized view);\n\nSELECT 1 AS order_id\n",
             },
             expected_error_fragment="snowflake execution requires explicit target database",
         )
@@ -595,7 +595,7 @@ def test_given_snowflake_local_override_without_target_namespace_when_compiling_
                     'database = "${ENV:TEST_DB}"\n'
                     'schema = "${ENV:TEST_SCHEMA}"\n'
                 ),
-                "models/stg_orders.sql": "MODEL (description 'Test model stg_orders.', materialized view);\n\nSELECT 1 AS order_id\n",
+                "sql/models/stg_orders.sql": "MODEL (description 'Test model stg_orders.', materialized view);\n\nSELECT 1 AS order_id\n",
             },
             expected_database="LOCAL_DB",
             expected_schema="LOCAL_SCHEMA",
@@ -612,7 +612,7 @@ def test_given_snowflake_local_override_without_target_namespace_when_compiling_
                     'database = "DEFAULTS_DB"\n'
                     'schema = "DEFAULTS_SCHEMA"\n'
                 ),
-                "models/stg_orders.sql": "MODEL (description 'Test model stg_orders.', materialized view);\n\nSELECT 1 AS order_id\n",
+                "sql/models/stg_orders.sql": "MODEL (description 'Test model stg_orders.', materialized view);\n\nSELECT 1 AS order_id\n",
             },
             expected_database="DEFAULTS_DB",
             expected_schema="DEFAULTS_SCHEMA",
@@ -660,10 +660,10 @@ def test_given_snowflake_local_target_namespace_when_compiling_then_targets_reso
                     "[targets.prod]\n"
                     'schema = "prod_schema"\n'
                 ),
-                "models/stg_orders.sql": (
+                "sql/models/stg_orders.sql": (
                     "MODEL (description 'Test model stg_orders.', materialized table);\n\nSELECT 1 AS order_id"
                 ),
-                "models/fact_orders.sql": (
+                "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT order_id FROM __ref("stg_orders")'
                 ),
             },
@@ -724,16 +724,16 @@ def test_given_project_with_defer_to_when_compiling_then_resolves_refs_to_deferr
                     "[settings]\n"
                     "sql_analysis = true\n"
                 ),
-                "models/stg_orders.sql": (
+                "sql/models/stg_orders.sql": (
                     'MODEL (description "Test model stg_orders.", materialized table);\n\nSELECT id, amount FROM __source("raw")'
                 ),
-                "models/fact_orders.sql": (
+                "sql/models/fact_orders.sql": (
                     "MODEL (description 'Test model fact_orders.', materialized table);\n\n"
                     "WITH local_helper AS (SELECT 1 AS one) "
                     'SELECT id, amount + one AS adjusted FROM __ref("stg_orders") '
                     "CROSS JOIN local_helper"
                 ),
-                "sources/raw.yml": "sources:\n  - name: raw\n    description: Test source raw.\n    schema: main\n    table: raw\n",
+                "sql/sources/raw.yml": "sources:\n  - name: raw\n    description: Test source raw.\n    schema: main\n    table: raw\n",
                 "tests/unit/test_chain.sql": (
                     "TEST();\n\n"
                     "WITH\n"
@@ -844,10 +844,10 @@ def test_given_append_cursor_model_when_compiling_then_sql_uses_expected_lower_b
             "sqlbuild_project.toml": (
                 f'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "{db_path}"\n'
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    schema: main\n    table: raw_orders\n"
             ),
-            "models/orders.sql": model_header,
+            "sql/models/orders.sql": model_header,
         },
     )
 

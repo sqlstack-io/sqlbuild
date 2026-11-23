@@ -29,11 +29,11 @@ def test_given_sql_and_custom_exceptions_when_compiling_cold_and_warm_then_both_
         '[rules]\nselect = ["SQLCLEAN004", "XSQBRARCH001"]\n'
         "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n"
         '[[rules.rule_exceptions]]\nrule = "SQLCLEAN004"\n'
-        'path = "models/orders.sql"\nreason = "A single synthetic row is intentional."\n'
+        'path = "sql/models/orders.sql"\nreason = "A single synthetic row is intentional."\n'
         '[[rules.rule_exceptions]]\nrule = "XSQBRARCH001"\n'
-        'path = "models/orders.sql"\nreason = "The synthetic model name is intentional."\n'
+        'path = "sql/models/orders.sql"\nreason = "The synthetic model name is intentional."\n'
     )
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "orders.sql").write_text(
         "MODEL (description 'Test model orders.');\n"

@@ -99,7 +99,7 @@ fn python_graph() -> PythonSelectionGraph {
         .map(|(name, _, tags, upstream, _)| InventoryNode {
             name: (*name).to_owned(),
             tags: owned(tags),
-            relative_path: format!("python/{name}.py"),
+            relative_path: format!("python/nodes/{name}.py"),
             upstream: owned(upstream),
         })
         .collect();

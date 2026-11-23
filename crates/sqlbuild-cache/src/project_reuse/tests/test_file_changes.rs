@@ -103,7 +103,7 @@ fn given_linked_inputs_when_targets_change_then_compile_reuse_is_invalidated() {
         LinkChangeTestCase {
             description: "add file through directory link",
             change: |_, outside| {
-                std::fs::write(outside.join("models/customers.sql"), b"SELECT 1")
+                std::fs::write(outside.join("sql/models/customers.sql"), b"SELECT 1")
                     .expect("added model");
             },
             expected_unchanged: false,
@@ -119,7 +119,7 @@ fn given_linked_inputs_when_targets_change_then_compile_reuse_is_invalidated() {
     for test_case in test_cases {
         let project = tempfile::tempdir().expect("project");
         let outside = tempfile::tempdir().expect("linked resources");
-        std::fs::create_dir(outside.path().join("models")).expect("model directory");
+        std::fs::create_dir(outside.path().join("sql/models")).expect("model directory");
         std::fs::write(outside.path().join("orders.sql"), b"SELECT 1").expect("target");
         std::fs::write(outside.path().join("other.sql"), b"SELECT 1").expect("other target");
         symlink(
@@ -127,7 +127,7 @@ fn given_linked_inputs_when_targets_change_then_compile_reuse_is_invalidated() {
             project.path().join("orders.sql"),
         )
         .expect("file link");
-        symlink(outside.path().join("models"), project.path().join("models"))
+        symlink(outside.path().join("sql/models"), project.path().join("sql/models"))
             .expect("directory link");
         let stored: Vec<StoredProjectFile> =
             snapshot_project_files(project.path(), &SnapshotRules::default())

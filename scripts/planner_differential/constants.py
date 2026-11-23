@@ -39,7 +39,7 @@ COPY_IGNORED: tuple[str, ...] = (
 
 STATE_TABLE_PREFIX: str = "_sqlbuild"
 ADDED_MODEL_NAME: str = "planner_differential_added"
-ADDED_MODEL_PATH: str = "models/planner_differential_added.sql"
+ADDED_MODEL_PATH: str = "sql/models/planner_differential_added.sql"
 ADDED_COLUMN_NAME: str = "planner_differential_flag"
 RENAMED_SUFFIX: str = "_renamed"
 EDITED_DESCRIPTION: str = "Edited by the planner differential."

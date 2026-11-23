@@ -44,7 +44,7 @@ def delivery_model_files() -> dict[str, str]:
     columns: str = "\n".join(f"    {name} (audits [not_null])," for name in ORDER_COLUMNS)
     selected: str = ",\n  ".join(f"1 AS {name}" for name in ORDER_COLUMNS)
     return {
-        "models/customers.sql": dedent(
+        "sql/models/customers.sql": dedent(
             """
             MODEL (description "Test model customers.",
               materialized table,
@@ -56,7 +56,7 @@ def delivery_model_files() -> dict[str, str]:
             SELECT 1 AS customer_id
             """
         ).lstrip(),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.',\n  materialized table,\n  columns (\n"
             f"{columns}\n"
             "  ),\n);\n\n"
@@ -75,7 +75,7 @@ def recording_sink_source(*, event_kinds: str, delay_seconds: float) -> str:
         import time
         from pathlib import Path
 
-        from sqlbuild.sinks import (
+        from sqlbuild.event_sinks import (
             LifecycleEvent,
             LifecycleEventKind,
             lifecycle_event_sink,
@@ -102,7 +102,7 @@ def slow_once_sink_source(*, slow_call: int) -> str:
         import time
         from pathlib import Path
 
-        from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink, lifecycle_event_to_json
+        from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink, lifecycle_event_to_json
 
         CALLS: list[int] = []
 
@@ -155,7 +155,7 @@ def audit_meta_project_files(
             database = "audit_meta.duckdb"
             """
         ).lstrip(),
-        "audits/generic/valid_order_rate.sql": dedent(
+        "sql/audits/generic/valid_order_rate.sql": dedent(
             """
             AUDIT (
               evaluation measurement,
@@ -172,10 +172,10 @@ def audit_meta_project_files(
             );
             """
         ).lstrip(),
-        "audits/generic/expression_is_true.sql": (
+        "sql/audits/generic/expression_is_true.sql": (
             "AUDIT ();\n\nSELECT * FROM @relation WHERE NOT (@expression)\n"
         ),
-        "python/factories/order_quality.py": dedent(
+        "python/nodes/factories/order_quality.py": dedent(
             """
             from sqlbuild.audits import AuditCase, AuditSeverity, audit_factory
 
@@ -193,7 +193,7 @@ def audit_meta_project_files(
                 ]
             """
         ).lstrip(),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (\n"
             '  description "Test model orders.",\n'
             "  materialized table,\n"
@@ -229,7 +229,7 @@ def prepare_audit_meta_project(*, tmp_path: Path, measurement_options: str) -> P
         project_name="audit_meta",
         repo_files={
             **audit_meta_project_files(measurement_options=measurement_options),
-            "sinks/orders_events.py": recording_sink_source(
+            "python/event_sinks/orders_events.py": recording_sink_source(
                 event_kinds="{LifecycleEventKind.AUDIT}", delay_seconds=0
             ),
         },
@@ -315,7 +315,7 @@ def plan_reasons(project_dir: Path) -> dict[str, str]:
     }
 
 
-GENERIC_AUDIT_PATH: str = "audits/generic/unique_within_group.sql"
+GENERIC_AUDIT_PATH: str = "sql/audits/generic/unique_within_group.sql"
 
 
 def generic_audit_project_files(*, arguments: str) -> dict[str, str]:
@@ -332,7 +332,7 @@ def generic_audit_project_files(*, arguments: str) -> dict[str, str]:
             "FROM @relation\nWHERE @column IS NOT NULL\nGROUP BY @group_columns\n"
             "HAVING COUNT(DISTINCT @column) > 1\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.',\n  materialized table,\n  columns (\n"
             f"    status (audits [unique_within_group ({arguments})]),\n  ),\n);\n\n"
             "SELECT 1 AS order_id, 'open' AS status, 'web' AS channel\n"

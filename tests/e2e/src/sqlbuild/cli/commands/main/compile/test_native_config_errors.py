@@ -35,7 +35,7 @@ _COUNTED_MART: str = FAILURE_BASE_MART.replace("SUM(amount)", "SUM(@py.counted('
 _UPSTREAM_MACRO: str = _COUNTED_MACRO.replace(
     "def counted(expression: str) -> str:", "def upstream() -> str:"
 ).replace("    return expression\n", "    return '__ref(\"ghost\")'\n")
-_STAGING_PATH: str = "models/staging/stg_orders.sql"
+_STAGING_PATH: str = "sql/models/staging/stg_orders.sql"
 _STAGING_BODY: str = (
     '\n);\n\nSELECT order_id, customer_id, amount, status\nFROM __source("raw_orders")\n'
 )
@@ -45,8 +45,8 @@ _INCREMENTAL: str = (
 )
 _FALLBACKS: tuple[tuple[ModuleType, str], ...] = ((_native, "expand_template_data"),)
 _PROJECT_FILES: dict[str, str] = {
-    "macros/python/counted.py": _COUNTED_MACRO,
-    "models/marts/customer_totals.sql": _COUNTED_MART,
+    "sql/macros/python/counted.py": _COUNTED_MACRO,
+    "sql/models/marts/customer_totals.sql": _COUNTED_MART,
     _CALL_LOG: "",
 }
 
@@ -160,8 +160,8 @@ def test_given_config_error_when_compiling_then_the_error_is_reported_without_fa
         MacroExpandedValidatorErrorTestCase(
             description="unknown_model_reference_from_a_macro",
             project_files={
-                "macros/python/upstream.py": _UPSTREAM_MACRO,
-                "models/marts/customer_totals.sql": (
+                "sql/macros/python/upstream.py": _UPSTREAM_MACRO,
+                "sql/models/marts/customer_totals.sql": (
                     'MODEL (\n  description "Order totals per customer",\n);\n\n'
                     "SELECT * FROM @py.upstream()\n"
                 ),

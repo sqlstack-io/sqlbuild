@@ -47,12 +47,12 @@ JOB_PROJECT_FILES: dict[str, str] = {
         '[targets.development]\nschema = "main"\n'
         '[vars]\namount = "1"\n'
     ),
-    "seeds/raw_orders.csv": "id\n1\n2\n",
-    "seeds/raw_orders.yml": (
+    "sql/seeds/raw_orders.csv": "id\n1\n2\n",
+    "sql/seeds/raw_orders.yml": (
         "seeds:\n  - name: raw_orders\n    description: Raw orders.\n    columns:\n"
         "      - name: id\n        type: INTEGER\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Orders with their amount.', materialized incremental,\n"
         "  incremental_strategy append, cursor id, cursor_type integer);\n"
         'SELECT id, CAST(@@amount AS INTEGER) AS amount FROM __seed("raw_orders")\n'
@@ -83,7 +83,7 @@ LOADER_PROJECT_FILES: dict[str, str] = {
         '[targets.development]\nschema = "main"\n'
         "[settings]\nconcurrency = 1\n"
     ),
-    "sources/loaded.yml": (
+    "sql/sources/loaded.yml": (
         "sources:\n"
         "  - name: raw_customers\n    description: Customers.\n    managed: true\n"
         "    write_strategy: table\n    table: raw_customers\n    columns:\n"
@@ -92,7 +92,7 @@ LOADER_PROJECT_FILES: dict[str, str] = {
         "    write_strategy: table\n    table: raw_inventory\n    columns:\n"
         "      - name: product_id\n        type: BIGINT\n"
     ),
-    "python/loaders/loaded.py": (
+    "python/nodes/loaders/loaded.py": (
         '"""Two loaders that record each run in the warehouse log."""\n\n'
         "import os\nfrom pathlib import Path\n\nfrom sqlbuild.loaders import loader\n\n\n"
         "def _record(name):\n"
@@ -109,7 +109,7 @@ LOADER_PROJECT_FILES: dict[str, str] = {
         '    _record("stage_inventory")\n'
         '    return [{"product_id": 2}]\n'
     ),
-    "models/customers.sql": (
+    "sql/models/customers.sql": (
         "MODEL (description 'Loaded customers.', materialized table);\n"
         'SELECT customer_id FROM __source("raw_customers")\n'
     ),

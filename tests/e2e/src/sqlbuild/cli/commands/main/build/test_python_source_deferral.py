@@ -27,15 +27,15 @@ _PROJECT_FILES: dict[str, str] = {
         '[targets.dev]\nschema = "dev"\nloader_schema = "raw_dev"\ndefer_sources_to = "prod"\n\n'
         '[targets.prod]\nschema = "prod"\nloader_schema = "raw_prod"\n'
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    managed: true\n    write_strategy: table\n"
         "    columns:\n      - name: order_id\n        type: INTEGER\n"
     ),
-    "python/loaders/raw.py": (
+    "python/nodes/loaders/raw.py": (
         "from sqlbuild.loaders import loader\n\n\n"
         "@loader\ndef raw_orders(ctx):\n    '''Test loader raw_orders.'''\n    return [{'order_id': 9}]\n"
     ),
-    "models/sales/_sqlbuild/_hooks/python/count.py": (
+    "sql/models/sales/_sqlbuild/_hooks/python/count.py": (
         "from sqlbuild.hooks import hook\nfrom sqlbuild.refs import source\n\n\n"
         '@hook(reads=source("raw_orders"))\n'
         "def count_raw(ctx):\n"
@@ -43,14 +43,14 @@ _PROJECT_FILES: dict[str, str] = {
         '    ctx.execute_sql(f"CREATE OR REPLACE TABLE main.hook_counts AS '
         'SELECT count(*) AS n FROM {raw}")\n'
     ),
-    "models/sales/order_count.sql": (
+    "sql/models/sales/order_count.sql": (
         'MODEL (description "Test model order_count.", materialized table, post_hooks [python("count_raw")]);\n'
         'SELECT count(*) AS n FROM __source("raw_orders")\n'
     ),
-    "models/sales/order_marker.sql": (
+    "sql/models/sales/order_marker.sql": (
         'MODEL (description "Test model order_marker.", materialized table, post_hooks [python("count_raw")]);\nSELECT 1 AS n\n'
     ),
-    "python/tasks/count.py": (
+    "python/nodes/tasks/count.py": (
         "from sqlbuild.refs import source\nfrom sqlbuild.assets import asset\n\n\n"
         '@asset(depends_on=source("raw_orders"))\n'
         "def count_task(ctx):\n"
@@ -58,7 +58,7 @@ _PROJECT_FILES: dict[str, str] = {
         '    ctx.execute_sql(f"CREATE OR REPLACE TABLE main.task_counts AS '
         'SELECT count(*) AS n FROM {raw}")\n'
     ),
-    "python/checks/count.py": (
+    "python/nodes/checks/count.py": (
         "from sqlbuild.checks import check\nfrom sqlbuild.refs import source\n\n\n"
         '@check(depends_on=source("raw_orders"))\n'
         "def two_raw_orders(ctx):\n"

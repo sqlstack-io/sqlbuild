@@ -58,10 +58,10 @@ def test_given_python_check_when_building_then_completion_line_reports_its_outco
                 'name = "python_check_outcomes"\nadapter = "duckdb"\n\n'
                 '[connection]\ndatabase = "warehouse.duckdb"\n\n[defaults]\nmaterialized = "table"\n'
             ),
-            "models/fact_orders.sql": (
+            "sql/models/fact_orders.sql": (
                 "MODEL (description 'Test model fact_orders.');\nSELECT 1 AS order_id\n"
             ),
-            "python/checks/orders.py": (
+            "python/nodes/checks/orders.py": (
                 "from sqlbuild.checks import check\nfrom sqlbuild.refs import model\n\n\n"
                 f"{test_case.check_decorator}\n"
                 "def orders_checked(ctx):\n"

@@ -19,23 +19,23 @@ fn given_sql_test_facts_when_evaluating_project_rules_then_returns_expected_faul
     scope["resources"] = json!([
         {
             "identity": "model:stg_orders", "kind": "model", "name": "stg_orders",
-            "path": "models/commerce/staging/stg_orders.sql", "ownership_root": "models",
+            "path": "sql/models/commerce/staging/stg_orders.sql", "ownership_root": "models",
             "ownership_root_kind": "model"
         },
         {
             "identity": "model:fact_orders", "kind": "model", "name": "fact_orders",
-            "path": "models/commerce/marts/fact_orders.sql", "ownership_root": "models",
+            "path": "sql/models/commerce/marts/fact_orders.sql", "ownership_root": "models",
             "ownership_root_kind": "model"
         },
         {
             "identity": "model:daily_revenue", "kind": "model", "name": "daily_revenue",
-            "path": "models/finance/marts/daily_revenue.sql", "ownership_root": "models",
+            "path": "sql/models/finance/marts/daily_revenue.sql", "ownership_root": "models",
             "ownership_root_kind": "model"
         },
         {
             "identity": "model:commerce__mart_v_order", "kind": "model",
             "name": "commerce__mart_v_order",
-            "path": "models/commerce/marts/commerce__mart_v_order.sql", "ownership_root": "models",
+            "path": "sql/models/commerce/marts/commerce__mart_v_order.sql", "ownership_root": "models",
             "ownership_root_kind": "model"
         }
     ]);
@@ -61,16 +61,16 @@ fn given_sql_test_facts_when_evaluating_project_rules_then_returns_expected_faul
             "kind": "macro",
             "name": "order_policy",
             "owner": null,
-            "path": "models/commerce/staging/_sqlbuild/_macros/policy.py",
+            "path": "sql/models/commerce/staging/_sqlbuild/_macros/policy.py",
             "line": 1,
             "column": 1,
             "scope": "local",
             "role": "macros",
             "visibility": "exact_owner_private",
-            "role_root": "models/commerce/staging/_sqlbuild/_macros",
+            "role_root": "sql/models/commerce/staging/_sqlbuild/_macros",
             "bucket_path": null,
             "ownership_root": "models",
-            "owning_path": "models/commerce/staging",
+            "owning_path": "sql/models/commerce/staging",
             "metadata": {"macro": {
                 "parameters": [],
                 "dependencies": [],

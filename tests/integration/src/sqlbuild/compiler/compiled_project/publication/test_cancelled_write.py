@@ -130,7 +130,7 @@ def test_given_steps_finishing_as_a_cancel_lands_when_a_write_is_cancelled_then_
         warehouse_query="",
         expected_status="cancelled",
         expected_rows=[],
-        files={"python/steps.py": _STEPS.format(directory=str(tmp_path))} | test_case.files,
+        files={"python/nodes/steps.py": _STEPS.format(directory=str(tmp_path))} | test_case.files,
         default_job_files={
             "orchestration/jobs/annual_orders_job.toml": (
                 'name = "annual_orders_job"\n'

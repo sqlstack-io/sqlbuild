@@ -138,11 +138,11 @@ fn given_blocked_models_when_building_guard_report_then_names_sizes_and_commands
         SizeGuardTestCase {
             description: "model without cursor omits bounded command and quotes key flags",
             request: request(|facts| {
-                facts.select = strings(&["tag:daily", "path:models/marts"]);
+                facts.select = strings(&["tag:daily", "path:sql/models/marts"]);
                 facts.unique_key_override = strings(&["order_id", "line number"]);
             }),
             has_cursor: false,
-            expected_full: "sqb diff prod:dev --full --select tag:daily path:models/marts --key order_id 'line number'",
+            expected_full: "sqb diff prod:dev --full --select tag:daily path:sql/models/marts --key order_id 'line number'",
             expected_bounded: None,
             expected_fragments: &["; no cursor"],
         },

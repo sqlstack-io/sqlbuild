@@ -110,7 +110,7 @@ fn text(value: Option<&Value>) -> String {
 pub(super) fn dynamic_summary(raw: &Value) -> Result<Vec<String>, String> {
     crate::header_metadata::main::parse_dynamic_columns::parse_dynamic_columns(
         raw,
-        ("orders", "models/orders.sql"),
+        ("orders", "sql/models/orders.sql"),
     )
     .map(|families| {
         families
@@ -132,7 +132,7 @@ pub(super) fn dynamic_summary(raw: &Value) -> Result<Vec<String>, String> {
 pub(super) fn factory_summary(raw: &Value) -> Result<Vec<String>, String> {
     crate::header_metadata::main::audit_factory_references::audit_factory_references(
         raw,
-        ("orders", "models/orders.sql"),
+        ("orders", "sql/models/orders.sql"),
         &["freshness".to_owned(), "daily_checks".to_owned()],
     )
     .map_err(stop_summary)

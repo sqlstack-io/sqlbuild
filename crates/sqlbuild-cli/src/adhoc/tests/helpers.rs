@@ -31,25 +31,25 @@ pub(super) fn owned_plan(
 pub(super) fn orders_publication()
 -> std::sync::Arc<dyn sqlbuild_orchestration::runs::types::PreparedPublication> {
     let resources = vec![
-        resource("model:stg_orders", &[], &["orders"], Some("models/staging")),
+        resource("model:stg_orders", &[], &["orders"], Some("sql/models/staging")),
         resource(
             "model:orders",
             &["model:stg_orders"],
             &["orders"],
-            Some("models/marts"),
+            Some("sql/models/marts"),
         ),
-        resource("model:customers", &[], &[], Some("models/marts")),
+        resource("model:customers", &[], &[], Some("sql/models/marts")),
         resource(
             "asset:partner_orders_file",
             &["model:orders"],
             &["orders"],
-            Some("python/orders/partner_export"),
+            Some("python/nodes/orders/partner_export"),
         ),
         resource(
             "asset:request_carrier_collection",
             &["asset:partner_orders_file"],
             &["orders"],
-            Some("python/fulfillment/carrier_sync"),
+            Some("python/nodes/fulfillment/carrier_sync"),
         ),
         PlannerResource {
             loader: Some("raw_shipments".to_owned()),
@@ -59,15 +59,15 @@ pub(super) fn orders_publication()
             "model:shipments",
             &["source:raw_shipments"],
             &[],
-            Some("models/marts"),
+            Some("sql/models/marts"),
         ),
         resource(
             "loader:raw_shipments",
             &["loader:stage_shipments"],
             &[],
-            Some("python/loaders"),
+            Some("python/nodes/loaders"),
         ),
-        resource("loader:stage_shipments", &[], &[], Some("python/loaders")),
+        resource("loader:stage_shipments", &[], &[], Some("python/nodes/loaders")),
     ];
     let jobs = sqlbuild_orchestration::runs::models::PublishedJobs {
         selections: std::collections::BTreeMap::from([(

@@ -299,10 +299,10 @@ def test_given_custom_materialization_when_audit_finds_rows_in_staging_then_bloc
             description="custom materialization dispatched through scheduler alongside regular table",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "models/regular.sql": (
+                "sql/models/regular.sql": (
                     "MODEL (description 'Test model regular.', materialized table);\n\nSELECT 1 AS id, 'regular' AS name"
                 ),
-                "models/custom_model.sql": (
+                "sql/models/custom_model.sql": (
                     "MODEL (description 'Test model custom_model.', materialized test_custom);\n\nSELECT 2 AS id, 'custom' AS name"
                 ),
             },
@@ -320,10 +320,10 @@ def test_given_custom_materialization_when_audit_finds_rows_in_staging_then_bloc
             description="custom materialization downstream of regular table receives correct data",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "models/upstream.sql": (
+                "sql/models/upstream.sql": (
                     "MODEL (description 'Test model upstream.', materialized table);\n\nSELECT 10 AS id, 'upstream' AS origin"
                 ),
-                "models/downstream_custom.sql": (
+                "sql/models/downstream_custom.sql": (
                     'MODEL (description "Test model downstream_custom.", materialized test_custom);\n\nSELECT id, origin FROM __ref("upstream")'
                 ),
             },
@@ -355,8 +355,8 @@ def test_given_build_with_custom_materialization_when_scheduled_then_routes_corr
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(contents, encoding="utf-8")
 
-    # Also create the materializations/ directory with test_custom.py
-    mat_dir: Path = project_dir / "materializations"
+    # Also create the python/materializations/ directory with test_custom.py
+    mat_dir: Path = project_dir / "python" / "nodes" / "python" / "materializations"
     mat_dir.mkdir()
     (mat_dir / "test_custom.py").write_text(
         "def materialize(ctx):\n"

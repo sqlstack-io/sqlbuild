@@ -17,7 +17,7 @@ from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
     InvalidResourceIdentityTestCase,
 )
 
-_RESOURCE_PATH: Path = Path("models/example.sql")
+_RESOURCE_PATH: Path = Path("sql/models/example.sql")
 
 
 @pytest.mark.parametrize(
@@ -120,13 +120,13 @@ def test_given_noncanonical_name_when_validating_resource_identity_then_coded_er
     [
         DiscoveredResourceIdentityErrorTestCase(
             description="model filename",
-            project_files={"models/DailyOrders.sql": "MODEL ();\n\nSELECT 1\n"},
+            project_files={"sql/models/DailyOrders.sql": "MODEL ();\n\nSELECT 1\n"},
             expected_error_fragment="Invalid model identity 'DailyOrders'",
         ),
         DiscoveredResourceIdentityErrorTestCase(
             description="source declaration",
             project_files={
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw-Orders\n"
                     "    database: analytics\n"
@@ -138,7 +138,7 @@ def test_given_noncanonical_name_when_validating_resource_identity_then_coded_er
         ),
         DiscoveredResourceIdentityErrorTestCase(
             description="SQL function filename",
-            project_files={"functions/sql/CalculateTax.sql": "FUNCTION (returns INTEGER);\n\n1\n"},
+            project_files={"sql/functions/sql/CalculateTax.sql": "FUNCTION (returns INTEGER);\n\n1\n"},
             expected_error_fragment="Invalid function identity 'CalculateTax'",
         ),
         DiscoveredResourceIdentityErrorTestCase(
@@ -148,13 +148,13 @@ def test_given_noncanonical_name_when_validating_resource_identity_then_coded_er
         ),
         DiscoveredResourceIdentityErrorTestCase(
             description="standalone audit name",
-            project_files={"audits/singular/orders.sql": "AUDIT (name OrderRule);\n\nSELECT 1\n"},
+            project_files={"sql/audits/singular/orders.sql": "AUDIT (name OrderRule);\n\nSELECT 1\n"},
             expected_error_fragment="Invalid audit identity 'OrderRule'",
         ),
         DiscoveredResourceIdentityErrorTestCase(
             description="generic audit filename",
             project_files={
-                "audits/generic/OrderRule.sql": (
+                "sql/audits/generic/OrderRule.sql": (
                     "AUDIT (name valid_block_name);\n\nSELECT * FROM @relation\n"
                 )
             },
@@ -163,22 +163,22 @@ def test_given_noncanonical_name_when_validating_resource_identity_then_coded_er
         DiscoveredResourceIdentityErrorTestCase(
             description="generic audit explicit instance name",
             project_files={
-                "audits/generic/order_rule.sql": (
+                "sql/audits/generic/order_rule.sql": (
                     "AUDIT (name OrderRule);\n\nSELECT * FROM @relation\n"
                 ),
-                "models/orders.sql": "MODEL (audits [order_rule]);\n\nSELECT 1\n",
+                "sql/models/orders.sql": "MODEL (audits [order_rule]);\n\nSELECT 1\n",
             },
             expected_error_fragment="Invalid generic audit instance identity 'OrderRule'",
         ),
         DiscoveredResourceIdentityErrorTestCase(
             description="public declaration with private spelling",
-            project_files={"constants/orders.sql": "CONSTANT (name _tax_rate, value 20);\n"},
+            project_files={"sql/constants/orders.sql": "CONSTANT (name _tax_rate, value 20);\n"},
             expected_error_fragment="Invalid public constant identity '_tax_rate'",
         ),
         DiscoveredResourceIdentityErrorTestCase(
             description="private model declaration without private spelling",
             project_files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     'MODEL (constants (tax_rate 20));\n\nSELECT @const("tax_rate")\n'
                 )
             },
@@ -187,14 +187,14 @@ def test_given_noncanonical_name_when_validating_resource_identity_then_coded_er
         DiscoveredResourceIdentityErrorTestCase(
             description="SQL hook filename",
             project_files={
-                "hooks/sql/GrantAccess.sql": "HOOK ();\n\nGRANT SELECT ON orders TO analyst\n"
+                "sql/hooks/sql/GrantAccess.sql": "HOOK ();\n\nGRANT SELECT ON orders TO analyst\n"
             },
             expected_error_fragment="Invalid SQL hook identity 'GrantAccess'",
         ),
         DiscoveredResourceIdentityErrorTestCase(
             description="Python asset name",
             project_files={
-                "python/tasks/orders.py": (
+                "python/nodes/tasks/orders.py": (
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def DailyTask(ctx):\n"

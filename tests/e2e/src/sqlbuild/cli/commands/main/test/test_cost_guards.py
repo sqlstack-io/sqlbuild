@@ -36,23 +36,23 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
 
 _ORDER_FILES: dict[str, str] = {
     "sqlbuild_project.toml": COST_GUARD_PROJECT_TOML,
-    "models/stg_orders.sql": (
+    "sql/models/stg_orders.sql": (
         "MODEL (description 'Staged orders.', materialized table);\n\n"
         "SELECT * FROM (VALUES (1, 100, 5)) AS t(order_id, customer_id, amount)\n"
     ),
-    "models/order_totals.sql": (
+    "sql/models/order_totals.sql": (
         "MODEL (description 'Order totals.', materialized table);\n\n"
         'SELECT order_id, customer_id, amount * 2 AS total FROM __ref("stg_orders")\n'
     ),
 }
 _SLOW_FILES: dict[str, str] = {
     "sqlbuild_project.toml": COST_GUARD_PROJECT_TOML,
-    "sources/raw_orders.yml": COST_GUARD_RAW_ORDERS_SOURCE,
-    "models/stg_orders.sql": (
+    "sql/sources/raw_orders.yml": COST_GUARD_RAW_ORDERS_SOURCE,
+    "sql/models/stg_orders.sql": (
         "MODEL (description 'Staged orders.', materialized table);\n\n"
         f'SELECT order_id, {SLOW_SCALAR_SQL} AS scanned FROM __source("raw_orders")\n'
     ),
-    "models/order_scans.sql": (
+    "sql/models/order_scans.sql": (
         "MODEL (description 'Order scans.', materialized table);\n\n"
         'SELECT order_id, scanned FROM __ref("stg_orders")\n'
     ),
@@ -458,7 +458,7 @@ def test_given_model_limit_expiring_in_promotion_when_building_then_published_ta
         database=database, max_duration=test_case.max_duration, order_total=20, customer_id=200
     )
     relative_path: str
-    for relative_path in ("models/order_totals.sql", "models/z_customers.sql"):
+    for relative_path in ("sql/models/order_totals.sql", "sql/models/z_customers.sql"):
         (project_dir / relative_path).write_text(changed_files[relative_path])
 
     result: subprocess.CompletedProcess[str] = run_sqb(

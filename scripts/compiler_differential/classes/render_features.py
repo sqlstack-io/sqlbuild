@@ -79,7 +79,7 @@ class RenderFeatureWriter:
         self._files[self._owned(role="enums", name="render_channel.sql")] = (
             'ENUM (\n  name render_channel,\n  members (WEB "web", STORE "store"),\n);\n'
         )
-        self._files[self._owned(role="macros", name="python/policy.py")] = (
+        self._files[self._owned(role="macros", name="python/nodes/policy.py")] = (
             "import os\n\n\n"
             "def minimum_amount_filter(ctx, column: str) -> str:\n"
             '    """Keep rows at or above the configured minimum amount."""\n'
@@ -117,7 +117,7 @@ class RenderFeatureWriter:
             else (self._staging * 2)
         )
         source: str = self._random.choice(self._sources)
-        self._files[self._owned(role="macros", name="python/relations.py")] = (
+        self._files[self._owned(role="macros", name="python/nodes/relations.py")] = (
             "from sqlbuild.refs import SqlResourceRef\n\n\n"
             "def union_ids(relations: list[SqlResourceRef]) -> str:\n"
             '    """Union the ids of several relations."""\n'
@@ -152,7 +152,7 @@ class RenderFeatureWriter:
         self._features.add("macro_generated_reference")
         base: ModelPlan = self._base()
         self.config_lines.extend(["", "[references]", "enforce_explicit = false"])
-        self._files[self._owned(role="macros", name="python/legacy.py")] = (
+        self._files[self._owned(role="macros", name="python/nodes/legacy.py")] = (
             "def legacy_events() -> str:\n"
             '    """Return a staged relation the way a migrated project wrote it."""\n'
             f"    return '__ref(\"{base.name}\")'\n"
@@ -167,7 +167,7 @@ class RenderFeatureWriter:
     def _table_function(self) -> None:
         self._features.add("table_function")
         base: ModelPlan = self._base()
-        self._files["functions/sql/table_fn__events_above.sql"] = (
+        self._files["sql/functions/sql/table_fn__events_above.sql"] = (
             "FUNCTION (\n"
             '  description "Events above an amount",\n'
             "  arguments (p_minimum DOUBLE),\n"
@@ -187,11 +187,11 @@ class RenderFeatureWriter:
     def _interpolation(self) -> None:
         self._features.add("interpolation")
         base: ModelPlan = self._base()
-        self._files[self._owned(role="hooks/sql", name="announce_refresh.sql")] = (
+        self._files[self._owned(role="sql/hooks/sql", name="announce_refresh.sql")] = (
             'HOOK (\n  description "Announce one refreshed relation"\n);\n\n'
             "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label\n"
         )
-        self._files[self._owned(role="macros", name="python/notes.py")] = (
+        self._files[self._owned(role="macros", name="python/nodes/notes.py")] = (
             "def refresh_note(relation: str) -> str:\n"
             '    """Describe one refreshed relation."""\n'
             "    return f\"'refreshed ' || '{relation}'\"\n"
@@ -222,7 +222,7 @@ class RenderFeatureWriter:
         self._deferred_placeholder(base)
 
     def _deferred_placeholder(self, base: ModelPlan) -> None:
-        self._files["materializations/windowed_copy.py"] = (
+        self._files["python/materializations/windowed_copy.py"] = (
             "from sqlbuild.executor.custom.models import MaterializationContext, "
             "MaterializationResult\n\n\n"
             "def materialize(ctx: MaterializationContext) -> MaterializationResult:\n"
@@ -272,16 +272,16 @@ class RenderFeatureWriter:
         self._features.add("macros_across_resources")
         base: ModelPlan = self._base()
         source: str = base.inputs[0].split(":", 1)[1]
-        self._files["macros/python/labels.py"] = (
+        self._files["sql/macros/python/labels.py"] = (
             "def tidy_label(expression: str) -> str:\n"
             '    """Trim and lower-case a label."""\n'
             '    return f"LOWER(TRIM({expression}))"\n'
         )
-        self._files[self._owned(role="audits/generic", name="tidy_status.sql")] = (
+        self._files[self._owned(role="sql/audits/generic", name="tidy_status.sql")] = (
             'AUDIT ();\n\nSELECT *\nFROM __ref("@model")\nWHERE @column <> '
             '@py.tidy_label("@column")\n'
         )
-        self._files["functions/sql/tidy_status.sql"] = (
+        self._files["sql/functions/sql/tidy_status.sql"] = (
             "FUNCTION (\n"
             '  description "Normalise a status label.",\n'
             "  arguments (raw_status STRING),\n"
@@ -298,7 +298,7 @@ class RenderFeatureWriter:
                 f'FROM __ref("{base.name}")\n'
             ),
         )
-        self._files["sources/labelled.yml"] = (
+        self._files["sql/sources/labelled.yml"] = (
             "sources:\n"
             "  - name: labelled_channels\n"
             "    description: Channel labels normalised in the source expression.\n"
@@ -382,7 +382,7 @@ class RenderFeatureWriter:
 
     def _resource_audits(self) -> None:
         self._features.add("resource_audits")
-        self._files["sources/audited.yml"] = (
+        self._files["sql/sources/audited.yml"] = (
             "sources:\n"
             "  - name: audited_events\n"
             "    description: Events with source audits.\n"
@@ -398,8 +398,8 @@ class RenderFeatureWriter:
             "      - name: amount\n"
             "        type: DOUBLE\n"
         )
-        self._files["seeds/channel_codes.csv"] = f'id,label\n1,"{self._label()}"\n2,web\n'
-        self._files["seeds/channel_codes.yml"] = (
+        self._files["sql/seeds/channel_codes.csv"] = f'id,label\n1,"{self._label()}"\n2,web\n'
+        self._files["sql/seeds/channel_codes.yml"] = (
             "seeds:\n"
             "  - name: channel_codes\n"
             "    description: Channel codes with seed audits.\n"
@@ -411,7 +411,7 @@ class RenderFeatureWriter:
             "      - name: label\n"
             "        type: VARCHAR\n"
         )
-        self._files[self._owned(role="audits/generic", name="amount_floor.sql")] = (
+        self._files[self._owned(role="sql/audits/generic", name="amount_floor.sql")] = (
             'AUDIT ();\n\nSELECT *\nFROM __ref("@model")\nWHERE amount < @minimum\n'
         )
         self._model(
@@ -430,7 +430,7 @@ class RenderFeatureWriter:
         self._features.add("model_config")
         self.templated_target = True
         base: ModelPlan = self._base()
-        self._files[self._owned(role="audits/generic", name="configured_floor.sql")] = (
+        self._files[self._owned(role="sql/audits/generic", name="configured_floor.sql")] = (
             'AUDIT ();\n\nSELECT *\nFROM __ref("@model")\nWHERE amount < @minimum\n'
         )
         self._model(
@@ -456,7 +456,7 @@ class RenderFeatureWriter:
             ),
             body=f'SELECT id, amount, status\nFROM __ref("{base.name}")\n',
         )
-        self._files["sources/configured.yml"] = (
+        self._files["sql/sources/configured.yml"] = (
             "sources:\n"
             "  - name: configured_events\n"
             f'    description: "Configured feed ${{coalesce(ENV:{GENERATOR_MISSING_ENV_VAR}, '
@@ -474,7 +474,7 @@ class RenderFeatureWriter:
             "      - name: amount\n"
             "        type: DOUBLE\n"
         )
-        self._files["functions/sql/configured_label.sql"] = (
+        self._files["sql/functions/sql/configured_label.sql"] = (
             "FUNCTION (\n"
             '  description "Label a configured status.",\n'
             f"  schema \"${{coalesce(ENV:{GENERATOR_MISSING_ENV_VAR}, 'udfs')}}\",\n"

@@ -55,7 +55,7 @@ def test_given_managed_loader_watermark_when_reloaded_then_incremental_consumes_
                 """
             ).strip()
             + "\n",
-            "python/loaders/raw.py": (
+            "python/nodes/loaders/raw.py": (
                 "from pathlib import Path\n"
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
@@ -64,7 +64,7 @@ def test_given_managed_loader_watermark_when_reloaded_then_incremental_consumes_
                 "    return [{'id': value, 'amount': value * 100} "
                 "for value in range(1, maximum + 1)]\n"
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
@@ -75,7 +75,7 @@ def test_given_managed_loader_watermark_when_reloaded_then_incremental_consumes_
                 "      - name: amount\n"
                 "        type: INTEGER\n"
             ),
-            "models/raw_orders_incremental.sql": dedent(
+            "sql/models/raw_orders_incremental.sql": dedent(
                 """
                 MODEL (description "Test model raw_orders_incremental.",
                   materialized incremental,

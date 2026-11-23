@@ -88,7 +88,7 @@ _LINEAGE_CACHE_RELATIVE_PATH: Path = (
             command=(
                 "lineage",
                 "--select",
-                "path:models/staging",
+                "path:sql/models/staging",
                 "--exclude",
                 "tag:finance",
                 "--direction",
@@ -109,11 +109,11 @@ def test_given_directional_selectors_when_expanding_then_depth_and_exclusions_ar
     test_case: LineageCliTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = prepare_lineage_cache_project(tmp_path=tmp_path)
-    staging_dir: Path = project_dir / "models" / "staging"
+    staging_dir: Path = project_dir / "sql" / "models" / "staging"
     staging_dir.mkdir()
     for name in ("stg_orders.sql", "stg_customers.sql"):
-        (project_dir / "models" / name).rename(staging_dir / name)
-    (project_dir / "models" / "fact_orders.sql").write_text(
+        (project_dir / "sql" / "models" / name).rename(staging_dir / name)
+    (project_dir / "sql" / "models" / "fact_orders.sql").write_text(
         'MODEL (description "Test model fact_orders.", materialized view, tags [finance]);\nSELECT * FROM __ref("stg_orders")\n',
         encoding="utf-8",
     )
@@ -344,7 +344,7 @@ def test_given_authored_dependency_change_when_lineage_runs_then_rebuilds_struct
         project_dir=project_dir,
     )
     assert first.returncode == 0, first.stdout + first.stderr
-    (project_dir / "models/fact_orders.sql").write_text(
+    (project_dir / "sql/models/fact_orders.sql").write_text(
         "MODEL (description 'Test model fact_orders.', materialized view);\n\n"
         'SELECT orders.order_id FROM __ref("stg_orders") AS orders\n'
         'JOIN __ref("stg_customers") AS customers USING (customer_id)\n',
@@ -555,7 +555,7 @@ def test_given_diamond_dependencies_when_rendering_lineage_tree_then_output_stay
     (
         SharedSelectorCliTestCase(
             description="models-rooted path",
-            selector="path:models/staging",
+            selector="path:sql/models/staging",
             expected_node_ids=("model:stg_customers", "model:stg_orders", "model:stg_payments"),
             expected_selected_models=3,
             expected_selected_functions=0,
@@ -569,7 +569,7 @@ def test_given_diamond_dependencies_when_rendering_lineage_tree_then_output_stay
         ),
         SharedSelectorCliTestCase(
             description="path and tag intersection",
-            selector="path:models/marts,tag:acceptance",
+            selector="path:sql/models/marts,tag:acceptance",
             expected_node_ids=(
                 "model:daily_activity_rollup",
                 "model:hourly_activity_with_daily_context",

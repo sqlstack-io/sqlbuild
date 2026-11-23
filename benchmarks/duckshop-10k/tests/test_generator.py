@@ -27,7 +27,7 @@ def models(files: dict[str, str]) -> dict[str, str]:
     return {
         path: text
         for path, text in files.items()
-        if path.startswith("models/") and "/_sqlbuild/" not in path and path.endswith(".sql")
+        if path.startswith("sql/models/") and "/_sqlbuild/" not in path and path.endswith(".sql")
     }
 
 
@@ -100,14 +100,14 @@ def test_given_full_profile_when_scanning_then_uses_each_construct(
 
 def test_given_full_profile_when_scanning_then_writes_a_few_hundred_python_assets() -> None:
     files = full()
-    modules = [path for path in files if path.startswith("python/exports/")]
+    modules = [path for path in files if path.startswith("python/nodes/exports/")]
     assets = sum(
         files[path].count("\n@asset(") + files[path].startswith("@asset(") for path in modules
     )
 
     assert 350 <= assets <= 500
     assert len(modules) >= 40
-    assert all("from python.shared.export_feed import" in files[path] for path in modules)
+    assert all("from python.nodes.shared.export_feed import" in files[path] for path in modules)
 
 
 def test_given_known_divergence_constructs_when_scanning_then_models_are_tagged() -> None:
@@ -124,17 +124,17 @@ def test_given_generated_files_when_scanning_then_uses_only_synthetic_identifier
 
 
 def test_given_declarations_when_placing_then_follow_their_users() -> None:
-    assert _placement({"models/staging/a/x", "models/staging/b/y"}, "macros/sql") == (
-        "models/staging/_sqlbuild/macros/sql"
+    assert _placement({"sql/models/staging/a/x", "sql/models/staging/b/y"}, "sql/macros/sql") == (
+        "sql/models/staging/_sqlbuild/macros/sql"
     )
-    assert _placement({"models/staging/a"}, "constants") == "models/staging/a/_sqlbuild/_constants"
-    assert _placement({"models/staging/a", "tests/unit/b"}, "macros/sql") == "macros/sql"
-    assert _placement({"models/a", "models/b"}, "enums") == "enums"
+    assert _placement({"sql/models/staging/a"}, "constants") == "sql/models/staging/a/_sqlbuild/_constants"
+    assert _placement({"sql/models/staging/a", "tests/unit/b"}, "sql/macros/sql") == "sql/macros/sql"
+    assert _placement({"sql/models/a", "sql/models/b"}, "enums") == "enums"
 
 
 def test_given_full_profile_when_placing_then_every_used_declaration_is_written_once() -> None:
     files = full()
-    declared = [path for path in files if "/_sqlbuild/" in path or path.startswith("macros/")]
+    declared = [path for path in files if "/_sqlbuild/" in path or path.startswith("sql/macros/")]
     names = [Path(path).name for path in declared]
 
     assert len(names) == len(set(names))

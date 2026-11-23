@@ -24,8 +24,8 @@ from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
         DiscoverMaterializationFilesTestCase(
             description="discovers materialization files from materializations directory",
             files={
-                "materializations/partition_tracked.py": "def materialize(ctx): pass\n",
-                "materializations/atomic_swap.py": "def materialize(ctx): pass\n",
+                "python/materializations/partition_tracked.py": "def materialize(ctx): pass\n",
+                "python/materializations/atomic_swap.py": "def materialize(ctx): pass\n",
             },
             expected_names=("atomic_swap", "partition_tracked"),
         ),
@@ -37,8 +37,8 @@ from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
         DiscoverMaterializationFilesTestCase(
             description="skips __init__ files in materializations directory",
             files={
-                "materializations/__init__.py": "",
-                "materializations/custom_one.py": "def materialize(ctx): pass\n",
+                "python/materializations/__init__.py": "",
+                "python/materializations/custom_one.py": "def materialize(ctx): pass\n",
             },
             expected_names=("custom_one",),
         ),
@@ -70,7 +70,7 @@ def test_given_project_dir_when_discovering_materializations_then_returns_expect
         DiscoverMaterializationFilesTestCase(
             description="records custom materialization provider usage metadata",
             files={
-                "providers/marker.py": """
+                "python/providers/marker.py": """
 from sqlbuild.providers import Provider
 
 
@@ -78,8 +78,8 @@ class MarkerProvider(Provider):
     pass
 """.strip()
                 + "\n",
-                "materializations/copy_table.py": """
-from providers.marker import MarkerProvider
+                "python/materializations/copy_table.py": """
+from python.nodes.providers.marker import MarkerProvider
 
 
 def materialize(ctx, marker_provider: MarkerProvider):
@@ -115,4 +115,4 @@ def test_given_materialization_provider_parameter_when_discovering_then_records_
     assert usage.provider_name == "marker_provider"
     assert usage.parameter_name == "marker_provider"
     assert usage.annotation_class_name == "MarkerProvider"
-    assert usage.annotation_module == "providers.marker"
+    assert usage.annotation_module == "python.providers.marker"

@@ -41,14 +41,14 @@ pub(super) fn visible_schema_records() -> HashMap<String, NamedRecord> {
             "orders_schema".to_owned(),
             record(
                 0,
-                "models/sales/schemas/orders.yml",
+                "sql/models/sales/schemas/orders.yml",
                 ScopeKind::Inherited,
-                Some("models/sales"),
+                Some("sql/models/sales"),
             ),
         ),
         (
             "base_schema".to_owned(),
-            record(1, "schemas/base.yml", ScopeKind::Global, None),
+            record(1, "sql/schemas/base.yml", ScopeKind::Global, None),
         ),
     ])
 }
@@ -59,18 +59,18 @@ pub(super) fn hidden_schema_records() -> HashMap<String, NamedRecord> {
             "orders_schema".to_owned(),
             record(
                 0,
-                "models/sales/schemas/orders.yml",
+                "sql/models/sales/schemas/orders.yml",
                 ScopeKind::Inherited,
-                Some("models/sales"),
+                Some("sql/models/sales"),
             ),
         ),
         (
             "base_schema".to_owned(),
             record(
                 1,
-                "models/finance/schemas/base.yml",
+                "sql/models/finance/schemas/base.yml",
                 ScopeKind::Inherited,
-                Some("models/finance"),
+                Some("sql/models/finance"),
             ),
         ),
     ])
@@ -79,7 +79,7 @@ pub(super) fn hidden_schema_records() -> HashMap<String, NamedRecord> {
 pub(super) fn visible_enum_records() -> HashMap<String, NamedRecord> {
     HashMap::from([(
         "order_status".to_owned(),
-        record(2, "enums/status.yml", ScopeKind::Global, None),
+        record(2, "sql/enums/status.yml", ScopeKind::Global, None),
     )])
 }
 
@@ -88,9 +88,9 @@ pub(super) fn hidden_enum_records() -> HashMap<String, NamedRecord> {
         "order_status".to_owned(),
         record(
             2,
-            "models/finance/enums/status.yml",
+            "sql/models/finance/enums/status.yml",
             ScopeKind::Local,
-            Some("models/finance"),
+            Some("sql/models/finance"),
         ),
     )])
 }

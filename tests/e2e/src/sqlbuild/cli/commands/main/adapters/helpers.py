@@ -18,7 +18,7 @@ def prepare_project_with_local_adapter(*, tmp_path: Path) -> Path:
                 "[connection]\n"
                 'database = "local.duckdb"\n'
             ),
-            "adapters/warehouse/duckdb_plus.py": (
+            "python/adapters/warehouse/duckdb_plus.py": (
                 "from sqlbuild.adapter.contract.models import QueryResult\n"
                 "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
                 "class DuckDbPlusAdapter(DuckDbAdapter):\n"
@@ -47,7 +47,7 @@ def prepare_project_with_rendering_adapter(*, tmp_path: Path) -> Path:
                 "[connection]\n"
                 'database = "local.duckdb"\n'
             ),
-            "adapters/duckdb_marked.py": (
+            "python/adapters/duckdb_marked.py": (
                 "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
                 "class DuckDbMarkedAdapter(DuckDbAdapter):\n"
                 "    adapter_name = 'duckdb_marked'\n\n"
@@ -58,7 +58,7 @@ def prepare_project_with_rendering_adapter(*, tmp_path: Path) -> Path:
                 "            'SELECT 1 AS marked',\n"
                 "        )\n"
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 'MODEL (description "Orders", materialized table);\n\n'
                 "SELECT 1 AS order_id, 'shipped' AS status\n"
             ),

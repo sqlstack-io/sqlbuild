@@ -48,8 +48,8 @@ _TARGET_CONFIG_RECORDER: str = (
     "        out.write(json.dumps(line) + '\\n')\n"
 )
 _TARGET_PROBE_SINK: str = (
-    "from providers.target_probe import TargetProbe\n"
-    "from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink\n\n"
+    "from python.nodes.providers.target_probe import TargetProbe\n"
+    "from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink\n\n"
     "@lifecycle_event_sink\n"
     "def probe_events(event: LifecycleEvent, target_probe: TargetProbe) -> None:\n"
     "    del event, target_probe\n"
@@ -151,9 +151,9 @@ def test_given_changed_unselected_upstream_when_building_leaf_then_warns_and_noo
                 "[connection]\n"
                 f'database = "{test_case.project_name}.duckdb"\n'
             ),
-            "models/a.sql": "MODEL (description 'Test model a.', materialized table);\n\nselect 1 as id\n",
-            "models/b.sql": "MODEL (description 'Test model b.', materialized table);\n\nselect 1 as id\n",
-            "models/c.sql": (
+            "sql/models/a.sql": "MODEL (description 'Test model a.', materialized table);\n\nselect 1 as id\n",
+            "sql/models/b.sql": "MODEL (description 'Test model b.', materialized table);\n\nselect 1 as id\n",
+            "sql/models/c.sql": (
                 "MODEL (description 'Test model c.', materialized table);\n\n"
                 'select id from __ref("a") union all select id from __ref("b")\n'
             ),
@@ -164,11 +164,11 @@ def test_given_changed_unselected_upstream_when_building_leaf_then_warns_and_noo
         command=test_case.initial_command,
         project_dir=project_dir,
     )
-    (project_dir / "models" / "a.sql").write_text(
+    (project_dir / "sql" / "models" / "a.sql").write_text(
         "MODEL (description 'Test model a.', materialized table);\n\nselect 10 as id\n",
         encoding="utf-8",
     )
-    (project_dir / "models" / "b.sql").write_text(
+    (project_dir / "sql" / "models" / "b.sql").write_text(
         "MODEL (description 'Test model b.', materialized table);\n\nselect 2 as id\n",
         encoding="utf-8",
     )
@@ -226,10 +226,10 @@ def test_given_direct_function_dependency_when_building_then_persists_function_h
                 "[connection]\n"
                 'database = "warehouse.duckdb"\n'
             ),
-            "functions/sql/is_large_order.sql": (
+            "sql/functions/sql/is_large_order.sql": (
                 "FUNCTION (description 'Test function is_large_order.', arguments (amount INTEGER), returns BOOLEAN);\n\namount > 100\n"
             ),
-            "models/fact_orders.sql": (
+            "sql/models/fact_orders.sql": (
                 'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT __udf("is_large_order")(150) AS is_large\n'
             ),
         },
@@ -286,7 +286,7 @@ def test_given_source_freshness_changes_during_build_when_appending_then_persist
                 "[connection]\n"
                 'database = "warehouse.duckdb"\n'
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    expression: SELECT 1 AS order_id\n"
@@ -295,7 +295,7 @@ def test_given_source_freshness_changes_during_build_when_appending_then_persist
                 "      type: integer\n"
                 "      query: SELECT data_version FROM freshness_control\n"
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 'MODEL (description "Test model orders.", materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
             ),
         },
@@ -315,7 +315,7 @@ def test_given_source_freshness_changes_during_build_when_appending_then_persist
         db_path=project_dir / "warehouse.duckdb",
         sql="UPDATE freshness_control SET data_version = 1",
     )
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         (
             "MODEL (description 'Test model orders.', materialized table, "
             'post_hooks [inline_sql("UPDATE freshness_control SET data_version = 2")]);\n\n'
@@ -376,7 +376,7 @@ def test_given_independent_source_branch_failure_when_building_then_appends_succ
                 "[connection]\n"
                 'database = "warehouse.duckdb"\n'
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    expression: SELECT 1 AS order_id\n"
@@ -391,10 +391,10 @@ def test_given_independent_source_branch_failure_when_building_then_appends_succ
                 "      type: integer\n"
                 "      query: SELECT 1 AS data_version\n"
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 'MODEL (description "Test model orders.", materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
             ),
-            "models/payments.sql": (
+            "sql/models/payments.sql": (
                 'MODEL (description "Test model payments.", materialized table);\n\nSELECT * FROM __source("raw_payments")\n'
             ),
         },
@@ -413,7 +413,7 @@ def test_given_independent_source_branch_failure_when_building_then_appends_succ
     assert first_changes_only_result.returncode == 0, (
         first_changes_only_result.stdout + first_changes_only_result.stderr
     )
-    (project_dir / "sources" / "raw.yml").write_text(
+    (project_dir / "sql" / "sources" / "raw.yml").write_text(
         "sources:\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    expression: SELECT 1 AS order_id\n"
@@ -429,7 +429,7 @@ def test_given_independent_source_branch_failure_when_building_then_appends_succ
         "      query: SELECT 2 AS data_version\n",
         encoding="utf-8",
     )
-    (project_dir / "models" / "payments.sql").write_text(
+    (project_dir / "sql" / "models" / "payments.sql").write_text(
         "MODEL (description 'Test model payments.', materialized table);\n\nSELECT CAST('bad' AS INTEGER) AS payment_id\n",
         encoding="utf-8",
     )
@@ -498,19 +498,19 @@ def test_given_source_freshness_error_when_building_then_blocks_only_affected_br
                 "[connection]\n"
                 'database = "warehouse.duckdb"\n'
             ),
-            "sources/raw.yml": build_freshness_error_branch_source_yml(
+            "sql/sources/raw.yml": build_freshness_error_branch_source_yml(
                 order_id=1,
                 customer_id=1,
                 order_freshness_query="SELECT CURRENT_TIMESTAMP AS data_version",
                 customer_freshness_query="SELECT CURRENT_TIMESTAMP AS data_version",
             ),
-            "models/stg_orders.sql": (
+            "sql/models/stg_orders.sql": (
                 'MODEL (description "Test model stg_orders.", materialized view);\n\nSELECT * FROM __source("raw_orders")\n'
             ),
-            "models/fact_orders.sql": (
+            "sql/models/fact_orders.sql": (
                 'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT * FROM __ref("stg_orders")\n'
             ),
-            "models/dim_customers.sql": (
+            "sql/models/dim_customers.sql": (
                 'MODEL (description "Test model dim_customers.", materialized table);\n\nSELECT * FROM __source("raw_customers")\n'
             ),
         },
@@ -522,7 +522,7 @@ def test_given_source_freshness_error_when_building_then_blocks_only_affected_br
     assert initial_build_result.returncode == 0, (
         initial_build_result.stdout + initial_build_result.stderr
     )
-    (project_dir / "sources" / "raw.yml").write_text(
+    (project_dir / "sql" / "sources" / "raw.yml").write_text(
         build_freshness_error_branch_source_yml(
             order_id=2,
             customer_id=2,
@@ -583,7 +583,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 "[connection]\n"
                 'database = "warehouse.duckdb"\n'
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    expression: SELECT 1 AS order_id\n"
@@ -598,7 +598,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 "      type: integer\n"
                 "      query: SELECT 1 AS data_version\n"
             ),
-            "models/fact_orders.sql": (
+            "sql/models/fact_orders.sql": (
                 "MODEL (description 'Test model fact_orders.', materialized table);\n\n"
                 'SELECT o.order_id, p.payment_id FROM __source("raw_orders") o '
                 'JOIN __source("raw_payments") p USING (order_id)\n'
@@ -619,7 +619,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
     assert first_changes_only_result.returncode == 0, (
         first_changes_only_result.stdout + first_changes_only_result.stderr
     )
-    (project_dir / "sources" / "raw.yml").write_text(
+    (project_dir / "sql" / "sources" / "raw.yml").write_text(
         "sources:\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    expression: SELECT 1 AS order_id\n"
@@ -635,7 +635,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
         "      query: SELECT 2 AS data_version\n",
         encoding="utf-8",
     )
-    (project_dir / "models" / "fact_orders.sql").write_text(
+    (project_dir / "sql" / "models" / "fact_orders.sql").write_text(
         "MODEL (description 'Test model fact_orders.', materialized table);\n\nSELECT CAST('bad' AS INTEGER) AS order_id\n",
         encoding="utf-8",
     )
@@ -675,20 +675,20 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_ingress_failure_project.duckdb"\n'
                 ),
-                "python/tasks/prepare.py": (
+                "python/nodes/tasks/prepare.py": (
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def prepare_orders(ctx):\n"
                     "    '''Test task prepare_orders.'''\n    raise RuntimeError('prepare failed')\n"
                 ),
-                "python/loaders/raw.py": (
-                    "from python.tasks.prepare import prepare_orders\n"
+                "python/nodes/loaders/raw.py": (
+                    "from python.nodes.tasks.prepare import prepare_orders\n"
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader(depends_on=(prepare_orders,))\n"
                     "def raw_orders(ctx):\n"
                     "    '''Test loader raw_orders.'''\n    return [{'order_id': 1}]\n"
                 ),
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_orders\n    description: Test source raw_orders.\n"
                     "    managed: true\n"
@@ -697,7 +697,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "      - name: order_id\n"
                     "        type: INTEGER\n"
                 ),
-                "models/fact_orders.sql": (
+                "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
                 ),
             },
@@ -721,21 +721,21 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_ingress_skip_project.duckdb"\n'
                 ),
-                "python/tasks/prepare.py": (
+                "python/nodes/tasks/prepare.py": (
                     "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def prepare_orders(ctx):\n"
                     "    '''Test task prepare_orders.'''\n    return ctx.skip(reason='no input', mode=SkipMode.HARD)\n"
                 ),
-                "python/loaders/raw.py": (
-                    "from python.tasks.prepare import prepare_orders\n"
+                "python/nodes/loaders/raw.py": (
+                    "from python.nodes.tasks.prepare import prepare_orders\n"
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader(depends_on=(prepare_orders,))\n"
                     "def raw_orders(ctx):\n"
                     "    '''Test loader raw_orders.'''\n    return [{'order_id': 1}]\n"
                 ),
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_orders\n    description: Test source raw_orders.\n"
                     "    managed: true\n"
@@ -744,7 +744,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "      - name: order_id\n"
                     "        type: INTEGER\n"
                 ),
-                "models/fact_orders.sql": (
+                "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
                 ),
             },
@@ -768,7 +768,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_non_json_result_project.duckdb"\n'
                 ),
-                "python/tasks/bad.py": (
+                "python/nodes/tasks/bad.py": (
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def produce_bad_result(ctx):\n"
@@ -792,7 +792,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_non_json_metadata_project.duckdb"\n'
                 ),
-                "python/tasks/bad.py": (
+                "python/nodes/tasks/bad.py": (
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def produce_bad_metadata(ctx):\n"
@@ -816,7 +816,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_read_side_failure_project.duckdb"\n'
                 ),
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_orders\n    description: Test source raw_orders.\n"
                     "    expression: SELECT 1 AS order_id\n"
@@ -824,10 +824,10 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "      - name: order_id\n"
                     "        type: INTEGER\n"
                 ),
-                "models/fact_orders.sql": (
+                "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
                 ),
-                "python/tasks/profile.py": (
+                "python/nodes/tasks/profile.py": (
                     "from sqlbuild.refs import model\n"
                     "from sqlbuild.assets import asset\n\n"
                     "@asset(depends_on=model('fact_orders'))\n"
@@ -855,7 +855,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_read_side_hard_skip_project.duckdb"\n'
                 ),
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_orders\n    description: Test source raw_orders.\n"
                     "    expression: SELECT 1 AS order_id\n"
@@ -863,10 +863,10 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "      - name: order_id\n"
                     "        type: INTEGER\n"
                 ),
-                "models/fact_orders.sql": (
+                "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
                 ),
-                "python/tasks/profile.py": (
+                "python/nodes/tasks/profile.py": (
                     "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
                     "from sqlbuild.refs import model\n"
                     "from sqlbuild.assets import asset\n\n"
@@ -895,7 +895,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_read_side_soft_skip_project.duckdb"\n'
                 ),
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_orders\n    description: Test source raw_orders.\n"
                     "    expression: SELECT 1 AS order_id\n"
@@ -903,10 +903,10 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "      - name: order_id\n"
                     "        type: INTEGER\n"
                 ),
-                "models/fact_orders.sql": (
+                "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
                 ),
-                "python/tasks/profile.py": (
+                "python/nodes/tasks/profile.py": (
                     "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
                     "from sqlbuild.refs import model\n"
                     "from sqlbuild.assets import asset\n\n"
@@ -935,7 +935,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_no_python_project.duckdb"\n'
                 ),
-                "python/tasks/prepare.py": (
+                "python/nodes/tasks/prepare.py": (
                     "from pathlib import Path\n"
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
@@ -944,14 +944,14 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "    marker.write_text('prepared')\n"
                     "    return ctx.result(payload={'order_id': 3})\n"
                 ),
-                "python/loaders/raw.py": (
-                    "from python.tasks.prepare import prepare_orders\n"
+                "python/nodes/loaders/raw.py": (
+                    "from python.nodes.tasks.prepare import prepare_orders\n"
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader(depends_on=(prepare_orders,))\n"
                     "def raw_orders(ctx):\n"
                     "    '''Test loader raw_orders.'''\n    return [{'order_id': 3}]\n"
                 ),
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_orders\n    description: Test source raw_orders.\n"
                     "    managed: true\n"
@@ -960,10 +960,10 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "      - name: order_id\n"
                     "        type: INTEGER\n"
                 ),
-                "models/fact_orders.sql": (
+                "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
                 ),
-                "python/tasks/profile.py": (
+                "python/nodes/tasks/profile.py": (
                     "from pathlib import Path\n"
                     "from sqlbuild.refs import model\n"
                     "from sqlbuild.assets import asset\n\n"
@@ -994,13 +994,13 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_source_relation_project.duckdb"\n'
                 ),
-                "python/loaders/raw.py": (
+                "python/nodes/loaders/raw.py": (
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader\n"
                     "def raw_orders(ctx):\n"
                     "    '''Test loader raw_orders.'''\n    return [{'order_id': 5}]\n"
                 ),
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_orders\n    description: Test source raw_orders.\n"
                     "    managed: true\n"
@@ -1009,7 +1009,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "      - name: order_id\n"
                     "        type: INTEGER\n"
                 ),
-                "python/tasks/profile.py": (
+                "python/nodes/tasks/profile.py": (
                     "from pathlib import Path\n"
                     "from sqlbuild.refs import source\n"
                     "from sqlbuild.assets import asset\n\n"
@@ -1082,7 +1082,7 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                     "[connection]\n"
                     'database = "direct_build_missing_intermediate_project.duckdb"\n'
                 ),
-                "python/loaders/raw.py": (
+                "python/nodes/loaders/raw.py": (
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader(write_strategy='table', columns=[\n"
                     "    {'name': 'event_id', 'type': 'INTEGER'},\n"
@@ -1095,7 +1095,7 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                     "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} AS "
                     "SELECT event_id FROM {events.destination}')\n"
                 ),
-                "sources/raw.yml": "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n",
+                "sql/sources/raw.yml": "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n",
             },
             expected_exit_code=1,
             expected_output_fragments=("requires intermediate loader 'fetch_events'",),
@@ -1111,7 +1111,7 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                     "[connection]\n"
                     'database = "direct_build_no_python_source_only_project.duckdb"\n'
                 ),
-                "python/tasks/prepare.py": (
+                "python/nodes/tasks/prepare.py": (
                     "from pathlib import Path\n"
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
@@ -1120,14 +1120,14 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                     "    marker.write_text('prepared')\n"
                     "    return ctx.result()\n"
                 ),
-                "python/loaders/raw.py": (
+                "python/nodes/loaders/raw.py": (
                     "from sqlbuild.loaders import loader\n"
-                    "from python.tasks.prepare import prepare_events\n\n"
+                    "from python.nodes.tasks.prepare import prepare_events\n\n"
                     "@loader(depends_on=[prepare_events])\n"
                     "def raw_events(ctx):\n"
                     "    '''Test loader raw_events.'''\n    return [{'event_id': 1}]\n"
                 ),
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_events\n    description: Test source raw_events.\n"
                     "    managed: true\n"
@@ -1188,7 +1188,7 @@ def test_given_direct_source_only_build_when_loader_has_ingress_then_enforces_so
                     "[connection]\n"
                     'database = "direct_build_existing_intermediate_project.duckdb"\n'
                 ),
-                "python/loaders/raw.py": (
+                "python/nodes/loaders/raw.py": (
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader(write_strategy='table', columns=[\n"
                     "    {'name': 'event_id', 'type': 'INTEGER'},\n"
@@ -1201,7 +1201,7 @@ def test_given_direct_source_only_build_when_loader_has_ingress_then_enforces_so
                     "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} AS "
                     "SELECT event_id FROM {events.destination}')\n"
                 ),
-                "sources/raw.yml": "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n",
+                "sql/sources/raw.yml": "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n",
             },
             expected_exit_code=0,
             expected_output_fragments=("source    raw_events",),
@@ -1255,7 +1255,7 @@ def test_given_existing_intermediate_target_when_building_source_only_then_reuse
                     "[connection]\n"
                     'database = "python_build_json_project.duckdb"\n'
                 ),
-                "python/assets/orders.py": (
+                "python/nodes/assets/orders.py": (
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def observed_orders(ctx):\n"
@@ -1360,7 +1360,7 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "[connection]\n"
                 'database = "python_sql_python_spine_build_project.duckdb"\n'
             ),
-            "python/loaders/window.py": (
+            "python/nodes/loaders/window.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader(\n"
                 "    destination='window_orders',\n"
@@ -1370,17 +1370,17 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "def load_window_orders(ctx):\n"
                 "    '''Test loader load_window_orders.'''\n    return [{'order_id': 7}]\n"
             ),
-            "python/tasks/prepare.py": (
-                "from python.loaders.window import load_window_orders\n"
+            "python/nodes/tasks/prepare.py": (
+                "from python.nodes.loaders.window import load_window_orders\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset(depends_on=load_window_orders)\n"
                 "def prepare_orders(ctx):\n"
                 "    '''Test task prepare_orders.'''\n    rows = ctx.query('SELECT order_id FROM window_orders').fetchall()\n"
                 "    return ctx.result(payload={'order_id': rows[0][0]})\n"
             ),
-            "python/assets/prepare.py": (
+            "python/nodes/assets/prepare.py": (
                 "from pathlib import Path\n"
-                "from python.tasks.prepare import prepare_orders\n"
+                "from python.nodes.tasks.prepare import prepare_orders\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset(depends_on=prepare_orders)\n"
                 "def publish_prepared_orders(ctx):\n"
@@ -1389,16 +1389,16 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "    marker.write_text(str(payload['order_id']))\n"
                 "    return ctx.result(payload=payload, materialized=True)\n"
             ),
-            "python/loaders/raw.py": (
+            "python/nodes/loaders/raw.py": (
                 "from pathlib import Path\n"
-                "from python.assets.prepare import publish_prepared_orders\n"
+                "from python.nodes.assets.prepare import publish_prepared_orders\n"
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader(depends_on=(publish_prepared_orders,))\n"
                 "def raw_orders(ctx):\n"
                 "    '''Test loader raw_orders.'''\n    marker = Path(__file__).parents[2].joinpath('prepared_order_id.txt')\n"
                 "    return [{'order_id': int(marker.read_text())}]\n"
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
@@ -1407,10 +1407,10 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "      - name: order_id\n"
                 "        type: INTEGER\n"
             ),
-            "models/fact_orders.sql": (
+            "sql/models/fact_orders.sql": (
                 'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
             ),
-            "python/tasks/profile.py": (
+            "python/nodes/tasks/profile.py": (
                 "from sqlbuild.refs import model\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset(depends_on=model('fact_orders'))\n"
@@ -1419,17 +1419,17 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "    order_id = ctx.query(f'SELECT order_id FROM {relation}').fetchall()[0][0]\n"
                 "    return ctx.result(payload={'order_id': order_id}, metadata={'rows': 1})\n"
             ),
-            "python/assets/export.py": (
-                "from python.tasks.profile import profile_fact_orders\n"
+            "python/nodes/assets/export.py": (
+                "from python.nodes.tasks.profile import profile_fact_orders\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset(depends_on=profile_fact_orders)\n"
                 "def export_fact_orders(ctx):\n"
                 "    '''Test asset export_fact_orders.'''\n    payload = ctx.result_of(node_function=profile_fact_orders).payload\n"
                 "    return ctx.result(payload=payload, metadata={'exported': True})\n"
             ),
-            "python/tasks/notify.py": (
+            "python/nodes/tasks/notify.py": (
                 "from pathlib import Path\n"
-                "from python.assets.export import export_fact_orders\n"
+                "from python.nodes.assets.export import export_fact_orders\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset(depends_on=export_fact_orders)\n"
                 "def notify_fact_orders(ctx):\n"
@@ -1516,7 +1516,7 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
                 "[connection]\n"
                 'database = "python_persisted_result_project.duckdb"\n'
             ),
-            "python/tasks/produce.py": (
+            "python/nodes/tasks/produce.py": (
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def produce_result(ctx):\n"
@@ -1534,7 +1534,7 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
         sql="SELECT run_id FROM _sqlbuild_node_results WHERE node_name = 'produce_result'",
     )
     first_run_id: str = str(first_run_rows[0][0])
-    (project_dir / "python" / "tasks" / "produce.py").write_text(
+    (project_dir / "python" / "nodes" / "tasks" / "produce.py").write_text(
         (
             "from sqlbuild.assets import asset\n\n"
             "@asset\n"
@@ -1547,7 +1547,7 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
         command=("--no-color", "build", "--select", "produce_result"),
         project_dir=project_dir,
     )
-    (project_dir / "python" / "tasks" / "produce.py").write_text(
+    (project_dir / "python" / "nodes" / "tasks" / "produce.py").write_text(
         (
             "from sqlbuild.assets import asset\n\n"
             "@asset\n"
@@ -1568,10 +1568,10 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
         ),
     )
     failed_run_id: str = str(failed_run_rows[0][0])
-    (project_dir / "python" / "tasks" / "consume.py").write_text(
+    (project_dir / "python" / "nodes" / "tasks" / "consume.py").write_text(
         (
             "from pathlib import Path\n"
-            "from python.tasks.produce import produce_result\n"
+            "from python.nodes.tasks.produce import produce_result\n"
             "from sqlbuild.assets import asset\n\n"
             "@asset\n"
             "def consume_result(ctx):\n"
@@ -1659,13 +1659,13 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                 "[connection]\n"
                 'database = "python_persisted_loader_result_project.duckdb"\n'
             ),
-            "python/loaders/events.py": (
+            "python/nodes/loaders/events.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_events(ctx):\n"
                 "    '''Test loader raw_events.'''\n    return [{'event_id': 1}]\n"
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_events\n    description: Test source raw_events.\n"
                 "    managed: true\n"
@@ -1674,12 +1674,12 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                 "      - name: event_id\n"
                 "        type: INTEGER\n"
             ),
-            "models/fact_events.sql": (
+            "sql/models/fact_events.sql": (
                 'MODEL (description "Test model fact_events.", materialized table);\n\nSELECT * FROM __source("raw_events")\n'
             ),
-            "python/tasks/consume.py": (
+            "python/nodes/tasks/consume.py": (
                 "from pathlib import Path\n"
-                "from python.loaders.events import raw_events\n"
+                "from python.nodes.loaders.events import raw_events\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def consume_loader_result(ctx):\n"
@@ -1728,13 +1728,13 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                     "[connection]\n"
                     'database = "python_failed_loader_result_project.duckdb"\n'
                 ),
-                "python/loaders/events.py": (
+                "python/nodes/loaders/events.py": (
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader\n"
                     "def raw_events(ctx):\n"
                     "    '''Test loader raw_events.'''\n    raise RuntimeError('loader failed')\n"
                 ),
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_events\n    description: Test source raw_events.\n"
                     "    managed: true\n"
@@ -1743,7 +1743,7 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                     "      - name: event_id\n"
                     "        type: INTEGER\n"
                 ),
-                "models/fact_events.sql": (
+                "sql/models/fact_events.sql": (
                     'MODEL (description "Test model fact_events.", materialized table);\n\nSELECT * FROM __source("raw_events")\n'
                 ),
             },
@@ -1761,21 +1761,21 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                     "[connection]\n"
                     'database = "python_skipped_loader_result_project.duckdb"\n'
                 ),
-                "python/tasks/prepare.py": (
+                "python/nodes/tasks/prepare.py": (
                     "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def prepare_events(ctx):\n"
                     "    '''Test task prepare_events.'''\n    return ctx.skip(reason='no input', mode=SkipMode.HARD)\n"
                 ),
-                "python/loaders/events.py": (
-                    "from python.tasks.prepare import prepare_events\n"
+                "python/nodes/loaders/events.py": (
+                    "from python.nodes.tasks.prepare import prepare_events\n"
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader(depends_on=(prepare_events,))\n"
                     "def raw_events(ctx):\n"
                     "    '''Test loader raw_events.'''\n    return [{'event_id': 1}]\n"
                 ),
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_events\n    description: Test source raw_events.\n"
                     "    managed: true\n"
@@ -1784,7 +1784,7 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                     "      - name: event_id\n"
                     "        type: INTEGER\n"
                 ),
-                "models/fact_events.sql": (
+                "sql/models/fact_events.sql": (
                     'MODEL (description "Test model fact_events.", materialized table);\n\nSELECT * FROM __source("raw_events")\n'
                 ),
             },
@@ -1855,7 +1855,7 @@ def test_given_loader_status_result_when_building_then_persists_loader_status_ro
                 "database_preserved": False,
                 "schema_preserved": False,
             },
-            extra_files=(("sinks/events.py", _TARGET_PROBE_SINK),),
+            extra_files=(("python/event_sinks/events.py", _TARGET_PROBE_SINK),),
         ),
         PythonTargetConfigBuildE2ETestCase(
             description="loader_schema falls back to the target schema",
@@ -1889,18 +1889,18 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 'database = "python_target_config_project.duckdb"\n\n'
                 "[targets.dev]\n" + test_case.project_target_lines
             ),
-            "python/recorder.py": _TARGET_CONFIG_RECORDER,
-            "providers/target_probe.py": (
-                "from python.recorder import record\n"
+            "python/nodes/recorder.py": _TARGET_CONFIG_RECORDER,
+            "python/providers/target_probe.py": (
+                "from python.nodes.recorder import record\n"
                 "from sqlbuild.providers import Provider\n\n"
                 "class TargetProbe(Provider):\n"
                 "    '''Test provider TargetProbe.'''\n\n"
                 "    def setup(self, ctx):\n"
                 "        record(ctx, 'provider')\n"
             ),
-            "python/tasks/configured.py": (
-                "from providers.target_probe import TargetProbe\n"
-                "from python.recorder import record\n"
+            "python/nodes/tasks/configured.py": (
+                "from python.nodes.providers.target_probe import TargetProbe\n"
+                "from python.nodes.recorder import record\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def configured_task(ctx, target_probe: TargetProbe):\n"
@@ -1908,9 +1908,9 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "    record(ctx, 'asset')\n"
                 "    return ctx.result()\n"
             ),
-            "python/loaders/raw.py": (
-                "from providers.target_probe import TargetProbe\n"
-                "from python.recorder import record\n"
+            "python/nodes/loaders/raw.py": (
+                "from python.nodes.providers.target_probe import TargetProbe\n"
+                "from python.nodes.recorder import record\n"
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_orders(ctx, target_probe: TargetProbe):\n"
@@ -1918,10 +1918,10 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "    record(ctx, 'loader')\n"
                 "    return [{'order_id': 1}]\n"
             ),
-            "python/checks/configured.py": (
-                "from providers.target_probe import TargetProbe\n"
-                "from python.recorder import record\n"
-                "from python.tasks.configured import configured_task\n"
+            "python/nodes/checks/configured.py": (
+                "from python.nodes.providers.target_probe import TargetProbe\n"
+                "from python.nodes.recorder import record\n"
+                "from python.nodes.tasks.configured import configured_task\n"
                 "from sqlbuild.checks import check\n\n"
                 "@check(depends_on=configured_task)\n"
                 "def configured_check(ctx, target_probe: TargetProbe):\n"
@@ -1929,7 +1929,7 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "    record(ctx, 'check')\n"
                 "    return ctx.pass_(message='recorded')\n"
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
@@ -2017,11 +2017,11 @@ def test_given_unresolvable_target_when_running_with_a_sink_then_only_target_fre
                 'connection = "warehouse"\n'
                 'schema = "dev"\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.', materialized table);\n\n"
                 "SELECT 1 AS order_id\n"
             ),
-            "providers/target_probe.py": (
+            "python/providers/target_probe.py": (
                 "import json\n"
                 "from pathlib import Path\n"
                 "from sqlbuild.providers import Provider\n\n"
@@ -2032,7 +2032,7 @@ def test_given_unresolvable_target_when_running_with_a_sink_then_only_target_fre
                 "        with Path(__file__).parents[1].joinpath('setups.jsonl').open('a') as out:\n"
                 "            out.write(json.dumps(line) + '\\n')\n"
             ),
-            "sinks/events.py": _TARGET_PROBE_SINK,
+            "python/event_sinks/events.py": _TARGET_PROBE_SINK,
             "setups.jsonl": "",
         },
     )
@@ -2079,10 +2079,10 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
                 "[targets.dev]\n"
                 f'schema = "{test_case.target_schema}"\n'
             ),
-            "models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS order_id\n",
-            "python/recorder.py": _TARGET_CONFIG_RECORDER,
-            "python/loaders/raw.py": (
-                "from python.recorder import record\n"
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS order_id\n",
+            "python/nodes/recorder.py": _TARGET_CONFIG_RECORDER,
+            "python/nodes/loaders/raw.py": (
+                "from python.nodes.recorder import record\n"
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_orders(ctx):\n"
@@ -2090,8 +2090,8 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
                 "    record(ctx, 'loader')\n"
                 "    return [{'order_id': 1}]\n"
             ),
-            "python/tasks/configured.py": (
-                "from python.recorder import record\n"
+            "python/nodes/tasks/configured.py": (
+                "from python.nodes.recorder import record\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def configured_task(ctx):\n"
@@ -2099,7 +2099,7 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
                 "    record(ctx, 'asset')\n"
                 "    return ctx.result()\n"
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
@@ -2178,15 +2178,15 @@ def test_given_same_node_results_in_multiple_targets_when_reading_then_uses_acti
                 "[targets.prod]\n"
                 'schema = "prod"\n'
             ),
-            "python/tasks/produce.py": (
+            "python/nodes/tasks/produce.py": (
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def produce_result(ctx):\n"
                 "    '''Test task produce_result.'''\n    return ctx.result(payload={'target': ctx.target})\n"
             ),
-            "python/tasks/consume.py": (
+            "python/nodes/tasks/consume.py": (
                 "from pathlib import Path\n"
-                "from python.tasks.produce import produce_result\n"
+                "from python.nodes.tasks.produce import produce_result\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def consume_result(ctx):\n"
@@ -2319,7 +2319,7 @@ def test_given_waffle_shop_project_when_running_build_then_warehouse_state_match
     )
 
     assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
-    run_sql_path: Path = project_dir / "target" / "run" / "models" / "marts" / "fact_orders.sql"
+    run_sql_path: Path = project_dir / "target" / "run" / "sql" / "models" / "marts" / "fact_orders.sql"
     assert run_sql_path.exists()
     run_sql: str = run_sql_path.read_text(encoding="utf-8")
     assert "CREATE OR REPLACE TABLE main.fact_orders__staging AS" in run_sql

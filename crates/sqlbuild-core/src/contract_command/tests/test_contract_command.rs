@@ -20,10 +20,10 @@ fn given_comparison_when_rendering_then_reports_text_json_and_exit_code() {
                     relation: "raw.orders".to_owned(),
                     findings: Vec::new(),
                 }],
-                written_paths: vec!["sources/raw.yml".to_owned()],
+                written_paths: vec!["sql/sources/raw.yml".to_owned()],
             },
-            expected_text: "Contract comparison from target 'prod'\n  OK    source:raw_orders\n\nUpdated repository declarations:\n  sources/raw.yml\n\n0 contract difference(s)\n",
-            expected_json: "{\n  \"differences\": 0,\n  \"from_target\": \"prod\",\n  \"resources\": [\n    {\n      \"findings\": [],\n      \"relation\": \"raw.orders\",\n      \"resource_name\": \"raw_orders\",\n      \"resource_type\": \"source\"\n    }\n  ],\n  \"written_paths\": [\n    \"sources/raw.yml\"\n  ]\n}\n",
+            expected_text: "Contract comparison from target 'prod'\n  OK    source:raw_orders\n\nUpdated repository declarations:\n  sql/sources/raw.yml\n\n0 contract difference(s)\n",
+            expected_json: "{\n  \"differences\": 0,\n  \"from_target\": \"prod\",\n  \"resources\": [\n    {\n      \"findings\": [],\n      \"relation\": \"raw.orders\",\n      \"resource_name\": \"raw_orders\",\n      \"resource_type\": \"source\"\n    }\n  ],\n  \"written_paths\": [\n    \"sql/sources/raw.yml\"\n  ]\n}\n",
             expected_exit_code: 0,
         },
         ReportTestCase {

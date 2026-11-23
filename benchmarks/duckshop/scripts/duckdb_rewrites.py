@@ -589,16 +589,16 @@ def macro_folder(root: pathlib.Path, folders: list[pathlib.Path]) -> pathlib.Pat
     if len(folders) == 1:
         return folders[0] / "_sqlbuild" / "_macros" / "sql"
     common = pathlib.Path(os.path.commonpath(folders))
-    if common in (root, root / "models"):
-        return root / "macros" / "sql"
-    return common / "_sqlbuild" / "macros" / "sql"
+    if common in (root, root / "sql" / "models"):
+        return root / "sql" / "macros" / "sql"
+    return common / "_sqlbuild" / "sql" / "macros" / "sql"
 
 
 def write_shims(root: pathlib.Path) -> None:
     """Write each shim overload a model calls, in the folder that owns its callers."""
 
     callers: dict[str, set[pathlib.Path]] = {}
-    for path in root.glob("models/**/*.sql"):
+    for path in root.glob("sql/models/**/*.sql"):
         for name in re.findall(r"@sql\.(\w+)\(", path.read_text()):
             callers.setdefault(name, set()).add(path.parent)
     for name, overloads in SHIMS.items():

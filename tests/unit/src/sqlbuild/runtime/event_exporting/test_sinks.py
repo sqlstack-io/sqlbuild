@@ -7,13 +7,13 @@ import pytest
 
 from sqlbuild._native import EventExportSeverity
 from sqlbuild.runtime.event_exporting.exceptions import EventExporterInputError
-from sqlbuild.sinks import (
-    CommandOutputSinkDefinition,
+from sqlbuild.event_sinks import (
+    CommandOutputEventSinkDefinition,
     CommandOutputStream,
     LifecycleEventKind,
     LifecycleEventSinkDefinition,
-    command_output_sink,
-    get_command_output_sink_definition,
+    command_output_event_sink,
+    get_command_output_event_sink_definition,
     get_lifecycle_event_sink_definition,
     lifecycle_event_sink,
 )
@@ -119,11 +119,11 @@ def test_given_invalid_lifecycle_severity_when_decorating_then_lists_allowed_val
 def test_given_command_output_decorator_when_reading_then_streams_are_typed(
     test_case: SinkApiTestCase,
 ) -> None:
-    @command_output_sink(name="stdout_only", streams={"stdout"})
+    @command_output_event_sink(name="stdout_only", streams={"stdout"})
     def publish(record: object) -> None:
         del record
 
-    definition: CommandOutputSinkDefinition | None = get_command_output_sink_definition(
+    definition: CommandOutputEventSinkDefinition | None = get_command_output_event_sink_definition(
         cast(Callable[..., object], publish)
     )
 
@@ -146,7 +146,7 @@ def test_given_lifecycle_sink_when_reading_command_output_definition_then_return
         del event
 
     assert test_case.expected_name is None
-    assert get_command_output_sink_definition(cast(Callable[..., object], publish)) is None
+    assert get_command_output_event_sink_definition(cast(Callable[..., object], publish)) is None
 
 
 @pytest.mark.parametrize(
@@ -160,7 +160,7 @@ def test_given_invalid_sink_name_when_decorating_then_rejects_declaration(
     assert test_case.expected_name is not None
     with pytest.raises(EventExporterInputError, match=test_case.expected_name):
 
-        @command_output_sink(name="Bad-Name")
+        @command_output_event_sink(name="Bad-Name")
         def publish(record: object) -> None:
             del record
 
@@ -176,7 +176,7 @@ def test_given_invalid_command_output_stream_when_decorating_then_rejects_declar
     assert test_case.expected_name is not None
     with pytest.raises(EventExporterInputError, match=test_case.expected_name):
 
-        @command_output_sink(streams={"diagnostic"})
+        @command_output_event_sink(streams={"diagnostic"})
         def publish(record: object) -> None:
             del record
 

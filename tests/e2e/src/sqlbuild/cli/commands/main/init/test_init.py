@@ -24,22 +24,22 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
                 "sqlbuild_project.toml",
                 ".gitignore",
                 "python",
-                "python/.gitkeep",
-                "hooks/sql",
-                "hooks/sql/.gitkeep",
-                "hooks/python",
-                "hooks/python/.gitkeep",
-                "audits/generic",
-                "audits/generic/.gitkeep",
-                "audits/singular",
-                "audits/singular/.gitkeep",
+                "python/nodes/.gitkeep",
+                "sql/hooks/sql",
+                "sql/hooks/sql/.gitkeep",
+                "sql/hooks/python",
+                "sql/hooks/python/.gitkeep",
+                "sql/audits/generic",
+                "sql/audits/generic/.gitkeep",
+                "sql/audits/singular",
+                "sql/audits/singular/.gitkeep",
             ),
             expected_output_fragments=(
                 "SQLBuild project created",
-                "Add Python loaders, assets, checks, and factories to python/",
-                "Add SQL hooks to hooks/sql/, Python hooks to hooks/python/",
-                "reusable audits to audits/generic/",
-                "standalone audits to audits/singular/",
+                "Add Python loaders, assets, checks, and factories to python/nodes/",
+                "Add SQL hooks to sql/hooks/sql/, Python hooks to sql/hooks/python/",
+                "reusable audits to sql/audits/generic/",
+                "standalone audits to sql/audits/singular/",
             ),
         )
     ],
@@ -71,19 +71,19 @@ def test_given_empty_project_directory_when_running_init_then_typed_resource_dir
         InitPythonRootE2ETestCase(
             description="initialized project builds Python nodes and helpers under python",
             project_files={
-                "models/marts/fact_orders.sql": (
+                "sql/models/marts/fact_orders.sql": (
                     "MODEL (description 'Test model fact_orders.', materialized table);\n\nSELECT 1 AS order_id\n"
                 ),
-                "python/_helpers.py": "def order_count(rows):\n    return len(rows)\n",
-                "python/tasks/orders.py": (
-                    "from python._helpers import order_count\n"
+                "python/nodes/_helpers.py": "def order_count(rows):\n    return len(rows)\n",
+                "python/nodes/tasks/orders.py": (
+                    "from python.nodes._helpers import order_count\n"
                     "from sqlbuild.assets import asset\n\n\n"
                     "@asset\n"
                     "def count_orders(ctx):\n"
                     "    '''Test task count_orders.'''\n    return ctx.result(payload={'order_count': order_count([1, 2])})\n"
                 ),
-                "python/assets/orders_export.py": (
-                    "from python.tasks.orders import count_orders\n"
+                "python/nodes/assets/orders_export.py": (
+                    "from python.nodes.tasks.orders import count_orders\n"
                     "from sqlbuild.assets import asset\n"
                     "from sqlbuild.refs import model\n\n\n"
                     "@asset(depends_on=(model('fact_orders'), count_orders))\n"

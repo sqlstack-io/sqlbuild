@@ -56,7 +56,7 @@ _JSON_COMPILE: tuple[str, ...] = ("compile", "--json")
 _TEXT_COMPILE: tuple[str, ...] = ("compile",)
 _UNTYPED_ADAPTER: str = "sqlserver"
 _SMALL_MODEL_COUNT: int = 30
-_SMALL_MODEL_ROOT: str = "models/sales000/intermediate/clean"
+_SMALL_MODEL_ROOT: str = "sql/models/sales000/intermediate/clean"
 _ANALYSED_MODEL: str = f"{_SMALL_MODEL_ROOT}/batch00000/sales000__int_clean__orders_00001.sql"
 _SMALL_EDITED_MODEL: str = f"{_SMALL_MODEL_ROOT}/batch00001/sales000__int_clean__orders_00005.sql"
 _RESHAPED_MODEL: str = f"{_SMALL_MODEL_ROOT}/batch00002/sales000__int_clean__orders_00010.sql"
@@ -127,7 +127,7 @@ GROUP BY customer_id
 """,
 )
 _ORDER_QUALITY_FACTORY: tuple[str, str] = (
-    "python/factories/quality.py",
+    "python/nodes/factories/quality.py",
     """from sqlbuild.audits import AuditCase, AuditSeverity, audit_factory
 
 
@@ -230,7 +230,7 @@ _TRACKED_VARIABLE_ADDED: str = (
     "delta compile fell back: the set of tracked environment variables changed"
 )
 _EDITED_MODEL: str = (
-    "models/sales000/intermediate/clean/batch00000/sales000__int_clean__orders_00003.sql"
+    "sql/models/sales000/intermediate/clean/batch00000/sales000__int_clean__orders_00003.sql"
 )
 
 

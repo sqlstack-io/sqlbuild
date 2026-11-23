@@ -48,23 +48,23 @@ _FORMATTED_FIXTURE_CTES: str = (
     [
         LintProjectTestCase(
             description="model without description faults",
-            files={"models/no_description.sql": NO_DESCRIPTION_MODEL},
+            files={"sql/models/no_description.sql": NO_DESCRIPTION_MODEL},
             expected_fault_codes=(("no_description.sql", "description-present"),),
         ),
         LintProjectTestCase(
             description="clean project reports no violations",
-            files={"models/fine.sql": CLEAN_MODEL},
+            files={"sql/models/fine.sql": CLEAN_MODEL},
             expected_fault_codes=(),
         ),
         LintProjectTestCase(
             description="schema declarations are discovered for linting",
-            files={"schemas/order.sql": "SCHEMA (name order, columns (id (type INTEGER)));\n"},
+            files={"sql/schemas/order.sql": "SCHEMA (name order, columns (id (type INTEGER)));\n"},
             expected_fault_codes=(),
         ),
         LintProjectTestCase(
             description="scoped declaration file preserves every header",
             files={
-                "models/_enums/status.sql": (
+                "sql/models/_enums/status.sql": (
                     'ENUM (name "status", members [OPEN, CLOSED]);\n'
                     'ENUM (name "tier", members [ONE, TWO]);\n'
                 )
@@ -101,17 +101,17 @@ def test_given_synthetic_project_when_linting_then_results_match_expected(
         FormatProjectTestCase(
             description="leading comment is relocated into the description",
             files={
-                "models/commented.sql": (
+                "sql/models/commented.sql": (
                     "-- A comment.\nMODEL (\n  materialized table\n);\nSELECT 1 AS x FROM t\n"
                 )
             },
-            expected_written_fragments={"models/commented.sql": 'description "A comment.",'},
+            expected_written_fragments={"sql/models/commented.sql": 'description "A comment.",'},
             expected_fault_codes=(),
             expected_formatted_count=1,
         ),
         FormatProjectTestCase(
             description="missing description is a fault and the file is still formatted",
-            files={"models/no_description.sql": NO_DESCRIPTION_MODEL},
+            files={"sql/models/no_description.sql": NO_DESCRIPTION_MODEL},
             expected_written_fragments={},
             expected_fault_codes=("description-present",),
             expected_formatted_count=1,
@@ -119,13 +119,13 @@ def test_given_synthetic_project_when_linting_then_results_match_expected(
         FormatProjectTestCase(
             description="SQLBuild reference calls survive canonical formatting",
             files={
-                "models/reference.sql": (
+                "sql/models/reference.sql": (
                     'MODEL (description "Reference formatting.");\n'
                     'select order_id from __ref("orders")\n'
                 )
             },
             expected_written_fragments={
-                "models/reference.sql": 'FROM __ref("orders")',
+                "sql/models/reference.sql": 'FROM __ref("orders")',
             },
             expected_fault_codes=(),
             expected_formatted_count=1,
@@ -133,13 +133,13 @@ def test_given_synthetic_project_when_linting_then_results_match_expected(
         FormatProjectTestCase(
             description="measurement audit queries format as separate bodies",
             files={
-                "audits/generic/measurement.sql": (
+                "sql/audits/generic/measurement.sql": (
                     "AUDIT (evaluation measurement, value measured_value);\n"
                     "MEASURE (SELECT COUNT(*) AS measured_value FROM @relation);\n"
                     "EVIDENCE (SELECT * FROM @relation WHERE @condition);\n"
                 )
             },
-            expected_written_fragments={"audits/generic/measurement.sql": "MEASURE (SELECT"},
+            expected_written_fragments={"sql/audits/generic/measurement.sql": "MEASURE (SELECT"},
             expected_fault_codes=(),
             expected_formatted_count=1,
         ),
@@ -178,8 +178,8 @@ def test_given_synthetic_project_when_formatting_then_results_match_expected(
             description="path default describes only the models under its path",
             project_toml=PROJECT_TOML + '\n[path_defaults.marts]\ndescription = "Mart model"\n',
             files={
-                "models/marts/orders.sql": "MODEL ();\nSELECT 1 AS x\n",
-                "models/staging/stg_orders.sql": "MODEL ();\nSELECT 1 AS x\n",
+                "sql/models/marts/orders.sql": "MODEL ();\nSELECT 1 AS x\n",
+                "sql/models/staging/stg_orders.sql": "MODEL ();\nSELECT 1 AS x\n",
             },
             expected_description_faults=(("stg_orders.sql", "description-present"),),
         ),
@@ -187,10 +187,10 @@ def test_given_synthetic_project_when_formatting_then_results_match_expected(
             description="description resolution never imports project Python",
             project_toml=PROJECT_TOML + '\n[path_defaults.marts]\ndescription = "Mart model"\n',
             files={
-                "providers/orders_api.py": 'raise RuntimeError("project Python was imported")\n',
-                "python/tasks/refresh.py": 'raise RuntimeError("project Python was imported")\n',
-                "models/marts/orders.sql": "MODEL ();\nSELECT 1 AS x\n",
-                "models/staging/stg_orders.sql": "MODEL ();\nSELECT 1 AS x\n",
+                "python/providers/orders_api.py": 'raise RuntimeError("project Python was imported")\n',
+                "python/nodes/tasks/refresh.py": 'raise RuntimeError("project Python was imported")\n',
+                "sql/models/marts/orders.sql": "MODEL ();\nSELECT 1 AS x\n",
+                "sql/models/staging/stg_orders.sql": "MODEL ();\nSELECT 1 AS x\n",
             },
             expected_description_faults=(("stg_orders.sql", "description-present"),),
         ),
@@ -198,13 +198,13 @@ def test_given_synthetic_project_when_formatting_then_results_match_expected(
             description="model schema description satisfies the header only when present",
             project_toml=PROJECT_TOML,
             files={
-                "schemas/orders.sql": (
+                "sql/schemas/orders.sql": (
                     'SCHEMA (name order_shape, description "One row per order", '
                     "columns (id (type INTEGER)));\n"
                     "SCHEMA (name bare_shape, columns (id (type INTEGER)));\n"
                 ),
-                "models/orders.sql": "MODEL (model_schema order_shape);\nSELECT 1 AS id\n",
-                "models/returns.sql": "MODEL (model_schema bare_shape);\nSELECT 1 AS id\n",
+                "sql/models/orders.sql": "MODEL (model_schema order_shape);\nSELECT 1 AS id\n",
+                "sql/models/returns.sql": "MODEL (model_schema bare_shape);\nSELECT 1 AS id\n",
             },
             expected_description_faults=(("returns.sql", "description-present"),),
         ),
@@ -252,7 +252,7 @@ def test_given_inherited_descriptions_when_formatting_then_faults_match_compile_
 def test_given_authored_newline_style_when_formatting_then_style_is_preserved(
     test_case: FormatNewlineTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    target: Path = tmp_path / "models" / "crlf.sql"
+    target: Path = tmp_path / "sql" / "models" / "crlf.sql"
     _ = target.parent.mkdir(parents=True)
     target.write_bytes(test_case.contents)
     _ = (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
@@ -277,7 +277,7 @@ def test_given_non_ascii_sql_when_native_linting_then_span_maps_to_authored_colu
 ) -> None:
     _ = test_case
     _ = (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
-    target: Path = tmp_path / "models" / "unicode.sql"
+    target: Path = tmp_path / "sql" / "models" / "unicode.sql"
     _ = target.parent.mkdir(parents=True)
     _ = target.write_text(
         "MODEL (description \"ok\");\nSELECT 'é' AS label FROM items WHERE value = NULL\n",
@@ -307,7 +307,7 @@ def test_given_comment_free_body_when_formatting_twice_then_output_is_canonical_
 ) -> None:
     _ = test_case
     _ = (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
-    target: Path = tmp_path / "models" / "messy.sql"
+    target: Path = tmp_path / "sql" / "models" / "messy.sql"
     target.parent.mkdir()
     _ = target.write_text(
         'MODEL (description "ok");\nselect a,b from items where a=1\n',
@@ -340,7 +340,7 @@ def test_given_commented_body_when_formatting_then_comment_is_preserved_in_canon
     _ = test_case
     _ = (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
     contents: str = 'MODEL (description "ok");\nSELECT a, /* preserve exactly */ b FROM items\n'
-    target: Path = tmp_path / "models" / "commented_body.sql"
+    target: Path = tmp_path / "sql" / "models" / "commented_body.sql"
     target.parent.mkdir()
     _ = target.write_text(contents, encoding="utf-8")
 
@@ -429,7 +429,7 @@ def test_given_inline_directive_when_linting_then_it_is_a_fault_printing_the_exc
     tmp_path: Path,
 ) -> None:
     _ = (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
-    target: Path = tmp_path / "models" / "sample.sql"
+    target: Path = tmp_path / "sql" / "models" / "sample.sql"
     target.parent.mkdir()
     _ = target.write_text(
         'MODEL (description "ok");\n'
@@ -451,7 +451,7 @@ def test_given_inline_directive_when_linting_then_it_is_a_fault_printing_the_exc
     assert (
         "[[rules.rule_exceptions]]\n"
         '            rule = "SQLCLEAN004"\n'
-        '            path = "models/sample.sql"\n'
+        '            path = "sql/models/sample.sql"\n'
         '            reason = "this fixture intentionally samples one row"'
     ) in remediation
 
@@ -470,7 +470,7 @@ def test_given_header_fault_directive_when_rejecting_then_mandatory_fault_remain
     test_case: LintBehaviorTestCase,
     tmp_path: Path,
 ) -> None:
-    target: Path = tmp_path / "models" / "missing_description.sql"
+    target: Path = tmp_path / "sql" / "models" / "missing_description.sql"
     contents: str = (
         "-- sqb: ignore description-present because this must not bypass compiler policy\n"
         "MODEL (materialized table);\n"

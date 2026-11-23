@@ -22,9 +22,9 @@ EXPORT_STRIDE = 5
 #: Export assets per Python module, so discovery walks many modules.
 EXPORTS_PER_MODULE = 6
 _TIMESTAMP = "TIMESTAMP_NTZ"
-_INCREMENT_FOLDER = "models/intermediate/increments"
-_EXPORT_PACKAGE = "python/exports"
-_SHARED_MODULE = "python/shared/export_feed.py"
+_INCREMENT_FOLDER = "sql/models/intermediate/increments"
+_EXPORT_PACKAGE = "python/nodes/exports"
+_SHARED_MODULE = "python/nodes/shared/export_feed.py"
 
 SHARED_EXPORT_HELPERS = '''"""What every export asset records about the relation it sent."""
 
@@ -149,5 +149,5 @@ def _export_module(folder: str, models: list[Model]) -> str:
         f'"""Exports of the {folder} marts to partner feeds."""\n\n'
         "from sqlbuild.assets import AssetContext, asset\n"
         "from sqlbuild.refs import model\n\n"
-        "from python.shared.export_feed import feed_metadata\n\n\n" + "\n\n".join(assets)
+        "from python.nodes.shared.export_feed import feed_metadata\n\n\n" + "\n\n".join(assets)
     )

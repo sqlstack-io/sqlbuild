@@ -78,7 +78,7 @@ def build_model_entry(
     return ModelPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=name),
         name=name,
-        relative_path=Path(f"models/{name}.sql"),
+        relative_path=Path(f"sql/models/{name}.sql"),
         materialization_type=materialization,
         action=PlanAction.CREATE_TABLE,
         reason=PlanReason.NO_CHANGE,
@@ -94,7 +94,7 @@ def build_seed_entry(name: str, *, schema: str) -> SeedPlanEntry:
         key=CompiledObjectKey(resource_type=CompiledResourceType.SEED, name=name),
         name=name,
         destination=build_location(name=name, schema=schema),
-        file_path=Path(f"seeds/{name}.csv"),
+        file_path=Path(f"sql/seeds/{name}.csv"),
         columns=(),
         csv_settings=SeedCsvSettings(),
     )

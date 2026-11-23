@@ -20,11 +20,11 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
 )
 
 _DUPLICATE_MACROS: dict[str, str] = {
-    "macros/python/cents.py": 'def to_cents(expression: str) -> str:\n    return f"({expression}) * 100"\n',
-    "macros/python/money.py": 'def to_cents(expression: str) -> str:\n    return f"({expression}) * 100"\n',
+    "sql/macros/python/cents.py": 'def to_cents(expression: str) -> str:\n    return f"({expression}) * 100"\n',
+    "sql/macros/python/money.py": 'def to_cents(expression: str) -> str:\n    return f"({expression}) * 100"\n',
 }
 _UNKNOWN_REFERENCE: dict[str, str] = {
-    "models/marts/order_gaps.sql": (
+    "sql/models/marts/order_gaps.sql": (
         "MODEL (description 'Test model order_gaps.',\n  materialized view,\n);\n\n"
         'SELECT order_id FROM __ref("missing_orders")\n'
     ),
@@ -36,7 +36,7 @@ _UNKNOWN_REFERENCE: dict[str, str] = {
     [
         ProjectFailureE2ETestCase(
             description="mv on a project with a duplicate macro name",
-            command=("mv", "fact_orders", "models/reporting/"),
+            command=("mv", "fact_orders", "sql/models/reporting/"),
             expected_codes=("P001",),
         ),
         ProjectFailureE2ETestCase(
@@ -86,7 +86,7 @@ def test_given_input_stage_failure_when_refactoring_then_compile_error_is_report
         ),
         ProjectFailureE2ETestCase(
             description="mv on a project with an unknown reference",
-            command=("mv", "fact_orders", "models/reporting/"),
+            command=("mv", "fact_orders", "sql/models/reporting/"),
             expected_codes=("P001",),
         ),
     ],

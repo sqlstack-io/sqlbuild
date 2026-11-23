@@ -74,7 +74,7 @@ def build_model_plan_entry(
     return ModelPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=name),
         name=name,
-        relative_path=Path(f"models/{name}.sql"),
+        relative_path=Path(f"sql/models/{name}.sql"),
         materialization_type=materialization_type,
         action=action,
         reason=reason,
@@ -98,7 +98,7 @@ def build_seed_plan_entry(*, name: str) -> SeedPlanEntry:
         destination=CompiledRelationLocation(
             database=None, schema="main", name=name, qualified_name=f"main.{name}"
         ),
-        file_path=Path(f"seeds/{name}.csv"),
+        file_path=Path(f"sql/seeds/{name}.csv"),
         columns=(),
         csv_settings=SeedCsvSettings(),
     )
@@ -142,8 +142,8 @@ def failing_source_node_test_loader(_ctx: object) -> list[dict[str, object]]:
 
 def build_discovered_source_loader(*, loader_name: str) -> DiscoveredLoaderFunction:
     return DiscoveredLoaderFunction(
-        file_path=Path("python/loaders/raw.py"),
-        relative_path=Path("python/loaders/raw.py"),
+        file_path=Path("python/nodes/loaders/raw.py"),
+        relative_path=Path("python/nodes/loaders/raw.py"),
         name=loader_name,
         function=source_node_test_loader,
     )
@@ -151,8 +151,8 @@ def build_discovered_source_loader(*, loader_name: str) -> DiscoveredLoaderFunct
 
 def build_failing_discovered_source_loader(*, loader_name: str) -> DiscoveredLoaderFunction:
     return DiscoveredLoaderFunction(
-        file_path=Path("python/loaders/raw.py"),
-        relative_path=Path("python/loaders/raw.py"),
+        file_path=Path("python/nodes/loaders/raw.py"),
+        relative_path=Path("python/nodes/loaders/raw.py"),
         name=loader_name,
         function=failing_source_node_test_loader,
     )

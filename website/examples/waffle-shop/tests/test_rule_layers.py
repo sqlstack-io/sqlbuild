@@ -9,7 +9,7 @@ def test_given_mart_reading_source_when_evaluating_then_reports_finding() -> Non
         test_case=RuleCase(
             description="mart reads a raw source",
             source='MODEL ();\nSELECT id FROM __source("raw__payments")\n',
-            path="models/marts/payments.sql",
+            path="sql/models/marts/payments.sql",
             expected_finding_count=1,
         ),
     )

@@ -35,9 +35,9 @@ from tests.unit.src.sqlbuild.compiler.discovery._test_types import (
             description="discovers raw project inputs across authored project surfaces",
             repo_files=base_repo_files()
             | {
-                "models/staging/orders.sql": "MODEL ();\n\nselect 1\n",
-                "models/staging/schema.yml": "models: []\n",
-                "sources/raw.yml": """
+                "sql/models/staging/orders.sql": "MODEL ();\n\nselect 1\n",
+                "sql/models/staging/schema.yml": "models: []\n",
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     managed: true
@@ -45,8 +45,8 @@ sources:
     table: orders
 """.strip()
                 + "\n",
-                "seeds/country_codes.csv": "country_code,country_name\nUS,United States\n",
-                "seeds/lookups.yml": """
+                "sql/seeds/country_codes.csv": "country_code,country_name\nUS,United States\n",
+                "sql/seeds/lookups.yml": """
 seeds:
   - name: country_codes
     columns:
@@ -67,63 +67,63 @@ __expected__daily_revenue AS (
 )
 SELECT 1
 """,
-                "audits/generic/not_null.sql": "AUDIT ();\nSELECT 1\n",
-                "macros/python/name_helpers.py": "def slug() -> str:\n    return 'slug'\n",
-                "python/loaders/raw_orders.py": """
+                "sql/audits/generic/not_null.sql": "AUDIT ();\nSELECT 1\n",
+                "sql/macros/python/name_helpers.py": "def slug() -> str:\n    return 'slug'\n",
+                "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader(name="raw_orders")
 def fetch_orders(ctx):
     return []
 """,
-                "python/tasks/windows.py": """
+                "python/nodes/tasks/windows.py": """
 from sqlbuild.assets import asset
 
 @asset(tags=("api",), group="ingestion")
 def fetch_window(ctx):
     return {"window": "today"}
 """,
-                "python/assets/exports.py": """
+                "python/nodes/assets/exports.py": """
 from sqlbuild.assets import asset
 
 @asset(columns=[{"name": "customer_id", "type": "string"}])
 def export_customers(ctx):
     return {"uri": "s3://exports/customers.parquet"}
 """,
-                "python/checks/exports.py": """
+                "python/nodes/checks/exports.py": """
 from sqlbuild.checks import check
-from python.assets.exports import export_customers
+from python.nodes.assets.exports import export_customers
 
 @check(depends_on=export_customers, severity="warn")
 def export_customers_exists(ctx):
     return True
 """,
-                "hooks/python/notifications.py": """
+                "sql/hooks/python/notifications.py": """
 from sqlbuild.hooks import hook
 
 @hook(name="notify_success")
 def notify_success(ctx):
     return None
 """,
-                "providers/slack.py": """
+                "python/providers/slack.py": """
 from sqlbuild.providers import Provider
 
 class SlackProvider(Provider):
     channel: str = "#alerts"
 """,
                 "target/manifest.json": '{"metadata": {"dbt_schema_version": "v12"}}\n',
-                "adapter.py": "class ExampleAdapter:\n    pass\n",
+                "python/adapter.py": "class ExampleAdapter:\n    pass\n",
                 "sqlbuild_local.toml": 'target = "dev"\n',
             },
-            expected_model_paths=("models/staging/orders.sql",),
+            expected_model_paths=("sql/models/staging/orders.sql",),
             expected_model_header_values=({},),
             expected_model_query_sql=("select 1",),
-            expected_schema_paths=("models/staging/schema.yml", "seeds/lookups.yml"),
+            expected_schema_paths=("sql/models/staging/schema.yml", "sql/seeds/lookups.yml"),
             expected_schema_model_names=((), ()),
             expected_schema_seed_names=((), ("country_codes",)),
-            expected_source_paths=("sources/raw.yml",),
+            expected_source_paths=("sql/sources/raw.yml",),
             expected_source_entry_names=(("raw_orders",),),
-            expected_seed_paths=("seeds/country_codes.csv",),
+            expected_seed_paths=("sql/seeds/country_codes.csv",),
             expected_test_paths=("tests/unit/orders_test.sql",),
             expected_test_block_indexes=(1,),
             expected_test_block_names=(None,),
@@ -136,18 +136,18 @@ class SlackProvider(Provider):
             expected_scenario_sql_bodies=(
                 "WITH\n__expected__daily_revenue AS (\n  SELECT 1 AS order_id\n)\nSELECT 1",
             ),
-            expected_audit_paths=("audits/generic/not_null.sql",),
+            expected_audit_paths=("sql/audits/generic/not_null.sql",),
             expected_audit_block_indexes=(1,),
             expected_audit_block_names=(None,),
             expected_audit_block_sql_bodies=("SELECT 1",),
-            expected_macro_paths=("macros/python/name_helpers.py",),
+            expected_macro_paths=("sql/macros/python/name_helpers.py",),
             expected_loader_names=("raw_orders",),
-            expected_adapter_path="adapter.py",
+            expected_adapter_path="python/adapter.py",
             expected_asset_names=("export_customers", "fetch_window"),
             expected_check_names=("export_customers_exists",),
             expected_hook_names=("notify_success",),
             expected_provider_names=("slack_provider",),
-            expected_provider_paths=("providers/slack.py",),
+            expected_provider_paths=("python/providers/slack.py",),
             expected_provider_class_names=("SlackProvider",),
         )
     ],
@@ -341,8 +341,8 @@ def test_given_valid_sql_and_failing_python_import_when_discovering_then_phases_
         tmp_path,
         base_repo_files()
         | {
-            "models/orders.sql": "MODEL ();\n\nSELECT 1 AS order_id\n",
-            "python/tasks/broken.py": "import dependency_that_does_not_exist\n",
+            "sql/models/orders.sql": "MODEL ();\n\nSELECT 1 AS order_id\n",
+            "python/nodes/tasks/broken.py": "import dependency_that_does_not_exist\n",
         },
     )
     events: list[LifecycleEvent] = []
@@ -379,7 +379,7 @@ def test_given_ignored_siblings_when_discovering_then_count_uses_relevant_collec
         tmp_path,
         base_repo_files()
         | {
-            "models/orders.sql": "MODEL ();\n\nSELECT 1 AS order_id\n",
+            "sql/models/orders.sql": "MODEL ();\n\nSELECT 1 AS order_id\n",
             ".git/objects/unrelated.sql": "not sqlbuild input\n",
             ".venv/cache/generated.sql": "not sqlbuild input\n",
         },
@@ -404,8 +404,8 @@ def test_given_ignored_siblings_when_discovering_then_count_uses_relevant_collec
             description="generated managed source loader matches source",
             repo_files=base_repo_files()
             | {
-                "sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
-                "python/loaders/generated.py": """
+                "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
+                "python/nodes/loaders/generated.py": """
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 
@@ -424,7 +424,7 @@ def generated_loaders():
             description="generated asset dependencies validate",
             repo_files=base_repo_files()
             | {
-                "python/factories/generated.py": """
+                "python/nodes/factories/generated.py": """
 from sqlbuild.assets import asset
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
@@ -449,7 +449,7 @@ def generated_nodes():
             description="single-kind factory validates in factories folder",
             repo_files=base_repo_files()
             | {
-                "python/factories/generated_tasks.py": """
+                "python/nodes/factories/generated_tasks.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -469,7 +469,7 @@ def generated_tasks():
             description="factory returning its own module-level node registers it once",
             repo_files=base_repo_files()
             | {
-                "python/factories/orders.py": """
+                "python/nodes/factories/orders.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -490,7 +490,7 @@ def order_nodes():
             description="factory binding its generated node to a module global registers it once",
             repo_files=base_repo_files()
             | {
-                "python/factories/orders.py": """
+                "python/nodes/factories/orders.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -512,8 +512,8 @@ def order_nodes():
             description="factory returning an imported python module node registers it once",
             repo_files=base_repo_files()
             | {
-                "python/a_factories/orders.py": """
-from python.tasks.orders import prepare_orders
+                "python/nodes/a_factories/orders.py": """
+from python.nodes.tasks.orders import prepare_orders
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -525,7 +525,7 @@ def order_nodes():
         return None
     return [prepare_orders, publish]
 """,
-                "python/tasks/orders.py": """
+                "python/nodes/tasks/orders.py": """
 from sqlbuild.assets import asset
 
 
@@ -540,9 +540,9 @@ def prepare_orders(ctx):
             description="factory can import ordinary private helper module",
             repo_files=base_repo_files()
             | {
-                "python/factories/orders/_helpers.py": "TASK_NAME = 'prepare_orders'\n",
-                "python/factories/orders/generated.py": """
-from python.factories.orders._helpers import TASK_NAME
+                "python/nodes/factories/orders/_helpers.py": "TASK_NAME = 'prepare_orders'\n",
+                "python/nodes/factories/orders/generated.py": """
+from python.nodes.factories.orders._helpers import TASK_NAME
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -562,7 +562,7 @@ def generated_tasks():
             description="generated check and asset may depend on a model and a seed",
             repo_files=base_repo_files()
             | {
-                "python/factories/generated.py": """
+                "python/nodes/factories/generated.py": """
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
 from sqlbuild.refs import model, seed
@@ -610,10 +610,10 @@ def test_given_generated_factory_nodes_when_discovering_inputs_then_validates_ex
         ProjectPythonPathAcceptanceTestCase(
             description="undecorated helper modules under python root",
             repo_files={
-                "python/_helpers.py": "REGION = 'emea'\n",
-                "python/orders/__init__.py": "",
-                "python/orders/utils.py": "def order_label(value):\n    return str(value)\n",
-                "adapter.py": "ADAPTER = None\n",
+                "python/nodes/_helpers.py": "REGION = 'emea'\n",
+                "python/nodes/orders/__init__.py": "",
+                "python/nodes/orders/utils.py": "def order_label(value):\n    return str(value)\n",
+                "python/adapter.py": "ADAPTER = None\n",
             },
             expected_project_name="demo",
         ),
@@ -777,7 +777,7 @@ def test_given_non_project_with_python_when_discovering_then_missing_config_erro
             description="generated duplicate names fail validation",
             repo_files=base_repo_files()
             | {
-                "python/tasks/generated.py": """
+                "python/nodes/tasks/generated.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -800,7 +800,7 @@ def generated_tasks():
             description="generated name colliding with top-level node fails validation",
             repo_files=base_repo_files()
             | {
-                "python/tasks/top_level.py": """
+                "python/nodes/tasks/top_level.py": """
 from sqlbuild.assets import asset
 
 
@@ -808,7 +808,7 @@ from sqlbuild.assets import asset
 def top_level_profile(ctx):
     return None
 """,
-                "python/assets/generated.py": """
+                "python/nodes/assets/generated.py": """
 from sqlbuild.assets import asset
 from sqlbuild.factories import factory
 
@@ -827,7 +827,7 @@ def generated_assets():
             description="factory returning a distinct node named like a module node fails validation",
             repo_files=base_repo_files()
             | {
-                "python/factories/orders.py": """
+                "python/nodes/factories/orders.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -851,7 +851,7 @@ def order_nodes():
             description="generated dependency cycle fails validation",
             repo_files=base_repo_files()
             | {
-                "python/tasks/generated.py": """
+                "python/nodes/tasks/generated.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -874,7 +874,7 @@ def generated_tasks():
             description="generated loader SQL dependency fails validation",
             repo_files=base_repo_files()
             | {
-                "python/loaders/generated.py": """
+                "python/nodes/loaders/generated.py": """
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 from sqlbuild.refs import model
@@ -894,8 +894,8 @@ def generated_loaders():
             description="generated managed source loader mismatch fails validation",
             repo_files=base_repo_files()
             | {
-                "sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
-                "python/loaders/generated.py": """
+                "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
+                "python/nodes/loaders/generated.py": """
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 
@@ -908,7 +908,7 @@ def generated_loaders():
     return load
 """,
             },
-            expected_error_fragment="Managed source 'raw_orders' in sources/raw.yml requires loader",
+            expected_error_fragment="Managed source 'raw_orders' in sql/sources/raw.yml requires loader",
         ),
     ),
     ids=lambda case: case.description,
@@ -931,7 +931,7 @@ def test_given_invalid_generated_factory_nodes_when_discovering_inputs_then_rais
             description="parameterized cases share their test's unique name",
             repo_files=base_repo_files()
             | {
-                "models/marts/orders.sql": "MODEL ();\n\nselect 1\n",
+                "sql/models/marts/orders.sql": "MODEL ();\n\nselect 1\n",
                 "tests/unit/order_status.sql": (
                     "TEST (parameters (status string), cases "
                     '(open_case (status "open"), closed_case (status "closed")));\nSELECT 1\n'
@@ -972,14 +972,14 @@ def test_given_parameterized_test_when_discovering_inputs_then_cases_are_not_dup
             description="raises on duplicate source names across files",
             repo_files=base_repo_files()
             | {
-                "sources/raw_orders.yml": """
+                "sql/sources/raw_orders.yml": """
 sources:
   - name: raw_orders
     schema: public
     table: orders
 """.strip()
                 + "\n",
-                "sources/raw_orders_duplicate.yml": """
+                "sql/sources/raw_orders_duplicate.yml": """
 sources:
   - name: raw_orders
     schema: public
@@ -993,7 +993,7 @@ sources:
             description="raises on schema yml model metadata",
             repo_files=base_repo_files()
             | {
-                "models/staging/schema.yml": """
+                "sql/models/staging/schema.yml": """
 models:
   - name: stg_orders
 """.strip()
@@ -1005,7 +1005,7 @@ models:
             description="raises on duplicate schema seed names across files",
             repo_files=base_repo_files()
             | {
-                "seeds/a.yml": """
+                "sql/seeds/a.yml": """
 seeds:
   - name: country_codes
     columns:
@@ -1013,7 +1013,7 @@ seeds:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "seeds/b.yml": """
+                "sql/seeds/b.yml": """
 seeds:
   - name: country_codes
     columns:
@@ -1028,8 +1028,8 @@ seeds:
             description="raises on duplicate model file names across directories",
             repo_files=base_repo_files()
             | {
-                "models/staging/orders.sql": "MODEL ();\n\nselect 1\n",
-                "models/marts/orders.sql": "MODEL ();\n\nselect 1\n",
+                "sql/models/staging/orders.sql": "MODEL ();\n\nselect 1\n",
+                "sql/models/marts/orders.sql": "MODEL ();\n\nselect 1\n",
             },
             expected_error_fragment="Duplicate model file name found for 'orders'",
         ),
@@ -1046,12 +1046,12 @@ seeds:
             description="raises when a unit test and a model share a name",
             repo_files=base_repo_files()
             | {
-                "models/marts/orders.sql": "MODEL ();\n\nselect 1\n",
+                "sql/models/marts/orders.sql": "MODEL ();\n\nselect 1\n",
                 "tests/unit/orders.sql": "TEST ();\nSELECT 1\n",
             },
             expected_error_fragment=(
                 "Project resource name 'orders' is declared as both model in "
-                "models/marts/orders.sql and unit test in tests/unit/orders.sql; .*unit test, "
+                "sql/models/marts/orders.sql and unit test in tests/unit/orders.sql; .*unit test, "
                 "scenario, job, job group, sensor, and calendar names must be globally unique"
             ),
         ),
@@ -1059,14 +1059,14 @@ seeds:
             description="raises when a scenario and a source share a name",
             repo_files=base_repo_files()
             | {
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_orders\n    schema: public\n    table: orders\n"
                 ),
                 "tests/scenarios/raw_orders.sql": "SCENARIO ();\nSELECT 1\n",
             },
             expected_error_fragment=(
                 "Project resource name 'raw_orders' is declared as both source in "
-                "sources/raw.yml and scenario in tests/scenarios/raw_orders.sql"
+                "sql/sources/raw.yml and scenario in tests/scenarios/raw_orders.sql"
             ),
         ),
         DiscoverProjectInputsErrorTestCase(
@@ -1085,8 +1085,8 @@ seeds:
             description="raises when model and source names collide",
             repo_files=base_repo_files()
             | {
-                "models/staging/orders.sql": "MODEL ();\n\nselect 1\n",
-                "sources/raw.yml": """
+                "sql/models/staging/orders.sql": "MODEL ();\n\nselect 1\n",
+                "sql/sources/raw.yml": """
 sources:
   - name: orders
     table: orders
@@ -1099,13 +1099,13 @@ sources:
             description="raises when source and seed names collide",
             repo_files=base_repo_files()
             | {
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: country_codes
     table: country_codes
 """.strip()
                 + "\n",
-                "seeds/schema.yml": """
+                "sql/seeds/schema.yml": """
 seeds:
   - name: country_codes
     columns:
@@ -1120,27 +1120,27 @@ seeds:
             description="raises when a source references an unknown loader",
             repo_files=base_repo_files()
             | {
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     managed: true
 """.strip()
                 + "\n",
             },
-            expected_error_fragment="Managed source 'raw_orders' in sources/raw.yml requires loader",
+            expected_error_fragment="Managed source 'raw_orders' in sql/sources/raw.yml requires loader",
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when loader names are duplicated",
             repo_files=base_repo_files()
             | {
-                "python/loaders/a.py": """
+                "python/nodes/loaders/a.py": """
 from sqlbuild.loaders import loader
 
 @loader
 def raw_orders(ctx):
     return []
 """,
-                "python/loaders/b.py": """
+                "python/nodes/loaders/b.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -1154,14 +1154,14 @@ def raw_orders(ctx):
             description="raises when explicit loader names are duplicated",
             repo_files=base_repo_files()
             | {
-                "python/loaders/a.py": """
+                "python/nodes/loaders/a.py": """
 from sqlbuild.loaders import loader
 
 @loader(name="raw_orders")
 def load_a(ctx):
     return []
 """,
-                "python/loaders/b.py": """
+                "python/nodes/loaders/b.py": """
 from sqlbuild.loaders import loader
 
 @loader(name="raw_orders")
@@ -1175,13 +1175,13 @@ def load_b(ctx):
             description="raises when unmanaged source name collides with loader name",
             repo_files=base_repo_files()
             | {
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: fetch_orders
     table: fetch_orders
 """.strip()
                 + "\n",
-                "python/loaders/raw_orders.py": """
+                "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -1189,19 +1189,19 @@ def fetch_orders(ctx):
     return []
 """,
             },
-            expected_error_fragment="Source 'fetch_orders' in sources/raw.yml conflicts with loader",
+            expected_error_fragment="Source 'fetch_orders' in sql/sources/raw.yml conflicts with loader",
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when unmanaged source name collides with terminal loader name",
             repo_files=base_repo_files()
             | {
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     table: raw_orders
 """.strip()
                 + "\n",
-                "python/loaders/raw_orders.py": """
+                "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -1209,13 +1209,13 @@ def raw_orders(ctx):
     return []
 """,
             },
-            expected_error_fragment="Source 'raw_orders' in sources/raw.yml conflicts with loader",
+            expected_error_fragment="Source 'raw_orders' in sql/sources/raw.yml conflicts with loader",
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when loader dependency is not decorated",
             repo_files=base_repo_files()
             | {
-                "python/loaders/events.py": """
+                "python/nodes/loaders/events.py": """
 from sqlbuild.loaders import loader
 
 def fetch_events(ctx):
@@ -1232,7 +1232,7 @@ def enriched_events(ctx):
             description="raises when loader dependencies contain a cycle",
             repo_files=base_repo_files()
             | {
-                "python/loaders/events.py": """
+                "python/nodes/loaders/events.py": """
 from sqlbuild.loaders import loader
 
 def fetch_events(ctx):
@@ -1251,14 +1251,14 @@ fetch_events = loader(depends_on=[enriched_events])(fetch_events)
             description="raises when terminal loader owns source config",
             repo_files=base_repo_files()
             | {
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     managed: true
     write_strategy: table
 """.strip()
                 + "\n",
-                "python/loaders/raw_orders.py": """
+                "python/nodes/loaders/raw_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader(write_strategy="table", columns=[{"name": "id", "type": "INTEGER"}])
@@ -1272,14 +1272,14 @@ def raw_orders(ctx):
             description="raises when task and asset names are duplicated",
             repo_files=base_repo_files()
             | {
-                "python/tasks/export_customers.py": """
+                "python/nodes/tasks/export_customers.py": """
 from sqlbuild.assets import asset
 
 @asset
 def export_customers(ctx):
     return None
 """,
-                "python/assets/export_customers.py": """
+                "python/nodes/assets/export_customers.py": """
 from sqlbuild.assets import asset
 
 @asset
@@ -1293,16 +1293,16 @@ def export_customers(ctx):
             description="raises when check name collides with task name",
             repo_files=base_repo_files()
             | {
-                "python/tasks/export_customers.py": """
+                "python/nodes/tasks/export_customers.py": """
 from sqlbuild.assets import asset
 
 @asset
 def export_customers(ctx):
     return None
 """,
-                "python/checks/export_customers.py": """
+                "python/nodes/checks/export_customers.py": """
 from sqlbuild.checks import check
-from python.tasks.export_customers import export_customers
+from python.nodes.tasks.export_customers import export_customers
 
 @check(depends_on=export_customers, name="export_customers")
 def export_customers_check(ctx):
@@ -1315,8 +1315,8 @@ def export_customers_check(ctx):
             description="raises when model name collides with task name",
             repo_files=base_repo_files()
             | {
-                "models/marts/export_customers.sql": "MODEL ();\n\nselect 1\n",
-                "python/tasks/export_customers.py": """
+                "sql/models/marts/export_customers.sql": "MODEL ();\n\nselect 1\n",
+                "python/nodes/tasks/export_customers.py": """
 from sqlbuild.assets import asset
 
 @asset
@@ -1332,7 +1332,7 @@ def export_customers(ctx):
             description="raises when seed name collides with asset name",
             repo_files=base_repo_files()
             | {
-                "seeds/schema.yml": """
+                "sql/seeds/schema.yml": """
 seeds:
   - name: export_customers
     columns:
@@ -1340,8 +1340,8 @@ seeds:
         type: INTEGER
 """.strip()
                 + "\n",
-                "seeds/export_customers.csv": "customer_id\n1\n",
-                "python/assets/export_customers.py": """
+                "sql/seeds/export_customers.csv": "customer_id\n1\n",
+                "python/nodes/assets/export_customers.py": """
 from sqlbuild.assets import asset
 
 @asset
@@ -1357,22 +1357,22 @@ def export_customers(ctx):
             description="raises when source name collides with check name",
             repo_files=base_repo_files()
             | {
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: export_customers_exists
     table: export_customers_exists
 """.strip()
                 + "\n",
-                "python/tasks/export_customers.py": """
+                "python/nodes/tasks/export_customers.py": """
 from sqlbuild.assets import asset
 
 @asset
 def export_customers(ctx):
     return None
 """,
-                "python/checks/export_customers.py": """
+                "python/nodes/checks/export_customers.py": """
 from sqlbuild.checks import check
-from python.tasks.export_customers import export_customers
+from python.nodes.tasks.export_customers import export_customers
 
 @check(depends_on=export_customers)
 def export_customers_exists(ctx):
@@ -1387,7 +1387,7 @@ def export_customers_exists(ctx):
             description="raises when sql function name collides with python function name",
             repo_files=base_repo_files()
             | {
-                "functions/sql/is_large_order.sql": """
+                "sql/functions/sql/is_large_order.sql": """
 FUNCTION (
   arguments (amount INTEGER),
   returns BOOLEAN,
@@ -1396,7 +1396,7 @@ FUNCTION (
 amount > 100
 """.strip()
                 + "\n",
-                "functions/python/is_large_order.py": """
+                "sql/functions/python/is_large_order.py": """
 from sqlbuild.functions import udf
 
 @udf(arguments={"amount": "INTEGER"}, returns="BOOLEAN", runtime_version="3.11")
@@ -1413,7 +1413,7 @@ def main(amount):
             description="raises when function name collides with loader name",
             repo_files=base_repo_files()
             | {
-                "functions/sql/fetch_orders.sql": """
+                "sql/functions/sql/fetch_orders.sql": """
 FUNCTION (
   arguments (amount INTEGER),
   returns BOOLEAN,
@@ -1422,7 +1422,7 @@ FUNCTION (
 amount > 100
 """.strip()
                 + "\n",
-                "python/loaders/fetch_orders.py": """
+                "python/nodes/loaders/fetch_orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -1438,25 +1438,25 @@ def fetch_orders(ctx):
             description="raises when SQL hook name collides with model name",
             repo_files=base_repo_files()
             | {
-                "models/notify.sql": "MODEL ();\n\nSELECT 1\n",
-                "hooks/sql/notify.sql": "HOOK ();\n\nSELECT 1\n",
+                "sql/models/notify.sql": "MODEL ();\n\nSELECT 1\n",
+                "sql/hooks/sql/notify.sql": "HOOK ();\n\nSELECT 1\n",
             },
             expected_error_fragment=(
-                "Project resource name 'notify' is declared as both model in models/notify.sql "
-                "and sql hook in hooks/sql/notify.sql"
+                "Project resource name 'notify' is declared as both model in sql/models/notify.sql "
+                "and sql hook in sql/hooks/sql/notify.sql"
             ),
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when Python hook name collides with provider name",
             repo_files=base_repo_files()
             | {
-                "providers/marker.py": """
+                "python/providers/marker.py": """
 from sqlbuild.providers import Provider
 
 class MarkerProvider(Provider):
     pass
 """,
-                "hooks/python/marker.py": """
+                "sql/hooks/python/marker.py": """
 from sqlbuild.hooks import hook
 
 @hook(name="marker_provider")
@@ -1472,8 +1472,8 @@ def marker(ctx):
             description="raises when SQL and Python hook names collide",
             repo_files=base_repo_files()
             | {
-                "hooks/sql/notify.sql": "HOOK ();\n\nSELECT 1\n",
-                "hooks/python/notify.py": """
+                "sql/hooks/sql/notify.sql": "HOOK ();\n\nSELECT 1\n",
+                "sql/hooks/python/notify.py": """
 from sqlbuild.hooks import hook
 
 @hook
@@ -1483,14 +1483,14 @@ def notify(ctx):
             },
             expected_error_fragment=(
                 "Project resource name 'notify' is declared as both sql hook in "
-                "hooks/sql/notify.sql and python hook in hooks/python/notify.py"
+                "sql/hooks/sql/notify.sql and python hook in sql/hooks/python/notify.py"
             ),
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when task dependency is not decorated",
             repo_files=base_repo_files()
             | {
-                "python/tasks/windows.py": """
+                "python/nodes/tasks/windows.py": """
 from sqlbuild.assets import asset
 
 def fetch_window(ctx):
@@ -1507,7 +1507,7 @@ def export_window(ctx):
             description="raises when task and asset dependencies contain a cycle",
             repo_files=base_repo_files()
             | {
-                "python/tasks/windows.py": """
+                "python/nodes/tasks/windows.py": """
 from sqlbuild.assets import asset
 
 def fetch_window(ctx):
@@ -1526,7 +1526,7 @@ fetch_window = asset(depends_on=enrich_window)(fetch_window)
             description="raises when check dependency is not decorated",
             repo_files=base_repo_files()
             | {
-                "python/checks/exports.py": """
+                "python/nodes/checks/exports.py": """
 from sqlbuild.checks import check
 
 def export_customers(ctx):
@@ -1543,7 +1543,7 @@ def export_customers_exists(ctx):
             description="raises when loader declares SQL model dependency",
             repo_files=base_repo_files()
             | {
-                "python/loaders/orders.py": """
+                "python/nodes/loaders/orders.py": """
 from sqlbuild.loaders import loader
 from sqlbuild.refs import model
 
@@ -1558,16 +1558,16 @@ def load_orders(ctx):
             description="raises when check depends on check",
             repo_files=base_repo_files()
             | {
-                "python/assets/exports.py": """
+                "python/nodes/assets/exports.py": """
 from sqlbuild.assets import asset
 
 @asset
 def export_customers(ctx):
     return None
 """,
-                "python/checks/exports.py": """
+                "python/nodes/checks/exports.py": """
 from sqlbuild.checks import check
-from python.assets.exports import export_customers
+from python.nodes.assets.exports import export_customers
 
 @check(depends_on=export_customers)
 def export_customers_exists(ctx):
@@ -1584,7 +1584,7 @@ def export_customers_recent(ctx):
             description="raises when seeds are declared outside seeds directory",
             repo_files=base_repo_files()
             | {
-                "models/schema.yml": """
+                "sql/models/schema.yml": """
 seeds:
   - name: country_codes
     columns:
@@ -1593,13 +1593,13 @@ seeds:
 """.strip()
                 + "\n",
             },
-            expected_error_fragment="seed declarations must live under seeds/",
+            expected_error_fragment="seed declarations must live under sql/seeds/",
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when a seed declaration uses yaml extension",
             repo_files=base_repo_files()
             | {
-                "seeds/lookups.yaml": "seeds: []\n",
+                "sql/seeds/lookups.yaml": "seeds: []\n",
             },
             expected_error_fragment=r"\.yaml is not supported",
         ),
@@ -1607,9 +1607,9 @@ seeds:
             description="raises when seed csv basenames are duplicated",
             repo_files=base_repo_files()
             | {
-                "seeds/a/country_codes.csv": "country_code\nUS\n",
-                "seeds/b/country_codes.csv": "country_code\nCA\n",
-                "seeds/lookups.yml": """
+                "sql/seeds/a/country_codes.csv": "country_code\nUS\n",
+                "sql/seeds/b/country_codes.csv": "country_code\nCA\n",
+                "sql/seeds/lookups.yml": """
 seeds:
   - name: country_codes
     columns:
@@ -1624,7 +1624,7 @@ seeds:
             description="raises when a declared seed has no matching csv file",
             repo_files=base_repo_files()
             | {
-                "seeds/schema.yml": """
+                "sql/seeds/schema.yml": """
 seeds:
   - name: country_codes
     columns:
@@ -1633,13 +1633,13 @@ seeds:
 """.strip()
                 + "\n",
             },
-            expected_error_fragment="has no matching CSV file under seeds/",
+            expected_error_fragment="has no matching CSV file under sql/seeds/",
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when a seed csv has no matching declaration",
             repo_files=base_repo_files()
             | {
-                "seeds/country_codes.csv": "country_code\nUS\n",
+                "sql/seeds/country_codes.csv": "country_code\nUS\n",
             },
             expected_error_fragment="has no matching declaration for seed 'country_codes'",
         ),
@@ -1647,7 +1647,7 @@ seeds:
             description="raises when a seed csv header does not match declared columns",
             repo_files=base_repo_files()
             | {
-                "seeds/schema.yml": """
+                "sql/seeds/schema.yml": """
 seeds:
   - name: country_codes
     columns:
@@ -1657,7 +1657,7 @@ seeds:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "seeds/country_codes.csv": "country_name,country_code\nUS,United States\n",
+                "sql/seeds/country_codes.csv": "country_name,country_code\nUS,United States\n",
             },
             expected_error_fragment="does not match declared seed columns",
         ),
@@ -1665,7 +1665,7 @@ seeds:
             description="raises when a seed csv has duplicate header columns",
             repo_files=base_repo_files()
             | {
-                "seeds/schema.yml": """
+                "sql/seeds/schema.yml": """
 seeds:
   - name: country_codes
     columns:
@@ -1675,7 +1675,7 @@ seeds:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "seeds/country_codes.csv": "country_code,country_code\nUS,United States\n",
+                "sql/seeds/country_codes.csv": "country_code,country_code\nUS,United States\n",
             },
             expected_error_fragment="contains duplicate CSV header column 'country_code'",
         ),
@@ -1691,7 +1691,7 @@ adapter = "duckdb"
 schema = "staging"
 """.strip()
                 + "\n",
-                "models/staging/orders.sql": "MODEL ();\n\nselect 1\n",
+                "sql/models/staging/orders.sql": "MODEL ();\n\nselect 1\n",
             },
             expected_error_fragment=r"path_defaults\['stagingg'\] does not match any model paths",
         ),

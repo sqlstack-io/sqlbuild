@@ -47,7 +47,7 @@ _MACRO_CONTEXT: MacroContext = MacroContext(
         LoadProjectMacrosTestCase(
             description="exports only public ordinary functions owned by each macro module",
             macro_files={
-                "macros/python/orders.py": """
+                "sql/macros/python/orders.py": """
 from pathlib import Path
 from urllib.parse import quote
 
@@ -72,12 +72,12 @@ def order_columns() -> str:
         LoadProjectMacrosTestCase(
             description="composes absolute and relative project macro imports without re-export",
             macro_files={
-                "macros/python/shared.py": "def shared(value: str) -> str:\n    return value.upper()\n",
-                "macros/python/absolute.py": (
+                "sql/macros/python/shared.py": "def shared(value: str) -> str:\n    return value.upper()\n",
+                "sql/macros/python/absolute.py": (
                     "from macros.python.shared import shared as render_shared\n\n"
                     "def absolute_macro() -> str:\n    return render_shared('absolute')\n"
                 ),
-                "macros/python/relative.py": (
+                "sql/macros/python/relative.py": (
                     "from .shared import shared\n\n"
                     "def relative_macro() -> str:\n    return shared('relative')\n"
                 ),
@@ -121,11 +121,11 @@ def test_given_macro_modules_when_loading_then_exports_only_owned_public_functio
         MacroDependencyTestCase(
             description="tracks imported macro called through a private helper but not unused import",
             macro_files={
-                "macros/python/shared.py": (
+                "sql/macros/python/shared.py": (
                     "def used(value: str) -> str:\n    return value.upper()\n\n"
                     "def unused() -> str:\n    return 'unused'\n"
                 ),
-                "macros/python/orders.py": (
+                "sql/macros/python/orders.py": (
                     "from macros.python.shared import used as render_used, unused\n\n"
                     "def _render(value: str) -> str:\n    return render_used(value)\n\n"
                     "def orders() -> str:\n    return _render('orders')\n"
@@ -138,7 +138,7 @@ def test_given_macro_modules_when_loading_then_exports_only_owned_public_functio
         MacroDependencyTestCase(
             description="tracks public macro called through private helper in same module",
             macro_files={
-                "macros/python/composed.py": (
+                "sql/macros/python/composed.py": (
                     "def base(value: str) -> str:\n    return value.upper()\n\n"
                     "def _helper(value: str) -> str:\n    return base(value)\n\n"
                     "def composed() -> str:\n    return _helper('composed')\n"
@@ -190,8 +190,8 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
         "from models.sales._macros.python.shared import shared\n\n"
         "def consumer() -> str:\n    return shared()\n"
     )
-    shared_path: Path = tmp_path / "models/sales/_macros/python/shared.py"
-    consumer_path: Path = tmp_path / "models/finance/macros/python/consumer.py"
+    shared_path: Path = tmp_path / "sql/models/sales/_macros/python/shared.py"
+    consumer_path: Path = tmp_path / "sql/models/finance/macros/python/consumer.py"
     shared_path.parent.mkdir(parents=True)
     consumer_path.parent.mkdir(parents=True)
     shared_path.write_text(shared_source, encoding="utf-8")
@@ -199,21 +199,21 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
     macro_files: tuple[DiscoveredMacroFile, ...] = (
         DiscoveredMacroFile(
             shared_path,
-            Path("models/sales/_macros/python/shared.py"),
+            Path("sql/models/sales/_macros/python/shared.py"),
             shared_source,
             ScopeKind.LOCAL,
             Path("models"),
-            Path("models/sales"),
-            Path("models/sales/_macros"),
+            Path("sql/models/sales"),
+            Path("sql/models/sales/_macros"),
         ),
         DiscoveredMacroFile(
             consumer_path,
-            Path("models/finance/macros/python/consumer.py"),
+            Path("sql/models/finance/macros/python/consumer.py"),
             consumer_source,
             ScopeKind.INHERITED,
             Path("models"),
-            Path("models/finance"),
-            Path("models/finance/macros"),
+            Path("sql/models/finance"),
+            Path("sql/models/finance/macros"),
         ),
     )
 
@@ -229,27 +229,27 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
         LoadProjectMacrosErrorTestCase(
             description="rejects a relative project module import before execution",
             macro_files={
-                "macros/python/a_consumer.py": (
+                "sql/macros/python/a_consumer.py": (
                     "from pathlib import Path\n"
                     "Path(__file__).parent.parent.joinpath('executed').touch()\n"
                     "from . import shared\n"
                 ),
-                "macros/python/shared.py": "def shared_macro() -> str:\n    return 'shared'\n",
+                "sql/macros/python/shared.py": "def shared_macro() -> str:\n    return 'shared'\n",
             },
             expected_error_fragment="imports project package 'macros.python' instead of a macro module",
         ),
         LoadProjectMacrosErrorTestCase(
             description="rejects an import of a package containing project macros",
             macro_files={
-                "macros/python/a_consumer.py": "import macros\n",
-                "macros/python/shared.py": "def shared_macro() -> str:\n    return 'shared'\n",
+                "sql/macros/python/a_consumer.py": "import macros\n",
+                "sql/macros/python/shared.py": "def shared_macro() -> str:\n    return 'shared'\n",
             },
             expected_error_fragment="module imports are not supported",
         ),
         LoadProjectMacrosErrorTestCase(
             description="rejects missing project macro module before execution",
             macro_files={
-                "macros/python/consumer.py": (
+                "sql/macros/python/consumer.py": (
                     "from pathlib import Path\n"
                     "Path(__file__).parent.parent.joinpath('executed').touch()\n"
                     "from macros.python.missing import missing\n\n"
@@ -261,13 +261,13 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
         LoadProjectMacrosErrorTestCase(
             description="rejects project macro import cycle before execution",
             macro_files={
-                "macros/python/first.py": (
+                "sql/macros/python/first.py": (
                     "from pathlib import Path\n"
                     "Path(__file__).parent.parent.joinpath('executed').touch()\n"
                     "from macros.python.second import second\n\n"
                     "def first() -> str:\n    return second()\n"
                 ),
-                "macros/python/second.py": (
+                "sql/macros/python/second.py": (
                     "from macros.python.first import first\n\ndef second() -> str:\n    return first()\n"
                 ),
             },
@@ -276,7 +276,7 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
         LoadProjectMacrosErrorTestCase(
             description="rejects local macro call cycle before execution",
             macro_files={
-                "macros/python/cycle.py": (
+                "sql/macros/python/cycle.py": (
                     "from pathlib import Path\n"
                     "Path(__file__).parent.parent.joinpath('executed').touch()\n\n"
                     "def first() -> str:\n    return second()\n\n"
@@ -288,11 +288,11 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
         LoadProjectMacrosErrorTestCase(
             description="rejects relative import escaping macro package before dependency executes",
             macro_files={
-                "macros/python/consumer.py": (
+                "sql/macros/python/consumer.py": (
                     "from ....macros.shared import shared\n\n"
                     "def consumer() -> str:\n    return shared()\n"
                 ),
-                "macros/python/shared.py": (
+                "sql/macros/python/shared.py": (
                     "from pathlib import Path\n"
                     "Path(__file__).parent.parent.joinpath('executed').touch()\n\n"
                     "def shared() -> str:\n    return 'shared'\n"
@@ -303,7 +303,7 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
         LoadProjectMacrosErrorTestCase(
             description="rejects dynamic local helper alias before execution",
             macro_files={
-                "macros/python/helpers.py": (
+                "sql/macros/python/helpers.py": (
                     "def _helper() -> str:\n    return 'helper'\n\n"
                     "def outer() -> str:\n"
                     "    alias = _helper\n"
@@ -315,8 +315,8 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
         LoadProjectMacrosErrorTestCase(
             description="rejects module-level local helper alias before execution",
             macro_files={
-                "macros/python/shared.py": "def shared() -> str:\n    return 'shared'\n",
-                "macros/python/helpers.py": (
+                "sql/macros/python/shared.py": "def shared() -> str:\n    return 'shared'\n",
+                "sql/macros/python/helpers.py": (
                     "from macros.python.shared import shared\n\n"
                     "def _helper() -> str:\n    return shared()\n\n"
                     "_alias = _helper\n\n"
@@ -330,8 +330,8 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
         LoadProjectMacrosErrorTestCase(
             description="rejects local helper call in macro default before execution",
             macro_files={
-                "macros/python/shared.py": "def shared() -> str:\n    return 'shared'\n",
-                "macros/python/helpers.py": (
+                "sql/macros/python/shared.py": "def shared() -> str:\n    return 'shared'\n",
+                "sql/macros/python/helpers.py": (
                     "from macros.python.shared import shared\n\n"
                     "def _helper() -> str:\n    return shared()\n\n"
                     "def outer(value=_helper()) -> str:\n    return value\n"
@@ -344,8 +344,8 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
         LoadProjectMacrosErrorTestCase(
             description="rejects module function replacing imported macro binding",
             macro_files={
-                "macros/python/shared.py": "def shared() -> str:\n    return 'shared'\n",
-                "macros/python/consumer.py": (
+                "sql/macros/python/shared.py": "def shared() -> str:\n    return 'shared'\n",
+                "sql/macros/python/consumer.py": (
                     "from macros.python.shared import shared as _helper\n\n"
                     "def _helper() -> str:\n    return 'local'\n\n"
                     "def outer() -> str:\n    return _helper()\n"
@@ -356,48 +356,48 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
         LoadProjectMacrosErrorTestCase(
             description="rejects normalized project macro module path collision",
             macro_files={
-                "macros/python/a.b.py": "def dotted() -> str:\n    return 'dotted'\n",
-                "macros/python/a/b.py": "def nested() -> str:\n    return 'nested'\n",
+                "sql/macros/python/a.b.py": "def dotted() -> str:\n    return 'dotted'\n",
+                "sql/macros/python/a/b.py": "def nested() -> str:\n    return 'nested'\n",
             },
             expected_error_fragment="Macro module path collision for 'macros.python.a.b'",
         ),
         LoadProjectMacrosErrorTestCase(
             description="rejects public module owned constants",
-            macro_files={"macros/python/orders.py": "DEFAULT_LIMIT = 10\n"},
+            macro_files={"sql/macros/python/orders.py": "DEFAULT_LIMIT = 10\n"},
             expected_error_fragment="declaration 'DEFAULT_LIMIT' must be underscore-private",
         ),
         LoadProjectMacrosErrorTestCase(
             description="rejects public module owned classes",
-            macro_files={"macros/python/orders.py": "class Formatter:\n    pass\n"},
+            macro_files={"sql/macros/python/orders.py": "class Formatter:\n    pass\n"},
             expected_error_fragment="declaration 'Formatter' must be underscore-private",
         ),
         LoadProjectMacrosErrorTestCase(
             description="reports an earlier module's declaration before a later syntax error",
             macro_files={
-                "macros/python/a_orders.py": "DEFAULT_LIMIT = 10\n",
-                "macros/python/b_customers.py": "def customers(:\n",
+                "sql/macros/python/a_orders.py": "DEFAULT_LIMIT = 10\n",
+                "sql/macros/python/b_customers.py": "def customers(:\n",
             },
             expected_error_fragment=(
-                "^Macro module 'macros/python/a_orders.py' declaration 'DEFAULT_LIMIT' must be "
+                "^Macro module 'sql/macros/python/a_orders.py' declaration 'DEFAULT_LIMIT' must be "
                 "underscore-private$"
             ),
         ),
         LoadProjectMacrosErrorTestCase(
             description="reports a later module's syntax error after earlier modules pass",
             macro_files={
-                "macros/python/a_orders.py": "def orders() -> str:\n    return 'orders'\n",
-                "macros/python/b_customers.py": "def customers(:\n",
+                "sql/macros/python/a_orders.py": "def orders() -> str:\n    return 'orders'\n",
+                "sql/macros/python/b_customers.py": "def customers(:\n",
             },
             expected_error_fragment="^Failed to parse macros from '.*b_customers.py': ",
         ),
         LoadProjectMacrosErrorTestCase(
             description="names the shallowest module-level use of an imported macro",
             macro_files={
-                "macros/python/shared.py": (
+                "sql/macros/python/shared.py": (
                     "def first() -> str:\n    return 'first'\n\n"
                     "def second() -> str:\n    return 'second'\n"
                 ),
-                "macros/python/consumer.py": (
+                "sql/macros/python/consumer.py": (
                     "from macros.python.shared import first, second\n\n"
                     "_PAIRS = [[first], second]\n\n"
                     "def consumer() -> str:\n    return 'consumer'\n"
@@ -640,7 +640,7 @@ def test_given_sql_macro_variants_when_expanding_then_it_returns_expected_sql(
 
     expanded_sql: str = expand_sql_macros(
         sql=test_case.sql,
-        file_path=tmp_path / "models" / "orders.sql",
+        file_path=tmp_path / "sql" / "models" / "orders.sql",
         loaded_macros=loaded_macros,
         macro_overrides=test_case.macro_overrides,
         macro_context=_MACRO_CONTEXT,
@@ -729,7 +729,7 @@ def test_given_invalid_sql_macro_usage_when_expanding_then_it_raises_clear_error
     with pytest.raises(ValueError, match=test_case.expected_error_fragment):
         expand_sql_macros(
             sql=test_case.sql,
-            file_path=tmp_path / "models" / "orders.sql",
+            file_path=tmp_path / "sql" / "models" / "orders.sql",
             loaded_macros=loaded_macros,
             macro_overrides=test_case.macro_overrides,
             macro_context=_MACRO_CONTEXT,
@@ -773,15 +773,15 @@ def test_given_sql_with_at_tokens_when_finding_macro_calls_then_returns_real_uni
         SqlMacroInventoryTestCase(
             description="an invalid SQL macro keeps the valid exports and names its own file",
             macro_files={
-                "macros/sql/a_valid.sql": (
+                "sql/macros/sql/a_valid.sql": (
                     'MACRO (description "Valid", arguments (v BIGINT), returns BIGINT);\n\n@v + 1\n'
                 ),
-                "macros/sql/z_invalid.sql": (
+                "sql/macros/sql/z_invalid.sql": (
                     'MACRO (description "Invalid", returns BIGINT);\n\nWITH a AS (SELECT 1)\n'
                 ),
             },
             expected_exports=("a_valid",),
-            expected_fault_paths=("macros/sql/z_invalid.sql",),
+            expected_fault_paths=("sql/macros/sql/z_invalid.sql",),
         )
     ],
     ids=lambda case: case.description,

@@ -62,7 +62,7 @@ _SCOPE: str = "sqlbuild.compiler.scopes.types:ScopeKind"
                     {"header_values": {"materialized": "copy_table"}, "contents": "-- café\n"},
                 ],
                 "materialization_files": [{"name": "copy_table"}],
-                "adapter_file": {"relative_path": {"__path__": "adapter.py"}},
+                "adapter_file": {"relative_path": {"__path__": "python/adapter.py"}},
             },
             expected_present=frozenset(
                 {
@@ -210,23 +210,23 @@ def test_given_encoded_inputs_when_classifying_then_encoded_empty_values_prove_n
     [
         AuthoredByteKindsTestCase(
             description="crlf_in_discovered_model",
-            files={"models/orders.sql": b"MODEL ();\r\nSELECT 1\r\n"},
-            read_paths=("models/orders.sql",),
+            files={"sql/models/orders.sql": b"MODEL ();\r\nSELECT 1\r\n"},
+            read_paths=("sql/models/orders.sql",),
             expected_crlf=True,
         ),
         AuthoredByteKindsTestCase(
             description="lf_only",
-            files={"models/orders.sql": b"MODEL ();\nSELECT 1\n"},
-            read_paths=("models/orders.sql",),
+            files={"sql/models/orders.sql": b"MODEL ();\nSELECT 1\n"},
+            read_paths=("sql/models/orders.sql",),
             expected_crlf=False,
         ),
         AuthoredByteKindsTestCase(
             description="crlf_only_in_a_file_discovery_did_not_read",
             files={
-                "models/orders.sql": b"MODEL ();\nSELECT 1\n",
+                "sql/models/orders.sql": b"MODEL ();\nSELECT 1\n",
                 "notes/readme.txt": b"orders\r\n",
             },
-            read_paths=("models/orders.sql",),
+            read_paths=("sql/models/orders.sql",),
             expected_crlf=False,
         ),
     ],
@@ -282,7 +282,7 @@ def test_given_discovered_project_inputs_when_listing_required_kinds_then_collec
         CaptureProblemsTestCase(
             description="sound_capture",
             capture=empty_inputs_capture(
-                asset_functions=[{"function": {"__callable__": "python.assets.orders:export"}}]
+                asset_functions=[{"function": {"__callable__": "python.nodes.assets.orders:export"}}]
             ),
             expected_problem_count=0,
         ),

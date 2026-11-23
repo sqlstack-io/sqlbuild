@@ -26,7 +26,7 @@ def dbt_project_dir(tmp_path: Path) -> Path:
     """Create a tiny dbt DuckDB project."""
 
     project_dir: Path = tmp_path / "dbt_project"
-    models_dir: Path = project_dir / "models"
+    models_dir: Path = project_dir / "sql" / "models"
     models_dir.mkdir(parents=True)
     project_dir.joinpath("dbt_project.yml").write_text(
         "\n".join(

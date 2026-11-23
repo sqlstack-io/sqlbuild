@@ -95,7 +95,7 @@ def test_given_expanded_offset_when_mapping_then_authored_position_matches(
     passes: tuple[tuple[ExpansionSpan, ...], ...]
     expanded_sql, passes = expand_authored_sql_with_spans(
         sql=test_case.sql,
-        file_path=tmp_path / "models" / "orders.sql",
+        file_path=tmp_path / "sql" / "models" / "orders.sql",
         effective_vars=test_case.effective_vars,
         loaded_macros=loaded_macros,
         macro_context=_MACRO_CONTEXT,

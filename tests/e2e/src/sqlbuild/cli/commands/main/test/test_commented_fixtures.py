@@ -22,10 +22,10 @@ _PROJECT_FILES: dict[str, str] = {
         '[connection]\ndatabase = "commented_fixtures.duckdb"\n\n'
         '[defaults]\nmaterialized = "table"\n'
     ),
-    "macros/python/status.py": (
+    "sql/macros/python/status.py": (
         'def normalize_status(value: str) -> str:\n    return f"LOWER(TRIM({value}))"\n'
     ),
-    "sources/raw_orders.yml": (
+    "sql/sources/raw_orders.yml": (
         "sources:\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: main\n"
@@ -34,11 +34,11 @@ _PROJECT_FILES: dict[str, str] = {
         "      - name: order_id\n        type: INTEGER\n"
         "      - name: status\n        type: VARCHAR\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Test model orders.');\n\n"
         'SELECT order_id, @py.normalize_status("status") AS status FROM __source("raw_orders")\n'
     ),
-    "models/order_counts.sql": (
+    "sql/models/order_counts.sql": (
         "MODEL (description 'Test model order_counts.');\n\n"
         'SELECT status, COUNT(*) AS order_count FROM __ref("orders") GROUP BY status\n'
     ),
@@ -89,8 +89,8 @@ _MISMATCH_FRAGMENT: str = (
         CommentedFixtureE2ETestCase(
             description="bounded CTE casts joins and unions execute with mocked sources",
             test_files={
-                "macros/python/status.py": "",
-                "models/orders.sql": (
+                "sql/macros/python/status.py": "",
+                "sql/models/orders.sql": (
                     "MODEL (description 'Orders through projected CTEs.');\n"
                     'WITH imported AS (SELECT * FROM __source("raw_orders")),\n'
                     "projected AS (SELECT CAST(COALESCE(b.order_id, 0) + 0 AS INTEGER) AS order_id,\n"
@@ -114,9 +114,9 @@ _MISMATCH_FRAGMENT: str = (
         CommentedFixtureE2ETestCase(
             description="nested model CTEs and marker lookalikes preserve mocked source results",
             test_files={
-                "macros/python/status.py": "",
-                "models/_macros/python/status.py": _PROJECT_FILES["macros/python/status.py"],
-                "models/orders.sql": (
+                "sql/macros/python/status.py": "",
+                "sql/models/_macros/python/status.py": _PROJECT_FILES["sql/macros/python/status.py"],
+                "sql/models/orders.sql": (
                     "MODEL (description 'Orders through nested CTEs.');\n"
                     'WITH "recent" AS (\n'
                     "  WITH nested AS (SELECT order_id, status, '__ref(\"ignored\")''s' AS note\n"

@@ -205,16 +205,16 @@ def generated_sql_test_files(
 def _project_files() -> dict[str, str]:
     files: dict[str, str] = {
         "sqlbuild_project.toml": _PROJECT_TOML,
-        "sources/raw.yml": _SOURCES,
-        "seeds/regions.yml": _SEEDS,
-        "seeds/regions.csv": "region,label\neast,East\n",
-        "macros/python/amounts.py": _MACROS,
-        "functions/sql/udf__is_big.sql": _UDF,
-        "functions/sql/table_fn__customer_orders.sql": _TABLE_FUNCTION,
-        "models/daily_orders.sql": _DAILY_ORDERS,
+        "sql/sources/raw.yml": _SOURCES,
+        "sql/seeds/regions.yml": _SEEDS,
+        "sql/seeds/regions.csv": "region,label\neast,East\n",
+        "sql/macros/python/amounts.py": _MACROS,
+        "sql/functions/sql/udf__is_big.sql": _UDF,
+        "sql/functions/sql/table_fn__customer_orders.sql": _TABLE_FUNCTION,
+        "sql/models/daily_orders.sql": _DAILY_ORDERS,
     }
     files.update(
-        (f"models/{name}.sql", f'MODEL (description "Model {name}.");\n\n{sql}\n')
+        (f"sql/models/{name}.sql", f'MODEL (description "Model {name}.");\n\n{sql}\n')
         for name, sql in _BASE_MODELS.items()
     )
     return files
@@ -262,7 +262,7 @@ EDGE_DECIMAL_OVERFLOW: str = EDGE_DECIMAL_CONTEXT.replace(
     '"5E-1000027"', '"9.99999999999999999999999999995E+999999"'
 )
 EDGE_UNICODE_MACRO_SCOPE: dict[str, str] = {
-    "models/weird_amounts.sql": (
+    "sql/models/weird_amounts.sql": (
         'MODEL (description "Model weird_amounts.");\n\n'
         'WITH o AS (SELECT amount FROM __source("raw_orders"))\nSELECT amount@\u00f6re FROM o\n'
     ),

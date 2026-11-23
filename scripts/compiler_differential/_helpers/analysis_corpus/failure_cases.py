@@ -45,7 +45,7 @@ _POSTGRES_CONFIG: str = (
     'name = "failure_corpus"\nadapter = "postgres"\n\n'
     '[connection]\nhost = "localhost"\ndatabase = "failure"\nschema = "public"\n'
 )
-_FUNCTION_PATH: str = "functions/sql/scaled_amount.sql"
+_FUNCTION_PATH: str = "sql/functions/sql/scaled_amount.sql"
 _SCALED_AMOUNT: str = (
     "FUNCTION (\n"
     '  description "Scale an amount by an integer factor",\n'
@@ -53,9 +53,9 @@ _SCALED_AMOUNT: str = (
     "  returns DOUBLE,\n);\n\n"
     "p_amount * p_factor\n"
 )
-_HOOK_PATH: str = "hooks/sql/record_refresh.sql"
+_HOOK_PATH: str = "sql/hooks/sql/record_refresh.sql"
 _EXPRESSION_AUDIT: str = 'AUDIT ();\n\nSELECT *\nFROM __ref("@model")\nWHERE NOT (@expression)\n'
-_EXPRESSION_AUDIT_PATH: str = "models/marts/_sqlbuild/_audits/generic/expression_is_true.sql"
+_EXPRESSION_AUDIT_PATH: str = "sql/models/marts/_sqlbuild/_audits/generic/expression_is_true.sql"
 _TEST_PATH: str = "tests/unit/test_stg_orders.sql"
 
 
@@ -350,7 +350,7 @@ def _contract_cases() -> tuple[FailureCase, ...]:
                 "order_status"
             ),
             files={
-                "models/staging/_enums/order_status.sql": (
+                "sql/models/staging/_enums/order_status.sql": (
                     'ENUM (name order_status, members (PLACED "placed", SHIPPED "shipped"));\n'
                 ),
                 **staging_files(
@@ -426,14 +426,14 @@ def _target_cases() -> tuple[FailureCase, ...]:
                 FAILURE_CONFIG_PATH: FAILURE_BASE_CONFIG
                 + '\n[targets.dev]\nschema = "dev"\nloader_schema = "raw"\n'
                 + '\n[targets.prod]\nschema = "prod"\nloader_schema = "raw"\n',
-                "python/loaders/orders.py": (
+                "python/nodes/loaders/orders.py": (
                     "from sqlbuild.loaders import loader\n\n\n"
                     "@loader\n"
                     "def loaded_orders(ctx):\n"
                     '    """Load raw orders."""\n'
                     '    return [{"order_id": 1}]\n'
                 ),
-                "sources/loaded.yml": (
+                "sql/sources/loaded.yml": (
                     "sources:\n  - name: loaded_orders\n    description: Loaded orders.\n"
                     "    managed: true\n    write_strategy: table\n"
                     "    columns:\n      - name: order_id\n        type: INTEGER\n"
@@ -466,7 +466,7 @@ def _target_cases() -> tuple[FailureCase, ...]:
                     'adapter = "duckdb"\n', 'adapter = "duckdb"\ndefault_target = "dev"\n'
                 )
                 + '\n[defaults]\nschema = "mart"\n\n[targets.dev]\nschema = "preserve"\n',
-                "python/tasks/announce.py": (
+                "python/nodes/tasks/announce.py": (
                     "from sqlbuild.assets import asset\n\n\n"
                     "@asset\n"
                     "def announce_orders(ctx):\n"
@@ -564,7 +564,7 @@ def _ordering_cases() -> tuple[FailureCase, ...]:
                 **staging_files(
                     FAILURE_BASE_STAGING.replace("amount, status", "amount, discount, status")
                 ),
-                "models/marts/order_counts.sql": (
+                "sql/models/marts/order_counts.sql": (
                     'MODEL (\n  description "Order counts per customer",\n);\n\n'
                     "SELECT customer_id, COUNT(missing_column) AS order_count\n"
                     f"FROM {_ORDERS}\nGROUP BY customer_id\n"

@@ -22,14 +22,14 @@ from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
         DiscoverLoaderFunctionsTestCase(
             description="discovers decorated source loaders from the python directory",
             files={
-                "python/loaders/github.py": """
+                "python/nodes/loaders/github.py": """
 from sqlbuild.loaders import loader
 
 @loader
 def github_events(ctx):
     return []
 """,
-                "python/loaders/stripe.py": """
+                "python/nodes/loaders/stripe.py": """
 from sqlbuild.loaders import loader
 
 @loader(destination="raw.customers")
@@ -49,7 +49,7 @@ def stripe_customers(ctx):
         DiscoverLoaderFunctionsTestCase(
             description="discovers intermediate loader write and schema metadata",
             files={
-                "python/loaders/events.py": """
+                "python/nodes/loaders/events.py": """
 from sqlbuild.loaders import loader
 
 @loader(
@@ -79,7 +79,7 @@ def events(ctx):
         DiscoverLoaderFunctionsTestCase(
             description="discovers loader dependencies from decorator metadata",
             files={
-                "python/loaders/events.py": """
+                "python/nodes/loaders/events.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -103,7 +103,7 @@ def enriched_events(ctx):
         DiscoverLoaderFunctionsTestCase(
             description="discovers explicit loader names and dependencies",
             files={
-                "python/loaders/events.py": """
+                "python/nodes/loaders/events.py": """
 from sqlbuild.loaders import loader
 
 @loader(name="fetch_events")
@@ -139,9 +139,9 @@ def make_enriched(ctx):
         DiscoverLoaderFunctionsTestCase(
             description="ignores undecorated functions and init files",
             files={
-                "python/loaders/__init__.py": "",
-                "python/loaders/helpers.py": "def helper(): return None\n",
-                "python/loaders/orders.py": """
+                "python/nodes/loaders/__init__.py": "",
+                "python/nodes/loaders/helpers.py": "def helper(): return None\n",
+                "python/nodes/loaders/orders.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -202,7 +202,7 @@ def test_given_project_dir_when_discovering_loaders_then_returns_expected(
     [
         DiscoverLoaderFunctionsTestCase(
             description="raises clear error when loader file import fails",
-            files={"python/loaders/broken.py": "import missing_loader_dependency\n"},
+            files={"python/nodes/loaders/broken.py": "import missing_loader_dependency\n"},
             expected_names=(),
             expected_targets=(),
             expected_dependency_counts=(),
@@ -211,7 +211,7 @@ def test_given_project_dir_when_discovering_loaders_then_returns_expected(
             expected_unique_keys=(),
             expected_column_names=(),
             expected_contracts=(),
-            expected_error_fragment="Failed to import Python node file python/loaders/broken.py",
+            expected_error_fragment="Failed to import Python node file python/nodes/loaders/broken.py",
         )
     ],
     ids=lambda case: case.description,
@@ -237,7 +237,7 @@ def test_given_loader_import_error_when_discovering_loaders_then_raises_clear_er
         DiscoverLoaderFunctionsTestCase(
             description="loader descriptions come from the decorator or the docstring",
             files={
-                "python/loaders/orders.py": '''
+                "python/nodes/loaders/orders.py": '''
 from sqlbuild.loaders import loader
 
 @loader

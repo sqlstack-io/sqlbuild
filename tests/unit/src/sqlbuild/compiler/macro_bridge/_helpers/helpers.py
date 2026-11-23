@@ -54,7 +54,7 @@ def constant_declarations(value: int) -> DeclarationResolutionContext:
             "base_rate": ConstantDeclaration(
                 name="base_rate",
                 value=SqlValue(logical_type=SqlLogicalType(kind=SqlValueKind.INTEGER), value=value),
-                relative_path=Path("constants/base_rate.sql"),
+                relative_path=Path("sql/constants/base_rate.sql"),
             )
         }
     )
@@ -185,13 +185,13 @@ def sqlbuild_module(_root: Path) -> object:
 def write_environment_project(root: Path) -> None:
     """Write a model and a macro for store environment checks."""
 
-    (root / "models").mkdir()
-    (root / "macros" / "python").mkdir(parents=True)
-    _ = (root / "models/orders.sql").write_text("SELECT 1\n", encoding="utf-8")
-    _ = (root / "macros/python/common.py").write_text("X = 1\n", encoding="utf-8")
+    (root / "sql" / "models").mkdir()
+    (root / "sql" / "macros" / "python").mkdir(parents=True)
+    _ = (root / "sql/models/orders.sql").write_text("SELECT 1\n", encoding="utf-8")
+    _ = (root / "sql/macros/python/common.py").write_text("X = 1\n", encoding="utf-8")
 
 
-EXCLUDED_MODEL_PATHS: list[str] = ["models/orders.sql"]
+EXCLUDED_MODEL_PATHS: list[str] = ["sql/models/orders.sql"]
 
 
 def environment_of(root: Path) -> str:

@@ -56,7 +56,7 @@ def test_given_rule_fixes_when_running_cli_then_reports_verified_or_refused_chan
     test_case: RuleFixTestCase, tmp_path: Path
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(test_case.sql)
     (model.parent / "customers.sql").write_text(
@@ -100,7 +100,7 @@ def test_given_wide_or_deep_unused_ctes_when_fixing_then_work_is_bounded(
     test_case: RuleFixPerformanceTestCase, tmp_path: Path
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     columns: str = ", ".join(f"{index} AS item_{index}" for index in range(test_case.width))
     ctes: list[str] = [f"items_0 AS (SELECT {columns})"]

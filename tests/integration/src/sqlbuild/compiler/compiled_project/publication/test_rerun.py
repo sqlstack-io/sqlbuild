@@ -48,14 +48,14 @@ def test_given_a_partial_group_when_retrying_from_failure_then_successful_nodes_
     test_case = replace(
         test_case,
         files={
-            "models/broken_orders.sql": Path(
+            "sql/models/broken_orders.sql": Path(
                 "benchmarks/duckshop/edge_cases/orchestration/rerun_from_failure.sql"
             ).read_text(),
-            "models/totals.sql": (
+            "sql/models/totals.sql": (
                 "MODEL (description 'Downstream totals.', materialized table);\n"
                 'SELECT amount FROM __ref("broken_orders")\n'
             ),
-            "models/inventory.sql": (
+            "sql/models/inventory.sql": (
                 "MODEL (description 'Independent inventory.', materialized table);\n"
                 "SELECT 29 AS amount\n"
             ),

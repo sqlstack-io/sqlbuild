@@ -53,8 +53,8 @@ _CYCLIC_MACROS: str = (
     'def pong(expression: str) -> str:\n    """Call ping."""\n    return ping(expression)\n'
 )
 _COUNTED_MART: str = FAILURE_BASE_MART.replace("SUM(amount)", "SUM(@py.counted('amount'))")
-_STAGING_PATH: str = "models/staging/stg_orders.sql"
-_MART_PATH: str = "models/marts/customer_totals.sql"
+_STAGING_PATH: str = "sql/models/staging/stg_orders.sql"
+_MART_PATH: str = "sql/models/marts/customer_totals.sql"
 _STAGING_PREFIX: str = (
     'MODEL (\n  description "Staged orders",\n);\n\nSELECT order_id, customer_id, '
 )
@@ -104,15 +104,15 @@ _STAGING_SUFFIX: str = ' AS amount, status\nFROM __source("raw_orders")\n'
             description="macro_in_a_sibling_scope",
             project_files={
                 _STAGING_PATH: _STAGING_PREFIX + "@py.mart_only('amount')" + _STAGING_SUFFIX,
-                "models/marts/_sqlbuild/macros/python/local.py": _MART_MACROS,
+                "sql/models/marts/_sqlbuild/macros/python/local.py": _MART_MACROS,
             },
             expected_report_text="stg_orders.sql' is inaccessible",
             expected_macro_runs=["counted amount"],
         ),
         NativeMacroErrorTestCase(
             description="macro_call_cycle",
-            project_files={"macros/python/cyclic.py": _CYCLIC_MACROS},
-            expected_report_text="Macro call cycle in 'macros/python/cyclic.py': ping -> pong -> ping",
+            project_files={"sql/macros/python/cyclic.py": _CYCLIC_MACROS},
+            expected_report_text="Macro call cycle in 'sql/macros/python/cyclic.py': ping -> pong -> ping",
             expected_macro_runs=[],
         ),
         NativeMacroErrorTestCase(
@@ -143,7 +143,7 @@ def test_given_macro_error_when_compiling_then_error_matches_python_once(
     project_dir: Path = tmp_path / "orders"
     for relative_path, contents in {
         **FAILURE_BASE_FILES,
-        "macros/python/orders.py": _MACROS,
+        "sql/macros/python/orders.py": _MACROS,
         _MART_PATH: _COUNTED_MART,
         _CALL_LOG: "",
         **test_case.project_files,
@@ -186,7 +186,7 @@ def test_given_macro_error_when_compiling_then_lifecycle_error_type_matches(
     project_dir: Path = tmp_path / "orders"
     for relative_path, contents in {
         **FAILURE_BASE_FILES,
-        "macros/python/orders.py": _MACROS,
+        "sql/macros/python/orders.py": _MACROS,
         _MART_PATH: _COUNTED_MART,
         _CALL_LOG: "",
         **test_case.project_files,

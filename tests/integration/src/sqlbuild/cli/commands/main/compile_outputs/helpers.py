@@ -40,13 +40,13 @@ OUTPUT_PROJECT_FILES: dict[str, str] = {
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN021"]\n'
     ),
     **{
-        f"models/orders_{name}.sql": OUTPUT_MODEL_HEADER.format(name=name)
+        f"sql/models/orders_{name}.sql": OUTPUT_MODEL_HEADER.format(name=name)
         + "SELECT CAST(1 AS INTEGER) AS order_id\n"
         for name in ("east", "north", "west")
     },
 }
-EDITED_MODEL: str = "models/orders_north.sql"
-DELETED_MODEL: str = "models/orders_west.sql"
+EDITED_MODEL: str = "sql/models/orders_north.sql"
+DELETED_MODEL: str = "sql/models/orders_west.sql"
 TOUCH_BACK_NS: int = 3_600_000_000_000
 BLOCKED_ARTIFACT: str = "target/compiled/models/orders_north.sql"
 HELPER_MODULE_DIRECTORY: str = "site_packages"
@@ -56,8 +56,8 @@ TRACKED_VARIABLE: str = "SQLBUILD_ORDERS_REGION"
 SURROGATE_SELECTOR: str = "orders\udcff"
 SURROGATE_HOOK_FILES: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-    "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-    "hooks/python/notify.py": (
+    "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+    "sql/hooks/python/notify.py": (
         "from sqlbuild.hooks import hook\n\n\n@hook\ndef notify_complete(ctx):\n"
         '    """Notify "q" \\\\ café \\udcff\\U0001F600\\ud83d\\ude00\\ud83d end."""\n'
         "    return None\n"
@@ -70,11 +70,11 @@ def nested_payload_hook_files(*, depth: int) -> dict[str, str]:
 
     return {
         "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Orders.', materialized table, post_hooks [python(\"notify\", "
             f"payload: {'[' * depth}1{']' * depth})]);\nSELECT 1 AS order_id\n"
         ),
-        "hooks/python/notify.py": (
+        "sql/hooks/python/notify.py": (
             "from sqlbuild.hooks import hook\n\n\n@hook\ndef notify(ctx, payload):\n"
             '    """Notify."""\n    return None\n'
         ),

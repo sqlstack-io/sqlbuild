@@ -6,10 +6,10 @@ use crate::python_rules::tests::test_types::PythonRunTestCase;
 
 const RUNTIME_FILES: [(&str, &str); 5] = [
     (
-        "python/orders/storefront_import/node.py",
+        "python/nodes/orders/storefront_import/node.py",
         r#"from sqlbuild.assets import AssetContext, asset
 
-from python.orders.storefront_import.main import main
+from python.nodes.orders.storefront_import.main import main
 
 
 @asset(description="Import storefront orders.")
@@ -18,7 +18,7 @@ def storefront_import(ctx: AssetContext) -> None:
 "#,
     ),
     (
-        "python/orders/storefront_import/main.py",
+        "python/nodes/orders/storefront_import/main.py",
         r#"from sqlbuild.assets import PythonNodeResult, AssetContext
 
 
@@ -27,13 +27,13 @@ def main(ctx: AssetContext) -> PythonNodeResult:
 "#,
     ),
     (
-        "python/orders/storefront_import/_helpers/row_mapping.py",
+        "python/nodes/orders/storefront_import/_helpers/row_mapping.py",
         r#"def map_row(raw: dict[str, object]) -> dict[str, object]:
     return {"status": str(raw["state"]).lower()}
 "#,
     ),
     (
-        "providers/storefront_api/provider.py",
+        "python/providers/storefront_api/provider.py",
         r#"from sqlbuild.providers import Provider
 
 
@@ -41,7 +41,7 @@ class StorefrontApi(Provider):
     region: str = "eu"
 "#,
     ),
-    ("providers/storefront_api/__init__.py", ""),
+    ("python/providers/storefront_api/__init__.py", ""),
 ];
 
 const CASE_TYPES: &str = r#"from dataclasses import dataclass
@@ -56,7 +56,7 @@ class RowMappingCase:
 
 const ROW_MAPPING_TEST: &str = r#"import pytest
 
-from python.orders.storefront_import._helpers.row_mapping import map_row
+from python.nodes.orders.storefront_import._helpers.row_mapping import map_row
 from tests.python.orders.storefront_import._helpers._test_types import RowMappingCase
 
 
@@ -83,7 +83,7 @@ class RegionCase:
 
 const PROVIDER_TEST: &str = r#"import pytest
 
-from providers.storefront_api.provider import StorefrontApi
+from python.nodes.providers.storefront_api.provider import StorefrontApi
 from tests.providers.storefront_api._test_types import RegionCase
 
 
@@ -130,19 +130,19 @@ fn given_project_python_tests_when_evaluating_test_rules_then_reports_misplaced_
                 RUNTIME_FILES[3],
                 RUNTIME_FILES[4],
                 (
-                    "tests/python/orders/storefront_import/_helpers/_test_types.py",
+                    "tests/python/nodes/orders/storefront_import/_helpers/_test_types.py",
                     CASE_TYPES,
                 ),
                 (
-                    "tests/python/orders/storefront_import/_helpers/test_row_mapping.py",
+                    "tests/python/nodes/orders/storefront_import/_helpers/test_row_mapping.py",
                     ROW_MAPPING_TEST,
                 ),
                 (
-                    "tests/providers/storefront_api/_test_types.py",
+                    "tests/python/providers/storefront_api/_test_types.py",
                     PROVIDER_CASE_TYPES,
                 ),
                 (
-                    "tests/providers/storefront_api/test_provider.py",
+                    "tests/python/providers/storefront_api/test_provider.py",
                     PROVIDER_TEST,
                 ),
             ],
@@ -154,35 +154,35 @@ fn given_project_python_tests_when_evaluating_test_rules_then_reports_misplaced_
             files: &[
                 RUNTIME_FILES[0],
                 RUNTIME_FILES[1],
-                ("tests/python/orders/_test_types.py", CASE_TYPES),
-                ("tests/python/orders/test_storefront.py", ROW_MAPPING_TEST),
-                ("tests/python/inventory/_test_types.py", CASE_TYPES),
-                ("tests/python/inventory/test_stock.py", ROW_MAPPING_TEST),
-                ("tests/python/_test_types.py", CASE_TYPES),
-                ("tests/python/test_everything.py", ROW_MAPPING_TEST),
+                ("tests/python/nodes/orders/_test_types.py", CASE_TYPES),
+                ("tests/python/nodes/orders/test_storefront.py", ROW_MAPPING_TEST),
+                ("tests/python/nodes/inventory/_test_types.py", CASE_TYPES),
+                ("tests/python/nodes/inventory/test_stock.py", ROW_MAPPING_TEST),
+                ("tests/python/nodes/_test_types.py", CASE_TYPES),
+                ("tests/python/nodes/test_everything.py", ROW_MAPPING_TEST),
             ],
             config: json!({"select": ["SQBRPYTHON021"]}),
             expected_faults: vec![
-                ("SQBRPYTHON021", "tests/python/_test_types.py", 1, 1),
+                ("SQBRPYTHON021", "tests/python/nodes/_test_types.py", 1, 1),
                 (
                     "SQBRPYTHON021",
-                    "tests/python/inventory/_test_types.py",
+                    "tests/python/nodes/inventory/_test_types.py",
                     1,
                     1,
                 ),
                 (
                     "SQBRPYTHON021",
-                    "tests/python/inventory/test_stock.py",
+                    "tests/python/nodes/inventory/test_stock.py",
                     1,
                     1,
                 ),
                 (
                     "SQBRPYTHON021",
-                    "tests/python/orders/test_storefront.py",
+                    "tests/python/nodes/orders/test_storefront.py",
                     1,
                     1,
                 ),
-                ("SQBRPYTHON021", "tests/python/test_everything.py", 1, 1),
+                ("SQBRPYTHON021", "tests/python/nodes/test_everything.py", 1, 1),
             ],
         },
         PythonRunTestCase {
@@ -216,15 +216,15 @@ fn given_project_python_tests_when_evaluating_test_rules_then_reports_misplaced_
                 RUNTIME_FILES[1],
                 RUNTIME_FILES[2],
                 (
-                    "tests/python/orders/storefront_import/_test_types.py",
+                    "tests/python/nodes/orders/storefront_import/_test_types.py",
                     CASE_TYPES,
                 ),
                 (
-                    "tests/python/orders/storefront_import/_helpers/_test_types.py",
+                    "tests/python/nodes/orders/storefront_import/_helpers/_test_types.py",
                     CASE_TYPES,
                 ),
                 (
-                    "tests/python/orders/storefront_import/_helpers/test_row_mapping.py",
+                    "tests/python/nodes/orders/storefront_import/_helpers/test_row_mapping.py",
                     BRANCHING_TEST,
                 ),
             ],
@@ -232,19 +232,19 @@ fn given_project_python_tests_when_evaluating_test_rules_then_reports_misplaced_
             expected_faults: vec![
                 (
                     "SQBRPYTHON702",
-                    "tests/python/orders/storefront_import/_helpers/test_row_mapping.py",
+                    "tests/python/nodes/orders/storefront_import/_helpers/test_row_mapping.py",
                     3,
                     1,
                 ),
                 (
                     "SQBRPYTHON703",
-                    "tests/python/orders/storefront_import/_helpers/test_row_mapping.py",
+                    "tests/python/nodes/orders/storefront_import/_helpers/test_row_mapping.py",
                     6,
                     1,
                 ),
                 (
                     "SQBRPYTHON704",
-                    "tests/python/orders/storefront_import/_helpers/test_row_mapping.py",
+                    "tests/python/nodes/orders/storefront_import/_helpers/test_row_mapping.py",
                     16,
                     5,
                 ),

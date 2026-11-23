@@ -39,10 +39,10 @@ def test_given_relationships_audit_when_compiling_then_target_must_be_a_referenc
         project_name="relationships_target",
         repo_files={
             "sqlbuild_project.toml": 'name = "relationships_target"\nadapter = "duckdb"\n',
-            "models/customers.sql": (
+            "sql/models/customers.sql": (
                 "MODEL (description 'Test model customers.');\nSELECT 1 AS id\n"
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.', columns (customer_id (\n"
                 f"  audits [relationships (to {test_case.target}, field id)])));\n"
                 "SELECT 1 AS order_id, 1 AS customer_id\n"

@@ -92,10 +92,10 @@ fn given_resources_when_building_description_help_then_snippets_match_python() {
                 name: "orders",
                 statement: "MODEL",
                 entry: "description \"What one row of orders represents\"",
-                path: "models/orders.sql",
+                path: "sql/models/orders.sql",
                 description_only: false,
             },
-            expected_help: "to describe model 'orders', add this to the MODEL header in models/orders.sql:\n            MODEL (\n              description \"What one row of orders represents\",\n              ...\n            );",
+            expected_help: "to describe model 'orders', add this to the MODEL header in sql/models/orders.sql:\n            MODEL (\n              description \"What one row of orders represents\",\n              ...\n            );",
         },
         HelpTestCase {
             description: "a one-line HOOK header snippet",
@@ -104,10 +104,10 @@ fn given_resources_when_building_description_help_then_snippets_match_python() {
                 name: "grant",
                 statement: "HOOK",
                 entry: "description \"What grant does\"",
-                path: "hooks/grant.sql",
+                path: "sql/hooks/grant.sql",
                 description_only: true,
             },
-            expected_help: "to describe hook 'grant', add this to the HOOK header in hooks/grant.sql:\n            HOOK (description \"What grant does\");",
+            expected_help: "to describe hook 'grant', add this to the HOOK header in sql/hooks/grant.sql:\n            HOOK (description \"What grant does\");",
         },
     ];
     for test_case in test_cases {
@@ -124,8 +124,8 @@ fn given_resources_when_building_description_help_then_snippets_match_python() {
 fn given_yaml_entries_when_building_description_help_then_snippets_match_python() {
     let test_cases = [YamlHelpTestCase {
         description: "a seed entry snippet",
-        entry: ("seed", "customers", "seeds/schema.yml"),
-        expected_help: "to describe seed 'customers', add `description` to its entry in seeds/schema.yml:\n            - name: customers\n              description: What one row of customers represents",
+        entry: ("seed", "customers", "sql/seeds/schema.yml"),
+        expected_help: "to describe seed 'customers', add `description` to its entry in sql/seeds/schema.yml:\n            - name: customers\n              description: What one row of customers represents",
     }];
     for test_case in test_cases {
         let (kind, name, path) = test_case.entry;

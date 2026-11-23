@@ -7,7 +7,7 @@ from sqlbuild.runtime.output_capture.models import (
     BoundCommandOutputSink,
     CommandOutputRecord,
 )
-from sqlbuild.sinks import CommandOutputStream
+from sqlbuild.event_sinks import CommandOutputStream
 
 
 def make_event_exporter_scope(*, records: list[CommandOutputRecord]) -> EventExporterCommandScope:

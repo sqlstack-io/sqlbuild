@@ -94,7 +94,7 @@ class DiscoveryFeatureWriter:
             "audit_factory": self._audit_factory,
             "provider": self._provider,
             "lifecycle_sink": self._lifecycle_sink,
-            "command_output_sink": self._command_output_sink,
+            "command_output_event_sink": self._command_output_sink,
             "custom_materialization": self._custom_materialization,
             "project_adapter": self._project_adapter,
             "model_schema": self._model_schema,
@@ -194,7 +194,7 @@ class DiscoveryFeatureWriter:
 
     def _managed_source_loader(self) -> None:
         self._features.add("managed_source_loader")
-        self._files["sources/managed.yml"] = (
+        self._files["sql/sources/managed.yml"] = (
             "sources:\n"
             "  - name: loaded_products\n"
             "    description: Products loaded by a project loader.\n"
@@ -204,7 +204,7 @@ class DiscoveryFeatureWriter:
             "      - name: id\n        type: INTEGER\n"
             "      - name: label\n        type: VARCHAR\n"
         )
-        self._files["python/loaders/products.py"] = (
+        self._files["python/nodes/loaders/products.py"] = (
             "from sqlbuild.loaders import loader\n\n\n"
             "@loader\n"
             "def loaded_products(ctx):\n"
@@ -221,7 +221,7 @@ class DiscoveryFeatureWriter:
     def _asset_and_check(self) -> None:
         self._features.add("asset_and_check")
         base: ModelPlan = self._base()
-        self._files["python/assets/exports.py"] = (
+        self._files["python/nodes/assets/exports.py"] = (
             "from sqlbuild.assets import asset\n"
             "from sqlbuild.checks import check\n"
             "from sqlbuild.refs import model\n\n\n"
@@ -237,7 +237,7 @@ class DiscoveryFeatureWriter:
 
     def _discovered_set(self) -> None:
         self._features.add("discovered_set")
-        self._files["python/assets/steps.py"] = (
+        self._files["python/nodes/assets/steps.py"] = (
             "from sqlbuild.assets import asset\n"
             "from sqlbuild.discovery import Discovered, Item, discover\n\n\n"
             '@discover(check_every="60s")\n'
@@ -257,7 +257,7 @@ class DiscoveryFeatureWriter:
     def _audit_factory(self) -> None:
         self._features.add("audit_factory")
         base: ModelPlan = self._base()
-        self._files["python/audits/quality.py"] = (
+        self._files["python/nodes/audits/quality.py"] = (
             "from sqlbuild.audits import AuditCase, audit_factory\n\n\n"
             "@audit_factory\n"
             "def event_quality():\n"
@@ -275,14 +275,14 @@ class DiscoveryFeatureWriter:
 
     def _provider(self) -> None:
         self._features.add("provider")
-        self._files["providers/export_settings.py"] = (
+        self._files["python/providers/export_settings.py"] = (
             "from sqlbuild.providers import Provider\n\n\n"
             "class ExportSettings(Provider):\n"
             '    """Settings for generated exports."""\n\n'
             f'    region: str = "{self._random.choice(("north", "south"))}"\n'
             "    batch_size: int = 50\n"
         )
-        self._files["python/tasks/provided.py"] = (
+        self._files["python/nodes/tasks/provided.py"] = (
             "from sqlbuild.assets import asset\n\n\n"
             "@asset\n"
             "def provided_export(ctx, export_settings):\n"
@@ -292,8 +292,8 @@ class DiscoveryFeatureWriter:
 
     def _lifecycle_sink(self) -> None:
         self._features.add("lifecycle_sink")
-        self._files["sinks/lifecycle.py"] = (
-            "from sqlbuild.sinks import LifecycleEvent, LifecycleEventKind, lifecycle_event_sink\n"
+        self._files["python/event_sinks/lifecycle.py"] = (
+            "from sqlbuild.event_sinks import LifecycleEvent, LifecycleEventKind, lifecycle_event_sink\n"
             "\n\n"
             "@lifecycle_event_sink(\n"
             "    event_kinds={LifecycleEventKind.RUN, LifecycleEventKind.RESOURCE}\n"
@@ -303,10 +303,10 @@ class DiscoveryFeatureWriter:
         )
 
     def _command_output_sink(self) -> None:
-        self._features.add("command_output_sink")
-        self._files["sinks/output.py"] = (
-            "from sqlbuild.sinks import CommandOutputRecord, command_output_sink\n\n\n"
-            '@command_output_sink(streams={"stderr"})\n'
+        self._features.add("command_output_event_sink")
+        self._files["python/event_sinks/output.py"] = (
+            "from sqlbuild.event_sinks import CommandOutputRecord, command_output_event_sink\n\n\n"
+            '@command_output_event_sink(streams={"stderr"})\n'
             "def ignore_output(record: CommandOutputRecord) -> None:\n"
             "    return None\n"
         )
@@ -314,7 +314,7 @@ class DiscoveryFeatureWriter:
     def _custom_materialization(self) -> None:
         self._features.add("custom_materialization")
         base: ModelPlan = self._base()
-        self._files["materializations/copy_table.py"] = (
+        self._files["python/materializations/copy_table.py"] = (
             "from sqlbuild.executor.custom.models import MaterializationContext, "
             "MaterializationResult\n\n\n"
             "def materialize(ctx: MaterializationContext) -> MaterializationResult:\n"
@@ -331,12 +331,12 @@ class DiscoveryFeatureWriter:
     def _project_adapter(self) -> None:
         self._features.add("project_adapter")
         self.adapter = GENERATOR_PROJECT_ADAPTER
-        self._files["adapters/generated_duckdb.py"] = (
+        self._files["python/adapters/generated_duckdb.py"] = (
             "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
             "class GeneratedDuckDbAdapter(DuckDbAdapter):\n"
             f'    adapter_name = "{GENERATOR_PROJECT_ADAPTER}"\n'
         )
-        self._files["adapter.py"] = (
+        self._files["python/adapter.py"] = (
             "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
             "class ProjectOverrideAdapter(DuckDbAdapter):\n"
             '    """Project adapter override."""\n\n'
@@ -385,12 +385,12 @@ class DiscoveryFeatureWriter:
     def _cross_file_macro_import(self) -> None:
         self._features.add("cross_file_macro_import")
         base: ModelPlan = self._base()
-        self._files["macros/python/rounding.py"] = (
+        self._files["sql/macros/python/rounding.py"] = (
             "def round_amount(expression: str, places: int = 2) -> str:\n"
             '    """Round an amount."""\n'
             '    return f"ROUND({expression}, {places})"\n'
         )
-        self._files["macros/python/tax.py"] = (
+        self._files["sql/macros/python/tax.py"] = (
             "from macros.python.rounding import round_amount\n\n\n"
             "def taxed(expression: str) -> str:\n"
             '    """Add tax to an amount, rounded."""\n'
@@ -467,14 +467,14 @@ class DiscoveryFeatureWriter:
 
     def _functions(self) -> None:
         self._features.add("functions")
-        self._files["functions/sql/is_placed.sql"] = (
+        self._files["sql/functions/sql/is_placed.sql"] = (
             "FUNCTION (\n"
             '  description "Whether a status is placed.",\n'
             "  arguments (event_status STRING),\n"
             "  returns BOOLEAN,\n);\n\n"
             "event_status = 'placed'\n"
         )
-        self._files["functions/python/is_large.py"] = (
+        self._files["sql/functions/python/is_large.py"] = (
             "from sqlbuild.functions import udf\n\n\n"
             '@udf(arguments={"amount": "DOUBLE"}, returns="BOOLEAN", runtime_version="3.11")\n'
             "def main(amount: float | None) -> bool:\n"
@@ -564,7 +564,7 @@ class DiscoveryFeatureWriter:
             ),
         )
         self._files[path] = self._files[path].replace("\n  ", "\n\t").replace("\n", GENERATOR_CRLF)
-        self._files["sources/raw.yml"] = GENERATOR_BOM + self._files["sources/raw.yml"].replace(
+        self._files["sql/sources/raw.yml"] = GENERATOR_BOM + self._files["sql/sources/raw.yml"].replace(
             "\n", GENERATOR_CRLF
         )
 

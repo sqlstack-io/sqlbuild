@@ -18,7 +18,7 @@ def fail_build_discovery(
 ) -> Mock:
     """Make project discovery fail in a provider module and record debug resource reporting."""
 
-    providers: Path = project_dir / "providers"
+    providers: Path = project_dir / "python" / "nodes" / "python" / "providers"
     providers.mkdir(parents=True)
     _ = (project_dir / "sqlbuild_project.toml").write_text(
         'name = "shop"\nadapter = "duckdb"\n', encoding="utf-8"
@@ -75,8 +75,8 @@ def configure_native_scenario_command(
 
     files: dict[str, str] = {
         "sqlbuild_project.toml": _SCENARIO_PROJECT_TOML,
-        "sources/raw.yml": _SCENARIO_SOURCES_YAML,
-        "models/orders.sql": _SCENARIO_MODEL_SQL,
+        "sql/sources/raw.yml": _SCENARIO_SOURCES_YAML,
+        "sql/models/orders.sql": _SCENARIO_MODEL_SQL,
         "tests/scenarios/orders_paid.sql": scenario_sql,
     }
     for relative_path, contents in files.items():

@@ -39,8 +39,8 @@ _COUNTING_MACRO_MODULE: str = (
             description="user macro modules execute once across compile and manifest generation",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/_macros/python/counting.py": _COUNTING_MACRO_MODULE,
-                "models/orders.sql": (
+                "sql/models/_macros/python/counting.py": _COUNTING_MACRO_MODULE,
+                "sql/models/orders.sql": (
                     "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id, @py.order_tag() AS tag"
                 ),
             },
@@ -78,13 +78,13 @@ def test_given_side_effect_macro_when_compiling_manifest_then_imports_macros_onc
             description="private helper composition reaches scope and manifest dependency",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/_macros/python/shared.py": "def shared() -> str:\n    return 'order_id'\n",
-                "models/_macros/python/orders.py": (
+                "sql/models/_macros/python/shared.py": "def shared() -> str:\n    return 'order_id'\n",
+                "sql/models/_macros/python/orders.py": (
                     "from models._macros.python.shared import shared\n\n"
                     "def _helper() -> str:\n    return shared()\n\n"
                     "def order_column() -> str:\n    return _helper()\n"
                 ),
-                "models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT @py.order_column()",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT @py.order_column()",
             },
             macro_name="order_column",
             expected_dependencies=("shared",),

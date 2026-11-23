@@ -16,7 +16,7 @@ _PROJECT_TOML: str = (
     'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
     '[vars]\nprobe = "1"\n\n[targets.dev]\n\n[targets.prod.vars]\nprobe = "NULL"\n'
 )
-_MODEL_PATH: Path = Path("models/orders.sql")
+_MODEL_PATH: Path = Path("sql/models/orders.sql")
 _MODEL_SQL: str = (
     'MODEL (description "Orders");\nSELECT o.order_id FROM orders AS o WHERE o.order_id = @@probe\n'
 )
@@ -35,7 +35,7 @@ _MODEL_SQL: str = (
 def test_given_no_early_lint_when_running_sql_rules_then_compile_vars_are_expanded(
     test_case: SqlRuleCompileVarsTestCase, tmp_path: Path
 ) -> None:
-    (tmp_path / "models").mkdir()
+    (tmp_path / "sql" / "models").mkdir()
     (tmp_path / "sqlbuild_project.toml").write_text(_PROJECT_TOML, encoding="utf-8")
     (tmp_path / _MODEL_PATH).write_text(_MODEL_SQL, encoding="utf-8")
     model: SimpleNamespace = SimpleNamespace(

@@ -10,6 +10,7 @@ pub mod header_changes;
 pub mod key_checks;
 pub mod model_files;
 pub mod models;
+pub mod node_files;
 pub mod orchestration_files;
 pub mod project_layout;
 pub mod project_validation;

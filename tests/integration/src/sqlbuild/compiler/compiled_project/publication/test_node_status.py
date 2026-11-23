@@ -88,9 +88,9 @@ _STEPS: frozenset[str] = frozenset({"asset:pick", "asset:pack", "asset:ship"})
             job_select="+raw_steps",
             job_settings="\n[settings]\nreload = true\n",
             files={
-                "python/loads.py": (
+                "python/nodes/loads.py": (
                     "from sqlbuild.loaders import loader\n"
-                    "from python.steps import ship\n\n\n"
+                    "from python.nodes.steps import ship\n\n\n"
                     "@loader(depends_on=[ship], write_strategy='table', "
                     "columns=[{'name': 'step', 'type': 'INTEGER'}])\n"
                     "def fetch_steps(ctx):\n"
@@ -101,7 +101,7 @@ _STEPS: frozenset[str] = frozenset({"asset:pick", "asset:pack", "asset:ship"})
                     '    """Load the steps."""\n'
                     '    return [{"step": 1}]\n'
                 ),
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_steps\n    description: Steps.\n"
                     "    managed: true\n    write_strategy: table\n"
                 ),
@@ -126,7 +126,7 @@ def test_given_a_chain_of_three_when_the_second_is_interrupted_then_the_first_st
         warehouse_query="",
         expected_status="partial",
         expected_rows=[],
-        files={"python/steps.py": chain} | test_case.files,
+        files={"python/nodes/steps.py": chain} | test_case.files,
         default_job_files={
             "orchestration/jobs/annual_orders_job.toml": (
                 'name = "annual_orders_job"\n'

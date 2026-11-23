@@ -68,7 +68,7 @@ from tests.unit.src.sqlbuild.executor.run._helpers.helpers import (
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/snapshot.py"),
+                    relative_path=Path("sql/hooks/python/snapshot.py"),
                     name="insert_hook_log",
                     function=insert_snapshot_hook_log,
                 ),
@@ -189,7 +189,7 @@ def test_given_python_snapshot_hook_failure_when_executing_then_reports_hook_pha
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/snapshot.py"),
+                    relative_path=Path("sql/hooks/python/snapshot.py"),
                     name="fail_hook",
                     function=fail_snapshot_hook,
                 ),

@@ -24,7 +24,7 @@ import os
 import time
 from pathlib import Path
 
-from providers.marker import MarkerProvider
+from python.nodes.providers.marker import MarkerProvider
 from sqlbuild.assets import AssetContext, asset
 from sqlbuild.discovery import Discovered, Item, discover
 
@@ -109,9 +109,9 @@ def test_given_python_only_steps_when_the_worker_gets_one_ctrl_c_then_each_is_re
             "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb_unrecorded"\n'
             '[connections.local]\ndatabase = "warehouse.duckdb"\n'
             '[targets.development]\nschema = "main"\n',
-            "adapters/duckdb_unrecorded.py": _ADAPTER,
-            "python/steps.py": _STEPS.format(directory=str(tmp_path)),
-            "providers/marker.py": _PROVIDER.format(directory=str(tmp_path)),
+            "python/adapters/duckdb_unrecorded.py": _ADAPTER,
+            "python/nodes/steps.py": _STEPS.format(directory=str(tmp_path)),
+            "python/providers/marker.py": _PROVIDER.format(directory=str(tmp_path)),
         },
         default_job_files={
             "orchestration/jobs/annual_orders_job.toml": (

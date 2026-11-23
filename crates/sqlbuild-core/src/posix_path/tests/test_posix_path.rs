@@ -11,7 +11,7 @@ fn given_paths_when_reading_pure_posix_parts_then_they_match_pathlib() {
     let test_cases = [
         PosixPathTestCase {
             description: "a relative file path",
-            path: "models/a.sql",
+            path: "sql/models/a.sql",
             expected_parts: &["models", "a.sql"],
             expected_parent: "models",
             expected_name: "a.sql",

@@ -23,19 +23,19 @@ _PROJECT_FILES: dict[str, str] = {
         '[connection]\ndatabase = ":memory:"\n\n'
         '[targets.dev]\nschema = "dev_schema"\n'
     ),
-    "models/staging/stg_orders.sql": (
+    "sql/models/staging/stg_orders.sql": (
         "MODEL (description 'Test model stg_orders.', materialized table\ntags [staging]);\n\nSELECT 1 AS order_id"
     ),
-    "models/staging/stg_customers.sql": (
+    "sql/models/staging/stg_customers.sql": (
         "MODEL (description 'Test model stg_customers.', materialized table\ntags [staging]);\n\nSELECT 1 AS customer_id"
     ),
-    "models/intermediate/int_orders.sql": (
+    "sql/models/intermediate/int_orders.sql": (
         'MODEL (description "Test model int_orders.", materialized table\ntags [core]);\n\nSELECT order_id FROM __ref("stg_orders")'
     ),
-    "models/marts/fact_orders.sql": (
+    "sql/models/marts/fact_orders.sql": (
         'MODEL (description "Test model fact_orders.", materialized table\ntags [core, mart]);\n\nSELECT order_id FROM __ref("int_orders")'
     ),
-    "models/marts/dim_customers.sql": (
+    "sql/models/marts/dim_customers.sql": (
         'MODEL (description "Test model dim_customers.", materialized table\ntags [mart]);\n\nSELECT customer_id FROM __ref("stg_customers")'
     ),
 }
@@ -52,7 +52,7 @@ _PROJECT_FILES: dict[str, str] = {
         ),
         DiffSelectorIntegrationTestCase(
             description="path selector returns models under folder",
-            select=("path:models/staging",),
+            select=("path:sql/models/staging",),
             exclude=(),
             expected_model_names=frozenset(("stg_orders", "stg_customers")),
         ),
@@ -88,7 +88,7 @@ _PROJECT_FILES: dict[str, str] = {
         ),
         DiffSelectorIntegrationTestCase(
             description="comma selector intersects resolved sets",
-            select=("tag:core,path:models/marts",),
+            select=("tag:core,path:sql/models/marts",),
             exclude=(),
             expected_model_names=frozenset(("fact_orders",)),
         ),

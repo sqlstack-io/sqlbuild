@@ -77,7 +77,7 @@ fn given_partial_scope_facts_when_deserializing_then_completeness_is_preserved()
         "code": "S013",
         "message": "runtime usage is incomplete",
         "severity": "warning",
-        "path": "models/orders.sql",
+        "path": "sql/models/orders.sql",
         "line": 1,
         "column": 1,
         "declaration": null,

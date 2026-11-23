@@ -54,30 +54,30 @@ dg: Any = pytest.importorskip("dagster")
                 "kind": "model",
                 "name": "orders",
                 "description": "Clean orders",
-                "path": "models/orders.sql",
+                "path": "sql/models/orders.sql",
                 "sql": "SELECT 1",
             },
             expected_description=("Clean orders\n\n**SQLBuild SQL:**\n```sql\nSELECT 1\n```"),
         ),
         DagsterDescriptionTestCase(
             description="non-SQL asset includes its source path",
-            node={"kind": "seed", "name": "waffles", "path": "seeds/waffles.csv"},
+            node={"kind": "seed", "name": "waffles", "path": "sql/seeds/waffles.csv"},
             expected_description=(
-                "SQLBuild seed `waffles`.\n\n**Source file:** `seeds/waffles.csv`"
+                "SQLBuild seed `waffles`.\n\n**Source file:** `sql/seeds/waffles.csv`"
             ),
         ),
         DagsterDescriptionTestCase(
             description="source path containing backticks remains one code span",
-            node={"kind": "seed", "name": "waffles", "path": "seeds/`waffles`.csv"},
+            node={"kind": "seed", "name": "waffles", "path": "sql/seeds/`waffles`.csv"},
             expected_description=(
-                "SQLBuild seed `waffles`.\n\n**Source file:** ``seeds/`waffles`.csv``"
+                "SQLBuild seed `waffles`.\n\n**Source file:** ``sql/seeds/`waffles`.csv``"
             ),
         ),
         DagsterDescriptionTestCase(
             description="source path whitespace is preserved",
-            node={"kind": "seed", "name": "waffles", "path": " seeds/waffles.csv "},
+            node={"kind": "seed", "name": "waffles", "path": " sql/seeds/waffles.csv "},
             expected_description=(
-                "SQLBuild seed `waffles`.\n\n**Source file:** `  seeds/waffles.csv  `"
+                "SQLBuild seed `waffles`.\n\n**Source file:** `  sql/seeds/waffles.csv  `"
             ),
         ),
         DagsterDescriptionTestCase(
@@ -174,7 +174,7 @@ def test_given_external_source_translator_when_building_specs_then_retains_depen
         ),
         DagsterAssetSelectionTestCase(
             description="path selector",
-            select="path:models",
+            select="path:sql/models",
             exclude=None,
             expected_asset_keys=(("analytics", "customers"), ("analytics", "orders")),
         ),
@@ -359,7 +359,7 @@ def test_given_branching_dag_when_building_asset_selection_then_expands_from_mat
                 "MODEL (materialized table);",
             ),
             expected_seed_description=(
-                "SQLBuild seed `waffle_types`.\n\n**Source file:** `seeds/waffle_types.csv`"
+                "SQLBuild seed `waffle_types`.\n\n**Source file:** `sql/seeds/waffle_types.csv`"
             ),
         )
     ],

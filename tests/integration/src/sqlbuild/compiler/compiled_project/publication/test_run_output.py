@@ -31,12 +31,12 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             "success",
             [(17,)],
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Orders.', materialized table,\n"
                     '  post_hooks [python("chatty")]);\n'
                     "SELECT 17 AS amount\n"
                 ),
-                "hooks/python/chatty.py": (
+                "sql/hooks/python/chatty.py": (
                     "import sys\n\n"
                     "from sqlbuild.hooks import hook\n\n\n"
                     "@hook\n"
@@ -65,12 +65,12 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             "success",
             [(17,)],
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Orders.', materialized table,\n"
                     '  post_hooks [python("chatty")]);\n'
                     "SELECT 17 AS amount\n"
                 ),
-                "hooks/python/chatty.py": (
+                "sql/hooks/python/chatty.py": (
                     "from sqlbuild.hooks import hook\n\n\n"
                     "@hook\n"
                     "def chatty(ctx):\n"
@@ -141,7 +141,7 @@ def test_given_a_node_printing_a_large_log_when_a_worker_runs_it_then_its_lines_
             "partial",
             [(17,)],
             files={
-                "python/assets/score_orders.py": (
+                "python/nodes/assets/score_orders.py": (
                     "from sqlbuild.assets import asset\n\n\n"
                     "def lookup_0(row):\n"
                     "    return row['customer_segment']\n\n\n"
@@ -190,12 +190,12 @@ def test_given_a_failing_python_node_when_a_worker_runs_it_then_its_run_error_is
 
 
 NUL_LOG_FILES: dict[str, str] = {
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Orders.', materialized table,\n"
         '  post_hooks [python("raw")]);\n'
         "SELECT 17 AS amount\n"
     ),
-    "hooks/python/raw.py": (
+    "sql/hooks/python/raw.py": (
         "from sqlbuild.hooks import hook\n\n\n"
         "@hook\n"
         "def raw(ctx):\n"
@@ -267,7 +267,7 @@ def test_given_a_nul_in_a_ctx_log_message_when_a_worker_reports_it_then_the_log_
 
 
 NUL_FAILURE_FILES: dict[str, str] = {
-    "python/assets/score_orders.py": (
+    "python/nodes/assets/score_orders.py": (
         "from sqlbuild.assets import asset\n\n\n"
         "@asset(description='Scores orders.')\n"
         "def score_orders(ctx):\n"

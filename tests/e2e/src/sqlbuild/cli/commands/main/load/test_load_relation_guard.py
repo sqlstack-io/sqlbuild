@@ -67,8 +67,8 @@ def test_given_loader_hard_codes_a_source_when_loading_then_it_warns_like_build(
                 '[connection]\ndatabase = "warehouse.duckdb"\n\n'
                 f"[references]\nenforce_explicit = {str(test_case.enforce_explicit).lower()}\n"
             ),
-            "sources/raw.yml": _SOURCES,
-            "python/loaders/raw.py": _LOADERS,
+            "sql/sources/raw.yml": _SOURCES,
+            "python/nodes/loaders/raw.py": _LOADERS,
         },
     )
 

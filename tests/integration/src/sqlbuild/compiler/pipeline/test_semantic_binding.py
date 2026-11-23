@@ -133,7 +133,7 @@ def test_given_complete_contract_when_clause_references_missing_column_then_comp
     assert "(context:" not in output
     assert "model: downstream" in output
     assert (
-        f"--> models/downstream.sql:2:{test_case.query_sql.index(test_case.missing_column) + 1}"
+        f"--> sql/models/downstream.sql:2:{test_case.query_sql.index(test_case.missing_column) + 1}"
         in output
     )
 
@@ -161,7 +161,7 @@ def test_given_two_complete_contracts_when_unqualified_column_is_ambiguous_then_
             'SELECT id FROM __ref("upstream") l CROSS JOIN __ref("other") r\n'
         ),
     )
-    _ = (tmp_path / "models" / "other.sql").write_text(
+    _ = (tmp_path / "sql" / "models" / "other.sql").write_text(
         _AUTHORITATIVE_MODEL,
         encoding="utf-8",
     )
@@ -233,8 +233,8 @@ def test_given_source_contract_default_when_compiling_then_effective_policy_cont
         'name = "semantic_binding"\nadapter = "duckdb"\n\n[defaults]\ncontract = "enforced"\n',
         encoding="utf-8",
     )
-    sources_dir: Path = tmp_path / "sources"
-    models_dir: Path = tmp_path / "models"
+    sources_dir: Path = tmp_path / "sql" / "sources"
+    models_dir: Path = tmp_path / "sql" / "models"
     sources_dir.mkdir()
     models_dir.mkdir()
     _ = (sources_dir / "raw.yml").write_text(
@@ -286,7 +286,7 @@ def test_given_complete_inferred_intermediate_when_downstream_column_is_missing_
             'SELECT id FROM __ref("intermediate") WHERE missing_derived = TRUE\n'
         ),
     )
-    _ = (tmp_path / "models" / "intermediate.sql").write_text(
+    _ = (tmp_path / "sql" / "models" / "intermediate.sql").write_text(
         'MODEL (description "Test model intermediate.", materialized view);\nSELECT id FROM __ref("upstream")\n',
         encoding="utf-8",
     )
@@ -360,7 +360,7 @@ def test_given_cached_dependent_error_when_upstream_analysis_disabled_then_stale
             'MODEL (description "Test model.", materialized view);\nSELECT runtime_column FROM __ref("intermediate")\n'
         ),
     )
-    intermediate_path: Path = tmp_path / "models" / "intermediate.sql"
+    intermediate_path: Path = tmp_path / "sql" / "models" / "intermediate.sql"
     _ = intermediate_path.write_text(
         'MODEL (description "Test model intermediate.", materialized view);\nSELECT id FROM __ref("upstream")\n',
         encoding="utf-8",
@@ -406,7 +406,7 @@ def test_given_cli_analysis_disabled_when_sql_is_unsupported_then_compile_succee
     _ = (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "semantic_binding"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    models_dir: Path = tmp_path / "models"
+    models_dir: Path = tmp_path / "sql" / "models"
     models_dir.mkdir()
     _ = (models_dir / "vendor.sql").write_text(
         "MODEL (description 'Test model vendor.', materialized view);\nSELEC unsupported vendor sql\n",
@@ -611,8 +611,8 @@ def test_given_untyped_source_when_cast_flows_through_ctes_then_declared_type_ma
         'name = "semantic_binding"\nadapter = "snowflake"\n' + _UNPROVEN_RANKING_RULES,
         encoding="utf-8",
     )
-    sources_dir: Path = tmp_path / "sources"
-    models_dir: Path = tmp_path / "models"
+    sources_dir: Path = tmp_path / "sql" / "sources"
+    models_dir: Path = tmp_path / "sql" / "models"
     sources_dir.mkdir()
     models_dir.mkdir()
     _ = (sources_dir / "raw.yml").write_text(

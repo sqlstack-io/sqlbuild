@@ -63,7 +63,7 @@ _DIAMOND_SOURCES_YML: str = (
     "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
     "    schema: main\n    table: raw_orders\n"
 )
-_DIAMOND_ROOT_PATH: str = "models/orders_0.sql"
+_DIAMOND_ROOT_PATH: str = "sql/models/orders_0.sql"
 
 
 def _incremental_header(*, extra_config: str) -> str:
@@ -94,16 +94,16 @@ def prepare_incremental_diamond_project(*, tmp_path: Path) -> Path:
 
     files: dict[str, str] = {
         "sqlbuild_project.toml": _DIAMOND_PROJECT_TOML,
-        "sources/raw.yml": _DIAMOND_SOURCES_YML,
+        "sql/sources/raw.yml": _DIAMOND_SOURCES_YML,
         _DIAMOND_ROOT_PATH: _diamond_root_sql(amount_offset=0),
     }
     for layer in range(1, DIAMOND_LAYERS + 1):
         for side in ("left", "right"):
-            files[f"models/orders_{side}_{layer}.sql"] = (
+            files[f"sql/models/orders_{side}_{layer}.sql"] = (
                 _incremental_header(extra_config="") + "SELECT order_id, order_date, amount_cents "
                 f'FROM __ref("orders_{layer - 1}")\n'
             )
-        files[f"models/orders_{layer}.sql"] = (
+        files[f"sql/models/orders_{layer}.sql"] = (
             _incremental_header(
                 extra_config=(
                     f"  cursor_inputs (orders_left_{layer} order_date, "
@@ -189,16 +189,16 @@ def prepare_missing_source_tables_project(*, tmp_path: Path) -> Path:
                 "[connection]\n"
                 'database = "warehouse.duckdb"\n'
             ),
-            "sources/raw.yml": _MISSING_SOURCE_TABLES_SOURCES_YML,
-            "models/orders.sql": (
+            "sql/sources/raw.yml": _MISSING_SOURCE_TABLES_SOURCES_YML,
+            "sql/models/orders.sql": (
                 'MODEL (description "Test model orders.", '
                 'materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
             ),
-            "models/customers.sql": (
+            "sql/models/customers.sql": (
                 'MODEL (description "Test model customers.", '
                 'materialized table);\n\nSELECT * FROM __source("raw_customers")\n'
             ),
-            "models/payments.sql": (
+            "sql/models/payments.sql": (
                 'MODEL (description "Test model payments.", '
                 'materialized table);\n\nSELECT * FROM __source("raw_payments")\n'
             ),
@@ -231,7 +231,7 @@ _DAILY_REVENUE_MODEL: str = (
     "MODEL (description 'Daily revenue.', materialized table, migrate_from revenue);\n\n"
     "SELECT 1 AS amount\n"
 )
-RECLAIMED_NAME: dict[str, str] = {"models/revenue.sql": _REVENUE_MODEL}
+RECLAIMED_NAME: dict[str, str] = {"sql/models/revenue.sql": _REVENUE_MODEL}
 REMOVABLE_MIGRATION_WARNING: str = "migrate_from can be removed from 'daily_revenue'"
 NAME_CLAIM_ERROR: str = "model 'revenue' would replace analytics.revenue"
 
@@ -244,15 +244,15 @@ def migrated_project(tmp_path: Path) -> Path:
         project_name="plan_exit_codes",
         repo_files={
             "sqlbuild_project.toml": _EXIT_CODE_PROJECT_TOML,
-            "models/revenue.sql": _REVENUE_MODEL,
+            "sql/models/revenue.sql": _REVENUE_MODEL,
         },
     )
     first: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build"), project_dir=project_dir
     )
     assert first.returncode == 0, first.stdout + first.stderr
-    (project_dir / "models/revenue.sql").unlink()
-    (project_dir / "models/daily_revenue.sql").write_text(_DAILY_REVENUE_MODEL, encoding="utf-8")
+    (project_dir / "sql/models/revenue.sql").unlink()
+    (project_dir / "sql/models/daily_revenue.sql").write_text(_DAILY_REVENUE_MODEL, encoding="utf-8")
     migrated: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build"), project_dir=project_dir
     )

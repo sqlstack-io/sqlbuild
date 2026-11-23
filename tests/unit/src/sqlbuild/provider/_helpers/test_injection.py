@@ -189,7 +189,7 @@ def test_given_provider_name_conflicts_with_context_parameter_when_calling_then_
             expected_error_fragment=(
                 "Provider parameter 'marker_provider' is annotated with MarkerProvider imported as "
                 "'alias_marker', but provider 'marker_provider' was discovered as "
-                "providers.marker.MarkerProvider. Import project providers using the project-root "
+                "python.providers.marker.MarkerProvider. Import project providers using the project-root "
                 "providers package path"
             ),
         )
@@ -200,7 +200,7 @@ def test_given_provider_class_imported_through_alias_when_calling_then_guides_us
     test_case: ProviderInjectionErrorTestCase,
     tmp_path: Path,
 ) -> None:
-    provider_file: Path = tmp_path / "providers" / "marker.py"
+    provider_file: Path = tmp_path / "python" / "nodes" / "python" / "providers" / "marker.py"
     provider_file.parent.mkdir(parents=True)
     provider_file.write_text(
         "from sqlbuild.providers import Provider\n\nclass MarkerProvider(Provider):\n    '''Test provider MarkerProvider.'''\n    pass\n",
@@ -210,7 +210,7 @@ def test_given_provider_class_imported_through_alias_when_calling_then_guides_us
     sys.path.insert(0, str(tmp_path))
     try:
         canonical_module: ModuleType = load_module(
-            module_name="providers.marker",
+            module_name="python.providers.marker",
             file_path=provider_file,
         )
         alias_module: ModuleType = load_module(
@@ -237,5 +237,5 @@ def test_given_provider_class_imported_through_alias_when_calling_then_guides_us
             )
     finally:
         sys.path = old_path
-        sys.modules.pop("providers.marker", None)
+        sys.modules.pop("python.providers.marker", None)
         sys.modules.pop("alias_marker", None)

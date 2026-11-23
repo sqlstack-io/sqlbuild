@@ -36,7 +36,7 @@ def assert_source_only_ingress_dependency_case(
                 ),
                 loader_py=(
                     "from sqlbuild.loaders import loader\n"
-                    "from python.tasks.prepare import prepare_events\n\n"
+                    "from python.nodes.tasks.prepare import prepare_events\n\n"
                     "@loader(depends_on=[prepare_events], write_strategy='table', columns=[\n"
                     "    {'name': 'event_id', 'type': 'INTEGER'},\n"
                     "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
@@ -53,7 +53,7 @@ def assert_source_only_ingress_dependency_case(
                     "SELECT event_id FROM {events.destination}')\n"
                 ),
             ),
-            "python/tasks/prepare.py": (
+            "python/nodes/tasks/prepare.py": (
                 "from pathlib import Path\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
@@ -159,8 +159,8 @@ def build_schema_behavior_project_files(*, source_yaml: str, loader_py: str) -> 
             "[connection]\n"
             'database = "source_loader_schema_behavior.duckdb"\n'
         ),
-        "sources/raw.yml": source_yaml,
-        "python/loaders/source_rows.py": loader_py,
+        "sql/sources/raw.yml": source_yaml,
+        "python/nodes/loaders/source_rows.py": loader_py,
     }
 
 
@@ -235,7 +235,7 @@ def build_loader_waffle_shop_project_files(*, project_toml: str | None = None) -
             "[defaults]\n"
             'materialized = "table"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    managed: true\n"
@@ -264,7 +264,7 @@ def build_loader_waffle_shop_project_files(*, project_toml: str | None = None) -
             "      - name: load_seq\n"
             "        type: INTEGER\n"
         ),
-        "python/loaders/waffle_loaders.py": (
+        "python/nodes/loaders/waffle_loaders.py": (
             "from sqlbuild.loaders import loader\n\n"
             "@loader(write_strategy='append', cursor_column='load_seq', columns=[\n"
             "    {'name': 'order_id', 'type': 'INTEGER'},\n"
@@ -359,7 +359,7 @@ def build_loader_waffle_shop_project_files(*, project_toml: str | None = None) -
             "        for row in cursor.fetchall()\n"
             "    ]\n"
         ),
-        "models/fact_waffle_orders.sql": (
+        "sql/models/fact_waffle_orders.sql": (
             "MODEL (description 'Test model fact_waffle_orders.', materialized table);\n\n"
             "SELECT\n"
             "  o.order_id,\n"
@@ -373,7 +373,7 @@ def build_loader_waffle_shop_project_files(*, project_toml: str | None = None) -
             'FROM __source("raw_orders") o\n'
             'LEFT JOIN __source("raw_customers") c ON o.customer_id = c.customer_id\n'
         ),
-        "models/customer_revenue.sql": (
+        "sql/models/customer_revenue.sql": (
             "MODEL (description 'Test model customer_revenue.', materialized table);\n\n"
             "SELECT\n"
             "  customer_id,\n"

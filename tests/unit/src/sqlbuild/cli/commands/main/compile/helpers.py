@@ -93,7 +93,7 @@ def prepare_static_compile_project(root: Path) -> Path:
     """Create a minimal local project for offline compile command tests."""
 
     project_dir: Path = root / "project"
-    models_dir: Path = project_dir / "models"
+    models_dir: Path = project_dir / "sql" / "models"
     models_dir.mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         "\n".join(
@@ -196,7 +196,7 @@ def build_target_writer_plan_output() -> PlanOutput:
                 key=seed_key,
                 name="country_codes",
                 destination=target,
-                file_path=Path("seeds/country_codes.csv"),
+                file_path=Path("sql/seeds/country_codes.csv"),
                 columns=(),
                 csv_settings=SeedCsvSettings(),
             ),
@@ -205,7 +205,7 @@ def build_target_writer_plan_output() -> PlanOutput:
             FunctionPlanEntry(
                 key=function_key,
                 name="is_completed_order",
-                relative_path=Path("functions/sql/is_completed_order.sql"),
+                relative_path=Path("sql/functions/sql/is_completed_order.sql"),
                 destination=CompiledRelationLocation(
                     database=None,
                     schema="analytics",
@@ -226,7 +226,7 @@ def build_target_writer_plan_output() -> PlanOutput:
             FunctionPlanEntry(
                 key=python_function_key,
                 name="is_completed_order_py",
-                relative_path=Path("functions/python/is_completed_order_py.py"),
+                relative_path=Path("sql/functions/python/is_completed_order_py.py"),
                 destination=CompiledRelationLocation(
                     database=None,
                     schema="analytics",
@@ -335,7 +335,7 @@ def build_static_target_writer_project() -> CompiledProjectView:
                 key=function_key,
                 deps=(),
                 name="is_completed_order",
-                relative_path=Path("functions/sql/is_completed_order.sql"),
+                relative_path=Path("sql/functions/sql/is_completed_order.sql"),
                 arguments=(FunctionArgument(name="order_status", type="VARCHAR"),),
                 returns="BOOLEAN",
                 body_sql="order_status = 'completed'",
@@ -417,7 +417,7 @@ def build_compile_output_graph(*, model_names: tuple[str, ...]) -> ProjectGraph:
                 key=key,
                 deps=(),
                 name=name,
-                relative_path=Path(f"models/{name}.sql"),
+                relative_path=Path(f"sql/models/{name}.sql"),
                 query_sql="SELECT 1 AS id",
                 config=CompileModelConfig(values={}),
                 destination=CompiledRelationLocation(
@@ -553,8 +553,8 @@ def prepare_rule_gated_compile_project(root: Path, *, test_header: str) -> Path:
     project_dir: Path = prepare_static_compile_project(root)
     with (project_dir / "sqlbuild_project.toml").open("a", encoding="utf-8") as config:
         config.write('\n[rules]\nselect = ["SQBRMODEL102"]\n')
-    (project_dir / "sources").mkdir()
-    (project_dir / "sources" / "raw.yml").write_text(
+    (project_dir / "sql" / "sources").mkdir()
+    (project_dir / "sql" / "sources" / "raw.yml").write_text(
         "sources:\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: main\n    table: raw_orders\n"
@@ -562,13 +562,13 @@ def prepare_rule_gated_compile_project(root: Path, *, test_header: str) -> Path:
         "    schema: main\n    table: raw_refunds\n",
         encoding="utf-8",
     )
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized view);\n\n"
         'SELECT o.order_id, r.refund_id FROM __source("raw_orders") AS o\n'
         'LEFT JOIN __source("raw_refunds") AS r ON r.order_id = o.order_id\n',
         encoding="utf-8",
     )
-    (project_dir / "models" / "bad_star.sql").write_text(
+    (project_dir / "sql" / "models" / "bad_star.sql").write_text(
         'MODEL (description "Test model bad_star.", '
         'materialized view);\n\nSELECT * FROM __source("raw_orders")\n',
         encoding="utf-8",
@@ -662,6 +662,6 @@ class BlockedModelStaging(StagingEveryProject):
 
     def create_staging_directory(self, staging_dir: Path) -> None:
         super().create_staging_directory(staging_dir)
-        blocker: Path = staging_dir / "compiled" / "models" / "staging"
+        blocker: Path = staging_dir / "compiled" / "sql" / "models" / "staging"
         blocker.parent.mkdir(parents=True)
         _ = blocker.write_text("not a directory\n", encoding="utf-8")

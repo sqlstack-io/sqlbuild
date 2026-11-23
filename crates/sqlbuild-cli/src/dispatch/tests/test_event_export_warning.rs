@@ -20,7 +20,7 @@ fn given_final_export_summary_when_formatting_warning_then_reports_loss_only() {
                  incomplete: 140 of 248 events dropped, 0 failed (sink 'orders_events'). \
                  Check sink health: a sink call slower than 1s drops that sink's events until it \
                  returns; events still queued at exit need a longer \
-                 sinks.lifecycle.shutdown_timeout.",
+                 event_sinks.lifecycle.shutdown_timeout.",
             ),
         },
         EventExportWarningTestCase {
@@ -32,7 +32,7 @@ fn given_final_export_summary_when_formatting_warning_then_reports_loss_only() {
                  1 failed (sink 'orders_events'). \
                  Check sink health: a sink call slower than 1s drops that sink's events until it \
                  returns; events still queued at exit need a longer \
-                 sinks.lifecycle.shutdown_timeout.",
+                 event_sinks.lifecycle.shutdown_timeout.",
             ),
         },
         EventExportWarningTestCase {
@@ -47,7 +47,7 @@ fn given_final_export_summary_when_formatting_warning_then_reports_loss_only() {
                  incomplete: 4 of 40 event deliveries dropped, 1 failed (sink 'orders_events'). \
                  Check sink health: a sink call slower than 1s drops that sink's events until it \
                  returns; events still queued at exit need a longer \
-                 sinks.lifecycle.shutdown_timeout.",
+                 event_sinks.lifecycle.shutdown_timeout.",
             ),
         },
     ];

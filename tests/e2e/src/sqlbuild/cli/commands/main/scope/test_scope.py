@@ -26,11 +26,11 @@ def test_given_minimal_project_when_running_scope_aliases_then_outputs_are_offli
     tmp_path: Path, test_case: ScopeE2eCase
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    (project_dir / "models").mkdir(parents=True)
+    (project_dir / "sql" / "models").mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "scope_e2e"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         "MODEL(description 'Test model orders.');\nSELECT 1 AS id\n", encoding="utf-8"
     )
 
@@ -44,10 +44,10 @@ def test_given_minimal_project_when_running_scope_aliases_then_outputs_are_offli
         alias="sqlbuild", project_dir=project_dir, args=("model:orders",)
     )
     prospective: subprocess.CompletedProcess[str] = run_scope_alias(
-        alias="sqb", project_dir=project_dir, args=("--at", "models/new/")
+        alias="sqb", project_dir=project_dir, args=("--at", "sql/models/new/")
     )
-    (project_dir / "macros" / "python").mkdir(parents=True)
-    (project_dir / "macros" / "python" / "broken.py").write_text("def broken(:\n", encoding="utf-8")
+    (project_dir / "sql" / "macros" / "python").mkdir(parents=True)
+    (project_dir / "sql" / "macros" / "python" / "nodes" / "broken.py").write_text("def broken(:\n", encoding="utf-8")
     broken: subprocess.CompletedProcess[str] = run_scope_alias(
         alias="sqb", project_dir=project_dir, args=("model:orders", "--json", "--no-cache")
     )
@@ -73,11 +73,11 @@ def test_given_bare_model_name_when_running_scope_then_matches_the_prefixed_repo
     tmp_path: Path, test_case: ScopeE2eCase
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    (project_dir / "models").mkdir(parents=True)
+    (project_dir / "sql" / "models").mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "scope_e2e"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         "MODEL(description 'Test model orders.');\nSELECT 1 AS id\n", encoding="utf-8"
     )
 
@@ -114,15 +114,15 @@ def test_given_bare_name_that_is_not_a_resource_when_running_scope_then_fails_cl
     tmp_path: Path, test_case: ScopeBareTargetE2eCase
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    (project_dir / "models").mkdir(parents=True)
-    (project_dir / "macros" / "python").mkdir(parents=True)
+    (project_dir / "sql" / "models").mkdir(parents=True)
+    (project_dir / "sql" / "macros" / "python").mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "scope_e2e"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         "MODEL(description 'Test model orders.');\nSELECT 1 AS id\n", encoding="utf-8"
     )
-    (project_dir / "macros" / "python" / "cents.py").write_text(
+    (project_dir / "sql" / "macros" / "python" / "nodes" / "cents.py").write_text(
         "def cents(expression: str) -> str:\n    return expression\n", encoding="utf-8"
     )
 

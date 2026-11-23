@@ -320,7 +320,7 @@ def _model_entry(
     return ModelPlanEntry(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=name),
         name=name,
-        relative_path=Path(f"models/{name}.sql"),
+        relative_path=Path(f"sql/models/{name}.sql"),
         materialization_type=MaterializationType.TABLE,
         action=PlanAction.CREATE_TABLE,
         reason=PlanReason.FIRST_RUN,
@@ -344,12 +344,12 @@ def write_partial_fixture_snowflake_project(
             'user = "example"\ndatabase = "analytics"\nschema = "marts"\n\n'
             '[defaults]\ndatabase = "analytics"\nschema = "marts"\nmaterialized = "table"\n'
         ),
-        "models/upstream.sql": (
+        "sql/models/upstream.sql": (
             "MODEL (description 'Upstream.', contract enforced,\n"
             "  columns (id (type INT), label (type VARCHAR)));\n"
             "SELECT 1 AS id, CAST('a' AS VARCHAR) AS label\n"
         ),
-        "models/downstream.sql": (
+        "sql/models/downstream.sql": (
             "MODEL (description 'Downstream.');\n"
             'SELECT u.id, u.label FROM __ref("upstream") AS u\n'
         ),

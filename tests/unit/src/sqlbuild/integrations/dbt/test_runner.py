@@ -216,7 +216,7 @@ def test_given_dbt_options_when_building_ls_argv_then_returns_expected_command(
                 '{"unique_id":"model.analytics.orders","resource_type":"model",'
                 '"package_name":"analytics","name":"orders",'
                 '"fqn":["analytics","marts","orders"],'
-                '"original_file_path":"models/orders.sql"}\n'
+                '"original_file_path":"sql/models/orders.sql"}\n'
                 "not json\n"
                 '{"unique_id":"source.analytics.raw.orders","resource_type":"source"}\n'
             ),

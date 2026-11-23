@@ -23,16 +23,16 @@ _PROJECT_TOML: str = (
     '[targets.prod]\nschema = "prod"\nloader_schema = "raw_prod"\n'
 )
 _PROJECT_FILES: dict[str, str] = {
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    managed: true\n    write_strategy: table\n"
         "    columns:\n      - name: order_id\n        type: INTEGER\n"
     ),
-    "python/loaders/raw.py": (
+    "python/nodes/loaders/raw.py": (
         "from sqlbuild.loaders import loader\n\n\n"
         "@loader\ndef raw_orders(ctx):\n    '''Test loader raw_orders.'''\n    return [{'order_id': 1}]\n"
     ),
-    "models/order_marker.sql": "MODEL (description 'Test model order_marker.', materialized table);\nSELECT 1 AS n\n",
-    "python/tasks/count.py": (
+    "sql/models/order_marker.sql": "MODEL (description 'Test model order_marker.', materialized table);\nSELECT 1 AS n\n",
+    "python/nodes/tasks/count.py": (
         "from sqlbuild.refs import source\nfrom sqlbuild.assets import asset\n\n\n"
         '@asset(depends_on=source("raw_orders"))\n'
         "def count_task(ctx):\n"

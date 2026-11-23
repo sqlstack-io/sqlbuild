@@ -16,25 +16,25 @@ from tests.unit.src.sqlbuild.rule_engine._helpers.engine.helpers import (
 
 _ORDERS: IncrementalModelSpec = IncrementalModelSpec(
     name="commerce__mart__orders",
-    relative_path="models/commerce/mart/commerce__mart__orders.sql",
+    relative_path="sql/models/commerce/mart/commerce__mart__orders.sql",
     sql="WITH orders AS (SELECT * FROM source_orders) SELECT order_id FROM orders WHERE amount > 7",
     config_values={"materialized": "table"},
 )
 _CUSTOMERS: IncrementalModelSpec = IncrementalModelSpec(
     name="commerce__mart__customers",
-    relative_path="models/commerce/mart/commerce__mart__customers.sql",
+    relative_path="sql/models/commerce/mart/commerce__mart__customers.sql",
     sql="SELECT customer_id FROM warehouse.raw.customers",
 )
 _PRODUCTS: IncrementalModelSpec = IncrementalModelSpec(
     name="commerce__stg__products",
-    relative_path="models/commerce/staging/commerce__stg__products.sql",
+    relative_path="sql/models/commerce/staging/commerce__stg__products.sql",
     sql="SELECT * FROM warehouse.raw.products",
 )
 _EDITED_ORDERS: IncrementalModelSpec = replace(_ORDERS, sql=_ORDERS.sql.replace("> 7", "> 9"))
 _RENAMED_PRODUCTS: IncrementalModelSpec = replace(
     _PRODUCTS,
     name="commerce__stg__catalog_products",
-    relative_path="models/commerce/staging/commerce__stg__catalog_products.sql",
+    relative_path="sql/models/commerce/staging/commerce__stg__catalog_products.sql",
 )
 
 EDIT_SEQUENCE: tuple[IncrementalRulesStep, ...] = (

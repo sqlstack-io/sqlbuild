@@ -83,24 +83,24 @@ fn given_project_module_when_reading_project_closure_then_lists_imported_project
             description: "helper modules across directories, transitively",
             files: vec![
                 (
-                    "macros/money.py",
+                    "sql/macros/money.py",
                     "import os\nfrom macros._rates import RATE\n\ndef cents(x):\n    return x\n",
                 ),
                 (
-                    "macros/_rates.py",
+                    "sql/macros/_rates.py",
                     "from python import shared\nRATE = 100\n",
                 ),
                 ("python/__init__.py", ""),
-                ("python/shared.py", "VALUE = 1\n"),
-                ("python/unused.py", "VALUE = 2\n"),
+                ("python/nodes/shared.py", "VALUE = 1\n"),
+                ("python/nodes/unused.py", "VALUE = 2\n"),
             ],
-            source: "macros/money.py",
-            expected_closure: vec!["macros/_rates.py", "python/__init__.py", "python/shared.py"],
+            source: "sql/macros/money.py",
+            expected_closure: vec!["sql/macros/_rates.py", "python/__init__.py", "python/nodes/shared.py"],
         },
         ProjectClosureTestCase {
             description: "a module importing nothing local has an empty closure",
-            files: vec![("macros/plain.py", "import json\n")],
-            source: "macros/plain.py",
+            files: vec![("sql/macros/plain.py", "import json\n")],
+            source: "sql/macros/plain.py",
             expected_closure: vec![],
         },
     ];

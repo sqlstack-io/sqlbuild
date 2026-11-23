@@ -25,7 +25,7 @@ _CONTRACT_HEADER: str = (
     "  columns (a (type VARCHAR), b (type VARCHAR), c (type VARCHAR)),\n);\n"
 )
 _BLANK_TO_NULL: dict[str, str] = {
-    "macros/sql/blank_to_null.sql": (
+    "sql/macros/sql/blank_to_null.sql": (
         'MACRO (description "Blank to null.", arguments (x VARCHAR), returns VARCHAR);\n\n'
         "CASE\n  WHEN TRIM(@x) = ''\n    THEN NULL\n  ELSE\n    TRIM(@x)\nEND\n"
     )
@@ -82,17 +82,17 @@ _NODE_RULE: str = custom_rule_source(
         RulePositionE2ETestCase(
             description="a query on the header's line is offset by the header",
             model_sql=f"{_HEADER} WITH o AS (SELECT 1 AS id) SELECT * FROM o\n",
-            expected_location="models/orders.sql:1:97 [SQBRMODEL102]",
+            expected_location="sql/models/orders.sql:1:97 [SQBRMODEL102]",
         ),
         RulePositionE2ETestCase(
             description="a query starting on the header's line keeps later lines unshifted",
             model_sql=f"{_HEADER}   WITH o AS (SELECT 1 AS id)\nSELECT * FROM o\n",
-            expected_location="models/orders.sql:2:8 [SQBRMODEL102]",
+            expected_location="sql/models/orders.sql:2:8 [SQBRMODEL102]",
         ),
         RulePositionE2ETestCase(
             description="a query below the header counts file lines",
             model_sql=f"{_HEADER}\n-- orders\nWITH o AS (SELECT 1 AS id) SELECT * FROM o\n",
-            expected_location="models/orders.sql:3:35 [SQBRMODEL102]",
+            expected_location="sql/models/orders.sql:3:35 [SQBRMODEL102]",
         ),
         RulePositionE2ETestCase(
             description="a star below multi-line macro expansions points at its authored line",
@@ -101,7 +101,7 @@ _NODE_RULE: str = custom_rule_source(
                 "    @sql.blank_to_null('b') AS b\n)\nSELECT * FROM o\n"
             ),
             macro_files=_BLANK_TO_NULL,
-            expected_location="models/orders.sql:7:8 [SQBRMODEL102]",
+            expected_location="sql/models/orders.sql:7:8 [SQBRMODEL102]",
         ),
         RulePositionE2ETestCase(
             description="a star after a macro call on its line points at its authored column",
@@ -110,7 +110,7 @@ _NODE_RULE: str = custom_rule_source(
                 "SELECT @sql.blank_to_null('a') AS x, * FROM o\n"
             ),
             macro_files=_BLANK_TO_NULL,
-            expected_location="models/orders.sql:3:38 [SQBRMODEL102]",
+            expected_location="sql/models/orders.sql:3:38 [SQBRMODEL102]",
         ),
         RulePositionE2ETestCase(
             description="the third of three macro call outputs points at its authored line",
@@ -120,7 +120,7 @@ _NODE_RULE: str = custom_rule_source(
             ),
             rule="SQBRCONTRACT105",
             macro_files=_BLANK_TO_NULL,
-            expected_location="models/orders.sql:10:3 [SQBRCONTRACT105]",
+            expected_location="sql/models/orders.sql:10:3 [SQBRCONTRACT105]",
         ),
     ],
     ids=lambda case: case.description,
@@ -136,7 +136,7 @@ def test_given_model_query_layout_when_running_rules_then_findings_use_file_posi
                 'name = "shop"\nadapter = "duckdb"\n\n[connection]\ndatabase = "shop.duckdb"\n\n'
                 "[scopes]\nenforce_placement = false\n"
             ),
-            "models/orders.sql": test_case.model_sql,
+            "sql/models/orders.sql": test_case.model_sql,
             **test_case.macro_files,
         },
     )
@@ -196,11 +196,11 @@ def test_given_custom_rule_over_the_syntax_tree_when_compiling_then_nodes_point_
         selected_rules=("XSQBRTREE001",),
         files=(
             ("rules/tree.py", _TREE_RULE),
-            *((f"models/{name}.sql", sql) for name, sql in test_case.other_models.items()),
+            *((f"sql/models/{name}.sql", sql) for name, sql in test_case.other_models.items()),
         ),
         adapter=test_case.adapter,
     )
-    (tmp_path / "models" / "orders.sql").write_text(test_case.model_sql, encoding="utf-8")
+    (tmp_path / "sql" / "models" / "orders.sql").write_text(test_case.model_sql, encoding="utf-8")
 
     result: subprocess.CompletedProcess[str] = run_compile_cli(tmp_path)
 
@@ -252,11 +252,11 @@ def test_given_custom_rule_reading_node_facts_when_compiling_then_it_sees_the_au
         selected_rules=("XSQBRTREE002",),
         files=(
             ("rules/facts.py", _FACTS_RULE),
-            *((f"models/{name}.sql", sql) for name, sql in test_case.other_models.items()),
+            *((f"sql/models/{name}.sql", sql) for name, sql in test_case.other_models.items()),
         ),
         adapter=test_case.adapter,
     )
-    (tmp_path / "models" / "orders.sql").write_text(test_case.model_sql, encoding="utf-8")
+    (tmp_path / "sql" / "models" / "orders.sql").write_text(test_case.model_sql, encoding="utf-8")
 
     result: subprocess.CompletedProcess[str] = run_compile_cli(tmp_path)
 
@@ -298,7 +298,7 @@ def test_given_custom_rule_finding_at_a_node_when_compiling_then_it_points_at_th
         configuration="\n[scopes]\nenforce_placement = false\n",
         adapter=test_case.adapter,
     )
-    (tmp_path / "models" / "orders.sql").write_text(test_case.model_sql, encoding="utf-8")
+    (tmp_path / "sql" / "models" / "orders.sql").write_text(test_case.model_sql, encoding="utf-8")
 
     cold: subprocess.CompletedProcess[str] = run_compile_cli(tmp_path)
     warm: subprocess.CompletedProcess[str] = run_compile_cli(tmp_path)

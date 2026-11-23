@@ -40,7 +40,7 @@ def test_given_bare_union_when_fixing_then_preserves_output_and_is_idempotent(
     test_case: FormatCompileIntegrationTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     original = 'MODEL (description "Orders");\nSELECT 1 AS order_id UNION SELECT 2 AS order_id\n'
     model.write_text(original)
@@ -65,7 +65,7 @@ def test_given_null_comparison_when_fixing_then_refuses_semantics_change(
     test_case: FormatCompileIntegrationTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id WHERE 1 = NULL\n')
     main(["--project-dir", str(tmp_path), "format", "--fix", "--json"])
@@ -85,7 +85,7 @@ def test_given_unanalysed_model_when_fixing_then_verification_preserves_original
     test_case: FormatCompileIntegrationTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "customers.sql").write_text(
         'MODEL (description "Customers");\nSELECT 1 AS customer_id\n'
@@ -139,7 +139,7 @@ def test_given_safe_native_fix_when_formatting_then_compiler_and_query_results_a
     test_case: SemanticFixTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text('MODEL (description "Orders", schema analytics);\n' + test_case.sql)
     assert main(["--project-dir", str(tmp_path), "format", "--fix", "--json"]) == 0
@@ -200,7 +200,7 @@ def test_given_dialect_sensitive_rewrite_when_fixing_then_requires_semantic_proo
     (tmp_path / "sqlbuild_project.toml").write_text(
         f'name = "orders"\nadapter = "{test_case.dialect}"\n'
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(
         'MODEL (description "Orders", database example, schema analytics);\n' + test_case.sql
@@ -222,7 +222,7 @@ def test_given_one_unverifiable_file_when_fixing_then_only_that_file_keeps_its_o
     test_case: FormatCompileIntegrationTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     verified: Path = models / "orders.sql"
     verified.write_text(
@@ -267,10 +267,10 @@ def test_given_existing_errors_and_unexpandable_file_when_fixing_then_other_file
     test_case: FormatCompileIntegrationTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
-    (tmp_path / "macros" / "python").mkdir(parents=True)
-    (tmp_path / "macros" / "python" / "relations.py").write_text(
+    (tmp_path / "sql" / "macros" / "python").mkdir(parents=True)
+    (tmp_path / "sql" / "macros" / "python" / "nodes" / "relations.py").write_text(
         "def orders_relation() -> str:\n    return '__ref(\"orders\")'\n"
     )
     fixable: Path = models / "orders.sql"
@@ -320,7 +320,7 @@ def test_given_only_unverifiable_fixes_when_fixing_then_every_refusal_is_listed_
     test_case: FormatCompileIntegrationTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "orders.sql").write_text(
         'MODEL (description "Orders");\nSELECT 1 AS order_id WHERE 1 = NULL\n'
@@ -399,7 +399,7 @@ def test_given_unused_cte_output_when_fixing_then_model_rows_are_unchanged(
     test_case: UnusedOutputDifferentialCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_DIFFERENTIAL_TOML)
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "raw_orders.sql").write_text(_DIFFERENTIAL_RAW_SQL)
     (models / "summary.sql").write_text(
@@ -433,10 +433,10 @@ def test_given_macro_and_crlf_source_when_fixing_then_previews_preserve_bytes_an
     test_case: FormatCompileIntegrationTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    macros: Path = tmp_path / "macros" / "python"
+    macros: Path = tmp_path / "sql" / "macros" / "python"
     macros.mkdir(parents=True)
     (macros / "values.py").write_text('def order_value():\n    return "1"\n')
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     original: bytes = (
         b'MODEL (description "Orders");\r\n'

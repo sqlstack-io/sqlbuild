@@ -66,7 +66,7 @@ from tests.unit.src.sqlbuild.compiler.python_nodes._helpers.helpers import (
         ),
         PythonNodeSelectorTestCase(
             description="selects every Python node by the python root path",
-            select=("path:python",),
+            select=("path:python/nodes",),
             exclude=(),
             expected_names=frozenset(
                 {"prepare_orders", "load_events", "export_orders", "check_orders_export"}
@@ -74,25 +74,25 @@ from tests.unit.src.sqlbuild.compiler.python_nodes._helpers.helpers import (
         ),
         PythonNodeSelectorTestCase(
             description="selects Python nodes by explicit tasks path",
-            select=("path:python/tasks",),
+            select=("path:python/nodes/tasks",),
             exclude=(),
             expected_names=frozenset({"prepare_orders"}),
         ),
         PythonNodeSelectorTestCase(
             description="selects Python nodes by explicit loaders path",
-            select=("path:python/loaders",),
+            select=("path:python/nodes/loaders",),
             exclude=(),
             expected_names=frozenset({"load_events"}),
         ),
         PythonNodeSelectorTestCase(
             description="selects Python nodes by explicit assets path",
-            select=("path:python/assets",),
+            select=("path:python/nodes/assets",),
             exclude=(),
             expected_names=frozenset({"export_orders"}),
         ),
         PythonNodeSelectorTestCase(
             description="selects Python nodes by explicit assets slash path",
-            select=("python/assets/",),
+            select=("python/nodes/assets/",),
             exclude=(),
             expected_names=frozenset({"export_orders"}),
         ),
@@ -104,7 +104,7 @@ from tests.unit.src.sqlbuild.compiler.python_nodes._helpers.helpers import (
         ),
         PythonNodeSelectorTestCase(
             description="selects Python nodes by explicit checks path with upstream expansion",
-            select=("+path:python/checks",),
+            select=("+path:python/nodes/checks",),
             exclude=(),
             expected_names=frozenset({"prepare_orders", "export_orders", "check_orders_export"}),
         ),
@@ -180,14 +180,14 @@ def test_given_python_node_selectors_when_resolving_then_returns_expected_names(
             select=("path:tasks",),
             exclude=(),
             expected_error_type=ValueError,
-            expected_error_fragment="use 'models/' or 'python/'",
+            expected_error_fragment="use 'sql/models/' or 'python/nodes/'",
         ),
         PythonNodeSelectorErrorTestCase(
             description="raises when explicit path selector matches no Python nodes",
-            select=("path:python/tasks/missing",),
+            select=("path:python/nodes/tasks/missing",),
             exclude=(),
             expected_error_type=ValueError,
-            expected_error_fragment="no Python nodes found under path 'python/tasks/missing'",
+            expected_error_fragment="no Python nodes found under path 'python/nodes/tasks/missing'",
         ),
         PythonNodeSelectorErrorTestCase(
             description="raises when SQL source selector is used for Python nodes",

@@ -24,7 +24,7 @@ def build_cursor_intrinsic_model(*, config_values: dict[str, object]) -> Compile
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="events"),
         deps=(),
         name="events",
-        relative_path=Path("models/events.sql"),
+        relative_path=Path("sql/models/events.sql"),
         query_sql="SELECT __cursor_start() AS batch_start, __cursor_end() AS batch_end",
         config=CompileModelConfig(values=config_values),
         destination=CompiledRelationLocation(
@@ -84,7 +84,7 @@ def build_cursor_models(
             key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name=name),
             deps=(),
             name=name,
-            relative_path=Path(f"models/{name}.sql"),
+            relative_path=Path(f"sql/models/{name}.sql"),
             query_sql="SELECT 1",
             config=CompileModelConfig(values=_cursor_model_config_values(cursor_type=cursor_type)),
             destination=CompiledRelationLocation(

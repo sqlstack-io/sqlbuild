@@ -107,7 +107,7 @@ def test_given_running_steps_when_reading_the_server_then_only_those_with_a_slot
         warehouse_query="",
         expected_status="success",
         expected_rows=[],
-        files={"python/steps.py": steps} | test_case.files,
+        files={"python/nodes/steps.py": steps} | test_case.files,
         default_job_files={
             "orchestration/jobs/annual_orders_job.toml": (
                 'name = "annual_orders_job"\n'

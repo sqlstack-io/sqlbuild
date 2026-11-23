@@ -33,7 +33,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
         LayoutRepairE2ETestCase(
             description="moving a model out of an over-full folder keeps the reduced failure",
             files=OVER_FULL_STAGING,
-            arguments=("stg_order_notes", "models/support/"),
+            arguments=("stg_order_notes", "sql/models/support/"),
             expected_status="applied",
             expected_baseline={"before": 1, "remaining": 1, "resolved": 0},
             expected_blocking=(),
@@ -43,9 +43,9 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
             files=OVER_FULL_STAGING,
             arguments=(
                 "stg_order_notes",
-                "models/support/",
+                "sql/models/support/",
                 "stg_order_returns",
-                "models/support/",
+                "sql/models/support/",
             ),
             expected_status="applied",
             expected_baseline={"before": 1, "remaining": 0, "resolved": 1},
@@ -54,23 +54,23 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
         LayoutRepairE2ETestCase(
             description="moving a model into the over-full folder worsens it",
             files=OVER_FULL_STAGING,
-            arguments=("fact_orders", "models/staging/"),
+            arguments=("fact_orders", "sql/models/staging/"),
             expected_status="compile_failed",
             expected_baseline={"before": 1, "remaining": 0, "resolved": 0},
-            expected_blocking=("XSQBRLAYOUT001 models/staging holds 6 models; the maximum is 3",),
+            expected_blocking=("XSQBRLAYOUT001 sql/models/staging holds 6 models; the maximum is 3",),
         ),
         LayoutRepairE2ETestCase(
             description="filling another folder past the limit is a new failure",
             files=OVER_FULL_STAGING,
             arguments=(
                 "stg_order_notes",
-                "models/marts/",
+                "sql/models/marts/",
                 "stg_order_returns",
-                "models/marts/",
+                "sql/models/marts/",
             ),
             expected_status="compile_failed",
             expected_baseline={"before": 1, "remaining": 0, "resolved": 1},
-            expected_blocking=("XSQBRLAYOUT001 models/marts holds 4 models; the maximum is 3",),
+            expected_blocking=("XSQBRLAYOUT001 sql/models/marts holds 4 models; the maximum is 3",),
         ),
         LayoutRepairE2ETestCase(
             description="moving every direct model of a mixed owner into a child repairs it",
@@ -88,7 +88,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
         LayoutRepairE2ETestCase(
             description="a count that grows at a file nothing moves into blocks",
             files=SIBLING_OWNERS,
-            arguments=("orders__stg__c", "models/orders/staging/fin_c/"),
+            arguments=("orders__stg__c", "sql/models/orders/staging/fin_c/"),
             expected_status="compile_failed",
             expected_baseline={"before": 1, "remaining": 0, "resolved": 0},
             expected_blocking=("SQBRPROJECT204 3 sibling owner directories",),
@@ -145,11 +145,11 @@ def test_given_existing_rule_failures_when_moving_then_only_new_or_worse_failure
         LayoutRepairDryRunE2ETestCase(
             description="an over-full folder losing a model",
             files=OVER_FULL_STAGING,
-            arguments=("stg_order_notes", "models/support/"),
+            arguments=("stg_order_notes", "sql/models/support/"),
             expected_lines=(
                 "Existing rule failures",
                 "The project had 1 rule failure before this change; 0 resolved, 1 still failing.",
-                "└── XSQBRLAYOUT001  models/staging:1  models/staging holds 4 models; "
+                "└── XSQBRLAYOUT001  sql/models/staging:1  sql/models/staging holds 4 models; "
                 "the maximum is 3",
                 "Existing rule failures do not block the change; it adds or worsens none.",
                 "Dry run: compiles, 1 file would change; nothing written",
@@ -181,15 +181,15 @@ def test_given_existing_rule_failures_when_dry_run_then_baseline_and_result_are_
             description="an over-full folder and a reference to a missing model",
             files={
                 **OVER_FULL_STAGING,
-                "models/marts/order_gaps.sql": layout_view("order_gaps", '__ref("missing_orders")'),
+                "sql/models/marts/order_gaps.sql": layout_view("order_gaps", '__ref("missing_orders")'),
             },
-            command=("mv", "stg_order_notes", "models/support/"),
+            command=("mv", "stg_order_notes", "sql/models/support/"),
             expected_codes=("P001",),
         ),
         RefusedBaselineE2ETestCase(
             description="an over-full folder and a unit test that cannot be planned",
-            files={**OVER_FULL_STAGING, "models/marts/fact_orders.sql": RESERVED_CTE_FACT_ORDERS},
-            command=("mv", "customer_totals", "models/support/"),
+            files={**OVER_FULL_STAGING, "sql/models/marts/fact_orders.sql": RESERVED_CTE_FACT_ORDERS},
+            command=("mv", "customer_totals", "sql/models/support/"),
             expected_codes=("XSQBRLAYOUT001", "P001"),
         ),
     ],

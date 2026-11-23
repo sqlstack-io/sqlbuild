@@ -94,7 +94,7 @@ class AnalysisFeatureWriter:
             header="",
             body=f'SELECT *\nFROM __ref("{base.name}")\n',
         )
-        self._files["sources/open.yml"] = (
+        self._files["sql/sources/open.yml"] = (
             "sources:\n"
             f"  - name: {GENERATOR_OPEN_SOURCE}\n"
             "    description: Events whose columns are only known to the warehouse.\n"
@@ -168,14 +168,14 @@ class AnalysisFeatureWriter:
         self._features.add("udf_signatures")
         base: ModelPlan = self._base()
         factor: int = self._random.randint(2, 9)
-        self._files["functions/sql/scaled_amount.sql"] = (
+        self._files["sql/functions/sql/scaled_amount.sql"] = (
             "FUNCTION (\n"
             '  description "Scale an amount by an integer factor",\n'
             "  arguments (p_amount DOUBLE, p_factor INTEGER),\n"
             "  returns DOUBLE,\n);\n\n"
             "p_amount * p_factor\n"
         )
-        self._files["functions/sql/table_fn__amount_bands.sql"] = (
+        self._files["sql/functions/sql/table_fn__amount_bands.sql"] = (
             "FUNCTION (\n"
             '  description "Band staged amounts above a floor",\n'
             "  arguments (p_floor DOUBLE),\n"
@@ -324,7 +324,7 @@ class AnalysisFeatureWriter:
 
     def _python_sql(self) -> None:
         self._features.add("python_sql")
-        self._files["python/tasks/flag_exports.py"] = (
+        self._files["python/nodes/tasks/flag_exports.py"] = (
             "from sqlbuild.assets import AssetContext, asset\n\n\n"
             "@asset\n"
             "def count_flagged_events(ctx: AssetContext):\n"

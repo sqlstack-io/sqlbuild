@@ -277,7 +277,7 @@ def test_given_host_owned_source_when_using_the_development_overlay_then_reloade
                 "benchmarks/duckshop/edge_cases/orchestration/container_deployment.json"
             ).read_text()
         )
-        (project / "models/orders.sql").write_text(
+        (project / "sql/models/orders.sql").write_text(
             "MODEL (description 'Example orders.', materialized table);\n" + cases["second"] + "\n"
         )
         second: dict[str, Any] = stack.wait(
@@ -298,7 +298,7 @@ def test_given_host_owned_source_when_using_the_development_overlay_then_reloade
             "import duckdb,json; print(json.dumps(duckdb.connect('/warehouse/orders.duckdb',read_only=True).sql('SELECT order_id FROM orders').fetchall()))",
         )
         assert json.loads(warehouse) == test_case.expected_warehouse_rows
-        (project / "models/orders.sql").write_text(cases["broken"] + "\n")
+        (project / "sql/models/orders.sql").write_text(cases["broken"] + "\n")
         stack.wait(
             "SELECT event_id FROM recall_events WHERE event_type='location_health' "
             "AND payload->'report'->'health'->>'kind'='compile_failed'",

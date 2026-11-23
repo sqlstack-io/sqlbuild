@@ -30,7 +30,7 @@ def test_given_nested_and_private_files_when_discovering_then_returns_public_exp
     write_repo_files: Callable[[Path, dict[str, str]], None],
 ) -> None:
     declaration = """
-from sqlbuild.sinks import lifecycle_event_sink
+from sqlbuild.event_sinks import lifecycle_event_sink
 
 @lifecycle_event_sink
 def publish(event):
@@ -39,10 +39,10 @@ def publish(event):
     write_repo_files(
         tmp_path,
         {
-            "sinks/nested/public.py": declaration,
-            "sinks/_private.py": declaration,
-            "sinks/_private_dir/hidden.py": declaration,
-            "sinks/nested/__init__.py": declaration,
+            "python/event_sinks/nested/public.py": declaration,
+            "python/event_sinks/_private.py": declaration,
+            "python/event_sinks/_private_dir/hidden.py": declaration,
+            "python/event_sinks/nested/__init__.py": declaration,
         },
     )
 
@@ -51,7 +51,7 @@ def publish(event):
     )
 
     assert tuple(exporter.name for exporter in exporters) == (test_case.expected_name,)
-    assert exporters[0].relative_path.as_posix() == "sinks/nested/public.py"
+    assert exporters[0].relative_path.as_posix() == "python/event_sinks/nested/public.py"
 
 
 @pytest.mark.parametrize(
@@ -67,15 +67,15 @@ def test_given_provider_parameter_when_discovering_then_records_usage(
     write_repo_files(
         tmp_path,
         {
-            "providers/sink.py": """
+            "python/providers/sink.py": """
 from sqlbuild.providers import Provider
 
 class Sink(Provider):
     pass
 """,
-            "sinks/publish.py": """
-from providers.sink import Sink
-from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink
+            "python/event_sinks/publish.py": """
+from python.nodes.providers.sink import Sink
+from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
 
 @lifecycle_event_sink
 def publish(event: LifecycleEvent, sink: Sink) -> None:
@@ -106,14 +106,14 @@ def test_given_unannotated_provider_parameter_when_discovering_then_accepts_name
     write_repo_files(
         tmp_path,
         {
-            "providers/sink.py": """
+            "python/providers/sink.py": """
 from sqlbuild.providers import Provider
 
 class Sink(Provider):
     pass
 """,
-            "sinks/publish.py": """
-from sqlbuild.sinks import lifecycle_event_sink
+            "python/event_sinks/publish.py": """
+from sqlbuild.event_sinks import lifecycle_event_sink
 
 @lifecycle_event_sink
 def publish(event, sink):
@@ -160,8 +160,8 @@ def test_given_invalid_signature_when_discovering_then_rejects_before_execution(
     write_repo_files(
         tmp_path,
         {
-            "sinks/invalid.py": (
-                "from sqlbuild.sinks import lifecycle_event_sink\n\n"
+            "python/event_sinks/invalid.py": (
+                "from sqlbuild.event_sinks import lifecycle_event_sink\n\n"
                 f"@lifecycle_event_sink\n{test_case.body}\n"
             )
         },
@@ -182,7 +182,7 @@ def test_given_duplicate_names_when_discovering_then_rejects_deterministically(
     write_repo_files: Callable[[Path, dict[str, str]], None],
 ) -> None:
     declaration = """
-from sqlbuild.sinks import lifecycle_event_sink
+from sqlbuild.event_sinks import lifecycle_event_sink
 
 @lifecycle_event_sink(name="duplicate")
 def publish(event):
@@ -191,8 +191,8 @@ def publish(event):
     write_repo_files(
         tmp_path,
         {
-            "sinks/first.py": declaration,
-            "sinks/second.py": declaration,
+            "python/event_sinks/first.py": declaration,
+            "python/event_sinks/second.py": declaration,
         },
     )
 
@@ -249,15 +249,15 @@ def test_given_invalid_typed_signature_when_discovering_then_rejects_exact_contr
     write_repo_files(
         tmp_path,
         {
-            "providers/sink.py": """
+            "python/providers/sink.py": """
 from sqlbuild.providers import Provider
 
 class Sink(Provider):
     pass
 """,
-            "sinks/invalid.py": (
-                "from providers.sink import Sink\n"
-                "from sqlbuild.sinks import lifecycle_event_sink\n"
+            "python/event_sinks/invalid.py": (
+                "from python.nodes.providers.sink import Sink\n"
+                "from sqlbuild.event_sinks import lifecycle_event_sink\n"
                 "from sqlbuild.providers import Provider\n\n"
                 "class Other(Provider):\n    pass\n\n"
                 f"@lifecycle_event_sink\n{test_case.declaration}\n"
@@ -283,8 +283,8 @@ def test_given_decorated_function_alias_when_discovering_then_declares_exporter_
     write_repo_files(
         tmp_path,
         {
-            "sinks/aliased.py": """
-from sqlbuild.sinks import lifecycle_event_sink
+            "python/event_sinks/aliased.py": """
+from sqlbuild.event_sinks import lifecycle_event_sink
 
 @lifecycle_event_sink
 def publish(event) -> None:

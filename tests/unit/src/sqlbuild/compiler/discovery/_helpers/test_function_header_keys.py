@@ -53,7 +53,7 @@ def test_given_supported_function_header_keys_when_parsing_then_accepts_header(
         DiscoveredSqlFunctionFile,
         discover_declaration_file(
             project_dir=tmp_path,
-            relative_path=f"functions/sql/{test_case.file_name}",
+            relative_path=f"sql/functions/sql/{test_case.file_name}",
             contents=test_case.contents,
         ),
     ).header_values
@@ -91,11 +91,11 @@ def test_given_supported_function_header_keys_when_parsing_then_accepts_header(
 def test_given_unknown_sql_function_header_key_when_parsing_then_rejects_key_with_location(
     test_case: FunctionHeaderKeysTestCase, tmp_path: Path
 ) -> None:
-    file_path: Path = tmp_path / "functions" / "sql" / test_case.file_name
+    file_path: Path = tmp_path / "sql" / "functions" / "sql" / test_case.file_name
     with pytest.raises(ModelSqlParseError) as raised:
         discover_declaration_file(
             project_dir=tmp_path,
-            relative_path=f"functions/sql/{test_case.file_name}",
+            relative_path=f"sql/functions/sql/{test_case.file_name}",
             contents=test_case.contents,
         )
 
@@ -126,7 +126,7 @@ def test_given_unknown_sql_function_header_key_when_parsing_then_rejects_key_wit
 def test_given_unknown_python_udf_key_when_parsing_then_rejects_key_with_location(
     test_case: FunctionHeaderKeysTestCase, tmp_path: Path
 ) -> None:
-    file_path: Path = tmp_path / "functions" / "python" / test_case.file_name
+    file_path: Path = tmp_path / "sql" / "functions" / "python" / test_case.file_name
     with pytest.raises(ModelSqlParseError) as raised:
         discover_python_function_file(
             project_dir=tmp_path, file_name=test_case.file_name, contents=test_case.contents

@@ -50,7 +50,7 @@ _SEED_COLUMNS: str = (
     "      - name: label\n        type: VARCHAR\n"
 )
 _ORDER_TOTALS_MODEL: tuple[str, str] = (
-    "models/order_totals.sql",
+    "sql/models/order_totals.sql",
     'MODEL (description "Order count");\n\nSELECT COUNT(*) AS order_count FROM __ref("orders")\n',
 )
 _SCENARIO_BODY: str = (
@@ -97,19 +97,19 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
     RequiredDescriptionCase(
         description="model header",
         missing_files=(
-            ("models/order_totals.sql", "MODEL (materialized table);\nSELECT 1 AS id\n"),
+            ("sql/models/order_totals.sql", "MODEL (materialized table);\nSELECT 1 AS id\n"),
         ),
         described_files=(
             (
-                "models/order_totals.sql",
+                "sql/models/order_totals.sql",
                 'MODEL (description "Order totals", materialized table);\nSELECT 1 AS id\n',
             ),
         ),
-        expected_diagnostic=("P010", "models/order_totals.sql", 1),
+        expected_diagnostic=("P010", "sql/models/order_totals.sql", 1),
         expected_message="model 'order_totals' has no description",
         expected_help_fragments=(
             "to describe model 'order_totals', add this to the MODEL header in "
-            "models/order_totals.sql:\n"
+            "sql/models/order_totals.sql:\n"
             "            MODEL (\n"
             '              description "What one row of order_totals represents",\n'
             "              ...\n"
@@ -143,21 +143,21 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
     RequiredDescriptionCase(
         description="seed YAML entry",
         missing_files=(
-            ("seeds/product_types.csv", _SEED_CSV),
-            ("seeds/product_types.yml", "seeds:\n  - name: product_types\n" + _SEED_COLUMNS),
+            ("sql/seeds/product_types.csv", _SEED_CSV),
+            ("sql/seeds/product_types.yml", "seeds:\n  - name: product_types\n" + _SEED_COLUMNS),
         ),
         described_files=(
-            ("seeds/product_types.csv", _SEED_CSV),
+            ("sql/seeds/product_types.csv", _SEED_CSV),
             (
-                "seeds/product_types.yml",
+                "sql/seeds/product_types.yml",
                 "seeds:\n  - name: product_types\n    description: Product type catalogue\n"
                 + _SEED_COLUMNS,
             ),
         ),
-        expected_diagnostic=("P010", "seeds/product_types.yml", 2),
+        expected_diagnostic=("P010", "sql/seeds/product_types.yml", 2),
         expected_message="seed 'product_types' has no description",
         expected_help_fragments=(
-            "add `description` to its entry in seeds/product_types.yml:\n"
+            "add `description` to its entry in sql/seeds/product_types.yml:\n"
             "            - name: product_types\n"
             "              description: What one row of product_types represents",
         ),
@@ -166,37 +166,37 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         description="source YAML entry",
         missing_files=(
             (
-                "sources/raw.yml",
+                "sql/sources/raw.yml",
                 "sources:\n  - name: raw_customers\n    schema: main\n    table: customers\n",
             ),
         ),
         described_files=(
             (
-                "sources/raw.yml",
+                "sql/sources/raw.yml",
                 "sources:\n  - name: raw_customers\n    description: Customer records\n"
                 "    schema: main\n    table: customers\n",
             ),
         ),
-        expected_diagnostic=("P010", "sources/raw.yml", 2),
+        expected_diagnostic=("P010", "sql/sources/raw.yml", 2),
         expected_message="source 'raw_customers' has no description",
         expected_help_fragments=(
-            "add `description` to its entry in sources/raw.yml:\n"
+            "add `description` to its entry in sql/sources/raw.yml:\n"
             "            - name: raw_customers\n",
         ),
     ),
     RequiredDescriptionCase(
         description="managed source described by its loader docstring",
         missing_files=(
-            ("sources/raw.yml", "sources:\n  - name: raw_customers\n    managed: true\n"),
+            ("sql/sources/raw.yml", "sources:\n  - name: raw_customers\n    managed: true\n"),
             (
-                "python/loaders/raw_customers.py",
+                "python/nodes/loaders/raw_customers.py",
                 python_node_source(module="loaders", decorator="loader", name="raw_customers"),
             ),
         ),
         described_files=(
-            ("sources/raw.yml", "sources:\n  - name: raw_customers\n    managed: true\n"),
+            ("sql/sources/raw.yml", "sources:\n  - name: raw_customers\n    managed: true\n"),
             (
-                "python/loaders/raw_customers.py",
+                "python/nodes/loaders/raw_customers.py",
                 python_node_source(
                     module="loaders",
                     decorator="loader",
@@ -205,10 +205,10 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
                 ),
             ),
         ),
-        expected_diagnostic=("P010", "sources/raw.yml", 2),
+        expected_diagnostic=("P010", "sql/sources/raw.yml", 2),
         expected_message="source 'raw_customers' has no description",
         expected_help_fragments=(
-            "or describe its loader 'raw_customers' in python/loaders/raw_customers.py with a "
+            "or describe its loader 'raw_customers' in python/nodes/loaders/raw_customers.py with a "
             'docstring or @loader(description="What one row of raw_customers represents")',
         ),
     ),
@@ -216,22 +216,22 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         description="SQL function header",
         missing_files=(
             (
-                "functions/sql/is_large_order.sql",
+                "sql/functions/sql/is_large_order.sql",
                 "FUNCTION (\n  arguments (amount INTEGER),\n  returns BOOLEAN,\n);\n\n"
                 "amount > 100\n",
             ),
         ),
         described_files=(
             (
-                "functions/sql/is_large_order.sql",
+                "sql/functions/sql/is_large_order.sql",
                 'FUNCTION (\n  description "Whether an order amount is large",\n'
                 "  arguments (amount INTEGER),\n  returns BOOLEAN,\n);\n\namount > 100\n",
             ),
         ),
-        expected_diagnostic=("P010", "functions/sql/is_large_order.sql", 1),
+        expected_diagnostic=("P010", "sql/functions/sql/is_large_order.sql", 1),
         expected_message="function 'is_large_order' has no description",
         expected_help_fragments=(
-            "add this to the FUNCTION header in functions/sql/is_large_order.sql:\n"
+            "add this to the FUNCTION header in sql/functions/sql/is_large_order.sql:\n"
             "            FUNCTION (\n"
             '              description "What is_large_order returns",',
         ),
@@ -240,20 +240,20 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         description="table function header",
         missing_files=(
             (
-                "functions/sql/order_lines.sql",
+                "sql/functions/sql/order_lines.sql",
                 "FUNCTION (\n  arguments (p_order_id INTEGER),\n"
                 "  returns table (order_id INTEGER),\n);\n\nSELECT p_order_id AS order_id\n",
             ),
         ),
         described_files=(
             (
-                "functions/sql/order_lines.sql",
+                "sql/functions/sql/order_lines.sql",
                 'FUNCTION (\n  description "Lines of one order",\n'
                 "  arguments (p_order_id INTEGER),\n"
                 "  returns table (order_id INTEGER),\n);\n\nSELECT p_order_id AS order_id\n",
             ),
         ),
-        expected_diagnostic=("P010", "functions/sql/order_lines.sql", 1),
+        expected_diagnostic=("P010", "sql/functions/sql/order_lines.sql", 1),
         expected_message="function 'order_lines' has no description",
         expected_help_fragments=('description "What order_lines returns"',),
     ),
@@ -261,7 +261,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         description="Python UDF described by its docstring",
         missing_files=(
             (
-                "functions/python/is_large_order_py.py",
+                "sql/functions/python/is_large_order_py.py",
                 "from sqlbuild.functions import udf\n\n\n"
                 '@udf(arguments={"amount": "INTEGER"}, returns="BOOLEAN", runtime_version="3.11")\n'
                 "def main(amount: int) -> bool:\n    return amount > 100\n",
@@ -269,7 +269,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         ),
         described_files=(
             (
-                "functions/python/is_large_order_py.py",
+                "sql/functions/python/is_large_order_py.py",
                 "from sqlbuild.functions import udf\n\n\n"
                 '@udf(arguments={"amount": "INTEGER"}, returns="BOOLEAN", runtime_version="3.11")\n'
                 "def main(amount: int) -> bool:\n"
@@ -277,10 +277,10 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
                 "    return amount > 100\n",
             ),
         ),
-        expected_diagnostic=("P010", "functions/python/is_large_order_py.py", 4),
+        expected_diagnostic=("P010", "sql/functions/python/is_large_order_py.py", 4),
         expected_message="function 'is_large_order_py' has no description",
         expected_help_fragments=(
-            "give its function in functions/python/is_large_order_py.py a docstring or add "
+            "give its function in sql/functions/python/is_large_order_py.py a docstring or add "
             "this to @udf:\n"
             '            @udf(description="What is_large_order_py returns", ...)',
         ),
@@ -289,7 +289,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         description="Python UDF described by its decorator",
         missing_files=(
             (
-                "functions/python/is_large_order_py.py",
+                "sql/functions/python/is_large_order_py.py",
                 "from sqlbuild.functions import udf\n\n\n"
                 '@udf(arguments={"amount": "INTEGER"}, returns="BOOLEAN", runtime_version="3.11")\n'
                 "def main(amount: int) -> bool:\n    return amount > 100\n",
@@ -297,7 +297,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         ),
         described_files=(
             (
-                "functions/python/is_large_order_py.py",
+                "sql/functions/python/is_large_order_py.py",
                 "from sqlbuild.functions import udf\n\n\n"
                 "@udf(\n"
                 '    description="Whether an order amount is large",\n'
@@ -308,27 +308,27 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
                 "def main(amount: int) -> bool:\n    return amount > 100\n",
             ),
         ),
-        expected_diagnostic=("P010", "functions/python/is_large_order_py.py", 4),
+        expected_diagnostic=("P010", "sql/functions/python/is_large_order_py.py", 4),
         expected_message="function 'is_large_order_py' has no description",
         expected_help_fragments=(),
     ),
     RequiredDescriptionCase(
         description="named SQL hook header",
         missing_files=(
-            ("hooks/sql/analyze_orders.sql", "HOOK ();\n\nSELECT 1\n"),
+            ("sql/hooks/sql/analyze_orders.sql", "HOOK ();\n\nSELECT 1\n"),
             hooked_model_file(model_name="analyzed_orders", hook='sql("analyze_orders")'),
         ),
         described_files=(
             (
-                "hooks/sql/analyze_orders.sql",
+                "sql/hooks/sql/analyze_orders.sql",
                 'HOOK (description "What analyze_orders does");\n\nSELECT 1\n',
             ),
             hooked_model_file(model_name="analyzed_orders", hook='sql("analyze_orders")'),
         ),
-        expected_diagnostic=("P010", "hooks/sql/analyze_orders.sql", 1),
+        expected_diagnostic=("P010", "sql/hooks/sql/analyze_orders.sql", 1),
         expected_message="hook 'analyze_orders' has no description",
         expected_help_fragments=(
-            "add this to the HOOK header in hooks/sql/analyze_orders.sql:\n"
+            "add this to the HOOK header in sql/hooks/sql/analyze_orders.sql:\n"
             '            HOOK (description "What analyze_orders does");',
         ),
     ),
@@ -336,14 +336,14 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         description="Python hook",
         missing_files=(
             (
-                "hooks/python/notify_orders.py",
+                "sql/hooks/python/notify_orders.py",
                 python_node_source(module="hooks", decorator="hook", name="notify_orders"),
             ),
             hooked_model_file(model_name="notified_orders", hook='python("notify_orders")'),
         ),
         described_files=(
             (
-                "hooks/python/notify_orders.py",
+                "sql/hooks/python/notify_orders.py",
                 python_node_source(
                     module="hooks",
                     decorator="hook",
@@ -353,10 +353,10 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
             ),
             hooked_model_file(model_name="notified_orders", hook='python("notify_orders")'),
         ),
-        expected_diagnostic=("P010", "hooks/python/notify_orders.py", 4),
+        expected_diagnostic=("P010", "sql/hooks/python/notify_orders.py", 4),
         expected_message="hook 'notify_orders' has no description",
         expected_help_fragments=(
-            "give its function in hooks/python/notify_orders.py a docstring or pass a "
+            "give its function in sql/hooks/python/notify_orders.py a docstring or pass a "
             "description to @hook:\n"
             '            @hook(description="What notify_orders does", ...)',
         ),
@@ -365,13 +365,13 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         description="loader without a source declaration",
         missing_files=(
             (
-                "python/loaders/raw_returns.py",
+                "python/nodes/loaders/raw_returns.py",
                 python_node_source(module="loaders", decorator="loader", name="raw_returns"),
             ),
         ),
         described_files=(
             (
-                "python/loaders/raw_returns.py",
+                "python/nodes/loaders/raw_returns.py",
                 python_node_source(
                     module="loaders",
                     decorator="loader",
@@ -380,7 +380,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
                 ),
             ),
         ),
-        expected_diagnostic=("P010", "python/loaders/raw_returns.py", 4),
+        expected_diagnostic=("P010", "python/nodes/loaders/raw_returns.py", 4),
         expected_message="loader 'raw_returns' has no description",
         expected_help_fragments=('@loader(description="What raw_returns does", ...)',),
     ),
@@ -388,13 +388,13 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         description="asset",
         missing_files=(
             (
-                "python/assets/order_report.py",
+                "python/nodes/assets/order_report.py",
                 python_node_source(module="assets", decorator="asset", name="order_report"),
             ),
         ),
         described_files=(
             (
-                "python/assets/order_report.py",
+                "python/nodes/assets/order_report.py",
                 python_node_source(
                     module="assets",
                     decorator="asset",
@@ -403,7 +403,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
                 ),
             ),
         ),
-        expected_diagnostic=("P010", "python/assets/order_report.py", 4),
+        expected_diagnostic=("P010", "python/nodes/assets/order_report.py", 4),
         expected_message="asset 'order_report' has no description",
         expected_help_fragments=('@asset(description="What order_report does", ...)',),
     ),
@@ -411,7 +411,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         description="check",
         missing_files=(
             (
-                "python/checks/orders_present.py",
+                "python/nodes/checks/orders_present.py",
                 python_node_source(
                     module="checks",
                     decorator="check",
@@ -423,7 +423,7 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
         ),
         described_files=(
             (
-                "python/checks/orders_present.py",
+                "python/nodes/checks/orders_present.py",
                 python_node_source(
                     module="checks",
                     decorator="check",
@@ -434,18 +434,18 @@ _CASES: tuple[RequiredDescriptionCase, ...] = (
                 ),
             ),
         ),
-        expected_diagnostic=("P010", "python/checks/orders_present.py", 5),
+        expected_diagnostic=("P010", "python/nodes/checks/orders_present.py", 5),
         expected_message="check 'orders_present' has no description",
         expected_help_fragments=('@check(description="What orders_present does", ...)',),
     ),
     RequiredDescriptionCase(
         description="provider",
-        missing_files=(("providers/orders_api.py", _PROVIDER_UNDESCRIBED),),
-        described_files=(("providers/orders_api.py", _PROVIDER_DESCRIBED),),
-        expected_diagnostic=("P010", "providers/orders_api.py", 4),
+        missing_files=(("python/providers/orders_api.py", _PROVIDER_UNDESCRIBED),),
+        described_files=(("python/providers/orders_api.py", _PROVIDER_DESCRIBED),),
+        expected_diagnostic=("P010", "python/providers/orders_api.py", 4),
         expected_message="provider 'orders_api' has no description",
         expected_help_fragments=(
-            "add a class docstring in providers/orders_api.py:\n"
+            "add a class docstring in python/providers/orders_api.py:\n"
             "            class OrdersApi(Provider):\n"
             '                """What orders_api provides."""',
         ),
@@ -462,12 +462,12 @@ _INHERITING_MODEL: str = "MODEL ();\n\nSELECT 1 AS id\n"
 
 
 _TYPED_NULL_FIXTURE_FILES: tuple[tuple[str, str], ...] = (
-    ("models/up.sql", 'MODEL (description "Upstream rows");\n\nSELECT 1 AS a\n'),
+    ("sql/models/up.sql", 'MODEL (description "Upstream rows");\n\nSELECT 1 AS a\n'),
     (
-        "models/marts/a_model.sql",
+        "sql/models/marts/a_model.sql",
         'MODEL (description "Own description");\n\nSELECT a\nFROM __ref("up")\n',
     ),
-    ("models/marts/b_model.sql", _INHERITING_MODEL),
+    ("sql/models/marts/b_model.sql", _INHERITING_MODEL),
     (
         "tests/unit/test_a_model.sql",
         'TEST (description "Null values pass through");\n\n'
@@ -479,7 +479,7 @@ _TYPED_NULL_FIXTURE_FILES: tuple[tuple[str, str], ...] = (
 
 _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
     *dict(chain.from_iterable(case.missing_files for case in _CASES)).items(),
-    ("models/undescribed_orders.sql", "MODEL (materialized view);\n\nSELECT 1 AS id\n"),
+    ("sql/models/undescribed_orders.sql", "MODEL (materialized view);\n\nSELECT 1 AS id\n"),
 )
 
 
@@ -491,7 +491,7 @@ _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
             description="asset docstring",
             missing_files=(
                 (
-                    "python/assets/order_report.py",
+                    "python/nodes/assets/order_report.py",
                     python_node_source(
                         module="assets",
                         decorator="asset",
@@ -502,7 +502,7 @@ _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
             ),
             described_files=(
                 (
-                    "python/assets/order_report.py",
+                    "python/nodes/assets/order_report.py",
                     python_node_source(
                         module="assets",
                         decorator="asset",
@@ -511,7 +511,7 @@ _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
                     ),
                 ),
             ),
-            expected_diagnostic=("P027", "python/assets/order_report.py", 4),
+            expected_diagnostic=("P027", "python/nodes/assets/order_report.py", 4),
             expected_message="asset 'order_report' description exceeds 10 lines",
             expected_help_fragments=("Shorten the description to 10 lines",),
         ),
@@ -519,7 +519,7 @@ _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
             description="asset description argument",
             missing_files=(
                 (
-                    "python/assets/order_report.py",
+                    "python/nodes/assets/order_report.py",
                     python_node_source(
                         module="assets",
                         decorator="asset",
@@ -530,7 +530,7 @@ _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
             ),
             described_files=(
                 (
-                    "python/assets/order_report.py",
+                    "python/nodes/assets/order_report.py",
                     python_node_source(
                         module="assets",
                         decorator="asset",
@@ -539,7 +539,7 @@ _ALL_UNDESCRIBED_FILES: tuple[tuple[str, str], ...] = (
                     ),
                 ),
             ),
-            expected_diagnostic=("P027", "python/assets/order_report.py", 4),
+            expected_diagnostic=("P027", "python/nodes/assets/order_report.py", 4),
             expected_message="asset 'order_report' description exceeds 10 lines",
             expected_help_fragments=("Shorten the description to 10 lines",),
         ),
@@ -636,55 +636,55 @@ def test_given_every_resource_kind_undescribed_when_compiling_then_one_run_repor
         RequiredDescriptionExactOutputCase(
             description="seed and source entries located at their outermost declarations",
             files=(
-                ("models/order_summary.sql", "MODEL ();\nSELECT 1 AS order_count\n"),
-                ("seeds/product_types.csv", _SEED_CSV),
-                ("seeds/product_labels.csv", _SEED_CSV),
-                ("seeds/products.yml", _TWO_SEEDS_YAML),
-                ("sources/raw.yml", _SHADOWED_SOURCES_YAML),
+                ("sql/models/order_summary.sql", "MODEL ();\nSELECT 1 AS order_count\n"),
+                ("sql/seeds/product_types.csv", _SEED_CSV),
+                ("sql/seeds/product_labels.csv", _SEED_CSV),
+                ("sql/seeds/products.yml", _TWO_SEEDS_YAML),
+                ("sql/sources/raw.yml", _SHADOWED_SOURCES_YAML),
             ),
             expected_diagnostics=(
                 (
                     "P010",
                     "model 'order_summary' has no description",
-                    "models/order_summary.sql",
+                    "sql/models/order_summary.sql",
                     1,
                     1,
                 ),
-                ("P010", "seed 'product_types' has no description", "seeds/products.yml", 2, 1),
-                ("P010", "seed 'product_labels' has no description", "seeds/products.yml", 8, 1),
-                ("P010", "source 'raw_orders' has no description", "sources/raw.yml", 2, 1),
-                ("P010", "source 'raw_refunds' has no description", "sources/raw.yml", 8, 1),
-                ("P010", "source 'raw_customers' has no description", "sources/raw.yml", 11, 1),
+                ("P010", "seed 'product_types' has no description", "sql/seeds/products.yml", 2, 1),
+                ("P010", "seed 'product_labels' has no description", "sql/seeds/products.yml", 8, 1),
+                ("P010", "source 'raw_orders' has no description", "sql/sources/raw.yml", 2, 1),
+                ("P010", "source 'raw_refunds' has no description", "sql/sources/raw.yml", 8, 1),
+                ("P010", "source 'raw_customers' has no description", "sql/sources/raw.yml", 11, 1),
             ),
             expected_help=(
                 "to describe model 'order_summary', add this to the MODEL header in "
-                "models/order_summary.sql:\n"
+                "sql/models/order_summary.sql:\n"
                 "            MODEL (\n"
                 '              description "What one row of order_summary represents",\n'
                 "              ...\n"
                 "            );",
                 (
-                    "to describe seed 'product_types', add `description` to its entry in seeds/products.yml:\n"
+                    "to describe seed 'product_types', add `description` to its entry in sql/seeds/products.yml:\n"
                     "            - name: product_types\n"
                     "              description: What one row of product_types represents"
                 ),
                 (
-                    "to describe seed 'product_labels', add `description` to its entry in seeds/products.yml:\n"
+                    "to describe seed 'product_labels', add `description` to its entry in sql/seeds/products.yml:\n"
                     "            - name: product_labels\n"
                     "              description: What one row of product_labels represents"
                 ),
                 (
-                    "to describe source 'raw_orders', add `description` to its entry in sources/raw.yml:\n"
+                    "to describe source 'raw_orders', add `description` to its entry in sql/sources/raw.yml:\n"
                     "            - name: raw_orders\n"
                     "              description: What one row of raw_orders represents"
                 ),
                 (
-                    "to describe source 'raw_refunds', add `description` to its entry in sources/raw.yml:\n"
+                    "to describe source 'raw_refunds', add `description` to its entry in sql/sources/raw.yml:\n"
                     "            - name: raw_refunds\n"
                     "              description: What one row of raw_refunds represents"
                 ),
                 (
-                    "to describe source 'raw_customers', add `description` to its entry in sources/raw.yml:\n"
+                    "to describe source 'raw_customers', add `description` to its entry in sql/sources/raw.yml:\n"
                     "            - name: raw_customers\n"
                     "              description: What one row of raw_customers represents"
                 ),
@@ -721,7 +721,7 @@ def test_given_undescribed_yaml_entries_when_compiling_then_reports_exact_ordere
             model_sql="MODEL (materialized table);\n\nSELECT 1 AS order_id\n",
             expected_returncode=1,
             expected_stderr_fragment=(
-                "[P010] models/orders.sql:1:1: model 'orders' has no description"
+                "[P010] sql/models/orders.sql:1:1: model 'orders' has no description"
             ),
         ),
     ],
@@ -735,7 +735,7 @@ def test_given_undescribed_model_when_planning_then_plan_is_blocked(
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": REQUIRED_DESCRIPTIONS_PROJECT,
-            "models/orders.sql": test_case.model_sql,
+            "sql/models/orders.sql": test_case.model_sql,
         },
     )
 
@@ -753,8 +753,8 @@ def test_given_undescribed_model_when_planning_then_plan_is_blocked(
         PathDefaultDescriptionCase(
             description="described model sorts before the inheriting model",
             model_files=(
-                ("models/marts/a_model.sql", _OWN_DESCRIPTION_MODEL),
-                ("models/marts/b_model.sql", _INHERITING_MODEL),
+                ("sql/models/marts/a_model.sql", _OWN_DESCRIPTION_MODEL),
+                ("sql/models/marts/b_model.sql", _INHERITING_MODEL),
             ),
             expected_returncode=0,
             expected_diagnostics=(),
@@ -763,8 +763,8 @@ def test_given_undescribed_model_when_planning_then_plan_is_blocked(
         PathDefaultDescriptionCase(
             description="inheriting model sorts before the described model",
             model_files=(
-                ("models/marts/a_model.sql", _INHERITING_MODEL),
-                ("models/marts/b_model.sql", _OWN_DESCRIPTION_MODEL),
+                ("sql/models/marts/a_model.sql", _INHERITING_MODEL),
+                ("sql/models/marts/b_model.sql", _OWN_DESCRIPTION_MODEL),
             ),
             expected_returncode=0,
             expected_diagnostics=(),
@@ -809,9 +809,9 @@ def test_given_path_default_description_when_compiling_then_every_model_keeps_it
         ),
         FormatDescriptionResolutionE2ECase(
             description="a genuinely missing description is still reported",
-            extra_files=(("models/bare.sql", "MODEL (materialized table);\n\nSELECT 1 AS id\n"),),
+            extra_files=(("sql/models/bare.sql", "MODEL (materialized table);\n\nSELECT 1 AS id\n"),),
             expected_returncode=1,
-            expected_faults=(("models/bare.sql", "description-present"),),
+            expected_faults=(("sql/models/bare.sql", "description-present"),),
         ),
     ],
     ids=lambda case: case.description,

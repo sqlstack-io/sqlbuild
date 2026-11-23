@@ -326,15 +326,15 @@ Recall's default for its stream, and Recall stores only what it publishes.
 
 ```python
 from sqlbuild.recall import RecallWriter
-from sqlbuild.sinks import CommandOutputRecord, command_output_sink
+from sqlbuild.event_sinks import CommandOutputRecord, command_output_event_sink
 
-@command_output_sink
+@command_output_event_sink
 def recall_output(record: CommandOutputRecord, writer: RecallWriter) -> None:
     redacted: bytes = record.data.replace(b"secret-token", b"[redacted]")
     writer.publish_command_output(record.replace(data=redacted))
 ```
 
-- A `@command_output_sink` replacement receives each output chunk with its exact bytes in
+- A `@command_output_event_sink` replacement receives each output chunk with its exact bytes in
   `record.data` (record schema version 2). `record.replace(data=…, message=…)` returns a copy that
   keeps the record ID and sequence; publish at most one record per call.
 - A `@lifecycle_event_sink` replacement receives each event its `event_kinds` and `min_severity`

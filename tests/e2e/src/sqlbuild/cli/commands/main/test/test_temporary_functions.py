@@ -20,7 +20,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     run_sqb,
 )
 
-_FUNCTION_PATH: str = "functions/sql/is_completed_order.sql"
+_FUNCTION_PATH: str = "sql/functions/sql/is_completed_order.sql"
 _FUNCTION_HEADER: str = (
     "FUNCTION (description 'Whether an order status counts as completed.', "
     "arguments (order_status VARCHAR), returns BOOLEAN);\n"
@@ -30,11 +30,11 @@ _PROJECT_FILES: dict[str, str] = {
         'name = "orders_temporary_functions"\nadapter = "duckdb"\n'
         '[connection]\ndatabase = "orders.duckdb"\n'
     ),
-    "models/order_statuses.sql": (
+    "sql/models/order_statuses.sql": (
         "MODEL (description 'Test model order_statuses.', materialized table);\n"
         "SELECT 'completed' AS order_status\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Test model orders.', materialized table);\n"
         'SELECT order_status, __udf("is_completed_order")(order_status) AS is_completed '
         'FROM __ref("order_statuses")\n'
@@ -47,7 +47,7 @@ _PROJECT_FILES: dict[str, str] = {
     ),
 }
 
-_CALLEE_PATH: str = "functions/sql/status_matches.sql"
+_CALLEE_PATH: str = "sql/functions/sql/status_matches.sql"
 _CALLEE_HEADER: str = (
     "FUNCTION (description 'Whether an order status is the completed one.', "
     "arguments (order_status VARCHAR), returns BOOLEAN);\n"
@@ -59,7 +59,7 @@ _CALLER_FILES: dict[str, str] = {
 _QUOTED_CALL_FILES: dict[str, str] = {
     **_PROJECT_FILES,
     _FUNCTION_PATH: _FUNCTION_HEADER + "order_status = 'completed'",
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Test model orders.', materialized table);\n"
         'SELECT order_status, __udf("is_completed_order")(order_status) AS is_completed, '
         "length('main.is_completed_order(order_status)') AS formula_length "
@@ -83,7 +83,7 @@ _SECOND_CONNECTION_FAILS: dict[str, str] = {
     "tests/unit/orders_again.sql": _PROJECT_FILES["tests/unit/orders_case.sql"].replace(
         "orders_case", "orders_again"
     ),
-    "adapters/duckdb_one_session.py": (
+    "python/adapters/duckdb_one_session.py": (
         "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
         "class DuckDbOneSessionAdapter(DuckDbAdapter):\n"
         '    adapter_name = "duckdb_one_session"\n'
@@ -103,7 +103,7 @@ _NO_COPIES: dict[str, str] = {
     "sqlbuild_project.toml": _PROJECT_FILES["sqlbuild_project.toml"].replace(
         'adapter = "duckdb"', 'adapter = "duckdb_no_copies"'
     ),
-    "adapters/duckdb_no_copies.py": (
+    "python/adapters/duckdb_no_copies.py": (
         "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
         "class DuckDbNoCopiesAdapter(DuckDbAdapter):\n"
         '    adapter_name = "duckdb_no_copies"\n\n'

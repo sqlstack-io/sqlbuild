@@ -113,7 +113,7 @@ class RejectedPublicationOutput(StringIO):
 
 # A provider whose settings only the project's .env sets; the worker must see them.
 REGION_PROVIDER_FILES: dict[str, str] = {
-    "providers/region.py": (
+    "python/providers/region.py": (
         "from pydantic import Field, SecretStr\n"
         "from sqlbuild.providers import Provider\n\n\n"
         "class Region(Provider):\n"
@@ -121,7 +121,7 @@ REGION_PROVIDER_FILES: dict[str, str] = {
         "    token: SecretStr = Field(validation_alias='WORKER_ENV_TOKEN')\n"
         "    code: int = Field(validation_alias='WORKER_ENV_REGION_CODE')\n"
     ),
-    "sources/regions.yml": (
+    "sql/sources/regions.yml": (
         "sources:\n"
         "  - name: raw_regions\n"
         "    description: The region code the provider reads.\n"
@@ -131,8 +131,8 @@ REGION_PROVIDER_FILES: dict[str, str] = {
         "      - name: code\n"
         "        type: BIGINT\n"
     ),
-    "python/loaders/regions.py": (
-        "from providers.region import Region\n"
+    "python/nodes/loaders/regions.py": (
+        "from python.nodes.providers.region import Region\n"
         "from sqlbuild.loaders import loader\n\n\n"
         "@loader\n"
         "def raw_regions(ctx, region: Region):\n"
@@ -1023,10 +1023,10 @@ def scheduled_worker(
                 "[pools]\n"
                 + "".join(f"{name} = {limit}\n" for name, limit in test_case.pools.items())
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\n" + test_case.model_sql + "\n"
             ),
-            "python/environment_guard.py": (
+            "python/nodes/environment_guard.py": (
                 "import os\n"
                 "if 'SQLBUILD_RUN_TOKEN' in os.environ:\n"
                 "    assert 'SQLBUILD_PLATFORM_WEBHOOK_URL' not in os.environ\n"
@@ -1530,7 +1530,7 @@ def scheduler_crash_history(directory: Path, fixture: dict[str, Any]) -> dict[st
                 '[connections.local]\ndatabase = "warehouse.duckdb"\n'
                 '[targets.development]\nschema = "main"\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\nSELECT 1 AS order_id\n"
             ),
         }
@@ -1864,13 +1864,13 @@ def hold_write_lock(database: Path) -> duckdb.DuckDBPyConnection:
 
 
 LOADED_ORDER_FILES: dict[str, str] = {
-    "sources/loaded.yml": Path(
+    "sql/sources/loaded.yml": Path(
         "benchmarks/duckshop/edge_cases/orchestration/loaded_sources.yml"
     ).read_text(),
-    "python/loaders/loaded.py": Path(
+    "python/nodes/loaders/loaded.py": Path(
         "benchmarks/duckshop/edge_cases/orchestration/loaded_sources.py"
     ).read_text(),
-    "models/orders.sql": Path(
+    "sql/models/orders.sql": Path(
         "benchmarks/duckshop/edge_cases/orchestration/loaded_orders.sql"
     ).read_text(),
     **duckshop_orchestration("loaded_orders"),
@@ -1878,13 +1878,13 @@ LOADED_ORDER_FILES: dict[str, str] = {
 
 
 INTERMEDIATE_LOADER_FILES: dict[str, str] = {
-    "sources/shipments.yml": Path(
+    "sql/sources/shipments.yml": Path(
         "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_sources.yml"
     ).read_text(),
-    "python/loaders/shipments.py": Path(
+    "python/nodes/loaders/shipments.py": Path(
         "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_sources.py"
     ).read_text(),
-    "models/orders.sql": Path(
+    "sql/models/orders.sql": Path(
         "benchmarks/duckshop/edge_cases/orchestration/intermediate_loader_orders.sql"
     ).read_text(),
     **duckshop_orchestration("loaded_orders"),
@@ -2316,8 +2316,8 @@ def endless_build_files(project_toml: str) -> dict[str, str]:
         "sqlbuild_project.toml": project_toml.replace(
             'adapter = "duckdb"', 'adapter = "duckdb_cancel_marking"'
         ),
-        "adapters/duckdb_cancel_marking.py": CANCEL_MARKING_ADAPTER,
-        "models/orders.sql": ENDLESS_ORDERS,
+        "python/adapters/duckdb_cancel_marking.py": CANCEL_MARKING_ADAPTER,
+        "sql/models/orders.sql": ENDLESS_ORDERS,
         **duckshop_orchestration("development_orders"),
     }
 
@@ -2477,16 +2477,16 @@ def launch_adhoc(worker: ScheduledWorker, command: list[str]) -> dict[str, Any]:
 # A loader after the items tagged `fulfilment`, which a `+raw_steps` reload runs as ingress.
 INGRESS_JOB_SETTINGS: str = "\n[settings]\nreload = true\n"
 INGRESS_LOADER_FILES: dict[str, str] = {
-    "python/ready.py": (
+    "python/nodes/ready.py": (
         "from sqlbuild.assets import asset\n"
         "from sqlbuild.refs import tag\n\n\n"
         '@asset(depends_on=tag("fulfilment"))\n'
         "def ready(ctx):\n"
         '    """Wait for every step."""\n'
     ),
-    "python/loads.py": (
+    "python/nodes/loads.py": (
         "from sqlbuild.loaders import loader\n"
-        "from python.ready import ready\n\n\n"
+        "from python.nodes.ready import ready\n\n\n"
         "@loader(depends_on=[ready], write_strategy='table', "
         "columns=[{'name': 'step', 'type': 'INTEGER'}])\n"
         "def fetch_steps(ctx):\n"
@@ -2497,7 +2497,7 @@ INGRESS_LOADER_FILES: dict[str, str] = {
         '    """Load the steps."""\n'
         '    return [{"step": 1}]\n'
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_steps\n    description: Steps.\n"
         "    managed: true\n    write_strategy: table\n"
     ),

@@ -45,13 +45,13 @@ def test_given_open_sources_when_validating_clauses_then_only_closed_shapes_prov
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "sources").mkdir()
-    (tmp_path / "sources/orders.yml").write_text(
+    (tmp_path / "sql" / "sources").mkdir()
+    (tmp_path / "sql/sources/orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    table: orders\n  - name: customers\n    description: Test source customers.\n    table: customers\n"
         "  - name: known\n    description: Test source known.\n    table: known\n    contract: enforced\n    columns:\n      - name: id\n        type: INTEGER\n"
     )
-    (tmp_path / "models").mkdir()
-    (tmp_path / "models/report.sql").write_text(
+    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql/models/report.sql").write_text(
         "MODEL (description 'Test model report.', materialized view);\n" + test_case.sql
     )
     result: int = main(["--project-dir", str(tmp_path), "compile", "--no-cache", "--json"])
@@ -99,7 +99,7 @@ def test_given_nested_function_calls_when_compiling_then_native_normalization_do
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = []\n'
     )
-    functions: Path = tmp_path / "functions/sql"
+    functions: Path = tmp_path / "sql/functions/sql"
     functions.mkdir(parents=True)
     (functions / "table_fn__orders.sql").write_text(
         "FUNCTION (description 'Test function table_fn__orders.', arguments (x INTEGER), returns table (id INTEGER)); SELECT x AS id"
@@ -107,8 +107,8 @@ def test_given_nested_function_calls_when_compiling_then_native_normalization_do
     (functions / "udf__quantity.sql").write_text(
         "FUNCTION (description 'Test function udf__quantity.', arguments (x INTEGER), returns INTEGER); x + 1"
     )
-    (tmp_path / "models").mkdir()
-    (tmp_path / "models/orders.sql").write_text(
+    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql/models/orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized view); " + test_case.sql
     )
     assert main(["--project-dir", str(tmp_path), "compile", "--no-cache", "--json"]) == 0
@@ -155,10 +155,10 @@ def test_given_inferred_output_when_binding_downstream_then_preserves_dialect_id
     (tmp_path / "sqlbuild_project.toml").write_text(
         f'name = "orders"\nadapter = "{test_case.dialect}"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "models").mkdir()
+    (tmp_path / "sql" / "models").mkdir()
     header: str = "MODEL (description 'Test model.', materialized view, database warehouse, schema analytics);\n"
-    (tmp_path / "models/orders.sql").write_text(header + f"SELECT 1 AS {test_case.projection}")
-    (tmp_path / "models/report.sql").write_text(
+    (tmp_path / "sql/models/orders.sql").write_text(header + f"SELECT 1 AS {test_case.projection}")
+    (tmp_path / "sql/models/report.sql").write_text(
         header + f'SELECT {test_case.reference} FROM __ref("orders")'
     )
     result: int = main(["--project-dir", str(tmp_path), "compile", "--no-cache", "--json"])
@@ -194,9 +194,9 @@ def test_given_metadata_predicates_when_compiling_then_allows_dialect_coercion_a
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "models").mkdir()
-    (tmp_path / "models/orders.sql").write_text(test_case.sql)
-    (tmp_path / "models/customers.sql").write_text(
+    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql/models/orders.sql").write_text(test_case.sql)
+    (tmp_path / "sql/models/customers.sql").write_text(
         "MODEL (description 'Test model customers.', materialized view); SELECT 1 AS CUSTOMER_ID"
     )
     result: int = main(["--project-dir", str(tmp_path), "compile", "--no-cache", "--json"])

@@ -47,11 +47,11 @@ def test_given_sqlite_temporal_cast_when_compiling_then_b104_warns(
                 'name = "shop"\nadapter = "sqlite"\n\n[connection]\npath = "shop.sqlite"\n\n'
                 "[scopes]\nenforce_placement = false\n"
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.');\n"
                 "SELECT 1 AS order_id, '2026-01-01 10:00:00' AS ordered_at\n"
             ),
-            "models/order_times.sql": (
+            "sql/models/order_times.sql": (
                 "MODEL (description 'Test model order_times.');\n"
                 f'SELECT o.order_id, {test_case.expression} AS ordered_at FROM __ref("orders") AS o\n'
             ),
@@ -67,7 +67,7 @@ def test_given_sqlite_temporal_cast_when_compiling_then_b104_warns(
     located: list[tuple[str, str, int, int]] = [
         (item["code"], item["path"], item["line"], item["column"]) for item in report["diagnostics"]
     ]
-    assert located.count(("B104", "models/order_times.sql", 2, 20)) == (
+    assert located.count(("B104", "sql/models/order_times.sql", 2, 20)) == (
         test_case.expected_warning_count
     ), test_case.description
     assert [item[0] for item in located].count("B104") == test_case.expected_warning_count

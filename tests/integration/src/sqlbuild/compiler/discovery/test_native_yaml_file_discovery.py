@@ -25,7 +25,7 @@ _BIG_HEX: str = "0x" + "f" * 40
             description="a big decimal integer loads exactly as a value and an explicit key",
             files=(
                 (
-                    "sources/a.yml",
+                    "sql/sources/a.yml",
                     (
                         f"sources:\n  - name: orders\n    meta:\n      big: {_BIG_DECIMAL}\n"
                         f"      ? {_BIG_DECIMAL}\n      : key\n"
@@ -46,15 +46,15 @@ _BIG_HEX: str = "0x" + "f" * 40
         ),
         NativeYamlLoadTestCase(
             description="a hexadecimal integer beyond 64 bits fails",
-            files=(("sources/a.yml", f"sources: []\nmeta: {{v: {_BIG_HEX}}}\n".encode()),),
+            files=(("sql/sources/a.yml", f"sources: []\nmeta: {{v: {_BIG_HEX}}}\n".encode()),),
             expected_native_tags=("error",),
             expected_values=(),
         ),
         NativeYamlLoadTestCase(
             description="an invalid file fails on its own and a later file still loads",
             files=(
-                ("sources/a.yml", b"sources: [\n"),
-                ("sources/b.yml", b"sources: []\nmeta: {v: on, w: 0o17}\n"),
+                ("sql/sources/a.yml", b"sources: [\n"),
+                ("sql/sources/b.yml", b"sources: []\nmeta: {v: on, w: 0o17}\n"),
             ),
             expected_native_tags=("error", "ok"),
             expected_values=({"sources": [], "meta": {"v": "on", "w": 15}},),

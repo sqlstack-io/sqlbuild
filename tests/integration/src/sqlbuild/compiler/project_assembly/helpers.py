@@ -72,7 +72,7 @@ def generated_assembly_files(*, rng: random.Random, model_count: int) -> dict[st
         *[f'__ref("orders_{index}")' for index in range(model_count - 1)],
     ]
     models: dict[str, str] = {
-        f"models/orders_{index}.sql": (
+        f"sql/models/orders_{index}.sql": (
             f'MODEL (\n  description "Generated orders model {index}",\n'
             f"{rng.choice(_HOOKS)}{rng.choice(_AUDITS)});\n\n"
             f"SELECT 1 AS n FROM {rng.choice(references[: 4 + index])}\n"
@@ -86,16 +86,16 @@ def generated_assembly_files(*, rng: random.Random, model_count: int) -> dict[st
             '[vars]\nenv_name = "prod"\nn = "3"\nflag = "true"\n\n'
             f"[defaults]\n{rng.choice(_DEFAULTS)}\n[targets.dev]\n{rng.choice(_TARGETS)}"
         ),
-        "seeds/lookups.yml": (
+        "sql/seeds/lookups.yml": (
             "seeds:\n"
             f"  - name: countries\n    description: Countries.\n{rng.choice(_SEED_NAMESPACES)}"
             "    columns:\n      - name: n\n        type: INTEGER\n"
             f"  - name: regions\n    description: Regions.\n{rng.choice(_SEED_NAMESPACES)}"
             "    columns:\n      - name: n\n        type: INTEGER\n"
         ),
-        "seeds/countries.csv": "n\n1\n",
-        "seeds/regions.csv": "n\n2\n",
-        "sources/raw.yml": (
+        "sql/seeds/countries.csv": "n\n1\n",
+        "sql/seeds/regions.csv": "n\n2\n",
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Raw orders.\n    managed: true\n"
             f"    write_strategy: table\n{rng.choice(_SOURCE_NAMESPACES)}"
@@ -104,11 +104,11 @@ def generated_assembly_files(*, rng: random.Random, model_count: int) -> dict[st
             f"{rng.choice(_SOURCE_NAMESPACES)}"
             "    columns:\n      - name: n\n        type: INTEGER\n"
         ),
-        "python/loaders/raw.py": (
+        "python/nodes/loaders/raw.py": (
             "from sqlbuild.loaders import loader\n\n\n"
             "@loader\ndef raw_orders(ctx):\n    '''Load raw orders.'''\n    return [{'n': 1}]\n"
         ),
-        "functions/sql/order_numbers.sql": (
+        "sql/functions/sql/order_numbers.sql": (
             'FUNCTION (\n  description "Order numbers.",\n  arguments (p_n INTEGER),\n'
             "  returns table (n INTEGER)\n);\n\n"
             'SELECT n FROM __ref("orders_0") WHERE n = p_n\n'
@@ -300,9 +300,9 @@ def _edge_seeds(*namespaces: str) -> str:
 
 def _edge_seed_files(*namespaces: str) -> dict[str, str]:
     return {
-        "seeds/lookups.yml": _edge_seeds(*namespaces),
-        "models/orders.sql": _EDGE_MODEL,
-        **{f"seeds/s{index}.csv": "n\n1\n" for index in range(len(namespaces))},
+        "sql/seeds/lookups.yml": _edge_seeds(*namespaces),
+        "sql/models/orders.sql": _EDGE_MODEL,
+        **{f"sql/seeds/s{index}.csv": "n\n1\n" for index in range(len(namespaces))},
     }
 
 
@@ -312,9 +312,9 @@ def _edge_target(text: str) -> str:
 
 def _edge_source_files(ns: str = "") -> dict[str, str]:
     return {
-        "sources/raw.yml": _EDGE_SOURCE.format(ns=ns),
-        "python/loaders/raw.py": _EDGE_LOADER,
-        "models/orders.sql": _EDGE_MODEL,
+        "sql/sources/raw.yml": _EDGE_SOURCE.format(ns=ns),
+        "python/nodes/loaders/raw.py": _EDGE_LOADER,
+        "sql/models/orders.sql": _EDGE_MODEL,
     }
 
 
@@ -439,7 +439,7 @@ EDGE_ASSEMBLY_PROJECTS: tuple[tuple[str, dict[str, str], dict[str, object] | Non
         {
             "sqlbuild_project.toml": _edge_target('schema = "dev"\n'),
             **_edge_seed_files('    schema: "${ENV:SQB_EDGE_UNSET}"\n'),
-            "models/orders.sql": 'MODEL (description "Orders");\n\nSELECT FROM WHERE (\n',
+            "sql/models/orders.sql": 'MODEL (description "Orders");\n\nSELECT FROM WHERE (\n',
         },
         None,
     ),
@@ -448,8 +448,8 @@ EDGE_ASSEMBLY_PROJECTS: tuple[tuple[str, dict[str, str], dict[str, object] | Non
         {
             "sqlbuild_project.toml": _edge_target('schema = "${ENV:SQB_EDGE_UNSET}"\n'),
             **_edge_source_files(),
-            "seeds/lookups.yml": _edge_seeds('    schema: "${var:nope}"\n'),
-            "seeds/s0.csv": "n\n1\n",
+            "sql/seeds/lookups.yml": _edge_seeds('    schema: "${var:nope}"\n'),
+            "sql/seeds/s0.csv": "n\n1\n",
         },
         None,
     ),

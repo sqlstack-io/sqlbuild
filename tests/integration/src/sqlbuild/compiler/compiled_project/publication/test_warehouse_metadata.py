@@ -448,7 +448,7 @@ def test_given_a_served_location_when_state_event_history_is_rebuilt_and_retaine
     test_case.append_history(adapter, connection, fixture)
     adapter.close(connection)
     (project / "orchestration/calendars/unexpected_calendar.py").unlink()
-    write_files(project_dir=project, files={"models/orders.sql": fixture["model"]})
+    write_files(project_dir=project, files={"sql/models/orders.sql": fixture["model"]})
     with snapshot_api(tmp_path / "control") as api:
         log: Path = tmp_path / "location.log"
         control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
@@ -995,7 +995,7 @@ def test_given_a_served_location_when_warehouse_history_changes_then_periodic_re
     (project / "orchestration/calendars/unexpected_calendar.py").unlink()
     write_files(
         project_dir=project,
-        files={"models/orders.sql": fixture["model"]},
+        files={"sql/models/orders.sql": fixture["model"]},
     )
     with snapshot_api(tmp_path / "control") as api:
         log: Path = tmp_path / "location.log"
@@ -1127,7 +1127,7 @@ def test_given_a_duckdb_location_when_its_sync_completes_then_it_opens_no_resume
     (project / "orchestration/calendars/unexpected_calendar.py").unlink()
     with (project / "sqlbuild_project.toml").open("a") as config:
         _ = config.write(fixture["dynamic"])
-    write_files(project_dir=project, files={"models/orders.sql": fixture["model"]})
+    write_files(project_dir=project, files={"sql/models/orders.sql": fixture["model"]})
     with snapshot_api(tmp_path / "control") as api:
         log: Path = tmp_path / "location.log"
         with location_process(
@@ -1201,7 +1201,7 @@ def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_pre
     (project / "orchestration/calendars/unexpected_calendar.py").unlink()
     write_files(
         project_dir=project,
-        files={"models/orders.sql": "MODEL (description 'Orders.'); SELECT 17 AS amount"},
+        files={"sql/models/orders.sql": "MODEL (description 'Orders.'); SELECT 17 AS amount"},
     )
     # Every build of the one node stays, so the overlap, not retention, decides what is mirrored.
     with snapshot_api(
@@ -1506,7 +1506,7 @@ def test_given_change_tokens_when_a_served_location_resyncs_then_only_changed_or
             "benchmarks/duckshop/edge_cases/orchestration/automatic_warehouse_history.json"
         ).read_text()
     )
-    write_files(project_dir=project, files={"models/orders.sql": fixture["model"]})
+    write_files(project_dir=project, files={"sql/models/orders.sql": fixture["model"]})
     hook: Path = tmp_path / "token-hook"
     hook.mkdir()
     tokens: Path = hook / "tokens.json"
@@ -1676,7 +1676,7 @@ def test_given_a_served_location_when_a_sync_has_many_pages_then_pages_run_back_
             "benchmarks/duckshop/edge_cases/orchestration/automatic_warehouse_history.json"
         ).read_text()
     )
-    write_files(project_dir=project, files={"models/orders.sql": fixture["model"]})
+    write_files(project_dir=project, files={"sql/models/orders.sql": fixture["model"]})
     shim: Path = tmp_path / "git-shim"
     shim.mkdir()
     calls: Path = shim / "calls.log"

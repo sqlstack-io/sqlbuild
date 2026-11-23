@@ -95,7 +95,7 @@ def test_given_artifact_path_blocked_when_publishing_staged_artifacts_then_compi
     )
     blocked: Path = block_artifact(project_dir=tmp_path)
     untouched: dict[str, bytes] = artifacts_except(
-        files=published[2], name="models/orders_north.sql"
+        files=published[2], name="sql/models/orders_north.sql"
     )
 
     with pytest.raises(IsADirectoryError) as raised:

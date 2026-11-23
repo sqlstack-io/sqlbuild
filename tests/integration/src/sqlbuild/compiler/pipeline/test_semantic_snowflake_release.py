@@ -86,9 +86,9 @@ def test_given_snowflake_semantics_when_compiling_then_preserves_native_verdicts
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "snowflake"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "models").mkdir()
-    (tmp_path / "sources").mkdir()
-    (tmp_path / "sources/orders.yml").write_text(
+    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql" / "sources").mkdir()
+    (tmp_path / "sql/sources/orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    table: orders\n    contract: enforced\n    columns:\n"
         "      - {name: order_id, type: INTEGER}\n"
         "      - {name: quantity, type: INTEGER}\n"
@@ -96,7 +96,7 @@ def test_given_snowflake_semantics_when_compiling_then_preserves_native_verdicts
         "      - {name: ordered_on, type: DATE}\n"
         "      - {name: ordered_at, type: TIMESTAMP}\n"
     )
-    (tmp_path / "models/report.sql").write_text(
+    (tmp_path / "sql/models/report.sql").write_text(
         "MODEL (description 'Test model report.', materialized view, database warehouse, schema analytics);\n"
         + test_case.sql
     )
@@ -132,8 +132,8 @@ def test_given_snowflake_query_when_inferring_rich_types_then_preserves_proven_o
     test_case: SnowflakeOutputInferenceCase, tmp_path: Path
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "snowflake"\n')
-    (tmp_path / "models").mkdir()
-    (tmp_path / "models/report.sql").write_text(
+    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql/models/report.sql").write_text(
         "MODEL (description 'Test model report.', materialized view, database warehouse, schema analytics);\n"
         + test_case.sql
     )

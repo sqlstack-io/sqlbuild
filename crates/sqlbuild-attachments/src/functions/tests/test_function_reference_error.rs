@@ -28,7 +28,7 @@ fn given_function_references_when_validating_then_first_unresolved_one_is_report
             description: "a seed read with __ref names the seed call",
             references: vec![("ref", "regions")],
             expected_error: Some(
-                "SQL function file functions/sql/lookup.sql references seed 'regions' with \
+                "SQL function file sql/functions/sql/lookup.sql references seed 'regions' with \
                  __ref(...). Use __seed(\"regions\") for seed references; __ref only resolves \
                  models.",
             ),
@@ -37,7 +37,7 @@ fn given_function_references_when_validating_then_first_unresolved_one_is_report
             description: "a table function called as a scalar UDF",
             references: vec![("ref", "orders"), ("udf", "open_orders")],
             expected_error: Some(
-                "SQL function file functions/sql/lookup.sql references table function \
+                "SQL function file sql/functions/sql/lookup.sql references table function \
                  'open_orders' with __udf(); use __table_fn()",
             ),
         },
@@ -45,7 +45,7 @@ fn given_function_references_when_validating_then_first_unresolved_one_is_report
             description: "a scalar function called as a table function",
             references: vec![("table_fn", "score")],
             expected_error: Some(
-                "SQL function file functions/sql/lookup.sql references scalar function 'score' \
+                "SQL function file sql/functions/sql/lookup.sql references scalar function 'score' \
                  with __table_fn(); use __udf() for scalar UDFs",
             ),
         },
@@ -53,7 +53,7 @@ fn given_function_references_when_validating_then_first_unresolved_one_is_report
 
     for test_case in test_cases {
         assert_eq!(
-            function_reference_error("functions/sql/lookup.sql", &test_case.references, &known)
+            function_reference_error("sql/functions/sql/lookup.sql", &test_case.references, &known)
                 .as_deref(),
             test_case.expected_error,
             "{}",

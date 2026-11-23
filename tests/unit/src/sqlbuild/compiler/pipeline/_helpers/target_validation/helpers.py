@@ -55,7 +55,7 @@ def build_project(
                 ),
                 deps=(),
                 name="stg_customers",
-                relative_path=Path("models/staging/stg_customers.sql"),
+                relative_path=Path("sql/models/staging/stg_customers.sql"),
                 query_sql="SELECT 1",
                 config=CompileModelConfig(values={}),
                 destination=target,

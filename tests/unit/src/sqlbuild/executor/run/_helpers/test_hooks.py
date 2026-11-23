@@ -236,7 +236,7 @@ def test_given_python_hook_when_executing_then_invokes_function_with_context_and
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/notifications.py"),
+                    relative_path=Path("sql/hooks/python/notifications.py"),
                     name="notify",
                     function=notify,
                 ),
@@ -311,7 +311,7 @@ def test_given_python_hook_returns_skip_when_executing_then_records_skipped_hook
         hook_functions=(
             DiscoveredHookFunction(
                 file_path=Path(__file__),
-                relative_path=Path("hooks/python/maybe_skip.py"),
+                relative_path=Path("sql/hooks/python/maybe_skip.py"),
                 name="maybe_skip",
                 function=maybe_skip,
             ),
@@ -381,13 +381,13 @@ def test_given_python_hook_returns_skip_when_executing_phase_then_later_hooks_do
         hook_functions=(
             DiscoveredHookFunction(
                 file_path=Path(__file__),
-                relative_path=Path("hooks/python/maybe_skip.py"),
+                relative_path=Path("sql/hooks/python/maybe_skip.py"),
                 name="maybe_skip",
                 function=maybe_skip,
             ),
             DiscoveredHookFunction(
                 file_path=Path(__file__),
-                relative_path=Path("hooks/python/should_not_run.py"),
+                relative_path=Path("sql/hooks/python/should_not_run.py"),
                 name="should_not_run",
                 function=should_not_run,
             ),
@@ -447,7 +447,7 @@ def test_given_python_pre_hook_returns_skip_when_executing_view_then_model_is_sk
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/maybe_skip.py"),
+                    relative_path=Path("sql/hooks/python/maybe_skip.py"),
                     name="maybe_skip",
                     function=maybe_skip,
                 ),
@@ -505,7 +505,7 @@ def test_given_python_hook_returns_payload_when_executing_then_it_fails_clearly(
                 hook_functions=(
                     DiscoveredHookFunction(
                         file_path=Path(__file__),
-                        relative_path=Path("hooks/python/invalid_return.py"),
+                        relative_path=Path("sql/hooks/python/invalid_return.py"),
                         name="invalid_return",
                         function=invalid_return,
                     ),
@@ -576,19 +576,19 @@ def test_given_python_hooks_when_executing_then_injects_supported_context_aliase
         hook_functions=(
             DiscoveredHookFunction(
                 file_path=Path(__file__),
-                relative_path=Path("hooks/python/aliases.py"),
+                relative_path=Path("sql/hooks/python/aliases.py"),
                 name="uses_ctx",
                 function=uses_ctx,
             ),
             DiscoveredHookFunction(
                 file_path=Path(__file__),
-                relative_path=Path("hooks/python/aliases.py"),
+                relative_path=Path("sql/hooks/python/aliases.py"),
                 name="uses_context",
                 function=uses_context,
             ),
             DiscoveredHookFunction(
                 file_path=Path(__file__),
-                relative_path=Path("hooks/python/aliases.py"),
+                relative_path=Path("sql/hooks/python/aliases.py"),
                 name="uses_hook_context",
                 function=uses_hook_context,
             ),
@@ -638,7 +638,7 @@ def test_given_python_hook_raises_when_executing_then_reports_hook_label(
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/explode.py"),
+                    relative_path=Path("sql/hooks/python/explode.py"),
                     name="explode",
                     function=explode,
                 ),

@@ -53,8 +53,8 @@ def test_given_relation_dropped_during_sampling_when_read_fails_then_catalog_can
     _ = adapter.execute(connection=connection, sql=fixture["create_sql"])
     adapter.close(connection)
     (project / "orchestration/calendars/unexpected_calendar.py").unlink()
-    (project / "models").mkdir()
-    (project / "models/orders.sql").write_text(fixture["model"])
+    (project / "sql" / "models").mkdir()
+    (project / "sql/models/orders.sql").write_text(fixture["model"])
     hook: Path = tmp_path / "sampling-hook"
     hook.mkdir()
     dropped: Path = hook / "dropped"

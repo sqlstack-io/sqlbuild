@@ -142,7 +142,7 @@ def test_given_an_interactive_adapter_when_developing_then_sign_in_happens_once_
             "sqlbuild_project.toml": DEVELOPMENT_PROJECT.replace(
                 'adapter = "duckdb"', 'adapter = "duckdb_sign_in"'
             ),
-            "adapters/duckdb_sign_in.py": SIGN_IN_ADAPTER.replace("READ_CODE", test_case.read_code),
+            "python/adapters/duckdb_sign_in.py": SIGN_IN_ADAPTER.replace("READ_CODE", test_case.read_code),
         },
     )
     environment: dict[str, str] = development_environment(
@@ -246,7 +246,7 @@ def test_given_a_busy_code_location_when_signalled_then_it_exits_promptly_withou
     test_case: DevelopmentSignalStopTestCase, tmp_path: Path
 ) -> None:
     project: Path = tmp_path / "project"
-    hooks: Path = tmp_path / "hooks"
+    hooks: Path = tmp_path / "sql" / "hooks"
     write_files(
         project_dir=project,
         files=PUBLISHABLE_FILES | {"sqlbuild_project.toml": DEVELOPMENT_PROJECT},
@@ -517,7 +517,7 @@ def test_given_an_env_file_when_developing_then_start_up_names_it_and_r_reloads_
             + PUBLISHABLE_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '[targets.development]\nschema = "main"\n',
-            "python/env_probe.py": ENV_PROBE,
+            "python/nodes/env_probe.py": ENV_PROBE,
         },
     )
     env_file: Path = project / ".env"
@@ -564,7 +564,7 @@ def test_given_an_env_file_when_developing_then_start_up_names_it_and_r_reloads_
             ".env",
             (
                 "1 provider has missing secrets",
-                "providers/region.py:7",
+                "python/providers/region.py:7",
                 "token \u2190 WORKER_ENV_TOKEN",
                 "code \u2190 WORKER_ENV_REGION_CODE",
                 "2 nodes need it (raw_regions, orders)",
@@ -598,7 +598,7 @@ def test_given_a_provider_missing_secrets_when_developing_then_a_warning_names_t
                 '[targets.development]\nschema = "main"\n'
                 f'env_file = "{test_case.env_file_name}"\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\n"
                 'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")\n'
             ),

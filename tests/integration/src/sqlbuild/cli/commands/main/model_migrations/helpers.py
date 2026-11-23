@@ -173,10 +173,10 @@ def write_project(
 
     project_dir.mkdir(parents=True, exist_ok=True)
     (project_dir / "sqlbuild_project.toml").write_text(project_toml, encoding="utf-8")
-    sources_dir: Path = project_dir / "sources"
+    sources_dir: Path = project_dir / "sql" / "sources"
     sources_dir.mkdir(exist_ok=True)
     (sources_dir / "raw.yml").write_text(RAW_SOURCES_YML, encoding="utf-8")
-    models_dir: Path = project_dir / "models"
+    models_dir: Path = project_dir / "sql" / "models"
     models_dir.mkdir(exist_ok=True)
     existing: Path
     for existing in models_dir.glob("*.sql"):

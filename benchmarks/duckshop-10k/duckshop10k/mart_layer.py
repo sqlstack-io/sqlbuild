@@ -231,7 +231,7 @@ def build_marts(
     for system, values in systems.items():
         for instance in values:
             models = result.per_instance.get(instance.code, {})
-            folder = f"models/marts/{AREA[system]}/{instance.code}"
+            folder = f"sql/models/marts/{AREA[system]}/{instance.code}"
             for spec in INSTANCE_MARTS.get(system, ()):
                 source = models.get(spec[2])
                 if source is not None:
@@ -248,7 +248,7 @@ def build_marts(
             models = result.regional.get(region.code)
             if not models:
                 continue
-            folder = f"models/marts/{team}/{region.code}"
+            folder = f"sql/models/marts/{team}/{region.code}"
             for spec in specs:
                 source = models.get(spec[2])
                 if source is not None:
@@ -267,7 +267,7 @@ def build_marts(
                 _apply(
                     project,
                     f"rpt_{team}__{spec[0]}",
-                    f"models/marts/{team}",
+                    f"sql/models/marts/{team}",
                     spec,
                     source,
                     f"{spec[2].split('__')[-1].replace('_', ' ').capitalize()} company-wide",
@@ -287,7 +287,7 @@ def _product_lines(project: Project, result: Intermediate) -> None:
         source = result.combined.get(f"{line}__daily_demand")
         if source is None:
             continue
-        folder = f"models/marts/merchandising/product_lines/{line}"
+        folder = f"sql/models/marts/merchandising/product_lines/{line}"
         subject = f"{line.title()} product-line demand"
         marts.top_n(project, f"rpt_{line}__top_skus", folder, source, "sku", 50, subject)
         marts.share_by(
@@ -296,7 +296,7 @@ def _product_lines(project: Project, result: Intermediate) -> None:
 
 
 def _published(project: Project, result: Intermediate) -> dict[str, Model]:
-    folder = "models/marts/core"
+    folder = "sql/models/marts/core"
     combined = result.combined
     plan = (
         ("fct_orders", "orders_usd", "order_id", "One row per storefront order with USD amounts"),
@@ -408,7 +408,7 @@ def _published(project: Project, result: Intermediate) -> dict[str, Model]:
 
 
 def _executive(project: Project) -> None:
-    folder = "models/marts/executive"
+    folder = "sql/models/marts/executive"
     daily_sources = [
         (region.code, project.models[f"int_storefronts_{region.code}__orders_enriched_daily"])
         for region in REGIONS
@@ -521,7 +521,7 @@ def _snapshot(
     project.add(
         Model(
             name=name,
-            folder="models/snapshots",
+            folder="sql/models/snapshots",
             layer="snapshots",
             description=description,
             config=config,

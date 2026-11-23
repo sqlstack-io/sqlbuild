@@ -20,7 +20,7 @@ _STEPS: str = '''\
 import time
 from pathlib import Path
 
-from providers.marker import MarkerProvider
+from python.nodes.providers.marker import MarkerProvider
 from sqlbuild.assets import AssetContext, asset
 from sqlbuild.discovery import Discovered, Item, discover
 
@@ -66,7 +66,7 @@ class MarkerProvider(Provider):
 '''
 
 _HUNG_STEPS: str = """\
-from providers.gateway import GatewayProvider
+from python.nodes.providers.gateway import GatewayProvider
 from sqlbuild.assets import AssetContext, asset
 from sqlbuild.discovery import Discovered, Item, discover
 
@@ -157,9 +157,9 @@ def test_given_steps_ignoring_cancel_when_signalled_then_the_command_exits_witho
             "sqlbuild_project.toml": f'name = "fulfilment"\nadapter = "{test_case.adapter}"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "python/steps.py": _STEPS.format(directory=str(tmp_path)),
-            "providers/marker.py": _PROVIDER.format(directory=str(tmp_path)),
-            "adapters/duckdb_unrecorded.py": _UNRECORDED_ADAPTER,
+            "python/nodes/steps.py": _STEPS.format(directory=str(tmp_path)),
+            "python/providers/marker.py": _PROVIDER.format(directory=str(tmp_path)),
+            "python/adapters/duckdb_unrecorded.py": _UNRECORDED_ADAPTER,
         },
     )
     log: Path = tmp_path / "build.log"
@@ -218,8 +218,8 @@ def test_given_a_step_in_a_provider_setup_that_never_returns_when_cancelled_then
             "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "python/steps.py": _HUNG_STEPS,
-            "providers/gateway.py": _HUNG_PROVIDER.format(directory=str(tmp_path)),
+            "python/nodes/steps.py": _HUNG_STEPS,
+            "python/providers/gateway.py": _HUNG_PROVIDER.format(directory=str(tmp_path)),
         },
     )
     log: Path = tmp_path / "build.log"
@@ -280,9 +280,9 @@ def test_given_a_cancel_inside_a_steps_submit_when_steps_ignore_it_then_both_are
             "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "python/steps.py": _STEPS.format(directory=str(tmp_path)),
-            "python/slow_submit.py": _SLOW_SUBMIT,
-            "providers/marker.py": _PROVIDER.format(directory=str(tmp_path)),
+            "python/nodes/steps.py": _STEPS.format(directory=str(tmp_path)),
+            "python/nodes/slow_submit.py": _SLOW_SUBMIT,
+            "python/providers/marker.py": _PROVIDER.format(directory=str(tmp_path)),
         },
     )
     log: Path = tmp_path / "build.log"

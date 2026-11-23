@@ -72,7 +72,7 @@ RECORDER: str = (
 )
 
 FILES: dict[str, str] = {
-    "providers/recorder.py": RECORDER,
+    "python/providers/recorder.py": RECORDER,
     "orchestration/jobs/orders_export_job.toml": (
         'name = "orders_export_job"\ndescription = "Export orders."\nselect = "orders"\n'
     ),

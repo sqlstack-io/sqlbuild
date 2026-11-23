@@ -25,23 +25,23 @@ _EXPECTED_ROW_SQL: str = (
 )
 _PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": build_offline_snowflake_project_toml() + '\n[vars]\nregion = "EU"\n',
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
         "    schema: main\n    table: raw_orders\n    columns:\n"
         '      - {name: order_id, type: "NUMBER(38,0)"}\n'
     ),
-    "models/_constants/start_date.sql": 'CONSTANT (name start_date, value "2025-01-01");\n',
-    "models/_enums/channel.sql": 'ENUM (name channel, members (WEB "web", APP "app"));\n',
-    "models/_macros/sql/shout.sql": (
+    "sql/models/_constants/start_date.sql": 'CONSTANT (name start_date, value "2025-01-01");\n',
+    "sql/models/_enums/channel.sql": 'ENUM (name channel, members (WEB "web", APP "app"));\n',
+    "sql/models/_macros/sql/shout.sql": (
         'MACRO (description "Upper case.", arguments (v VARCHAR), returns VARCHAR);\n\nUPPER(@v)\n'
     ),
-    "models/_macros/python/tag.py": (
+    "sql/models/_macros/python/tag.py": (
         '"""Order tag macros."""\n\n\n'
         "def tag() -> str:\n"
         '    """Return the order tag literal."""\n'
         "    return \"'tag'\"\n"
     ),
-    "models/order_notes.sql": (
+    "sql/models/order_notes.sql": (
         'MODEL (description "Order notes holding backslash escapes.");\n'
         "SELECT\n"
         "  o.order_id,\n"
@@ -109,7 +109,7 @@ def test_given_snowflake_backslash_escapes_when_compiling_and_replaying_locally_
 
     assert compiled.returncode == 0, compiled.stdout + compiled.stderr
     compiled_sql: str = (
-        project_dir / "target" / "compiled" / "models" / "order_notes.sql"
+        project_dir / "target" / "compiled" / "sql" / "models" / "order_notes.sql"
     ).read_text()
     for fragment in test_case.expected_compiled_fragments:
         assert fragment in compiled_sql, compiled_sql

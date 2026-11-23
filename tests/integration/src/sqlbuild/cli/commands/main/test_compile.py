@@ -44,9 +44,9 @@ def test_given_typed_dependency_when_compiling_cte_then_preserves_binding_and_ou
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
-    sources: Path = tmp_path / "sources"
+    sources: Path = tmp_path / "sql" / "sources"
     sources.mkdir()
     (sources / "orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    contract: enforced\n"
@@ -80,7 +80,7 @@ def test_given_multiple_typed_model_headers_when_compiling_then_cli_preserves_he
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    models_dir: Path = tmp_path / "models"
+    models_dir: Path = tmp_path / "sql" / "models"
     models_dir.mkdir()
     (models_dir / "staged_orders.sql").write_text(
         "MODEL (description 'Test model staged_orders.',\n"
@@ -110,7 +110,7 @@ def test_given_multiple_typed_model_headers_when_compiling_then_cli_preserves_he
     assert exit_code == 0
     assert summary["models"] == test_case.expected_count
     assert summary["errors"] == 0
-    assert (tmp_path / "target" / "compiled" / "models" / "orders.sql").is_file()
+    assert (tmp_path / "target" / "compiled" / "sql" / "models" / "orders.sql").is_file()
 
 
 @pytest.mark.parametrize(
@@ -130,7 +130,7 @@ def test_given_model_macro_when_compiling_with_sql_rules_then_expands_once_and_p
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = ["SQLCLEAN001"]\n'
     )
-    macro_dir: Path = tmp_path / "models" / "orders" / "_sqlbuild" / "_macros" / "python"
+    macro_dir: Path = tmp_path / "sql" / "models" / "orders" / "_sqlbuild" / "_macros" / "python"
     macro_dir.mkdir(parents=True)
     (macro_dir / "missing_value.py").write_text(
         "from pathlib import Path\n"
@@ -140,7 +140,7 @@ def test_given_model_macro_when_compiling_with_sql_rules_then_expands_once_and_p
         "    counter.write_text(str(count + 1))\n"
         "    return 'NULL'\n"
     )
-    (tmp_path / "models" / "orders" / "orders.sql").write_text(
+    (tmp_path / "sql" / "models" / "orders" / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id WHERE 1 = @py.missing_value()\n"
     )
     exit_code: int = main(["--project-dir", str(tmp_path), "compile", "--json", "--no-cache"])
@@ -170,7 +170,7 @@ def test_given_unicode_model_when_compiling_twice_then_cli_preserves_unchanged_a
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "inventory"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model_path: Path = tmp_path / "models" / "products.sql"
+    model_path: Path = tmp_path / "sql" / "models" / "products.sql"
     model_path.parent.mkdir()
     model_path.write_text(
         "MODEL (description 'Test model products.', materialized table);\nSELECT 'café' AS product_name  \n\n",
@@ -181,7 +181,7 @@ def test_given_unicode_model_when_compiling_twice_then_cli_preserves_unchanged_a
         ["--project-dir", str(tmp_path), "--no-color", "compile", "--no-cache"]
     )
     _ = capsys.readouterr()
-    artifact_path: Path = tmp_path / "target" / "compiled" / "models" / "products.sql"
+    artifact_path: Path = tmp_path / "target" / "compiled" / "sql" / "models" / "products.sql"
     unchanged_mtime_ns: int = 1_000_000_000
     os.utime(artifact_path, ns=(unchanged_mtime_ns, unchanged_mtime_ns))
     second_exit_code: int = main(
@@ -232,7 +232,7 @@ def test_given_supported_snowflake_aggregation_when_compiling_then_project_succe
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "snowflake"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "order_summary.sql"
+    model: Path = tmp_path / "sql" / "models" / "order_summary.sql"
     model.parent.mkdir()
     model.write_text(
         f"MODEL (description 'Test model order_summary.', database warehouse, schema analytics);\n\n{test_case.query_sql}",
@@ -276,7 +276,7 @@ def test_given_nullable_output_when_compiling_contract_then_only_schema_nullabil
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = tmp_path / "models" / "orders.sql"
+    model: Path = tmp_path / "sql" / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(
         "MODEL (description 'Test model orders.',\n"
@@ -311,14 +311,14 @@ def test_given_relative_project_directory_when_compiling_then_private_macro_is_v
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    (project_dir / "models" / "orders" / "_sqlbuild" / "_macros" / "python").mkdir(parents=True)
+    (project_dir / "sql" / "models" / "orders" / "_sqlbuild" / "_macros" / "python").mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     (
-        project_dir / "models" / "orders" / "_sqlbuild" / "_macros" / "python" / "order_id.py"
+        project_dir / "sql" / "models" / "orders" / "_sqlbuild" / "_macros" / "python" / "nodes" / "order_id.py"
     ).write_text('def order_id() -> str:\n    return "CAST(1 AS INTEGER)"\n', encoding="utf-8")
-    (project_dir / "models" / "orders" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders" / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized table);\nSELECT @py.order_id() AS order_id\n",
         encoding="utf-8",
     )
@@ -347,7 +347,7 @@ def test_given_sql_test_chain_when_compiling_then_native_planner_writes_complete
         'name = "orders"\nadapter = "duckdb"\n\n[settings]\nsql_analysis = true\n',
         encoding="utf-8",
     )
-    models_dir: Path = tmp_path / "models"
+    models_dir: Path = tmp_path / "sql" / "models"
     models_dir.mkdir()
     (models_dir / "stg_orders.sql").write_text(
         'MODEL (description "Test model stg_orders.", materialized table);\nSELECT order_id, amount FROM __source("raw_orders")\n',
@@ -357,7 +357,7 @@ def test_given_sql_test_chain_when_compiling_then_native_planner_writes_complete
         'MODEL (description "Test model orders.", materialized table);\nSELECT order_id, amount FROM __ref("stg_orders")\n',
         encoding="utf-8",
     )
-    sources_dir: Path = tmp_path / "sources"
+    sources_dir: Path = tmp_path / "sql" / "sources"
     sources_dir.mkdir()
     (sources_dir / "raw_orders.yml").write_text(
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    schema: main\n    table: raw_orders\n",

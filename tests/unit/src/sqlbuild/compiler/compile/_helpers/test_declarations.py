@@ -69,17 +69,17 @@ def test_given_public_and_private_declarations_when_compiling_then_resolves_scop
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "models/_enums/market.sql": """
+            "sql/models/_enums/market.sql": """
 ENUM (name fulfillment_method, members [DELIVERY, PICKUP]);
 ENUM (name priority, members (LOW 1, HIGH 3));
 """,
-            "constants/market/thresholds.sql": """
+            "sql/constants/market/thresholds.sql": """
 CONSTANT (name min_items, value 7);
 """,
-            "models/_constants/thresholds.sql": """
+            "sql/models/_constants/thresholds.sql": """
 CONSTANT (name source_name, value "O'Brien");
 """,
-            "models/orders.sql": """
+            "sql/models/orders.sql": """
 MODEL (description "Test model orders.",
   contract enforced,
   pre_hooks [inline_sql('SELECT @const("min_items") + @const("_offset")')],
@@ -105,7 +105,7 @@ SELECT
   @const("min_items") + @const("_offset") AS threshold,
   @const("source_name") AS source_name
 """,
-            "functions/sql/add_threshold.sql": """
+            "sql/functions/sql/add_threshold.sql": """
 FUNCTION (description "Test function add_threshold.",
   arguments (value INTEGER),
   returns INTEGER,
@@ -113,7 +113,7 @@ FUNCTION (description "Test function add_threshold.",
 
 value + @const("min_items")
 """,
-            "sources/inline.yml": """
+            "sql/sources/inline.yml": """
 sources:
   - name: inline_values
     description: Test source inline_values.
@@ -142,7 +142,7 @@ __expected__orders AS (
 )
 SELECT 1
 """,
-            "audits/singular/orders.sql": """
+            "sql/audits/singular/orders.sql": """
 AUDIT ();
 
 SELECT * FROM __ref("orders") WHERE threshold < @const("min_items")
@@ -309,7 +309,7 @@ def test_given_typed_constants_when_compiling_then_all_sql_surfaces_use_adapter_
             "sqlbuild_project.toml": (
                 _PROJECT_FILE + '\n[constants]\ncollection_rendering = "array"\n'
             ),
-            "constants/typed.sql": """
+            "sql/constants/typed.sql": """
 CONSTANT (name enabled, value true);
 CONSTANT (name ratio, value 0.75);
 CONSTANT (name rate, type decimal, value "2.4700");
@@ -320,7 +320,7 @@ CONSTANT (name project_array, value ["project", "default"]);
 CONSTANT (name country_array, value ["GB", "FR"], render_as array);
 CONSTANT (name labels, value (GB "Great Britain", FR "France"));
 """,
-            "models/orders.sql": """
+            "sql/models/orders.sql": """
 MODEL (description "Test model orders.",
   pre_hooks [inline_sql("SELECT 'GB' IN @const('countries')")],
   post_hooks [sql("typed_hook")],
@@ -337,15 +337,15 @@ SELECT @const("enabled") AS enabled, @const("ratio") AS ratio,
   @const("labels") AS labels,
   @const("_local_values") AS local_values
 """,
-            "functions/sql/is_supported.sql": """
+            "sql/functions/sql/is_supported.sql": """
 FUNCTION (description "Test function is_supported.", arguments (value VARCHAR), returns BOOLEAN);
 value IN @const("countries")
 """,
-            "hooks/sql/typed_hook.sql": """
+            "sql/hooks/sql/typed_hook.sql": """
 HOOK (description "Typed constant hook");
 SELECT 'FR' IN @const("countries")
 """,
-            "sources/inline.yml": """
+            "sql/sources/inline.yml": """
 sources:
   - name: supported_entries
     description: Test source supported_entries.
@@ -364,12 +364,12 @@ WITH __ref__orders AS (SELECT @const("country_array") AS countries),
 __expected__orders AS (SELECT @const("country_array") AS countries)
 SELECT 1
 """,
-            "audits/singular/orders.sql": """
+            "sql/audits/singular/orders.sql": """
 AUDIT ();
 SELECT * FROM __ref("orders") JOIN __source("supported_entries") USING (country)
 WHERE country NOT IN @const("unique_countries")
 """,
-            "audits/generic/typed_audit.sql": """
+            "sql/audits/generic/typed_audit.sql": """
 AUDIT ();
 SELECT * FROM __ref("@model") WHERE country NOT IN @const("countries")
 """,
@@ -403,7 +403,7 @@ SELECT * FROM __ref("@model") WHERE country NOT IN @const("countries")
     [
         DeclarationFingerprintTestCase(
             description="constant value changes rendered query identity",
-            declaration_path="models/_constants/threshold.sql",
+            declaration_path="sql/models/_constants/threshold.sql",
             initial_declaration="CONSTANT (name threshold, value 7);\n",
             changed_declaration="CONSTANT (name threshold, value 8);\n",
             model_sql='MODEL (description "Test model threshold.");\nSELECT @const("threshold") AS threshold\n',
@@ -412,7 +412,7 @@ SELECT * FROM __ref("@model") WHERE country NOT IN @const("countries")
         ),
         DeclarationFingerprintTestCase(
             description="list order changes rendered query identity",
-            declaration_path="models/_constants/countries.sql",
+            declaration_path="sql/models/_constants/countries.sql",
             initial_declaration='CONSTANT (name countries, value ["GB", "FR"]);\n',
             changed_declaration='CONSTANT (name countries, value ["FR", "GB"]);\n',
             model_sql='MODEL (description "Test model countries.");\nSELECT @const("countries") AS countries\n',
@@ -421,7 +421,7 @@ SELECT * FROM __ref("@model") WHERE country NOT IN @const("countries")
         ),
         DeclarationFingerprintTestCase(
             description="list duplicate changes rendered query identity",
-            declaration_path="models/_constants/countries.sql",
+            declaration_path="sql/models/_constants/countries.sql",
             initial_declaration='CONSTANT (name countries, value ["GB", "FR"]);\n',
             changed_declaration='CONSTANT (name countries, value ["GB", "FR", "FR"]);\n',
             model_sql='MODEL (description "Test model countries.");\nSELECT @const("countries") AS countries\n',
@@ -430,7 +430,7 @@ SELECT * FROM __ref("@model") WHERE country NOT IN @const("countries")
         ),
         DeclarationFingerprintTestCase(
             description="set order does not change rendered query identity",
-            declaration_path="models/_constants/countries.sql",
+            declaration_path="sql/models/_constants/countries.sql",
             initial_declaration='CONSTANT (name countries, value {"GB", "FR"});\n',
             changed_declaration='CONSTANT (name countries, value {"FR", "GB"});\n',
             model_sql='MODEL (description "Test model countries.");\nSELECT @const("countries") AS countries\n',
@@ -439,7 +439,7 @@ SELECT * FROM __ref("@model") WHERE country NOT IN @const("countries")
         ),
         DeclarationFingerprintTestCase(
             description="object key order does not change rendered query identity",
-            declaration_path="models/_constants/labels.sql",
+            declaration_path="sql/models/_constants/labels.sql",
             initial_declaration=(
                 'CONSTANT (name labels, value (GB "Great Britain", FR "France"));\n'
             ),
@@ -452,7 +452,7 @@ SELECT * FROM __ref("@model") WHERE country NOT IN @const("countries")
         ),
         DeclarationFingerprintTestCase(
             description="set membership changes rendered query identity",
-            declaration_path="models/_constants/countries.sql",
+            declaration_path="sql/models/_constants/countries.sql",
             initial_declaration='CONSTANT (name countries, value {"GB", "FR"});\n',
             changed_declaration='CONSTANT (name countries, value {"GB", "HK"});\n',
             model_sql='MODEL (description "Test model countries.");\nSELECT @const("countries") AS countries\n',
@@ -461,7 +461,7 @@ SELECT * FROM __ref("@model") WHERE country NOT IN @const("countries")
         ),
         DeclarationFingerprintTestCase(
             description="object value changes rendered query identity",
-            declaration_path="models/_constants/labels.sql",
+            declaration_path="sql/models/_constants/labels.sql",
             initial_declaration='CONSTANT (name labels, value (GB "Great Britain"));\n',
             changed_declaration='CONSTANT (name labels, value (GB "Britain"));\n',
             model_sql='MODEL (description "Test model labels.");\nSELECT @const("labels") AS labels\n',
@@ -470,7 +470,7 @@ SELECT * FROM __ref("@model") WHERE country NOT IN @const("countries")
         ),
         DeclarationFingerprintTestCase(
             description="collection render mode changes rendered query identity",
-            declaration_path="models/_constants/countries.sql",
+            declaration_path="sql/models/_constants/countries.sql",
             initial_declaration='CONSTANT (name countries, value ["GB", "FR"]);\n',
             changed_declaration=(
                 'CONSTANT (name countries, value ["GB", "FR"], render_as array);\n'
@@ -481,21 +481,21 @@ SELECT * FROM __ref("@model") WHERE country NOT IN @const("countries")
         ),
         DeclarationFingerprintTestCase(
             description="declaration used by another model does not alter model identity",
-            declaration_path="models/_constants/countries.sql",
+            declaration_path="sql/models/_constants/countries.sql",
             initial_declaration='CONSTANT (name countries, value ["GB", "FR"]);\n',
             changed_declaration='CONSTANT (name countries, value ["GB", "HK"]);\n',
             model_sql="MODEL (description 'Test model countries.');\nSELECT 1 AS value\n",
             expected_query_hash_changed=False,
             expected_metadata_changed=False,
             additional_files={
-                "models/z_consumer.sql": (
+                "sql/models/z_consumer.sql": (
                     'MODEL (description "Test model z_consumer.");\nSELECT @const("countries") AS countries\n'
                 )
             },
         ),
         DeclarationFingerprintTestCase(
             description="enum members change enforced contract identity",
-            declaration_path="models/_enums/state.sql",
+            declaration_path="sql/models/_enums/state.sql",
             initial_declaration="ENUM (name state, members [OPEN]);\n",
             changed_declaration="ENUM (name state, members [OPEN, CLOSED]);\n",
             model_sql="""
@@ -521,7 +521,7 @@ def test_given_declaration_change_when_compiling_then_updates_dependent_identity
         {
             "sqlbuild_project.toml": _PROJECT_FILE,
             test_case.declaration_path: test_case.initial_declaration,
-            "models/orders.sql": test_case.model_sql,
+            "sql/models/orders.sql": test_case.model_sql,
         }
         | test_case.additional_files,
     )
@@ -549,8 +549,8 @@ def test_given_declaration_change_when_compiling_then_updates_dependent_identity
         CompileDeclarationsErrorTestCase(
             description="unknown enum member",
             repo_files={
-                "enums/state.sql": "ENUM (name state, members [OPEN, CLOSED]);",
-                "models/orders.sql": (
+                "sql/enums/state.sql": "ENUM (name state, members [OPEN, CLOSED]);",
+                "sql/models/orders.sql": (
                     'MODEL (description "Test model orders.");\nSELECT @enum("state").MISSING AS state\n'
                 ),
             },
@@ -559,8 +559,8 @@ def test_given_declaration_change_when_compiling_then_updates_dependent_identity
         CompileDeclarationsErrorTestCase(
             description="lowercase enum member access",
             repo_files={
-                "enums/state.sql": 'ENUM (name state, members (DELIVERY "active"));',
-                "models/orders.sql": (
+                "sql/enums/state.sql": 'ENUM (name state, members (DELIVERY "active"));',
+                "sql/models/orders.sql": (
                     'MODEL (description "Test model orders.");\nSELECT @enum("state").active AS state\n'
                 ),
             },
@@ -569,22 +569,22 @@ def test_given_declaration_change_when_compiling_then_updates_dependent_identity
         CompileDeclarationsErrorTestCase(
             description="unknown constant",
             repo_files={
-                "models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("missing") AS value\n',
+                "sql/models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("missing") AS value\n',
             },
             expected_error_fragment="Unknown constant 'missing'",
         ),
         CompileDeclarationsErrorTestCase(
             description="foreign private constant",
             repo_files={
-                "models/a.sql": "MODEL (description 'Test model a.', constants (_limit 7));\nSELECT 1 AS value\n",
-                "models/b.sql": 'MODEL (description "Test model b.");\nSELECT @const("_limit") AS value\n',
+                "sql/models/a.sql": "MODEL (description 'Test model a.', constants (_limit 7));\nSELECT 1 AS value\n",
+                "sql/models/b.sql": 'MODEL (description "Test model b.");\nSELECT @const("_limit") AS value\n',
             },
             expected_error_fragment="Constant '_limit' is known but inaccessible",
         ),
         CompileDeclarationsErrorTestCase(
             description="non-private model constant name",
             repo_files={
-                "models/orders.sql": "MODEL (description 'Test model orders.', constants (limit 7));\nSELECT 1 AS value\n",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.', constants (limit 7));\nSELECT 1 AS value\n",
             },
             expected_error_fragment=(
                 "Invalid model-local constant identity 'limit'.*use snake_case '_limit'"
@@ -593,29 +593,29 @@ def test_given_declaration_change_when_compiling_then_updates_dependent_identity
         CompileDeclarationsErrorTestCase(
             description="duplicate public enum name",
             repo_files={
-                "enums/one.sql": "ENUM (name state, members [OPEN]);",
-                "enums/nested/two.sql": "ENUM (name state, members [CLOSED]);",
-                "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value\n",
+                "sql/enums/one.sql": "ENUM (name state, members [OPEN]);",
+                "sql/enums/nested/two.sql": "ENUM (name state, members [CLOSED]);",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value\n",
             },
             expected_error_fragment="Duplicate declaration 'enum:state'",
         ),
         CompileDeclarationsErrorTestCase(
             description="nested collection cannot render as a portable value list",
             repo_files={
-                "constants/groups.sql": "CONSTANT (name groups, value [[1], [2]]);",
-                "models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("groups") AS groups\n',
+                "sql/constants/groups.sql": "CONSTANT (name groups, value [[1], [2]]);",
+                "sql/models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("groups") AS groups\n',
             },
             expected_error_fragment=(
-                "constants/groups.sql constant 'groups'.*adapter 'duckdb'.*value_list"
+                "sql/constants/groups.sql constant 'groups'.*adapter 'duckdb'.*value_list"
             ),
         ),
         CompileDeclarationsErrorTestCase(
             description="constant rendered over the SQL value size limit",
             repo_files={
-                "constants/big.sql": f'CONSTANT (name big, value "{"'" * 600_000}");',
-                "models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("big") AS big\n',
+                "sql/constants/big.sql": f'CONSTANT (name big, value "{"'" * 600_000}");',
+                "sql/models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("big") AS big\n',
             },
-            expected_error_fragment="constants/big.sql constant 'big'.*maximum is 1000000 bytes",
+            expected_error_fragment="sql/constants/big.sql constant 'big'.*maximum is 1000000 bytes",
         ),
     ],
     ids=lambda case: case.description,

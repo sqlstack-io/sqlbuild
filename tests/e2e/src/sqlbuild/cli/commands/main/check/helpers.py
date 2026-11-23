@@ -23,7 +23,7 @@ adapter = "duckdb"
 [connection]
 database = "python_check_project.duckdb"
 """,
-            "python/tasks/orders.py": """
+            "python/nodes/tasks/orders.py": """
 from sqlbuild.assets import asset
 
 
@@ -38,9 +38,9 @@ def export_customers(ctx):
     '''Test task export_customers.'''
     return ctx.result(payload={"rows": 2}, metadata={"rows": 2})
 """,
-            "python/assets/orders.py": """
+            "python/nodes/assets/orders.py": """
 from sqlbuild.assets import asset
-from python.tasks.orders import export_orders
+from python.nodes.tasks.orders import export_orders
 
 
 @asset(depends_on=export_orders)
@@ -48,10 +48,10 @@ def orders_asset(ctx):
     '''Test asset orders_asset.'''
     return ctx.result(payload={"asset_rows": 3}, metadata={"asset_rows": 3})
 """,
-            "python/checks/orders.py": """
+            "python/nodes/checks/orders.py": """
 from sqlbuild.checks import check
-from python.assets.orders import orders_asset
-from python.tasks.orders import export_customers, export_orders
+from python.nodes.assets.orders import orders_asset
+from python.nodes.tasks.orders import export_customers, export_orders
 
 
 @check(depends_on=export_orders)
@@ -115,7 +115,7 @@ adapter = "duckdb"
 [connection]
 database = "terminal_loader_check_project.duckdb"
 """,
-            "python/loaders/raw.py": """
+            "python/nodes/loaders/raw.py": """
 from sqlbuild.loaders import loader
 
 
@@ -124,7 +124,7 @@ def raw_orders(ctx):
     '''Test loader raw_orders.'''
     return [{"order_id": 1}]
 """,
-            "sources/raw.yml": """
+            "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -134,9 +134,9 @@ sources:
       - name: order_id
         type: INTEGER
 """,
-            "python/checks/raw.py": """
+            "python/nodes/checks/raw.py": """
 from sqlbuild.checks import check
-from python.loaders.raw import raw_orders
+from python.nodes.loaders.raw import raw_orders
 
 
 @check(depends_on=raw_orders)

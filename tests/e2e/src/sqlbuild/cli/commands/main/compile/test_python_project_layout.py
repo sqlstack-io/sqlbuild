@@ -30,7 +30,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             expected_stderr_fragments=(
                 "error[D016]",
                 "Unsupported project Python path(s): audit_helpers/measurements.py",
-                "Move pipeline Python nodes and the helper modules they import under python/",
+                "Move pipeline Python nodes and the helper modules they import under python/nodes/",
             ),
         ),
         PythonProjectLayoutCompileTestCase(
@@ -274,7 +274,7 @@ def test_given_python_under_unsupported_root_when_compiling_then_command_fails_w
             description="custom Rule harness test path",
             repo_files={
                 "sqlbuild_project.toml": 'name = "rule_harness_layout"\nadapter = "duckdb"\n',
-                "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n",
                 "tests/rules/test_order_policy.py": "def test_order_policy(): pass\n",
             },
             expected_exit_code=0,
@@ -318,7 +318,7 @@ def test_given_rule_harness_test_when_compiling_then_python_test_path_is_accepte
                     'connection = "developer"\n'
                     'schema = "main"\n'
                 ),
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_orders\n    description: Test source raw_orders.\n"
                     "    managed: true\n"
@@ -329,30 +329,30 @@ def test_given_rule_harness_test_when_compiling_then_python_test_path_is_accepte
                     "      - name: status\n"
                     "        type: VARCHAR\n"
                 ),
-                "models/fact_orders.sql": (
+                "sql/models/fact_orders.sql": (
                     "MODEL (description 'Test model fact_orders.', materialized table);\n\n"
                     'SELECT order_id, status FROM __source("raw_orders")\n'
                 ),
-                "python/_helpers.py": (
+                "python/nodes/_helpers.py": (
                     "def normalize_status(value):\n    return value.strip().lower()\n"
                 ),
-                "python/orders/__init__.py": "",
-                "python/orders/utils.py": (
-                    "from python._helpers import normalize_status\n\n\n"
+                "python/nodes/orders/__init__.py": "",
+                "python/nodes/orders/utils.py": (
+                    "from python.nodes._helpers import normalize_status\n\n\n"
                     "def order_rows():\n"
                     "    return [\n"
                     "        {'order_id': 1, 'status': normalize_status(' Shipped ')},\n"
                     "        {'order_id': 2, 'status': normalize_status('PENDING')},\n"
                     "    ]\n"
                 ),
-                "python/loaders/orders.py": (
-                    "from python.orders.utils import order_rows\n"
+                "python/nodes/loaders/orders.py": (
+                    "from python.nodes.orders.utils import order_rows\n"
                     "from sqlbuild.loaders import loader\n\n\n"
                     "@loader\n"
                     "def raw_orders(ctx):\n"
                     "    '''Test loader raw_orders.'''\n    return order_rows()\n"
                 ),
-                "python/orders/exports/assets.py": (
+                "python/nodes/orders/exports/assets.py": (
                     "from sqlbuild.assets import asset\n"
                     "from sqlbuild.refs import model\n\n\n"
                     "@asset(depends_on=model('fact_orders'))\n"
@@ -361,8 +361,8 @@ def test_given_rule_harness_test_when_compiling_then_python_test_path_is_accepte
                     "    rows = ctx.query(f'SELECT COUNT(*) FROM {relation}').fetchall()\n"
                     "    return ctx.result(payload={'order_count': int(rows[0][0])})\n"
                 ),
-                "python/orders/exports/checks.py": (
-                    "from python.orders.exports.assets import orders_export\n"
+                "python/nodes/orders/exports/checks.py": (
+                    "from python.nodes.orders.exports.assets import orders_export\n"
                     "from sqlbuild.checks import check\n\n\n"
                     "@check(depends_on=orders_export)\n"
                     "def orders_export_not_empty(ctx):\n"
@@ -424,7 +424,7 @@ def test_given_python_root_project_when_compiling_and_building_then_nodes_run_wi
                 "sqlbuild_project.toml": (
                     'name = "factory_layout"\nadapter = "duckdb"\n\n[connection]\ndatabase = ":memory:"\n'
                 ),
-                "python/factories/orders.py": (
+                "python/nodes/factories/orders.py": (
                     "from sqlbuild.factories import factory\n"
                     "from sqlbuild.assets import asset\n\n\n"
                     "@asset\n"
@@ -443,7 +443,7 @@ def test_given_python_root_project_when_compiling_and_building_then_nodes_run_wi
                 "sqlbuild_project.toml": (
                     'name = "factory_layout"\nadapter = "duckdb"\n\n[connection]\ndatabase = ":memory:"\n'
                 ),
-                "python/factories/orders.py": (
+                "python/nodes/factories/orders.py": (
                     "from sqlbuild.factories import factory\n"
                     "from sqlbuild.assets import asset\n\n\n"
                     "@factory\n"
@@ -492,7 +492,7 @@ def test_given_factory_returning_module_node_when_planning_then_node_registers_o
                 "sqlbuild_project.toml": (
                     'name = "factory_layout"\nadapter = "duckdb"\n\n[connection]\ndatabase = ":memory:"\n'
                 ),
-                "python/factories/orders.py": (
+                "python/nodes/factories/orders.py": (
                     "from sqlbuild.factories import factory\n"
                     "from sqlbuild.assets import asset\n\n\n"
                     "@asset\n"
@@ -538,19 +538,19 @@ def test_given_factory_returning_distinct_same_name_node_when_planning_then_conf
             description="project python helpers win over an unrelated python package on PYTHONPATH",
             unrelated_files={
                 "python/__init__.py": "UNRELATED = True\n",
-                "python/helpers.py": "raise RuntimeError('unrelated python package imported')\n",
+                "python/nodes/helpers.py": "raise RuntimeError('unrelated python package imported')\n",
             },
             repo_files={
                 "sqlbuild_project.toml": (
                     'name = "python_collision"\nadapter = "duckdb"\n\n[connection]\ndatabase = ":memory:"\n'
                 ),
-                "python/helpers/__init__.py": "",
-                "python/helpers/values.py": "STATUS = 'shipped'\n",
-                "python/helpers/clean.py": (
+                "python/nodes/helpers/__init__.py": "",
+                "python/nodes/helpers/values.py": "STATUS = 'shipped'\n",
+                "python/nodes/helpers/clean.py": (
                     "from .values import STATUS\n\n\ndef label():\n    return STATUS\n"
                 ),
-                "python/orders.py": (
-                    "import python.helpers.clean\n"
+                "python/nodes/orders.py": (
+                    "import python.nodes.helpers.clean\n"
                     "from sqlbuild.assets import asset\n\n\n"
                     "@asset\n"
                     "def orders(ctx):\n"

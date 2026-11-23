@@ -75,7 +75,7 @@ fn given_valid_macro_files_when_parsing_then_each_parameter_and_the_body_are_rea
     ];
 
     for test_case in test_cases {
-        let definition = parse_sql_macro("m", "macros/sql/m.sql", test_case.source)
+        let definition = parse_sql_macro("m", "sql/macros/sql/m.sql", test_case.source)
             .expect(test_case.description);
 
         let labels: Vec<String> = definition
@@ -350,7 +350,7 @@ fn given_invalid_macro_files_when_parsing_then_each_is_rejected() {
             description: "missing header",
             source: "SELECT 1",
             expected_code: "P015",
-            expected_message: "SQL macro file macros/sql/m.sql must start with a MACRO (...) header",
+            expected_message: "SQL macro file sql/macros/sql/m.sql must start with a MACRO (...) header",
         },
         DefinitionErrorTestCase {
             description: "unknown header key",
@@ -361,7 +361,7 @@ fn given_invalid_macro_files_when_parsing_then_each_is_rejected() {
     ];
 
     for test_case in test_cases {
-        let error = parse_sql_macro("m", "macros/sql/m.sql", test_case.source)
+        let error = parse_sql_macro("m", "sql/macros/sql/m.sql", test_case.source)
             .expect_err(test_case.description);
 
         assert_eq!(
@@ -414,7 +414,7 @@ fn given_macro_descriptions_when_parsing_then_the_folded_text_is_stored() {
     ];
 
     for test_case in test_cases {
-        let definition = parse_sql_macro("m", "macros/sql/m.sql", test_case.source)
+        let definition = parse_sql_macro("m", "sql/macros/sql/m.sql", test_case.source)
             .expect(test_case.description);
 
         assert_eq!(
@@ -474,7 +474,7 @@ fn given_misquoted_macro_descriptions_when_parsing_then_the_quote_is_located() {
     ];
 
     for test_case in test_cases {
-        let error = parse_sql_macro("m", "macros/sql/m.sql", test_case.source)
+        let error = parse_sql_macro("m", "sql/macros/sql/m.sql", test_case.source)
             .expect_err(test_case.description);
         let location = error
             .locations

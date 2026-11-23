@@ -93,7 +93,7 @@ _NO_SQL_ANALYSIS_CONFIG: str = FAILURE_BASE_CONFIG + "\n[settings]\nsql_analysis
         ReferenceScanErrorTestCase(
             description="macro_output_fault_before_an_authored_fault_is_unlocated",
             project_files={
-                "macros/python/emit.py": _EMIT_MACRO,
+                "sql/macros/python/emit.py": _EMIT_MACRO,
                 FAILURE_MART_PATH: _MART_HEADER
                 + "SELECT customer_id, @py.emit('__ref(1') AS total_amount\n"
                 'FROM __ref("stg_orders"\n',
@@ -107,7 +107,7 @@ _NO_SQL_ANALYSIS_CONFIG: str = FAILURE_BASE_CONFIG + "\n[settings]\nsql_analysis
         ReferenceScanErrorTestCase(
             description="authored_fault_after_a_macro_is_located_natively",
             project_files={
-                "macros/python/emit.py": _EMIT_MACRO,
+                "sql/macros/python/emit.py": _EMIT_MACRO,
                 FAILURE_MART_PATH: _MART_HEADER
                 + "SELECT customer_id, @py.emit('1') AS total_amount\n"
                 'FROM __ref("stg_orders"\n',
@@ -141,7 +141,7 @@ _NO_SQL_ANALYSIS_CONFIG: str = FAILURE_BASE_CONFIG + "\n[settings]\nsql_analysis
         ReferenceScanErrorTestCase(
             description="audit_file_header_names_the_file",
             project_files={
-                "audits/generic/positive_total.sql": (
+                "sql/audits/generic/positive_total.sql": (
                     "AUDIT (\n  -- totals over 12\" boxes, by customer's orders\n"
                     "  severity warn\n);\n\n"
                     'SELECT * FROM __ref("@model") WHERE note = \'open\n'
@@ -151,7 +151,7 @@ _NO_SQL_ANALYSIS_CONFIG: str = FAILURE_BASE_CONFIG + "\n[settings]\nsql_analysis
                 ),
             },
             expected_message=(
-                "audits/generic/positive_total.sql: SQL reference contains an unclosed quoted string"
+                "sql/audits/generic/positive_total.sql: SQL reference contains an unclosed quoted string"
             ),
             expected_macro_calls=0,
             expected_error_type="CompileInputError",
@@ -160,14 +160,14 @@ _NO_SQL_ANALYSIS_CONFIG: str = FAILURE_BASE_CONFIG + "\n[settings]\nsql_analysis
             description="function_file_header_names_the_file",
             project_files={
                 "sqlbuild_project.toml": _NO_SQL_ANALYSIS_CONFIG,
-                "functions/sql/orders_for.sql": (
+                "sql/functions/sql/orders_for.sql": (
                     f'FUNCTION (\n  description """{_QUOTED_DESCRIPTION}""",\n'
                     "  arguments (p_customer_id INTEGER),\n  returns INTEGER\n);\n\n"
                     'SELECT COUNT(*) FROM __ref("stg_orders" WHERE customer_id = p_customer_id\n'
                 ),
             },
             expected_message=(
-                "functions/sql/orders_for.sql: SQL reference contains an unclosed parenthesis"
+                "sql/functions/sql/orders_for.sql: SQL reference contains an unclosed parenthesis"
             ),
             expected_macro_calls=0,
             expected_error_type="CompileInputError",

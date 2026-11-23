@@ -30,9 +30,9 @@ pub(super) fn project_reading_environment() -> PathBuf {
     let root: PathBuf = std::env::temp_dir()
         .join(format!("sqlbuild-since-cache-{}", std::process::id()))
         .join("project");
-    let _ = std::fs::create_dir_all(root.join("models"));
+    let _ = std::fs::create_dir_all(root.join("sql/models"));
     let _ = std::fs::write(
-        root.join("models/orders.sql"),
+        root.join("sql/models/orders.sql"),
         "SELECT order_id FROM orders WHERE region = '@@ENV:ORDERS_REGION'\n",
     );
     root

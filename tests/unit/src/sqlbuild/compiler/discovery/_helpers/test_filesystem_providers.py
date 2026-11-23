@@ -26,7 +26,7 @@ from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
         DiscoverProviderClassesTestCase(
             description="discovers provider classes",
             repo_files={
-                "providers/notifications.py": """
+                "python/providers/notifications.py": """
 from typing import ClassVar
 
 from sqlbuild.providers import Provider
@@ -40,7 +40,7 @@ class AlertsProvider(Provider):
     provider_name: ClassVar[str] = "alerts"
 """.strip()
                 + "\n",
-                "providers/nested/clock.py": """
+                "python/providers/nested/clock.py": """
 from sqlbuild.providers import Provider
 
 
@@ -51,16 +51,16 @@ class Clock(Provider):
             },
             expected_provider_names=("clock", "alerts", "slack_provider"),
             expected_provider_paths=(
-                "providers/nested/clock.py",
-                "providers/notifications.py",
-                "providers/notifications.py",
+                "python/providers/nested/clock.py",
+                "python/providers/notifications.py",
+                "python/providers/notifications.py",
             ),
             expected_provider_class_names=("Clock", "AlertsProvider", "SlackProvider"),
         ),
         DiscoverProviderClassesTestCase(
             description="ignores private files init files imported classes and abstract classes",
             repo_files={
-                "providers/__init__.py": """
+                "python/providers/__init__.py": """
 from sqlbuild.providers import Provider
 
 
@@ -68,7 +68,7 @@ class PackageProvider(Provider):
     pass
 """.strip()
                 + "\n",
-                "providers/_private.py": """
+                "python/providers/_private.py": """
 from sqlbuild.providers import Provider
 
 
@@ -76,7 +76,7 @@ class PrivateProvider(Provider):
     pass
 """.strip()
                 + "\n",
-                "providers/nested/_private.py": """
+                "python/providers/nested/_private.py": """
 from sqlbuild.providers import Provider
 
 
@@ -84,7 +84,7 @@ class NestedPrivateProvider(Provider):
     pass
 """.strip()
                 + "\n",
-                "providers/shared.py": """
+                "python/providers/shared.py": """
 from abc import ABC, abstractmethod
 
 from sqlbuild.providers import Provider
@@ -100,8 +100,8 @@ class AbstractProvider(Provider, ABC):
         raise NotImplementedError
 """.strip()
                 + "\n",
-                "providers/public.py": """
-from providers.shared import AbstractProvider, ImportedProvider
+                "python/providers/public.py": """
+from python.nodes.providers.shared import AbstractProvider, ImportedProvider
 from sqlbuild.providers import Provider
 
 
@@ -111,13 +111,13 @@ class PublicProvider(Provider):
                 + "\n",
             },
             expected_provider_names=("public_provider", "imported_provider"),
-            expected_provider_paths=("providers/public.py", "providers/shared.py"),
+            expected_provider_paths=("python/providers/public.py", "python/providers/shared.py"),
             expected_provider_class_names=("PublicProvider", "ImportedProvider"),
         ),
         DiscoverProviderClassesTestCase(
             description="skips provider base class imported into provider module",
             repo_files={
-                "providers/base_only.py": """
+                "python/providers/base_only.py": """
 from sqlbuild.providers import Provider
 """.strip()
                 + "\n",
@@ -129,7 +129,7 @@ from sqlbuild.providers import Provider
         DiscoverProviderClassesTestCase(
             description="does not call setup during discovery",
             repo_files={
-                "providers/no_setup.py": """
+                "python/providers/no_setup.py": """
 from pathlib import Path
 
 from sqlbuild.providers import Provider
@@ -142,7 +142,7 @@ class NoSetupProvider(Provider):
                 + "\n",
             },
             expected_provider_names=("no_setup_provider",),
-            expected_provider_paths=("providers/no_setup.py",),
+            expected_provider_paths=("python/providers/no_setup.py",),
             expected_provider_class_names=("NoSetupProvider",),
             expected_marker_file_exists=False,
         ),
@@ -172,7 +172,7 @@ def test_given_provider_files_when_discovering_then_returns_provider_classes(
         provider.provider_class for provider in providers
     )
     assert (
-        tmp_path / "providers" / "setup.marker"
+        tmp_path / "python" / "nodes" / "python" / "providers" / "setup.marker"
     ).is_file() is test_case.expected_marker_file_exists
 
 
@@ -182,7 +182,7 @@ def test_given_provider_files_when_discovering_then_returns_provider_classes(
         DiscoverProviderCacheIsolationTestCase(
             description="isolates provider package cache between project directories",
             first_repo_files={
-                "providers/shared.py": """
+                "python/providers/shared.py": """
 from sqlbuild.providers import Provider
 
 
@@ -192,7 +192,7 @@ class FirstProvider(Provider):
                 + "\n",
             },
             second_repo_files={
-                "providers/shared.py": """
+                "python/providers/shared.py": """
 from sqlbuild.providers import Provider
 
 
@@ -200,8 +200,8 @@ class ImportedProvider(Provider):
     pass
 """.strip()
                 + "\n",
-                "providers/public.py": """
-from providers.shared import ImportedProvider
+                "python/providers/public.py": """
+from python.nodes.providers.shared import ImportedProvider
 from sqlbuild.providers import Provider
 
 
@@ -247,7 +247,7 @@ def test_given_previous_project_provider_package_when_discovering_then_uses_curr
         DiscoverProviderClassesErrorTestCase(
             description="duplicate provider names fail",
             repo_files={
-                "providers/first.py": """
+                "python/providers/first.py": """
 from typing import ClassVar
 
 from sqlbuild.providers import Provider
@@ -257,7 +257,7 @@ class FirstProvider(Provider):
     provider_name: ClassVar[str] = "alerts"
 """.strip()
                 + "\n",
-                "providers/second.py": """
+                "python/providers/second.py": """
 from typing import ClassVar
 
 from sqlbuild.providers import Provider
@@ -274,7 +274,7 @@ class SecondProvider(Provider):
         DiscoverProviderClassesErrorTestCase(
             description="duplicate provider names in same file fail",
             repo_files={
-                "providers/duplicates.py": """
+                "python/providers/duplicates.py": """
 from typing import ClassVar
 
 from sqlbuild.providers import Provider
@@ -289,24 +289,24 @@ class SecondProvider(Provider):
 """.strip()
                 + "\n",
             },
-            expected_error_fragment="Duplicate provider name 'alerts' found in providers/duplicates.py",
+            expected_error_fragment="Duplicate provider name 'alerts' found in python/providers/duplicates.py",
             expected_error_type=ProviderDiscoveryError,
         ),
         DiscoverProviderClassesErrorTestCase(
             description="provider import failure identifies file",
             repo_files={
-                "providers/broken.py": """
+                "python/providers/broken.py": """
 from missing_package import missing_provider
 """.strip()
                 + "\n",
             },
-            expected_error_fragment="Failed to import provider file providers/broken.py",
+            expected_error_fragment="Failed to import provider file python/providers/broken.py",
             expected_error_type=ProviderDiscoveryError,
         ),
         DiscoverProviderClassesErrorTestCase(
             description="provider settings failure identifies provider",
             repo_files={
-                "providers/slack.py": """
+                "python/providers/slack.py": """
 from pydantic import Field
 from sqlbuild.providers import Provider
 
@@ -317,14 +317,14 @@ class SlackProvider(Provider):
                 + "\n",
             },
             expected_error_fragment=(
-                "Provider 'slack_provider' in providers/slack.py has invalid settings"
+                "Provider 'slack_provider' in python/providers/slack.py has invalid settings"
             ),
             expected_error_type=ProviderDiscoveryError,
         ),
         DiscoverProviderClassesErrorTestCase(
             description="invalid provider name identifies provider",
             repo_files={
-                "providers/slack.py": """
+                "python/providers/slack.py": """
 from typing import ClassVar
 
 from sqlbuild.providers import Provider
@@ -358,7 +358,7 @@ def test_given_invalid_provider_files_when_discovering_then_raises(
         DiscoverProviderEnvSettingsTestCase(
             description="env-backed settings resolve during discovery",
             repo_files={
-                "providers/slack.py": """
+                "python/providers/slack.py": """
 from pydantic import Field
 
 from sqlbuild.providers import Provider
@@ -402,7 +402,7 @@ def test_given_env_backed_provider_settings_when_discovering_then_instance_has_e
         DiscoverProviderSecretErrorTestCase(
             description="invalid plain env setting error redacts raw input value",
             repo_files={
-                "providers/slack.py": """
+                "python/providers/slack.py": """
 from pydantic import Field
 
 from sqlbuild.providers import Provider
@@ -416,7 +416,7 @@ class SlackProvider(Provider):
             env_name="SLACK_TOKEN",
             env_value="super-secret-token-value",
             expected_error_fragment=(
-                "Provider 'slack_provider' in providers/slack.py has invalid settings"
+                "Provider 'slack_provider' in python/providers/slack.py has invalid settings"
             ),
             unexpected_error_fragment="super-secret-token-value",
         ),

@@ -131,7 +131,7 @@ def test_given_items_logging_at_every_level_when_a_worker_runs_them_then_each_ke
         warehouse_query="",
         expected_status="",
         expected_rows=[],
-        files={"python/steps.py": steps} | test_case.files,
+        files={"python/nodes/steps.py": steps} | test_case.files,
         default_job_files={
             "orchestration/jobs/annual_orders_job.toml": (
                 'name = "annual_orders_job"\n'

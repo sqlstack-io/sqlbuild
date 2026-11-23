@@ -53,8 +53,8 @@ def test_given_a_target_schema_when_auditing_alone_then_history_is_stored_where_
     _ = (tmp_path / "sqlbuild_project.toml").write_text(
         _PROJECT + test_case.target_toml, encoding="utf-8"
     )
-    (tmp_path / "models").mkdir()
-    _ = (tmp_path / "models" / "orders.sql").write_text(_ORDERS_MODEL, encoding="utf-8")
+    (tmp_path / "sql" / "models").mkdir()
+    _ = (tmp_path / "sql" / "models" / "orders.sql").write_text(_ORDERS_MODEL, encoding="utf-8")
     assert main(["--no-color", "--project-dir", str(tmp_path), "build"]) == 0
     _ = capsys.readouterr()
 

@@ -17,7 +17,7 @@ from sqlbuild._native import (
     EventExportSummary,
 )
 from sqlbuild.providers import Provider
-from sqlbuild.sinks import CommandOutputRecord, CommandOutputStream
+from sqlbuild.event_sinks import CommandOutputRecord, CommandOutputStream
 from tests.unit.src.sqlbuild.runtime.event_exporting.classes._test_types import (
     EventExporterTeardownTestCase,
     SharedSinkProviderTestCase,
@@ -98,8 +98,8 @@ def test_given_both_sink_types_when_delivering_then_they_share_one_provider_inst
         del record
         provider_ids.append(id(destination))
 
-    provider_path: Path = tmp_path / "providers/destination.py"
-    sink_path: Path = tmp_path / "sinks/destination.py"
+    provider_path: Path = tmp_path / "python/providers/destination.py"
+    sink_path: Path = tmp_path / "python/event_sinks/destination.py"
     usage: DiscoveredProviderUsage = DiscoveredProviderUsage(
         provider_name="destination",
         parameter_name="destination",
@@ -108,21 +108,21 @@ def test_given_both_sink_types_when_delivering_then_they_share_one_provider_inst
     )
     provider: DiscoveredProvider = DiscoveredProvider(
         file_path=provider_path,
-        relative_path=Path("providers/destination.py"),
+        relative_path=Path("python/providers/destination.py"),
         name="destination",
         provider_class=Destination,
         settings=Destination(),
     )
     lifecycle_sink: DiscoveredEventExporter = DiscoveredEventExporter(
         file_path=sink_path,
-        relative_path=Path("sinks/destination.py"),
+        relative_path=Path("python/event_sinks/destination.py"),
         name="publish_lifecycle",
         function=publish_lifecycle,
         provider_usages=(usage,),
     )
     output_sink: DiscoveredCommandOutputSink = DiscoveredCommandOutputSink(
         file_path=sink_path,
-        relative_path=Path("sinks/destination.py"),
+        relative_path=Path("python/event_sinks/destination.py"),
         name="publish_output",
         function=publish_output,
         streams=frozenset(CommandOutputStream),

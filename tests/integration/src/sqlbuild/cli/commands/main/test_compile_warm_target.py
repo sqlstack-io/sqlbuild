@@ -70,9 +70,9 @@ def test_given_warm_target_with_stale_entries_when_compiling_then_preserves_unch
     [
         WarmTargetEditTestCase(
             "one_model_edited",
-            edited_path="models/inventory.sql",
+            edited_path="sql/models/inventory.sql",
             edited_contents="MODEL (description 'Test model inventory.');\nSELECT 3 AS item_id\n",
-            expected_changed=("models/inventory.sql",),
+            expected_changed=("sql/models/inventory.sql",),
         )
     ],
     ids=lambda case: case.description,

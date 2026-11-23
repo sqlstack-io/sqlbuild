@@ -79,8 +79,8 @@ def test_given_project_and_library_logs_during_build_when_running_then_only_libr
     test_case: ThirdPartyLogTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = write_project(tmp_path / "orders_shop")
-    (project_dir / "models" / "orders.sql").write_text(ORDERS_MODEL, encoding="utf-8")
-    hook_path: Path = project_dir / "hooks" / "python" / "sync.py"
+    (project_dir / "sql" / "models" / "orders.sql").write_text(ORDERS_MODEL, encoding="utf-8")
+    hook_path: Path = project_dir / "sql" / "hooks" / "python" / "nodes" / "sync.py"
     hook_path.parent.mkdir(parents=True)
     hook_path.write_text(PROJECT_HOOK, encoding="utf-8")
     library_dir: Path = tmp_path / "installed"

@@ -24,7 +24,7 @@ import os
 import time
 from pathlib import Path
 
-from providers.marker import MarkerProvider
+from python.nodes.providers.marker import MarkerProvider
 from sqlbuild.assets import AssetContext, asset
 from sqlbuild.discovery import Discovered, Item, discover
 
@@ -109,10 +109,10 @@ def test_given_a_cancel_mid_chain_when_rerun_from_failure_then_only_unfinished_s
         expected_status="cancelled",
         expected_rows=[],
         files={
-            "python/steps.py": _CHAIN.format(
+            "python/nodes/steps.py": _CHAIN.format(
                 directory=str(tmp_path), max_parallel=test_case.max_parallel
             ),
-            "providers/marker.py": _PROVIDER.format(directory=str(tmp_path)),
+            "python/providers/marker.py": _PROVIDER.format(directory=str(tmp_path)),
         },
         default_job_files={
             "orchestration/jobs/annual_orders_job.toml": (

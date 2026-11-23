@@ -488,7 +488,7 @@ def test_given_chained_loader_project_when_building_source_model_then_runs_loade
             ),
         )
         | {
-            "models/fact_events.sql": (
+            "sql/models/fact_events.sql": (
                 "MODEL (description 'Test model fact_events.', materialized table);\n\n"
                 'SELECT event_id, status FROM __source("raw_events")\n'
             )
@@ -567,7 +567,7 @@ def test_given_chained_loader_project_when_running_source_model_then_runs_loader
             ),
         )
         | {
-            "models/fact_events.sql": (
+            "sql/models/fact_events.sql": (
                 "MODEL (description 'Test model fact_events.', materialized table);\n\n"
                 'SELECT event_id, status FROM __source("raw_events")\n'
             )
@@ -615,7 +615,7 @@ def test_given_source_loader_reads_unselected_task_payload_when_loading_then_run
     test_case: SourceOnlyComplexIngressE2ETestCase,
 ) -> None:
     assert test_case.expected_error_fragment is not None
-    dependency_file: str = f"python/{test_case.dependency_dir}/prepare.py"
+    dependency_file: str = f"python/nodes/{test_case.dependency_dir}/prepare.py"
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,
         project_name="source_loader_schema_behavior",
@@ -632,7 +632,7 @@ def test_given_source_loader_reads_unselected_task_payload_when_loading_then_run
                 ),
                 loader_py=(
                     "from sqlbuild.loaders import loader\n"
-                    f"from python.{test_case.dependency_dir}.prepare import prepare_events\n\n"
+                    f"from python.nodes.{test_case.dependency_dir}.prepare import prepare_events\n\n"
                     "@loader(depends_on=[prepare_events])\n"
                     "def raw_events(ctx):\n"
                     "    '''Test loader raw_events.'''\n    payload = ctx.result_of(node_function=prepare_events).payload\n"
@@ -1356,10 +1356,10 @@ def test_given_loader_dependency_failure_when_building_then_only_dependents_skip
             ),
         )
         | {
-            "models/bad_model.sql": (
+            "sql/models/bad_model.sql": (
                 'MODEL (description "Test model bad_model.", materialized table);\n\nSELECT event_id FROM __source("raw_bad")\n'
             ),
-            "models/ok_model.sql": (
+            "sql/models/ok_model.sql": (
                 'MODEL (description "Test model ok_model.", materialized table);\n\nSELECT event_id FROM __source("raw_ok")\n'
             ),
         },

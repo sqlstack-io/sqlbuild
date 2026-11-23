@@ -49,8 +49,8 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
             description="one step keeps downstream output names",
             command=("rename", "column:stg_orders.amount", "revenue"),
             expected_fragments={
-                "models/staging/stg_orders.sql": ("  amount AS revenue,",),
-                "models/marts/fact_orders.sql": ("  o.revenue AS amount,",),
+                "sql/models/staging/stg_orders.sql": ("  amount AS revenue,",),
+                "sql/models/marts/fact_orders.sql": ("  o.revenue AS amount,",),
                 "tests/unit/test_fact_orders.sql": ("25 AS revenue",),
             },
             expected_columns={
@@ -62,8 +62,8 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
             description="cascade renames pass-through outputs downstream",
             command=("rename", "column:stg_orders.amount", "revenue", "--cascade"),
             expected_fragments={
-                "models/marts/fact_orders.sql": ("  o.revenue,",),
-                "models/marts/customer_totals.sql": ("SUM(revenue) AS total_amount",),
+                "sql/models/marts/fact_orders.sql": ("  o.revenue,",),
+                "sql/models/marts/customer_totals.sql": ("SUM(revenue) AS total_amount",),
             },
             expected_columns={
                 "fact_orders": ("order_id", "customer_id", "revenue", "order_date"),
@@ -75,9 +75,9 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
             command=("rename", "column:stg_orders.customer_id", "buyer_id"),
             extra_files=CUSTOMER_DECLARATIONS,
             expected_fragments={
-                "seeds/customers.yml": ("field: buyer_id",),
-                "sources/customers.yml": ("field: buyer_id}",),
-                "models/marts/fact_orders.sql": ("  o.buyer_id AS customer_id,",),
+                "sql/seeds/customers.yml": ("field: buyer_id",),
+                "sql/sources/customers.yml": ("field: buyer_id}",),
+                "sql/models/marts/fact_orders.sql": ("  o.buyer_id AS customer_id,",),
             },
             expected_columns={
                 "stg_orders": ("order_id", "buyer_id", "amount", "order_date"),
@@ -88,7 +88,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
             command=("rename", "column:stg_orders.customer_id", "buyer_id"),
             extra_files=ORDER_SHAPE,
             expected_fragments={
-                "models/marts/_sqlbuild/_schemas/order_shape.sql": ("field buyer_id)",),
+                "sql/models/marts/_sqlbuild/_schemas/order_shape.sql": ("field buyer_id)",),
             },
             expected_columns={
                 "fact_orders": ("order_id", "customer_id", "amount", "order_date"),
@@ -99,8 +99,8 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
             command=("rename", "column:fact_orders.amount", "revenue", "--cascade"),
             extra_files=order_amount_union(first="stg_orders", second="fact_orders"),
             expected_fragments={
-                "models/marts/order_amounts.sql": ('SELECT revenue FROM __ref("fact_orders")',),
-                "models/marts/order_amount_reads.sql": ("SELECT amount FROM",),
+                "sql/models/marts/order_amounts.sql": ('SELECT revenue FROM __ref("fact_orders")',),
+                "sql/models/marts/order_amount_reads.sql": ("SELECT amount FROM",),
             },
             expected_columns={
                 "order_amounts": ("amount",),
@@ -112,11 +112,11 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
             command=("rename", "column:fact_orders.amount", "revenue", "--cascade"),
             extra_files=order_amount_union(first="fact_orders", second="stg_orders"),
             expected_fragments={
-                "models/marts/order_amounts.sql": (
+                "sql/models/marts/order_amounts.sql": (
                     'SELECT revenue FROM __ref("fact_orders")',
                     'SELECT amount FROM __ref("stg_orders")',
                 ),
-                "models/marts/order_amount_reads.sql": ("SELECT revenue FROM",),
+                "sql/models/marts/order_amount_reads.sql": ("SELECT revenue FROM",),
             },
             expected_columns={
                 "order_amounts": ("revenue",),
@@ -127,7 +127,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
             description="cascade follows SELECT star consumers",
             command=("rename", "column:fact_orders.amount", "revenue", "--cascade"),
             extra_files=ORDER_EXPORT,
-            expected_fragments={"models/marts/customer_totals.sql": ("SUM(revenue)",)},
+            expected_fragments={"sql/models/marts/customer_totals.sql": ("SUM(revenue)",)},
             expected_columns={
                 "fact_orders": ("order_id", "customer_id", "revenue", "order_date"),
                 "order_export": ("order_id", "customer_id", "revenue", "order_date"),
@@ -138,11 +138,11 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
             command=("rename", "column:flagged_orders.is_flagged", "is_marked", "--cascade"),
             extra_files=FLAGGED_CONTRACT,
             expected_fragments={
-                "models/marts/flagged_orders.sql": (
+                "sql/models/marts/flagged_orders.sql": (
                     "    is_marked (type BOOLEAN)\n",
                     "CAST(TRUE AS BOOLEAN) AS is_marked\n",
                 ),
-                "models/marts/flagged_order_summary.sql": ("  is_marked\nFROM orders",),
+                "sql/models/marts/flagged_order_summary.sql": ("  is_marked\nFROM orders",),
             },
             expected_columns={
                 "flagged_orders": ("order_id", "is_marked"),
@@ -154,11 +154,11 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
             command=("rename", "column:flagged_orders.is_flagged", "is_marked", "--cascade"),
             extra_files=FLAGGED_AUDITS,
             expected_fragments={
-                "models/marts/flagged_orders.sql": (
+                "sql/models/marts/flagged_orders.sql": (
                     "where_condition \"is_marked = TRUE AND 'is_flagged' <> ''\"",
                     'where_condition "NOT is_marked"',
                 ),
-                "models/marts/flagged_order_summary.sql": ('where_condition "is_marked IS NULL"',),
+                "sql/models/marts/flagged_order_summary.sql": ('where_condition "is_marked IS NULL"',),
             },
             expected_columns={
                 "flagged_orders": ("order_id", "is_marked"),
@@ -170,7 +170,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
             command=("rename", "column:flagged_orders.is_flagged", "is_marked"),
             extra_files=FLAGGED_SUBQUERY_AUDITS,
             expected_fragments={
-                "models/marts/flagged_orders.sql": (
+                "sql/models/marts/flagged_orders.sql": (
                     "'is_marked IN (SELECT is_flagged FROM __ref(\"vip_flags\"))'",
                     "'is_marked IN (SELECT is_marked FROM __ref(\"flagged_orders\"))'",
                 ),
@@ -185,7 +185,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
             command=("rename", "column:flagged_orders.is_flagged", "is_marked"),
             extra_files=FLAGGED_LAMBDA_AUDIT,
             expected_fragments={
-                "models/marts/flagged_orders.sql": (
+                "sql/models/marts/flagged_orders.sql": (
                     "'len(list_filter([is_marked], lambda is_flagged: is_flagged)) > 0'",
                 ),
             },
@@ -225,11 +225,11 @@ def test_given_column_rename_when_applied_then_project_tests_and_builds(
     [
         RefusedRefactorE2ETestCase(
             description="move needing to split a declaration file",
-            command=("mv", "model:stg_order_cents", "models/marts/"),
+            command=("mv", "model:stg_order_cents", "sql/models/marts/"),
             extra_files=SPLIT_CENTS_MACROS,
             expected_status="refused",
             expected_reason="would take macro:to_dollars along, which must stay in",
-            expected_paths=("models/staging/_sqlbuild/_macros/python/cents.py",),
+            expected_paths=("sql/models/staging/_sqlbuild/_macros/python/cents.py",),
         ),
         RefusedRefactorE2ETestCase(
             description="column named in Python SQL text needs a manual check",
@@ -237,7 +237,7 @@ def test_given_column_rename_when_applied_then_project_tests_and_builds(
             extra_files=ORDER_AMOUNT_CHECK,
             expected_status="refused",
             expected_reason="Python SQL may read column amount of stg_orders",
-            expected_paths=("python/checks/order_amounts.py",),
+            expected_paths=("python/nodes/checks/order_amounts.py",),
         ),
         RefusedRefactorE2ETestCase(
             description="rename onto an existing model",
@@ -245,7 +245,7 @@ def test_given_column_rename_when_applied_then_project_tests_and_builds(
             extra_files={},
             expected_status="refused",
             expected_reason="model:fact_orders already exists",
-            expected_paths=("models/marts/fact_orders.sql",),
+            expected_paths=("sql/models/marts/fact_orders.sql",),
         ),
         RefusedRefactorE2ETestCase(
             description="column used inside macro-generated SQL",
@@ -253,7 +253,7 @@ def test_given_column_rename_when_applied_then_project_tests_and_builds(
             extra_files=CENTS_MACRO,
             expected_status="refused",
             expected_reason="referenced in SQL a macro generates",
-            expected_paths=("models/staging/stg_order_cents.sql",),
+            expected_paths=("sql/models/staging/stg_order_cents.sql",),
         ),
         RefusedRefactorE2ETestCase(
             description="SELECT star consumer without cascade",
@@ -261,7 +261,7 @@ def test_given_column_rename_when_applied_then_project_tests_and_builds(
             extra_files=ORDER_EXPORT,
             expected_status="refused",
             expected_reason="rerun with --cascade",
-            expected_paths=("models/marts/order_export.sql",),
+            expected_paths=("sql/models/marts/order_export.sql",),
         ),
         RefusedRefactorE2ETestCase(
             description="model reference produced by a macro",
@@ -269,7 +269,7 @@ def test_given_column_rename_when_applied_then_project_tests_and_builds(
             extra_files=ORDERS_MACRO,
             expected_status="refused",
             expected_reason="reference to stg_orders produced by a macro",
-            expected_paths=("models/staging/stg_order_count.sql",),
+            expected_paths=("sql/models/staging/stg_order_count.sql",),
         ),
         RefusedRefactorE2ETestCase(
             description="audit argument the audit quotes as a string needs a manual check",
@@ -277,7 +277,7 @@ def test_given_column_rename_when_applied_then_project_tests_and_builds(
             extra_files=FLAGGED_LITERAL_AUDIT,
             expected_status="refused",
             expected_reason="audit prefix_check quotes argument prefix as a string",
-            expected_paths=("models/marts/flagged_orders.sql",),
+            expected_paths=("sql/models/marts/flagged_orders.sql",),
         ),
         RefusedRefactorE2ETestCase(
             description="audit argument joining on the column with USING needs a manual edit",
@@ -285,7 +285,7 @@ def test_given_column_rename_when_applied_then_project_tests_and_builds(
             extra_files=FLAGGED_USING_AUDIT,
             expected_status="refused",
             expected_reason="USING or NATURAL join on is_flagged in this audit argument",
-            expected_paths=("models/marts/flagged_orders.sql",),
+            expected_paths=("sql/models/marts/flagged_orders.sql",),
         ),
     ],
     ids=lambda case: case.description,
@@ -340,7 +340,7 @@ def test_given_built_incremental_when_renaming_column_then_build_keeps_history(
     result: subprocess.CompletedProcess[str] = sqb(
         project_dir, "rename", "column:order_history.amount", "revenue"
     )
-    header: str = (project_dir / "models/marts/order_history.sql").read_text(encoding="utf-8")
+    header: str = (project_dir / "sql/models/marts/order_history.sql").read_text(encoding="utf-8")
     load_raw_orders(project_dir=project_dir, order_ids=(3, 4))
     second: subprocess.CompletedProcess[str] = sqb(project_dir, "build")
 
@@ -384,7 +384,7 @@ def test_given_renamed_table_when_renaming_its_column_then_build_keeps_both(
     column: subprocess.CompletedProcess[str] = sqb(
         project_dir, "rename", "column:order_ledger.amount", "revenue"
     )
-    header: str = (project_dir / "models/marts/order_ledger.sql").read_text(encoding="utf-8")
+    header: str = (project_dir / "sql/models/marts/order_ledger.sql").read_text(encoding="utf-8")
     second: subprocess.CompletedProcess[str] = sqb(project_dir, "build")
 
     assert first.returncode == 0, first.stdout + first.stderr

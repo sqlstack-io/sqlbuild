@@ -276,14 +276,14 @@ def prepare_sqlserver_waffle_shop(*, tmp_path: Path, config: dict[str, object]) 
     schema_name: str = build_unique_schema_name(prefix="sqb_waffle")
     project_dir: Path = prepare_waffle_shop(tmp_path)
 
-    (project_dir / "functions" / "sql" / "customer_orders.sql").unlink(missing_ok=True)
-    (project_dir / "functions" / "python" / "is_completed_order_py.py").unlink(missing_ok=True)
+    (project_dir / "sql" / "functions" / "sql" / "customer_orders.sql").unlink(missing_ok=True)
+    (project_dir / "sql" / "functions" / "python" / "nodes" / "is_completed_order_py.py").unlink(missing_ok=True)
     (project_dir / "tests" / "unit" / "test_customer_orders_table_fn.sql").unlink(missing_ok=True)
     (project_dir / "tests" / "unit" / "test_fact_orders.sql").unlink(missing_ok=True)
-    (project_dir / "models" / "marts" / "daily_order_partitioned.sql").unlink(missing_ok=True)
+    (project_dir / "sql" / "models" / "marts" / "daily_order_partitioned.sql").unlink(missing_ok=True)
     (project_dir / "tests" / "unit" / "test_is_completed_order_udf.sql").unlink(missing_ok=True)
 
-    macro_path: Path = project_dir / "models" / "marts" / "_macros" / "python" / "time.py"
+    macro_path: Path = project_dir / "sql" / "models" / "marts" / "_macros" / "python" / "nodes" / "time.py"
     _rewrite(
         macro_path,
         (
@@ -300,7 +300,7 @@ def prepare_sqlserver_waffle_shop(*, tmp_path: Path, config: dict[str, object]) 
             "    return f\"DATE_TRUNC('{grain}', {expression})\"",
         ),
     )
-    is_completed_order_path: Path = project_dir / "functions" / "sql" / "is_completed_order.sql"
+    is_completed_order_path: Path = project_dir / "sql" / "functions" / "sql" / "is_completed_order.sql"
     _rewrite(is_completed_order_path, ("STRING", "NVARCHAR"))
     _rewrite(is_completed_order_path, ("BOOLEAN", "BIT"))
     _rewrite(
@@ -310,7 +310,7 @@ def prepare_sqlserver_waffle_shop(*, tmp_path: Path, config: dict[str, object]) 
             "CAST(CASE WHEN order_status = 'completed' THEN 1 ELSE 0 END AS BIT)",
         ),
     )
-    fact_orders_path: Path = project_dir / "models" / "marts" / "fact_orders.sql"
+    fact_orders_path: Path = project_dir / "sql" / "models" / "marts" / "fact_orders.sql"
     _rewrite(
         fact_orders_path,
         (
@@ -331,9 +331,9 @@ def prepare_sqlserver_waffle_shop(*, tmp_path: Path, config: dict[str, object]) 
         ),
         encoding="utf-8",
     )
-    lookups_path: Path = project_dir / "seeds" / "lookups.yml"
+    lookups_path: Path = project_dir / "sql" / "seeds" / "lookups.yml"
     _rewrite(lookups_path, ("type: VARCHAR", "type: NVARCHAR(100)"))
-    raw_sources_path: Path = project_dir / "sources" / "raw.yml"
+    raw_sources_path: Path = project_dir / "sql" / "sources" / "raw.yml"
     adapt_sqlserver_text_file(raw_sources_path)
     _rewrite(
         raw_sources_path,
@@ -366,12 +366,12 @@ def prepare_sqlserver_source_loader_strategies(
             config=config,
         ),
     )
-    source_path: Path = project_dir / "sources" / "raw.yml"
+    source_path: Path = project_dir / "sql" / "sources" / "raw.yml"
     source_path.write_text(
         source_path.read_text(encoding="utf-8").replace("type: TIMESTAMP", "type: DATETIME2"),
         encoding="utf-8",
     )
-    loader_path: Path = project_dir / "python" / "loaders" / "strategy_sources.py"
+    loader_path: Path = project_dir / "python" / "nodes" / "loaders" / "strategy_sources.py"
     old_sql: str = (
         'f"CREATE TABLE {ctx.destination} AS "\n'
         "        \"SELECT 1 AS status_id, 'loaded' AS status_name, "

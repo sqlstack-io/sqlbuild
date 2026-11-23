@@ -15,11 +15,11 @@ from tests.integration.src.sqlbuild.compiler.pipeline.helpers import postgres_se
             description="quoted upstream column keeps its quoting through a star listed first",
             files={
                 "sqlbuild_project.toml": 'name = "orders"\nadapter = "postgres"\n',
-                "models/a_orders_wide.sql": (
+                "sql/models/a_orders_wide.sql": (
                     "MODEL (description 'Every order column.', schema analytics);\n"
                     'SELECT * FROM __ref("z_orders")\n'
                 ),
-                "models/z_orders.sql": (
+                "sql/models/z_orders.sql": (
                     "MODEL (description 'Orders.', schema analytics);\n"
                     "SELECT 1 AS \"OrderId\", 'placed' AS status\n"
                 ),

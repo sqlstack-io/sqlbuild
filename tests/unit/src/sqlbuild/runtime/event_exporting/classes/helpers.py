@@ -47,8 +47,8 @@ def blocking_exporter(*, event: LifecycleEvent, blocking_provider: BlockingProvi
 def blocking_discovery() -> tuple[
     tuple[DiscoveredProvider, ...], tuple[DiscoveredEventExporter, ...]
 ]:
-    provider_path: Path = Path("providers/blocking.py")
-    exporter_path: Path = Path("sinks/blocking.py")
+    provider_path: Path = Path("python/providers/blocking.py")
+    exporter_path: Path = Path("python/event_sinks/blocking.py")
     provider: DiscoveredProvider = DiscoveredProvider(
         file_path=provider_path,
         relative_path=provider_path,

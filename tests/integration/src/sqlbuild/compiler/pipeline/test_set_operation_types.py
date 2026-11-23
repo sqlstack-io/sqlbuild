@@ -53,7 +53,7 @@ def test_given_mixed_branch_types_when_compiling_then_known_types_match_duckdb(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_PROJECT_CONFIG, encoding="utf-8")
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "orders.sql").write_text(
         f"MODEL (description 'Test model orders.', materialized table);\n{test_case.query_sql}",
@@ -92,7 +92,7 @@ def test_given_union_type_recovery_when_compiling_then_cte_lineage_is_preserved(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_PROJECT_CONFIG, encoding="utf-8")
-    models: Path = tmp_path / "models"
+    models: Path = tmp_path / "sql" / "models"
     models.mkdir()
     (models / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized table, contract enforced, columns (amount (type DOUBLE)));\n"

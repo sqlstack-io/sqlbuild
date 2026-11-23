@@ -89,13 +89,13 @@ SQL_MODEL_HEADER_KEYS: frozenset[str] = frozenset(
 
 
 def write_lifecycle_event_sink_project(*, project_dir: Path, exporter_config: str) -> None:
-    (project_dir / "sinks").mkdir()
+    (project_dir / "python" / "event_sinks").mkdir()
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "filters"\nadapter = "duckdb"\n' + exporter_config,
         encoding="utf-8",
     )
-    (project_dir / "sinks" / "publish.py").write_text(
-        "from sqlbuild.sinks import lifecycle_event_sink\n"
+    (project_dir / "python" / "event_sinks" / "publish.py").write_text(
+        "from sqlbuild.event_sinks import lifecycle_event_sink\n"
         '@lifecycle_event_sink(event_kinds={"run", "statement"}, min_severity="info")\n'
         "def publish(event):\n    del event\n",
         encoding="utf-8",
@@ -180,8 +180,8 @@ def parse_schema_yml(
 
 RECALL_SINK_IMPORTS: str = (
     "from sqlbuild.recall import RecallWriter\n"
-    "from sqlbuild.sinks import (\n"
-    "    CommandOutputRecord, LifecycleEvent, command_output_sink, lifecycle_event_sink,\n"
+    "from sqlbuild.event_sinks import (\n"
+    "    CommandOutputRecord, LifecycleEvent, command_output_event_sink, lifecycle_event_sink,\n"
     ")\n\n"
 )
 

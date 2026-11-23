@@ -114,13 +114,13 @@ def test_given_managed_source_when_cloning_sqlserver_then_source_precedes_depend
                 "[targets.prod.clone]\n"
                 "allow_as_clone_destination = true\n"
             ),
-            "python/loaders/raw.py": (
+            "python/nodes/loaders/raw.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_customers(ctx):\n"
                 "    '''Test loader raw_customers.'''\n    return []\n"
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_customers\n    description: Test source raw_customers.\n"
                 "    managed: true\n"
@@ -131,7 +131,7 @@ def test_given_managed_source_when_cloning_sqlserver_then_source_precedes_depend
                 "      - name: first_name\n"
                 "        type: VARCHAR\n"
             ),
-            "models/stg_customers.sql": (
+            "sql/models/stg_customers.sql": (
                 "MODEL (description 'Test model stg_customers.', materialized view);\n\n"
                 'SELECT customer_id, first_name FROM __source("raw_customers")\n'
             ),
@@ -293,7 +293,7 @@ def test_given_sqlserver_targets_when_running_diff_then_all_modes_execute_end_to
                 "[targets.dev]\n"
                 f'schema = "{dev_schema}"\n'
             ),
-            "models/fact_orders.sql": (
+            "sql/models/fact_orders.sql": (
                 "MODEL (description 'Test model fact_orders.',\n"
                 "  materialized table,\n"
                 "  unique_key [order_id],\n"
@@ -432,15 +432,15 @@ def test_given_python_result_when_running_check_on_sqlserver_then_persists_node_
                 schema_name=schema_name,
                 config=config,
             ),
-            "python/tasks/results.py": (
+            "python/nodes/tasks/results.py": (
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def produce_result(ctx):\n"
                 "    '''Test task produce_result.'''\n    return ctx.result(payload={'value': 42}, metadata={'source': 'sqlserver'})\n"
             ),
-            "python/checks/results.py": (
+            "python/nodes/checks/results.py": (
                 "from sqlbuild.checks import check\n"
-                "from python.tasks.results import produce_result\n\n"
+                "from python.nodes.tasks.results import produce_result\n\n"
                 "@check(depends_on=produce_result)\n"
                 "def check_produce_result(ctx):\n"
                 "    '''Test check check_produce_result.'''\n    return ctx.result_of(node_function=produce_result).payload['value'] == 42\n"
@@ -707,7 +707,7 @@ def test_given_source_loader_project_when_building_on_sqlserver_then_model_reads
                 schema_name=schema_name,
                 config=config,
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
@@ -718,13 +718,13 @@ def test_given_source_loader_project_when_building_on_sqlserver_then_model_reads
                 "      - name: status\n"
                 "        type: NVARCHAR(100)\n"
             ),
-            "python/loaders/raw_orders.py": (
+            "python/nodes/loaders/raw_orders.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_orders(ctx):\n"
                 "    '''Test loader raw_orders.'''\n    return [{'order_id': 7, 'status': 'loaded-dev'}]\n"
             ),
-            "models/stg_orders.sql": (
+            "sql/models/stg_orders.sql": (
                 'MODEL (description "Test model stg_orders.", materialized table);\n\nSELECT order_id, status FROM __source("raw_orders")'
             ),
         },
@@ -779,7 +779,7 @@ def test_given_source_deferral_env_when_building_on_sqlserver_then_reads_prod_an
                 prod_schema_name=prod_schema_name,
                 config=config,
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 "  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n"
@@ -790,13 +790,13 @@ def test_given_source_deferral_env_when_building_on_sqlserver_then_reads_prod_an
                 "      - name: status\n"
                 "        type: NVARCHAR(100)\n"
             ),
-            "python/loaders/raw_orders.py": (
+            "python/nodes/loaders/raw_orders.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_orders(ctx):\n"
                 "    '''Test loader raw_orders.'''\n    return [{'order_id': 7, 'status': 'loaded-dev'}]\n"
             ),
-            "models/stg_orders.sql": (
+            "sql/models/stg_orders.sql": (
                 'MODEL (description "Test model stg_orders.", materialized table);\n\nSELECT order_id, status FROM __source("raw_orders")'
             ),
         },
@@ -1337,7 +1337,7 @@ def test_given_snapshot_project_when_building_on_sqlserver_then_scd2_history_is_
             expected_historical_check_rows=test_case.expected_historical_check_rows,
         )
 
-        (project_dir / "models" / "current_customers.sql").write_text(
+        (project_dir / "sql" / "models" / "current_customers.sql").write_text(
             adapt_sqlserver_sql(
                 build_current_customers_model_sql(plan="blocked", updated_at="2026-01-02 00:00:00")
             ),
@@ -1363,7 +1363,7 @@ def test_given_snapshot_project_when_building_on_sqlserver_then_scd2_history_is_
             expected_rows=test_case.expected_current_rows_after_initial_build,
         )
 
-        (project_dir / "models" / "current_customers.sql").write_text(
+        (project_dir / "sql" / "models" / "current_customers.sql").write_text(
             adapt_sqlserver_sql(
                 build_current_customers_model_sql(plan="pro", updated_at="2026-01-02 00:00:00")
             ),
@@ -1448,18 +1448,18 @@ def test_given_existing_snapshot_targets_when_building_on_sqlserver_then_apply_s
         )
         assert initial_result.returncode == 0, initial_result.stdout + initial_result.stderr
 
-        (project_dir / "models" / "current_check_customers.sql").write_text(
+        (project_dir / "sql" / "models" / "current_check_customers.sql").write_text(
             build_current_check_customers_model_sql(changed=True), encoding="utf-8"
         )
-        (project_dir / "models" / "current_delete_customers.sql").write_text(
+        (project_dir / "sql" / "models" / "current_delete_customers.sql").write_text(
             adapt_sqlserver_sql(build_current_delete_customers_model_sql(changed=True)),
             encoding="utf-8",
         )
-        (project_dir / "models" / "historical_timestamp_extracts.sql").write_text(
+        (project_dir / "sql" / "models" / "historical_timestamp_extracts.sql").write_text(
             adapt_sqlserver_sql(build_historical_timestamp_extracts_model_sql(changed=True)),
             encoding="utf-8",
         )
-        (project_dir / "models" / "historical_check_daily.sql").write_text(
+        (project_dir / "sql" / "models" / "historical_check_daily.sql").write_text(
             adapt_sqlserver_sql(build_historical_check_daily_model_sql(changed=True)),
             encoding="utf-8",
         )

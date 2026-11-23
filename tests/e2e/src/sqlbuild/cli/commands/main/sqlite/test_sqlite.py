@@ -196,7 +196,7 @@ def test_given_cloned_target_when_diffing_then_sqlite_reports_changed_rows(
         SqliteProjectE2ETestCase(
             description="sequential microbatches rewrite each day without state tables",
             files=STRATEGY_PROJECT_FILES,
-            changed_files={"seeds/order_events.csv": CHANGED_EVENTS_CSV},
+            changed_files={"sql/seeds/order_events.csv": CHANGED_EVENTS_CSV},
             query="SELECT * FROM analytics__daily_revenue ORDER BY 1",
             expected_rows=(("2026-01-02 00:00:00", 2, 550), ("2026-01-03 00:00:00", 1, 400)),
             absent_tables=("analytics___sqlbuild_microbatches", "_sqlbuild_microbatches"),
@@ -204,7 +204,7 @@ def test_given_cloned_target_when_diffing_then_sqlite_reports_changed_rows(
         SqliteProjectE2ETestCase(
             description="keyed cursor delete_insert replaces the window and changed keys",
             files=STRATEGY_PROJECT_FILES,
-            changed_files={"seeds/order_events.csv": CHANGED_EVENTS_CSV},
+            changed_files={"sql/seeds/order_events.csv": CHANGED_EVENTS_CSV},
             query="SELECT * FROM analytics__orders_window ORDER BY 1, 3",
             expected_rows=(
                 (1, 100, "2026-01-01 10:00:00"),
@@ -216,7 +216,7 @@ def test_given_cloned_target_when_diffing_then_sqlite_reports_changed_rows(
         SqliteProjectE2ETestCase(
             description="timestamp snapshot closes updated and hard-deleted versions",
             files=STRATEGY_PROJECT_FILES,
-            changed_files={"seeds/order_events.csv": CHANGED_EVENTS_CSV},
+            changed_files={"sql/seeds/order_events.csv": CHANGED_EVENTS_CSV},
             query=(
                 "SELECT order_id, amount_cents, valid_from, valid_to IS NULL "
                 "FROM analytics__order_history ORDER BY 1, 3"
@@ -232,7 +232,7 @@ def test_given_cloned_target_when_diffing_then_sqlite_reports_changed_rows(
         SqliteProjectE2ETestCase(
             description="check snapshot versions a changed amount",
             files=STRATEGY_PROJECT_FILES,
-            changed_files={"seeds/order_events.csv": CHANGED_EVENTS_CSV},
+            changed_files={"sql/seeds/order_events.csv": CHANGED_EVENTS_CSV},
             query=(
                 "SELECT order_id, amount_cents, valid_to IS NULL "
                 "FROM analytics__order_amount_history ORDER BY 1, 2"

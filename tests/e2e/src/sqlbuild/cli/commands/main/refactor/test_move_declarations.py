@@ -23,13 +23,13 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
     write_orders_project,
 )
 
-_CENTS: str = "models/staging/_sqlbuild/_macros/python/cents.py"
-_GROUPED_CENTS: str = "models/staging/_sqlbuild/_macros/python/money/cents.py"
+_CENTS: str = "sql/models/staging/_sqlbuild/_macros/python/cents.py"
+_GROUPED_CENTS: str = "sql/models/staging/_sqlbuild/_macros/python/money/cents.py"
 _PRIORITY_ENUM: dict[str, str] = {
-    "models/marts/_sqlbuild/_enums/priority.sql": (
+    "sql/models/marts/_sqlbuild/_enums/priority.sql": (
         "ENUM (\n  name priority,\n  members (LOW 1, HIGH 3),\n);\n"
     ),
-    "models/marts/fact_orders.sql": ORDER_SHAPE["models/marts/fact_orders.sql"].replace(
+    "sql/models/marts/fact_orders.sql": ORDER_SHAPE["sql/models/marts/fact_orders.sql"].replace(
         "SELECT", 'SELECT\n  @enum("priority").LOW AS priority,', 1
     ),
 }
@@ -42,13 +42,13 @@ _PRIORITY_ENUM: dict[str, str] = {
             description="declarations only the moved model uses move with it",
             model="fact_orders",
             extra_files={**ORDER_SHAPE, **_PRIORITY_ENUM},
-            destination="models/reporting/",
+            destination="sql/models/reporting/",
             expected_moved={
-                "models/marts/_sqlbuild/_schemas/order_shape.sql": (
-                    "models/reporting/_sqlbuild/_schemas/order_shape.sql"
+                "sql/models/marts/_sqlbuild/_schemas/order_shape.sql": (
+                    "sql/models/reporting/_sqlbuild/_schemas/order_shape.sql"
                 ),
-                "models/marts/_sqlbuild/_enums/priority.sql": (
-                    "models/reporting/_sqlbuild/_enums/priority.sql"
+                "sql/models/marts/_sqlbuild/_enums/priority.sql": (
+                    "sql/models/reporting/_sqlbuild/_enums/priority.sql"
                 ),
             },
         ),
@@ -56,26 +56,26 @@ _PRIORITY_ENUM: dict[str, str] = {
             description="a macro still used at the old folder moves up to the shared owner",
             model="stg_order_cents",
             extra_files={**CENTS_MACRO, **ORDER_REFUNDS},
-            destination="models/staging/eu/",
-            expected_moved={_CENTS: "models/staging/_sqlbuild/macros/python/cents.py"},
+            destination="sql/models/staging/eu/",
+            expected_moved={_CENTS: "sql/models/staging/_sqlbuild/macros/python/cents.py"},
         ),
         DeclarationMoveE2ETestCase(
             description="a macro shared across the models root moves to the top-level role",
             model="stg_order_cents",
             extra_files={**CENTS_MACRO, **ORDER_REFUNDS},
-            destination="models/marts/",
-            expected_moved={_CENTS: "macros/python/cents.py"},
+            destination="sql/models/marts/",
+            expected_moved={_CENTS: "sql/macros/python/cents.py"},
         ),
         DeclarationMoveE2ETestCase(
             description="a grouped macro keeps its group in a grouped destination role",
             model="stg_order_cents",
             extra_files=grouped_role_files(
                 cents_path=_GROUPED_CENTS,
-                labels_path="models/staging/_sqlbuild/macros/python/text/labels.py",
+                labels_path="sql/models/staging/_sqlbuild/macros/python/text/labels.py",
             ),
-            destination="models/staging/eu/",
+            destination="sql/models/staging/eu/",
             expected_moved={
-                _GROUPED_CENTS: "models/staging/_sqlbuild/macros/python/money/cents.py"
+                _GROUPED_CENTS: "sql/models/staging/_sqlbuild/macros/python/money/cents.py"
             },
         ),
         DeclarationMoveE2ETestCase(
@@ -83,10 +83,10 @@ _PRIORITY_ENUM: dict[str, str] = {
             model="stg_order_cents",
             extra_files=grouped_role_files(
                 cents_path=_GROUPED_CENTS,
-                labels_path="models/staging/_sqlbuild/macros/python/labels.py",
+                labels_path="sql/models/staging/_sqlbuild/macros/python/labels.py",
             ),
-            destination="models/staging/eu/",
-            expected_moved={_GROUPED_CENTS: "models/staging/_sqlbuild/macros/python/cents.py"},
+            destination="sql/models/staging/eu/",
+            expected_moved={_GROUPED_CENTS: "sql/models/staging/_sqlbuild/macros/python/cents.py"},
         ),
     ],
     ids=lambda case: case.description,
@@ -122,11 +122,11 @@ def test_given_scoped_declarations_when_moving_model_then_they_follow_placement_
             model="stg_order_cents",
             extra_files=grouped_role_files(
                 cents_path=_CENTS,
-                labels_path="models/staging/_sqlbuild/macros/python/text/labels.py",
+                labels_path="sql/models/staging/_sqlbuild/macros/python/text/labels.py",
             ),
-            destination="models/staging/eu/",
+            destination="sql/models/staging/eu/",
             expected_message=(
-                "macro:to_cents must move to models/staging/_sqlbuild/macros/python/, which keeps its "
+                "macro:to_cents must move to sql/models/staging/_sqlbuild/macros/python/, which keeps its "
                 f"files in group folders, but {_CENTS} is not in a group; move it into a group "
                 "folder of its current role first"
             ),

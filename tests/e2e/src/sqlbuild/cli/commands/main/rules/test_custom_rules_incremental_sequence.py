@@ -25,8 +25,8 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
 )
 
 CONFIG: str = "sqlbuild_project.toml"
-ORDER_TOTALS: str = "models/marts/order_totals.sql"
-SOURCES: str = "sources/raw.yml"
+ORDER_TOTALS: str = "sql/models/marts/order_totals.sql"
+SOURCES: str = "sql/sources/raw.yml"
 APPROVED: str = "rules/approved_sources.yaml"
 CUSTOM_EDIT_SEQUENCE: tuple[RulesCacheEditCase, ...] = (
     RulesCacheEditCase(
@@ -47,14 +47,14 @@ CUSTOM_EDIT_SEQUENCE: tuple[RulesCacheEditCase, ...] = (
         "mart_added",
         lambda root: write_project_file(
             root,
-            "models/marts/customer_totals.sql",
+            "sql/models/marts/customer_totals.sql",
             'MODEL (description "Customer totals");\n\n'
             'SELECT customer_id FROM __ref("stg_customers")\n',
         ),
     ),
     RulesCacheEditCase(
         "model_removed",
-        lambda root: (root / "models/intermediate/orders_007.sql").unlink(),
+        lambda root: (root / "sql/models/intermediate/orders_007.sql").unlink(),
     ),
     RulesCacheEditCase(
         "rules_cache_disabled",
@@ -112,7 +112,7 @@ def test_given_warm_custom_rules_when_applying_edit_chain_then_every_compile_equ
     (
         OneModelCustomRuleEditCase(
             description="edit_adds_a_finding",
-            edited_model="models/orders_002.sql",
+            edited_model="sql/models/orders_002.sql",
             before="SELECT 2 AS",
             after="SELECT 3 AS",
             expected_warm_counts=(ONE_MODEL_EDIT_CACHED_RESULTS, 0),
@@ -121,7 +121,7 @@ def test_given_warm_custom_rules_when_applying_edit_chain_then_every_compile_equ
         ),
         OneModelCustomRuleEditCase(
             description="edit_removes_the_finding",
-            edited_model="models/orders_003.sql",
+            edited_model="sql/models/orders_003.sql",
             before="SELECT 3 AS",
             after="SELECT 30 AS",
             expected_warm_counts=(ONE_MODEL_EDIT_CACHED_RESULTS, 0),

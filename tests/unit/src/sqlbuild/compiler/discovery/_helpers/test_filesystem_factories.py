@@ -23,7 +23,7 @@ from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers mixed nodes returned by a factory",
             files={
-                "python/factories/generated.py": """
+                "python/nodes/factories/generated.py": """
 from sqlbuild.assets import asset
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
@@ -77,7 +77,7 @@ def regional_pipeline():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers tuple nodes returned by a factory",
             files={
-                "python/loaders/generated.py": """
+                "python/nodes/loaders/generated.py": """
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 
@@ -102,7 +102,7 @@ def generated_loaders():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers set node returned by a factory",
             files={
-                "python/checks/generated.py": """
+                "python/nodes/checks/generated.py": """
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
 
@@ -123,7 +123,7 @@ def generated_checks():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers single node returned by a factory in assets folder",
             files={
-                "python/assets/generated.py": """
+                "python/nodes/assets/generated.py": """
 from sqlbuild.assets import asset
 from sqlbuild.factories import factory
 
@@ -144,7 +144,7 @@ def generated_asset():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers factory in loaders folder",
             files={
-                "python/loaders/generated.py": """
+                "python/nodes/loaders/generated.py": """
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 
@@ -165,7 +165,7 @@ def generated_loader():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers node kind from its decorator regardless of python subfolder",
             files={
-                "python/checks/generated.py": """
+                "python/nodes/checks/generated.py": """
 from sqlbuild.assets import asset
 
 
@@ -182,11 +182,11 @@ def export(ctx):
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers mixed-kind factory next to direct nodes using a shared helper",
             files={
-                "python/_helpers.py": """
+                "python/nodes/_helpers.py": """
 REGION = "emea"
 """,
-                "python/orders/pipeline.py": """
-from python._helpers import REGION
+                "python/nodes/orders/pipeline.py": """
+from python.nodes._helpers import REGION
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
@@ -243,7 +243,7 @@ def test_given_factory_nodes_when_discovering_python_nodes_then_returns_generate
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns invalid shape",
             files={
-                "python/tasks/generated.py": """
+                "python/nodes/tasks/generated.py": """
 from sqlbuild.factories import factory
 
 
@@ -260,7 +260,7 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns none",
             files={
-                "python/tasks/generated.py": """
+                "python/nodes/tasks/generated.py": """
 from sqlbuild.factories import factory
 
 
@@ -277,7 +277,7 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns dict",
             files={
-                "python/tasks/generated.py": """
+                "python/nodes/tasks/generated.py": """
 from sqlbuild.factories import factory
 
 
@@ -294,7 +294,7 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns bytes",
             files={
-                "python/tasks/generated.py": """
+                "python/nodes/tasks/generated.py": """
 from sqlbuild.factories import factory
 
 
@@ -311,7 +311,7 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns object",
             files={
-                "python/tasks/generated.py": """
+                "python/nodes/tasks/generated.py": """
 from sqlbuild.factories import factory
 
 
@@ -328,7 +328,7 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns class",
             files={
-                "python/tasks/generated.py": """
+                "python/nodes/tasks/generated.py": """
 from sqlbuild.factories import factory
 
 
@@ -349,7 +349,7 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returns nested structures",
             files={
-                "python/tasks/generated.py": """
+                "python/nodes/tasks/generated.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -372,7 +372,7 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory returned item is not decorated",
             files={
-                "python/tasks/generated.py": """
+                "python/nodes/tasks/generated.py": """
 from sqlbuild.factories import factory
 
 
@@ -393,7 +393,7 @@ def broken_factory():
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory requires arguments",
             files={
-                "python/tasks/generated.py": """
+                "python/nodes/tasks/generated.py": """
 from sqlbuild.factories import factory
 
 
@@ -410,7 +410,7 @@ def broken_factory(region):
         DiscoverPythonNodeFactoriesTestCase(
             description="raises when factory body fails",
             files={
-                "python/tasks/generated.py": """
+                "python/nodes/tasks/generated.py": """
 from sqlbuild.factories import factory
 
 

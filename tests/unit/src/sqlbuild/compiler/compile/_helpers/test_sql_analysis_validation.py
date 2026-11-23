@@ -12,7 +12,7 @@ from tests.unit.src.sqlbuild.compiler.compile._helpers._test_types import (
 )
 
 _MODEL_NAME: str = "test_model"
-_FILE_PATH: Path = Path("models/test_model.sql")
+_FILE_PATH: Path = Path("sql/models/test_model.sql")
 
 
 @pytest.mark.parametrize(

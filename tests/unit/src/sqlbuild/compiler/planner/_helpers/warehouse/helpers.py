@@ -52,7 +52,7 @@ def check_one_source_table(
         source_entry=source,
         source_file=DiscoveredSourceFile(
             file_path=Path("/project/sources/raw.yml"),
-            relative_path=Path("sources/raw.yml"),
+            relative_path=Path("sql/sources/raw.yml"),
             contents=f"sources:\n  - name: {source.name}\n",
             source_entries=(source,),
         ),

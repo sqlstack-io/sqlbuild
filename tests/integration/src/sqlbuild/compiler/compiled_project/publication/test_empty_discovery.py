@@ -73,7 +73,7 @@ def test_given_no_items_when_checking_and_publishing_then_the_set_fails_and_the_
             "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "python/plan/nodes.py": nodes,
+            "python/nodes/plan/nodes.py": nodes,
         },
     )
     log: Path = tmp_path / "location.log"
@@ -104,7 +104,7 @@ def test_given_no_items_when_checking_and_publishing_then_the_set_fails_and_the_
                 f"Discovered set fulfilment_plan check failed: {_ERROR}",
                 timeout=100,
             )
-            (project / "python/plan/nodes.py").write_text(nodes + "\n# An edit runs it again.\n")
+            (project / "python/nodes/plan/nodes.py").write_text(nodes + "\n# An edit runs it again.\n")
             second: dict[str, Any] = wait_for_generation(api, "development", 2, process, log)
             health: str = str(location_health_reports(api))
 

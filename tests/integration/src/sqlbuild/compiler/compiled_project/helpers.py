@@ -71,20 +71,20 @@ METADATA: dict[str, Any] = {
 
 PYTHON_PIPELINE_FILES: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-    "models/stg_orders.sql": (
+    "sql/models/stg_orders.sql": (
         "MODEL (description 'Staged orders.', tags [orders]);\n\nSELECT 1 AS order_id\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Orders.', tags [orders]);\n\n"
         'SELECT order_id FROM __ref("stg_orders")\n'
     ),
-    "python/orders/partner_export/node.py": Path(
+    "python/nodes/orders/partner_export/node.py": Path(
         "benchmarks/duckshop/edge_cases/orchestration/python_pipeline_partner_export.py"
     ).read_text(),
-    "python/fulfillment/carrier_sync/node.py": Path(
+    "python/nodes/fulfillment/carrier_sync/node.py": Path(
         "benchmarks/duckshop/edge_cases/orchestration/python_pipeline_carrier_sync.py"
     ).read_text(),
-    "python/checks/orders_present.py": Path(
+    "python/nodes/checks/orders_present.py": Path(
         "benchmarks/duckshop/edge_cases/orchestration/python_pipeline_orders_check.py"
     ).read_text(),
 }
@@ -94,13 +94,13 @@ TYPE_PROOF_FILES: dict[str, str] = {
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRCONTRACT105"]\n\n'
         '[defaults]\ncontract = "enforced"\n'
     ),
-    "models/stg_orders.sql": (
+    "sql/models/stg_orders.sql": (
         "MODEL (description 'Staged orders.',\n"
         "  columns (order_id (type INTEGER), amount (type INTEGER)),\n"
         ");\n\n"
         "SELECT CAST(1 AS INTEGER) AS order_id, CAST(5 AS INTEGER) AS amount\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Typed orders.',\n"
         "  columns (order_id (type INTEGER), amount (type BIGINT)),\n"
         ");\n\n"
@@ -109,7 +109,7 @@ TYPE_PROOF_FILES: dict[str, str] = {
 }
 # The type-proof project with its contract finding fixed, so a location's load passes its rules.
 PUBLISHABLE_FILES: dict[str, str] = TYPE_PROOF_FILES | {
-    "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(
+    "sql/models/orders.sql": TYPE_PROOF_FILES["sql/models/orders.sql"].replace(
         "SELECT order_id, amount", "SELECT order_id, CAST(amount AS BIGINT) AS amount"
     ),
 }
@@ -166,52 +166,52 @@ PARITY_FILES: dict[str, str] = {
         '[defaults]\nmaterialized = "table"\n\n[path_defaults.staging]\n'
         'materialized = "view"\ntags = ["staged"]\n'
     ),
-    "seeds/payment_methods.csv": "method\ncard\n",
-    "seeds/payment_methods.yml": (
+    "sql/seeds/payment_methods.csv": "method\ncard\n",
+    "sql/seeds/payment_methods.yml": (
         "seeds:\n  - name: payment_methods\n    description: Payment methods.\n"
         "    columns:\n      - name: method\n        type: VARCHAR\n"
     ),
-    "models/staging/stg_orders.sql": (
+    "sql/models/staging/stg_orders.sql": (
         "MODEL (description 'Staged orders.', tags [daily]);\n"
         "SELECT 1 AS order_id, '@@region' AS region -- note\n"
     ),
-    "models/staging/stg_payments.sql": (
+    "sql/models/staging/stg_payments.sql": (
         'MODEL (tags [payments]);\nSELECT method FROM __seed("payment_methods")\n'
     ),
-    "models/marts/orders.sql": (
+    "sql/models/marts/orders.sql": (
         "MODEL (description 'Orders.', materialized incremental, incremental_strategy append,"
         " cursor order_id, cursor_type integer);\n"
         'SELECT order_id FROM __ref("stg_orders")\n'
         "WHERE order_id >= __cursor_start()\n"
     ),
-    "models/marts/opted_out.sql": ("MODEL (sql_analysis false);\nSELECT 1 AS order_id\n"),
-    "models/marts/described_columns.sql": (
+    "sql/models/marts/opted_out.sql": ("MODEL (sql_analysis false);\nSELECT 1 AS order_id\n"),
+    "sql/models/marts/described_columns.sql": (
         "MODEL (\n  columns (order_id (type INTEGER, nullable false,"
         ' audits [not_null, unique]), note (description "Free text.")),\n'
         ");\n"
         "SELECT 1 AS order_id, 'x' AS note\n"
     ),
-    "enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
-    "constants/limits.sql": (
+    "sql/enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
+    "sql/constants/limits.sql": (
         "CONSTANT (name order_cap, value 3);\nCONSTANT (name held_codes, value [30, 31]);\n"
     ),
-    "models/marts/statuses.sql": (
+    "sql/models/marts/statuses.sql": (
         "MODEL (columns (status (type VARCHAR)));\n"
         'SELECT @enum("order_status").PLACED AS status, @const("order_cap") AS cap\n'
         'WHERE 30 NOT IN @const("held_codes")\n'
     ),
-    "macros/python/money.py": 'def cents(value: str) -> str:\n    return f"{value} * 100"\n',
-    "models/marts/priced.sql": (
+    "sql/macros/python/money.py": 'def cents(value: str) -> str:\n    return f"{value} * 100"\n',
+    "sql/models/marts/priced.sql": (
         "MODEL (description 'Priced orders.');\n"
         "SELECT @py.cents('3') AS cents, order_id FROM __ref(\"stg_orders\")\n"
     ),
-    "models/marts/hooked.sql": (
+    "sql/models/marts/hooked.sql": (
         "MODEL (\n  description 'Hooked orders.',\n"
         "  pre_hooks [inline_sql('SELECT @@region AS region')],\n"
         "  post_hooks [inline_sql('SELECT @py.cents(2) AS cents')],\n);\n"
         "SELECT 1 AS order_id\n"
     ),
-    "models/marts/migrated.sql": (
+    "sql/models/marts/migrated.sql": (
         "MODEL (materialized incremental, incremental_strategy append,"
         " columns (order_id (migrate_from id)));\nSELECT 1 AS order_id\n"
     ),
@@ -220,11 +220,11 @@ PARITY_FILES: dict[str, str] = {
 
 HEADER_CONTRACT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-    "enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
-    "audits/generic/expression_is_true.sql": (
+    "sql/enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
+    "sql/audits/generic/expression_is_true.sql": (
         'AUDIT ();\nSELECT * FROM __ref("@model") WHERE NOT (@expression)\n'
     ),
-    "python/quality.py": (
+    "python/nodes/quality.py": (
         "from sqlbuild.audits import AuditCase, audit_factory\n\n\n"
         "@audit_factory\n"
         "def order_checks():\n"
@@ -233,17 +233,17 @@ HEADER_CONTRACT_FILES: dict[str, str] = {
         '                  arguments={"expression": "total > 0"}),\n'
         "    ]\n"
     ),
-    "models/order_amounts.sql": (
+    "sql/models/order_amounts.sql": (
         "MODEL (columns (customer_id (type INTEGER)));\n"
         "SELECT 1 AS customer_id, 'books' AS category, 2 AS amount\n"
     ),
-    "models/category_amounts.sql": (
+    "sql/models/category_amounts.sql": (
         "MODEL (\n  columns (customer_id (type INTEGER)),\n"
         "  dynamic_columns (category_amounts (pivot_column category, value_column amount,"
         ' aggregate max, type INTEGER, name_pattern "^[a-z]+$")),\n);\n'
         'PIVOT __ref("order_amounts") ON category USING MAX(amount)\n'
     ),
-    "models/order_statuses.sql": (
+    "sql/models/order_statuses.sql": (
         "MODEL (\n  contract enforced,\n"
         "  columns (status (type order_status, audits [not_null]), total (type INTEGER)),\n"
         "  audit_factories [order_checks],\n);\n"
@@ -257,10 +257,10 @@ OPT_OUT_FILES: dict[str, str] = {
         'name = "orders"\nadapter = "duckdb"\n\n[settings]\nrequire_sql_analysis = true\n\n'
         "[path_defaults.legacy]\nsql_analysis = false\n"
     ),
-    "models/header_opt_out.sql": "MODEL (\n  sql_analysis false\n);\nSELECT 1 AS order_id\n",
-    "models/legacy/path_opt_out.sql": "MODEL ();\nSELECT 1 AS order_id\n",
-    "models/unparsed.sql": "MODEL (sql_analysis false);\nSELECT FROM WHERE (\n",
-    "models/invalid_call.sql": (
+    "sql/models/header_opt_out.sql": "MODEL (\n  sql_analysis false\n);\nSELECT 1 AS order_id\n",
+    "sql/models/legacy/path_opt_out.sql": "MODEL ();\nSELECT 1 AS order_id\n",
+    "sql/models/unparsed.sql": "MODEL (sql_analysis false);\nSELECT FROM WHERE (\n",
+    "sql/models/invalid_call.sql": (
         "MODEL ();\nSELECT * FROM __ref(order_name)\nCROSS JOIN __table_fn('customer_orders')\n"
     ),
 }
@@ -268,20 +268,20 @@ OPT_OUT_FILES: dict[str, str] = {
 
 MODEL_SCHEMA_FILES: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-    "enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
-    "schemas/orders.sql": (
+    "sql/enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
+    "sql/schemas/orders.sql": (
         "SCHEMA (\n  name order_shape,\n  description 'Order shape.',\n"
         "  columns (order_id (type INTEGER, nullable false), status (type order_status)),\n);\n"
     ),
-    "models/marts/_sqlbuild/schemas/local.sql": (
+    "sql/models/marts/_sqlbuild/schemas/local.sql": (
         "SCHEMA (\n  name marts_shape,\n  columns (order_id (type INTEGER)),\n);\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (\n  contract enforced,\n  model_schema order_shape,\n"
         "  columns (order_id (audits [unique]), note (type VARCHAR)),\n);\n"
         "SELECT 1 AS order_id, 'PLACED' AS status, 'x' AS note\n"
     ),
-    "models/staging/hidden.sql": (
+    "sql/models/staging/hidden.sql": (
         "MODEL (\n  description 'Out of reach.',\n  model_schema marts_shape,\n);\n"
         "SELECT 1 AS order_id\n"
     ),
@@ -289,7 +289,7 @@ MODEL_SCHEMA_FILES: dict[str, str] = {
 
 
 PYTHON_HOOK_FILES: dict[str, str] = {
-    "hooks/python/notifications.py": (
+    "sql/hooks/python/notifications.py": (
         "from sqlbuild.hooks import hook\n\n\n"
         "@hook\ndef notify(ctx, channel, *, level='info'):\n"
         '    """Notify a channel."""\n    return None\n\n\n'
@@ -303,21 +303,21 @@ PYTHON_HOOK_FILES: dict[str, str] = {
 
 PYTHON_HOOK_PARITY_FILES: dict[str, str] = PYTHON_HOOK_FILES | {
     "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-    "models/marts/_sqlbuild/hooks/python/local.py": (
+    "sql/models/marts/_sqlbuild/hooks/python/local.py": (
         "from sqlbuild.hooks import hook\n\n\n"
         "@hook\ndef refresh(ctx):\n"
         '    """Refresh marts."""\n    return None\n'
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         'MODEL (\n  pre_hooks [python("notify", channel: "ops")],\n'
         '  post_hooks [python("flexible", any: 1), python("notify", channel: "c", level: "x")],\n'
         ");\n"
         "SELECT 1 AS order_id\n"
     ),
-    "models/marts/summary.sql": (
+    "sql/models/marts/summary.sql": (
         'MODEL (post_hooks [python("refresh"), python("flexible")]);\nSELECT 1 AS order_id\n'
     ),
-    "models/staging/hidden.sql": (
+    "sql/models/staging/hidden.sql": (
         'MODEL (post_hooks [python("refresh")]);\nSELECT 1 AS order_id\n'
     ),
 }
@@ -325,21 +325,21 @@ PYTHON_HOOK_PARITY_FILES: dict[str, str] = PYTHON_HOOK_FILES | {
 
 SQL_HOOK_FILES: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n\n[vars]\nregion = "eu"\n',
-    "enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
-    "constants/limits.sql": "CONSTANT (name order_cap, value 3);\n",
-    "macros/python/money.py": 'def cents(value: str) -> str:\n    return f"{value} * 100"\n',
-    "hooks/sql/grant_read.sql": (
+    "sql/enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
+    "sql/constants/limits.sql": "CONSTANT (name order_cap, value 3);\n",
+    "sql/macros/python/money.py": 'def cents(value: str) -> str:\n    return f"{value} * 100"\n',
+    "sql/hooks/sql/grant_read.sql": (
         "HOOK (description 'Grant read access.');\n\n"
         "INSERT INTO audit.read_grants SELECT '@@CTX:destination.qualified', grantee\n"
         "FROM unnest([@'role']) AS granted(grantee)\n"
     ),
-    "hooks/sql/log_load.sql": (
+    "sql/hooks/sql/log_load.sql": (
         "HOOK (description 'Log a load.');\n\n"
         'INSERT INTO @target SELECT @enum("order_status").PLACED, @const("order_cap"),'
         " @py.cents(@amount), '@@region' FROM __ref(\"stg_orders\")\n"
     ),
-    "models/staging/stg_orders.sql": "MODEL ();\nSELECT 1 AS order_id\n",
-    "models/marts/loaded.sql": (
+    "sql/models/staging/stg_orders.sql": "MODEL ();\nSELECT 1 AS order_id\n",
+    "sql/models/marts/loaded.sql": (
         "MODEL (\n  schema analytics,\n"
         '  pre_hooks [sql("grant_read", role: ["reader", "writer"])],\n'
         '  post_hooks [sql("log_load", target: "audit.loads", amount: 5),'
@@ -350,7 +350,7 @@ SQL_HOOK_FILES: dict[str, str] = {
 
 MACRO_FILES: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n\n[vars]\nregion = "eu"\n',
-    "macros/python/amounts.py": (
+    "sql/macros/python/amounts.py": (
         '"""Amount macros."""\n\n\n'
         'def cents(value):\n    """Cents."""\n    return f"{value} * 100"\n\n\n'
         'def word():\n    """A word."""\n    return "x"\n'
@@ -454,28 +454,28 @@ def _group_cycle_model(name: str, reads: str) -> str:
 
 # Models and a seed for the DuckShop `group_cycles` jobs, grouped into three cycles.
 GROUP_CYCLE_NODES: dict[str, str] = {
-    "seeds/regions.csv": "id\n1\n",
-    "seeds/regions.yml": (
+    "sql/seeds/regions.csv": "id\n1\n",
+    "sql/seeds/regions.yml": (
         "seeds:\n  - name: regions\n    description: Regions\n    columns:\n"
         "      - name: id\n        type: INTEGER\n"
     ),
-    "models/stg_orders.sql": (
+    "sql/models/stg_orders.sql": (
         "MODEL (description 'Synthetic stg_orders.', columns (id (type INTEGER)));\n\n"
         "SELECT CAST(1 AS INTEGER) AS id\n"
     ),
-    "models/stg_inventory.sql": (
+    "sql/models/stg_inventory.sql": (
         "MODEL (description 'Synthetic stg_inventory.', columns (id (type INTEGER)));\n\n"
         "SELECT CAST(1 AS INTEGER) AS id\n"
     ),
-    "models/customers.sql": _group_cycle_model("customers", "stg_orders"),
-    "models/orders.sql": _group_cycle_model("orders", "customers"),
-    "models/shipments.sql": _group_cycle_model("shipments", "stg_inventory"),
-    "models/inventory.sql": _group_cycle_model("inventory", "shipments"),
-    "models/region_report.sql": (
+    "sql/models/customers.sql": _group_cycle_model("customers", "stg_orders"),
+    "sql/models/orders.sql": _group_cycle_model("orders", "customers"),
+    "sql/models/shipments.sql": _group_cycle_model("shipments", "stg_inventory"),
+    "sql/models/inventory.sql": _group_cycle_model("inventory", "shipments"),
+    "sql/models/region_report.sql": (
         "MODEL (description 'Synthetic region_report.', columns (id (type INTEGER)));\n\n"
         'SELECT CAST(1 AS INTEGER) AS id FROM __seed("regions")\n'
     ),
-    "models/regional_orders.sql": _group_cycle_model("regional_orders", "region_report"),
+    "sql/models/regional_orders.sql": _group_cycle_model("regional_orders", "region_report"),
 }
 # What compile and publish both report for that group: every cycle, then the shared-read hint.
 GROUP_CYCLE_MESSAGE: str = "\n".join(
@@ -518,9 +518,9 @@ SOURCE_PROJECT_FILES: dict[str, str] = {
         'name = "orders"\nadapter = "duckdb"\n\n[vars]\nregion = "eu"\n\n'
         '[defaults]\ncontract = "enforced"\n'
     ),
-    "enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
-    "constants/limits.sql": "CONSTANT (name order_cap, value 3);\n",
-    "macros/python/money.py": 'def cents(value: str) -> str:\n    return f"{value} * 100"\n',
+    "sql/enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
+    "sql/constants/limits.sql": "CONSTANT (name order_cap, value 3);\n",
+    "sql/macros/python/money.py": 'def cents(value: str) -> str:\n    return f"{value} * 100"\n',
 }
 _SOURCE_CONNECTION: dict[str, object] = {"database": "warehouse", "schema": "main"}
 
@@ -531,7 +531,7 @@ def compile_source_project(
     """Compile a project declaring `source_yml`; return the project and its compile inputs."""
 
     write_files(
-        project_dir=project_dir, files={**SOURCE_PROJECT_FILES, "sources/raw.yml": source_yml}
+        project_dir=project_dir, files={**SOURCE_PROJECT_FILES, "sql/sources/raw.yml": source_yml}
     )
     project: CompiledProjectView = build_compiled_project(
         discovered_inputs=discover_project_inputs(project_dir=project_dir),
@@ -553,18 +553,18 @@ FUNCTION_PROJECT_FILES: dict[str, str] = {
         'name = "orders"\nadapter = "duckdb"\n\n[vars]\nregion = "eu"\n'
         'amount_type = "DECIMAL(10, 2)"\n\n[defaults]\nfunction_schema = "udfs_${region}"\n'
     ),
-    "enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
-    "models/orders.sql": "MODEL (description 'Orders.', schema analytics);\nSELECT 1 AS order_id\n",
-    "functions/sql/order_total.sql": (
+    "sql/enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
+    "sql/models/orders.sql": "MODEL (description 'Orders.', schema analytics);\nSELECT 1 AS order_id\n",
+    "sql/functions/sql/order_total.sql": (
         "FUNCTION (description 'Order total.', tags [finance],"
         " arguments (amount ${amount_type}), returns ${amount_type});\nSELECT amount * 2\n"
     ),
-    "functions/sql/open_orders.sql": (
+    "sql/functions/sql/open_orders.sql": (
         "FUNCTION (description 'Open orders.', schema reporting,"
         " returns table (order_id INTEGER, status VARCHAR));\n"
         'SELECT order_id, @enum("order_status").PLACED AS status FROM __ref("orders")\n'
     ),
-    "functions/python/score.py": (
+    "sql/functions/python/score.py": (
         "from sqlbuild.functions import udf\n\n"
         "@udf(arguments={'value': 'INTEGER'}, returns='INTEGER', runtime_version='3.11',"
         " packages=['numpy'], tags=['ml'])\n"
@@ -575,24 +575,24 @@ FUNCTION_PROJECT_FILES: dict[str, str] = {
 
 TABLE_FUNCTION_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders"\nadapter = "snowflake"\n',
-    "models/readings.sql": (
+    "sql/models/readings.sql": (
         "MODEL (description 'Readings.');\nSELECT 1 AS device_id, 1.0 AS ts, 2.0 AS reading\n"
     ),
-    "functions/python/smooth.py": (
+    "sql/functions/python/smooth.py": (
         "import polars as pl\nfrom sqlbuild.functions import table_fn\n\n"
         "@table_fn(arguments={'device_id': 'INTEGER', 'reading': 'FLOAT'},"
         " returns={'device_id': 'INTEGER', 'smoothed': 'FLOAT'}, runtime_version='3.12')\n"
         "def main(readings: pl.DataFrame) -> pl.DataFrame:\n"
         '    """Smooth."""\n    return readings\n'
     ),
-    "functions/python/rank_readings.py": (
+    "sql/functions/python/rank_readings.py": (
         "import pandas as pd\nfrom sqlbuild.functions import table_fn\n\n"
         "@table_fn(arguments={'reading': 'FLOAT'}, returns={'position': 'INTEGER'},"
         " runtime_version='3.12')\n"
         "def main(readings: pd.DataFrame) -> pd.DataFrame:\n"
         '    """Rank."""\n    return readings\n'
     ),
-    "models/smoothed.sql": (
+    "sql/models/smoothed.sql": (
         "MODEL (description 'Smoothed.');\nSELECT s.* FROM __ref(\"readings\") r,\n"
         '  __table_fn("smooth")(r.device_id, r.reading) OVER (PARTITION BY r.device_id) s\n'
     ),
@@ -660,15 +660,15 @@ AUDIT_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "orders"\nadapter = "duckdb"\n\n[settings]\ndefault_audit_severity = "warn"\n'
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Orders.', columns (order_id (type INTEGER,"
         " audits [not_null, at_least(minimum 1, severity error)])));\nSELECT 1 AS order_id\n"
     ),
-    "models/customers.sql": "MODEL (description 'Customers.');\nSELECT 1 AS customer_id\n",
-    "audits/generic/at_least.sql": (
+    "sql/models/customers.sql": "MODEL (description 'Customers.');\nSELECT 1 AS customer_id\n",
+    "sql/audits/generic/at_least.sql": (
         "AUDIT (name at_least);\nSELECT * FROM @relation WHERE @column < @minimum\n"
     ),
-    "audits/singular/orders_have_customers.sql": (
+    "sql/audits/singular/orders_have_customers.sql": (
         "AUDIT (name orders_have_customers, run_scope final);\n"
         'SELECT * FROM __ref("orders") o LEFT JOIN __ref("customers") c'
         " ON o.order_id = c.customer_id WHERE c.customer_id IS NULL\n"
@@ -753,8 +753,8 @@ def cursor_model_files(*, read: str = "") -> dict[str, str]:
     """An upstream payments model and an incremental cursor model reading `read`."""
 
     return {
-        "models/payments.sql": 'MODEL (description "Payments");\nSELECT 1 AS id\n',
-        "models/finance/daily_revenue.sql": _CURSOR_MODEL.format(read=read),
+        "sql/models/payments.sql": 'MODEL (description "Payments");\nSELECT 1 AS id\n',
+        "sql/models/finance/daily_revenue.sql": _CURSOR_MODEL.format(read=read),
     }
 
 
@@ -763,7 +763,7 @@ _HAND_BUILT_CONFIG: ProjectConfig = ProjectConfig(name="orders", adapter="duckdb
 
 
 def _hand_built_model(name: str, sql: str) -> CompileModelInput:
-    relative_path: Path = Path(f"models/{name}.sql")
+    relative_path: Path = Path(f"sql/models/{name}.sql")
     return CompileModelInput(
         model_file=DiscoveredSqlModelFile(
             file_path=Path("/repo") / relative_path,
@@ -806,7 +806,7 @@ def native_analysed_project(*, project_dir: Path, models: dict[str, str]) -> Com
         files={
             "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
             **{
-                f"models/{name}.sql": f"MODEL (description 'Test model.');\n\n{sql}\n"
+                f"sql/models/{name}.sql": f"MODEL (description 'Test model.');\n\n{sql}\n"
                 for name, sql in models.items()
             },
         },

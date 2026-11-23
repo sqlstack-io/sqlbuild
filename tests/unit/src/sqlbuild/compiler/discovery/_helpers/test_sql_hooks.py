@@ -200,7 +200,7 @@ def test_given_hook_header_and_sql_when_parsing_then_returns_named_resource(
         DiscoveredSqlHookFile,
         discover_declaration_file(
             project_dir=tmp_path,
-            relative_path="hooks/sql/grant_access.sql",
+            relative_path="sql/hooks/sql/grant_access.sql",
             contents=test_case.contents,
         ),
     )
@@ -208,7 +208,7 @@ def test_given_hook_header_and_sql_when_parsing_then_returns_named_resource(
     assert hook.name == test_case.expected_name
     assert hook.description == test_case.expected_description
     assert hook.sql_body == test_case.expected_sql_body
-    assert hook.relative_path == Path("hooks/sql/grant_access.sql")
+    assert hook.relative_path == Path("sql/hooks/sql/grant_access.sql")
 
 
 @pytest.mark.parametrize(
@@ -217,12 +217,12 @@ def test_given_hook_header_and_sql_when_parsing_then_returns_named_resource(
         DiscoverSqlHooksTestCase(
             description="discovers nested public SQL hooks only",
             repo_files={
-                "hooks/sql/admin/grant_access.sql": "HOOK ();\n\nSELECT 1\n",
-                "hooks/sql/_private.sql": "not a hook\n",
-                "hooks/python/not_sql.sql": "not a hook\n",
+                "sql/hooks/sql/admin/grant_access.sql": "HOOK ();\n\nSELECT 1\n",
+                "sql/hooks/sql/_private.sql": "not a hook\n",
+                "sql/hooks/python/not_sql.sql": "not a hook\n",
             },
             expected_names=("grant_access",),
-            expected_paths=("hooks/sql/admin/grant_access.sql",),
+            expected_paths=("sql/hooks/sql/admin/grant_access.sql",),
         )
     ],
     ids=lambda case: case.description,
@@ -287,7 +287,7 @@ def test_given_invalid_sql_hook_when_parsing_then_raises(
 ) -> None:
     with pytest.raises(SqlHookParseError, match=test_case.expected_error_fragment):
         discover_declaration_file(
-            project_dir=tmp_path, relative_path="hooks/sql/invalid.sql", contents=test_case.contents
+            project_dir=tmp_path, relative_path="sql/hooks/sql/invalid.sql", contents=test_case.contents
         )
 
 

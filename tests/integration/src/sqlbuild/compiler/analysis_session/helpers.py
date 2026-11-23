@@ -205,19 +205,19 @@ _ADAPTER_RULE_SQL: dict[str, tuple[str, str]] = {
     ),
 }
 ADAPTER_RULE_MODELS: dict[str, str] = {
-    f"models/adapter_rules/{name}.sql": (
+    f"sql/models/adapter_rules/{name}.sql": (
         f'MODEL (\n  description "Adapter rule model {name}",\n{header});\n\n{sql}\n'
     )
     for name, (header, sql) in _ADAPTER_RULE_SQL.items()
 }
 _CONTRACT_CTE_MODELS: dict[str, str] = {
-    "models/marts/payments_by_customer.sql": (
+    "sql/models/marts/payments_by_customer.sql": (
         'MODEL (\n  description "Payments passed through a CTE",\n  contract enforced,\n'
         "  columns (customer_id (type INTEGER), region (type VARCHAR)),\n);\n\n"
         'WITH base AS (SELECT customer_id, region FROM __source("raw_payments"))\n'
         "SELECT customer_id, region FROM base\n"
     ),
-    "models/marts/payment_totals.sql": (
+    "sql/models/marts/payment_totals.sql": (
         'MODEL (\n  description "Payment totals aggregated in a CTE",\n  contract enforced,\n'
         "  columns (total_amount (type DECIMAL(38, 2)), region (type VARCHAR)),\n);\n\n"
         "WITH base AS (\n  SELECT SUM(amount) AS total_amount, region\n"
@@ -254,10 +254,10 @@ def _pivot_files(
     """A typed pivot every passthrough reads, and the drawn pivot shapes in one dialect's PIVOT."""
 
     return {
-        "models/marts/status_amounts.sql": typed_pivot,
-        "models/marts/status_passthrough.sql": _TYPED_PIVOT_PASSTHROUGH,
+        "sql/models/marts/status_amounts.sql": typed_pivot,
+        "sql/models/marts/status_passthrough.sql": _TYPED_PIVOT_PASSTHROUGH,
         **{
-            f"models/marts/pivot_{index}.sql": (
+            f"sql/models/marts/pivot_{index}.sql": (
                 _PIVOT_HEADER.format(pivot=pivot, value=value, aggregate=aggregates[aggregate])
                 + bodies[shape].format(aggregate=aggregates[aggregate])
                 + "\n"
@@ -477,10 +477,10 @@ def pivot_project_files() -> dict[str, str]:
 
     return {
         "sqlbuild_project.toml": _PROJECT_TOML,
-        "sources/raw.yml": _SOURCES,
-        "models/marts/status_amounts.sql": _TYPED_PIVOT,
-        "models/marts/status_passthrough.sql": _TYPED_PIVOT_PASSTHROUGH,
-        "models/staging/orders_list.sql": (
+        "sql/sources/raw.yml": _SOURCES,
+        "sql/models/marts/status_amounts.sql": _TYPED_PIVOT,
+        "sql/models/marts/status_passthrough.sql": _TYPED_PIVOT_PASSTHROUGH,
+        "sql/models/staging/orders_list.sql": (
             'MODEL (description "Order ids");\n\nSELECT order_id FROM __source("raw_orders")\n'
         ),
     }
@@ -515,7 +515,7 @@ def generated_analysis_files(
     named: str = dialect or ""
     files: dict[str, str] = {
         "sqlbuild_project.toml": _PROJECT_TOML,
-        "sources/raw.yml": _SOURCES,
+        "sql/sources/raw.yml": _SOURCES,
         **_pivot_models(rng, named),
         **_CONTRACT_CTE_MODELS,
     }
@@ -528,7 +528,7 @@ def generated_analysis_files(
         template: _Template = templates[index % len(templates)]
         header, sql, columns = template(rng, rng.sample(relations, k=2))
         name: str = f"orders_model_{index}"
-        files[f"models/layer_{index % 3}/{name}.sql"] = (
+        files[f"sql/models/layer_{index % 3}/{name}.sql"] = (
             f'MODEL (\n  description "Generated orders model {index}",\n{header});\n\n{sql}\n'
         )
         relations.append((f'__ref("{name}")', columns))
@@ -541,14 +541,14 @@ def shared_analysis_files(
     """Equal regional models and rollups, missing-column readers and one unshared summary."""
 
     regional: dict[str, str] = {
-        f"models/staging/orders_{region}.sql": (
+        f"sql/models/staging/orders_{region}.sql": (
             f'MODEL (description "Orders in {region}");\n\n'
             'SELECT order_id, customer_id, amount FROM __source("raw_orders")\n'
         )
         for region in regions
     }
     rollups: dict[str, str] = {
-        f"models/marts/totals_{region}.sql": (
+        f"sql/models/marts/totals_{region}.sql": (
             f'MODEL (description "Customer totals in {region}");\n\n'
             "SELECT customer_id, SUM(amount) AS total_amount\n"
             f'FROM __ref("orders_{region}")\nGROUP BY customer_id\n'
@@ -556,7 +556,7 @@ def shared_analysis_files(
         for region in regions
     }
     inexact: dict[str, str] = {
-        f"models/marts/missing_{region}.sql": (
+        f"sql/models/marts/missing_{region}.sql": (
             f'MODEL (description "Orders in {region} with an unknown column");\n\n'
             f'SELECT customer_id, missing_column FROM __ref("orders_{region}")\n'
         )
@@ -564,11 +564,11 @@ def shared_analysis_files(
     }
     return {
         "sqlbuild_project.toml": _PROJECT_TOML,
-        "sources/raw.yml": _SOURCES,
+        "sql/sources/raw.yml": _SOURCES,
         **regional,
         **rollups,
         **inexact,
-        "models/marts/orders_summary.sql": (
+        "sql/models/marts/orders_summary.sql": (
             'MODEL (description "Order count");\n\n'
             f'SELECT COUNT(*) AS order_count FROM __ref("orders_{regions[0]}")\n'
         ),
@@ -931,7 +931,7 @@ def write_shared_query_project(
     _ = (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = []\n', encoding="utf-8"
     )
-    model_dir: Path = project_dir / "models"
+    model_dir: Path = project_dir / "sql" / "models"
     model_dir.mkdir()
     for name, sql in {"orders": upstream_sql, "customers": upstream_sql, **models}.items():
         _ = (model_dir / f"{name}.sql").write_text(sql, encoding="utf-8")

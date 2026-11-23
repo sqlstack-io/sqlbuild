@@ -191,7 +191,7 @@ def test_given_private_view_access_when_evaluating_repeatedly_then_rule_is_never
             ),
             body=_FLAG_ORDERS.format(condition="'orders' in _owners(ctx)").strip(),
             expected_rerun_hits=0,
-            expected_finding_paths=("models/orders.sql",),
+            expected_finding_paths=("sql/models/orders.sql",),
         ),
     ),
     ids=lambda case: case.description,
@@ -243,7 +243,7 @@ def test_given_untracked_rule_reading_hidden_file_when_file_changes_then_rule_re
                 condition="'orders' in ctx.project.tree.read_text('config/owners.yaml')"
             ).strip(),
             expected_rerun_hits=1,
-            expected_finding_paths=("models/orders.sql",),
+            expected_finding_paths=("sql/models/orders.sql",),
         ),
     ),
     ids=lambda case: case.description,

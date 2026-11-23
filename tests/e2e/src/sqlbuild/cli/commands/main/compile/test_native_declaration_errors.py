@@ -30,13 +30,13 @@ _COUNTED_MACRO: str = (
     "    return expression\n"
 )
 _COUNTED_MART: str = FAILURE_BASE_MART.replace("SUM(amount)", "SUM(@py.counted('amount'))")
-_STAGING_PATH: str = "models/staging/stg_orders.sql"
+_STAGING_PATH: str = "sql/models/staging/stg_orders.sql"
 _STAGING_PREFIX: str = (
     'MODEL (\n  description "Staged orders",\n);\n\n'
     'SELECT order_id, customer_id, amount, status\nFROM __source("raw_orders")\nWHERE '
 )
 _STATUS_ENUM: dict[str, str] = {
-    "enums/order_status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
+    "sql/enums/order_status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
 }
 
 
@@ -71,7 +71,7 @@ _STATUS_ENUM: dict[str, str] = {
         NativeDeclarationErrorTestCase(
             description="inaccessible_local_constant_after_a_macro_ran",
             project_files={
-                "models/marts/_constants/limits.sql": "CONSTANT (name order_cap, value 3);\n",
+                "sql/models/marts/_constants/limits.sql": "CONSTANT (name order_cap, value 3);\n",
                 _STAGING_PATH: _STAGING_PREFIX + 'amount > @const("order_cap")\n',
             },
             expected_report_text="Constant 'order_cap' is known but inaccessible",
@@ -90,7 +90,7 @@ _STATUS_ENUM: dict[str, str] = {
             description="duplicate_scoped_enum_before_any_macro_runs",
             project_files={
                 **_STATUS_ENUM,
-                "models/staging/_enums/order_status.sql": (
+                "sql/models/staging/_enums/order_status.sql": (
                     "ENUM (name order_status, members [HELD]);\n"
                 ),
             },
@@ -99,7 +99,7 @@ _STATUS_ENUM: dict[str, str] = {
         ),
         NativeDeclarationErrorTestCase(
             description="invalid_enum_declaration_file",
-            project_files={"enums/order_status.sql": "ENUM (name order_status, members [held]);\n"},
+            project_files={"sql/enums/order_status.sql": "ENUM (name order_status, members [held]);\n"},
             expected_report_text="member identifiers must be uppercase",
             expected_macro_calls=0,
         ),
@@ -112,8 +112,8 @@ def test_given_declaration_error_when_compiling_natively_then_error_matches_pyth
     project_dir: Path = tmp_path / "orders"
     files: dict[str, str] = {
         **FAILURE_BASE_FILES,
-        "macros/python/counted.py": _COUNTED_MACRO,
-        "models/marts/customer_totals.sql": _COUNTED_MART,
+        "sql/macros/python/counted.py": _COUNTED_MACRO,
+        "sql/models/marts/customer_totals.sql": _COUNTED_MART,
         **test_case.project_files,
     }
     for relative_path, contents in {**files, _CALL_LOG: ""}.items():
@@ -157,8 +157,8 @@ def test_given_declaration_error_when_compiling_then_lifecycle_error_type_matche
     project_dir: Path = tmp_path / "orders"
     for relative_path, contents in {
         **FAILURE_BASE_FILES,
-        "macros/python/counted.py": _COUNTED_MACRO,
-        "models/marts/customer_totals.sql": _COUNTED_MART,
+        "sql/macros/python/counted.py": _COUNTED_MACRO,
+        "sql/models/marts/customer_totals.sql": _COUNTED_MART,
         _CALL_LOG: "",
         **test_case.project_files,
     }.items():

@@ -63,11 +63,11 @@ print(json.dumps({"code": code, "discoveries": work.get("discover_project_inputs
     (
         QueryUnrelatedProjectFaultTestCase(
             description="model without a MODEL header",
-            repo_files={"models/orders.sql": "SELECT FROM WHERE (\n"},
+            repo_files={"sql/models/orders.sql": "SELECT FROM WHERE (\n"},
         ),
         QueryUnrelatedProjectFaultTestCase(
             description="project Python that fails to import",
-            repo_files={"python/broken.py": 'raise RuntimeError("broken project python")\n'},
+            repo_files={"python/nodes/broken.py": 'raise RuntimeError("broken project python")\n'},
         ),
         QueryUnrelatedProjectFaultTestCase(
             description="local SQL analysis opt-out the project forbids",
@@ -125,7 +125,7 @@ def test_given_project_when_running_command_then_project_discovery_runs_only_whe
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,
         project_name="orders_project",
-        repo_files={"sqlbuild_project.toml": PROJECT_TOML, "models/orders.sql": VALID_MODEL_SQL},
+        repo_files={"sqlbuild_project.toml": PROJECT_TOML, "sql/models/orders.sql": VALID_MODEL_SQL},
     )
     argv: list[str] = ["--project-dir", str(project_dir), *test_case.command]
 

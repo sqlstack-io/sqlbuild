@@ -23,8 +23,8 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
 )
 
 _CONFIG: str = "sqlbuild_project.toml"
-_ORDER_TOTALS: str = "models/commerce/mart/commerce__mart__order_totals.sql"
-_PRODUCTS: str = "models/commerce/mart/commerce__mart__products.sql"
+_ORDER_TOTALS: str = "sql/models/commerce/mart/commerce__mart__order_totals.sql"
+_PRODUCTS: str = "sql/models/commerce/mart/commerce__mart__products.sql"
 
 EDIT_SEQUENCE: tuple[RulesCacheEditCase, ...] = (
     RulesCacheEditCase(
@@ -41,12 +41,12 @@ EDIT_SEQUENCE: tuple[RulesCacheEditCase, ...] = (
     ),
     RulesCacheEditCase(
         "model_removed",
-        lambda root: (root / "models/commerce/mart/commerce__mart__customers.sql").unlink(),
+        lambda root: (root / "sql/models/commerce/mart/commerce__mart__customers.sql").unlink(),
     ),
     RulesCacheEditCase(
         "model_renamed",
         lambda root: move_project_file(
-            root, _PRODUCTS, "models/commerce/mart/commerce__mart__catalog_products.sql"
+            root, _PRODUCTS, "sql/models/commerce/mart/commerce__mart__catalog_products.sql"
         ),
     ),
     RulesCacheEditCase(
@@ -62,7 +62,7 @@ EDIT_SEQUENCE: tuple[RulesCacheEditCase, ...] = (
             _CONFIG,
             "[rules.thresholds]",
             '[[rules.rule_ignores]]\nrules = ["SQBRTEST201"]\n'
-            'paths = ["models/commerce/staging/commerce__stg__orders.sql"]\n'
+            'paths = ["sql/models/commerce/staging/commerce__stg__orders.sql"]\n'
             'reason = "Audits arrive with the source contract"\n\n[rules.thresholds]',
         ),
     ),

@@ -100,14 +100,14 @@ fn given_a_dev_run_output_folder_when_a_file_is_written_then_the_watch_leaves_ou
         },
         OutputWatchTestCase {
             description: "a folder given through a parent reference is resolved",
-            folder: Some("models/../output"),
+            folder: Some("sql/models/../output"),
             written: "output/runs/run/claim/000000000000.zst",
             expected_seen: false,
         },
         OutputWatchTestCase {
             description: "a source edit beside the folder is seen",
             folder: Some("output"),
-            written: "models/orders.sql",
+            written: "sql/models/orders.sql",
             expected_seen: true,
         },
         OutputWatchTestCase {
@@ -119,7 +119,7 @@ fn given_a_dev_run_output_folder_when_a_file_is_written_then_the_watch_leaves_ou
         OutputWatchTestCase {
             description: "another folder named output is still watched",
             folder: Some("output"),
-            written: "models/output/orders.sql",
+            written: "sql/models/output/orders.sql",
             expected_seen: true,
         },
         OutputWatchTestCase {
@@ -131,19 +131,19 @@ fn given_a_dev_run_output_folder_when_a_file_is_written_then_the_watch_leaves_ou
         OutputWatchTestCase {
             description: "a store at the project root leaves the watch on",
             folder: Some("."),
-            written: "models/orders.sql",
+            written: "sql/models/orders.sql",
             expected_seen: true,
         },
         OutputWatchTestCase {
             description: "a store resolving to the project root leaves the watch on",
-            folder: Some("models/.."),
-            written: "models/orders.sql",
+            folder: Some("sql/models/.."),
+            written: "sql/models/orders.sql",
             expected_seen: true,
         },
         OutputWatchTestCase {
             description: "a store above the project leaves the watch on",
             folder: Some(".."),
-            written: "models/orders.sql",
+            written: "sql/models/orders.sql",
             expected_seen: true,
         },
         OutputWatchTestCase {

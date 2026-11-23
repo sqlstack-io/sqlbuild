@@ -21,7 +21,7 @@ TOKEN_VALUE: str = "t0ken-never-printed"
 PROJECT_HEADER: str = 'name = "env_file_project"\nadapter = "duckdb"\n'
 CONNECTION_TABLE: str = '\n[connection]\ndatabase = "env_file_project.duckdb"\n'
 PROVIDER_FILES: dict[str, str] = {
-    "providers/settings_api.py": dedent(
+    "python/providers/settings_api.py": dedent(
         f"""
         from pydantic import Field, SecretStr
         from sqlbuild.providers import Provider
@@ -34,12 +34,12 @@ PROVIDER_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "python/assets/report_region.py": dedent(
+    "python/nodes/assets/report_region.py": dedent(
         """
         import os
         from pathlib import Path
 
-        from providers.settings_api import SettingsApi
+        from python.nodes.providers.settings_api import SettingsApi
         from sqlbuild.assets import asset
 
 

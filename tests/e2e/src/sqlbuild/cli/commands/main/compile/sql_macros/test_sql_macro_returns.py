@@ -24,20 +24,20 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import 
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
 
 _UNTYPED_UPSTREAM: dict[str, str] = {
-    "models/marts/up.sql": (
+    "sql/models/marts/up.sql": (
         'MODEL (description "Up");\n\nSELECT NULL AS s FROM __ref("stg_orders") AS o\n'
     ),
 }
 _UNTYPED_CALL: str = 'SELECT @sql.m(u.s) AS v FROM __ref("up") AS u\n'
 _FIRST_OF: dict[str, str] = {
-    "macros/sql/first_of.sql": (
+    "sql/macros/sql/first_of.sql": (
         'MACRO (\n  description "The first of two values",\n'
         "  arguments (value ANY, other ANY),\n  returns TYPE OF value,\n);\n\n"
         "list_extract([@value, @other], 1)\n"
     )
 }
 _FIRST_OF_UNTYPED: dict[str, str] = {
-    "macros/sql/first_of.sql": _FIRST_OF["macros/sql/first_of.sql"].replace(
+    "sql/macros/sql/first_of.sql": _FIRST_OF["sql/macros/sql/first_of.sql"].replace(
         "  returns TYPE OF value,\n", ""
     )
 }
@@ -75,16 +75,16 @@ _SNOWFLAKE_PROJECT: dict[str, str] = {
     )
 }
 _ROUNDED: dict[str, str] = {
-    "macros/sql/rounded.sql": (
+    "sql/macros/sql/rounded.sql": (
         'MACRO (\n  description "Rounded to places",\n'
         "  arguments (value ANY NUMERIC, places INT CONST DEFAULT 2),\n"
         "  returns TYPE OF value,\n);\n\nROUND(@value, @places)\n"
     ),
-    "macros/sql/shouted.sql": (
+    "sql/macros/sql/shouted.sql": (
         'MACRO (\n  description "Shouted",\n  arguments (value ANY TEXT),\n'
         "  returns TYPE OF value,\n);\n\nUPPER(@value)\n"
     ),
-    "macros/sql/month_of.sql": (
+    "sql/macros/sql/month_of.sql": (
         'MACRO (\n  description "Month start",\n  arguments (value ANY TEMPORAL),\n'
         "  returns TYPE OF value,\n);\n\nDATE_TRUNC('month', @value)\n"
     ),
@@ -147,7 +147,7 @@ _ROUNDED: dict[str, str] = {
             expected_fragments=(
                 "error[P024]: macro m() declares returns BIGINT, but its body is VARCHAR\n"
                 "  model: orders\n"
-                "  --> macros/sql/m.sql:7:1",
+                "  --> sql/macros/sql/m.sql:7:1",
             ),
         ),
         SqlMacroCompileTestCase(
@@ -466,13 +466,13 @@ def test_given_a_partly_unknown_list_body_when_compiling_then_the_mismatch_is_re
             expected_returncode=1,
             expected_fragments=(
                 "error[P015]: returns TYPE OF missing names no argument of macro m()",
-                "macros/sql/m.sql:4:",
+                "sql/macros/sql/m.sql:4:",
             ),
         ),
         SqlMacroCompileTestCase(
             description="returns_type_of_a_list_argument_is_reported_at_the_macro_file",
             files={
-                "macros/sql/m.sql": (
+                "sql/macros/sql/m.sql": (
                     'MACRO (\n  description "Listed",\n  arguments (codes LIST VARCHAR),\n'
                     "  returns TYPE OF codes,\n);\n\n'GB' IN @codes\n"
                 ),
@@ -549,7 +549,7 @@ def test_given_returns_type_of_when_compiling_then_each_call_has_its_argument_ty
             expected_returncode=1,
             expected_fragments=(
                 "argument value of macro rounded() expects a number; o.status is VARCHAR",
-                "models/marts/orders.sql:3:",
+                "sql/models/marts/orders.sql:3:",
             ),
         ),
         SqlMacroCompileTestCase(
@@ -566,7 +566,7 @@ def test_given_returns_type_of_when_compiling_then_each_call_has_its_argument_ty
         SqlMacroCompileTestCase(
             description="a_body_wrong_for_its_family_is_reported_at_the_macro_file",
             files={
-                "macros/sql/m.sql": (
+                "sql/macros/sql/m.sql": (
                     'MACRO (\n  description "Shouted number",\n  arguments (value ANY NUMERIC),\n'
                     ");\n\nUPPER(@value)\n"
                 ),
@@ -577,7 +577,7 @@ def test_given_returns_type_of_when_compiling_then_each_call_has_its_argument_ty
             expected_returncode=1,
             expected_fragments=(
                 "error[P025]: body of macro m() does not accept every value of value ANY NUMERIC",
-                "--> macros/sql/m.sql:6:1",
+                "--> sql/macros/sql/m.sql:6:1",
             ),
         ),
     ],
@@ -604,7 +604,7 @@ def test_given_any_type_families_when_compiling_then_calls_and_bodies_are_checke
                 **_FIRST_OF,
                 **contract_model("orders", "day_value (type DATE)", _TYPE_OF_UNION),
             },
-            edited_path="macros/sql/first_of.sql",
+            edited_path="sql/macros/sql/first_of.sql",
             replaced_text=("  returns TYPE OF value,\n", ""),
             expected_cold_fragment="0 errors, 0 warnings",
             expected_warm_fragment="warning[K003]: column 'day_value'",

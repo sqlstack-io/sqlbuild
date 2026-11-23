@@ -40,15 +40,15 @@ database = "audit_factory_failures.duckdb"
 [defaults]
 materialized = "table"
 """,
-            "models/orders.sql": """
+            "sql/models/orders.sql": """
 MODEL (description "Test model orders.", audit_factories [order_quality]);
 SELECT 2 AS id, -10 AS amount
 """,
-            "audits/generic/expression_is_true.sql": """
+            "sql/audits/generic/expression_is_true.sql": """
 AUDIT ();
 SELECT * FROM __ref("@model") WHERE NOT (@expression)
 """,
-            "python/factories/quality.py": """
+            "python/nodes/factories/quality.py": """
 from sqlbuild.audits import AuditCase, AuditSeverity, audit_factory
 
 @audit_factory

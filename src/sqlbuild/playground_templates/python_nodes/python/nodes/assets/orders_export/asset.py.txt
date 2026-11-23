@@ -1,0 +1,26 @@
+"""Asset examples for the Python nodes playground."""
+
+from sqlbuild.assets import asset
+from sqlbuild.refs import model
+
+from python.nodes.assets.orders_inputs import export_window, optional_partner_feed
+
+
+@asset(
+    depends_on=(model("fact_orders"), optional_partner_feed, export_window),
+    tags=["python", "external"],
+    group="exports",
+    columns=[{"name": "order_count", "type": "INTEGER"}],
+    column_lineage={"order_count": [{"node": "fact_orders", "column": "order_id"}]},
+)
+def orders_export(ctx):
+    """Read a SQL model relation and describe an external export artifact."""
+
+    relation = ctx.relation(model("fact_orders"))
+    rows = ctx.query(f"SELECT COUNT(*) AS order_count FROM {relation}").fetchall()
+    order_count = int(rows[0][0])
+    return ctx.result(
+        payload={"order_count": order_count},
+        metadata={"target_uri": "s3://example-bucket/orders.json", "window": "daily"},
+        materialized=False,
+    )

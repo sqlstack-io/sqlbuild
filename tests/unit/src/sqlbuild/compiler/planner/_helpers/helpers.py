@@ -106,7 +106,7 @@ def microbatch_model_with_cursor_end(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="orders"),
         deps=(),
         name="orders",
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         query_sql="SELECT 1",
         references=(),
         config=CompileModelConfig(
@@ -181,7 +181,7 @@ def build_selection_model(
         key=key,
         deps=(),
         name=name,
-        relative_path=Path(f"models/{name}.sql"),
+        relative_path=Path(f"sql/models/{name}.sql"),
         query_sql="SELECT 1",
         config=CompileModelConfig(values=values),
         destination=CompiledRelationLocation(
@@ -228,8 +228,8 @@ def build_source_load_nodes_project() -> CompiledProjectView:
                 name="raw_orders",
                 source_entry=raw_orders_entry,
                 source_file=DiscoveredSourceFile(
-                    file_path=Path("sources/raw.yml"),
-                    relative_path=Path("sources/raw.yml"),
+                    file_path=Path("sql/sources/raw.yml"),
+                    relative_path=Path("sql/sources/raw.yml"),
                     contents="",
                     source_entries=(raw_orders_entry,),
                 ),
@@ -237,16 +237,16 @@ def build_source_load_nodes_project() -> CompiledProjectView:
         ),
         loader_functions=(
             DiscoveredLoaderFunction(
-                file_path=Path("python/loaders/raw.py"),
-                relative_path=Path("python/loaders/raw.py"),
+                file_path=Path("python/nodes/loaders/raw.py"),
+                relative_path=Path("python/nodes/loaders/raw.py"),
                 name="fetch_orders",
                 function=fetch_orders,
                 destination="staging_fetch_orders",
                 write_strategy=SourceWriteStrategy.TABLE,
             ),
             DiscoveredLoaderFunction(
-                file_path=Path("python/loaders/raw.py"),
-                relative_path=Path("python/loaders/raw.py"),
+                file_path=Path("python/nodes/loaders/raw.py"),
+                relative_path=Path("python/nodes/loaders/raw.py"),
                 name="load_orders",
                 function=load_orders,
                 depends_on=(fetch_orders,),
@@ -306,7 +306,7 @@ def build_test_project(
             )
             for d in dep_names
         )
-        rel_path: str = effective_paths.get(model_name, f"models/{model_name}.sql")
+        rel_path: str = effective_paths.get(model_name, f"sql/models/{model_name}.sql")
         models.append(
             CompiledModel(
                 key=model_key(model_name),
@@ -334,7 +334,7 @@ def build_test_project(
                 name=source_name,
                 source_entry=source_entry,
                 source_file=DiscoveredSourceFile(
-                    file_path=Path(f"sources/{source_name}.yml"),
+                    file_path=Path(f"sql/sources/{source_name}.yml"),
                     relative_path=Path(source_name),
                     contents="",
                     source_entries=(source_entry,),
@@ -351,8 +351,8 @@ def build_test_project(
                 deps=(),
                 name=seed_name,
                 seed_file=DiscoveredSeedFile(
-                    file_path=Path(f"seeds/{seed_name}.csv"),
-                    relative_path=Path(f"seeds/{seed_name}.csv"),
+                    file_path=Path(f"sql/seeds/{seed_name}.csv"),
+                    relative_path=Path(f"sql/seeds/{seed_name}.csv"),
                 ),
                 schema_entry=SchemaSeedEntry(name=seed_name, columns=()),
                 schema_file=_stub_schema_file(),
@@ -370,7 +370,7 @@ def build_test_project(
                 key=function_key(function_name),
                 deps=(),
                 name=function_name,
-                relative_path=Path(f"functions/sql/{function_name}.sql"),
+                relative_path=Path(f"sql/functions/sql/{function_name}.sql"),
                 arguments=(),
                 returns="BOOLEAN",
                 body_sql="SELECT TRUE",
@@ -460,8 +460,8 @@ def build_test_project(
                 name=f"{model_name}_audit",
                 definition_name="test_audit",
                 audit_file=DiscoveredAuditFile(
-                    file_path=Path("audits/generic/test.sql"),
-                    relative_path=Path("audits/generic/test.sql"),
+                    file_path=Path("sql/audits/generic/test.sql"),
+                    relative_path=Path("sql/audits/generic/test.sql"),
                     contents="",
                     blocks=(),
                 ),
@@ -753,8 +753,8 @@ def build_test_project_with_source_entry(source_entry: SourceEntry) -> CompiledP
         name=source_entry.name,
         source_entry=source_entry,
         source_file=DiscoveredSourceFile(
-            file_path=Path("sources/raw.yml"),
-            relative_path=Path("sources/raw.yml"),
+            file_path=Path("sql/sources/raw.yml"),
+            relative_path=Path("sql/sources/raw.yml"),
             contents="",
             source_entries=(source_entry,),
         ),
@@ -782,7 +782,7 @@ def build_source_cursor_input_model(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="test_model"),
         deps=(),
         name="test_model",
-        relative_path=Path("models/test_model.sql"),
+        relative_path=Path("sql/models/test_model.sql"),
         query_sql="SELECT 1",
         references=(
             CompileSqlReference(
@@ -809,7 +809,7 @@ def build_transitive_watermark_models(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="orders_view"),
         deps=(),
         name="orders_view",
-        relative_path=Path("models/orders_view.sql"),
+        relative_path=Path("sql/models/orders_view.sql"),
         query_sql='SELECT * FROM __source("raw_orders")',
         references=(CompileSqlReference(ref_kind=SqlReferenceKind.SOURCE, ref_name="raw_orders"),),
         config=CompileModelConfig(values={"materialized": "view"}),
@@ -826,7 +826,7 @@ def build_transitive_watermark_models(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="test_model"),
         deps=(),
         name="test_model",
-        relative_path=Path("models/test_model.sql"),
+        relative_path=Path("sql/models/test_model.sql"),
         query_sql='SELECT * FROM __ref("orders_view")',
         references=(CompileSqlReference(ref_kind=SqlReferenceKind.REF, ref_name="orders_view"),),
         config=CompileModelConfig(
@@ -874,7 +874,7 @@ def build_function_transitive_watermark_models(
         key=CompiledObjectKey(resource_type=CompiledResourceType.TABLE_FN, name=function_name),
         deps=(),
         name=function_name,
-        relative_path=Path(f"functions/sql/{function_name}.sql"),
+        relative_path=Path(f"sql/functions/sql/{function_name}.sql"),
         arguments=(),
         returns="TABLE (order_id INTEGER)",
         body_sql='SELECT * FROM __ref("orders_view")',
@@ -906,7 +906,7 @@ def build_cursor_input_contract_models(
             ),
             deps=(),
             name=test_case.reference_name,
-            relative_path=Path(f"models/{test_case.reference_name}.sql"),
+            relative_path=Path(f"sql/models/{test_case.reference_name}.sql"),
             query_sql="SELECT 1",
             config=CompileModelConfig(values={"contract": test_case.upstream_contract}),
             inferred_columns=test_case.compiled_inferred_columns,
@@ -987,7 +987,7 @@ def build_strategy_model(test_case: ResolveModelPlanActionTestCase) -> CompiledM
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="test_model"),
         deps=(),
         name="test_model",
-        relative_path=Path("models/test_model.sql"),
+        relative_path=Path("sql/models/test_model.sql"),
         query_sql="SELECT 1",
         config=CompileModelConfig(values=config_values),
         destination=CompiledRelationLocation(
@@ -1027,7 +1027,7 @@ def build_strategy_error_model(test_case: IncrementalStrategyErrorTestCase) -> C
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="test_model"),
         deps=(),
         name="test_model",
-        relative_path=Path("models/test_model.sql"),
+        relative_path=Path("sql/models/test_model.sql"),
         query_sql="SELECT 1",
         config=CompileModelConfig(values=config_values),
         destination=CompiledRelationLocation(
@@ -1078,8 +1078,8 @@ def build_audit_from_test_case(
         scope_deps=(),
         name="test_audit",
         audit_file=DiscoveredAuditFile(
-            file_path=Path("audits/generic/test.sql"),
-            relative_path=Path("audits/generic/test.sql"),
+            file_path=Path("sql/audits/generic/test.sql"),
+            relative_path=Path("sql/audits/generic/test.sql"),
             contents="",
             blocks=(),
         ),
@@ -1132,7 +1132,7 @@ def build_cursor_override_model(cursor_type: str | None) -> CompiledModelView:
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="test_model"),
         deps=(),
         name="test_model",
-        relative_path=Path("models/test_model.sql"),
+        relative_path=Path("sql/models/test_model.sql"),
         query_sql="SELECT 1",
         config=CompileModelConfig(values=config_values),
         destination=CompiledRelationLocation(
@@ -1163,7 +1163,7 @@ def build_microbatch_lookback_model(
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="test_model"),
         deps=(),
         name="test_model",
-        relative_path=Path("models/test_model.sql"),
+        relative_path=Path("sql/models/test_model.sql"),
         query_sql="SELECT 1",
         config=CompileModelConfig(values=config_values),
         destination=CompiledRelationLocation(
@@ -1185,7 +1185,7 @@ def build_compiled_function(*, body_sql: str, target_schema: str = "main") -> Co
         ),
         deps=(),
         name="is_completed_order",
-        relative_path=Path("functions/sql/is_completed_order.sql"),
+        relative_path=Path("sql/functions/sql/is_completed_order.sql"),
         arguments=(FunctionArgument(name="order_status", type="STRING"),),
         returns="BOOLEAN",
         body_sql=body_sql,
@@ -1225,8 +1225,8 @@ def _stub_schema_file() -> DiscoveredSchemaFile:
     """Return a minimal schema file stub for seed construction."""
 
     return DiscoveredSchemaFile(
-        file_path=Path("seeds/schema.yml"),
-        relative_path=Path("seeds/schema.yml"),
+        file_path=Path("sql/seeds/schema.yml"),
+        relative_path=Path("sql/seeds/schema.yml"),
         contents="",
         model_entries=(),
         seed_entries=(),
@@ -1242,8 +1242,8 @@ def build_scheduling_audit(
     """Build a minimal CompiledAudit for scheduling tests."""
 
     stub_file: DiscoveredAuditFile = DiscoveredAuditFile(
-        file_path=Path("audits/singular/check.sql"),
-        relative_path=Path("audits/singular/check.sql"),
+        file_path=Path("sql/audits/singular/check.sql"),
+        relative_path=Path("sql/audits/singular/check.sql"),
         contents="",
         blocks=(),
     )
@@ -1310,11 +1310,11 @@ def build_seed_identity_compiled_seed(
         key=CompiledObjectKey(resource_type=CompiledResourceType.SEED, name="orders"),
         deps=(),
         name="orders",
-        seed_file=DiscoveredSeedFile(file_path=file_path, relative_path=Path("seeds/orders.csv")),
+        seed_file=DiscoveredSeedFile(file_path=file_path, relative_path=Path("sql/seeds/orders.csv")),
         schema_entry=schema_entry,
         schema_file=DiscoveredSchemaFile(
             file_path=file_path.parent / "schema.yml",
-            relative_path=Path("seeds/schema.yml"),
+            relative_path=Path("sql/seeds/schema.yml"),
             contents="",
             model_entries=(),
             seed_entries=(schema_entry,),

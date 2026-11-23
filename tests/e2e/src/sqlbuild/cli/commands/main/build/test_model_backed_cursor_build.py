@@ -55,7 +55,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_orders
@@ -65,7 +65,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                     """
                 ).strip()
                 + "\n",
-                "models/staging/stg_orders.sql": dedent(
+                "sql/models/staging/stg_orders.sql": dedent(
                     """
                     MODEL (description "Test model stg_orders.",
                       materialized view
@@ -82,7 +82,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                     """
                 ).strip()
                 + "\n",
-                "models/marts/fact_orders.sql": dedent(
+                "sql/models/marts/fact_orders.sql": dedent(
                     """
                     MODEL (description "Test model fact_orders.",
                       materialized table
@@ -99,7 +99,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                     """
                 ).strip()
                 + "\n",
-                "models/intermediate/order_status_index.sql": dedent(
+                "sql/models/intermediate/order_status_index.sql": dedent(
                     """
                     MODEL (description "Test model order_status_index.",
                       materialized incremental,
@@ -123,7 +123,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                     """
                 ).strip()
                 + "\n",
-                "models/marts/hourly_order_activity.sql": dedent(
+                "sql/models/marts/hourly_order_activity.sql": dedent(
                     """
                     MODEL (description "Test model hourly_order_activity.",
                       materialized incremental,
@@ -153,7 +153,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
                     """
                 ).strip()
                 + "\n",
-                "models/marts/fact_orders_view.sql": dedent(
+                "sql/models/marts/fact_orders_view.sql": dedent(
                     """
                     MODEL (description "Test model fact_orders_view.",
                       materialized view
@@ -231,8 +231,8 @@ def test_given_inline_project_when_building_model_backed_cursor_models_then_it_s
         assert tuple(tuple(row) for row in actual_rows) == expected_rows
 
     runtime_sql_paths: tuple[Path, ...] = (
-        project_dir / "target" / "run" / "models" / "intermediate" / "order_status_index.sql",
-        project_dir / "target" / "run" / "models" / "marts" / "hourly_order_activity.sql",
+        project_dir / "target" / "run" / "sql" / "models" / "intermediate" / "order_status_index.sql",
+        project_dir / "target" / "run" / "sql" / "models" / "marts" / "hourly_order_activity.sql",
     )
     runtime_sql_path: Path
     for runtime_sql_path in runtime_sql_paths:
@@ -245,7 +245,7 @@ def test_given_inline_project_when_building_model_backed_cursor_models_then_it_s
     connection.execute("DELETE FROM raw_orders")
     connection.close()
     normal_incremental_path: Path = (
-        project_dir / "models" / "intermediate" / "order_status_index.sql"
+        project_dir / "sql" / "models" / "intermediate" / "order_status_index.sql"
     )
     normal_incremental_sql: str = normal_incremental_path.read_text(encoding="utf-8")
     normal_incremental_path.write_text(

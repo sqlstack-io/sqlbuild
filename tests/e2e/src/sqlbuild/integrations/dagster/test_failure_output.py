@@ -32,10 +32,10 @@ _FAILING_AUDIT_PROJECT_FILES: dict[str, str] = {
         'name = "orders_shop"\nadapter = "duckdb"\n\n'
         '[connection]\ndatabase = "warehouse.duckdb"\n\n[defaults]\nmaterialized = "table"\n'
     ),
-    "models/customers.sql": (
+    "sql/models/customers.sql": (
         "MODEL (description 'One row per customer.');\nSELECT 1 AS customer_id\n"
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (\n  description 'One row per order.',\n"
         "  columns (order_id (audits [not_null])),\n);\n"
         'SELECT 1 AS order_id, customer_id FROM __ref("customers")\n'

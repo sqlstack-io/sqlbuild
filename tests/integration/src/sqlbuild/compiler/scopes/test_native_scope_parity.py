@@ -43,7 +43,7 @@ _MACRO_TEST_HEADER: str = 'TEST (mode macro, name "eu_label");\n\n'
             description="a global enum duplicating a scoped enum fails with Python's diagnostics",
             files={
                 **SCOPED_PROJECT,
-                "enums/region.sql": "ENUM (name eu_region, members [EAST]);\n",
+                "sql/enums/region.sql": "ENUM (name eu_region, members [EAST]);\n",
             },
             expected_error="Duplicate declaration 'enum:eu_region'",
         ),
@@ -102,7 +102,7 @@ _MACRO_TEST_HEADER: str = 'TEST (mode macro, name "eu_label");\n\n'
             description="non-ASCII folders keep Python's repr order of path keys",
             files={
                 **SCOPED_PROJECT,
-                "models/sales/r\u00e9gion/regional.sql": (
+                "sql/models/sales/r\u00e9gion/regional.sql": (
                     'MODEL (\n  description "Regional",\n);\n\n'
                     'SELECT order_id, @const("sales_cap") AS cap\nFROM __ref("orders")\n'
                 ),
@@ -113,7 +113,7 @@ _MACRO_TEST_HEADER: str = 'TEST (mode macro, name "eu_label");\n\n'
             description="a test granted a deeper macro's folder through a macro test",
             files={
                 **SCOPED_PROJECT,
-                "models/sales/eu/_macros/python/rates.py": (
+                "sql/models/sales/eu/_macros/python/rates.py": (
                     'def eu_rate(value: str) -> str:\n    return f"{value} * 2"\n\n\n'
                     "def eu_label(value: str) -> str:\n    return eu_rate(value)\n"
                 ),

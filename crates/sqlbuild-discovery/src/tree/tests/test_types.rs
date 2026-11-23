@@ -31,7 +31,7 @@ pub(super) struct OsFailureTestCase {
     pub(super) expected_message: &'static str,
 }
 
-/// Files written by raw byte path below a project whose `models/` is walked for `*.sql`.
+/// Files written by raw byte path below a project whose `sql/models/` is walked for `*.sql`.
 #[cfg(unix)]
 pub(super) struct UndecodableWalkTestCase {
     pub(super) description: &'static str,
@@ -42,7 +42,7 @@ pub(super) struct UndecodableWalkTestCase {
     pub(super) expected_contents: &'static [&'static str],
 }
 
-/// A junction `models/linked` to a directory holding `orders.sql`, walked for `*.sql`.
+/// A junction `sql/models/linked` to a directory holding `orders.sql`, walked for `*.sql`.
 #[cfg(windows)]
 pub(super) struct JunctionWalkTestCase {
     pub(super) description: &'static str,
@@ -64,7 +64,7 @@ pub(super) struct WideUnitsTestCase {
     pub(super) expected_code_points: &'static [u32],
 }
 
-/// Files named by UTF-16 units below `models/`, walked for `*.sql` on Windows.
+/// Files named by UTF-16 units below `sql/models/`, walked for `*.sql` on Windows.
 #[cfg(windows)]
 pub(super) struct WideNameWalkTestCase {
     pub(super) description: &'static str,

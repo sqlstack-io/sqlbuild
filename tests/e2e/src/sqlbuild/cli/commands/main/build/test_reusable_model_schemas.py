@@ -43,7 +43,7 @@ def test_given_reusable_inherited_schemas_when_building_then_all_materialization
                 """
             ).strip()
             + "\n",
-            "sources/raw.yml": dedent(
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_events
@@ -53,7 +53,7 @@ def test_given_reusable_inherited_schemas_when_building_then_all_materialization
                 """
             ).strip()
             + "\n",
-            "schemas/events/base.sql": dedent(
+            "sql/schemas/events/base.sql": dedent(
                 """
                 SCHEMA (description "Test schema.",
                   name event,
@@ -65,7 +65,7 @@ def test_given_reusable_inherited_schemas_when_building_then_all_materialization
                 """
             ).strip()
             + "\n",
-            "schemas/events/sourced.sql": dedent(
+            "sql/schemas/events/sourced.sql": dedent(
                 """
                 SCHEMA (description "Test schema.",
                   name sourced_event,
@@ -77,7 +77,7 @@ def test_given_reusable_inherited_schemas_when_building_then_all_materialization
                 """
             ).strip()
             + "\n",
-            "models/stg_events.sql": dedent(
+            "sql/models/stg_events.sql": dedent(
                 """
                 MODEL (
                   materialized view,
@@ -92,7 +92,7 @@ def test_given_reusable_inherited_schemas_when_building_then_all_materialization
                 """
             ).strip()
             + "\n",
-            "models/event_table.sql": dedent(
+            "sql/models/event_table.sql": dedent(
                 """
                 MODEL (
                   materialized table,
@@ -108,7 +108,7 @@ def test_given_reusable_inherited_schemas_when_building_then_all_materialization
                 """
             ).strip()
             + "\n",
-            "models/event_incremental.sql": dedent(
+            "sql/models/event_incremental.sql": dedent(
                 """
                 MODEL (
                   materialized incremental,

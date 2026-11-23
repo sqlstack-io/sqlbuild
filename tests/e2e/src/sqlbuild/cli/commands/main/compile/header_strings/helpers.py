@@ -11,8 +11,8 @@ _BASE_FILES: dict[str, str] = {
         'name = "shop"\nadapter = "duckdb"\n\n[connection]\ndatabase = "shop.duckdb"\n\n'
         "[scopes]\nenforce_placement = false\n"
     ),
-    "seeds/raw_customers.csv": "customer_id,title\n1,Miss\n2,Mr\n",
-    "seeds/raw_customers.yml": (
+    "sql/seeds/raw_customers.csv": "customer_id,title\n1,Miss\n2,Mr\n",
+    "sql/seeds/raw_customers.yml": (
         "seeds:\n  - name: raw_customers\n    description: Raw customers.\n"
         "    columns:\n      - name: customer_id\n        type: BIGINT\n"
         "      - name: title\n        type: VARCHAR\n"

@@ -155,7 +155,7 @@ def build_scoped_macro_resolver(
         resources=(
             ResourceRecord(
                 model_identity,
-                "models/marts/finance/orders.sql",
+                "sql/models/marts/finance/orders.sql",
                 OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
             ),
         ),
@@ -171,7 +171,7 @@ def build_scoped_macro_resolver(
 
 
 def build_loaded_macros(tmp_path: Path, macro_file_contents: str) -> dict[str, LoadedMacro]:
-    macros_dir: Path = tmp_path / "macros" / "python"
+    macros_dir: Path = tmp_path / "sql" / "macros" / "python"
     macros_dir.mkdir(parents=True, exist_ok=True)
     macro_file_path: Path = macros_dir / "common.py"
     macro_file_path.write_text(macro_file_contents, encoding="utf-8")
@@ -179,7 +179,7 @@ def build_loaded_macros(tmp_path: Path, macro_file_contents: str) -> dict[str, L
         (
             DiscoveredMacroFile(
                 file_path=macro_file_path,
-                relative_path=Path("macros/python/common.py"),
+                relative_path=Path("sql/macros/python/common.py"),
                 contents=macro_file_contents,
             ),
         )
@@ -253,7 +253,7 @@ def _compiled_direct_tested_names(payload: object) -> tuple[str, ...]:
 def singular_audit_files(*, base: dict[str, str], sql: str) -> dict[str, str]:
     """Return project files with one top-level singular audit over the given SQL."""
 
-    return base | {"audits/singular/check.sql": f"AUDIT ();\n{sql}"}
+    return base | {"sql/audits/singular/check.sql": f"AUDIT ();\n{sql}"}
 
 
 def model_header(*, key: str, value: str) -> str:
@@ -318,7 +318,7 @@ def expand_typed_macro_sql(
     loaded_macros: dict[str, LoadedMacro] = build_loaded_macros(tmp_path, macro_file_contents)
     return expand_sql_macros(
         sql=sql,
-        file_path=tmp_path / "models" / "order_summary.sql",
+        file_path=tmp_path / "sql" / "models" / "order_summary.sql",
         loaded_macros=loaded_macros,
         macro_context=MacroContext(
             adapter_name="duckdb",
@@ -434,19 +434,19 @@ def write_scoped_macro_orders_project(project_dir: Path) -> None:
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model: Path = project_dir / "models" / "orders.sql"
+    model: Path = project_dir / "sql" / "models" / "orders.sql"
     model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\nSELECT 1 AS order_id WHERE @py.order_filter("1")\n',
         encoding="utf-8",
     )
-    (project_dir / "macros" / "python").mkdir(parents=True)
-    (project_dir / "macros" / "python" / "order_filter.py").write_text(
+    (project_dir / "sql" / "macros" / "python").mkdir(parents=True)
+    (project_dir / "sql" / "macros" / "python" / "nodes" / "order_filter.py").write_text(
         'def order_filter(column: str) -> str:\n    return f"{column} > 0"\n', encoding="utf-8"
     )
     tests_dir: Path = project_dir / "tests" / "unit"
     (tests_dir / "_macros" / "python").mkdir(parents=True)
-    (tests_dir / "_macros" / "python" / "row_limit.py").write_text(
+    (tests_dir / "_macros" / "python" / "nodes" / "row_limit.py").write_text(
         'def row_limit() -> str:\n    return "LIMIT 1"\n', encoding="utf-8"
     )
     (tests_dir / "test_orders.sql").write_text(

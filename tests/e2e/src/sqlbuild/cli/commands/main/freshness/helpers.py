@@ -20,12 +20,12 @@ def prepare_freshness_project(
             "[connection]\n"
             'database = "warehouse.duckdb"\n'
         ),
-        "sources/raw.yml": freshness_sources_yml(
+        "sql/sources/raw.yml": freshness_sources_yml(
             raw_orders_freshness=raw_orders_freshness,
             include_error_source=include_error_source,
             include_managed_source=include_managed_source,
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             'MODEL (description "Test model orders.", '
             'materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
         ),
@@ -34,7 +34,7 @@ def prepare_freshness_project(
         {
             False: {},
             True: {
-                "python/loaders/raw.py": (
+                "python/nodes/loaders/raw.py": (
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader\n"
                     "def raw_managed(ctx):\n"
@@ -61,12 +61,12 @@ def prepare_multi_schema_freshness_project(*, tmp_path: Path) -> Path:
                 "[connection]\n"
                 'database = "warehouse.duckdb"\n'
             ),
-            "sources/raw.yml": freshness_sources_yml(include_error_source=False),
-            "models/dev_orders.sql": (
+            "sql/sources/raw.yml": freshness_sources_yml(include_error_source=False),
+            "sql/models/dev_orders.sql": (
                 'MODEL (description "Test model dev_orders.", '
                 'materialized table, schema dev);\n\nSELECT * FROM __source("raw_orders")\n'
             ),
-            "models/mart_orders.sql": (
+            "sql/models/mart_orders.sql": (
                 'MODEL (description "Test model mart_orders.", '
                 'materialized table, schema mart);\n\nSELECT * FROM __source("raw_orders")\n'
             ),

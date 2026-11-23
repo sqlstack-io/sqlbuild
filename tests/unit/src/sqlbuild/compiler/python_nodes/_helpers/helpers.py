@@ -119,7 +119,7 @@ def build_terminal_loader_python_node_graph() -> PythonNodeGraph:
             loader_functions=(
                 DiscoveredLoaderFunction(
                     file_path=Path("/project/loaders/orders.py"),
-                    relative_path=Path("python/loaders/orders.py"),
+                    relative_path=Path("python/nodes/loaders/orders.py"),
                     name="raw_orders",
                     function=raw_orders,
                 ),
@@ -136,7 +136,7 @@ def build_orders_python_node_graph() -> PythonNodeGraph:
             loader_functions=(
                 DiscoveredLoaderFunction(
                     file_path=Path("/project/loaders/events.py"),
-                    relative_path=Path("python/loaders/events.py"),
+                    relative_path=Path("python/nodes/loaders/events.py"),
                     name="load_events",
                     function=load_events,
                     depends_on=(prepare_orders,),
@@ -145,14 +145,14 @@ def build_orders_python_node_graph() -> PythonNodeGraph:
             asset_functions=(
                 DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/orders.py"),
-                    relative_path=Path("python/tasks/orders.py"),
+                    relative_path=Path("python/nodes/tasks/orders.py"),
                     name="prepare_orders",
                     function=prepare_orders,
                     tags=("orders", "daily"),
                 ),
                 DiscoveredAssetFunction(
                     file_path=Path("/project/assets/orders.py"),
-                    relative_path=Path("python/assets/orders.py"),
+                    relative_path=Path("python/nodes/assets/orders.py"),
                     name="export_orders",
                     function=export_orders,
                     depends_on=(imported_prepare_orders,),
@@ -166,7 +166,7 @@ def build_orders_python_node_graph() -> PythonNodeGraph:
             check_functions=(
                 DiscoveredCheckFunction(
                     file_path=Path("/project/checks/orders.py"),
-                    relative_path=Path("python/checks/orders.py"),
+                    relative_path=Path("python/nodes/checks/orders.py"),
                     name="check_orders_export",
                     function=check_orders_export,
                     depends_on=(export_orders,),
@@ -257,7 +257,7 @@ def build_sql_ref_python_node_graph(*, dependency: SqlResourceRef) -> PythonNode
             asset_functions=(
                 DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/orders.py"),
-                    relative_path=Path("python/tasks/orders.py"),
+                    relative_path=Path("python/nodes/tasks/orders.py"),
                     name="profile_orders",
                     function=prepare_orders,
                     depends_on=(dependency,),
@@ -277,14 +277,14 @@ def build_sibling_sql_ref_python_node_graph() -> PythonNodeGraph:
             asset_functions=(
                 DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/orders.py"),
-                    relative_path=Path("python/tasks/orders.py"),
+                    relative_path=Path("python/nodes/tasks/orders.py"),
                     name="export_orders",
                     function=prepare_orders,
                     depends_on=(model_ref("orders"),),
                 ),
                 DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/raw.py"),
-                    relative_path=Path("python/tasks/raw.py"),
+                    relative_path=Path("python/nodes/tasks/raw.py"),
                     name="export_raw_orders",
                     function=prepare_orders,
                     depends_on=(source_ref("raw_orders"),),
@@ -302,7 +302,7 @@ def build_sql_downstream_asset_to_loader_python_node_graph() -> PythonNodeGraph:
             loader_functions=(
                 DiscoveredLoaderFunction(
                     file_path=Path("/project/loaders/orders.py"),
-                    relative_path=Path("python/loaders/orders.py"),
+                    relative_path=Path("python/nodes/loaders/orders.py"),
                     name="load_events",
                     function=load_events,
                     depends_on=(prepare_orders,),
@@ -311,7 +311,7 @@ def build_sql_downstream_asset_to_loader_python_node_graph() -> PythonNodeGraph:
             asset_functions=(
                 DiscoveredAssetFunction(
                     file_path=Path("/project/tasks/orders.py"),
-                    relative_path=Path("python/tasks/orders.py"),
+                    relative_path=Path("python/nodes/tasks/orders.py"),
                     name="prepare_orders",
                     function=prepare_orders,
                     depends_on=(model_ref("orders"),),
@@ -370,13 +370,13 @@ def _build_loader_dependency_python_node_graph(
     intermediate_loaders: tuple[DiscoveredLoaderFunction, ...] = (
         DiscoveredLoaderFunction(
             file_path=Path("/project/loaders/events.py"),
-            relative_path=Path("python/loaders/events.py"),
+            relative_path=Path("python/nodes/loaders/events.py"),
             name="fetch_pages",
             function=fetch_pages,
         ),
         DiscoveredLoaderFunction(
             file_path=Path("/project/loaders/events.py"),
-            relative_path=Path("python/loaders/events.py"),
+            relative_path=Path("python/nodes/loaders/events.py"),
             name="load_events",
             function=load_events,
             depends_on=(fetch_pages,),
@@ -385,7 +385,7 @@ def _build_loader_dependency_python_node_graph(
     terminal_loaders: tuple[DiscoveredLoaderFunction, ...] = (
         DiscoveredLoaderFunction(
             file_path=Path("/project/loaders/events.py"),
-            relative_path=Path("python/loaders/events.py"),
+            relative_path=Path("python/nodes/loaders/events.py"),
             name="raw_orders",
             function=raw_orders,
         ),
@@ -398,7 +398,7 @@ def _build_loader_dependency_python_node_graph(
     asset_functions: tuple[DiscoveredAssetFunction, ...] = (
         DiscoveredAssetFunction(
             file_path=Path("/project/assets/orders.py"),
-            relative_path=Path("python/assets/orders.py"),
+            relative_path=Path("python/nodes/assets/orders.py"),
             name="export_orders",
             function=export_orders,
             depends_on=(dependency_function,),
@@ -407,7 +407,7 @@ def _build_loader_dependency_python_node_graph(
     check_functions: tuple[DiscoveredCheckFunction, ...] = (
         DiscoveredCheckFunction(
             file_path=Path("/project/checks/orders.py"),
-            relative_path=Path("python/checks/orders.py"),
+            relative_path=Path("python/nodes/checks/orders.py"),
             name="check_loaded_orders",
             function=check_loaded_orders,
             depends_on=(dependency_function,),
@@ -460,7 +460,7 @@ def build_orders_project_graph() -> ProjectGraph:
     )
     source_file: DiscoveredSourceFile = DiscoveredSourceFile(
         file_path=Path("/project/sources/raw.yml"),
-        relative_path=Path("sources/raw.yml"),
+        relative_path=Path("sql/sources/raw.yml"),
         contents="sources: []\n",
         source_entries=(),
     )
@@ -475,7 +475,7 @@ def build_orders_project_graph() -> ProjectGraph:
         key=orders_key,
         deps=(raw_orders_key,),
         name="orders",
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         query_sql='select * from __source("raw_orders")',
         config=CompileModelConfig(values={"tags": ["daily"]}),
         destination=CompiledRelationLocation(
@@ -600,7 +600,7 @@ def identity_summary(
 _DOMAINS: tuple[str, ...] = ("orders", "customers", "inventory", "fulfillment", "support")
 
 _SHARED_PROJECT_FILES: dict[str, str] = {
-    "providers/warehouse_api/provider.py": '''"""Warehouse API client."""
+    "python/providers/warehouse_api/provider.py": '''"""Warehouse API client."""
 
 from sqlbuild.providers import Provider
 
@@ -611,7 +611,7 @@ class WarehouseApi(Provider):
     def page_size(self) -> int:
         return 100
 ''',
-    "python/shared/text.py": '''"""Text helpers."""
+    "python/nodes/shared/text.py": '''"""Text helpers."""
 
 
 def normalize_text(value: str) -> str:
@@ -621,9 +621,9 @@ def normalize_text(value: str) -> str:
 def clean_status(value: str) -> str:
     return normalize_text(value).replace("-", "_")
 ''',
-    "python/shared/money.py": '''"""Money helpers."""
+    "python/nodes/shared/money.py": '''"""Money helpers."""
 
-from python.shared.text import normalize_text
+from python.nodes.shared.text import normalize_text
 
 
 class Money:
@@ -649,8 +649,8 @@ def to_units(cents: int) -> float:
 def _domain_rows(domain: str) -> str:
     return f'''"""{domain.title()} row helpers."""
 
-from python.shared.money import Ledger, Money
-from python.shared.text import clean_status
+from python.nodes.shared.money import Ledger, Money
+from python.nodes.shared.text import clean_status
 
 
 class RowBatch:
@@ -668,13 +668,13 @@ def map_row(raw: dict[str, str]) -> dict[str, object]:
 
 def _node_files(domain: str, index: int) -> dict[str, str]:
     name: str = f"{domain}_sync_{index:03d}"
-    folder: str = f"python/{domain}/{name}"
+    folder: str = f"python/nodes/{domain}/{name}"
     return {
         f"{folder}/node.py": f'''"""Sync {domain} batch {index}."""
 
-from providers.warehouse_api.provider import WarehouseApi
-from python.{domain}._helpers.rows import RowBatch
-from python.{domain}.{name}.main import main
+from python.nodes.providers.warehouse_api.provider import WarehouseApi
+from python.nodes.{domain}._helpers.rows import RowBatch
+from python.nodes.{domain}.{name}.main import main
 from sqlbuild.assets import asset
 
 
@@ -685,7 +685,7 @@ def {name}(ctx, warehouse_api: WarehouseApi):
 ''',
         f"{folder}/main.py": f'''"""Sync {domain} batch {index}."""
 
-from python.{domain}._helpers.rows import RowBatch
+from python.nodes.{domain}._helpers.rows import RowBatch
 
 
 def main(*, ctx, warehouse_api):
@@ -701,7 +701,7 @@ def _write_shared_project(
 
     shared: dict[str, str] = dict(_SHARED_PROJECT_FILES)
     for domain in _DOMAINS:
-        shared[f"python/{domain}/_helpers/rows.py"] = _domain_rows(domain)
+        shared[f"python/nodes/{domain}/_helpers/rows.py"] = _domain_rows(domain)
     nodes: dict[str, str] = {}
     for index in range(node_count):
         nodes.update(_node_files(_DOMAINS[index % len(_DOMAINS)], index))

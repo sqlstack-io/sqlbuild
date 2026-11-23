@@ -95,7 +95,7 @@ _READING_ASSET: str = (
             _LINE,
             settle_seconds=1.5,
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     f"MODEL (description 'Orders.', materialized table);\n{_ENDLESS}\n"
                 )
             },
@@ -117,7 +117,7 @@ _READING_ASSET: str = (
             "Value: ",
             _LINE,
             presses=2,
-            files={"python/assets/reader.py": _READING_ASSET},
+            files={"python/nodes/assets/reader.py": _READING_ASSET},
             expected_within_seconds=5.0,
         ),
     ],

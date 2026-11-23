@@ -320,7 +320,7 @@ pub(crate) fn load_path_defaults(payload: Option<&ConfigValue>, file: ConfigFile
                 format!(
                     "path_defaults defines both '{path_key}' and another key that normalize to \
                      '{normalized}'. Use only the canonical model-relative form without a \
-                     leading 'models/' prefix."
+                     leading 'sql/models/' prefix."
                 ),
             ));
         }

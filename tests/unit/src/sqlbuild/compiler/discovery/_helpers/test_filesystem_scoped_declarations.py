@@ -53,7 +53,7 @@ class _DiscoveredFile(Protocol):
         DiscoverScopedDeclarationTestCase("models", "models", "models"),
         DiscoverScopedDeclarationTestCase("unit_tests", "tests/unit", "tests/unit"),
         DiscoverScopedDeclarationTestCase("scenarios", "tests/scenarios", "tests/scenarios"),
-        DiscoverScopedDeclarationTestCase("sql_functions", "functions/sql", "functions/sql"),
+        DiscoverScopedDeclarationTestCase("sql_functions", "sql/functions/sql", "sql/functions/sql"),
         DiscoverScopedDeclarationTestCase("sources", "sources", "sources"),
     ),
     ids=lambda case: case.description,
@@ -105,22 +105,22 @@ def test_given_declaration_below_authored_root_when_discovering_then_records_bou
     "test_case",
     (
         DiscoverGroupedDeclarationTestCase(
-            "public_macro", "macro", "macros", "inherited", "models/orders"
+            "public_macro", "macro", "macros", "inherited", "sql/models/orders"
         ),
         DiscoverGroupedDeclarationTestCase(
-            "private_macro", "macro", "_macros", "local", "models/orders"
+            "private_macro", "macro", "_macros", "local", "sql/models/orders"
         ),
         DiscoverGroupedDeclarationTestCase(
-            "public_enum", "enum", "enums", "inherited", "models/orders"
+            "public_enum", "enum", "enums", "inherited", "sql/models/orders"
         ),
         DiscoverGroupedDeclarationTestCase(
-            "private_enum", "enum", "_enums", "local", "models/orders"
+            "private_enum", "enum", "_enums", "local", "sql/models/orders"
         ),
         DiscoverGroupedDeclarationTestCase(
-            "public_constant", "constant", "constants", "inherited", "models/orders"
+            "public_constant", "constant", "constants", "inherited", "sql/models/orders"
         ),
         DiscoverGroupedDeclarationTestCase(
-            "private_constant", "constant", "_constants", "local", "models/orders"
+            "private_constant", "constant", "_constants", "local", "sql/models/orders"
         ),
     ),
     ids=lambda case: case.description,
@@ -130,7 +130,7 @@ def test_given_grouped_declaration_when_discovering_then_owner_is_above_sqlbuild
     tmp_path: Path,
 ) -> None:
     suffix, contents = declaration_contents(kind=test_case.declaration_kind)
-    declaration_root: Path = Path("models/orders/_sqlbuild") / test_case.directory_name
+    declaration_root: Path = Path("sql/models/orders/_sqlbuild") / test_case.directory_name
     file_name: Path = declaration_kind_folder(kind=test_case.declaration_kind) / f"policy{suffix}"
     file_path: Path = tmp_path / declaration_root / file_name
     file_path.parent.mkdir(parents=True)
@@ -191,27 +191,27 @@ def test_given_top_level_public_declarations_when_discovering_then_scope_remains
         ),
         InvalidScopedDeclarationRootTestCase(
             "nested_scoped_roots",
-            "models/macros/organization/_constants/value.sql",
+            "sql/models/macros/organization/_constants/value.sql",
             "nested inside another declaration tree",
         ),
         InvalidScopedDeclarationRootTestCase(
             "scoped_root_below_global_tree",
-            "macros/organization/_macros/python/value.py",
+            "sql/macros/organization/_macros/python/value.py",
             "nested inside another declaration tree",
         ),
         InvalidScopedDeclarationRootTestCase(
             "global_root_below_global_tree",
-            "macros/organization/constants/value.sql",
+            "sql/macros/organization/constants/value.sql",
             "nested inside another declaration tree",
         ),
         InvalidScopedDeclarationRootTestCase(
             "global_root_below_scoped_tree",
-            "models/macros/organization/enums/value.sql",
+            "sql/models/macros/organization/enums/value.sql",
             "nested inside another declaration tree",
         ),
         InvalidScopedDeclarationRootTestCase(
             "grouped_root_with_intermediate_folder",
-            "models/orders/_sqlbuild/organization/macros/python/value.py",
+            "sql/models/orders/_sqlbuild/organization/macros/python/value.py",
             "contains unsupported entries",
         ),
         InvalidScopedDeclarationRootTestCase(
@@ -221,12 +221,12 @@ def test_given_top_level_public_declarations_when_discovering_then_scope_remains
         ),
         InvalidScopedDeclarationRootTestCase(
             "authored_root_grouped_root",
-            "models/_sqlbuild/macros/python/value.py",
+            "sql/models/_sqlbuild/macros/python/value.py",
             "must be below a concrete owner directory",
         ),
         InvalidScopedDeclarationRootTestCase(
             "grouped_root_with_unsupported_entry",
-            "models/orders/_sqlbuild/notes.py",
+            "sql/models/orders/_sqlbuild/notes.py",
             "contains unsupported entries",
         ),
     ),
@@ -250,8 +250,8 @@ def test_given_invalid_declaration_root_when_discovering_then_raises(
         OrdinaryFolderTestCase(
             description="old local spelling is ordinary",
             root_relative_path="_local_constants/value.sql",
-            model_relative_path="models/_local_constants/orders.sql",
-            expected_model_relative_paths=("models/_local_constants/orders.sql",),
+            model_relative_path="sql/models/_local_constants/orders.sql",
+            expected_model_relative_paths=("sql/models/_local_constants/orders.sql",),
         ),
     ),
     ids=lambda case: case.description,
@@ -309,14 +309,14 @@ def test_given_invalid_scoped_root_when_discovering_project_inputs_then_strict_d
     (
         OrdinaryDiscoveryExclusionTestCase(
             "model",
-            "models/domain/_constants/value.sql",
+            "sql/models/domain/_constants/value.sql",
             "CONSTANT (name scoped_value, value 1);\n",
             "model",
             (),
         ),
         OrdinaryDiscoveryExclusionTestCase(
             "grouped_model",
-            "models/domain/_sqlbuild/constants/value.sql",
+            "sql/models/domain/_sqlbuild/constants/value.sql",
             "CONSTANT (name scoped_value, value 1);\n",
             "model",
             (),
@@ -337,42 +337,42 @@ def test_given_invalid_scoped_root_when_discovering_project_inputs_then_strict_d
         ),
         OrdinaryDiscoveryExclusionTestCase(
             "hook",
-            "models/domain/_sqlbuild/_constants/value.sql",
+            "sql/models/domain/_sqlbuild/_constants/value.sql",
             "CONSTANT (name scoped_value, value 1);\n",
             "hook",
             (),
         ),
         OrdinaryDiscoveryExclusionTestCase(
             "function",
-            "functions/sql/domain/_constants/value.sql",
+            "sql/functions/sql/domain/_constants/value.sql",
             "CONSTANT (name scoped_value, value 1);\n",
             "function",
             (),
         ),
         OrdinaryDiscoveryExclusionTestCase(
             "audit",
-            "models/domain/_sqlbuild/_constants/value.sql",
+            "sql/models/domain/_sqlbuild/_constants/value.sql",
             "CONSTANT (name scoped_value, value 1);\n",
             "audit",
             (),
         ),
         OrdinaryDiscoveryExclusionTestCase(
             "source",
-            "sources/domain/_constants/value.sql",
+            "sql/sources/domain/_constants/value.sql",
             "CONSTANT (name scoped_value, value 1);\n",
             "source",
             (),
         ),
         OrdinaryDiscoveryExclusionTestCase(
             "python_function",
-            "functions/sql/domain/_macros/python/value.py",
+            "sql/functions/sql/domain/_macros/python/value.py",
             "raise RuntimeError('must not import')\n",
             "python_function",
             (),
         ),
         OrdinaryDiscoveryExclusionTestCase(
             "python_hook",
-            "models/domain/_sqlbuild/_macros/python/value.py",
+            "sql/models/domain/_sqlbuild/_macros/python/value.py",
             "raise RuntimeError('must not import')\n",
             "python_hook",
             (),
@@ -427,8 +427,8 @@ def test_given_file_in_declaration_role_when_discovering_resources_then_returns_
     (
         DiscoveryPathInventoryTestCase(
             "similarly_prefixed_directory",
-            ("models/_constants_archive/orders.sql",),
-            ("models/_constants_archive/orders.sql",),
+            ("sql/models/_constants_archive/orders.sql",),
+            ("sql/models/_constants_archive/orders.sql",),
         ),
     ),
     ids=lambda case: case.description,
@@ -454,15 +454,15 @@ def test_given_similarly_prefixed_directory_when_discovering_then_treats_it_as_o
         DiscoveryPathInventoryTestCase(
             "unsorted_scoped_macros",
             (
-                "models/z/_macros/python/z.py",
-                "models/a/_macros/python/z.py",
-                "models/a/_macros/python/a.py",
-                "models/a/_macros/python/__init__.py",
+                "sql/models/z/_macros/python/z.py",
+                "sql/models/a/_macros/python/z.py",
+                "sql/models/a/_macros/python/a.py",
+                "sql/models/a/_macros/python/__init__.py",
             ),
             (
-                "models/a/_macros/python/a.py",
-                "models/a/_macros/python/z.py",
-                "models/z/_macros/python/z.py",
+                "sql/models/a/_macros/python/a.py",
+                "sql/models/a/_macros/python/z.py",
+                "sql/models/z/_macros/python/z.py",
             ),
         ),
     ),

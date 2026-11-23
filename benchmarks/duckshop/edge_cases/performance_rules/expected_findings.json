@@ -1,7 +1,7 @@
 {
   "findings": [
-    ["SQBRPERFORMANCE101", "models/line_options.sql", 7, 3],
-    ["SQBRPERFORMANCE102", "models/order_lines_enriched.sql", 12, 3]
+    ["SQBRPERFORMANCE101", "sql/models/line_options.sql", 7, 3],
+    ["SQBRPERFORMANCE102", "sql/models/order_lines_enriched.sql", 12, 3]
   ],
   "skipped_note": "SQBRPERFORMANCE102 skipped 1 model without column lineage or inferred types"
 }

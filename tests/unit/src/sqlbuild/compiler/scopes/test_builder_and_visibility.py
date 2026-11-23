@@ -61,15 +61,15 @@ from tests.unit.src.sqlbuild.compiler.scopes.helpers import (
 @pytest.mark.parametrize(
     "test_case",
     [
-        ResourceExpectation("model", "model", "orders", "models/orders.sql", "models"),
+        ResourceExpectation("model", "model", "orders", "sql/models/orders.sql", "models"),
         ResourceExpectation("test", "test", "orders_test", "tests/unit/orders.sql", "tests/unit"),
         ResourceExpectation(
             "scenario", "scenario", "checkout", "tests/scenarios/checkout.sql", "tests/scenarios"
         ),
         ResourceExpectation(
-            "function", "function", "tax", "functions/sql/tax.sql", "functions/sql"
+            "function", "function", "tax", "sql/functions/sql/tax.sql", "sql/functions/sql"
         ),
-        ResourceExpectation("source", "source", "raw_orders", "sources/raw.yml", "sources"),
+        ResourceExpectation("source", "source", "raw_orders", "sql/sources/raw.yml", "sources"),
     ],
     ids=lambda case: case.description,
 )
@@ -77,10 +77,10 @@ def test_given_every_authored_resource_kind_when_building_then_uses_canonical_ro
     test_case: ResourceExpectation,
 ) -> None:
     test_path: Path = Path("tests/unit/orders.sql")
-    audit_path: Path = Path("audits/fresh.sql")
+    audit_path: Path = Path("sql/audits/fresh.sql")
     index: ScopeIndex = build_scope_index(
         discovered_inputs=discovered_inputs(
-            model_files=(discovered_model(name="orders", path="models/orders.sql"),),
+            model_files=(discovered_model(name="orders", path="sql/models/orders.sql"),),
             test_files=(
                 DiscoveredSqlTestFile(
                     test_path,
@@ -101,8 +101,8 @@ def test_given_every_authored_resource_kind_when_building_then_uses_canonical_ro
             ),
             sql_hook_files=(
                 DiscoveredSqlHookFile(
-                    Path("hooks/sql/grant.sql"),
-                    Path("hooks/sql/grant.sql"),
+                    Path("sql/hooks/sql/grant.sql"),
+                    Path("sql/hooks/sql/grant.sql"),
                     "",
                     {},
                     "SELECT 1",
@@ -111,8 +111,8 @@ def test_given_every_authored_resource_kind_when_building_then_uses_canonical_ro
             ),
             sql_function_files=(
                 DiscoveredSqlFunctionFile(
-                    Path("functions/sql/tax.sql"),
-                    Path("functions/sql/tax.sql"),
+                    Path("sql/functions/sql/tax.sql"),
+                    Path("sql/functions/sql/tax.sql"),
                     "",
                     {"name": "tax"},
                     "SELECT 1",
@@ -128,8 +128,8 @@ def test_given_every_authored_resource_kind_when_building_then_uses_canonical_ro
             ),
             source_files=(
                 DiscoveredSourceFile(
-                    Path("sources/raw.yml"),
-                    Path("sources/raw.yml"),
+                    Path("sql/sources/raw.yml"),
+                    Path("sql/sources/raw.yml"),
                     "",
                     (SourceEntry(name="raw_orders"),),
                 ),
@@ -170,30 +170,30 @@ def test_given_all_scope_tiers_when_resolving_then_classifies_without_shadow_res
     other: ResourceIdentity = ResourceIdentity(ResourceKind.MODEL, "other")
     resource: ResourceRecord = ResourceRecord(
         target,
-        "models/sales/daily/orders.sql",
+        "sql/models/sales/daily/orders.sql",
         OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
     )
     declarations: tuple[DeclarationRecord, ...] = (
         declaration_record(name="global", scope=ScopeKind.GLOBAL, owner_path=None),
         declaration_record(name="root", scope=ScopeKind.INHERITED, owner_path="models"),
-        declaration_record(name="near", scope=ScopeKind.INHERITED, owner_path="models/sales"),
+        declaration_record(name="near", scope=ScopeKind.INHERITED, owner_path="sql/models/sales"),
         declaration_record(
             name="noncanonical",
             scope=ScopeKind.INHERITED,
             owner_path=r"models\.\sales\daily\..",
         ),
-        declaration_record(name="local", scope=ScopeKind.LOCAL, owner_path="models/sales/daily"),
+        declaration_record(name="local", scope=ScopeKind.LOCAL, owner_path="sql/models/sales/daily"),
         declaration_record(
-            name="_private", scope=ScopeKind.PRIVATE, owner_path="models/sales/daily", owner=target
+            name="_private", scope=ScopeKind.PRIVATE, owner_path="sql/models/sales/daily", owner=target
         ),
-        declaration_record(name="parent_local", scope=ScopeKind.LOCAL, owner_path="models/sales"),
-        declaration_record(name="sibling", scope=ScopeKind.INHERITED, owner_path="models/finance"),
+        declaration_record(name="parent_local", scope=ScopeKind.LOCAL, owner_path="sql/models/sales"),
+        declaration_record(name="sibling", scope=ScopeKind.INHERITED, owner_path="sql/models/finance"),
         declaration_record(
-            name="descendant", scope=ScopeKind.INHERITED, owner_path="models/sales/daily/child"
+            name="descendant", scope=ScopeKind.INHERITED, owner_path="sql/models/sales/daily/child"
         ),
-        declaration_record(name="prefix", scope=ScopeKind.INHERITED, owner_path="models/sale"),
+        declaration_record(name="prefix", scope=ScopeKind.INHERITED, owner_path="sql/models/sale"),
         declaration_record(
-            name="_other", scope=ScopeKind.PRIVATE, owner_path="models/sales/daily", owner=other
+            name="_other", scope=ScopeKind.PRIVATE, owner_path="sql/models/sales/daily", owner=other
         ),
     )
     resolution: VisibilityResolution = resolve_scope_visibility(
@@ -246,22 +246,22 @@ def test_given_out_of_scope_declarations_when_resolving_then_returns_specific_re
     other: ResourceIdentity = ResourceIdentity(ResourceKind.MODEL, "other")
     resource: ResourceRecord = ResourceRecord(
         target,
-        "models/sales/daily/orders.sql",
+        "sql/models/sales/daily/orders.sql",
         OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
     )
     declarations: tuple[DeclarationRecord, ...] = (
-        declaration_record(name="parent_local", scope=ScopeKind.LOCAL, owner_path="models/sales"),
-        declaration_record(name="sibling", scope=ScopeKind.INHERITED, owner_path="models/finance"),
+        declaration_record(name="parent_local", scope=ScopeKind.LOCAL, owner_path="sql/models/sales"),
+        declaration_record(name="sibling", scope=ScopeKind.INHERITED, owner_path="sql/models/finance"),
         declaration_record(
             name="descendant",
             scope=ScopeKind.INHERITED,
-            owner_path="models/sales/daily/child",
+            owner_path="sql/models/sales/daily/child",
         ),
-        declaration_record(name="prefix", scope=ScopeKind.INHERITED, owner_path="models/sale"),
+        declaration_record(name="prefix", scope=ScopeKind.INHERITED, owner_path="sql/models/sale"),
         declaration_record(
             name="_other",
             scope=ScopeKind.PRIVATE,
-            owner_path="models/sales/daily",
+            owner_path="sql/models/sales/daily",
             owner=other,
         ),
     )
@@ -332,18 +332,18 @@ def test_given_public_duplicates_across_scopes_when_building_then_retains_all_an
     test_case: ExpectedBooleanCase,
 ) -> None:
     declaration: EnumDeclaration = EnumDeclaration(
-        "status", (EnumMember("OPEN", "OPEN"),), "VARCHAR", Path("enums/status.sql")
+        "status", (EnumMember("OPEN", "OPEN"),), "VARCHAR", Path("sql/enums/status.sql")
     )
     files: tuple[DiscoveredEnumFile, ...] = (
         DiscoveredEnumFile(
-            Path("enums/status.sql"),
-            Path("enums/status.sql"),
+            Path("sql/enums/status.sql"),
+            Path("sql/enums/status.sql"),
             "",
             (declaration,),
         ),
         DiscoveredEnumFile(
-            Path("models/enums/status.sql"),
-            Path("models/enums/status.sql"),
+            Path("sql/models/enums/status.sql"),
+            Path("sql/models/enums/status.sql"),
             "",
             (declaration,),
             ScopeKind.INHERITED,
@@ -351,13 +351,13 @@ def test_given_public_duplicates_across_scopes_when_building_then_retains_all_an
             Path("models"),
         ),
         DiscoveredEnumFile(
-            Path("models/sales/_enums/status.sql"),
-            Path("models/sales/_enums/status.sql"),
+            Path("sql/models/sales/_enums/status.sql"),
+            Path("sql/models/sales/_enums/status.sql"),
             "",
             (declaration,),
             ScopeKind.LOCAL,
             Path("models"),
-            Path("models/sales"),
+            Path("sql/models/sales"),
         ),
     )
     index: ScopeIndex = build_scope_index(discovered_inputs=discovered_inputs(enum_files=files))
@@ -386,8 +386,8 @@ def test_given_duplicate_resource_identity_when_building_then_lookup_retains_eve
     index: ScopeIndex = build_scope_index(
         discovered_inputs=discovered_inputs(
             model_files=(
-                discovered_model(name="orders", path="models/a.sql"),
-                discovered_model(name="orders", path="models/b.sql"),
+                discovered_model(name="orders", path="sql/models/a.sql"),
+                discovered_model(name="orders", path="sql/models/b.sql"),
             )
         )
     )
@@ -410,35 +410,35 @@ def test_given_cross_kind_and_same_private_name_across_owners_when_building_then
     test_case: ExpectedBooleanCase,
 ) -> None:
     private: EnumDeclaration = EnumDeclaration(
-        "_status", (EnumMember("OPEN", "OPEN"),), "VARCHAR", Path("models/a.sql"), "a"
+        "_status", (EnumMember("OPEN", "OPEN"),), "VARCHAR", Path("sql/models/a.sql"), "a"
     )
     enum_file: DiscoveredEnumFile = DiscoveredEnumFile(
-        Path("enums/status.sql"),
-        Path("enums/status.sql"),
+        Path("sql/enums/status.sql"),
+        Path("sql/enums/status.sql"),
         "",
         (
             EnumDeclaration(
-                "status", (EnumMember("OPEN", "OPEN"),), "VARCHAR", Path("enums/status.sql")
+                "status", (EnumMember("OPEN", "OPEN"),), "VARCHAR", Path("sql/enums/status.sql")
             ),
         ),
     )
     constant_file: DiscoveredConstantFile = DiscoveredConstantFile(
-        Path("constants/status.sql"),
-        Path("constants/status.sql"),
+        Path("sql/constants/status.sql"),
+        Path("sql/constants/status.sql"),
         "",
         (
             ConstantDeclaration(
                 "status",
                 normalize_sql_value(raw_value=1, context="test"),
-                Path("constants/status.sql"),
+                Path("sql/constants/status.sql"),
             ),
         ),
     )
     index: ScopeIndex = build_scope_index(
         discovered_inputs=discovered_inputs(
             model_files=(
-                discovered_model(name="a", path="models/a.sql", enums=(private,)),
-                discovered_model(name="b", path="models/b.sql", enums=(private,)),
+                discovered_model(name="a", path="sql/models/a.sql", enums=(private,)),
+                discovered_model(name="b", path="sql/models/b.sql", enums=(private,)),
             ),
             enum_files=(enum_file,),
             constant_files=(constant_file,),
@@ -469,12 +469,12 @@ def test_given_reserved_private_name_when_building_then_emits_stable_name_diagno
     test_case: ExpectedBooleanCase,
 ) -> None:
     private: EnumDeclaration = EnumDeclaration(
-        "__status", (EnumMember("OPEN", "OPEN"),), "VARCHAR", Path("models/a.sql"), "a"
+        "__status", (EnumMember("OPEN", "OPEN"),), "VARCHAR", Path("sql/models/a.sql"), "a"
     )
 
     index: ScopeIndex = build_scope_index(
         discovered_inputs=discovered_inputs(
-            model_files=(discovered_model(name="a", path="models/a.sql", enums=(private,)),)
+            model_files=(discovered_model(name="a", path="sql/models/a.sql", enums=(private,)),)
         )
     )
 
@@ -494,7 +494,7 @@ def test_given_loaded_scoped_macro_when_building_then_metadata_is_safe_and_norma
     def normalize_status(value: object, fallback: str = "unknown") -> str:
         return str(value or fallback)
 
-    path: Path = Path("models/sales/macros/python/status.py")
+    path: Path = Path("sql/models/sales/macros/python/status.py")
     source = "def normalize_status(value, fallback='unknown'):\n    return str(value or fallback)\n"
     index: ScopeIndex = build_scope_index(
         discovered_inputs=discovered_inputs(
@@ -505,8 +505,8 @@ def test_given_loaded_scoped_macro_when_building_then_metadata_is_safe_and_norma
                     source,
                     ScopeKind.INHERITED,
                     Path("models"),
-                    Path("models/sales"),
-                    Path("models/sales/macros"),
+                    Path("sql/models/sales"),
+                    Path("sql/models/sales/macros"),
                 ),
             )
         ),
@@ -519,7 +519,7 @@ def test_given_loaded_scoped_macro_when_building_then_metadata_is_safe_and_norma
 
     record: DeclarationRecord = index.declarations[0]
     assert (record.scope is ScopeKind.INHERITED) is test_case.expected_result
-    assert record.owning_path == "models/sales"
+    assert record.owning_path == "sql/models/sales"
     assert record.ownership_root.resource_kind is ResourceKind.MODEL
     assert record.macro is not None
     assert record.macro.parameters == ("value", "fallback")

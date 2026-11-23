@@ -7,11 +7,11 @@ fn given_identity_keys_when_grouping_then_groups_follow_python_repr_order() {
         LookupTestCase {
             description: "ASCII keys order by repr, where quotes and punctuation sort first",
             resources: &[
-                ("model", "ab", "models/ab.sql"),
-                ("model", "ab!", "models/ab_bang.sql"),
-                ("model", "it's", "models/its.sql"),
-                ("function", "zz", "functions/sql/zz.sql"),
-                ("seed", "a", "seeds/a.csv"),
+                ("model", "ab", "sql/models/ab.sql"),
+                ("model", "ab!", "sql/models/ab_bang.sql"),
+                ("model", "it's", "sql/models/its.sql"),
+                ("function", "zz", "sql/functions/sql/zz.sql"),
+                ("seed", "a", "sql/seeds/a.csv"),
             ],
             declarations: &[],
             expected_resource_groups: &[
@@ -26,12 +26,12 @@ fn given_identity_keys_when_grouping_then_groups_follow_python_repr_order() {
         LookupTestCase {
             description: "non-ASCII keys order by repr, with escapes for separators",
             resources: &[
-                ("model", "caf\u{e9}", "models/cafe_accent.sql"),
-                ("model", "cafe", "models/cafe.sql"),
-                ("model", "\u{a0}x", "models/nbsp.sql"),
-                ("model", "\u{1F600}", "models/emoji.sql"),
-                ("model", "Zed", "models/zed.sql"),
-                ("model", "e\u{301}", "models/combining.sql"),
+                ("model", "caf\u{e9}", "sql/models/cafe_accent.sql"),
+                ("model", "cafe", "sql/models/cafe.sql"),
+                ("model", "\u{a0}x", "sql/models/nbsp.sql"),
+                ("model", "\u{1F600}", "sql/models/emoji.sql"),
+                ("model", "Zed", "sql/models/zed.sql"),
+                ("model", "e\u{301}", "sql/models/combining.sql"),
             ],
             declarations: &[],
             expected_resource_groups: &[
@@ -46,21 +46,21 @@ fn given_identity_keys_when_grouping_then_groups_follow_python_repr_order() {
         },
         LookupTestCase {
             description: "visibility positions group by scope over the canonical declarations",
-            resources: &[("model", "orders", "models/sales/orders.sql")],
+            resources: &[("model", "orders", "sql/models/sales/orders.sql")],
             declarations: &[
-                ("macro", "g", "macros/g.py", 1, "global", None),
+                ("macro", "g", "sql/macros/g.py", 1, "global", None),
                 (
                     "macro",
                     "l",
-                    "models/sales/_macros/l.py",
+                    "sql/models/sales/_macros/l.py",
                     1,
                     "local",
-                    Some("models/sales"),
+                    Some("sql/models/sales"),
                 ),
                 (
                     "enum",
                     "i",
-                    "models/_sqlbuild/enums/i.sql",
+                    "sql/models/_sqlbuild/enums/i.sql",
                     1,
                     "inherited",
                     Some("models"),
@@ -68,17 +68,17 @@ fn given_identity_keys_when_grouping_then_groups_follow_python_repr_order() {
                 (
                     "constant",
                     "_p",
-                    "models/sales/orders.sql",
+                    "sql/models/sales/orders.sql",
                     1,
                     "private",
-                    Some("models/sales"),
+                    Some("sql/models/sales"),
                 ),
             ],
             expected_resource_groups: &["model:orders"],
             expected_visibility: &[
                 "global [2]",
                 "private model:orders [0]",
-                "local models/sales [3]",
+                "local sql/models/sales [3]",
                 "inherited models [1]",
             ],
         },

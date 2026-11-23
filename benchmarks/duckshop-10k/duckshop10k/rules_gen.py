@@ -16,7 +16,7 @@ _DEDUPE = ("@sql.cdc_latest(", "@sql.cdc_history(")
 
 def _is_change_log(ctx: RuleContext, source: str) -> bool:
     """Whether a source declares an _op column, read from its instance's own sources file."""
-    path = f"sources/{source.split('__', 1)[0]}.yml"
+    path = f"sql/sources/{source.split('__', 1)[0]}.yml"
     if not ctx.project.tree.glob(path):
         return False
     text = ctx.project.tree.read_text(path)
@@ -58,7 +58,7 @@ from sqlbuild.rules import RuleFile
 from sqlbuild.rules.testing import RuleCase, evaluate_rule
 
 _SOURCES = RuleFile(
-    path="sources/shop_xx.yml",
+    path="sql/sources/shop_xx.yml",
     source="""sources:
   - name: shop_xx__orders
     description: Orders change log
@@ -93,7 +93,7 @@ def test_given_change_log_read_without_dedupe_macro_when_evaluating_then_reports
         test_case=RuleCase(
             description="staging model reads a change log directly",
             source=_RAW_CHANGE_LOG_READ,
-            path="models/staging/storefronts/shop_xx/base_shop_xx__orders.sql",
+            path="sql/models/staging/storefronts/shop_xx/base_shop_xx__orders.sql",
             files=(_SOURCES,),
             expected_finding_count=1,
         ),
@@ -111,7 +111,7 @@ def test_given_append_only_source_when_evaluating_then_passes() -> None:
             source=_RAW_CHANGE_LOG_READ.replace("shop_xx__orders", "shop_xx__page_views").replace(
                 "order_id", "event_id"
             ),
-            path="models/staging/storefronts/shop_xx/base_shop_xx__page_views.sql",
+            path="sql/models/staging/storefronts/shop_xx/base_shop_xx__page_views.sql",
             files=(_SOURCES,),
             expected_finding_count=0,
         ),
@@ -126,7 +126,7 @@ def test_given_change_log_read_outside_staging_when_evaluating_then_passes() -> 
         test_case=RuleCase(
             description="snapshots and other layers may read the full change log",
             source=_RAW_CHANGE_LOG_READ,
-            path="models/snapshots/snap_orders.sql",
+            path="sql/models/snapshots/snap_orders.sql",
             files=(_SOURCES,),
             expected_finding_count=0,
         ),

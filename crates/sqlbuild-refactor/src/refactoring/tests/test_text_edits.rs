@@ -147,11 +147,11 @@ fn given_offset_when_locating_then_line_and_column_are_one_based() {
 fn given_edits_and_moves_when_grouping_then_changes_follow_final_paths() {
     let test_cases = [FileChangesTestCase {
         description: "a moved file's edits follow it and paths are sorted",
-        edited_paths: &["models/b.sql", "models/a.sql"],
-        moves: &[("models/b.sql", "models/z/b.sql")],
+        edited_paths: &["sql/models/b.sql", "sql/models/a.sql"],
+        moves: &[("sql/models/b.sql", "sql/models/z/b.sql")],
         expected_changes: &[
-            ("models/a.sql", "models/a.sql", 1),
-            ("models/z/b.sql", "models/b.sql", 1),
+            ("sql/models/a.sql", "sql/models/a.sql", 1),
+            ("sql/models/z/b.sql", "sql/models/b.sql", 1),
         ],
     }];
     for test_case in test_cases {

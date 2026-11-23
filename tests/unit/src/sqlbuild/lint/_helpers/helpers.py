@@ -72,7 +72,7 @@ def write_orders_lint_project(*, project_dir: Path, model_bytes: bytes) -> Path:
     _ = (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
-    model_path: Path = project_dir / "models" / "orders.sql"
+    model_path: Path = project_dir / "sql" / "models" / "orders.sql"
     model_path.parent.mkdir(parents=True)
     _ = model_path.write_bytes(model_bytes)
     test_path: Path = project_dir / "tests" / "test_orders.sql"
@@ -90,14 +90,14 @@ def write_orders_lint_project(*, project_dir: Path, model_bytes: bytes) -> Path:
 def write_linked_orders_project(*, project_dir: Path) -> None:
     """Write models reached both directly and through file and directory links."""
 
-    (project_dir / "models" / "orders").mkdir(parents=True)
+    (project_dir / "sql" / "models" / "orders").mkdir(parents=True)
     (project_dir / "shared").mkdir()
-    (project_dir / "models" / "orders" / "orders.sql").write_text("SELECT 1 AS order_id\n")
+    (project_dir / "sql" / "models" / "orders" / "orders.sql").write_text("SELECT 1 AS order_id\n")
     (project_dir / "shared" / "customers.sql").write_text("SELECT 1 AS customer_id\n")
-    (project_dir / "models" / "orders" / "customers_link.sql").symlink_to(
+    (project_dir / "sql" / "models" / "orders" / "customers_link.sql").symlink_to(
         project_dir / "shared" / "customers.sql"
     )
-    (project_dir / "models" / "shared_link").symlink_to(project_dir / "shared")
+    (project_dir / "sql" / "models" / "shared_link").symlink_to(project_dir / "shared")
 
 
 def files_resolving_to(*, files: dict[Path, str], selected: frozenset[Path]) -> dict[Path, str]:

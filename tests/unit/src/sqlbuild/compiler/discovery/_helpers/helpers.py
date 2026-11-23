@@ -141,9 +141,9 @@ def discover_declaration_file(*, project_dir: Path, relative_path: str, contents
 def discover_python_function_file(
     *, project_dir: Path, file_name: str, contents: str
 ) -> DiscoveredPythonFunctionFile:
-    """Write one ``functions/python`` file into a project and return its discovered record."""
+    """Write one ``sql/functions/python`` file into a project and return its discovered record."""
 
-    file_path: Path = project_dir / "functions" / "python" / file_name
+    file_path: Path = project_dir / "sql" / "functions" / "python" / file_name
     file_path.parent.mkdir(parents=True, exist_ok=True)
     _ = file_path.write_text(contents, encoding="utf-8")
     return discover_python_function_files(project_dir=project_dir)[0]
@@ -169,8 +169,8 @@ _STATEMENT_HEADER_PARSERS: dict[str, Callable[..., object]] = {
 
 
 _STATEMENT_FILE_PATHS: dict[str, Callable[[Path], Path]] = {
-    "AUDIT": lambda project_dir: project_dir / "audits" / "generic" / "orders.sql",
-    "HOOK": lambda project_dir: project_dir / "hooks" / "sql" / "orders.sql",
+    "AUDIT": lambda project_dir: project_dir / "sql" / "audits" / "generic" / "orders.sql",
+    "HOOK": lambda project_dir: project_dir / "sql" / "hooks" / "sql" / "orders.sql",
 }
 
 

@@ -103,7 +103,7 @@ def refactor_cases() -> tuple[CorpusProject, ...]:
             name="rename-model-dry-run",
             refactor=_refactor("rename", "stg_orders", "stg_order_lines", "--dry-run"),
         ),
-        _case(name="mv-model", refactor=_refactor("mv", "customer_totals", "models/finance/")),
+        _case(name="mv-model", refactor=_refactor("mv", "customer_totals", "sql/models/finance/")),
         _case(
             name="rename-column",
             refactor=_refactor("rename", "stg_orders.amount", "order_amount"),

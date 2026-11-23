@@ -116,14 +116,14 @@ fn given_a_publication_when_its_vocabulary_is_read_then_each_value_counts_the_no
             entries_of: |vocabulary| &vocabulary.paths,
             expected_entries: &[
                 ("models", 4),
-                ("models/marts", 3),
-                ("models/staging", 1),
+                ("sql/models/marts", 3),
+                ("sql/models/staging", 1),
                 ("python", 4),
-                ("python/fulfillment", 1),
-                ("python/fulfillment/carrier_sync", 1),
-                ("python/loaders", 2),
-                ("python/orders", 1),
-                ("python/orders/partner_export", 1),
+                ("python/nodes/fulfillment", 1),
+                ("python/nodes/fulfillment/carrier_sync", 1),
+                ("python/nodes/loaders", 2),
+                ("python/nodes/orders", 1),
+                ("python/nodes/orders/partner_export", 1),
             ],
         },
         VocabularyTestCase {
@@ -167,9 +167,9 @@ fn given_refused_selectors_when_evaluated_then_the_refused_part_its_type_and_val
         },
         RefusedPartTestCase {
             description: "a folder with no models",
-            select: "path:models/mart",
+            select: "path:sql/models/mart",
             expected_code: Some("S009"),
-            expected_refused: Some(("path:models/mart", 0, "path", "models/mart")),
+            expected_refused: Some(("path:sql/models/mart", 0, "path", "sql/models/mart")),
         },
         RefusedPartTestCase {
             description: "an unknown job",

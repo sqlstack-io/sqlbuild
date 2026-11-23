@@ -86,7 +86,7 @@ def prepare_dbt_profile_workspace(*, tmp_path: Path, profiles_yml: str) -> Path:
     workspace: Path = tmp_path / "workspace"
     dbt_project_dir: Path = workspace / "dbt_project"
     profiles_dir: Path = workspace / "profiles"
-    (dbt_project_dir / "models").mkdir(parents=True)
+    (dbt_project_dir / "sql" / "models").mkdir(parents=True)
     profiles_dir.mkdir(parents=True)
     (dbt_project_dir / "dbt_project.yml").write_text(
         "name: analytics\n"
@@ -106,7 +106,7 @@ def prepare_dbt_profile_workspace(*, tmp_path: Path, profiles_yml: str) -> Path:
 def write_dbt_profile_orders_model(*, workspace: Path, order_id: int) -> None:
     """Write the mutable dbt model used by adapter dbt-profile E2Es."""
 
-    (workspace / "dbt_project" / "models" / "dbt_orders.sql").write_text(
+    (workspace / "dbt_project" / "sql" / "models" / "dbt_orders.sql").write_text(
         f"select {order_id} as order_id\n",
         encoding="utf-8",
     )
@@ -115,7 +115,7 @@ def write_dbt_profile_orders_model(*, workspace: Path, order_id: int) -> None:
 def add_dbt_profile_downstream_model(*, sqlbuild_project_dir: Path) -> None:
     """Add a SQLBuild model downstream of the dbt profile E2E model."""
 
-    models_dir: Path = sqlbuild_project_dir / "models"
+    models_dir: Path = sqlbuild_project_dir / "sql" / "models"
     models_dir.mkdir(exist_ok=True)
     (models_dir / "downstream_orders.sql").write_text(
         "MODEL (description 'Test model downstream_orders.', materialized table);\n\n"
@@ -587,8 +587,8 @@ def build_real_warehouse_snapshot_project_files(*, project_toml: str) -> dict[st
 
     return {
         "sqlbuild_project.toml": project_toml,
-        "models/current_customers.sql": build_current_customers_model_sql(plan="basic"),
-        "models/current_customer_snapshot.sql": (
+        "sql/models/current_customers.sql": build_current_customers_model_sql(plan="basic"),
+        "sql/models/current_customer_snapshot.sql": (
             "MODEL (description 'Test model current_customer_snapshot.',\n"
             "  materialized snapshot,\n"
             "  unique_key [customer_id, region_id],\n"
@@ -606,7 +606,7 @@ def build_real_warehouse_snapshot_project_files(*, project_toml: str) -> dict[st
             "SELECT customer_id, region_id, plan, updated_at\n"
             'FROM __ref("current_customers")\n'
         ),
-        "models/historical_customer_extracts.sql": (
+        "sql/models/historical_customer_extracts.sql": (
             "MODEL (description 'Test model historical_customer_extracts.', "
             "materialized table);\n\n"
             "SELECT 1 AS customer_id, 'basic' AS plan, "
@@ -619,7 +619,7 @@ def build_real_warehouse_snapshot_project_files(*, project_toml: str) -> dict[st
             "CAST('2026-01-02 00:00:00' AS TIMESTAMP) AS updated_at, "
             "CAST('2026-01-04 00:00:00' AS TIMESTAMP) AS observed_at\n"
         ),
-        "models/historical_customer_snapshot.sql": (
+        "sql/models/historical_customer_snapshot.sql": (
             "MODEL (description 'Test model historical_customer_snapshot.',\n"
             "  materialized snapshot,\n"
             "  unique_key [customer_id],\n"
@@ -631,7 +631,7 @@ def build_real_warehouse_snapshot_project_files(*, project_toml: str) -> dict[st
             "SELECT customer_id, plan, updated_at, observed_at\n"
             'FROM __ref("historical_customer_extracts")\n'
         ),
-        "models/historical_membership_daily.sql": (
+        "sql/models/historical_membership_daily.sql": (
             "MODEL (description 'Test model historical_membership_daily.', materialized table);\n\n"
             "SELECT 1 AS customer_id, 'active' AS status, "
             "CAST('2026-01-01 00:00:00' AS TIMESTAMP) AS observed_at\n"
@@ -644,7 +644,7 @@ def build_real_warehouse_snapshot_project_files(*, project_toml: str) -> dict[st
             "UNION ALL SELECT 2 AS customer_id, 'active' AS status, "
             "CAST('2026-01-03 00:00:00' AS TIMESTAMP) AS observed_at\n"
         ),
-        "models/historical_membership_snapshot.sql": (
+        "sql/models/historical_membership_snapshot.sql": (
             "MODEL (description 'Test model historical_membership_snapshot.',\n"
             "  materialized snapshot,\n"
             "  unique_key [customer_id],\n"
@@ -657,7 +657,7 @@ def build_real_warehouse_snapshot_project_files(*, project_toml: str) -> dict[st
             "SELECT customer_id, status, observed_at\n"
             'FROM __ref("historical_membership_daily")\n'
         ),
-        "audits/generic/expression_is_true.sql": (
+        "sql/audits/generic/expression_is_true.sql": (
             'AUDIT ();\n\nSELECT * FROM __ref("@model") WHERE NOT (@expression)\n'
         ),
     }
@@ -678,10 +678,10 @@ def build_real_warehouse_existing_snapshot_project_files(*, project_toml: str) -
 
     return {
         "sqlbuild_project.toml": project_toml,
-        "models/current_check_customers.sql": build_current_check_customers_model_sql(
+        "sql/models/current_check_customers.sql": build_current_check_customers_model_sql(
             changed=False
         ),
-        "models/current_check_snapshot.sql": (
+        "sql/models/current_check_snapshot.sql": (
             "MODEL (description 'Test model current_check_snapshot.',\n"
             "  materialized snapshot,\n"
             "  unique_key [customer_id],\n"
@@ -691,10 +691,10 @@ def build_real_warehouse_existing_snapshot_project_files(*, project_toml: str) -
             "SELECT customer_id, status\n"
             'FROM __ref("current_check_customers")\n'
         ),
-        "models/current_delete_customers.sql": build_current_delete_customers_model_sql(
+        "sql/models/current_delete_customers.sql": build_current_delete_customers_model_sql(
             changed=False
         ),
-        "models/current_delete_snapshot.sql": (
+        "sql/models/current_delete_snapshot.sql": (
             "MODEL (description 'Test model current_delete_snapshot.',\n"
             "  materialized snapshot,\n"
             "  unique_key [customer_id],\n"
@@ -705,10 +705,10 @@ def build_real_warehouse_existing_snapshot_project_files(*, project_toml: str) -
             "SELECT customer_id, plan, updated_at\n"
             'FROM __ref("current_delete_customers")\n'
         ),
-        "models/historical_timestamp_extracts.sql": build_historical_timestamp_extracts_model_sql(
+        "sql/models/historical_timestamp_extracts.sql": build_historical_timestamp_extracts_model_sql(
             changed=False
         ),
-        "models/historical_timestamp_snapshot.sql": (
+        "sql/models/historical_timestamp_snapshot.sql": (
             "MODEL (description 'Test model historical_timestamp_snapshot.',\n"
             "  materialized snapshot,\n"
             "  unique_key [customer_id],\n"
@@ -721,8 +721,8 @@ def build_real_warehouse_existing_snapshot_project_files(*, project_toml: str) -
             "SELECT customer_id, plan, updated_at, observed_at\n"
             'FROM __ref("historical_timestamp_extracts")\n'
         ),
-        "models/historical_check_daily.sql": build_historical_check_daily_model_sql(changed=False),
-        "models/historical_check_snapshot.sql": (
+        "sql/models/historical_check_daily.sql": build_historical_check_daily_model_sql(changed=False),
+        "sql/models/historical_check_snapshot.sql": (
             "MODEL (description 'Test model historical_check_snapshot.',\n"
             "  materialized snapshot,\n"
             "  unique_key [customer_id],\n"

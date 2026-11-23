@@ -43,7 +43,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             expected_origin="sensor",
             files={
                 **duckshop_orchestration("source_orders"),
-                "sources/orders.yml": Path(
+                "sql/sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
@@ -58,10 +58,10 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             expected_origin="sensor",
             files={
                 **duckshop_orchestration("stale_orders"),
-                "sources/orders.yml": Path(
+                "sql/sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/managed_orders.yml"
                 ).read_text(),
-                "python/loaders/orders.py": Path(
+                "python/nodes/loaders/orders.py": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/orders_loader.py"
                 ).read_text(),
                 "source_observations.json": Path(
@@ -79,7 +79,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             expected_origin="sensor",
             files={
                 **duckshop_orchestration("changed_source_orders"),
-                "sources/orders.yml": Path(
+                "sql/sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },

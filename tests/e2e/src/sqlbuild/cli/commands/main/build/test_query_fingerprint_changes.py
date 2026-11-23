@@ -25,18 +25,18 @@ _PROJECT_FILES: dict[str, str] = {
         '[connection]\ndatabase = "fingerprint.duckdb"\n\n'
         '[defaults]\nmaterialized = "table"\n'
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    schema: main\n    table: raw_orders\n"
     ),
-    "functions/sql/is_large_order.sql": (
+    "sql/functions/sql/is_large_order.sql": (
         "FUNCTION (description 'Test function is_large_order.', arguments (amount_cents INTEGER), returns BOOLEAN);\n\namount_cents > 100\n"
     ),
-    "models/stg_orders.sql": (
+    "sql/models/stg_orders.sql": (
         "MODEL (description 'Test model stg_orders.', materialized table);\n\n"
         "SELECT id AS order_id, amount_cents, 'web  order' AS channel\n"
         'FROM __source("raw_orders")\n'
     ),
-    "models/large_orders.sql": (
+    "sql/models/large_orders.sql": (
         "MODEL (description 'Test model large_orders.', materialized table);\n\n"
         "SELECT order_id, is_large_order(amount_cents) AS is_large\n"
         'FROM __ref("stg_orders")\n'
@@ -64,8 +64,8 @@ _PROJECT_FILES: dict[str, str] = {
         QueryFingerprintEditE2ETestCase(
             description="comment and keyword case edits are unchanged",
             edits=(
-                ("models/stg_orders.sql", "SELECT id", "-- Staged orders.\nselect id"),
-                ("functions/sql/is_large_order.sql", "amount_cents > 100", "amount_cents  >  100"),
+                ("sql/models/stg_orders.sql", "SELECT id", "-- Staged orders.\nselect id"),
+                ("sql/functions/sql/is_large_order.sql", "amount_cents > 100", "amount_cents  >  100"),
             ),
             format_flags=("--check",),
             expected_format_summary="3 files checked, 3 changed",
@@ -73,14 +73,14 @@ _PROJECT_FILES: dict[str, str] = {
         ),
         QueryFingerprintEditE2ETestCase(
             description="whitespace inside a string literal is a query change",
-            edits=(("models/stg_orders.sql", "'web  order'", "'web order'"),),
+            edits=(("sql/models/stg_orders.sql", "'web  order'", "'web order'"),),
             format_flags=("--check",),
             expected_format_summary="3 files checked, 2 changed",
             expected_reasons={"stg_orders": "query_changed"},
         ),
         QueryFingerprintEditE2ETestCase(
             description="identifier case is a query change",
-            edits=(("models/large_orders.sql", "AS is_large", "AS Is_Large"),),
+            edits=(("sql/models/large_orders.sql", "AS is_large", "AS Is_Large"),),
             format_flags=("--check",),
             expected_format_summary="3 files checked, 2 changed",
             expected_reasons={"stg_orders": "no_change", "large_orders": "query_changed"},

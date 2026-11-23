@@ -77,12 +77,12 @@ _DAILY_BUILD: dict[str, str] = {
 
 _PROVIDER_PROJECT: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-    "models/orders.sql": "MODEL (description 'Orders.');\n\nSELECT 1 AS order_id\n",
+    "sql/models/orders.sql": "MODEL (description 'Orders.');\n\nSELECT 1 AS order_id\n",
 }
 
 
 _PRICE_MODELS: dict[str, str] = {
-    "models/stg_prices.sql": (
+    "sql/models/stg_prices.sql": (
         'MODEL (description "Staged prices");\n'
         "SELECT 'W-1' AS window_id, CAST(12345 AS BIGINT) AS price_minor, "
         "CAST('2026-03-30 08:00:00' AS TIMESTAMP) AS loaded_at\n"
@@ -97,9 +97,9 @@ _PRICE_MODELS: dict[str, str] = {
             "model and seed catalog",
             TYPE_PROOF_FILES
             | {
-                "seeds/payment_methods.csv": PARITY_FILES["seeds/payment_methods.csv"],
-                "seeds/payment_methods.yml": PARITY_FILES["seeds/payment_methods.yml"],
-                "models/payments.sql": (
+                "sql/seeds/payment_methods.csv": PARITY_FILES["sql/seeds/payment_methods.csv"],
+                "sql/seeds/payment_methods.yml": PARITY_FILES["sql/seeds/payment_methods.yml"],
+                "sql/models/payments.sql": (
                     "MODEL (description 'Payment methods.');\n"
                     'SELECT method FROM __seed("payment_methods")\n'
                 ),
@@ -110,7 +110,7 @@ _PRICE_MODELS: dict[str, str] = {
             "attached audits",
             TYPE_PROOF_FILES
             | {
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Orders.', columns (order_id (audits [not_null])));\n"
                     'SELECT order_id, amount FROM __ref("stg_orders")\n'
                 ),
@@ -122,21 +122,21 @@ _PRICE_MODELS: dict[str, str] = {
             {
                 path: value
                 for path, value in FUNCTION_PROJECT_FILES.items()
-                if path != "enums/status.sql"
+                if path != "sql/enums/status.sql"
             }
-            | {"functions/sql/_enums/status.sql": FUNCTION_PROJECT_FILES["enums/status.sql"]},
+            | {"sql/functions/sql/_enums/status.sql": FUNCTION_PROJECT_FILES["sql/enums/status.sql"]},
             frozenset({"model", "udf", "table_fn"}),
         ),
         SnapshotCatalogTestCase(
             "Python hooks",
             TYPE_PROOF_FILES
             | {
-                "hooks/python/notifications.py": (
+                "sql/hooks/python/notifications.py": (
                     "from sqlbuild.hooks import hook\n\n"
                     "@hook\ndef notify(ctx, channel):\n"
                     '    """Notify support."""\n    return None\n'
                 ),
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Orders.', pre_hooks [python('notify', channel: 'support')]);\n"
                     'SELECT order_id, amount FROM __ref("stg_orders")\n'
                 ),
@@ -153,9 +153,9 @@ _PRICE_MODELS: dict[str, str] = {
                     ).read_text()
                 )[source]
                 for path, source in (
-                    ("python/notify/orders.py", "side_effect"),
-                    ("python/assets/orders.py", "asset"),
-                    ("python/checks/orders.py", "initial"),
+                    ("python/nodes/notify/orders.py", "side_effect"),
+                    ("python/nodes/assets/orders.py", "asset"),
+                    ("python/nodes/checks/orders.py", "initial"),
                 )
             },
             frozenset({"model", "asset", "check"}),
@@ -164,8 +164,8 @@ _PRICE_MODELS: dict[str, str] = {
             "SQL hooks",
             TYPE_PROOF_FILES
             | {
-                "hooks/sql/record_load.sql": "HOOK (description 'Record load.');\nSELECT 3 AS load_count\n",
-                "models/orders.sql": (
+                "sql/hooks/sql/record_load.sql": "HOOK (description 'Record load.');\nSELECT 3 AS load_count\n",
+                "sql/models/orders.sql": (
                     "MODEL (description 'Orders.', pre_hooks [sql('record_load')]);\n"
                     'SELECT order_id FROM __ref("stg_orders")\n'
                 ),
@@ -176,7 +176,7 @@ _PRICE_MODELS: dict[str, str] = {
             "source catalog",
             TYPE_PROOF_FILES
             | {
-                "sources/orders.yml": (
+                "sql/sources/orders.yml": (
                     "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
                     "    schema: raw\n    table: orders\n"
                     "    columns:\n      - name: order_id\n        type: INTEGER\n"
@@ -198,9 +198,9 @@ _PRICE_MODELS: dict[str, str] = {
             | {
                 path: (Path("benchmarks/duckshop/project") / path).read_text()
                 for path in (
-                    "seeds/edge_cases/edge_quantity_steps.csv",
-                    "seeds/edge_cases/edge_quantity_steps.yml",
-                    "functions/sql/edge_cases/edge_next_quantity.sql",
+                    "sql/seeds/edge_cases/edge_quantity_steps.csv",
+                    "sql/seeds/edge_cases/edge_quantity_steps.yml",
+                    "sql/functions/sql/edge_cases/edge_next_quantity.sql",
                 )
             },
             frozenset({"model", "seed", "udf"}),
@@ -281,9 +281,9 @@ def test_given_semantic_edits_when_publishing_then_local_identities_keep_planner
         | {
             path: (Path("benchmarks/duckshop/project") / path).read_text()
             for path in (
-                "seeds/edge_cases/edge_quantity_steps.csv",
-                "seeds/edge_cases/edge_quantity_steps.yml",
-                "functions/sql/edge_cases/edge_next_quantity.sql",
+                "sql/seeds/edge_cases/edge_quantity_steps.csv",
+                "sql/seeds/edge_cases/edge_quantity_steps.yml",
+                "sql/functions/sql/edge_cases/edge_next_quantity.sql",
             )
         }
     )
@@ -346,7 +346,7 @@ def test_given_semantic_edits_when_publishing_then_local_identities_keep_planner
         ),
         SnapshotRejectionTestCase(
             description="compiler errors cannot replace the last good publication",
-            files=TYPE_PROOF_FILES | {"models/orders.sql": "MODEL ();\nSELECT 1 AS order_id\n"},
+            files=TYPE_PROOF_FILES | {"sql/models/orders.sql": "MODEL ();\nSELECT 1 AS order_id\n"},
             nodes={},
             expected_compiler_errors=True,
             expected_message="cannot publish a project with compiler errors",
@@ -385,16 +385,16 @@ def test_given_invalid_compilation_or_forged_nodes_when_publishing_then_no_snaps
             description="published column lineage follows passthroughs, casts and aggregations",
             files={
                 "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-                "models/stg_orders.sql": (
+                "sql/models/stg_orders.sql": (
                     "MODEL (description 'Staged orders.');\n\n"
                     "SELECT 1 AS order_id, 'eu' AS region, '5.00' AS amount_text\n"
                 ),
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Typed orders.');\n\n"
                     "SELECT order_id, region, CAST(amount_text AS DECIMAL(10, 2)) AS amount\n"
                     'FROM __ref("stg_orders")\n'
                 ),
-                "models/region_revenue.sql": (
+                "sql/models/region_revenue.sql": (
                     "MODEL (description 'Revenue by region.');\n\n"
                     "SELECT region, SUM(amount) AS revenue\n"
                     'FROM __ref("orders")\nGROUP BY region\n'
@@ -441,7 +441,7 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
             description="a provider is published with its fields and consumers but no values",
             files=_PROVIDER_PROJECT
             | {
-                "providers/fulfillment.py": (
+                "python/providers/fulfillment.py": (
                     "from typing import Literal\n\n"
                     "from pydantic import AliasChoices, Field, SecretStr\n"
                     "from pydantic_settings import SettingsConfigDict\n"
@@ -458,18 +458,18 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                     "        None, validation_alias=AliasChoices('SHIP_TIMEOUT', 'TIMEOUT')\n"
                     "    )\n"
                 ),
-                "python/tasks/publish_orders.py": (
-                    "from providers.fulfillment import FulfillmentApi\n"
+                "python/nodes/tasks/publish_orders.py": (
+                    "from python.nodes.providers.fulfillment import FulfillmentApi\n"
                     "from sqlbuild.assets import asset\n\n\n"
                     "@asset\n"
                     "def publish_orders(fulfillment_api: FulfillmentApi):\n"
                     '    """Send orders to fulfillment."""\n'
                 ),
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Orders.', post_hooks [python(\"notify_fulfillment\")]);\n\n"
                     "SELECT 1 AS order_id\n"
                 ),
-                "hooks/python/notify_fulfillment.py": (
+                "sql/hooks/python/notify_fulfillment.py": (
                     "from sqlbuild.hooks import hook\n\n\n"
                     "@hook\n"
                     "def notify_fulfillment(ctx, fulfillment_api):\n"
@@ -481,9 +481,9 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                 "providers": [
                     {
                         "name": "fulfillment_api",
-                        "class": "providers.fulfillment.FulfillmentApi",
+                        "class": "python.providers.fulfillment.FulfillmentApi",
                         "description": "Client for the fulfillment service.\n\nSends shipped orders.",
-                        "path": "providers/fulfillment.py",
+                        "path": "python/providers/fulfillment.py",
                         "settings": [
                             {
                                 "name": "api_key",
@@ -563,7 +563,7 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
             description="a prefix that applies only to aliases leaves plain field names unprefixed",
             files=_PROVIDER_PROJECT
             | {
-                "providers/inventory.py": (
+                "python/providers/inventory.py": (
                     "from pydantic import Field\n"
                     "from pydantic_settings import SettingsConfigDict\n"
                     "from sqlbuild.providers import Provider\n\n\n"
@@ -581,9 +581,9 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                 "providers": [
                     {
                         "name": "inventory_api",
-                        "class": "providers.inventory.InventoryApi",
+                        "class": "python.providers.inventory.InventoryApi",
                         "description": "Client for the inventory service.",
-                        "path": "providers/inventory.py",
+                        "path": "python/providers/inventory.py",
                         "settings": [
                             {
                                 "name": "region",
@@ -653,7 +653,7 @@ def test_given_project_providers_when_publishing_then_they_are_a_snapshot_docume
                 "sqlbuild_project.toml": (
                     'name = "orders"\nadapter = "duckdb"\n\n[vars]\nreporting_currency = "USD"\n'
                 ),
-                "models/_macros/sql/minor_to_major.sql": (
+                "sql/models/_macros/sql/minor_to_major.sql": (
                     "MACRO (\n"
                     '  description "Minor units to major units",\n'
                     "  arguments (amount BIGINT, places INT CONST DEFAULT 2),\n"
@@ -661,12 +661,12 @@ def test_given_project_providers_when_publishing_then_they_are_a_snapshot_docume
                     ");\n\n"
                     "ROUND(@amount / 100, @places)::DECIMAL(18, 2)\n"
                 ),
-                "models/_macros/python/rounding.py": (
+                "sql/models/_macros/python/rounding.py": (
                     "def round_half_even(ctx, expression: str, places: int = 2) -> str:\n"
                     "    return f'ROUND_EVEN({expression}, {places})'\n"
                 ),
                 **_PRICE_MODELS,
-                "models/price_spans.sql": (
+                "sql/models/price_spans.sql": (
                     "MODEL (\n"
                     '  description "Prices with rewritten expressions",\n'
                     "  materialized incremental,\n"
@@ -703,7 +703,7 @@ def test_given_project_providers_when_publishing_then_they_are_a_snapshot_docume
             files={
                 "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
                 **_PRICE_MODELS,
-                "models/price_refs.sql": (
+                "sql/models/price_refs.sql": (
                     'MODEL (description "Price references");\n'
                     'SELECT __ref("stg_prices").window_id AS window_id, '
                     "'EUR' AS currency FROM __ref(\"stg_prices\")\n"
@@ -731,7 +731,7 @@ def test_given_rewritten_model_sql_when_publishing_then_expression_ranges_slice_
             files={
                 "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
                 **_PRICE_MODELS,
-                "models/price_columns.sql": (
+                "sql/models/price_columns.sql": (
                     'MODEL (description "Price columns");\n'
                     'SELECT p.window_id, p.price_minor FROM __ref("stg_prices") AS p\n'
                 ),
@@ -751,7 +751,7 @@ def test_given_rewritten_model_sql_when_publishing_then_expression_ranges_slice_
                     '[defaults]\ndatabase = "WAREHOUSE"\nschema = "MAIN"\n\n'
                     '[vars]\nreporting_currency = "USD"\n'
                 ),
-                "sources/edge_cases.yml": (
+                "sql/sources/edge_cases.yml": (
                     "sources:\n"
                     "  - name: edge__price_windows\n"
                     "    description: Price windows\n"
@@ -764,7 +764,7 @@ def test_given_rewritten_model_sql_when_publishing_then_expression_ranges_slice_
                     "        type: TIMESTAMP_NTZ\n"
                 ),
                 # A second consumer keeps the DuckShop macros project-wide, as they are there.
-                "models/price_checks.sql": (
+                "sql/models/price_checks.sql": (
                     'MODEL (description "Price checks");\n'
                     "SELECT @sql.money_from_minor(150, 2) AS amount, "
                     '@py.round_half_even("1.25", 1) AS rounded\n'
@@ -772,10 +772,10 @@ def test_given_rewritten_model_sql_when_publishing_then_expression_ranges_slice_
                 **{
                     path: (_DUCKSHOP / path).read_text()
                     for path in (
-                        "macros/sql/money_from_minor.sql",
-                        "macros/sql/safe_divide.sql",
-                        "macros/python/rounding.py",
-                        "models/intermediate/edge_cases/int_edge_expression_spans.sql",
+                        "sql/macros/sql/money_from_minor.sql",
+                        "sql/macros/sql/safe_divide.sql",
+                        "sql/macros/python/rounding.py",
+                        "sql/models/intermediate/edge_cases/int_edge_expression_spans.sql",
                     )
                 },
             },
@@ -1303,18 +1303,18 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             description="DuckShop layer jobs that share a function wait only by lineage",
             files={
                 **duckshop_orchestration("shared_function_layers"),
-                "functions/sql/order_cents.sql": (
+                "sql/functions/sql/order_cents.sql": (
                     "FUNCTION (description 'Amount in cents.',"
                     " arguments (amount INTEGER), returns INTEGER);\nSELECT amount * 100\n"
                 ),
-                "models/stg_orders.sql": (
+                "sql/models/stg_orders.sql": (
                     "MODEL (description 'Staged orders.', tags [staging],\n"
                     "  columns (order_id (type INTEGER), cents (type INTEGER)),\n"
                     ");\n\n"
                     "SELECT CAST(1 AS INTEGER) AS order_id,"
                     ' __udf("order_cents")(CAST(5 AS INTEGER)) AS cents\n'
                 ),
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Typed orders.', tags [marts],\n"
                     "  columns (order_id (type INTEGER), cents (type INTEGER)),\n"
                     ");\n\n"
@@ -1337,7 +1337,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     for path in (_DUCKSHOP / "orchestration").rglob("*")
                     if path.is_file()
                 },
-                "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(
+                "sql/models/orders.sql": TYPE_PROOF_FILES["sql/models/orders.sql"].replace(
                     "MODEL (", "MODEL (tags ['edge_case'],", 1
                 ),
                 "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
@@ -1610,7 +1610,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             description="source_new_data selectors freeze only source nodes without event kinds",
             files={
                 **duckshop_orchestration("source_orders"),
-                "sources/orders.yml": Path(
+                "sql/sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
@@ -1634,7 +1634,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             description="source_stale freezes source nodes and a positive timestamp-age threshold",
             files={
                 **duckshop_orchestration("stale_orders"),
-                "sources/orders.yml": Path(
+                "sql/sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
@@ -1876,11 +1876,11 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="DuckShop jobs cannot reuse a model name",
             files=duckshop_orchestration("name_collision")
-            | {"models/orders_job.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n"},
+            | {"sql/models/orders_job.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n"},
             expected_error=DiscoveryConflictError,
             expected_message=re.escape(
                 "Project resource name 'orders_job' is declared as both model in "
-                "models/orders_job.sql and job in orchestration/jobs/orders_job.toml"
+                "sql/models/orders_job.sql and job in orchestration/jobs/orders_job.toml"
                 + ORCHESTRATION_NAME_CONFLICT
             ),
         ),
@@ -2013,7 +2013,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
                     "after_seconds=60",
                     "after_seconds=0",
                 ),
-                "sources/orders.yml": Path(
+                "sql/sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
@@ -2029,7 +2029,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
                     "after_seconds=60",
                     "after_seconds=True",
                 ),
-                "sources/orders.yml": Path(
+                "sql/sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
@@ -2045,7 +2045,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
                     "after_seconds=60",
                     "after_seconds=2**32",
                 ),
-                "sources/orders.yml": Path(
+                "sql/sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
@@ -2278,7 +2278,7 @@ def test_given_projects_compiled_in_one_process_when_one_imports_orchestration_t
         ),
         PythonJobSelectionTestCase(
             description="a python folder selects every node under it",
-            select="python/orders",
+            select="python/nodes/orders",
             expected_selection=("asset:partner_orders_file",),
         ),
         PythonJobSelectionTestCase(
@@ -2312,8 +2312,8 @@ def test_given_python_selectors_when_publishing_jobs_then_selections_match_the_c
         PythonJobGroupTestCase(
             description="a job waits for the job building the Python node its task depends on",
             jobs=(
-                ("orders_export_job", "python/orders/partner_export"),
-                ("carrier_sync_job", "python/fulfillment/carrier_sync"),
+                ("orders_export_job", "python/nodes/orders/partner_export"),
+                ("carrier_sync_job", "python/nodes/fulfillment/carrier_sync"),
             ),
             expected_groups={
                 "orders_nightly_job_group": {

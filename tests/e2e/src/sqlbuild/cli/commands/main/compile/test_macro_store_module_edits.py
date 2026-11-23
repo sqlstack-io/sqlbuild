@@ -97,7 +97,7 @@ def test_given_stored_call_reused_when_its_lazily_imported_module_changes_then_o
     [
         StoredMacroDeltaFallbackTestCase(
             description="a model error found by the delta round",
-            edited_path="models/staging/stg_customers.sql",
+            edited_path="sql/models/staging/stg_customers.sql",
             old="  email,\n",
             new="  email,\n  unknown_column,\n",
             expected_outcome=(0, 1, False, 1),

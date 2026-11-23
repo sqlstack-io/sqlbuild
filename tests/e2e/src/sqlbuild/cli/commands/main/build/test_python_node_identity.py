@@ -19,8 +19,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     run_sqb,
 )
 
-_LOADERS_PATH: str = "python/loaders/orders.py"
-_ASSETS_PATH: str = "python/assets/exports.py"
+_LOADERS_PATH: str = "python/nodes/loaders/orders.py"
+_ASSETS_PATH: str = "python/nodes/assets/exports.py"
 _ORIGINAL_COLUMNS: str = 'LoaderColumnSpec(name="order_id", type="INTEGER")'
 _ORIGINAL_RETRY: str = "RetryPolicy(max_attempts=2, retry_on=RuntimeError)"
 
@@ -89,7 +89,7 @@ def test_given_built_python_nodes_when_editing_decorator_inputs_then_identity_tr
                     return [{{"order_id": row[0]}} for row in rows]
                 """
             ).lstrip(),
-            "sources/raw.yml": dedent(
+            "sql/sources/raw.yml": dedent(
                 """
                 sources:
                   - name: raw_orders
@@ -155,7 +155,7 @@ def test_given_built_python_nodes_when_editing_decorator_inputs_then_identity_tr
     [
         PythonHelperPackageIdentityE2ETestCase(
             description="relative-import helper edit changes the dependent task identity",
-            edited_path="python/helpers/clean.py",
+            edited_path="python/nodes/helpers/clean.py",
             original_text="value.strip().lower()",
             edited_text="value.strip().upper()",
             expected_identity_status="changed",
@@ -182,9 +182,9 @@ def test_given_helper_package_with_relative_imports_when_editing_helper_then_tas
                 """
             ).strip()
             + "\n",
-            "python/helpers/__init__.py": "",
-            "python/helpers/values.py": 'STATUS = "shipped"\n',
-            "python/helpers/clean.py": dedent(
+            "python/nodes/helpers/__init__.py": "",
+            "python/nodes/helpers/values.py": 'STATUS = "shipped"\n',
+            "python/nodes/helpers/clean.py": dedent(
                 """
                 from .values import STATUS
 
@@ -193,9 +193,9 @@ def test_given_helper_package_with_relative_imports_when_editing_helper_then_tas
                     return f"{value.strip().lower()}:{STATUS}"
                 """
             ).lstrip(),
-            "python/orders.py": dedent(
+            "python/nodes/orders.py": dedent(
                 """
-                import python.helpers.clean
+                import python.nodes.helpers.clean
                 from sqlbuild.assets import asset
 
 

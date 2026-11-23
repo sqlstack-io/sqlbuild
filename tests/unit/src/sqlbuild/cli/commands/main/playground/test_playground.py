@@ -29,26 +29,26 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
             expected_files=(
                 Path("README.md"),
                 Path("sqlbuild_project.toml"),
-                Path("models/staging/stg_orders.sql"),
-                Path("models/marts/fact_orders.sql"),
-                Path("seeds/waffle_types.csv"),
-                Path("sources/raw.yml"),
+                Path("sql/models/staging/stg_orders.sql"),
+                Path("sql/models/marts/fact_orders.sql"),
+                Path("sql/seeds/waffle_types.csv"),
+                Path("sql/sources/raw.yml"),
                 Path("tests/unit/test_daily_revenue_chain.sql"),
-                Path("models/marts/_sqlbuild/_audits/generic/expression_is_true.sql"),
-                Path("functions/sql/udf__is_completed_order.sql"),
-                Path("functions/sql/table_fn__customer_orders.sql"),
-                Path("python/loaders/waffle_sources.py"),
-                Path("macros/python/currency.py"),
-                Path("models/marts/_sqlbuild/_macros/python/currency.py"),
-                Path("models/marts/_sqlbuild/_macros/python/datetime.py"),
-                Path("materializations/partition_tracked.py"),
+                Path("sql/models/marts/_sqlbuild/_audits/generic/expression_is_true.sql"),
+                Path("sql/functions/sql/udf__is_completed_order.sql"),
+                Path("sql/functions/sql/table_fn__customer_orders.sql"),
+                Path("python/nodes/loaders/waffle_sources.py"),
+                Path("sql/macros/python/currency.py"),
+                Path("sql/models/marts/_sqlbuild/_macros/python/currency.py"),
+                Path("sql/models/marts/_sqlbuild/_macros/python/datetime.py"),
+                Path("python/materializations/partition_tracked.py"),
             ),
             unexpected_paths=(
                 Path("target"),
                 Path("sqlbuild_local.toml"),
                 Path("waffle_shop_control.duckdb"),
-                Path("macros/__pycache__"),
-                Path("models/marts/_macros"),
+                Path("sql/macros/__pycache__"),
+                Path("sql/models/marts/_macros"),
             ),
             expected_file_fragments=(
                 (
@@ -56,7 +56,7 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
                     ("[connections.developer]", 'connection = "developer"'),
                 ),
                 (
-                    Path("materializations/partition_tracked.py"),
+                    Path("python/materializations/partition_tracked.py"),
                     ("from sqlbuild.adapter.contract.types import FrameworkType",),
                 ),
             ),
@@ -142,10 +142,10 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
             expected_files=(
                 Path("README.md"),
                 Path("sqlbuild_project.toml"),
-                Path("models/fact_waffle_orders.sql"),
-                Path("models/customer_revenue.sql"),
-                Path("sources/raw.yml"),
-                Path("python/loaders/waffle_loaders.py"),
+                Path("sql/models/fact_waffle_orders.sql"),
+                Path("sql/models/customer_revenue.sql"),
+                Path("sql/sources/raw.yml"),
+                Path("python/nodes/loaders/waffle_loaders.py"),
             ),
             unexpected_paths=(Path("target"), Path("sqlbuild_local.toml")),
             expected_file_fragments=(
@@ -153,16 +153,16 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
                     Path("sqlbuild_project.toml"),
                     ("[connections.developer]", 'connection = "developer"'),
                 ),
-                (Path("sources/raw.yml"), ("managed: true",)),
+                (Path("sql/sources/raw.yml"), ("managed: true",)),
                 (
-                    Path("python/loaders/waffle_loaders.py"),
+                    Path("python/nodes/loaders/waffle_loaders.py"),
                     ("def raw_orders(ctx):", "def raw_customers(ctx):"),
                 ),
             ),
             unexpected_file_fragments=(
-                (Path("sources/raw.yml"), ("loader:",)),
+                (Path("sql/sources/raw.yml"), ("loader:",)),
                 (
-                    Path("python/loaders/waffle_loaders.py"),
+                    Path("python/nodes/loaders/waffle_loaders.py"),
                     ("def load_raw_orders(ctx):", "def load_raw_customers(ctx):"),
                 ),
             ),
@@ -174,12 +174,12 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
             expected_files=(
                 Path("README.md"),
                 Path("sqlbuild_project.toml"),
-                Path("sources/raw.yml"),
-                Path("models/fact_orders.sql"),
-                Path("python/assets/orders_inputs.py"),
-                Path("python/loaders/orders.py"),
-                Path("python/assets/orders_export.py"),
-                Path("python/checks/orders_export.py"),
+                Path("sql/sources/raw.yml"),
+                Path("sql/models/fact_orders.sql"),
+                Path("python/nodes/assets/orders_inputs.py"),
+                Path("python/nodes/loaders/orders.py"),
+                Path("python/nodes/assets/orders_export.py"),
+                Path("python/nodes/checks/orders_export.py"),
             ),
             unexpected_paths=(Path("target"), Path("sqlbuild_local.toml")),
             expected_file_fragments=(
@@ -188,7 +188,7 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
                     ("[connections.developer]", 'connection = "developer"'),
                 ),
                 (
-                    Path("python/assets/orders_inputs.py"),
+                    Path("python/nodes/assets/orders_inputs.py"),
                     (
                         "from sqlbuild.assets import SkipMode, asset",
                         "def prepare_raw_orders",
@@ -197,11 +197,11 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
                     ),
                 ),
                 (
-                    Path("python/loaders/orders.py"),
+                    Path("python/nodes/loaders/orders.py"),
                     ("@loader(depends_on=(prepare_raw_orders,))", "def raw_orders"),
                 ),
                 (
-                    Path("python/assets/orders_export.py"),
+                    Path("python/nodes/assets/orders_export.py"),
                     (
                         'ctx.relation(model("fact_orders"))',
                         "materialized=False",
@@ -209,7 +209,7 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
                     ),
                 ),
                 (
-                    Path("python/checks/orders_export.py"),
+                    Path("python/nodes/checks/orders_export.py"),
                     (
                         "@check(depends_on=orders_export",
                         "ctx.result_of(node_function=orders_export)",
@@ -217,7 +217,7 @@ from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
                 ),
             ),
             unexpected_file_fragments=(
-                (Path("python/assets/orders_inputs.py"), ("sqlbuild.compiler",)),
+                (Path("python/nodes/assets/orders_inputs.py"), ("sqlbuild.compiler",)),
             ),
         ),
     ],

@@ -17,8 +17,8 @@ from scripts.compiler_differential.models import FailureCase
 _STAGING_HEADER: str = '"Staged orders",'
 _MART_HEADER: str = '"Order totals per customer",'
 _STAGING_COLUMNS: str = "amount, status"
-_STAGING_MACROS: str = "models/staging/_sqlbuild/_macros/python/orders.py"
-_MART_MACROS: str = "models/marts/_sqlbuild/_macros/python/orders.py"
+_STAGING_MACROS: str = "sql/models/staging/_sqlbuild/_macros/python/orders.py"
+_MART_MACROS: str = "sql/models/marts/_sqlbuild/_macros/python/orders.py"
 _CENTS_MACRO: str = (
     'def cents(expression: str) -> str:\n    """Convert to cents."""\n'
     '    return f"({expression} * 100)"\n'
@@ -56,7 +56,7 @@ _CENTS_TEST_PREFIX: str = (
     '__macro_actual__ AS (SELECT @py.cents("amount") AS cents FROM input_values),\n'
 )
 
-_SQL_MACRO_MACROS: str = "models/staging/_sqlbuild/_macros/sql"
+_SQL_MACRO_MACROS: str = "sql/models/staging/_sqlbuild/_macros/sql"
 _SQL_MACRO_STAGING_COLUMNS: str = "amount, status"
 _SQL_MACRO_X_HEADER: str = 'MACRO (description "X", arguments ({arguments}){returns});\n\n'
 _SQL_MACRO_CENTS: dict[str, str] = {
@@ -154,7 +154,7 @@ def _macro_cases() -> tuple[FailureCase, ...]:
                     columns='amount, @py.explode("status") AS status',
                     files={_STAGING_MACROS: _CENTS_MACRO + _EXPLODE_MACRO},
                 ),
-                "macros/python/explode.py": _EXPLODE_MACRO.replace("def explode", "def blow_up"),
+                "sql/macros/python/explode.py": _EXPLODE_MACRO.replace("def explode", "def blow_up"),
                 FAILURE_MART_PATH: FAILURE_BASE_MART.replace(
                     "SUM(amount)", 'SUM(@py.blow_up("total"))'
                 ),
@@ -196,12 +196,12 @@ def _macro_cases() -> tuple[FailureCase, ...]:
             expected_code="S007",
             files={
                 _STAGING_MACROS: _CENTS_MACRO,
-                "models/staging/_sqlbuild/macros/python/wrapping.py": (
+                "sql/models/staging/_sqlbuild/macros/python/wrapping.py": (
                     "from models.staging._sqlbuild._macros.python.orders import cents\n\n\n"
                     'def wrapped(expression: str) -> str:\n    """Wrap cents."""\n'
                     "    return cents(expression)\n"
                 ),
-                "models/staging/regional/stg_regional_orders.sql": (
+                "sql/models/staging/regional/stg_regional_orders.sql": (
                     'MODEL (\n  description "Regional orders",\n);\n\n'
                     'SELECT order_id, @py.wrapped("amount") AS amount_cents\n'
                     'FROM __ref("stg_orders")\n'
@@ -243,7 +243,7 @@ def _interpolation_cases() -> tuple[FailureCase, ...]:
             expected_code="P001",
             expected_message="@@@placeholders without default values",
             files={
-                "materializations/copy_table.py": (
+                "python/materializations/copy_table.py": (
                     "from sqlbuild.executor.custom.models import MaterializationContext, "
                     "MaterializationResult\n\n\n"
                     "def materialize(ctx: MaterializationContext) -> MaterializationResult:\n"
@@ -278,7 +278,7 @@ def _interpolation_cases() -> tuple[FailureCase, ...]:
             expected_code="P001",
             expected_message="is missing argument 'label'",
             files={
-                "hooks/sql/record_refresh.sql": _RECORD_HOOK,
+                "sql/hooks/sql/record_refresh.sql": _RECORD_HOOK,
                 FAILURE_MART_PATH: FAILURE_BASE_MART.replace(
                     _MART_HEADER, f'{_MART_HEADER}\n  post_hooks [sql("record_refresh")],'
                 ),
@@ -289,7 +289,7 @@ def _interpolation_cases() -> tuple[FailureCase, ...]:
             expected_code="P001",
             expected_message="is missing argument 'minimum' for generic audit 'floor'",
             files={
-                "models/staging/_sqlbuild/_audits/generic/floor.sql": _FLOOR_AUDIT,
+                "sql/models/staging/_sqlbuild/_audits/generic/floor.sql": _FLOOR_AUDIT,
                 **_staging_header("  audits [floor],"),
             },
         ),
@@ -298,7 +298,7 @@ def _interpolation_cases() -> tuple[FailureCase, ...]:
             expected_code="P001",
             expected_message="passes argument 'where_condition', which the audit's SQL in",
             files={
-                "models/staging/_sqlbuild/_audits/generic/floor.sql": _FLOOR_AUDIT,
+                "sql/models/staging/_sqlbuild/_audits/generic/floor.sql": _FLOOR_AUDIT,
                 **_staging_header(
                     "  audits [floor (minimum 0, where_condition \"status <> 'void'\")],"
                 ),
@@ -314,7 +314,7 @@ def _reference_cases() -> tuple[FailureCase, ...]:
             expected_code="P001",
             expected_message="expects 1 argument but received 2",
             files={
-                "functions/sql/table_fn__orders_for.sql": _ORDERS_FOR,
+                "sql/functions/sql/table_fn__orders_for.sql": _ORDERS_FOR,
                 **mart_body_files(
                     "SELECT order_id AS customer_id, 1 AS total_amount\n"
                     'FROM __table_fn("table_fn__orders_for")(1, 2)\n'
@@ -507,7 +507,7 @@ def _reference_cases() -> tuple[FailureCase, ...]:
             name="hard-coded-relation-in-python",
             expected_code="P008",
             files={
-                "python/tasks/exports.py": (
+                "python/nodes/tasks/exports.py": (
                     "from sqlbuild.assets import asset\n\n\n"
                     '@asset\ndef export_orders(ctx):\n    """Export orders."""\n'
                     '    return ctx.query("SELECT * FROM stg_orders")\n'
@@ -523,7 +523,7 @@ def _attachment_cases() -> tuple[FailureCase, ...]:
             name="attached-audit-reads-dependant",
             expected_code="P005",
             files={
-                "models/staging/_sqlbuild/_audits/generic/matches_totals.sql": _TOTALS_READER,
+                "sql/models/staging/_sqlbuild/_audits/generic/matches_totals.sql": _TOTALS_READER,
                 **_staging_header("  audits [matches_totals],"),
             },
         ),
@@ -531,7 +531,7 @@ def _attachment_cases() -> tuple[FailureCase, ...]:
             name="hook-reads-dependant",
             expected_code="P007",
             files={
-                "models/staging/_sqlbuild/_hooks/python/notes.py": _HOOK_READING_TOTALS,
+                "sql/models/staging/_sqlbuild/_hooks/python/notes.py": _HOOK_READING_TOTALS,
                 **_staging_header('  post_hooks [python("note_refresh")],'),
             },
         ),
@@ -560,7 +560,7 @@ def _attachment_cases() -> tuple[FailureCase, ...]:
             name="schema-from-sibling-folder",
             expected_code="S006",
             files={
-                "models/marts/_sqlbuild/_schemas/order_shape.sql": (
+                "sql/models/marts/_sqlbuild/_schemas/order_shape.sql": (
                     'SCHEMA (\n  name order_shape,\n  description "Order shape",\n'
                     "  columns (\n    order_id (type INTEGER),\n  ),\n);\n"
                 ),
@@ -571,7 +571,7 @@ def _attachment_cases() -> tuple[FailureCase, ...]:
             name="inherited-declaration-used-in-one-folder",
             expected_code="S008",
             files={
-                "models/staging/_sqlbuild/constants/limits.sql": (
+                "sql/models/staging/_sqlbuild/constants/limits.sql": (
                     "CONSTANT (name minimum_amount, value 1);\n"
                 ),
                 **staging_files(FAILURE_BASE_STAGING + 'WHERE amount > @const("minimum_amount")\n'),
@@ -581,7 +581,7 @@ def _attachment_cases() -> tuple[FailureCase, ...]:
             name="singular-audit-across-trees",
             expected_code="S009",
             files={
-                "models/marts/_sqlbuild/audits/singular/totals_have_orders.sql": (
+                "sql/models/marts/_sqlbuild/audits/singular/totals_have_orders.sql": (
                     'AUDIT (name "totals_have_orders");\n\n'
                     'SELECT t.customer_id\nFROM __ref("customer_totals") t\n'
                     'LEFT JOIN __source("raw_orders") o ON t.customer_id = o.customer_id\n'
@@ -594,13 +594,13 @@ def _attachment_cases() -> tuple[FailureCase, ...]:
             expected_code="S024",
             expected_warning_code="C216",
             files={
-                "python/audits/quality.py": (
+                "python/nodes/audits/quality.py": (
                     "from sqlbuild.audits import AuditCase, audit_factory\n\n\n"
                     "@audit_factory\ndef order_quality():\n"
                     '    return [AuditCase(name="id_present", definition="not_null", '
                     'arguments={"column": "order_id"})]\n'
                 ),
-                "constants/limits.sql": "CONSTANT (name minimum_amount, value 1);\n",
+                "sql/constants/limits.sql": "CONSTANT (name minimum_amount, value 1);\n",
                 **staging_files(FAILURE_BASE_STAGING + 'WHERE amount > @const("minimum_amount")\n'),
             },
         ),
@@ -811,12 +811,12 @@ def _sql_macro_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="sql-macro-body-declaration-not-visible",
             expected_code="S026",
-            expected_message="constant price_places is not visible from macros/sql/x.sql",
+            expected_message="constant price_places is not visible from sql/macros/sql/x.sql",
             files={
-                "models/staging/_sqlbuild/_constants/places.sql": (
+                "sql/models/staging/_sqlbuild/_constants/places.sql": (
                     "CONSTANT (name price_places, value 2);\n"
                 ),
-                "macros/sql/x.sql": _SQL_MACRO_X_HEADER.format(
+                "sql/macros/sql/x.sql": _SQL_MACRO_X_HEADER.format(
                     arguments="v DOUBLE", returns=", returns DOUBLE"
                 )
                 + 'ROUND(@v, @const("price_places"))\n',

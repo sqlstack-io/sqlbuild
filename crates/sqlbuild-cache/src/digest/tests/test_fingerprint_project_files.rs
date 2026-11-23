@@ -19,7 +19,7 @@ fn given_project_edit_when_fingerprinting_then_only_covered_content_changes_it()
             edit: |root| {
                 write_file(
                     root,
-                    "macros/cents.py",
+                    "sql/macros/cents.py",
                     "def cents(amount):\n    return 1\n",
                 )
             },
@@ -27,18 +27,18 @@ fn given_project_edit_when_fingerprinting_then_only_covered_content_changes_it()
         },
         FingerprintProjectFilesTestCase {
             description: "helper module added",
-            edit: |root| write_file(root, "macros/_rounding.py", "SCALE = 2\n"),
+            edit: |root| write_file(root, "sql/macros/_rounding.py", "SCALE = 2\n"),
             expected_changed: true,
         },
         FingerprintProjectFilesTestCase {
             description: "macro file removed",
-            edit: |root| std::fs::remove_file(root.join("macros/cents.py")).expect("removed"),
+            edit: |root| std::fs::remove_file(root.join("sql/macros/cents.py")).expect("removed"),
             expected_changed: true,
         },
         FingerprintProjectFilesTestCase {
             description: "file renamed with the same content",
             edit: |root| {
-                std::fs::rename(root.join("macros/cents.py"), root.join("macros/money.py"))
+                std::fs::rename(root.join("sql/macros/cents.py"), root.join("sql/macros/money.py"))
                     .expect("renamed");
             },
             expected_changed: true,
@@ -50,7 +50,7 @@ fn given_project_edit_when_fingerprinting_then_only_covered_content_changes_it()
         },
         FingerprintProjectFilesTestCase {
             description: "new model is covered until the caller excludes it",
-            edit: |root| write_file(root, "models/customers.sql", "SELECT 1 AS id\n"),
+            edit: |root| write_file(root, "sql/models/customers.sql", "SELECT 1 AS id\n"),
             expected_changed: true,
         },
         FingerprintProjectFilesTestCase {
@@ -60,12 +60,12 @@ fn given_project_edit_when_fingerprinting_then_only_covered_content_changes_it()
         },
         FingerprintProjectFilesTestCase {
             description: "nested target folder edit",
-            edit: |root| write_file(root, "macros/target/notes.txt", "covered"),
+            edit: |root| write_file(root, "sql/macros/target/notes.txt", "covered"),
             expected_changed: true,
         },
         FingerprintProjectFilesTestCase {
             description: "bytecode cache edit",
-            edit: |root| write_file(root, "macros/__pycache__/cents.pyc", "other"),
+            edit: |root| write_file(root, "sql/macros/__pycache__/cents.pyc", "other"),
             expected_changed: false,
         },
         FingerprintProjectFilesTestCase {

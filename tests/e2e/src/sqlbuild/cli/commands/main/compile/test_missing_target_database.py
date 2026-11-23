@@ -108,11 +108,11 @@ _PRESERVED_TARGET_PROJECT: str = (
                 '[connections.archive]\ndatabase = "archive.duckdb"\n'
             ),
             extra_files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Test model orders.', materialized view, "
                     "schema staging);\n\nSELECT 1 AS order_id\n"
                 ),
-                "python/loaders/orders.py": (
+                "python/nodes/loaders/orders.py": (
                     "from sqlbuild.loaders import loader\n\n\n@loader\n"
                     "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
                     '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
@@ -138,11 +138,11 @@ _PRESERVED_TARGET_PROJECT: str = (
                 '[connections.archive]\ndatabase = "archive.duckdb"\n'
             ),
             extra_files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Test model orders.', materialized view, "
                     "schema staging);\n\nSELECT 1 AS order_id\n"
                 ),
-                "python/loaders/orders.py": (
+                "python/nodes/loaders/orders.py": (
                     "from sqlbuild.loaders import loader\n\n\n@loader\n"
                     "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
                     '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
@@ -169,7 +169,7 @@ _PRESERVED_TARGET_PROJECT: str = (
                 '[defaults]\nschema = "analytics"\n\n[targets.dev]\nschema = "preserve"\n'
             ),
             extra_files={
-                "python/loaders/orders.py": (
+                "python/nodes/loaders/orders.py": (
                     "from sqlbuild.loaders import loader\n\n\n@loader\n"
                     "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
                     '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
@@ -193,7 +193,7 @@ _PRESERVED_TARGET_PROJECT: str = (
                 '[defaults]\nschema = "analytics"\n\n[targets.dev]\nschema = "preserve"\n'
             ),
             extra_files={
-                "python/loaders/orders.py": (
+                "python/nodes/loaders/orders.py": (
                     "from sqlbuild.loaders import loader\n\n\n@loader\n"
                     "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
                     '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
@@ -218,12 +218,12 @@ _PRESERVED_TARGET_PROJECT: str = (
                 '[targets.dev]\nschema = "analytics"\nloader_schema = "preserve"\n'
             ),
             extra_files={
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
                     "    managed: true\n    write_strategy: table\n"
                     "    columns:\n      - name: order_id\n        type: INTEGER\n"
                 ),
-                "python/loaders/orders.py": (
+                "python/nodes/loaders/orders.py": (
                     "from sqlbuild.loaders import loader\n\n\n@loader\n"
                     "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
                     '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
@@ -246,12 +246,12 @@ _PRESERVED_TARGET_PROJECT: str = (
                 '[targets.dev]\nschema = "analytics"\nloader_schema = "raw_${CTX:run.id}"\n'
             ),
             extra_files={
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
                     "    managed: true\n    write_strategy: table\n"
                     "    columns:\n      - name: order_id\n        type: INTEGER\n"
                 ),
-                "python/loaders/orders.py": (
+                "python/nodes/loaders/orders.py": (
                     "from sqlbuild.loaders import loader\n\n\n@loader\n"
                     "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
                     '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'
@@ -272,7 +272,7 @@ def test_given_model_without_location_when_compiling_then_error_names_the_settin
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": test_case.project_toml,
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.', materialized view);\n\n"
                 "SELECT 1 AS order_id\n"
             ),
@@ -329,7 +329,7 @@ def test_given_connection_location_when_compiling_then_models_build_there(
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": test_case.project_toml,
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.', materialized view);\n\n"
                 "SELECT 1 AS order_id\n"
             ),
@@ -432,16 +432,16 @@ def test_given_managed_source_when_loading_then_source_lands_in_its_resolved_sch
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": test_case.project_toml,
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.', materialized view, "
                 'schema staging);\n\nSELECT order_id FROM __source("raw_orders")\n'
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
                 f"    managed: true\n{test_case.source_schema}    write_strategy: table\n"
                 "    columns:\n      - name: order_id\n        type: INTEGER\n"
             ),
-            "python/loaders/orders.py": (
+            "python/nodes/loaders/orders.py": (
                 "from sqlbuild.loaders import loader\n\n\n@loader\n"
                 "def raw_orders(ctx: object) -> list[dict[str, object]]:\n"
                 '    """Raw orders."""\n    _ = ctx\n    return [{"order_id": 1}]\n'

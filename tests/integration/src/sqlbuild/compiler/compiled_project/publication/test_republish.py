@@ -124,8 +124,8 @@ def test_given_a_changed_external_plan_when_republishing_then_the_readback_shows
             "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/plan/nodes.py": _NODES.format(plan=str(plan)),
+            "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            "python/nodes/plan/nodes.py": _NODES.format(plan=str(plan)),
         },
     )
     executable: str = str(Path(sys.executable).with_name("sqb"))
@@ -209,7 +209,7 @@ def test_given_a_saved_login_session_when_republishing_then_the_request_names_th
             "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n'
             'default_target = "production"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.production]\nschema = "main"\n',
-            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
         },
     )
     with gateway(tmp_path) as (origin, certificate, transport):
@@ -292,8 +292,8 @@ def test_given_a_republish_waiting_on_a_check_when_the_grace_passes_then_the_rep
             "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/plan/nodes.py": _CHECKED.format(
+            "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            "python/nodes/plan/nodes.py": _CHECKED.format(
                 directory=str(tmp_path), check_seconds=test_case.check_seconds
             ),
         },
@@ -385,8 +385,8 @@ def test_given_a_service_account_key_over_network_http_when_republishing_then_it
             "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/plan/nodes.py": _NODES.format(plan=str(plan)),
+            "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            "python/nodes/plan/nodes.py": _NODES.format(plan=str(plan)),
         },
     )
     successful(administer(installation, ["create-user", "orders-admin"]))

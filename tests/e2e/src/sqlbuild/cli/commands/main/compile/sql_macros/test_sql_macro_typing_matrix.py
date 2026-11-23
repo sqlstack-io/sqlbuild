@@ -297,7 +297,7 @@ def test_given_a_known_different_body_when_compiling_then_the_inferred_type_stan
                 **orders_model(f"SELECT @sql.status_bar(o.status) AS x, o.missing {_FROM}\n"),
             },
             expected_returncode=1,
-            expected_fragments=("--> models/marts/orders.sql:3:42",),
+            expected_fragments=("--> sql/models/marts/orders.sql:3:42",),
         ),
         SqlMacroCompileTestCase(
             description="the_reserved_analysis_function_is_rejected_in_a_model",

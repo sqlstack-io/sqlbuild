@@ -86,18 +86,18 @@ def build_scenario_project_files() -> dict[str, str]:
             "[defaults]\n"
             'materialized = "table"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.', materialized table);\n\n"
             "SELECT\n"
             "  id AS order_id,\n"
             "  amount\n"
             'FROM __source("raw_orders")\n'
         ),
-        "models/order_totals.sql": (
+        "sql/models/order_totals.sql": (
             "MODEL (description 'Test model order_totals.', materialized table);\n\n"
             "SELECT\n"
             "  SUM(amount) AS total_amount\n"
@@ -151,7 +151,7 @@ def build_partial_fixture_scenario_project_files() -> dict[str, str]:
             "[connection]\n"
             'database = "partial_fixture_scenario.duckdb"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n"
@@ -160,7 +160,7 @@ def build_partial_fixture_scenario_project_files() -> dict[str, str]:
             "      - name: order_id\n        type: INTEGER\n        nullable: false\n"
             "      - name: status\n        type: VARCHAR\n"
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             'MODEL (description "Test model orders.");\n\n'
             'SELECT order_id, status FROM __source("raw_orders")\n'
         ),
@@ -180,7 +180,7 @@ def build_scenario_python_hooks_project_files() -> dict[str, str]:
     """Build an inline scenario project with a Python lifecycle hook."""
 
     repo_files: dict[str, str] = build_scenario_project_files()
-    repo_files["hooks/python/scenario_hooks.py"] = (
+    repo_files["sql/hooks/python/scenario_hooks.py"] = (
         "from sqlbuild.hooks import hook\n\n"
         "@hook\n"
         "def log_scenario_model(ctx):\n"
@@ -189,7 +189,7 @@ def build_scenario_python_hooks_project_files() -> dict[str, str]:
         "        f\"SELECT '{ctx.model_name}' AS model_name, '{ctx.phase}' AS phase\"\n"
         "    )\n"
     )
-    repo_files["models/orders.sql"] = (
+    repo_files["sql/models/orders.sql"] = (
         'MODEL (description "Test model orders.", '
         'materialized table, post_hooks [python("log_scenario_model")]);\n\n'
         "SELECT\n"
@@ -204,11 +204,11 @@ def build_scenario_dependency_chain_project_files() -> dict[str, str]:
     """Build a three-model scenario with partial source fixtures and final checks."""
 
     repo_files: dict[str, str] = build_partial_fixture_scenario_project_files()
-    repo_files["models/orders_summary.sql"] = (
+    repo_files["sql/models/orders_summary.sql"] = (
         'MODEL (description "Summarize fixture orders.", materialized table);\n'
         'SELECT order_id, status FROM __ref("orders")\n'
     )
-    repo_files["models/orders_final.sql"] = (
+    repo_files["sql/models/orders_final.sql"] = (
         'MODEL (description "Final scenario output.", materialized table);\n'
         'SELECT order_id, status FROM __ref("orders_summary")\n'
     )
@@ -248,11 +248,11 @@ def build_real_warehouse_local_replay_project_files(
 
     return {
         "sqlbuild_project.toml": project_toml,
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_events\n    description: Test source raw_events.\n"
             "    schema: raw\n    table: raw_events\n"
         ),
-        "models/event_rollup.sql": model_sql,
+        "sql/models/event_rollup.sql": model_sql,
         f"tests/scenarios/{scenario_name}.sql": scenario_sql,
     }
 
@@ -262,17 +262,17 @@ def build_real_warehouse_remote_scenario_project_files(*, project_toml: str) -> 
 
     return {
         "sqlbuild_project.toml": project_toml,
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_events\n    description: Test source raw_events.\n"
             "    schema: raw\n    table: raw_events\n"
         ),
-        "models/stg_events.sql": (
+        "sql/models/stg_events.sql": (
             "MODEL (description 'Test model stg_events.', materialized view);\n\n"
             "SELECT customer_id, amount_cents\n"
             'FROM __source("raw_events")\n'
             "WHERE amount_cents >= 1000\n"
         ),
-        "models/event_rollup.sql": (
+        "sql/models/event_rollup.sql": (
             "MODEL (description 'Test model event_rollup.', materialized table);\n\n"
             "SELECT\n"
             "  customer_id,\n"
@@ -356,7 +356,7 @@ def assert_scenario_snapshot(
 
     snapshot_root: Path = project_dir / "tests" / "_scenario_snapshots" / scenario_name
     manifest_path: Path = snapshot_root / "scenario.json"
-    jsonl_path: Path = snapshot_root / "sources" / "raw_orders.jsonl"
+    jsonl_path: Path = snapshot_root / "sql" / "sources" / "raw_orders.jsonl"
     assert manifest_path.exists()
     assert jsonl_path.exists()
 
@@ -365,7 +365,7 @@ def assert_scenario_snapshot(
     assert manifest_data["scenario_name"] == scenario_name
     assert manifest_data["format"] == "jsonl"
     assert manifest_data["total_rows"] == expected_row_count
-    assert manifest_data["relations"][0]["file"] == "sources/raw_orders.jsonl"
+    assert manifest_data["relations"][0]["file"] == "sql/sources/raw_orders.jsonl"
     assert manifest_data["relations"][0]["row_count"] == expected_row_count
     columns: object = manifest_data["relations"][0]["columns"]
     assert isinstance(columns, list)
@@ -398,7 +398,7 @@ def maybe_corrupt_scenario_snapshot_jsonl(
             / "tests"
             / "_scenario_snapshots"
             / scenario_name
-            / "sources"
+            / "sql" / "sources"
             / "raw_orders.jsonl"
         )
         jsonl_path.write_text('{"id": 1, "amount": 10}\nnot-json\n', encoding="utf-8")
@@ -436,7 +436,7 @@ def write_committed_order_totals_pass_snapshot(*, project_dir: Path) -> None:
     """Write a small snapshot fixture without running scenario capture."""
 
     snapshot_root: Path = project_dir / "tests" / "_scenario_snapshots" / "order_totals_pass"
-    sources_root: Path = snapshot_root / "sources"
+    sources_root: Path = snapshot_root / "sql" / "sources"
     sources_root.mkdir(parents=True)
     (snapshot_root / "scenario.json").write_text(
         json.dumps(
@@ -463,7 +463,7 @@ def write_committed_order_totals_pass_snapshot(*, project_dir: Path) -> None:
                                 "warehouse_type": "INTEGER",
                             },
                         ],
-                        "file": "sources/raw_orders.jsonl",
+                        "file": "sql/sources/raw_orders.jsonl",
                         "kind": "source",
                         "logical_name": "raw_orders",
                         "row_count": 2,
@@ -622,7 +622,7 @@ def build_promotion_project_files(test_case: ScenarioPromotionE2ETestCase) -> di
             f"{test_case.defaults_config}\n"
             f"{test_case.settings_config}"
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_orders\n"
             "    description: Raw orders.\n"
@@ -634,7 +634,7 @@ def build_promotion_project_files(test_case: ScenarioPromotionE2ETestCase) -> di
             "      - name: amount\n"
             "        type: INTEGER\n"
         ),
-        "models/order_totals.sql": (
+        "sql/models/order_totals.sql": (
             "MODEL (\n"
             "  description 'Order totals.',\n"
             "  materialized table,\n"
@@ -685,7 +685,7 @@ def build_empty_fixture_scenario_project_files(*, customer_columns_yaml: str) ->
             "[rules]\n"
             'select = ["SQLCLEAN021"]\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_orders\n"
             "    description: Raw orders.\n"
@@ -702,7 +702,7 @@ def build_empty_fixture_scenario_project_files(*, customer_columns_yaml: str) ->
             "    table: raw_customers\n"
             f"{customer_columns_yaml}"
         ),
-        "models/customer_orders.sql": (
+        "sql/models/customer_orders.sql": (
             "MODEL (description 'Orders joined to known customers.', materialized table);\n\n"
             "SELECT o.id AS order_id, c.name AS customer_name\n"
             'FROM __source("raw_orders") AS o\n'
@@ -743,7 +743,7 @@ _MODEL_TOTALS: dict[bool, str] = {True: f"SUM(o.amount) + {_ENDLESS_SUM}", False
 _POST_HOOKS: dict[bool, str] = {True: ', post_hooks [python("pause_after_build")]', False: ""}
 _HOOK_FILES: dict[bool, dict[str, str]] = {
     True: {
-        "hooks/python/slow_hooks.py": (
+        "sql/hooks/python/slow_hooks.py": (
             "import os\n"
             "import time\n\n"
             "from sqlbuild.hooks import hook\n\n\n"
@@ -782,14 +782,14 @@ def build_interrupt_project_files(
             "[defaults]\n"
             'materialized = "table"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_orders\n"
             "    description: Raw orders.\n"
             "    schema: main\n"
             "    table: raw_orders\n"
         ),
-        "models/order_totals.sql": (
+        "sql/models/order_totals.sql": (
             "MODEL (description 'Order totals.', materialized table, sql_analysis false"
             f"{_POST_HOOKS[slow_hook]});\n\n"
             f"SELECT {_MODEL_TOTALS[long_model]} AS total_amount "
@@ -887,12 +887,12 @@ _EXPECTED_COLUMNS_PROJECT_FILES: dict[str, str] = {
         'name = "scenario_expected_columns"\nadapter = "duckdb"\n\n'
         '[connection]\ndatabase = "warehouse.duckdb"\n'
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         'MODEL (description "Orders", materialized table);\n\n'
         "SELECT order_id, status\n"
         "FROM (VALUES ('o1', 'placed')) AS t(order_id, status)\n"
     ),
-    "models/order_flags.sql": (
+    "sql/models/order_flags.sql": (
         'MODEL (description "Orders with a flag", materialized table);\n\n'
         'WITH orders AS (SELECT * FROM __ref("orders"))\n\n'
         "SELECT order_id, status, status = 'cancelled' AS is_cancelled\n"
@@ -950,24 +950,24 @@ def build_unmocked_input_scenario_project_files() -> dict[str, str]:
             'name = "unmocked_inputs"\nadapter = "duckdb"\n\n'
             '[connection]\ndatabase = "unmocked_inputs.duckdb"\n'
         ),
-        "sources/raw.yml": "sources:\n"
+        "sql/sources/raw.yml": "sources:\n"
         + "".join(
             f"  - name: {name}\n    description: Test source {name}.\n"
             f"    schema: main\n    table: {name}\n"
             for name in ("raw_orders", *_UNMOCKED_REP_SOURCES)
         ),
-        "models/stg_orders.sql": (
+        "sql/models/stg_orders.sql": (
             'MODEL (description "Test model stg_orders.");\n\n'
             'SELECT order_id, rep_id FROM __source("raw_orders")\n'
         ),
-        "models/stg_sales_reps.sql": (
+        "sql/models/stg_sales_reps.sql": (
             'MODEL (description "Test model stg_sales_reps.");\n\n'
             + "\nUNION ALL\n".join(
                 f'SELECT rep_id, rep_name FROM __source("{name}")' for name in _UNMOCKED_REP_SOURCES
             )
             + "\n"
         ),
-        "models/order_reps.sql": (
+        "sql/models/order_reps.sql": (
             'MODEL (description "Test model order_reps.");\n\n'
             "SELECT o.order_id, r.rep_name\n"
             'FROM __ref("stg_orders") AS o\n'
@@ -1000,19 +1000,19 @@ def build_lambda_scenario_project_files() -> dict[str, str]:
             'name = "lambda_scenario"\nadapter = "duckdb"\n\n'
             '[connection]\ndatabase = "lambda_scenario.duckdb"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_sessions\n    description: Test source raw_sessions.\n"
             "    schema: main\n    table: raw_sessions\n"
         ),
-        "models/sessions.sql": (
+        "sql/models/sessions.sql": (
             "MODEL (description 'Test model sessions.');\n"
             'SELECT * FROM __source("raw_sessions")\n'
         ),
-        "models/carts.sql": (
+        "sql/models/carts.sql": (
             "MODEL (description 'Test model carts.');\n"
             "SELECT 1 AS session_id, [1, 2, 3] AS quantities\n"
         ),
-        "models/cart_totals.sql": (
+        "sql/models/cart_totals.sql": (
             "MODEL (description 'Test model cart_totals.');\n"
             'WITH sess AS (SELECT * FROM __ref("sessions")),\n'
             'crt AS (SELECT c.session_id, c.quantities FROM __ref("carts") AS c)\n'
@@ -1041,19 +1041,19 @@ def build_contracted_star_empty_fixture_project_files() -> dict[str, str]:
             'name = "contracted_star"\nadapter = "duckdb"\n\n'
             '[connection]\ndatabase = "contracted_star.duckdb"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n"
             "    schema: main\n    table: raw_customers\n"
         ),
-        "models/customers.sql": (
+        "sql/models/customers.sql": (
             "MODEL (description 'Test model customers.', contract enforced,\n"
             "  columns (id (type INTEGER), name (type VARCHAR)));\n"
             'SELECT * FROM __source("raw_customers")\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.');\nSELECT 1 AS id, 7 AS customer_id\n"
         ),
-        "models/customer_orders.sql": (
+        "sql/models/customer_orders.sql": (
             "MODEL (description 'Test model customer_orders.');\n"
             "SELECT o.id AS order_id, c.name AS customer_name\n"
             'FROM __ref("orders") AS o\nJOIN __ref("customers") AS c ON c.id = o.customer_id\n'
@@ -1079,11 +1079,11 @@ def build_cursor_intrinsic_scenario_project_files() -> dict[str, str]:
             'name = "cursor_scenario"\nadapter = "duckdb"\n\n'
             '[connection]\ndatabase = "cursor_scenario.duckdb"\n'
         ),
-        "models/orders.sql": (
+        "sql/models/orders.sql": (
             "MODEL (description 'Test model orders.');\n"
             "SELECT 1 AS order_id, TIMESTAMP '2026-01-02 10:00:00' AS ordered_at\n"
         ),
-        "models/hourly_orders.sql": (
+        "sql/models/hourly_orders.sql": (
             "MODEL (\n  description 'Test model hourly_orders.',\n  materialized incremental,\n"
             "  incremental_strategy delete_insert,\n  cursor ordered_at,\n"
             "  cursor_type timestamp,\n  cursor_grain hour,\n  cursor_inputs (orders ordered_at),\n"
@@ -1111,12 +1111,12 @@ def build_connect_by_scenario_project_files() -> dict[str, str]:
             '[targets.dev]\ndatabase = "warehouse"\nschema = "analytics"\n\n'
             "[scopes]\nenforce_placement = false\n"
         ),
-        "models/categories.sql": (
+        "sql/models/categories.sql": (
             "MODEL (description 'Test model categories.');\n"
             "SELECT CAST(1 AS INTEGER) AS category_id, CAST(NULL AS INTEGER) AS parent_id,\n"
             "  CAST('root' AS VARCHAR) AS name\n"
         ),
-        "models/category_paths.sql": (
+        "sql/models/category_paths.sql": (
             "MODEL (description 'Test model category_paths.');\n"
             'WITH categories AS (SELECT * FROM __ref("categories")),\n'
             "tree AS (\n"
@@ -1150,12 +1150,12 @@ def build_local_variant_scenario_project_files(
             'name = "local_variant"\nadapter = "duckdb"\n\n[connection]\ndatabase = ":memory:"\n\n'
             "[scopes]\nenforce_placement = false\n"
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n    columns:\n"
             "      - {name: order_id, type: INTEGER}\n      - {name: payload, type: VARIANT}\n"
         ),
-        "models/stg_orders.sql": (
+        "sql/models/stg_orders.sql": (
             "MODEL (description 'Test model stg_orders.');\n"
             f"SELECT o.order_id, {output}\n"
             'FROM __source("raw_orders") AS o\n'
@@ -1179,12 +1179,12 @@ def build_helper_fixture_scenario_project_files() -> dict[str, str]:
             'name = "helper_fixture"\nadapter = "duckdb"\n\n[connection]\ndatabase = ":memory:"\n\n'
             "[scopes]\nenforce_placement = false\n"
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             "    schema: main\n    table: raw_orders\n    columns:\n"
             "      - {name: order_id, type: INTEGER}\n"
         ),
-        "models/stg_orders.sql": (
+        "sql/models/stg_orders.sql": (
             "MODEL (description 'Test model stg_orders.');\n"
             'SELECT o.order_id FROM __source("raw_orders") AS o\n'
         ),
@@ -1209,14 +1209,14 @@ def build_snowflake_variant_scenario_project_files(*, expected_payload_json: str
 
     return {
         "sqlbuild_project.toml": build_offline_snowflake_project_toml(),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
             "    schema: main\n    table: raw_orders\n    columns:\n"
             '      - {name: order_id, type: "NUMBER(38,0)"}\n'
             "      - {name: status, type: VARCHAR}\n"
             "      - {name: payload, type: VARIANT}\n"
         ),
-        "models/stg_payloads.sql": (
+        "sql/models/stg_payloads.sql": (
             'MODEL (description "Order payloads.");\n'
             'SELECT order_id, payload FROM __source("raw_orders")\n'
         ),
@@ -1237,9 +1237,9 @@ def write_snowflake_variant_snapshot(
     """Write the snapshot a Snowflake capture stores: the VARIANT as Snowflake's JSON text."""
 
     snapshot_root: Path = project_dir / "tests" / "_scenario_snapshots" / scenario_name
-    (snapshot_root / "sources").mkdir(parents=True)
+    (snapshot_root / "sql" / "sources").mkdir(parents=True)
     row: str = json.dumps({"ORDER_ID": 1, "PAYLOAD": payload_text, "STATUS": "a"}) + "\n"
-    (snapshot_root / "sources" / "raw_orders.jsonl").write_text(row, encoding="utf-8")
+    (snapshot_root / "sql" / "sources" / "raw_orders.jsonl").write_text(row, encoding="utf-8")
     manifest: dict[str, object] = {
         "capture_adapter": "snowflake",
         "capture_dialect": "snowflake",
@@ -1269,7 +1269,7 @@ def write_snowflake_variant_snapshot(
                         ("payload", "VARIANT", "VARIANT"),
                     )
                 ],
-                "file": "sources/raw_orders.jsonl",
+                "file": "sql/sources/raw_orders.jsonl",
                 "kind": "source",
                 "logical_name": "raw_orders",
                 "row_count": 1,
@@ -1294,12 +1294,12 @@ def build_snowflake_lambda_scenario_project_files() -> dict[str, str]:
 
     return {
         "sqlbuild_project.toml": build_offline_snowflake_project_toml(),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
             "    schema: main\n    table: raw_orders\n    columns:\n"
             '      - {name: order_id, type: "NUMBER(38,0)"}\n'
         ),
-        "models/order_quantities.sql": (
+        "sql/models/order_quantities.sql": (
             'MODEL (description "Quantities above each order id.");\n'
             "SELECT order_id,\n"
             "  FILTER(ARRAY_CONSTRUCT(1, 2, 3), x -> x > order_id) AS big_quantities\n"
@@ -1321,9 +1321,9 @@ def write_snowflake_order_ids_snapshot(*, project_dir: Path, scenario_name: str)
     """Write the snapshot a Snowflake capture stores for a one-column order source."""
 
     snapshot_root: Path = project_dir / "tests" / "_scenario_snapshots" / scenario_name
-    (snapshot_root / "sources").mkdir(parents=True)
+    (snapshot_root / "sql" / "sources").mkdir(parents=True)
     row: str = json.dumps({"ORDER_ID": 1}) + "\n"
-    (snapshot_root / "sources" / "raw_orders.jsonl").write_text(row, encoding="utf-8")
+    (snapshot_root / "sql" / "sources" / "raw_orders.jsonl").write_text(row, encoding="utf-8")
     manifest: dict[str, object] = {
         "capture_adapter": "snowflake",
         "capture_dialect": "snowflake",
@@ -1352,7 +1352,7 @@ def write_snowflake_order_ids_snapshot(*, project_dir: Path, scenario_name: str)
                         "warehouse_type": "NUMBER(1,0)",
                     }
                 ],
-                "file": "sources/raw_orders.jsonl",
+                "file": "sql/sources/raw_orders.jsonl",
                 "kind": "source",
                 "logical_name": "raw_orders",
                 "row_count": 1,

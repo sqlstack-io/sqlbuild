@@ -79,7 +79,7 @@ def test_given_clickhouse_targets_when_running_diff_then_all_modes_execute_end_t
                 dev_schema=dev_schema,
                 config=config,
             ),
-            "models/fact_orders.sql": _FACT_ORDERS_SQL,
+            "sql/models/fact_orders.sql": _FACT_ORDERS_SQL,
         },
     )
     try:
@@ -144,8 +144,8 @@ def test_given_built_dev_target_when_cloning_to_prod_then_clickhouse_clones_rela
                 dev_schema=dev_schema,
                 config=config,
             ),
-            "models/fact_orders.sql": _FACT_ORDERS_SQL,
-            "models/order_summary.sql": (
+            "sql/models/fact_orders.sql": _FACT_ORDERS_SQL,
+            "sql/models/order_summary.sql": (
                 "MODEL (description 'Order summary.', materialized view);\n\n"
                 'SELECT order_id, amount_cents FROM __ref("fact_orders")\n'
             ),

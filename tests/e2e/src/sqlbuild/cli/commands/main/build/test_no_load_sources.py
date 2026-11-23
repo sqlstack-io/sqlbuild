@@ -71,17 +71,17 @@ def test_given_loaded_source_when_building_without_loading_then_only_its_audits_
                 '[connection]\ndatabase = "warehouse.duckdb"\n\n'
                 '[defaults]\nmaterialized = "table"\n'
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
                 "    managed: true\n    write_strategy: append\n    columns:\n"
                 "      - name: order_id\n        type: INTEGER\n        audits: [not_null]\n"
             ),
-            "python/loaders/orders.py": (
+            "python/nodes/loaders/orders.py": (
                 "from sqlbuild.loaders import loader\n\n\n"
                 "@loader()\ndef raw_orders(ctx):\n"
                 "    '''Test loader raw_orders.'''\n    return [{'order_id': 1}]\n"
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.');\n"
                 'SELECT r.order_id FROM __source("raw_orders") AS r\n'
             ),

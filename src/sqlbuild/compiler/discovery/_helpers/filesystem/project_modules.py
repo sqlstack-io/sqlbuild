@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Annotated, Literal, Union, get_args, get_origi
 from sqlbuild._native import (
     PYTHON_INIT_MODULE_STEM,
     PYTHON_NODE_ROOT,
+    PYTHON_PACKAGE_NAME,
     DiscoveredProvider,
     DiscoveredProviderUsage,
     EventExporterDiscoveryError,
@@ -136,9 +137,31 @@ def validate_event_exporter_signature(
 
 
 def install_python_root_package(*, node_root: Path, project_dir: Path) -> dict[str, ModuleType]:
-    """Bind python to this project's python/ folder and return displaced unrelated modules."""
+    """Bind python to this project's python/ folder, dropping stale node modules.
 
-    existing: ModuleType | None = sys.modules.get(PYTHON_NODE_ROOT)
+    Returns the unrelated modules the binding displaced, for `restore_python_root_modules`.
+    """
+
+    saved_modules: dict[str, ModuleType] = _ensure_python_package(project_dir=project_dir)
+    nodes_package: str = ".".join(Path(PYTHON_NODE_ROOT).parts)
+    module_name: str
+    for module_name in tuple(sys.modules):
+        if module_name == nodes_package or module_name.startswith(f"{nodes_package}."):
+            sys.modules.pop(module_name, None)
+    importlib.invalidate_caches()
+    del node_root
+    return saved_modules
+
+
+def _ensure_python_package(*, project_dir: Path) -> dict[str, ModuleType]:
+    """Bind python to `project_dir`'s python/ folder unless it already is; keep its loaded modules."""
+
+    package_root: Path = project_dir / PYTHON_PACKAGE_NAME
+    existing: ModuleType | None = sys.modules.get(PYTHON_PACKAGE_NAME)
+    if existing is not None and getattr(existing, _PROJECT_PYTHON_PACKAGE_MARKER, None) == str(
+        package_root.resolve()
+    ):
+        return {}
     owned: bool = existing is None or bool(getattr(existing, _PROJECT_PYTHON_PACKAGE_MARKER, False))
     saved_modules: dict[str, ModuleType] = {}
     module_name: str
@@ -148,23 +171,23 @@ def install_python_root_package(*, node_root: Path, project_dir: Path) -> dict[s
             saved_modules[module_name] = module
     importlib.invalidate_caches()
     _ = register_user_code_root(project_dir)
-    init_file: Path = node_root / f"{PYTHON_INIT_MODULE_STEM}.py"
+    init_file: Path = package_root / f"{PYTHON_INIT_MODULE_STEM}.py"
     spec: ModuleSpec | None = (
         user_code_spec(
-            name=PYTHON_NODE_ROOT,
+            name=PYTHON_PACKAGE_NAME,
             file_path=init_file,
             root=project_dir,
-            submodule_search_locations=[str(node_root)],
+            submodule_search_locations=[str(package_root)],
         )
         if init_file.is_file()
-        else ModuleSpec(PYTHON_NODE_ROOT, None, is_package=True)
+        else ModuleSpec(PYTHON_PACKAGE_NAME, None, is_package=True)
     )
     if spec is None:
-        raise PythonNodeDiscoveryError(f"Could not load Python node package {node_root}")
-    spec.submodule_search_locations = [str(node_root)]
+        raise PythonNodeDiscoveryError(f"Could not load Python package {package_root}")
+    spec.submodule_search_locations = [str(package_root)]
     package: ModuleType = importlib.util.module_from_spec(spec)
-    setattr(package, _PROJECT_PYTHON_PACKAGE_MARKER, True)
-    sys.modules[PYTHON_NODE_ROOT] = package
+    setattr(package, _PROJECT_PYTHON_PACKAGE_MARKER, str(package_root.resolve()))
+    sys.modules[PYTHON_PACKAGE_NAME] = package
     if spec.loader is None:
         return saved_modules
     old_path: list[str] = list(sys.path)
@@ -174,7 +197,7 @@ def install_python_root_package(*, node_root: Path, project_dir: Path) -> dict[s
     except Exception as error:
         restore_python_root_modules(saved_modules=saved_modules)
         raise PythonNodeDiscoveryError(
-            f"Failed to import Python node file {init_file.relative_to(project_dir)}: {error}"
+            f"Failed to import Python package file {init_file.relative_to(project_dir)}: {error}"
         ) from error
     finally:
         sys.path = old_path
@@ -226,8 +249,9 @@ def load_python_node_module(*, file_path: Path, project_dir: Path) -> ModuleType
 
 
 def load_provider_module(*, file_path: Path, project_dir: Path) -> ModuleType:
-    """Import one providers/ module under its package name."""
+    """Import one python/providers/ module under its package name."""
 
+    _ = _ensure_python_package(project_dir=project_dir)
     return _load_project_package_module(
         file_path=file_path,
         project_dir=project_dir,
@@ -236,13 +260,14 @@ def load_provider_module(*, file_path: Path, project_dir: Path) -> ModuleType:
     )
 
 
-def load_sink_module(*, file_path: Path, project_dir: Path) -> ModuleType:
-    """Import one sinks/ module under its package name."""
+def load_event_sink_module(*, file_path: Path, project_dir: Path) -> ModuleType:
+    """Import one python/event_sinks/ module under its package name."""
 
+    _ = _ensure_python_package(project_dir=project_dir)
     return _load_project_package_module(
         file_path=file_path,
         project_dir=project_dir,
-        file_label="sink",
+        file_label="event sink",
         error_type=EventExporterDiscoveryError,
     )
 
@@ -261,8 +286,9 @@ def load_orchestration_module(*, file_path: Path, project_dir: Path) -> ModuleTy
 def load_materialize_function(
     *, file_path: Path, project_dir: Path
 ) -> Callable[..., object] | None:
-    """Execute one materializations/ module and return its callable `materialize`, if any."""
+    """Execute one python/materializations/ module and return its callable `materialize`, if any."""
 
+    _ = _ensure_python_package(project_dir=project_dir)
     removed_hook_name: str = "prepare_version"
     removed_hook_message: str = (
         f"materialization '{file_path.stem}' at {file_path} defines "
@@ -299,7 +325,7 @@ def _python_root_module_names() -> tuple[str, ...]:
     return tuple(
         module_name
         for module_name in sys.modules
-        if module_name == PYTHON_NODE_ROOT or module_name.startswith(f"{PYTHON_NODE_ROOT}.")
+        if module_name == PYTHON_PACKAGE_NAME or module_name.startswith(f"{PYTHON_PACKAGE_NAME}.")
     )
 
 
@@ -387,9 +413,17 @@ def _evict_stale_project_package_modules(*, root_module: str, project_dir: Path)
         if module_paths is None:
             sys.modules.pop(module_name, None)
             continue
-        if any(Path(path).resolve() == root_path for path in module_paths):
+        if any(_is_within(path=Path(path).resolve(), root=root_path) for path in module_paths):
             continue
         sys.modules.pop(module_name, None)
+
+
+def _is_within(*, path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
 
 
 def provider_usages(
