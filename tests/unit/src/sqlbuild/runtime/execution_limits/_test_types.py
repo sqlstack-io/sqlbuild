@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 
 from sqlbuild.runtime.execution_limits.models import ItemTimeoutPolicy
@@ -93,3 +94,16 @@ class InterruptedConnectionReportsTestCase:
 class InterruptedIdentityReuseTestCase:
     description: str
     expected_reuse_and_report: tuple[bool, bool]
+
+
+@dataclass(frozen=True)
+class BookkeepingCancelTestCase:
+    description: str
+    marking: Callable[[], AbstractContextManager[None]]
+    expected_cancelled: bool
+
+
+@dataclass(frozen=True)
+class BookkeepingDeadlineTestCase:
+    description: str
+    expected_expired: bool

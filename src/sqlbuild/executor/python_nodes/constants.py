@@ -11,7 +11,6 @@ TRACEBACK_HEADER: str = "Traceback (most recent call last):\n"
 TRACEBACK_ELIDED: str = "  ... {count} earlier lines\n"
 
 CANCEL_REPEAT_SECONDS: float = 1.0
-CANCEL_POLL_SECONDS: float = 0.05
 CANCEL_GRACE_SECONDS: float = 5.0
 ABANDONABLE_THREAD_PREFIX: str = "sqlbuild-item"
 ABANDONED_STEPS_NOTICE: str = (

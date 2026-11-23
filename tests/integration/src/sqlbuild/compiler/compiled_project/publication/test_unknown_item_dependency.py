@@ -5,25 +5,29 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError
 
 import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     UnknownDependencyDiscoverTestCase,
     UnknownDependencyTestCase,
+    UnknownTagTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    current_snapshot,
     location_health_reports,
     location_process,
     snapshot_api,
     wait_for_generation,
+    wait_for_log,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
 _PLAN: str = '''\
 from sqlbuild.assets import AssetContext, asset
 from sqlbuild.discovery import Discovered, Item, discover
-from sqlbuild.refs import job, model, seed, source
+from sqlbuild.refs import job, model, seed, source, tag
 
 
 @discover
@@ -219,3 +223,60 @@ def test_given_an_item_naming_what_the_project_lacks_when_compiling_with_discove
 
     assert compiled.returncode != 0, compiled.stdout
     assert test_case.expected_error in compiled.stdout + compiled.stderr
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        UnknownTagTestCase(
+            description="an unknown tag still fails the whole publish",
+            dependency='tag("returns")',
+            expected_error="asset 'fulfil[pack]' depends on tag 'returns', which no node carries",
+            expected_status=404,
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_item_naming_a_tag_no_node_carries_when_publishing_then_nothing_publishes(
+    test_case: UnknownTagTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
+            'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
+            '[targets.development]\nschema = "main"\n',
+            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            "python/plan/nodes.py": _PLAN.format(dependency=test_case.dependency),
+            "python/support/nodes.py": _GOOD.replace(
+                'after = (model("orders"), source("raw_orders"), seed("regions"), job("orders_job"))',
+                'after = (model("orders"),)',
+            ),
+        },
+    )
+    log: Path = tmp_path / "location.log"
+    with snapshot_api(tmp_path / "control") as api:
+        arguments: list[str] = [
+            str(Path(sys.executable).with_name("sqb")),
+            "--project-dir",
+            str(project),
+            "location",
+            "serve",
+            "--server",
+            api.url,
+            "--location-id",
+            api.location_id,
+            "--target",
+            "development",
+        ]
+        environment: dict[str, str] = os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer}
+        with location_process(
+            arguments, log, tmp_path / "location.stdout", env=environment
+        ) as process:
+            wait_for_log(process, log, test_case.expected_error, timeout=60)
+            with pytest.raises(HTTPError) as unpublished:
+                _ = current_snapshot(api, "development")
+
+    assert unpublished.value.code == test_case.expected_status

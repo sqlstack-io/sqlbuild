@@ -9,6 +9,7 @@ from typing import Any
 
 from sqlbuild._native import Fingerprint, PythonNodeIdentity, write_fingerprint
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
+from sqlbuild.runtime.execution_limits.main.bookkeeping_statements import bookkeeping_statements
 
 
 def try_write_python_node_identity_fingerprint(
@@ -34,32 +35,33 @@ def try_write_python_node_identity_fingerprint(
         )
         return
     try:
-        _ = write_fingerprint(
-            connection=connection,
-            execute=adapter.execute,
-            database=database,
-            schema=schema,
-            fingerprint=Fingerprint(
-                node_type=identity.node_type,
-                node_name=identity.node_name,
-                target_database=database,
-                target_schema=schema,
-                target_name=target_name,
-                run_id=run_id,
-                definition_hash=identity.definition_hash,
-                version_hash=identity.version_hash,
-                schema_fingerprint=hashlib.sha256(b"").hexdigest(),
-                definition=identity.definition_json,
-                metadata_json=identity.metadata_json,
-                ts=datetime.now(tz=UTC),
-            ),
-            render_qualified_name=adapter.render_qualified_name,
-            render_framework_type=adapter.render_framework_type,
-            read_columns=adapter.get_columns,
-            render_add_columns=adapter.render_add_columns,
-            render_create_table_sql=adapter.render_create_fingerprint_table_sql,
-            render_create_index_sqls=adapter.render_create_fingerprint_index_sqls,
-        )
+        with bookkeeping_statements():
+            _ = write_fingerprint(
+                connection=connection,
+                execute=adapter.execute,
+                database=database,
+                schema=schema,
+                fingerprint=Fingerprint(
+                    node_type=identity.node_type,
+                    node_name=identity.node_name,
+                    target_database=database,
+                    target_schema=schema,
+                    target_name=target_name,
+                    run_id=run_id,
+                    definition_hash=identity.definition_hash,
+                    version_hash=identity.version_hash,
+                    schema_fingerprint=hashlib.sha256(b"").hexdigest(),
+                    definition=identity.definition_json,
+                    metadata_json=identity.metadata_json,
+                    ts=datetime.now(tz=UTC),
+                ),
+                render_qualified_name=adapter.render_qualified_name,
+                render_framework_type=adapter.render_framework_type,
+                read_columns=adapter.get_columns,
+                render_add_columns=adapter.render_add_columns,
+                render_create_table_sql=adapter.render_create_fingerprint_table_sql,
+                render_create_index_sqls=adapter.render_create_fingerprint_index_sqls,
+            )
     except Exception as exc:
         resolved_logger.warning(
             "python identity fingerprint write failed for '%s': %s",
