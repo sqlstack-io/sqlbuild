@@ -46,6 +46,7 @@ export function change(credits: number, previous: number): { text: string; tone:
 export const sharePct = (part: number, total: number) => (total <= 0 ? '—' : part > 0 && part / total < 0.005 ? '<1%' : `${Math.round((part / total) * 100)}%`);
 
 export function hours(seconds: number): string {
+	if (seconds <= 0) return '—';
 	if (seconds < 3600) return `${Math.max(1, Math.round(seconds / 60))}m`;
 	return seconds < 36_000 ? `${(seconds / 3600).toFixed(1)}h` : `${Math.round(seconds / 3600).toLocaleString('en')}h`;
 }

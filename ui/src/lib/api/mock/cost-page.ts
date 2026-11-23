@@ -264,3 +264,13 @@ export function mockStatements(model: string, credits: number, seconds: number, 
 		: [[`create or replace table ${model.toUpperCase()} as select`, 0.81], [`select count(*) from ${model.toUpperCase()}`, 0.11], [`grant select on ${model.toUpperCase()}`, 0.08]];
 	return kinds.map(([text, share]) => ({ text, credits: credits * share, seconds: seconds * share, queries: Math.max(1, Math.round((queries * share) / 2)) }));
 }
+
+/** The mock project's models and their folders, for resolving selectors over the cost mock. */
+export function mockCostModels(now = Date.now()): { key: string; folder: string }[] {
+	return build(now).models.map((m) => ({ key: m.key, folder: m.folder }));
+}
+
+/** Each job's models, for `job:` selectors. */
+export function mockCostJobs(now = Date.now()): Map<string, string[]> {
+	return new Map([...build(now).jobs.values()].map((j) => [j.key, j.models.map((m) => m.key)]));
+}

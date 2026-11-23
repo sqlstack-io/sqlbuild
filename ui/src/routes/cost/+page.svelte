@@ -12,6 +12,7 @@
 	import VariantD from './variant-d.svelte';
 	import VariantE from './variant-e.svelte';
 	import VariantF from './variant-f.svelte';
+	import VariantG from './variant-g.svelte';
 
 	// Estimated query cost of the target's runs. Mockup: `?variant=a|b|c|d` picks a layout (CHI-1650).
 	const s = createCostState();
@@ -23,9 +24,9 @@
 	<RefreshButton onclick={() => s.cost.refresh()} />
 </AppTopbar>
 
-{#if (s.variant === 'e' || s.variant === 'f') && cost}
+{#if (s.variant === 'e' || s.variant === 'f' || s.variant === 'g') && cost}
 	<!-- The explorers fill the page and scroll their own panes. -->
-	{#if s.variant === 'e'}<VariantE {cost} />{:else}<VariantF {cost} />{/if}
+	{#if s.variant === 'e'}<VariantE {cost} />{:else if s.variant === 'g'}<VariantG {cost} />{:else}<VariantF {cost} />{/if}
 {:else}
 <PageBody>
 	{#if s.cost.error && !cost}

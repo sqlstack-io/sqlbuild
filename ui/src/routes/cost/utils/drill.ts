@@ -4,7 +4,15 @@ import type { CostFact, CostPage, CostRun } from '../types';
 
 export type GroupRoot = 'job' | 'folder';
 /** Where the explorer is: under a job and/or a folder, or on one model. `flat` lists a job's models without folders. */
-export type Scope = { by: GroupRoot; job: string | null; folder: string | null; model: string | null; flat: boolean };
+export type Scope = {
+	by: GroupRoot;
+	job: string | null;
+	folder: string | null;
+	model: string | null;
+	flat: boolean;
+	/** Only these models, for a selection the tree can't break down; null for all. */
+	models?: ReadonlySet<string> | null;
+};
 export type Level = 'jobs' | 'folders' | 'models' | 'model';
 
 export type DrillRow = {
@@ -36,7 +44,7 @@ const inFolder = (folder: string, base: string | null) => !base || folder === ba
 
 /** The job-and-model pairs a scope covers. */
 export function factsIn(cost: CostPage, s: Scope): CostFact[] {
-	return cost.facts.filter((f) => (!s.job || f.job === s.job) && inFolder(f.folder, s.folder) && (!s.model || f.model === s.model));
+	return cost.facts.filter((f) => (!s.job || f.job === s.job) && inFolder(f.folder, s.folder) && (!s.model || f.model === s.model) && (!s.models || s.models.has(f.model)));
 }
 
 /** Runs of a group: each job's runs once, however many of its models the group holds. */
@@ -152,7 +160,7 @@ export function sizesIn(cost: CostPage, facts: CostFact[]): DrillRow[] {
 		.sort((a, b) => b.credits - a.credits);
 }
 
-export type TreeRow = { row: DrillRow; depth: number; parent: number; id: string; open: boolean } | { more: number; depth: number; id: string; scope: Scope };
+export type TreeRow = { row: DrillRow; depth: number; parent: number; id: string; open: boolean; /** The largest sibling's cost, for bars relative to it. */ peak?: number } | { more: number; depth: number; id: string; scope: Scope };
 export const rowId = (r: Pick<DrillRow, 'kind' | 'key'>) => `${r.kind}:${r.key}`;
 
 /**
@@ -171,7 +179,7 @@ export function treeRows(cost: CostPage, s: Scope, open: ReadonlySet<string>, op
 			const id = `${path}/${rowId(r)}`;
 			const deeper = r.deeper && (!opts.foldersOnly || childrenOf(cost, scopeFor(scope, r)).some((c) => c.kind !== 'model'));
 			const isOpen = deeper && open.has(id);
-			out.push({ row: { ...r, deeper }, depth, parent: parentCredits, id, open: isOpen });
+			out.push({ row: { ...r, deeper }, depth, parent: parentCredits, id, open: isOpen, peak: kids[0]?.credits ?? 0 });
 			if (isOpen) walk(scopeFor(scope, r), r.credits, depth + 1, id);
 		}
 		if (models > limit) out.push({ more: models - limit, depth, id: `${path}/more`, scope });

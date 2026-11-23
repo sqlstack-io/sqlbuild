@@ -14,10 +14,11 @@
 	import { usd } from '../utils';
 	import DrillTable from './drill-table.svelte';
 	import TrendBars from './trend-bars.svelte';
+	import TrendArea from './trend-area.svelte';
 
 	// A model, the explorer's deepest level: which jobs spent its cost, its runs over the period, the
 	// warehouse sizes, and its statements. `narrow` stacks it for a drawer.
-	let { cost, scope, narrow = false }: { cost: CostPage; scope: Scope; narrow?: boolean } = $props();
+	let { cost, scope, narrow = false, jobHref: jobLink, smooth = false }: { cost: CostPage; scope: Scope; narrow?: boolean; jobHref?: (job: string) => string; smooth?: boolean } = $props();
 	const facts = $derived(factsIn(cost, { ...scope, job: null, folder: null, flat: false }));
 	const sum = $derived(total(facts));
 	const jobs = $derived(
@@ -30,7 +31,7 @@
 	let allRuns = $state(false);
 	const sizes = $derived(sizesIn(cost, facts));
 	const statements = $derived(mockStatements(scope.model ?? '', sum.credits, sum.seconds, sum.queries));
-	const jobHref = (r: DrillRow) => `?${scopeParams(page.url.searchParams, { ...scope, by: 'job', job: r.key, flat: false })}`;
+	const jobHref = (r: DrillRow) => jobLink?.(r.key) ?? `?${scopeParams(page.url.searchParams, { ...scope, by: 'job', job: r.key, flat: false })}`;
 	const runColumns: TableColumn[] = [
 		{ id: 'run', label: 'Run', width: '110px' },
 		{ id: 'job', label: 'Job', minWidth: 120 },
@@ -56,11 +57,11 @@
 	<div class="col">
 		{#if narrow}
 			<Panel title="Cost per day">
-				<TrendBars {cost} values={dailyOf(cost, facts)} height={44} />
+				{#if smooth}<TrendArea {cost} values={dailyOf(cost, facts)} height={44} />{:else}<TrendBars {cost} values={dailyOf(cost, facts)} height={44} />{/if}
 			</Panel>
 		{/if}
 		<Panel title="Jobs" note={jobs.length === 1 ? 'one job' : `${jobs.length} jobs`} help="The jobs whose runs built this model, and the part of its cost each spent">
-			<DrillTable {cost} rows={jobs} name="Job" hrefOf={jobHref} embedded selected={scope.job} />
+			<DrillTable {cost} rows={jobs} name="Job" hrefOf={jobHref} embedded selected={scope.job} {narrow} />
 		</Panel>
 		<Panel title="Runs" note="of {runs.length.toLocaleString('en')}">
 			<DataTable class="compact static framed" embedded columns={runColumns} rows={allRuns ? runs.slice(0, 100) : runs.slice(0, 8)} key={(r) => r.id} empty="No runs in this period.">
