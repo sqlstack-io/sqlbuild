@@ -34,24 +34,42 @@ def assert_source_only_ingress_dependency_case(
                     "sources:\n  - name: raw_events\n    description: Test source raw_events.\n"
                     "    managed: true\n"
                 ),
-                loader_py=(
-                    "from sqlbuild.loaders import loader\n"
-                    "from python.nodes.tasks.prepare.asset import prepare_events\n\n"
-                    "@loader(depends_on=[prepare_events], write_strategy='table', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                    "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
-                    "])\n"
-                    "def fetch_events(ctx):\n"
-                    "    '''Test loader fetch_events.'''\n    return [\n"
-                    "        {'event_id': 1, 'load_seq': 1},\n"
-                    "        {'event_id': 2, 'load_seq': 1},\n"
-                    "    ]\n\n"
-                    "@loader(depends_on=[fetch_events])\n"
-                    "def raw_events(ctx):\n"
-                    "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                    "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} AS "
-                    "SELECT event_id FROM {events.destination}')\n"
-                ),
+                node_files={
+                    "python/nodes/loaders/source_rows/fetch_events/loader.py": (
+                        "from sqlbuild.loaders import loader\n"
+                        "from python.nodes.tasks.prepare.asset import prepare_events\n"
+                        "\n"
+                        "\n"
+                        "@loader(depends_on=[prepare_events], write_strategy='table', columns=[\n"
+                        "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                        "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+                        "])\n"
+                        "def fetch_events(ctx):\n"
+                        "    '''Test loader fetch_events.'''\n"
+                        "    return [\n"
+                        "        {'event_id': 1, 'load_seq': 1},\n"
+                        "        {'event_id': 2, 'load_seq': 1},\n"
+                        "    ]\n"
+                    ),
+                    "python/nodes/loaders/source_rows/raw_events/loader.py": (
+                        "from sqlbuild.loaders import loader\n"
+                        "from python.nodes.tasks.prepare.asset import prepare_events\n"
+                        "from python.nodes.loaders.source_rows.fetch_events.loader "
+                        "import fetch_events\n"
+                        "\n"
+                        "\n"
+                        "@loader(depends_on=[fetch_events])\n"
+                        "def raw_events(ctx):\n"
+                        "    '''Test loader raw_events.'''\n"
+                        "    events = ctx.loader(fetch_events)\n"
+                        "    ctx.execute_sql(f'CREATE OR REPLACE TABLE "
+                        "{ctx.destination} AS SELECT event_id FROM {events.destination}')\n"
+                    ),
+                    "python/nodes/loaders/source_rows/__init__.py": (
+                        "from .fetch_events.loader import fetch_events\n"
+                        "from .raw_events.loader import raw_events\n"
+                    ),
+                },
             ),
             "python/nodes/tasks/prepare/asset.py": (
                 "from pathlib import Path\n"
@@ -151,7 +169,9 @@ def _assert_successful_source_only_result(
     assert (project_dir / "prepared.txt").exists() is test_case.expected_marker_exists
 
 
-def build_schema_behavior_project_files(*, source_yaml: str, loader_py: str) -> dict[str, str]:
+def build_schema_behavior_project_files(
+    *, source_yaml: str, node_files: dict[str, str]
+) -> dict[str, str]:
     return {
         "sqlbuild_project.toml": (
             'name = "source_loader_schema_behavior"\n'
@@ -160,7 +180,7 @@ def build_schema_behavior_project_files(*, source_yaml: str, loader_py: str) -> 
             'database = "source_loader_schema_behavior.duckdb"\n'
         ),
         "sql/sources/raw.yml": source_yaml,
-        "python/nodes/loaders/source_rows.py": loader_py,
+        **node_files,
     }
 
 

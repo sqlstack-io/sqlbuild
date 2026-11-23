@@ -112,8 +112,10 @@ def raw_orders(ctx):
     '''Test loader raw_orders.'''
     return [{"order_id": 7, "status": "loaded"}]
 """,
+    "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
     "sql/models/stg_orders.sql": (
-        'MODEL (description "Test model stg_orders.", materialized table);\n\nSELECT order_id, status FROM __source("raw_orders")'
+        'MODEL (description "Test model stg_orders.", materialized table);\n\nSELECT '
+        'order_id, status FROM __source("raw_orders")'
     ),
 }
 
@@ -145,6 +147,9 @@ schema = "prod"
     "sql/sources/raw.yml": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["sql/sources/raw.yml"],
     "python/nodes/loaders/raw_orders/loader.py": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES[
         "python/nodes/loaders/raw_orders/loader.py"
+    ],
+    "python/nodes/loaders/raw_orders/__init__.py": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES[
+        "python/nodes/loaders/raw_orders/__init__.py"
     ],
     "sql/models/stg_orders.sql": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["sql/models/stg_orders.sql"],
 }
@@ -244,7 +249,8 @@ sources:
 _SOURCE_DEFERRAL_UNSELECTED_MANAGED_PROJECT_FILES: dict[str, str] = {
     **_SOURCE_DEFERRAL_MISSING_PROJECT_FILES,
     "sql/models/fact_orders.sql": (
-        'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT order_id, status FROM __ref("stg_orders")'
+        'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT '
+        'order_id, status FROM __ref("stg_orders")'
     ),
 }
 
@@ -286,28 +292,37 @@ sources:
         type: VARCHAR
 """.strip()
     + "\n",
-    "python/nodes/loaders/raw_orders/loader.py": """
-from sqlbuild.loaders import loader
-
-@loader(
-    write_strategy="table",
-    columns=[
-        {"name": "order_id", "type": "INTEGER"},
-        {"name": "status", "type": "VARCHAR"},
-    ],
-)
-def fetch_orders(ctx):
-    '''Test loader fetch_orders.'''
-    return [{"order_id": 7, "status": "intermediate"}]
-
-@loader(depends_on=[fetch_orders])
-def raw_orders(ctx):
-    '''Test loader raw_orders.'''
-    rows = ctx.query(
-        f"SELECT order_id, status FROM {ctx.loader(fetch_orders).destination}"
-    ).fetchall()
-    return [{"order_id": row[0], "status": "loaded-" + row[1]} for row in rows]
-""",
+    "python/nodes/loaders/raw_orders/fetch_orders/loader.py": (
+        "from sqlbuild.loaders import loader\n"
+        "\n"
+        "\n"
+        "@loader(\n"
+        '    write_strategy="table",\n'
+        "    columns=[\n"
+        '        {"name": "order_id", "type": "INTEGER"},\n'
+        '        {"name": "status", "type": "VARCHAR"},\n'
+        "    ],\n"
+        ")\n"
+        "def fetch_orders(ctx):\n"
+        "    '''Test loader fetch_orders.'''\n"
+        '    return [{"order_id": 7, "status": "intermediate"}]\n'
+    ),
+    "python/nodes/loaders/raw_orders/raw_orders/loader.py": (
+        "from sqlbuild.loaders import loader\n"
+        "from python.nodes.loaders.raw_orders.fetch_orders.loader import fetch_orders\n"
+        "\n"
+        "\n"
+        "@loader(depends_on=[fetch_orders])\n"
+        "def raw_orders(ctx):\n"
+        "    '''Test loader raw_orders.'''\n"
+        "    rows = ctx.query(\n"
+        '        f"SELECT order_id, status FROM {ctx.loader(fetch_orders).destination}"\n'
+        "    ).fetchall()\n"
+        '    return [{"order_id": row[0], "status": "loaded-" + row[1]} for row in rows]\n'
+    ),
+    "python/nodes/loaders/raw_orders/__init__.py": (
+        "from .fetch_orders.loader import fetch_orders\nfrom .raw_orders.loader import raw_orders\n"
+    ),
     "sql/models/stg_orders.sql": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["sql/models/stg_orders.sql"],
 }
 
@@ -342,6 +357,9 @@ sources:
     + "\n",
     "python/nodes/loaders/raw_orders/loader.py": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES[
         "python/nodes/loaders/raw_orders/loader.py"
+    ],
+    "python/nodes/loaders/raw_orders/__init__.py": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES[
+        "python/nodes/loaders/raw_orders/__init__.py"
     ],
     "sql/models/stg_orders.sql": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["sql/models/stg_orders.sql"],
 }
@@ -386,6 +404,9 @@ sources:
     + "\n",
     "python/nodes/loaders/raw_orders/loader.py": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES[
         "python/nodes/loaders/raw_orders/loader.py"
+    ],
+    "python/nodes/loaders/raw_orders/__init__.py": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES[
+        "python/nodes/loaders/raw_orders/__init__.py"
     ],
     "sql/models/stg_orders.sql": _BUILD_RUN_AUTO_LOAD_PROJECT_FILES["sql/models/stg_orders.sql"],
 }
@@ -504,7 +525,8 @@ SELECT 1
 _BUILD_RUN_AUTO_LOAD_SELECTION_PROJECT_FILES: dict[str, str] = {
     **_BUILD_RUN_AUTO_LOAD_PROJECT_FILES,
     "sql/models/fact_orders.sql": (
-        'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT order_id, status FROM __ref("stg_orders")'
+        'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT '
+        'order_id, status FROM __ref("stg_orders")'
     ),
 }
 
@@ -518,6 +540,7 @@ def raw_orders(ctx):
     '''Test loader raw_orders.'''
     raise RuntimeError("loader exploded")
 """,
+    "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
 }
 
 _BUILD_RUN_AUTO_LOAD_RELOAD_PROJECT_FILES: dict[str, str] = {
@@ -531,6 +554,7 @@ def raw_orders(ctx):
     status = "reload" if ctx.is_reload else "incremental"
     return [{"order_id": 7, "status": status}]
 """,
+    "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
 }
 
 _BUILD_RUN_AUTO_LOAD_TWO_SOURCE_PROJECT_FILES: dict[str, str] = {
@@ -566,7 +590,8 @@ def raw_customers(ctx):
     return [{"customer_id": 10, "name": "Ada"}]
 """,
     "sql/models/stg_customers.sql": (
-        'MODEL (description "Test model stg_customers.", materialized table);\n\nSELECT customer_id, name FROM __source("raw_customers")'
+        'MODEL (description "Test model stg_customers.", materialized table);\n\nSELECT '
+        'customer_id, name FROM __source("raw_customers")'
     ),
 }
 
@@ -595,8 +620,10 @@ def raw_orders(ctx):
         "SELECT 7 AS order_id, 'self-managed' AS status"
     )
 """,
+    "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
     "sql/models/stg_orders.sql": (
-        'MODEL (description "Test model stg_orders.", materialized table);\n\nSELECT order_id, status FROM __source("raw_orders")'
+        'MODEL (description "Test model stg_orders.", materialized table);\n\nSELECT '
+        'order_id, status FROM __source("raw_orders")'
     ),
 }
 
@@ -632,6 +659,7 @@ def raw_orders(ctx):
         {"order_id": 2, "status": "shipped"},
     ]
 """,
+            "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
         },
         expected_exit_code=0,
         expected_rows=((1, "placed"), (2, "shipped")),
@@ -684,6 +712,7 @@ def raw_orders(ctx):
     '''Test loader raw_orders.'''
     return [{"order_id": 3, "status": "selected"}]
 """,
+            "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
             "python/nodes/loaders/raw_events/loader.py": """
 from sqlbuild.loaders import loader
 
@@ -751,6 +780,7 @@ def raw_orders(ctx):
         "status": status,
     }]
 """,
+            "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
         },
         expected_exit_code=0,
         expected_rows=((4, "dev:cli:yes:True"),),
@@ -1910,6 +1940,7 @@ def raw_orders(ctx):
         {"order_id": 2, "status": "shipped"},
     ]
 """,
+                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
             },
             expected_exit_code=0,
             expected_rows=((1, "placed"), (2, "shipped")),
@@ -1962,6 +1993,7 @@ def raw_orders(ctx):
     '''Test loader raw_orders.'''
     return [{"order_id": 3, "status": "selected"}]
 """,
+                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
                 "python/nodes/loaders/raw_events/loader.py": """
 from sqlbuild.loaders import loader
 
@@ -2029,6 +2061,7 @@ def raw_orders(ctx):
         "status": status,
     }]
 """,
+                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
             },
             expected_exit_code=0,
             expected_rows=((4, "dev:cli:yes:True"),),
@@ -2130,6 +2163,7 @@ def raw_orders(ctx):
         {"order_id": 2, "status": "shipped"},
     ]
 """,
+                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
             },
             expected_exit_code=0,
             expected_rows=((1, "placed"), (2, "shipped")),
@@ -2182,6 +2216,7 @@ def raw_orders(ctx):
     '''Test loader raw_orders.'''
     return [{"order_id": 3, "status": "selected"}]
 """,
+                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
                 "python/nodes/loaders/raw_events/loader.py": """
 from sqlbuild.loaders import loader
 
@@ -2249,6 +2284,7 @@ def raw_orders(ctx):
         "status": status,
     }]
 """,
+                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
             },
             expected_exit_code=0,
             expected_rows=((4, "dev:cli:yes:True"),),
@@ -2387,6 +2423,7 @@ def raw_append_events(ctx):
     next_id = int(ctx.current_cursor_value) + 1
     return [{"event_id": next_id, "cursor_seen": str(ctx.current_cursor_value)}]
 """,
+            "python/nodes/loaders/raw/__init__.py": "from .loader import raw_append_events\n",
         },
         select_sql="SELECT event_id, cursor_seen FROM raw_append_events ORDER BY event_id",
         expected_rows=((1, "none"), (2, "1")),
@@ -2428,6 +2465,7 @@ def raw_merge_customers(ctx):
         {"customer_id": 3, "name": "new", "updated_at": 2},
     ]
 """,
+            "python/nodes/loaders/raw/__init__.py": "from .loader import raw_merge_customers\n",
         },
         select_sql=(
             "SELECT customer_id, name, updated_at FROM raw_merge_customers ORDER BY customer_id"
@@ -2470,6 +2508,7 @@ def raw_merge_composite(ctx):
         {"entity_id": 1, "source": "feed", "value": "inserted", "version": 2},
     ]
 """,
+            "python/nodes/loaders/raw/__init__.py": "from .loader import raw_merge_composite\n",
         },
         select_sql=(
             "SELECT entity_id, source, value, version FROM raw_merge_composite ORDER BY source"
@@ -2512,6 +2551,7 @@ def raw_delete_insert_events(ctx):
         {"event_id": 3, "status": "new-range"},
     ]
 """,
+            "python/nodes/loaders/raw/__init__.py": "from .loader import raw_delete_insert_events\n",
         },
         select_sql=(
             "SELECT event_id, status FROM raw_delete_insert_events ORDER BY event_id, status"
@@ -2561,6 +2601,7 @@ def raw_delete_insert_ts(ctx):
         {"event_at": datetime(2026, 1, 1, 2, 0, 0), "status": "new-range"},
     ]
 """,
+            "python/nodes/loaders/raw/__init__.py": "from .loader import raw_delete_insert_ts\n",
         },
         select_sql=(
             "SELECT strftime(event_at, '%Y-%m-%d %H:%M:%S'), status "
@@ -2604,6 +2645,7 @@ def raw_delete_insert_empty(ctx):
         ]
     return []
 """,
+            "python/nodes/loaders/raw/__init__.py": "from .loader import raw_delete_insert_empty\n",
         },
         select_sql="SELECT event_id, status FROM raw_delete_insert_empty ORDER BY event_id",
         expected_rows=((1, "existing"), (2, "existing")),
@@ -2640,6 +2682,7 @@ def raw_no_cursor(ctx):
     run_count += 1
     return [{"run_number": run_count, "cursor_seen": str(ctx.current_cursor_value)}]
 """,
+            "python/nodes/loaders/raw/__init__.py": "from .loader import raw_no_cursor\n",
         },
         select_sql="SELECT run_number, cursor_seen FROM raw_no_cursor ORDER BY run_number",
         expected_rows=((1, "None"), (1, "None")),
@@ -2670,6 +2713,7 @@ def raw_empty_cursor(ctx):
     '''Test loader raw_empty_cursor.'''
     return [{"event_id": 1, "cursor_seen": str(ctx.current_cursor_value)}]
 """,
+            "python/nodes/loaders/raw/__init__.py": "from .loader import raw_empty_cursor\n",
         },
         select_sql="SELECT event_id, cursor_seen FROM raw_empty_cursor ORDER BY event_id",
         expected_rows=((1, "None"),),
@@ -2702,6 +2746,7 @@ def raw_missing_cursor_target(ctx):
     '''Test loader raw_missing_cursor_target.'''
     return [{"event_id": 1, "cursor_seen": str(ctx.current_cursor_value)}]
 """,
+            "python/nodes/loaders/raw/__init__.py": "from .loader import raw_missing_cursor_target\n",
         },
         select_sql=(
             "SELECT event_id, cursor_seen FROM raw_missing_cursor_target ORDER BY event_id"
@@ -2732,6 +2777,7 @@ def raw_reload_context(ctx):
     '''Test loader raw_reload_context.'''
     return [{"is_reload": ctx.is_reload}]
 """,
+    "python/nodes/loaders/raw/__init__.py": "from .loader import raw_reload_context\n",
 }
 
 CURSOR_OVERRIDE_CONTEXT_PROJECT_FILES: dict[str, str] = {
@@ -2766,6 +2812,7 @@ def raw_cursor_overrides(ctx):
         "end_int": None if ctx.end_cursor_int is None else str(ctx.end_cursor_int),
     }]
 """,
+    "python/nodes/loaders/raw/__init__.py": "from .loader import raw_cursor_overrides\n",
 }
 
 
@@ -2801,6 +2848,7 @@ def raw_append_events(ctx):
     next_id = int(ctx.current_cursor_value) + 1
     return [{"event_id": next_id, "cursor_seen": str(ctx.current_cursor_value)}]
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_append_events\n",
             },
             select_sql="SELECT event_id, cursor_seen FROM raw_append_events ORDER BY event_id",
             expected_rows=((1, "none"), (2, "1")),
@@ -2842,6 +2890,7 @@ def raw_merge_customers(ctx):
         {"customer_id": 3, "name": "new", "updated_at": 2},
     ]
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_merge_customers\n",
             },
             select_sql=(
                 "SELECT customer_id, name, updated_at FROM raw_merge_customers ORDER BY customer_id"
@@ -2884,6 +2933,7 @@ def raw_merge_composite(ctx):
         {"entity_id": 1, "source": "feed", "value": "inserted", "version": 2},
     ]
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_merge_composite\n",
             },
             select_sql=(
                 "SELECT entity_id, source, value, version FROM raw_merge_composite ORDER BY source"
@@ -2926,6 +2976,7 @@ def raw_delete_insert_events(ctx):
         {"event_id": 3, "status": "new-range"},
     ]
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_delete_insert_events\n",
             },
             select_sql=(
                 "SELECT event_id, status FROM raw_delete_insert_events ORDER BY event_id, status"
@@ -2975,6 +3026,7 @@ def raw_delete_insert_ts(ctx):
         {"event_at": datetime(2026, 1, 1, 2, 0, 0), "status": "new-range"},
     ]
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_delete_insert_ts\n",
             },
             select_sql=(
                 "SELECT strftime(event_at, '%Y-%m-%d %H:%M:%S'), status "
@@ -3018,6 +3070,7 @@ def raw_delete_insert_empty(ctx):
         ]
     return []
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_delete_insert_empty\n",
             },
             select_sql="SELECT event_id, status FROM raw_delete_insert_empty ORDER BY event_id",
             expected_rows=((1, "existing"), (2, "existing")),
@@ -3055,14 +3108,16 @@ def test_given_source_loader_write_strategy_when_running_load_twice_then_writes_
             description="append creates target first then inserts on rerun",
             project_files=WRITE_STRATEGY_CASE_FIXTURES[0].project_files,
             expected_first_run_fragments=(
-                "CREATE OR REPLACE TABLE raw_append_events AS SELECT * FROM raw_append_events__staging",
+                "CREATE OR REPLACE TABLE raw_append_events AS SELECT * FROM "
+                "raw_append_events__staging",
             ),
             expected_second_run_fragments=(
                 'INSERT INTO raw_append_events ("event_id", "cursor_seen") '
                 "SELECT * FROM raw_append_events__staging",
             ),
             absent_second_run_fragments=(
-                "CREATE OR REPLACE TABLE raw_append_events AS SELECT * FROM raw_append_events__staging",
+                "CREATE OR REPLACE TABLE raw_append_events AS SELECT * FROM "
+                "raw_append_events__staging",
             ),
         ),
         LoadCommandWriteStrategyLifecycleTestCase(
@@ -3100,8 +3155,10 @@ def test_given_source_loader_write_strategy_when_running_load_twice_then_writes_
             ),
             expected_second_run_fragments=(
                 'SELECT MIN("event_id"), MAX("event_id") FROM raw_delete_insert_events__staging',
-                "DELETE FROM raw_delete_insert_events WHERE \"event_id\" >= '2' AND \"event_id\" < '4'",
-                "INSERT INTO raw_delete_insert_events SELECT * FROM raw_delete_insert_events__staging",
+                "DELETE FROM raw_delete_insert_events WHERE \"event_id\" >= '2' AND "
+                "\"event_id\" < '4'",
+                "INSERT INTO raw_delete_insert_events SELECT * FROM "
+                "raw_delete_insert_events__staging",
             ),
             absent_second_run_fragments=(
                 "CREATE OR REPLACE TABLE raw_delete_insert_events AS SELECT * FROM "
@@ -3323,6 +3380,7 @@ def raw_no_cursor(ctx):
     run_count += 1
     return [{"run_number": run_count, "cursor_seen": str(ctx.current_cursor_value)}]
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_no_cursor\n",
             },
             select_sql="SELECT run_number, cursor_seen FROM raw_no_cursor ORDER BY run_number",
             expected_rows=((1, "None"), (1, "None")),
@@ -3353,6 +3411,7 @@ def raw_empty_cursor(ctx):
     '''Test loader raw_empty_cursor.'''
     return [{"event_id": 1, "cursor_seen": str(ctx.current_cursor_value)}]
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_empty_cursor\n",
             },
             select_sql="SELECT event_id, cursor_seen FROM raw_empty_cursor ORDER BY event_id",
             expected_rows=((1, "None"),),
@@ -3385,6 +3444,7 @@ def raw_missing_cursor_target(ctx):
     '''Test loader raw_missing_cursor_target.'''
     return [{"event_id": 1, "cursor_seen": str(ctx.current_cursor_value)}]
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_missing_cursor_target\n",
             },
             select_sql=(
                 "SELECT event_id, cursor_seen FROM raw_missing_cursor_target ORDER BY event_id"
@@ -3615,32 +3675,50 @@ sources:
         type: BIGINT
 """.strip()
                 + "\n",
-                "python/nodes/loaders/raw/loader.py": """
-import threading
-import time
-
-from sqlbuild.loaders import loader
-
-barrier = threading.Barrier(2)
-
-@loader
-def raw_a(ctx):
-    '''Test loader raw_a.'''
-    barrier.wait(timeout=1)
-    time.sleep(0.05)
-    return [{"source_name": "raw_a", "connection_id": id(ctx.connection)}]
-
-@loader
-def raw_b(ctx):
-    '''Test loader raw_b.'''
-    barrier.wait(timeout=1)
-    return [{"source_name": "raw_b", "connection_id": id(ctx.connection)}]
-
-@loader
-def raw_c(ctx):
-    '''Test loader raw_c.'''
-    return [{"source_name": "raw_c", "connection_id": id(ctx.connection)}]
-""",
+                "python/nodes/loaders/raw/raw_a/loader.py": (
+                    "import threading\n"
+                    "import time\n"
+                    "from sqlbuild.loaders import loader\n"
+                    "barrier = threading.Barrier(2)\n"
+                    "\n"
+                    "\n"
+                    "@loader\n"
+                    "def raw_a(ctx):\n"
+                    "    '''Test loader raw_a.'''\n"
+                    "    barrier.wait(timeout=1)\n"
+                    "    time.sleep(0.05)\n"
+                    '    return [{"source_name": "raw_a", "connection_id": id(ctx.connection)}]\n'
+                ),
+                "python/nodes/loaders/raw/raw_b/loader.py": (
+                    "import threading\n"
+                    "import time\n"
+                    "from sqlbuild.loaders import loader\n"
+                    "barrier = threading.Barrier(2)\n"
+                    "\n"
+                    "\n"
+                    "@loader\n"
+                    "def raw_b(ctx):\n"
+                    "    '''Test loader raw_b.'''\n"
+                    "    barrier.wait(timeout=1)\n"
+                    '    return [{"source_name": "raw_b", "connection_id": id(ctx.connection)}]\n'
+                ),
+                "python/nodes/loaders/raw/raw_c/loader.py": (
+                    "import threading\n"
+                    "import time\n"
+                    "from sqlbuild.loaders import loader\n"
+                    "barrier = threading.Barrier(2)\n"
+                    "\n"
+                    "\n"
+                    "@loader\n"
+                    "def raw_c(ctx):\n"
+                    "    '''Test loader raw_c.'''\n"
+                    '    return [{"source_name": "raw_c", "connection_id": id(ctx.connection)}]\n'
+                ),
+                "python/nodes/loaders/raw/__init__.py": (
+                    "from .raw_a.loader import raw_a\n"
+                    "from .raw_b.loader import raw_b\n"
+                    "from .raw_c.loader import raw_c\n"
+                ),
             },
             max_concurrency=2,
             expected_connection_count=2,
@@ -3720,38 +3798,62 @@ sources:
         type: INTEGER
 """.strip()
                 + "\n",
-                "python/nodes/loaders/raw/loader.py": """
-import threading
-import time
-
-from sqlbuild.loaders import loader
-
-barrier = threading.Barrier(2)
-finished = set()
-lock = threading.Lock()
-
-@loader(write_strategy='table', columns=[{'name': 'id', 'type': 'INTEGER'}])
-def fetch_a(ctx):
-    '''Test loader fetch_a.'''
-    barrier.wait(timeout=1)
-    time.sleep(0.05)
-    with lock:
-        finished.add('a')
-    return [{'id': 1}]
-
-@loader(write_strategy='table', columns=[{'name': 'id', 'type': 'INTEGER'}])
-def fetch_b(ctx):
-    '''Test loader fetch_b.'''
-    barrier.wait(timeout=1)
-    with lock:
-        finished.add('b')
-    return [{'id': 2}]
-
-@loader(depends_on=[fetch_a, fetch_b])
-def raw_join(ctx):
-    '''Test loader raw_join.'''
-    return [{'upstream_count': len(finished)}]
-""",
+                "python/nodes/loaders/raw/fetch_a/loader.py": (
+                    "import threading\n"
+                    "import time\n"
+                    "from sqlbuild.loaders import loader\n"
+                    "barrier = threading.Barrier(2)\n"
+                    "finished = set()\n"
+                    "lock = threading.Lock()\n"
+                    "\n"
+                    "\n"
+                    "@loader(write_strategy='table', columns=[{'name': 'id', 'type': 'INTEGER'}])\n"
+                    "def fetch_a(ctx):\n"
+                    "    '''Test loader fetch_a.'''\n"
+                    "    barrier.wait(timeout=1)\n"
+                    "    time.sleep(0.05)\n"
+                    "    with lock:\n"
+                    "        finished.add('a')\n"
+                    "    return [{'id': 1}]\n"
+                ),
+                "python/nodes/loaders/raw/fetch_b/loader.py": (
+                    "import threading\n"
+                    "import time\n"
+                    "from sqlbuild.loaders import loader\n"
+                    "barrier = threading.Barrier(2)\n"
+                    "finished = set()\n"
+                    "lock = threading.Lock()\n"
+                    "\n"
+                    "\n"
+                    "@loader(write_strategy='table', columns=[{'name': 'id', 'type': 'INTEGER'}])\n"
+                    "def fetch_b(ctx):\n"
+                    "    '''Test loader fetch_b.'''\n"
+                    "    barrier.wait(timeout=1)\n"
+                    "    with lock:\n"
+                    "        finished.add('b')\n"
+                    "    return [{'id': 2}]\n"
+                ),
+                "python/nodes/loaders/raw/raw_join/loader.py": (
+                    "import threading\n"
+                    "import time\n"
+                    "from sqlbuild.loaders import loader\n"
+                    "barrier = threading.Barrier(2)\n"
+                    "finished = set()\n"
+                    "lock = threading.Lock()\n"
+                    "from python.nodes.loaders.raw.fetch_a.loader import fetch_a\n"
+                    "from python.nodes.loaders.raw.fetch_b.loader import fetch_b\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_a, fetch_b])\n"
+                    "def raw_join(ctx):\n"
+                    "    '''Test loader raw_join.'''\n"
+                    "    return [{'upstream_count': len(finished)}]\n"
+                ),
+                "python/nodes/loaders/raw/__init__.py": (
+                    "from .fetch_a.loader import fetch_a\n"
+                    "from .fetch_b.loader import fetch_b\n"
+                    "from .raw_join.loader import raw_join\n"
+                ),
             },
             max_concurrency=2,
             expected_connection_count=2,
@@ -3866,6 +3968,7 @@ def raw_inferred(ctx):
         "service_date": date(2026, 5, 21),
     }
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_inferred\n",
             },
             expected_row=(
                 1,
@@ -3955,6 +4058,7 @@ def raw_inferred(ctx):
     yield {"order_ref": UUID("12345678-1234-5678-1234-567812345678"), "price": Decimal("12.50")}
     yield {"order_ref": None, "price": Decimal("1234.5")}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_inferred\n",
             },
             expected_row=("12345678-1234-5678-1234-567812345678", Decimal("12.50")),
             expected_column_types={"order_ref": "VARCHAR", "price": "DECIMAL(6,2)"},
@@ -3985,6 +4089,7 @@ def raw_inferred(ctx):
     yield {"order_ref": "a_wide", "price": Decimal("12345678901234567890.123")}
     yield {"order_ref": "b_tiny", "price": Decimal("1E-7")}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_inferred\n",
             },
             expected_row=("a_wide", Decimal("12345678901234567890.123")),
             expected_column_types={"order_ref": "VARCHAR", "price": "DECIMAL(27,7)"},
@@ -4048,6 +4153,7 @@ def raw_multi_yield(ctx):
     yield {"id": 1, "status": "first"}
     yield {"id": 2, "status": "second"}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_multi_yield\n",
             },
             expected_rows=((1, "first"), (2, "second")),
         ),
@@ -4107,6 +4213,7 @@ def raw_batched_yield(ctx):
     yield {"id": 2, "status": "second", "late_flag": True}
     yield {"id": 3, "status": "third", "late_flag": False}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_batched_yield\n",
             },
             expected_rows=((1, "first", None), (2, "second", True), (3, "third", False)),
             expected_column_types={"id": "INTEGER", "status": "VARCHAR", "late_flag": "BOOLEAN"},
@@ -4202,6 +4309,7 @@ def raw_missing_known(ctx):
     yield {"id": 1, "status": "first"}
     yield {"id": 2}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_missing_known\n",
             },
             select_sql="SELECT id, status FROM raw_missing_known ORDER BY id",
             table_name="raw_missing_known",
@@ -4236,6 +4344,7 @@ def raw_empty_generator(ctx):
     if False:
         yield {"id": 1, "status": "unreachable"}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_empty_generator\n",
             },
             select_sql="SELECT COUNT(*) FROM raw_empty_generator",
             table_name="raw_empty_generator",
@@ -4268,6 +4377,7 @@ def raw_late_null(ctx):
     yield {"id": 1, "late_note": None}
     yield {"id": 2, "late_note": "filled"}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_late_null\n",
             },
             select_sql="SELECT id, late_note FROM raw_late_null ORDER BY id",
             table_name="raw_late_null",
@@ -4301,6 +4411,7 @@ def raw_batch_size_two(ctx):
     yield {"id": 2}
     yield {"id": 3}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_batch_size_two\n",
             },
             select_sql="SELECT id FROM raw_batch_size_two ORDER BY id",
             table_name="raw_batch_size_two",
@@ -4334,6 +4445,7 @@ def raw_default_batch(ctx):
     yield {"id": 2}
     yield {"id": 3}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_default_batch\n",
             },
             select_sql="SELECT id FROM raw_default_batch ORDER BY id",
             table_name="raw_default_batch",
@@ -4424,6 +4536,7 @@ def raw_many_rows(ctx):
     for value in range(1001):
         yield {"id": value}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_many_rows\n",
             },
             expected_exit_code=0,
             expected_rows=(),
@@ -4488,6 +4601,7 @@ def raw_empty(ctx):
     '''Test loader raw_empty.'''
     return []
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_empty\n",
             },
             expected_column_types={"id": "INTEGER", "status": "VARCHAR"},
         ),
@@ -4548,6 +4662,7 @@ def raw_self_managed(ctx):
     '''Test loader raw_self_managed.'''
     ctx.execute_sql("CREATE OR REPLACE TABLE raw_self_managed AS SELECT 1 AS id")
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_self_managed\n",
             },
             select_sql="SELECT id FROM raw_self_managed",
             expected_rows=((1,),),
@@ -4605,6 +4720,7 @@ def raw_conflict(ctx):
         {"id": "two"},
     ]
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_conflict\n",
             },
             expected_exit_code=1,
             expected_stdout_fragment="conflicting types for column 'id'",
@@ -4631,6 +4747,7 @@ def raw_unknown_type(ctx):
     '''Test loader raw_unknown_type.'''
     return [{"id": 1, "order_ref": UUID("12345678-1234-5678-1234-567812345678")}]
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_unknown_type\n",
             },
             expected_exit_code=1,
             expected_stdout_fragment=(
@@ -4662,6 +4779,7 @@ def raw_wider_decimal(ctx):
     yield {"price": Decimal("1.5")}
     yield {"price": Decimal("123.25")}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_wider_decimal\n",
             },
             expected_exit_code=1,
             expected_stdout_fragment=(
@@ -4688,6 +4806,7 @@ def raw_missing_strategy(ctx):
     '''Test loader raw_missing_strategy.'''
     return [{"id": 1}]
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_missing_strategy\n",
             },
             expected_exit_code=1,
             expected_stdout_fragment="returned rows but source has no write_strategy",
@@ -4712,6 +4831,7 @@ def raw_unexpected_none(ctx):
     '''Test loader raw_unexpected_none.'''
     return None
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_unexpected_none\n",
             },
             expected_exit_code=1,
             expected_stdout_fragment=(
@@ -4763,6 +4883,7 @@ def raw_batched_conflict(ctx):
     yield {"id": 1}
     yield {"id": "two"}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_batched_conflict\n",
             },
             staging_table_name="raw_batched_conflict__staging",
             expected_staging_exists=False,
@@ -4795,6 +4916,7 @@ def raw_batched_non_dict(ctx):
     yield {"id": 1}
     yield ("id", 2)
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_batched_non_dict\n",
             },
             staging_table_name="raw_batched_non_dict__staging",
             expected_staging_exists=False,
@@ -4825,6 +4947,7 @@ def raw_append_failure(ctx):
     yield {"id": 1}
     yield {"id": "two"}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_append_failure\n",
             },
             staging_table_name="raw_append_failure__staging",
             expected_staging_exists=False,
@@ -4863,6 +4986,7 @@ def raw_merge_failure(ctx):
     yield {"id": 1, "status": "new"}
     yield {"id": "two", "status": "bad"}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_merge_failure\n",
             },
             staging_table_name="raw_merge_failure__staging",
             expected_staging_exists=False,
@@ -4901,6 +5025,7 @@ def raw_delete_insert_failure(ctx):
     yield {"id": 1, "status": "new"}
     yield {"id": "two", "status": "bad"}
 """,
+                "python/nodes/loaders/raw/__init__.py": "from .loader import raw_delete_insert_failure\n",
             },
             staging_table_name="raw_delete_insert_failure__staging",
             expected_staging_exists=False,
@@ -4978,6 +5103,7 @@ sources:
 """.strip()
                 + "\n",
                 "python/nodes/loaders/raw_orders/loader.py": _RAW_ORDERS_LOADER,
+                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
             },
             select=("missing_source",),
             exclude=(),
@@ -5016,6 +5142,7 @@ sources:
 """.strip()
                 + "\n",
                 "python/nodes/loaders/raw_orders/loader.py": _RAW_ORDERS_LOADER,
+                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
             },
             select=(),
             exclude=("missing_source",),
@@ -5039,6 +5166,7 @@ sources:
 """.strip()
                 + "\n",
                 "python/nodes/loaders/raw_orders/loader.py": _RAW_ORDERS_LOADER,
+                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
             },
             select=(),
             exclude=("raw_customers",),
@@ -5107,6 +5235,7 @@ sources:
 """.strip()
                 + "\n",
                 "python/nodes/loaders/raw_orders/loader.py": _RAW_ORDERS_LOADER,
+                "python/nodes/loaders/raw_orders/__init__.py": "from .loader import raw_orders\n",
             },
             select=(),
             exclude=("raw_orders",),

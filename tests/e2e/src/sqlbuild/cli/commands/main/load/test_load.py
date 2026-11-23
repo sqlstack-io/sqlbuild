@@ -144,14 +144,17 @@ def test_given_non_contract_loader_when_late_column_appears_then_existing_target
                 "      - name: load_seq\n"
                 "        type: INTEGER\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    if ctx.current_cursor_value is None:\n"
-                "        return [{'event_id': 1, 'load_seq': 1}]\n"
-                "    return [{'event_id': 2, 'load_seq': 2, 'note': 'late-note'}]\n"
-            ),
+            node_files={
+                "python/nodes/loaders/source_rows/loader.py": (
+                    "from sqlbuild.loaders import loader\n\n"
+                    "@loader\n"
+                    "def raw_events(ctx):\n"
+                    "    '''Test loader raw_events.'''\n    if ctx.current_cursor_value is None:\n"
+                    "        return [{'event_id': 1, 'load_seq': 1}]\n"
+                    "    return [{'event_id': 2, 'load_seq': 2, 'note': 'late-note'}]\n"
+                ),
+                "python/nodes/loaders/source_rows/__init__.py": "from .loader import raw_events\n",
+            },
         ),
     )
     db_path: Path = project_dir / "source_loader_schema_behavior.duckdb"
@@ -317,33 +320,59 @@ def test_given_two_terminal_sources_when_sharing_intermediate_then_intermediate_
                 "    managed: true\n"
                 "    write_strategy: table\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='append', cursor_column='load_seq', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_orders(ctx):\n"
-                "    '''Test loader fetch_orders.'''\n    if ctx.current_cursor_value is None:\n"
-                "        next_seq = 1\n"
-                "    else:\n"
-                "        next_seq = ctx.current_cursor_value + 1\n"
-                "    return [{'event_id': next_seq, 'load_seq': next_seq}]\n\n"
-                "@loader(depends_on=[fetch_orders])\n"
-                "def raw_orders(ctx):\n"
-                "    '''Test loader raw_orders.'''\n    orders = ctx.loader(fetch_orders)\n"
-                "    cursor = ctx.query(\n"
-                "        f'SELECT event_id FROM {orders.destination} ORDER BY event_id'\n"
-                "    )\n"
-                "    return [{'event_id': row[0]} for row in cursor.fetchall()]\n\n"
-                "@loader(depends_on=[fetch_orders])\n"
-                "def raw_order_metrics(ctx):\n"
-                "    '''Test loader raw_order_metrics.'''\n    orders = ctx.loader(fetch_orders)\n"
-                "    cursor = ctx.query(\n"
-                "        f'SELECT event_id FROM {orders.destination} ORDER BY event_id'\n"
-                "    )\n"
-                "    return [{'event_id': row[0]} for row in cursor.fetchall()]\n"
-            ),
+            node_files={
+                "python/nodes/loaders/source_rows/fetch_orders/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader(write_strategy='append', cursor_column='load_seq', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_orders(ctx):\n"
+                    "    '''Test loader fetch_orders.'''\n"
+                    "    if ctx.current_cursor_value is None:\n"
+                    "        next_seq = 1\n"
+                    "    else:\n"
+                    "        next_seq = ctx.current_cursor_value + 1\n"
+                    "    return [{'event_id': next_seq, 'load_seq': next_seq}]\n"
+                ),
+                "python/nodes/loaders/source_rows/raw_orders/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.source_rows.fetch_orders.loader import "
+                    "fetch_orders\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_orders])\n"
+                    "def raw_orders(ctx):\n"
+                    "    '''Test loader raw_orders.'''\n"
+                    "    orders = ctx.loader(fetch_orders)\n"
+                    "    cursor = ctx.query(\n"
+                    "        f'SELECT event_id FROM {orders.destination} ORDER BY event_id'\n"
+                    "    )\n"
+                    "    return [{'event_id': row[0]} for row in cursor.fetchall()]\n"
+                ),
+                "python/nodes/loaders/source_rows/raw_order_metrics/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.source_rows.fetch_orders.loader import "
+                    "fetch_orders\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_orders])\n"
+                    "def raw_order_metrics(ctx):\n"
+                    "    '''Test loader raw_order_metrics.'''\n"
+                    "    orders = ctx.loader(fetch_orders)\n"
+                    "    cursor = ctx.query(\n"
+                    "        f'SELECT event_id FROM {orders.destination} ORDER BY event_id'\n"
+                    "    )\n"
+                    "    return [{'event_id': row[0]} for row in cursor.fetchall()]\n"
+                ),
+                "python/nodes/loaders/source_rows/__init__.py": (
+                    "from .fetch_orders.loader import fetch_orders\n"
+                    "from .raw_orders.loader import raw_orders\n"
+                    "from .raw_order_metrics.loader import raw_order_metrics\n"
+                ),
+            },
         ),
     )
     db_path: Path = project_dir / "source_loader_schema_behavior.duckdb"
@@ -401,25 +430,42 @@ def test_given_chained_loader_project_when_loading_source_then_runs_dependencies
                 "      - name: status\n"
                 "        type: VARCHAR\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='table', cursor_column='load_seq', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    source_cursor = ctx.source('raw_events').max('event_id')\n"
-                "    return [\n"
-                "        {'event_id': 1, 'load_seq': 1},\n"
-                "        {'event_id': 2, 'load_seq': 1},\n"
-                "    ] if source_cursor is None else []\n\n"
-                "@loader(depends_on=[fetch_events])\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} AS '
-                "SELECT event_id, 'loaded' AS status, {events.current_cursor_value} AS max_seq "
-                'FROM {events.destination}")\n'
-            ),
+            node_files={
+                "python/nodes/loaders/source_rows/fetch_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader(write_strategy='table', cursor_column='load_seq', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_events(ctx):\n"
+                    "    '''Test loader fetch_events.'''\n"
+                    "    source_cursor = ctx.source('raw_events').max('event_id')\n"
+                    "    return [\n"
+                    "        {'event_id': 1, 'load_seq': 1},\n"
+                    "        {'event_id': 2, 'load_seq': 1},\n"
+                    "    ] if source_cursor is None else []\n"
+                ),
+                "python/nodes/loaders/source_rows/raw_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.source_rows.fetch_events.loader import "
+                    "fetch_events\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_events])\n"
+                    "def raw_events(ctx):\n"
+                    "    '''Test loader raw_events.'''\n"
+                    "    events = ctx.loader(fetch_events)\n"
+                    '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} '
+                    "AS SELECT event_id, 'loaded' AS status, "
+                    '{events.current_cursor_value} AS max_seq FROM {events.destination}")\n'
+                ),
+                "python/nodes/loaders/source_rows/__init__.py": (
+                    "from .fetch_events.loader import fetch_events\n"
+                    "from .raw_events.loader import raw_events\n"
+                ),
+            },
         ),
     )
     db_path: Path = project_dir / "source_loader_schema_behavior.duckdb"
@@ -473,19 +519,36 @@ def test_given_chained_loader_project_when_building_source_model_then_runs_loade
                 "      - name: status\n"
                 "        type: VARCHAR\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='table', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}, {'event_id': 2}]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} AS '
-                "SELECT event_id, 'loaded' AS status FROM {events.destination}\")\n"
-            ),
+            node_files={
+                "python/nodes/loaders/source_rows/fetch_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader(write_strategy='table', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_events(ctx):\n"
+                    "    '''Test loader fetch_events.'''\n"
+                    "    return [{'event_id': 1}, {'event_id': 2}]\n"
+                ),
+                "python/nodes/loaders/source_rows/raw_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.source_rows.fetch_events.loader import "
+                    "fetch_events\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_events])\n"
+                    "def raw_events(ctx):\n"
+                    "    '''Test loader raw_events.'''\n"
+                    "    events = ctx.loader(fetch_events)\n"
+                    '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} '
+                    "AS SELECT event_id, 'loaded' AS status FROM {events.destination}\")\n"
+                ),
+                "python/nodes/loaders/source_rows/__init__.py": (
+                    "from .fetch_events.loader import fetch_events\n"
+                    "from .raw_events.loader import raw_events\n"
+                ),
+            },
         )
         | {
             "sql/models/fact_events.sql": (
@@ -552,19 +615,36 @@ def test_given_chained_loader_project_when_running_source_model_then_runs_loader
                 "      - name: status\n"
                 "        type: VARCHAR\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='table', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}, {'event_id': 2}]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} AS '
-                "SELECT event_id, 'loaded' AS status FROM {events.destination}\")\n"
-            ),
+            node_files={
+                "python/nodes/loaders/source_rows/fetch_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader(write_strategy='table', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_events(ctx):\n"
+                    "    '''Test loader fetch_events.'''\n"
+                    "    return [{'event_id': 1}, {'event_id': 2}]\n"
+                ),
+                "python/nodes/loaders/source_rows/raw_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.source_rows.fetch_events.loader import "
+                    "fetch_events\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_events])\n"
+                    "def raw_events(ctx):\n"
+                    "    '''Test loader raw_events.'''\n"
+                    "    events = ctx.loader(fetch_events)\n"
+                    '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} '
+                    "AS SELECT event_id, 'loaded' AS status FROM {events.destination}\")\n"
+                ),
+                "python/nodes/loaders/source_rows/__init__.py": (
+                    "from .fetch_events.loader import fetch_events\n"
+                    "from .raw_events.loader import raw_events\n"
+                ),
+            },
         )
         | {
             "sql/models/fact_events.sql": (
@@ -630,14 +710,17 @@ def test_given_source_loader_reads_unselected_task_payload_when_loading_then_run
                     "      - name: event_id\n"
                     "        type: INTEGER\n"
                 ),
-                loader_py=(
-                    "from sqlbuild.loaders import loader\n"
-                    f"from python.nodes.{test_case.dependency_dir}.prepare import prepare_events\n\n"
-                    "@loader(depends_on=[prepare_events])\n"
-                    "def raw_events(ctx):\n"
-                    "    '''Test loader raw_events.'''\n    payload = ctx.result_of(node_function=prepare_events).payload\n"
-                    "    return [{'event_id': payload['event_id']}]\n"
-                ),
+                node_files={
+                    "python/nodes/loaders/source_rows.py": (
+                        "from sqlbuild.loaders import loader\n"
+                        f"from python.nodes.{test_case.dependency_dir}.prepare import prepare_events\n\n"
+                        "@loader(depends_on=[prepare_events])\n"
+                        "def raw_events(ctx):\n"
+                        "    '''Test loader raw_events.'''\n    payload = "
+                        "ctx.result_of(node_function=prepare_events).payload\n"
+                        "    return [{'event_id': payload['event_id']}]\n"
+                    )
+                },
             ),
             dependency_file: (
                 f"{test_case.decorator_import}\n"
@@ -749,42 +832,92 @@ def test_given_source_only_selection_when_skipping_complex_intermediates_then_va
                 "  - name: raw_rollup\n    description: Test source raw_rollup.\n"
                 "    managed: true\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='table', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}]\n\n"
-                "@loader(write_strategy='table', columns=[\n"
-                "    {'name': 'price_id', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_prices(ctx):\n"
-                "    '''Test loader fetch_prices.'''\n    return [{'price_id': 1}]\n\n"
-                "@loader(depends_on=[fetch_events, fetch_prices])\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                "    prices = ctx.loader(fetch_prices)\n"
-                "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} AS "
-                "SELECT event_id FROM {events.destination} UNION ALL "
-                "SELECT price_id FROM {prices.destination}')\n\n"
-                "@loader(write_strategy='table', columns=[\n"
-                "    {'name': 'page_id', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_pages(ctx):\n"
-                "    '''Test loader fetch_pages.'''\n    return [{'page_id': 1}]\n\n"
-                "@loader(depends_on=[fetch_pages], write_strategy='table', "
-                "columns=[{'name': 'page_id', 'type': 'INTEGER'}])\n"
-                "def normalize_pages(ctx):\n"
-                "    '''Test loader normalize_pages.'''\n    pages = ctx.loader(fetch_pages)\n"
-                "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} AS "
-                "SELECT page_id FROM {pages.destination}')\n\n"
-                "@loader(depends_on=[normalize_pages])\n"
-                "def raw_rollup(ctx):\n"
-                "    '''Test loader raw_rollup.'''\n    pages = ctx.loader(normalize_pages)\n"
-                "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} AS "
-                "SELECT page_id FROM {pages.destination}')\n"
-            ),
+            node_files={
+                "python/nodes/loaders/source_rows/fetch_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader(write_strategy='table', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_events(ctx):\n"
+                    "    '''Test loader fetch_events.'''\n"
+                    "    return [{'event_id': 1}]\n"
+                ),
+                "python/nodes/loaders/source_rows/fetch_prices/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader(write_strategy='table', columns=[\n"
+                    "    {'name': 'price_id', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_prices(ctx):\n"
+                    "    '''Test loader fetch_prices.'''\n"
+                    "    return [{'price_id': 1}]\n"
+                ),
+                "python/nodes/loaders/source_rows/raw_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.source_rows.fetch_events.loader import "
+                    "fetch_events\n"
+                    "from python.nodes.loaders.source_rows.fetch_prices.loader import "
+                    "fetch_prices\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_events, fetch_prices])\n"
+                    "def raw_events(ctx):\n"
+                    "    '''Test loader raw_events.'''\n"
+                    "    events = ctx.loader(fetch_events)\n"
+                    "    prices = ctx.loader(fetch_prices)\n"
+                    "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} "
+                    "AS SELECT event_id FROM {events.destination} UNION ALL SELECT "
+                    "price_id FROM {prices.destination}')\n"
+                ),
+                "python/nodes/loaders/source_rows/fetch_pages/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader(write_strategy='table', columns=[\n"
+                    "    {'name': 'page_id', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_pages(ctx):\n"
+                    "    '''Test loader fetch_pages.'''\n"
+                    "    return [{'page_id': 1}]\n"
+                ),
+                "python/nodes/loaders/source_rows/normalize_pages/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.source_rows.fetch_pages.loader import fetch_pages\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_pages], write_strategy='table', "
+                    "columns=[{'name': 'page_id', 'type': 'INTEGER'}])\n"
+                    "def normalize_pages(ctx):\n"
+                    "    '''Test loader normalize_pages.'''\n"
+                    "    pages = ctx.loader(fetch_pages)\n"
+                    "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} "
+                    "AS SELECT page_id FROM {pages.destination}')\n"
+                ),
+                "python/nodes/loaders/source_rows/raw_rollup/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.source_rows.normalize_pages.loader "
+                    "import normalize_pages\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[normalize_pages])\n"
+                    "def raw_rollup(ctx):\n"
+                    "    '''Test loader raw_rollup.'''\n"
+                    "    pages = ctx.loader(normalize_pages)\n"
+                    "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} "
+                    "AS SELECT page_id FROM {pages.destination}')\n"
+                ),
+                "python/nodes/loaders/source_rows/__init__.py": (
+                    "from .fetch_events.loader import fetch_events\n"
+                    "from .fetch_prices.loader import fetch_prices\n"
+                    "from .raw_events.loader import raw_events\n"
+                    "from .fetch_pages.loader import fetch_pages\n"
+                    "from .normalize_pages.loader import normalize_pages\n"
+                    "from .raw_rollup.loader import raw_rollup\n"
+                ),
+            },
         ),
     )
     setup_command: tuple[str, ...]
@@ -872,22 +1005,40 @@ def test_given_chained_loader_project_when_selecting_loader_then_expands_expecte
         project_name="source_loader_schema_behavior",
         repo_files=build_schema_behavior_project_files(
             source_yaml=(
-                "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n"
+                "sources:\n  - name: raw_events\n    description: Test source "
+                "raw_events.\n    managed: true\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='table', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    return [{'event_id': 1, 'load_seq': 1}, {'event_id': 2, 'load_seq': 1}]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} AS '
-                'SELECT event_id FROM {events.destination}")\n'
-            ),
+            node_files={
+                "python/nodes/loaders/source_rows/fetch_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader(write_strategy='table', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_events(ctx):\n"
+                    "    '''Test loader fetch_events.'''\n"
+                    "    return [{'event_id': 1, 'load_seq': 1}, {'event_id': 2, 'load_seq': 1}]\n"
+                ),
+                "python/nodes/loaders/source_rows/raw_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.source_rows.fetch_events.loader import "
+                    "fetch_events\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_events])\n"
+                    "def raw_events(ctx):\n"
+                    "    '''Test loader raw_events.'''\n"
+                    "    events = ctx.loader(fetch_events)\n"
+                    '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} '
+                    'AS SELECT event_id FROM {events.destination}")\n'
+                ),
+                "python/nodes/loaders/source_rows/__init__.py": (
+                    "from .fetch_events.loader import fetch_events\n"
+                    "from .raw_events.loader import raw_events\n"
+                ),
+            },
         ),
     )
     db_path: Path = project_dir / "source_loader_schema_behavior.duckdb"
@@ -944,21 +1095,39 @@ def test_given_chained_loader_project_when_excluding_dependency_then_prunes_depe
         project_name="source_loader_schema_behavior",
         repo_files=build_schema_behavior_project_files(
             source_yaml=(
-                "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n"
+                "sources:\n  - name: raw_events\n    description: Test source "
+                "raw_events.\n    managed: true\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='table', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} AS '
-                'SELECT event_id FROM {events.destination}")\n'
-            ),
+            node_files={
+                "python/nodes/loaders/source_rows/fetch_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader(write_strategy='table', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_events(ctx):\n"
+                    "    '''Test loader fetch_events.'''\n"
+                    "    return [{'event_id': 1}]\n"
+                ),
+                "python/nodes/loaders/source_rows/raw_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.source_rows.fetch_events.loader import "
+                    "fetch_events\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_events])\n"
+                    "def raw_events(ctx):\n"
+                    "    '''Test loader raw_events.'''\n"
+                    "    events = ctx.loader(fetch_events)\n"
+                    '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} '
+                    'AS SELECT event_id FROM {events.destination}")\n'
+                ),
+                "python/nodes/loaders/source_rows/__init__.py": (
+                    "from .fetch_events.loader import fetch_events\n"
+                    "from .raw_events.loader import raw_events\n"
+                ),
+            },
         ),
     )
     db_path: Path = project_dir / "source_loader_schema_behavior.duckdb"
@@ -997,22 +1166,40 @@ def test_given_chained_loader_project_when_intermediate_has_custom_target_then_r
         project_name="source_loader_schema_behavior",
         repo_files=build_schema_behavior_project_files(
             source_yaml=(
-                "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n"
+                "sources:\n  - name: raw_events\n    description: Test source "
+                "raw_events.\n    managed: true\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(destination='custom_fetch_events', write_strategy='table', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}]\n\n"
-                "@loader(depends_on=[fetch_events])\n"
-                "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} AS '
-                "SELECT event_id, '{events.table_name}' AS source_table "
-                'FROM {events.destination}")\n'
-            ),
+            node_files={
+                "python/nodes/loaders/source_rows/fetch_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader(destination='custom_fetch_events', write_strategy='table', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_events(ctx):\n"
+                    "    '''Test loader fetch_events.'''\n"
+                    "    return [{'event_id': 1}]\n"
+                ),
+                "python/nodes/loaders/source_rows/raw_events/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.source_rows.fetch_events.loader import "
+                    "fetch_events\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_events])\n"
+                    "def raw_events(ctx):\n"
+                    "    '''Test loader raw_events.'''\n"
+                    "    events = ctx.loader(fetch_events)\n"
+                    '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} '
+                    "AS SELECT event_id, '{events.table_name}' AS source_table FROM "
+                    '{events.destination}")\n'
+                ),
+                "python/nodes/loaders/source_rows/__init__.py": (
+                    "from .fetch_events.loader import fetch_events\n"
+                    "from .raw_events.loader import raw_events\n"
+                ),
+            },
         ),
     )
     db_path: Path = project_dir / "source_loader_schema_behavior.duckdb"
@@ -1047,7 +1234,8 @@ def test_given_chained_loader_project_when_intermediate_has_custom_target_then_r
                 "    {'name': 'amount', 'type': 'INTEGER'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    return [{'event_id': 1, 'amount': 100}, {'event_id': 2, 'amount': 200}]\n\n"
+                "    '''Test loader fetch_events.'''\n    return [{'event_id': 1, "
+                "'amount': 100}, {'event_id': 2, 'amount': 200}]\n\n"
                 "@loader(depends_on=[fetch_events])\n"
                 "def raw_events(ctx):\n"
                 "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
@@ -1107,7 +1295,8 @@ def test_given_chained_loader_project_when_intermediate_has_custom_target_then_r
                 "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value is not None:\n"
+                "    '''Test loader fetch_events.'''\n    if ctx.current_cursor_value "
+                "is not None:\n"
                 "        return [\n"
                 "            {'event_id': 2, 'amount': 250, 'load_seq': 1},\n"
                 "            {'event_id': 3, 'amount': 300, 'load_seq': 1},\n"
@@ -1151,7 +1340,7 @@ def test_given_chained_loader_project_when_intermediate_uses_strategy_then_appli
                 "      - name: amount\n"
                 "        type: INTEGER\n"
             ),
-            loader_py=test_case.loader_py,
+            node_files={"python/nodes/loaders/source_rows.py": test_case.loader_py},
         ),
     )
     db_path: Path = project_dir / "source_loader_schema_behavior.duckdb"
@@ -1211,7 +1400,11 @@ def test_given_intermediate_loader_without_write_strategy_when_loading_twice_the
         project_name="source_loader_schema_behavior",
         repo_files=build_schema_behavior_project_files(
             source_yaml=(edge_cases / "intermediate_default_accounts.yml").read_text(),
-            loader_py=(edge_cases / "intermediate_default_accounts.py").read_text(),
+            node_files={
+                "python/nodes/loaders/source_rows.py": (
+                    edge_cases / "intermediate_default_accounts.py"
+                ).read_text()
+            },
         ),
     )
     db_path: Path = project_dir / "source_loader_schema_behavior.duckdb"
@@ -1273,22 +1466,45 @@ def test_given_loader_dependency_failure_when_loading_then_only_dependents_skip(
                 "    managed: true\n"
                 "    write_strategy: table\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='table', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_bad(ctx):\n"
-                "    '''Test loader fetch_bad.'''\n    raise RuntimeError('boom')\n\n"
-                "@loader(depends_on=[fetch_bad])\n"
-                "def raw_bad(ctx):\n"
-                "    '''Test loader raw_bad.'''\n    events = ctx.loader(fetch_bad)\n"
-                '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} AS '
-                'SELECT event_id FROM {events.destination}")\n\n'
-                "@loader\n"
-                "def raw_ok(ctx):\n"
-                "    '''Test loader raw_ok.'''\n    return [{'event_id': 1}]\n"
-            ),
+            node_files={
+                "python/nodes/loaders/source_rows/fetch_bad/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader(write_strategy='table', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_bad(ctx):\n"
+                    "    '''Test loader fetch_bad.'''\n"
+                    "    raise RuntimeError('boom')\n"
+                ),
+                "python/nodes/loaders/source_rows/raw_bad/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.source_rows.fetch_bad.loader import fetch_bad\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_bad])\n"
+                    "def raw_bad(ctx):\n"
+                    "    '''Test loader raw_bad.'''\n"
+                    "    events = ctx.loader(fetch_bad)\n"
+                    '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} '
+                    'AS SELECT event_id FROM {events.destination}")\n'
+                ),
+                "python/nodes/loaders/source_rows/raw_ok/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader\n"
+                    "def raw_ok(ctx):\n"
+                    "    '''Test loader raw_ok.'''\n"
+                    "    return [{'event_id': 1}]\n"
+                ),
+                "python/nodes/loaders/source_rows/__init__.py": (
+                    "from .fetch_bad.loader import fetch_bad\n"
+                    "from .raw_bad.loader import raw_bad\n"
+                    "from .raw_ok.loader import raw_ok\n"
+                ),
+            },
         ),
     )
     db_path: Path = project_dir / "source_loader_schema_behavior.duckdb"
@@ -1338,29 +1554,54 @@ def test_given_loader_dependency_failure_when_building_then_only_dependents_skip
                 "    managed: true\n"
                 "    write_strategy: table\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='table', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_bad(ctx):\n"
-                "    '''Test loader fetch_bad.'''\n    raise RuntimeError('boom')\n\n"
-                "@loader(depends_on=[fetch_bad])\n"
-                "def raw_bad(ctx):\n"
-                "    '''Test loader raw_bad.'''\n    events = ctx.loader(fetch_bad)\n"
-                '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} AS '
-                'SELECT event_id FROM {events.destination}")\n\n'
-                "@loader\n"
-                "def raw_ok(ctx):\n"
-                "    '''Test loader raw_ok.'''\n    return [{'event_id': 1}]\n"
-            ),
+            node_files={
+                "python/nodes/loaders/source_rows/fetch_bad/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader(write_strategy='table', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_bad(ctx):\n"
+                    "    '''Test loader fetch_bad.'''\n"
+                    "    raise RuntimeError('boom')\n"
+                ),
+                "python/nodes/loaders/source_rows/raw_bad/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.source_rows.fetch_bad.loader import fetch_bad\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_bad])\n"
+                    "def raw_bad(ctx):\n"
+                    "    '''Test loader raw_bad.'''\n"
+                    "    events = ctx.loader(fetch_bad)\n"
+                    '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} '
+                    'AS SELECT event_id FROM {events.destination}")\n'
+                ),
+                "python/nodes/loaders/source_rows/raw_ok/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader\n"
+                    "def raw_ok(ctx):\n"
+                    "    '''Test loader raw_ok.'''\n"
+                    "    return [{'event_id': 1}]\n"
+                ),
+                "python/nodes/loaders/source_rows/__init__.py": (
+                    "from .fetch_bad.loader import fetch_bad\n"
+                    "from .raw_bad.loader import raw_bad\n"
+                    "from .raw_ok.loader import raw_ok\n"
+                ),
+            },
         )
         | {
             "sql/models/bad_model.sql": (
-                'MODEL (description "Test model bad_model.", materialized table);\n\nSELECT event_id FROM __source("raw_bad")\n'
+                'MODEL (description "Test model bad_model.", materialized '
+                'table);\n\nSELECT event_id FROM __source("raw_bad")\n'
             ),
             "sql/models/ok_model.sql": (
-                'MODEL (description "Test model ok_model.", materialized table);\n\nSELECT event_id FROM __source("raw_ok")\n'
+                'MODEL (description "Test model ok_model.", materialized '
+                'table);\n\nSELECT event_id FROM __source("raw_ok")\n'
             ),
         },
     )
@@ -1413,22 +1654,45 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
                 "    managed: true\n"
                 "    write_strategy: table\n"
             ),
-            loader_py=(
-                "from sqlbuild.loaders import loader\n\n"
-                "@loader(write_strategy='table', columns=[\n"
-                "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                "])\n"
-                "def fetch_bad(ctx):\n"
-                "    '''Test loader fetch_bad.'''\n    raise RuntimeError('boom')\n\n"
-                "@loader(depends_on=[fetch_bad])\n"
-                "def raw_bad(ctx):\n"
-                "    '''Test loader raw_bad.'''\n    events = ctx.loader(fetch_bad)\n"
-                '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} AS '
-                'SELECT event_id FROM {events.destination}")\n\n'
-                "@loader\n"
-                "def raw_ok(ctx):\n"
-                "    '''Test loader raw_ok.'''\n    return [{'event_id': 1}]\n"
-            ),
+            node_files={
+                "python/nodes/loaders/source_rows/fetch_bad/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader(write_strategy='table', columns=[\n"
+                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                    "])\n"
+                    "def fetch_bad(ctx):\n"
+                    "    '''Test loader fetch_bad.'''\n"
+                    "    raise RuntimeError('boom')\n"
+                ),
+                "python/nodes/loaders/source_rows/raw_bad/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.loaders.source_rows.fetch_bad.loader import fetch_bad\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_bad])\n"
+                    "def raw_bad(ctx):\n"
+                    "    '''Test loader raw_bad.'''\n"
+                    "    events = ctx.loader(fetch_bad)\n"
+                    '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} '
+                    'AS SELECT event_id FROM {events.destination}")\n'
+                ),
+                "python/nodes/loaders/source_rows/raw_ok/loader.py": (
+                    "from sqlbuild.loaders import loader\n"
+                    "\n"
+                    "\n"
+                    "@loader\n"
+                    "def raw_ok(ctx):\n"
+                    "    '''Test loader raw_ok.'''\n"
+                    "    return [{'event_id': 1}]\n"
+                ),
+                "python/nodes/loaders/source_rows/__init__.py": (
+                    "from .fetch_bad.loader import fetch_bad\n"
+                    "from .raw_bad.loader import raw_bad\n"
+                    "from .raw_ok.loader import raw_ok\n"
+                ),
+            },
         ),
     )
     db_path: Path = project_dir / "source_loader_schema_behavior.duckdb"
@@ -1464,7 +1728,8 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
             repo_files=build_schema_behavior_project_files(
                 source_yaml=(
                     "sources:\n"
-                    "  - name: raw_contract_events\n    description: Test source raw_contract_events.\n"
+                    "  - name: raw_contract_events\n    description: Test source "
+                    "raw_contract_events.\n"
                     "    managed: true\n"
                     "    write_strategy: table\n"
                     "    contract: enforced\n"
@@ -1472,12 +1737,16 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
                     "      - name: event_id\n"
                     "        type: INTEGER\n"
                 ),
-                loader_py=(
-                    "from sqlbuild.loaders import loader\n\n"
-                    "@loader\n"
-                    "def raw_contract_events(ctx):\n"
-                    "    '''Test loader raw_contract_events.'''\n    return [{'event_id': 1, 'extra_note': 'not declared'}]\n"
-                ),
+                node_files={
+                    "python/nodes/loaders/source_rows/loader.py": (
+                        "from sqlbuild.loaders import loader\n\n"
+                        "@loader\n"
+                        "def raw_contract_events(ctx):\n"
+                        "    '''Test loader raw_contract_events.'''\n    return "
+                        "[{'event_id': 1, 'extra_note': 'not declared'}]\n"
+                    ),
+                    "python/nodes/loaders/source_rows/__init__.py": "from .loader import raw_contract_events\n",
+                },
             ),
         ),
         SourceLoaderErrorE2ETestCase(
@@ -1487,7 +1756,8 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
             repo_files=build_schema_behavior_project_files(
                 source_yaml=(
                     "sources:\n"
-                    "  - name: raw_contract_events\n    description: Test source raw_contract_events.\n"
+                    "  - name: raw_contract_events\n    description: Test source "
+                    "raw_contract_events.\n"
                     "    managed: true\n"
                     "    write_strategy: table\n"
                     "    contract: enforced\n"
@@ -1497,12 +1767,15 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
                     "      - name: event_name\n"
                     "        type: VARCHAR\n"
                 ),
-                loader_py=(
-                    "from sqlbuild.loaders import loader\n\n"
-                    "@loader\n"
-                    "def raw_contract_events(ctx):\n"
-                    "    '''Test loader raw_contract_events.'''\n    return [{'event_id': 1}]\n"
-                ),
+                node_files={
+                    "python/nodes/loaders/source_rows/loader.py": (
+                        "from sqlbuild.loaders import loader\n\n"
+                        "@loader\n"
+                        "def raw_contract_events(ctx):\n"
+                        "    '''Test loader raw_contract_events.'''\n    return [{'event_id': 1}]\n"
+                    ),
+                    "python/nodes/loaders/source_rows/__init__.py": "from .loader import raw_contract_events\n",
+                },
             ),
         ),
         SourceLoaderErrorE2ETestCase(
@@ -1522,14 +1795,18 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
                     "      - name: load_seq\n"
                     "        type: INTEGER\n"
                 ),
-                loader_py=(
-                    "from sqlbuild.loaders import loader\n\n"
-                    "@loader\n"
-                    "def raw_events(ctx):\n"
-                    "    '''Test loader raw_events.'''\n    if ctx.current_cursor_value is None:\n"
-                    "        return [{'event_id': 1, 'load_seq': 1, 'amount': 100}]\n"
-                    "    return [{'event_id': 2, 'load_seq': 2, 'amount': 'one hundred'}]\n"
-                ),
+                node_files={
+                    "python/nodes/loaders/source_rows/loader.py": (
+                        "from sqlbuild.loaders import loader\n\n"
+                        "@loader\n"
+                        "def raw_events(ctx):\n"
+                        "    '''Test loader raw_events.'''\n    if "
+                        "ctx.current_cursor_value is None:\n"
+                        "        return [{'event_id': 1, 'load_seq': 1, 'amount': 100}]\n"
+                        "    return [{'event_id': 2, 'load_seq': 2, 'amount': 'one hundred'}]\n"
+                    ),
+                    "python/nodes/loaders/source_rows/__init__.py": "from .loader import raw_events\n",
+                },
             ),
         ),
         SourceLoaderErrorE2ETestCase(
@@ -1538,21 +1815,39 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
             expected_error_fragment="contract has extra columns: extra_note",
             repo_files=build_schema_behavior_project_files(
                 source_yaml=(
-                    "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n"
+                    "sources:\n  - name: raw_events\n    description: Test source "
+                    "raw_events.\n    managed: true\n"
                 ),
-                loader_py=(
-                    "from sqlbuild.loaders import loader\n\n"
-                    "@loader(write_strategy='table', contract='enforced', columns=[\n"
-                    "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                    "])\n"
-                    "def fetch_events(ctx):\n"
-                    "    '''Test loader fetch_events.'''\n    return [{'event_id': 1, 'extra_note': 'not declared'}]\n\n"
-                    "@loader(depends_on=[fetch_events])\n"
-                    "def raw_events(ctx):\n"
-                    "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                    '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} AS '
-                    'SELECT event_id FROM {events.destination}")\n'
-                ),
+                node_files={
+                    "python/nodes/loaders/source_rows/fetch_events/loader.py": (
+                        "from sqlbuild.loaders import loader\n"
+                        "\n"
+                        "\n"
+                        "@loader(write_strategy='table', contract='enforced', columns=[\n"
+                        "    {'name': 'event_id', 'type': 'INTEGER'},\n"
+                        "])\n"
+                        "def fetch_events(ctx):\n"
+                        "    '''Test loader fetch_events.'''\n"
+                        "    return [{'event_id': 1, 'extra_note': 'not declared'}]\n"
+                    ),
+                    "python/nodes/loaders/source_rows/raw_events/loader.py": (
+                        "from sqlbuild.loaders import loader\n"
+                        "from python.nodes.loaders.source_rows.fetch_events.loader "
+                        "import fetch_events\n"
+                        "\n"
+                        "\n"
+                        "@loader(depends_on=[fetch_events])\n"
+                        "def raw_events(ctx):\n"
+                        "    '''Test loader raw_events.'''\n"
+                        "    events = ctx.loader(fetch_events)\n"
+                        '    ctx.execute_sql(f"CREATE OR REPLACE TABLE '
+                        '{ctx.destination} AS SELECT event_id FROM {events.destination}")\n'
+                    ),
+                    "python/nodes/loaders/source_rows/__init__.py": (
+                        "from .fetch_events.loader import fetch_events\n"
+                        "from .raw_events.loader import raw_events\n"
+                    ),
+                },
             ),
         ),
         SourceLoaderErrorE2ETestCase(
@@ -1561,19 +1856,37 @@ def test_given_loader_dependency_failure_when_loading_json_then_reports_skipped_
             expected_error_fragment="returned no rows and has no destination declared",
             repo_files=build_schema_behavior_project_files(
                 source_yaml=(
-                    "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n"
+                    "sources:\n  - name: raw_events\n    description: Test source "
+                    "raw_events.\n    managed: true\n"
                 ),
-                loader_py=(
-                    "from sqlbuild.loaders import loader\n\n"
-                    "@loader\n"
-                    "def fetch_events(ctx):\n"
-                    "    '''Test loader fetch_events.'''\n    ctx.execute_sql('SELECT 1')\n\n"
-                    "@loader(depends_on=[fetch_events])\n"
-                    "def raw_events(ctx):\n"
-                    "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                    '    ctx.execute_sql(f"CREATE OR REPLACE TABLE {ctx.destination} AS '
-                    'SELECT * FROM {events.destination}")\n'
-                ),
+                node_files={
+                    "python/nodes/loaders/source_rows/fetch_events/loader.py": (
+                        "from sqlbuild.loaders import loader\n"
+                        "\n"
+                        "\n"
+                        "@loader\n"
+                        "def fetch_events(ctx):\n"
+                        "    '''Test loader fetch_events.'''\n"
+                        "    ctx.execute_sql('SELECT 1')\n"
+                    ),
+                    "python/nodes/loaders/source_rows/raw_events/loader.py": (
+                        "from sqlbuild.loaders import loader\n"
+                        "from python.nodes.loaders.source_rows.fetch_events.loader "
+                        "import fetch_events\n"
+                        "\n"
+                        "\n"
+                        "@loader(depends_on=[fetch_events])\n"
+                        "def raw_events(ctx):\n"
+                        "    '''Test loader raw_events.'''\n"
+                        "    events = ctx.loader(fetch_events)\n"
+                        '    ctx.execute_sql(f"CREATE OR REPLACE TABLE '
+                        '{ctx.destination} AS SELECT * FROM {events.destination}")\n'
+                    ),
+                    "python/nodes/loaders/source_rows/__init__.py": (
+                        "from .fetch_events.loader import fetch_events\n"
+                        "from .raw_events.loader import raw_events\n"
+                    ),
+                },
             ),
         ),
     ],

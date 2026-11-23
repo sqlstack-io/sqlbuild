@@ -424,7 +424,7 @@ def generated_loaders():
             description="generated asset dependencies validate",
             repo_files=base_repo_files()
             | {
-                "python/nodes/factories/generated.py": """
+                "python/nodes/factories/generated/assets.py": """
 from sqlbuild.assets import asset
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
@@ -442,6 +442,7 @@ def generated_nodes():
 
     return [prepare, export]
 """,
+                "python/nodes/factories/generated/__init__.py": "from .assets import generated_nodes\n",
             },
             expected_asset_names=("prepare_orders", "orders_export"),
         ),
@@ -469,7 +470,7 @@ def generated_tasks():
             description="factory returning its own module-level node registers it once",
             repo_files=base_repo_files()
             | {
-                "python/nodes/factories/orders/assets.py": """
+                "python/nodes/factories/orders.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -505,6 +506,7 @@ def order_nodes():
 
     return orders
 """,
+                "python/nodes/factories/orders/__init__.py": "from .assets import order_nodes\n",
             },
             expected_asset_names=("orders",),
         ),
@@ -562,7 +564,7 @@ def generated_tasks():
             description="generated check and asset may depend on a model and a seed",
             repo_files=base_repo_files()
             | {
-                "python/nodes/factories/generated.py": """
+                "python/nodes/factories/generated/factory.py": """
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
 from sqlbuild.refs import model, seed
@@ -581,6 +583,7 @@ def generated_nodes():
 
     return [export_countries, check_orders]
 """,
+                "python/nodes/factories/generated/__init__.py": "from .factory import generated_nodes\n",
             },
             expected_asset_names=("export_countries",),
             expected_check_names=("check_orders",),
@@ -793,6 +796,7 @@ def make_task():
 def generated_tasks():
     return [make_task(), make_task()]
 """,
+                "python/nodes/tasks/generated/__init__.py": "from .assets import generated_tasks\n",
             },
             expected_error_fragment="Duplicate Python node found for 'profile'",
         ),
@@ -827,23 +831,31 @@ def generated_assets():
             description="factory returning a distinct node named like a module node fails validation",
             repo_files=base_repo_files()
             | {
-                "python/nodes/factories/orders/assets.py": """
-from sqlbuild.factories import factory
-from sqlbuild.assets import asset
-
-
-@asset
-def orders(ctx):
-    return None
-
-
-@factory
-def order_nodes():
-    @asset(name="orders")
-    def generated_orders(ctx):
-        return None
-    return generated_orders
-""",
+                "python/nodes/factories/orders/orders/asset.py": (
+                    "from sqlbuild.factories import factory\n"
+                    "from sqlbuild.assets import asset\n"
+                    "\n"
+                    "\n"
+                    "@asset\n"
+                    "def orders(ctx):\n"
+                    "    return None\n"
+                ),
+                "python/nodes/factories/orders/order_nodes/assets.py": (
+                    "from sqlbuild.factories import factory\n"
+                    "from sqlbuild.assets import asset\n"
+                    "\n"
+                    "\n"
+                    "@factory\n"
+                    "def order_nodes():\n"
+                    '    @asset(name="orders")\n'
+                    "    def generated_orders(ctx):\n"
+                    "        return None\n"
+                    "    return generated_orders\n"
+                ),
+                "python/nodes/factories/orders/__init__.py": (
+                    "from .orders.asset import orders\n"
+                    "from .order_nodes.assets import order_nodes\n"
+                ),
             },
             expected_error_fragment="Duplicate Python node found for 'orders'",
         ),
@@ -851,7 +863,7 @@ def order_nodes():
             description="generated dependency cycle fails validation",
             repo_files=base_repo_files()
             | {
-                "python/nodes/tasks/generated/assets.py": """
+                "python/nodes/tasks/generated.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 

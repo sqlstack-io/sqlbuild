@@ -102,7 +102,7 @@ def generated_loaders():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers set node returned by a factory",
             files={
-                "python/nodes/checks/generated.py": """
+                "python/nodes/checks/generated/checks.py": """
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
 
@@ -114,6 +114,7 @@ def generated_checks():
         return True
     return {generated_check}
 """,
+                "python/nodes/checks/generated/__init__.py": "from .checks import generated_checks\n",
             },
             expected_loader_names=(),
             expected_asset_names=(),
@@ -165,7 +166,7 @@ def generated_loader():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers node kind from its decorator regardless of python subfolder",
             files={
-                "python/nodes/checks/generated.py": """
+                "python/nodes/checks/generated/asset.py": """
 from sqlbuild.assets import asset
 
 
@@ -173,6 +174,7 @@ from sqlbuild.assets import asset
 def export(ctx):
     return {}
 """,
+                "python/nodes/checks/generated/__init__.py": "from .asset import export\n",
             },
             expected_loader_names=(),
             expected_asset_names=("orders_export",),
