@@ -60,6 +60,8 @@ pub(crate) const PAUSE_DYNAMIC_KEY: &str = "pause_dynamic";
 pub(crate) const ENV_FILE_KEY: &str = "env_file";
 /// Project entries the layout check allows beside the expected folders.
 pub(crate) const EXTRA_PATHS_KEY: &str = "extra_paths";
+/// The path segment that would lead an `extra_paths` entry out of the project.
+pub(crate) const PARENT_SEGMENT: &str = "..";
 /// Whether each run records the machine it ran on in the runs state table.
 pub(crate) const RECORD_RUN_HOST_KEY: &str = "record_run_host";
 pub(crate) const DEFAULT_TEST_TIMEOUT: &str = "30s";

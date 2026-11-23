@@ -30,11 +30,7 @@ pub(crate) fn unit_layout_faults(
                 .contains(format!("{PACKAGE_ROOT}/{unit}/{UNIT_MAIN_FILE}").as_str())
         })
         .filter_map(|unit| {
-            let anchor: String = UNIT_DECLARATION_FILES
-                .iter()
-                .chain([&UNIT_CHECKS_FILE])
-                .map(|file| format!("{PACKAGE_ROOT}/{unit}/{file}"))
-                .find(|path| project.paths.contains(path.as_str()))?;
+            let anchor: String = unit_anchor(project, unit)?;
             catalogue_fault(
                 NODE_UNIT_LAYOUT_CODE,
                 &anchor,
@@ -169,8 +165,16 @@ fn kind_file(kind: &str) -> &'static str {
     }
 }
 
-/// The file of a factory, from the kinds of the nodes it declares inside: plural for one kind,
-/// `factory.py` for several.
+/// The first declaration file of `unit` the project holds, where a missing `main.py` is reported.
+fn unit_anchor(project: &UnitProject<'_>, unit: &str) -> Option<String> {
+    let mut candidates = UNIT_DECLARATION_FILES.iter().chain([&UNIT_CHECKS_FILE]);
+    candidates.find_map(|file| {
+        let path: String = format!("{PACKAGE_ROOT}/{unit}/{file}");
+        project.paths.contains(path.as_str()).then_some(path)
+    })
+}
+
+/// A factory's file: plural for the one kind it declares, `factory.py` for several.
 fn factory_file(function: &UnitFunction) -> Option<&'static str> {
     let mut kinds: Vec<&str> = Vec::new();
     for inner in &function.inner {

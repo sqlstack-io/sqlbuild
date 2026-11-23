@@ -4,5 +4,5 @@ use crate::node_files::models::NodeModule;
 pub(super) struct NodeFilesTestCase {
     pub(super) description: &'static str,
     pub(super) modules: Vec<NodeModule>,
-    pub(super) expected: Option<&'static str>,
+    pub(super) expected_problem: Option<&'static str>,
 }

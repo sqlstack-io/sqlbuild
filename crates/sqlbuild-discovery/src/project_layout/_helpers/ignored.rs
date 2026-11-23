@@ -1,5 +1,4 @@
-//! The project's gitignore rules: its own `.gitignore`, those above it up to the repository root,
-//! and the repository's `info/exclude`.
+//! The gitignore rules from the project up to the repository root, with `info/exclude`.
 
 use std::path::{Path, PathBuf};
 

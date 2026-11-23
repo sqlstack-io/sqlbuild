@@ -1680,6 +1680,16 @@ rule = "FFT104"
 path = "tests/unit/src/sqlbuild/rule_engine/_helpers/host/interrupts/helpers.py"
 reason = "The interrupter thread polls for the event that starts the interrupt and must not interrupt once its block has ended; the tests using it remain branch-free."
 
+[[targets.python.rule_exceptions]]
+rule = "FFT104"
+path = "tests/unit/src/sqlbuild/python_nodes/helpers.py"
+reason = "node_module_files rewrites an inline node module into one kind-named file per declaration by walking its syntax tree, which needs branches by node kind; the tests that call it remain branch-free."
+
+[[targets.python.rule_exceptions]]
+rule = "FFT106"
+path = "tests/unit/src/sqlbuild/python_nodes/helpers.py"
+reason = "node_module_files collects names across the declarations of an inline module with nested comprehensions over its syntax tree; the tests that call it remain branch-free."
+
 [targets.rust]
 analyzer = "rust"
 roots = ["crates"]

@@ -26,8 +26,8 @@ use crate::project::_helpers::targets::{
 use crate::project::_helpers::values::is_truthy;
 use crate::project::constants::{
     ALLOW_MISSING_SECRETS_KEY, COLUMN_CONTRACT_MODES, ENV_FILE_KEY, EXTRA_PATHS_KEY,
-    LEGACY_COLUMN_CONTRACT_MODE_KEY, LOCAL_CONFIG_FILENAME, POOLS_KEY, QUERY_CHANGE_TRACKING_KEY,
-    REQUIRE_SQL_ANALYSIS_KEY, SHARED_POLICY_SETTINGS, SQL_ANALYSIS_KEY,
+    LEGACY_COLUMN_CONTRACT_MODE_KEY, LOCAL_CONFIG_FILENAME, PARENT_SEGMENT, POOLS_KEY,
+    QUERY_CHANGE_TRACKING_KEY, REQUIRE_SQL_ANALYSIS_KEY, SHARED_POLICY_SETTINGS, SQL_ANALYSIS_KEY,
 };
 use crate::project::errors::{ConfigFailure, FailureClass, LoadFailure, MessagePiece};
 use crate::project::models::{
@@ -580,8 +580,7 @@ fn legacy_column_contract_mode(table: &ConfigValue) -> Option<bool> {
         .map(|(_, checked)| *checked)
 }
 
-/// `extra_paths`: project-relative entries the layout check allows, each relative and inside the
-/// project.
+/// `extra_paths`: the relative entries inside the project that the layout check allows.
 fn extra_paths(payload: &Entries) -> Loaded<Vec<String>> {
     let paths: Vec<String> = string_sequence(
         get(payload, EXTRA_PATHS_KEY),
@@ -594,7 +593,7 @@ fn extra_paths(payload: &Entries) -> Loaded<Vec<String>> {
         let normalized: String = path.replace('\\', "/");
         let escapes: bool = normalized.starts_with('/')
             || normalized.contains(':')
-            || normalized.split('/').any(|part| part == "..")
+            || normalized.split('/').any(|part| part == PARENT_SEGMENT)
             || normalized.trim_matches('/').is_empty();
         if escapes {
             return Err(ConfigFailure::at(

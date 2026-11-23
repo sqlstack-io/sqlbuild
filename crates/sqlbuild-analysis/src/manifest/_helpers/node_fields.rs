@@ -11,8 +11,7 @@ use crate::manifest::models::{
 };
 use crate::python_values::models::PythonValue;
 
-/// `[project, *relative_path.parent.parts, relative_path.stem]`, with the parts read below `sql/`
-/// so the name keeps the shape it had before resources moved into that folder.
+/// `[project, *relative_path.parent.parts, relative_path.stem]`, with the parts read below `sql/`.
 pub(crate) fn fqn(project_name: &str, path: &ManifestPathInput) -> PythonValue {
     let parents: &[String] = match path.parent_parts.split_first() {
         Some((first, rest)) if first == sqlbuild_core::constants::SQL_DIRECTORY => rest,

@@ -1554,6 +1554,9 @@ pub(crate) const CONNECTING_FUNCTIONS: [&str; 2] = ["connect", "create_pool"];
 pub(crate) const PACKAGE_INIT_MODULE: &str = "__init__";
 /// Fensu's scope for test files, the only scope its test rules check.
 pub(crate) const TEST_SCOPE: &str = "test";
+/// The project folders Python tests mirror, each below `tests/`.
+pub(crate) const MIRRORED_TEST_ROOTS: [&str; 3] =
+    ["python/nodes", "python/providers", "orchestration"];
 /// The prefix of a test module's file name; other files in a mirrored test folder need only the folder.
 pub(crate) const TEST_FILE_PREFIX: &str = "test_";
 /// The orchestration rules, which read sensor and calendar modules and their importers.

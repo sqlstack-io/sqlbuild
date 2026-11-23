@@ -40,3 +40,10 @@ pub const GETTERS: &[GetterEntry] = &[
         read: read_native_directory_snapshot,
     },
 ];
+/// The extra-paths line every D018 help ends with.
+pub(crate) const LAYOUT_EXTRA_PATHS_HELP: &str =
+    "or list it in extra_paths in sqlbuild_project.toml if it belongs here on purpose";
+/// The indent that lines a D018 help continuation up under the first help line.
+pub(crate) const LAYOUT_HELP_CONTINUATION: &str = "\n          ";
+/// The prefix of a further D018 help line.
+pub(crate) const LAYOUT_HELP_LINE: &str = "\n  = help: ";

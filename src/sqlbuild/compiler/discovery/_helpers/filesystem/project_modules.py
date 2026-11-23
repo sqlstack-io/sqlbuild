@@ -137,10 +137,7 @@ def validate_event_exporter_signature(
 
 
 def install_python_root_package(*, node_root: Path, project_dir: Path) -> dict[str, ModuleType]:
-    """Bind python to this project's python/ folder, dropping stale node modules.
-
-    Returns the unrelated modules the binding displaced, for `restore_python_root_modules`.
-    """
+    """Bind python to this project's python/ folder and return the unrelated modules displaced."""
 
     saved_modules: dict[str, ModuleType] = _ensure_python_package(project_dir=project_dir)
     nodes_package: str = ".".join(Path(PYTHON_NODE_ROOT).parts)
@@ -154,10 +151,7 @@ def install_python_root_package(*, node_root: Path, project_dir: Path) -> dict[s
 
 
 def _ensure_python_package(*, project_dir: Path) -> dict[str, ModuleType]:
-    """Bind python to `project_dir`'s python/ folder unless it already is.
-
-    A package already bound to this folder keeps its loaded modules.
-    """
+    """Bind python to `project_dir`'s python/ folder, keeping a binding already made to it."""
 
     package_root: Path = project_dir / PYTHON_PACKAGE_NAME
     existing: ModuleType | None = sys.modules.get(PYTHON_PACKAGE_NAME)

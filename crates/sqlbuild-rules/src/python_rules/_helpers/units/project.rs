@@ -80,11 +80,7 @@ fn unit_project(sources: &[PythonSource], python_version: (u8, u8)) -> UnitProje
             .collect(),
         node_modules: units
             .iter()
-            .flat_map(|unit| {
-                NODE_MODULES.iter().map(move |module| {
-                    format!("{PACKAGE_MODULE}.{}.{module}", unit.replace('/', "."))
-                })
-            })
+            .flat_map(|unit| unit_node_modules(unit))
             .collect(),
         files,
         units,
@@ -94,6 +90,15 @@ fn unit_project(sources: &[PythonSource], python_version: (u8, u8)) -> UnitProje
             .collect(),
         modules: project_modules(sources),
     }
+}
+
+/// The dotted modules of `unit`'s declaration files.
+fn unit_node_modules(unit: &str) -> Vec<String> {
+    let package: String = format!("{PACKAGE_MODULE}.{}", unit.replace('/', "."));
+    NODE_MODULES
+        .iter()
+        .map(|module| format!("{package}.{module}"))
+        .collect()
 }
 
 /// Every dotted module the project's Python files define, packages included.

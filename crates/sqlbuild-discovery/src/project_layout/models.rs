@@ -10,3 +10,11 @@ pub struct LayoutProblem {
     /// What that folder may hold, each folder with a trailing `/`.
     pub allowed: Vec<String>,
 }
+
+/// One folder the check reads and the entries it may hold.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Checked<'a> {
+    pub(crate) folder: Option<&'static str>,
+    pub(crate) directories: &'a [&'a str],
+    pub(crate) files: &'a [&'a str],
+}

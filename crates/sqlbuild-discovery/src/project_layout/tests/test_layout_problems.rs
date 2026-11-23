@@ -27,9 +27,9 @@ fn given_project_entries_when_checking_layout_then_only_unexpected_entries_are_r
                 ".env",
             ],
             folders: &["orchestration", "target", "logs", ".agents", "__pycache__"],
-            gitignore: None,
+            gitignore: "",
             extra_paths: &[],
-            expected: &[],
+            expected_paths: &[],
         },
         LayoutTestCase {
             description: "unknown entries at every checked level",
@@ -45,9 +45,9 @@ fn given_project_entries_when_checking_layout_then_only_unexpected_entries_are_r
                 "python/nodes/deep/unchecked/thing.json",
             ],
             folders: &[],
-            gitignore: None,
+            gitignore: "",
             extra_paths: &[],
-            expected: &[
+            expected_paths: &[
                 "migrations/",
                 "models/",
                 "notes.txt",
@@ -67,9 +67,9 @@ fn given_project_entries_when_checking_layout_then_only_unexpected_entries_are_r
                 "build.log",
             ],
             folders: &["data"],
-            gitignore: Some("scratch/\n*.log\n"),
+            gitignore: "scratch/\n*.log\n",
             extra_paths: &["migrations/", "sql/notes", "data"],
-            expected: &[],
+            expected_paths: &[],
         },
     ];
     for test_case in test_cases {
@@ -89,9 +89,7 @@ fn given_project_entries_when_checking_layout_then_only_unexpected_entries_are_r
         for folder in test_case.folders {
             let _ = fs::create_dir_all(directory.join(folder));
         }
-        if let Some(rules) = test_case.gitignore {
-            let _ = fs::write(directory.join(".gitignore"), rules);
-        }
+        let _ = fs::write(directory.join(".gitignore"), test_case.gitignore);
         let extra: Vec<String> = test_case
             .extra_paths
             .iter()
@@ -102,6 +100,10 @@ fn given_project_entries_when_checking_layout_then_only_unexpected_entries_are_r
             .map(|problem| problem.path)
             .collect();
         let _ = fs::remove_dir_all(&directory);
-        assert_eq!(reported, test_case.expected, "{}", test_case.description);
+        assert_eq!(
+            reported, test_case.expected_paths,
+            "{}",
+            test_case.description
+        );
     }
 }

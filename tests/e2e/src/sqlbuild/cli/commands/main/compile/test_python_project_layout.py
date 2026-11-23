@@ -17,6 +17,14 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
 from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import orders_job_project
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
+_LAYOUT_CONFIG: str = 'name = "python_layout"\nadapter = "duckdb"\n'
+_ASSET_MODULE: str = (
+    "from sqlbuild.assets import asset\n\n\n"
+    "@asset\n"
+    "def orders(ctx):\n"
+    "    '''Test task orders.'''\n    return None\n"
+)
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -590,15 +598,6 @@ def test_given_unrelated_python_package_on_path_when_building_then_project_pytho
     output: str = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert all(fragment in output for fragment in test_case.expected_build_fragments)
-
-
-_LAYOUT_CONFIG: str = 'name = "python_layout"\nadapter = "duckdb"\n'
-_ASSET_MODULE: str = (
-    "from sqlbuild.assets import asset\n\n\n"
-    "@asset\n"
-    "def orders(ctx):\n"
-    "    '''Test task orders.'''\n    return None\n"
-)
 
 
 @pytest.mark.parametrize(

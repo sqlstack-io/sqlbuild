@@ -1,24 +1,6 @@
 use crate::node_files::main::node_file_problems::node_file_problems;
-use crate::node_files::models::NodeModule;
+use crate::node_files::tests::helpers::module;
 use crate::node_files::tests::test_types::NodeFilesTestCase;
-
-fn module(
-    path: &str,
-    direct: &[(&str, &'static str)],
-    factories: &[(&str, &[&'static str])],
-) -> NodeModule {
-    NodeModule {
-        relative_path: path.to_owned(),
-        direct: direct
-            .iter()
-            .map(|(name, kind)| ((*name).to_owned(), *kind))
-            .collect(),
-        factories: factories
-            .iter()
-            .map(|(name, kinds)| ((*name).to_owned(), kinds.to_vec()))
-            .collect(),
-    }
-}
 
 #[test]
 fn given_node_modules_when_checking_file_names_then_each_declaration_sits_in_its_kind_file() {
@@ -48,7 +30,7 @@ fn given_node_modules_when_checking_file_names_then_each_declaration_sits_in_its
                 ),
                 module("python/nodes/sales/helpers.py", &[], &[]),
             ],
-            expected: None,
+            expected_problem: None,
         },
         NodeFilesTestCase {
             description: "an asset in node.py",
@@ -57,7 +39,7 @@ fn given_node_modules_when_checking_file_names_then_each_declaration_sits_in_its
                 &[("orders", "asset")],
                 &[],
             )],
-            expected: Some(
+            expected_problem: Some(
                 "@asset 'orders' is declared in python/nodes/sales/orders/node.py; an @asset is \
                  declared in asset.py",
             ),
@@ -69,7 +51,7 @@ fn given_node_modules_when_checking_file_names_then_each_declaration_sits_in_its
                 &[("x", "asset")],
                 &[],
             )],
-            expected: Some(
+            expected_problem: Some(
                 "@asset 'x' is declared in python/nodes/raw/x/loader.py; an @asset is declared in \
                  asset.py",
             ),
@@ -81,7 +63,7 @@ fn given_node_modules_when_checking_file_names_then_each_declaration_sits_in_its
                 &[],
                 &[("make", &["asset"])],
             )],
-            expected: Some(
+            expected_problem: Some(
                 "@factory 'make' in python/nodes/raw/x/loaders.py makes only assets; a factory \
                  that makes only assets is declared in assets.py",
             ),
@@ -93,7 +75,7 @@ fn given_node_modules_when_checking_file_names_then_each_declaration_sits_in_its
                 &[],
                 &[("make", &["loader"])],
             )],
-            expected: Some(
+            expected_problem: Some(
                 "@factory 'make' in python/nodes/raw/x/factory.py makes only loaders; a factory \
                  that makes only loaders is declared in loaders.py",
             ),
@@ -105,7 +87,7 @@ fn given_node_modules_when_checking_file_names_then_each_declaration_sits_in_its
                 &[],
                 &[("make", &["asset", "check"])],
             )],
-            expected: Some(
+            expected_problem: Some(
                 "@factory 'make' in python/nodes/raw/x/assets.py makes assets and checks; a \
                  factory that makes more than one kind is declared in factory.py",
             ),
@@ -117,7 +99,7 @@ fn given_node_modules_when_checking_file_names_then_each_declaration_sits_in_its
                 &[("a", "asset"), ("b", "asset")],
                 &[],
             )],
-            expected: Some(
+            expected_problem: Some(
                 "python/nodes/s/o/asset.py declares 2 nodes (a, b); asset.py declares exactly \
                  one, so give each its own unit folder or use a factory",
             ),
@@ -128,7 +110,7 @@ fn given_node_modules_when_checking_file_names_then_each_declaration_sits_in_its
                 module("python/nodes/s/o/asset.py", &[("a", "asset")], &[]),
                 module("python/nodes/s/o/loader.py", &[("b", "loader")], &[]),
             ],
-            expected: Some(
+            expected_problem: Some(
                 "python/nodes/s/o/ holds asset.py and loader.py; a unit folder holds one node \
                  declaration file, plus checks.py",
             ),
@@ -137,7 +119,7 @@ fn given_node_modules_when_checking_file_names_then_each_declaration_sits_in_its
     for test_case in test_cases {
         assert_eq!(
             node_file_problems(&test_case.modules).as_deref(),
-            test_case.expected,
+            test_case.expected_problem,
             "{}",
             test_case.description
         );
