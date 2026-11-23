@@ -7,6 +7,20 @@ use crate::run_output::tests::test_types::{OutputDefaultTestCase, OutputLocation
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
+/// A filesystem root, so a case's `/`-led path is absolute on this platform too.
+#[cfg(windows)]
+const ROOT: &str = "C:\\";
+#[cfg(not(windows))]
+const ROOT: &str = "/";
+
+/// The case's path, with a leading `/` read as this platform's root.
+fn platform_path(path: &str) -> std::path::PathBuf {
+    path.strip_prefix('/').map_or_else(
+        || std::path::PathBuf::from(path),
+        |rest| std::path::Path::new(ROOT).join(rest),
+    )
+}
+
 #[test]
 fn given_a_users_folders_when_no_store_is_set_then_the_default_never_depends_on_the_working_directory()
  {
@@ -86,12 +100,14 @@ fn given_a_users_folders_when_no_store_is_set_then_the_default_never_depends_on_
                 .map(|directory| directory.path().canonicalize().expect("store folder"))
                 .unwrap_or_default();
             let folders = (
-                test_case.state_home.map(std::path::PathBuf::from),
-                test_case.home.map(std::path::PathBuf::from),
+                test_case.state_home.map(platform_path),
+                test_case.home.map(platform_path),
             );
             assert_eq!(
                 default_folder(&fixture.store, folders).ok(),
-                test_case.expected_folder.map(|folder| beside.join(folder)),
+                test_case
+                    .expected_folder
+                    .map(|folder| beside.join(platform_path(folder))),
                 "{}",
                 test_case.description
             );
