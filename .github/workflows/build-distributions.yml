@@ -145,9 +145,8 @@ jobs:
     name: Build wheel (${{ matrix.platform.name }})
     needs: source
     runs-on: ${{ matrix.platform.runner }}
-    # Cold dist builds take up to about 2x the 17-31 minute release-profile jobs on Windows and macOS,
-    # and a cold macOS arm64 dist build has taken an hour.
-    timeout-minutes: 150
+    # Release-profile wheel jobs take about 20-40 minutes; the limit leaves room for a slow runner.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
