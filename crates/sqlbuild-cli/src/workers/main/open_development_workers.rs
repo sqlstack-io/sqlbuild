@@ -11,7 +11,7 @@ pub(crate) fn open_development_workers(
     (location_id, target): (Uuid, String),
     project_dir: PathBuf,
     executable: PathBuf,
-    server_url: String,
+    (server_url, written): (String, Vec<(&'static str, PathBuf)>),
 ) -> Result<Workers, ControlError> {
     Ok(Workers {
         configuration: Launchers {
@@ -24,6 +24,7 @@ pub(crate) fn open_development_workers(
                 project_dir,
                 executable,
                 pool_caps: Default::default(),
+                written,
             }],
             docker: Vec::new(),
         },

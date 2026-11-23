@@ -41,6 +41,7 @@ use crate::native_commands::_helpers::location::dev_exposure::{
 use crate::native_commands::_helpers::location::dev_supervision::{
     DevRoles, supervise_development_roles,
 };
+use crate::native_commands::_helpers::location::development_written::development_written;
 use crate::native_commands::_helpers::location::dynamic_resume::resume_expired_holds;
 use crate::native_commands::_helpers::location::env_reload::env_file_summary;
 use crate::native_commands::_helpers::location::provider_secrets::report_provider_secrets;
@@ -55,7 +56,9 @@ use crate::native_commands::constants::{
     METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS,
     UNKNOWN_COMMAND,
 };
-use crate::native_commands::constants::{DEVELOPMENT_OUTPUT_FOLDER, PLAN_NOT_PRODUCED};
+use crate::native_commands::constants::{
+    DEVELOPMENT_CONTROL_FILE, DEVELOPMENT_OUTPUT_FOLDER, PLAN_NOT_PRODUCED,
+};
 use crate::native_commands::constants::{OPENING_STORE, STORE_READY};
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
@@ -168,11 +171,13 @@ pub(crate) async fn run_development_roles(
     let opened_to: Option<String> = exposure(listening, &scope);
     let location_id = scope.location_id;
     let target = scope.target.clone();
+    let output: OutputStore = open_output_store(&OutputSettings::default(), &store)?;
+    let written: Vec<(&'static str, PathBuf)> = development_written(&store, output.local_folder())?;
     let workers = open_development_workers(
         (location_id, target.clone()),
         project.clone(),
         executable.clone(),
-        url.clone(),
+        (url.clone(), written.clone()),
     )?;
     let (stop, shutdown) = watch::channel(false);
     let mut roles: DevRoles = DevRoles::default();
@@ -181,7 +186,6 @@ pub(crate) async fn run_development_roles(
         detail: String::new(),
     }));
     let api_ready = messages.clone();
-    let output: OutputStore = open_output_store(&OutputSettings::default(), &store)?;
     roles.spawn(
         Some("UI server"),
         serve_api(
@@ -218,7 +222,7 @@ pub(crate) async fn run_development_roles(
     let (location, pipes) = development_location_role(
         (&project, &executable),
         (location_id, &target),
-        (&url, &store, output.local_folder()),
+        (&url, &written),
         shutdown.clone(),
     )?;
     roles.spawn(Some("code location"), location);
@@ -286,7 +290,7 @@ async fn development_stopped(mut shutdown: watch::Receiver<bool>) {
 fn development_location_role(
     (project, executable): (&Path, &Path),
     (location_id, target): (Uuid, &str),
-    (url, store, output): (&str, &ControlStore, Option<&Path>),
+    (url, written): (&str, &[(&'static str, PathBuf)]),
     shutdown: watch::Receiver<bool>,
 ) -> Result<
     (
@@ -315,7 +319,7 @@ fn development_location_role(
         .env_remove("SQLBUILD_PLATFORM_WEBHOOK_URL")
         .env_remove(SECURITY_AUDIT_WEBHOOK_VARIABLE)
         .env_remove(RUN_TOKEN_VARIABLE)
-        .env_remove("SQLBUILD_DEVELOPMENT_CONTROL_FILE")
+        .env_remove(DEVELOPMENT_CONTROL_FILE)
         .env_remove(DEVELOPMENT_OUTPUT_FOLDER)
         .env(DEV_EVENTS_VARIABLE, DEV_EVENTS_ON)
         .stdin(Stdio::piped())
@@ -324,15 +328,7 @@ fn development_location_role(
         .kill_on_drop(true);
     #[cfg(unix)]
     command.process_group(0);
-    if let ControlStore::Sqlite(path) = store {
-        command.env(
-            "SQLBUILD_DEVELOPMENT_CONTROL_FILE",
-            std::env::current_dir()?.join(path),
-        );
-    }
-    if let Some(folder) = output {
-        command.env(DEVELOPMENT_OUTPUT_FOLDER, folder);
-    }
+    command.envs(written.iter().cloned());
     let mut child = command.spawn()?;
     let group: Option<u32> = child.id();
     if let Some(group) = group {

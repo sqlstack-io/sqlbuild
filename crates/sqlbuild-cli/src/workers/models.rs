@@ -66,6 +66,9 @@ pub(super) struct LocalLauncher {
     /// Lowers a project's pool limits for this location and target; never raises them.
     #[serde(default)]
     pub(super) pool_caps: BTreeMap<String, NonZeroU32>,
+    /// What `sqb dev` hands each worker about the files it writes inside the project.
+    #[serde(skip)]
+    pub(super) written: Vec<(&'static str, PathBuf)>,
 }
 
 /// The installation chooses the daemon and location container; the snapshot pins the worker image.

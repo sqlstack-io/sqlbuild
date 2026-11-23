@@ -269,4 +269,8 @@ pub(crate) const REPUBLISH_POLL_SECONDS: u64 = 10;
 pub(crate) const REPUBLISH_TIMEOUT_SECONDS: u64 = 600;
 
 /// How `sqb dev` hands its location the resolved folder of run output, which the watch leaves out.
-pub(crate) const DEVELOPMENT_OUTPUT_FOLDER: &str = "SQLBUILD_DEVELOPMENT_OUTPUT_FOLDER";
+pub(crate) const DEVELOPMENT_OUTPUT_FOLDER: &str =
+    sqlbuild_core::constants::DEVELOPMENT_OUTPUT_FOLDER_ENV;
+/// How `sqb dev` hands its location the SQLite control store file, which the watch leaves out.
+pub(crate) const DEVELOPMENT_CONTROL_FILE: &str =
+    sqlbuild_core::constants::DEVELOPMENT_CONTROL_FILE_ENV;

@@ -141,3 +141,7 @@ pub const STATE_TABLE_NAMES: [&str; 14] = [
 pub const ZERO_DAY_DURATION: &str = "0d";
 /// Node key of a common table expression in the polyglot SQL AST.
 pub const CTE_AST_KIND: &str = "cte";
+/// How `sqb dev` hands its location the SQLite control store file it writes.
+pub const DEVELOPMENT_CONTROL_FILE_ENV: &str = "SQLBUILD_DEVELOPMENT_CONTROL_FILE";
+/// How `sqb dev` hands its location the folder it writes run output to.
+pub const DEVELOPMENT_OUTPUT_FOLDER_ENV: &str = "SQLBUILD_DEVELOPMENT_OUTPUT_FOLDER";

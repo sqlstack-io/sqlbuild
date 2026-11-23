@@ -933,6 +933,10 @@ These entries are always allowed:
 - local database files at the top level, ending in `.duckdb`, `.db`, `.sqlite` or `.sqlite3`, and
   the write-ahead log, shared-memory and journal files beside them (ending in `.wal`, `-wal`,
   `-shm` or `-journal`), such as `warehouse.duckdb` and `warehouse.duckdb.wal`;
+- Python dependency files at the top level: `pyproject.toml`, `uv.lock`, `poetry.lock`, `pdm.lock`,
+  `Pipfile.lock` and `requirements*.txt`;
+- the control store file and the run output folder `sqb dev` writes, when they are inside the
+  project;
 - anything the project's `.gitignore` files ignore, read from the project directory up to the
   repository root, with the repository's `.git/info/exclude`.
 

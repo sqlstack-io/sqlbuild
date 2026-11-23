@@ -71,6 +71,24 @@ fn given_project_entries_when_checking_layout_then_only_unexpected_entries_are_r
             extra_paths: &["migrations/", "sql/notes", "data"],
             expected_paths: &[],
         },
+        LayoutTestCase {
+            description: "Python dependency manifests and lock files are allowed at the top level",
+            files: &[
+                "sqlbuild_project.toml",
+                "pyproject.toml",
+                "uv.lock",
+                "poetry.lock",
+                "pdm.lock",
+                "Pipfile.lock",
+                "requirements.txt",
+                "requirements-dev.txt",
+                "sql/uv.lock",
+            ],
+            folders: &[],
+            gitignore: "",
+            extra_paths: &[],
+            expected_paths: &["sql/uv.lock"],
+        },
     ];
     for test_case in test_cases {
         let directory = std::env::temp_dir().join(format!(

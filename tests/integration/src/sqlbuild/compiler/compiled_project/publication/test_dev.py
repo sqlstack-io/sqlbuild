@@ -101,8 +101,6 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
         files=TYPE_PROOF_FILES
         | {
             "sqlbuild_project.toml": 'default_target = "development"\n'
-            # A control store inside the project writes its run output beside it.
-            + 'extra_paths = ["output/"]\n'
             + TYPE_PROOF_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '[targets.development]\nschema = "main"\n',

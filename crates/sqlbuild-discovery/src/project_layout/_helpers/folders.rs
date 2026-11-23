@@ -3,6 +3,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use sqlbuild_core::git_revisions::main::is_dependency_file::is_dependency_file;
+
 use crate::project_layout::_helpers::ignored::IgnoreRules;
 use crate::project_layout::constants::{
     DATABASE_COMPANION_SUFFIXES, DATABASE_FILE_SUFFIXES, HIDDEN_PREFIX, OUTPUT_DIRECTORIES,
@@ -54,7 +56,7 @@ pub(crate) fn folder_problems(
     problems
 }
 
-/// Hidden entries, bytecode caches, and top-level output folders and local database files.
+/// Hidden entries, bytecode caches, top-level output folders, database and Python dependency files.
 fn always_allowed(folder: Option<&str>, name: &str, is_dir: bool) -> bool {
     if name.starts_with(HIDDEN_PREFIX) || name == PYTHON_CACHE_DIRECTORY {
         return true;
@@ -65,7 +67,7 @@ fn always_allowed(folder: Option<&str>, name: &str, is_dir: bool) -> bool {
     if is_dir {
         OUTPUT_DIRECTORIES.contains(&name)
     } else {
-        is_database_file(name)
+        is_database_file(name) || is_dependency_file(name)
     }
 }
 
