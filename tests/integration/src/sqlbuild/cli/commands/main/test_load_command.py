@@ -3679,7 +3679,7 @@ sources:
                     "import threading\n"
                     "import time\n"
                     "from sqlbuild.loaders import loader\n"
-                    "barrier = threading.Barrier(2)\n"
+                    "from python.nodes.loaders.raw._sync import barrier\n"
                     "\n"
                     "\n"
                     "@loader\n"
@@ -3693,7 +3693,7 @@ sources:
                     "import threading\n"
                     "import time\n"
                     "from sqlbuild.loaders import loader\n"
-                    "barrier = threading.Barrier(2)\n"
+                    "from python.nodes.loaders.raw._sync import barrier\n"
                     "\n"
                     "\n"
                     "@loader\n"
@@ -3706,13 +3706,16 @@ sources:
                     "import threading\n"
                     "import time\n"
                     "from sqlbuild.loaders import loader\n"
-                    "barrier = threading.Barrier(2)\n"
+                    "from python.nodes.loaders.raw._sync import barrier\n"
                     "\n"
                     "\n"
                     "@loader\n"
                     "def raw_c(ctx):\n"
                     "    '''Test loader raw_c.'''\n"
                     '    return [{"source_name": "raw_c", "connection_id": id(ctx.connection)}]\n'
+                ),
+                "python/nodes/loaders/raw/_sync.py": (
+                    "import threading\n\nbarrier = threading.Barrier(2)\n"
                 ),
                 "python/nodes/loaders/raw/__init__.py": (
                     "from .raw_a.loader import raw_a\n"
@@ -3802,9 +3805,7 @@ sources:
                     "import threading\n"
                     "import time\n"
                     "from sqlbuild.loaders import loader\n"
-                    "barrier = threading.Barrier(2)\n"
-                    "finished = set()\n"
-                    "lock = threading.Lock()\n"
+                    "from python.nodes.loaders.raw._sync import barrier, finished, lock\n"
                     "\n"
                     "\n"
                     "@loader(write_strategy='table', columns=[{'name': 'id', 'type': 'INTEGER'}])\n"
@@ -3820,9 +3821,7 @@ sources:
                     "import threading\n"
                     "import time\n"
                     "from sqlbuild.loaders import loader\n"
-                    "barrier = threading.Barrier(2)\n"
-                    "finished = set()\n"
-                    "lock = threading.Lock()\n"
+                    "from python.nodes.loaders.raw._sync import barrier, finished, lock\n"
                     "\n"
                     "\n"
                     "@loader(write_strategy='table', columns=[{'name': 'id', 'type': 'INTEGER'}])\n"
@@ -3837,9 +3836,7 @@ sources:
                     "import threading\n"
                     "import time\n"
                     "from sqlbuild.loaders import loader\n"
-                    "barrier = threading.Barrier(2)\n"
-                    "finished = set()\n"
-                    "lock = threading.Lock()\n"
+                    "from python.nodes.loaders.raw._sync import barrier, finished, lock\n"
                     "from python.nodes.loaders.raw.fetch_a.loader import fetch_a\n"
                     "from python.nodes.loaders.raw.fetch_b.loader import fetch_b\n"
                     "\n"
@@ -3848,6 +3845,11 @@ sources:
                     "def raw_join(ctx):\n"
                     "    '''Test loader raw_join.'''\n"
                     "    return [{'upstream_count': len(finished)}]\n"
+                ),
+                "python/nodes/loaders/raw/_sync.py": (
+                    "import threading\n\nbarrier = threading.Barrier(2)\n"
+                    "finished = set()\n"
+                    "lock = threading.Lock()\n"
                 ),
                 "python/nodes/loaders/raw/__init__.py": (
                     "from .fetch_a.loader import fetch_a\n"

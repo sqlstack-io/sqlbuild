@@ -167,9 +167,11 @@ def test_given_an_item_naming_what_the_project_lacks_when_publishing_then_only_i
             (project / "sql/models/orders.sql").write_text(
                 "MODEL (description 'Orders.');\nSELECT 2 AS order_id\n"
             )
-            (project / "python/nodes/plan/nodes.py").write_text(
-                _PLAN.format(dependency=test_case.then)
+            edited: dict[str, str] = node_module_files(
+                "python/nodes/plan/nodes.py", _PLAN.format(dependency=test_case.then)
             )
+            for path, text in edited.items():
+                (project / path).write_text(text)
             for removed in test_case.removed:
                 (project / removed).unlink()
             published: dict[str, Any] = wait_for_generation(api, "development", 2, process, log)

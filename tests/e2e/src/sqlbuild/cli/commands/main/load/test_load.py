@@ -696,7 +696,10 @@ def test_given_source_loader_reads_unselected_task_payload_when_loading_then_run
     test_case: SourceOnlyComplexIngressE2ETestCase,
 ) -> None:
     assert test_case.expected_error_fragment is not None
-    dependency_file: str = f"python/nodes/{test_case.dependency_dir}/prepare.py"
+    dependency_module: str = (
+        f"python.nodes.{test_case.dependency_dir}.prepare_events.{test_case.decorator_name}"
+    )
+    dependency_file: str = f"{dependency_module.replace('.', '/')}.py"
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,
         project_name="source_loader_schema_behavior",
@@ -715,7 +718,7 @@ def test_given_source_loader_reads_unselected_task_payload_when_loading_then_run
                     **node_module_files(
                         "python/nodes/loaders/source_rows.py",
                         "from sqlbuild.loaders import loader\n"
-                        f"from python.nodes.{test_case.dependency_dir}.prepare import prepare_events\n\n"
+                        f"from {dependency_module} import prepare_events\n\n"
                         "@loader(depends_on=[prepare_events])\n"
                         "def raw_events(ctx):\n"
                         "    '''Test loader raw_events.'''\n    payload = "
