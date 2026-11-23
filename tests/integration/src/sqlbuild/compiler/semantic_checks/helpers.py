@@ -168,7 +168,7 @@ def generated_semantic_files(
             'name = "orders_semantics"\nadapter = "duckdb"\n\n[connection]\n'
             f'database = "orders.duckdb"\n{settings}'
         ),
-        "sources/raw.yml": _SOURCES,
+        "sql/sources/raw.yml": _SOURCES,
     }
     relations: list[tuple[str, tuple[str, ...]]] = list(_RELATIONS.items())
     for index in range(model_count):
@@ -176,7 +176,7 @@ def generated_semantic_files(
         sql, outputs = _TEMPLATES[index % len(_TEMPLATES)](rng, relation, columns)
         name: str = f"orders_model_{index}"
         opt_out: str = _OPT_OUTS[rng.random() < _OPT_OUT_SHARE]
-        files[f"models/layer_{index % 3}/{name}.sql"] = (
+        files[f"sql/models/layer_{index % 3}/{name}.sql"] = (
             f'MODEL (description "Generated orders model {index}"{opt_out});\n\n{sql}\n'
         )
         relations.append((f'__ref("{name}")', outputs))
@@ -226,7 +226,7 @@ def one_model_completion(
     files: dict[str, str] = generated_semantic_files(
         rng=random.Random(0), model_count=0, require_analysis=True
     )
-    files["models/probe.sql"] = f'MODEL (description "Probe");\n\n{sql}\n'
+    files["sql/models/probe.sql"] = f'MODEL (description "Probe");\n\n{sql}\n'
     native: CompiledProjectView = completed_natively(
         captured_under_dialect(project_dir=project_dir, files=files, dialect=dialect)
     )
@@ -245,7 +245,7 @@ def model_findings(
         rng=random.Random(0), model_count=0, require_analysis=True
     )
     for name, sql in models.items():
-        files[f"models/{name}.sql"] = f'MODEL (description "{name}");\n\n{sql}\n'
+        files[f"sql/models/{name}.sql"] = f'MODEL (description "{name}");\n\n{sql}\n'
     native: CompiledProjectView = completed_natively(
         captured_under_dialect(project_dir=project_dir, files=files, dialect=dialect)
     )
@@ -547,11 +547,11 @@ def generated_metadata_files(*, rng: random.Random, model_count: int) -> dict[st
             'name = "orders_metadata"\nadapter = "duckdb"\n\n[connection]\n'
             'database = "orders.duckdb"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Orders feed.\n"
             f"{_SOURCE_SQL}{columns}{_LOADED_SOURCE.format(cursor=rng.choice(_LOADED_CURSORS))}"
         ),
-        "python/loaders/raw_events.py": _LOADER,
+        "python/nodes/loaders/raw_events/loader.py": _LOADER,
         "tests/unit/test_orders_model_0.sql": (
             "TEST();\n\nWITH\n__source__raw_orders AS (\n"
             "  SELECT 1 AS order_id, 10 AS customer_id, CAST(5 AS DOUBLE) AS amount,"
@@ -562,12 +562,12 @@ def generated_metadata_files(*, rng: random.Random, model_count: int) -> dict[st
         ),
     }
     for name in _FUNCTIONS:
-        files[f"functions/sql/{name}.sql"] = _function_file(name)
+        files[f"sql/functions/sql/{name}.sql"] = _function_file(name)
     relations: list[_Relation] = [('__source("raw_orders")', "", _SOURCE_COLUMNS)]
     for index in range(model_count):
         relation: _Relation = rng.choice(relations)
         name: str = f"orders_model_{index}"
-        files[f"models/layer_{index % 3}/{name}.sql"] = (
+        files[f"sql/models/layer_{index % 3}/{name}.sql"] = (
             f'MODEL (\n  description "Generated orders model {index}",\n'
             f"{_header(rng, index, relation)});\n\n{_query(rng, relation)}\n"
         )

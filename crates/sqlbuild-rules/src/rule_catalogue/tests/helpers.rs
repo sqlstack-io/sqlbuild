@@ -58,7 +58,7 @@ pub(crate) fn overridden_config() -> RulesConfig {
     RulesConfig {
         thresholds: BTreeMap::from([("min_tests_per_model".into(), 3)]),
         threshold_overrides: vec![ThresholdOverride {
-            paths: vec!["models/a".into()],
+            paths: vec!["sql/models/a".into()],
             thresholds: BTreeMap::from([("min_audits_per_model".into(), 2)]),
             reason: "Critical.".into(),
         }],

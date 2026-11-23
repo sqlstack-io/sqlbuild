@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "SQL function functions/sql/order_label.sql return type type 'DECIMAL(10,' is not valid for adapter 'duckdb' SQL analysis dialect 'duckdb': Parse error at line 1, column 12: Expected number"
+     "message": "SQL function sql/functions/sql/order_label.sql return type type 'DECIMAL(10,' is not valid for adapter 'duckdb' SQL analysis dialect 'duckdb': Parse error at line 1, column 12: Expected number"
     }
    ]
   }

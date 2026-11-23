@@ -102,14 +102,17 @@ _CONTRACT_ERROR_MODEL: str = (
         CompileReuseInvalidationTestCase(
             description="model_sql_edit",
             edit=lambda root: replace_project_text(
-                root, "models/staging/stg_orders.sql", "  quantity,", "  quantity + 0 AS quantity,"
+                root,
+                "sql/models/staging/stg_orders.sql",
+                "  quantity,",
+                "  quantity + 0 AS quantity,",
             ),
         ),
         CompileReuseInvalidationTestCase(
             description="model_reference_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "models/marts/referenced_orders.sql",
+                "sql/models/marts/referenced_orders.sql",
                 '__ref("stg_orders")',
                 '__ref("regional_orders")',
             ),
@@ -118,7 +121,7 @@ _CONTRACT_ERROR_MODEL: str = (
             description="macro_built_reference_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "models/marts/_sqlbuild/_macros/python/order_source.py",
+                "sql/models/marts/_sqlbuild/_macros/python/order_source.py",
                 '"stg_orders"',
                 '"regional_orders"',
             ),
@@ -131,20 +134,20 @@ _CONTRACT_ERROR_MODEL: str = (
             description="model_added",
             edit=lambda root: write_project_file(
                 root,
-                "models/marts/order_quantities.sql",
+                "sql/models/marts/order_quantities.sql",
                 "MODEL (description 'Order quantities.');\n\n"
                 'SELECT order_id, quantity FROM __ref("stg_orders")\n',
             ),
         ),
         CompileReuseInvalidationTestCase(
             description="model_deleted",
-            edit=lambda root: (root / "models/marts/regional_orders.sql").unlink(),
+            edit=lambda root: (root / "sql/models/marts/regional_orders.sql").unlink(),
         ),
         CompileReuseInvalidationTestCase(
             description="source_yaml_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "sources/raw.yml",
+                "sql/sources/raw.yml",
                 "      - name: quantity\n        type: INTEGER",
                 "      - name: quantity\n        type: BIGINT",
             ),
@@ -152,14 +155,14 @@ _CONTRACT_ERROR_MODEL: str = (
         CompileReuseInvalidationTestCase(
             description="seed_csv_edit",
             edit=lambda root: replace_project_text(
-                root, "seeds/waffle_types.csv", "Classic Belgian", "Classic Brussels"
+                root, "sql/seeds/waffle_types.csv", "Classic Belgian", "Classic Brussels"
             ),
         ),
         CompileReuseInvalidationTestCase(
             description="macro_file_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "macros/python/currency.py",
+                "sql/macros/python/currency.py",
                 "{price_cents} * {quantity}",
                 "{quantity} * {price_cents}",
             ),
@@ -167,14 +170,14 @@ _CONTRACT_ERROR_MODEL: str = (
         CompileReuseInvalidationTestCase(
             description="module_imported_by_macro_edit",
             edit=lambda root: replace_project_text(
-                root, "macros/python/_rounding.py", "_SCALE: int = 2", "_SCALE: int = 3"
+                root, "sql/macros/python/_rounding.py", "_SCALE: int = 2", "_SCALE: int = 3"
             ),
         ),
         CompileReuseInvalidationTestCase(
             description="scoped_macro_edit",
             edit=lambda root: replace_project_text(
                 root,
-                "models/marts/_sqlbuild/_macros/python/currency.py",
+                "sql/models/marts/_sqlbuild/_macros/python/currency.py",
                 'return f"ROUND(({column}) / 100.0, 2)"',
                 'return f"ROUND(({column}) / 100.0, 3)"',
             ),
@@ -182,7 +185,10 @@ _CONTRACT_ERROR_MODEL: str = (
         CompileReuseInvalidationTestCase(
             description="enum_declaration_edit",
             edit=lambda root: replace_project_text(
-                root, "models/marts/_sqlbuild/_enums/order_channel.sql", 'WEB "web"', 'WEB "online"'
+                root,
+                "sql/models/marts/_sqlbuild/_enums/order_channel.sql",
+                'WEB "web"',
+                'WEB "online"',
             ),
         ),
         CompileReuseInvalidationTestCase(
@@ -234,14 +240,17 @@ _CONTRACT_ERROR_MODEL: str = (
         CompileReuseInvalidationTestCase(
             description="contract_error_replayed_as_failure",
             edit=lambda root: write_project_file(
-                root, "models/marts/order_contract.sql", _CONTRACT_ERROR_MODEL
+                root, "sql/models/marts/order_contract.sql", _CONTRACT_ERROR_MODEL
             ),
             expected_returncode=1,
         ),
         CompileReuseInvalidationTestCase(
             description="stopped_compile_is_never_replayed",
             edit=lambda root: replace_project_text(
-                root, "models/staging/stg_orders.sql", "materialized view,", "materialized view,,(("
+                root,
+                "sql/models/staging/stg_orders.sql",
+                "materialized view,",
+                "materialized view,,((",
             ),
             expected_returncode=1,
             expected_rewarm_hit=False,
@@ -404,7 +413,7 @@ def test_given_timestamp_only_change_when_it_repeats_then_the_known_content_is_r
             description="model_reads_run_id",
             edit=lambda root: write_project_file(
                 root,
-                "models/marts/stamped_orders.sql",
+                "sql/models/marts/stamped_orders.sql",
                 "MODEL (description 'Orders stamped by run ${CTX:run.id}.');\n\n"
                 'SELECT order_id FROM __ref("stg_orders")\n',
             ),

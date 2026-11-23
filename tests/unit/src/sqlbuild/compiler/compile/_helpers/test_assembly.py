@@ -38,6 +38,7 @@ from tests.unit.src.sqlbuild.compiler.compile._helpers.helpers import (
 from tests.unit.src.sqlbuild.compiler.compile._test_helpers import (
     base_repo_files,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 if TYPE_CHECKING:
     from sqlbuild._native import CompileInputsView
@@ -62,7 +63,7 @@ materialized = "table"
 schema = "analytics"
 """.strip()
                 + "\n",
-                "models/staging/orders.sql": """
+                "sql/models/staging/orders.sql": """
 MODEL (description "Test model orders.",
   columns (
     order_id (type VARCHAR),
@@ -73,7 +74,7 @@ MODEL (description "Test model orders.",
 select * from __source("raw_orders")
 """.strip()
                 + "\n",
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -81,7 +82,7 @@ sources:
     table: orders
 """.strip()
                 + "\n",
-                "seeds/schema.yml": """
+                "sql/seeds/schema.yml": """
 seeds:
   - name: country_codes
     description: Test seed country_codes.
@@ -90,8 +91,8 @@ seeds:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "seeds/country_codes.csv": "code\nUS\n",
-                "models/staging/_sqlbuild/_audits/generic/not_null.sql": "AUDIT ();\n\n"
+                "sql/seeds/country_codes.csv": "code\nUS\n",
+                "sql/models/staging/_sqlbuild/_audits/generic/not_null.sql": "AUDIT ();\n\n"
                 'SELECT @column FROM __ref("@model") WHERE @column IS NULL\n',
                 "tests/unit/orders_test.sql": """
 TEST ();
@@ -139,8 +140,8 @@ SELECT 1
             repo_files=base_repo_files()
             | {
                 "sqlbuild_project.toml": 'name = "demo"\nadapter = "duckdb"\n',
-                "models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS order_id\n",
-                "seeds/schema.yml": """
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS order_id\n",
+                "sql/seeds/schema.yml": """
 seeds:
   - name: order_codes
     description: Test seed order_codes.
@@ -149,8 +150,8 @@ seeds:
         type: INTEGER
 """.strip()
                 + "\n",
-                "seeds/order_codes.csv": "order_id\n1\n",
-                "audits/singular/orders.sql": """
+                "sql/seeds/order_codes.csv": "order_id\n1\n",
+                "sql/audits/singular/orders.sql": """
 AUDIT (always_run true);
 
 SELECT order_id FROM __ref("orders")
@@ -214,7 +215,7 @@ schema = "seeds_${project}"
 database = "${ENV:LOCAL_TARGET_DB}_${project}"
 """.strip()
                 + "\n",
-                "seeds/schema.yml": """
+                "sql/seeds/schema.yml": """
 seeds:
   - name: country_codes
     description: Test seed country_codes.
@@ -223,7 +224,7 @@ seeds:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "seeds/country_codes.csv": "code\nUS\n",
+                "sql/seeds/country_codes.csv": "code\nUS\n",
             },
             expected_model_names=(),
             expected_model_deps=(),
@@ -268,7 +269,7 @@ database = "env_db"
 schema = "env_schema"
 """.strip()
                 + "\n",
-                "seeds/lookups.yml": """
+                "sql/seeds/lookups.yml": """
 seeds:
   - name: country_codes
     description: Test seed country_codes.
@@ -279,7 +280,7 @@ seeds:
         type: VARCHAR
 """.strip()
                 + "\n",
-                "seeds/country_codes.csv": "code\nUS\n",
+                "sql/seeds/country_codes.csv": "code\nUS\n",
             },
             expected_model_names=(),
             expected_model_deps=(),
@@ -306,13 +307,13 @@ seeds:
             repo_files=base_repo_files()
             | {
                 "sqlbuild_project.toml": 'name = "demo"\nadapter = "duckdb"\n',
-                "macros/python/status.py": (
+                "sql/macros/python/status.py": (
                     'def normalize_status(value):\n    return f"LOWER(TRIM({value}))"\n'
                 ),
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Test model orders.');\n\nSELECT @py.normalize_status(\"'  PAID  '\") AS status\n"
                 ),
-                "models/customers.sql": "MODEL (description 'Test model customers.');\n\nSELECT 'active' AS status\n",
+                "sql/models/customers.sql": "MODEL (description 'Test model customers.');\n\nSELECT 'active' AS status\n",
                 "tests/unit/test_normalize_status.sql": """
 TEST (mode macro, name "normalizes_status");
 
@@ -361,7 +362,7 @@ loader_schema = "raw_${suffix}"
 suffix = "dev"
 """.strip()
                 + "\n",
-                "sources/raw.yml": """
+                "sql/sources/raw.yml": """
 sources:
   - name: raw_orders
     description: Test source raw_orders.
@@ -369,7 +370,9 @@ sources:
     write_strategy: table
 """.strip()
                 + "\n",
-                "python/loaders/raw_orders.py": """
+                **node_module_files(
+                    "python/nodes/loaders/raw_orders.py",
+                    """
 from sqlbuild.loaders import loader
 
 @loader
@@ -377,7 +380,8 @@ def raw_orders(ctx):
     '''Test loader raw_orders.'''
     return [{"id": 1}]
 """.strip()
-                + "\n",
+                    + "\n",
+                ),
             },
             expected_model_names=(),
             expected_model_deps=(),
@@ -398,7 +402,7 @@ def raw_orders(ctx):
             repo_files=base_repo_files()
             | {
                 "sqlbuild_project.toml": 'name = "demo"\nadapter = "duckdb"\n',
-                "functions/sql/format_cents.sql": """
+                "sql/functions/sql/format_cents.sql": """
 FUNCTION (description "Test function format_cents.",
   arguments (amount_cents INTEGER),
   returns VARCHAR,
@@ -407,10 +411,10 @@ FUNCTION (description "Test function format_cents.",
 '$' || CAST(amount_cents / 100 AS VARCHAR)
 """.strip()
                 + "\n",
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     'MODEL (description "Test model orders.");\n\nSELECT __udf("format_cents")(1250) AS formatted\n'
                 ),
-                "models/customers.sql": "MODEL (description 'Test model customers.');\n\nSELECT 'active' AS status\n",
+                "sql/models/customers.sql": "MODEL (description 'Test model customers.');\n\nSELECT 'active' AS status\n",
                 "tests/unit/test_format_cents.sql": """
 TEST (mode udf, name "formats_cents");
 
@@ -449,7 +453,7 @@ SELECT 1
             repo_files=base_repo_files()
             | {
                 "sqlbuild_project.toml": 'name = "demo"\nadapter = "duckdb"\n',
-                "functions/sql/customer_orders.sql": """
+                "sql/functions/sql/customer_orders.sql": """
 FUNCTION (description "Test function customer_orders.",
   arguments (p_customer_id INTEGER),
   returns table (
@@ -461,7 +465,7 @@ FUNCTION (description "Test function customer_orders.",
 SELECT p_customer_id AS customer_id, 1 AS order_id
 """.strip()
                 + "\n",
-                "models/customer_order_summary.sql": (
+                "sql/models/customer_order_summary.sql": (
                     "MODEL (description 'Test model customer_order_summary.');\n\nSELECT customer_id, order_id "
                     'FROM __table_fn("customer_orders")(42)\n'
                 ),
@@ -604,7 +608,7 @@ def test_given_named_generic_audit_instances_when_assembling_then_each_name_is_p
         tmp_path,
         base_repo_files()
         | {
-            "models/orders.sql": """
+            "sql/models/orders.sql": """
 MODEL (description "Test model orders.",
   audits [
     expression_is_true (name "positive_revenue", expression "revenue > 0"),
@@ -615,7 +619,7 @@ MODEL (description "Test model orders.",
 SELECT 1 AS revenue
 """.strip()
             + "\n",
-            "audits/generic/expression_is_true.sql": """
+            "sql/audits/generic/expression_is_true.sql": """
 AUDIT ();
 
 SELECT * FROM @relation WHERE NOT (@expression)
@@ -675,7 +679,7 @@ database = "physical_db"
 schema = "physical_schema"
 """.strip()
             + "\n",
-            "seeds/schema.yml": """
+            "sql/seeds/schema.yml": """
 seeds:
   - name: country_codes
     description: Test seed country_codes.
@@ -691,8 +695,8 @@ seeds:
         type: VARCHAR
 """.strip()
             + "\n",
-            "seeds/country_codes.csv": "code\nUS\n",
-            "seeds/currencies.csv": "code\nUSD\n",
+            "sql/seeds/country_codes.csv": "code\nUS\n",
+            "sql/seeds/currencies.csv": "code\nUSD\n",
         },
     )
     discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
@@ -965,8 +969,8 @@ def test_given_sql_hooks_when_assembling_then_applies_adapter_aware_validation(
         tmp_path,
         {
             "sqlbuild_project.toml": 'name = "demo"\nadapter = "sqlserver"\n',
-            "models/orders.sql": test_case.model_sql,
-            "hooks/sql/vendor_hook.sql": test_case.named_hook_sql,
+            "sql/models/orders.sql": test_case.model_sql,
+            "sql/hooks/sql/vendor_hook.sql": test_case.named_hook_sql,
         },
     )
     discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)

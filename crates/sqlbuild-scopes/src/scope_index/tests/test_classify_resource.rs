@@ -7,7 +7,7 @@ fn given_consumers_when_classifying_then_records_follow_python_order() {
     let test_cases = [
         ClassifyTestCase {
             description: "global, private, local and inherited positions sort by position",
-            path: "models/marts/orders.sql",
+            path: "sql/models/marts/orders.sql",
             private: &[1],
             grants: &[],
             expected_classified: Some((
@@ -23,7 +23,7 @@ fn given_consumers_when_classifying_then_records_follow_python_order() {
         },
         ClassifyTestCase {
             description: "grants follow the position's own reason and keep their order",
-            path: "models/marts/orders.sql",
+            path: "sql/models/marts/orders.sql",
             private: &[],
             grants: &[
                 (5, VisibilityReason::TestedMacro, 7),

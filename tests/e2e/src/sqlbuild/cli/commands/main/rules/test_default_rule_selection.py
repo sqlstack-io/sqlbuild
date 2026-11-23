@@ -97,7 +97,7 @@ def test_given_rule_selection_when_running_commands_then_defaults_and_notice_fol
         project_name="shop",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML + test_case.rules_section,
-            "models/orders.sql": _HEADER + test_case.sql,
+            "sql/models/orders.sql": _HEADER + test_case.sql,
         },
     )
 

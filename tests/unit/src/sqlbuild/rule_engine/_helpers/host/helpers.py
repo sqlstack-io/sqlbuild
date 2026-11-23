@@ -96,7 +96,7 @@ def orders_project(*, model_count: int, edits: dict[str, str] | None = None) -> 
     }
     sql_by_name.update(edits or {})
     projects: list[CompiledProjectView] = [
-        build_project(name=name, relative_path=f"models/{name}.sql", sql=sql, config_values={})
+        build_project(name=name, relative_path=f"sql/models/{name}.sql", sql=sql, config_values={})
         for name, sql in sql_by_name.items()
     ]
     return project_with(

@@ -8,14 +8,14 @@ import sys
 import pytest
 
 from sqlbuild._native import INVOCATION_CONTEXT_ENV, EventExporterCommandScope
-from sqlbuild.observability import ExecutionIdentity
-from sqlbuild.runtime.output_capture.main.configured_output_capture_scope import (
-    configured_output_capture_scope,
-)
-from sqlbuild.sinks import (
+from sqlbuild.event_sinks import (
     CommandOutputRecord,
     CommandOutputValidationError,
     command_output_context,
+)
+from sqlbuild.observability import ExecutionIdentity
+from sqlbuild.runtime.output_capture.main.configured_output_capture_scope import (
+    configured_output_capture_scope,
 )
 from tests.unit.src.sqlbuild.cli.commands.main.entrypoint._test_types import (
     OutputCaptureWiringTestCase,

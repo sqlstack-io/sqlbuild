@@ -72,7 +72,7 @@ RECORDER: str = (
 )
 
 FILES: dict[str, str] = {
-    "providers/recorder.py": RECORDER,
+    "python/providers/recorder.py": RECORDER,
     "orchestration/jobs/orders_export_job.toml": (
         'name = "orders_export_job"\ndescription = "Export orders."\nselect = "orders"\n'
     ),
@@ -191,7 +191,7 @@ def test_given_sensor_functions_when_events_arrive_and_people_try_them_then_tick
     )
     monkeypatch.setenv("SQLBUILD_TEST_ENV_FILE", str(dotenv))
     home: Path = tmp_path / "home"
-    home.mkdir()
+    home.mkdir(parents=True)
     client_environment: dict[str, str] = environment({"HOME": str(home)})
     client_environment.pop("DBUS_SESSION_BUS_ADDRESS", None)
     client_environment.pop("XDG_RUNTIME_DIR", None)

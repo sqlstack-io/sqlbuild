@@ -8,6 +8,8 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBytes, PyDict, PyDictMethods, PyList, PyString, PyTuple};
 use pyo3::{IntoPyObjectExt, pyfunction};
 use sqlbuild_core::constants::PYTHON_NODE_ROOT;
+use sqlbuild_discovery::node_files::main::node_file_problems::node_file_problems;
+use sqlbuild_discovery::node_files::models::NodeModule;
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::discovery::_helpers::python_files::imported_modules::{
@@ -34,6 +36,8 @@ const NOT_A_NODE: &str = "that is not a SQLBuild asset, loader, or check";
 
 /// One Python-node kind: its reader, record class, bucket and copied definition fields.
 struct NodeKind {
+    /// The decorator name, as the file-name check reads it.
+    name: &'static str,
     reader: UserCodeHost,
     record: RecordId,
     bucket: usize,
@@ -45,6 +49,7 @@ struct NodeKind {
 /// Readers in precedence order; the first matching definition decides the kind.
 const NODE_KINDS: [NodeKind; 3] = [
     NodeKind {
+        name: "loader",
         reader: UserCodeHost::ReadLoaderDefinition,
         record: RecordId::DiscoveredLoaderFunction,
         bucket: 0,
@@ -61,6 +66,7 @@ const NODE_KINDS: [NodeKind; 3] = [
         ],
     },
     NodeKind {
+        name: "asset",
         reader: UserCodeHost::ReadAssetDefinition,
         record: RecordId::DiscoveredAssetFunction,
         bucket: 1,
@@ -78,6 +84,7 @@ const NODE_KINDS: [NodeKind; 3] = [
         ],
     },
     NodeKind {
+        name: "check",
         reader: UserCodeHost::ReadCheckDefinition,
         record: RecordId::DiscoveredCheckFunction,
         bucket: 2,
@@ -105,6 +112,17 @@ pub(crate) const DISCOVER_BUCKET: usize = 3;
 /// The `Buckets::nodes` slot of assets that run once per discovered item.
 pub(crate) const FOR_EACH_BUCKET: usize = 4;
 
+/// What `append_node` found in one function.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Appended {
+    /// A loader, asset or check, by decorator name.
+    Node(&'static str),
+    /// A `@discover` function, which is not a node.
+    Discover,
+    /// No node definition.
+    Nothing,
+}
+
 /// The module and the file it was imported from.
 struct ImportedModule<'py> {
     file_path: Bound<'py, PyAny>,
@@ -112,18 +130,18 @@ struct ImportedModule<'py> {
 }
 
 impl<'py> Buckets<'py> {
-    /// Append `function` to its kind's bucket; `false` when it carries no node definition.
+    /// Append `function` to its kind's bucket, and say what it was.
     fn append_node(
         &mut self,
         (project, file_path): (&ProjectDir<'py>, &Bound<'py, PyAny>),
         function: &Bound<'py, PyAny>,
         providers: &Bound<'py, PyDict>,
-    ) -> PyResult<bool> {
+    ) -> PyResult<Appended> {
         let py: Python<'py> = project.py();
         if let Some(read) = definition(function, READ_DISCOVER)? {
             let record = discover_function(project, (file_path, function), (&read, providers))?;
             self.nodes[DISCOVER_BUCKET].push(record);
-            return Ok(true);
+            return Ok(Appended::Discover);
         }
         for kind in &NODE_KINDS {
             let Some(read) = definition(function, kind.reader)? else {
@@ -154,9 +172,9 @@ impl<'py> Buckets<'py> {
             } else {
                 self.nodes[FOR_EACH_BUCKET].push(record);
             }
-            return Ok(true);
+            return Ok(Appended::Node(kind.name));
         }
-        Ok(false)
+        Ok(Appended::Nothing)
     }
 
     /// Collect audit factories without routing them through Python-node discovery.
@@ -217,12 +235,14 @@ impl<'py> Buckets<'py> {
         Ok(())
     }
 
+    /// Append every factory's nodes; each factory's name with the kinds it made.
     fn append_factory_nodes(
         &mut self,
         (project, imported_module): (&ProjectDir<'py>, &ImportedModule<'py>),
         providers: &Bound<'py, PyDict>,
         direct: &HashMap<usize, Bound<'py, PyAny>>,
-    ) -> PyResult<()> {
+    ) -> PyResult<Vec<(String, Vec<&'static str>)>> {
+        let mut factories: Vec<(String, Vec<&'static str>)> = Vec::new();
         let py: Python<'py> = project.py();
         let location: String = project.relative_to(&imported_module.file_path)?;
         for function in module_functions(&imported_module.module)? {
@@ -231,6 +251,7 @@ impl<'py> Buckets<'py> {
             };
             let name: String = native_field(&read, "name")?.extract()?;
             let result: Bound<'py, PyAny> = call_factory(&function, ("Factory", &name, &location))?;
+            let mut kinds: Vec<&'static str> = Vec::new();
             for (index, generated) in factory_functions(&result, (&name, &location))?
                 .into_iter()
                 .enumerate()
@@ -241,22 +262,31 @@ impl<'py> Buckets<'py> {
                 {
                     continue;
                 }
-                if !self.append_node(
+                match self.append_node(
                     (project, &imported_module.file_path),
                     &generated,
                     providers,
                 )? {
-                    return Err(discovery_error(
-                        py,
-                        NODE_ERROR,
-                        format!(
-                            "Factory '{name}' in {location} returned item {index} {NOT_A_NODE}"
-                        ),
-                    ));
+                    Appended::Node(kind) => {
+                        if !kinds.contains(&kind) {
+                            kinds.push(kind);
+                        }
+                    }
+                    Appended::Discover => {}
+                    Appended::Nothing => {
+                        return Err(discovery_error(
+                            py,
+                            NODE_ERROR,
+                            format!(
+                                "Factory '{name}' in {location} returned item {index} {NOT_A_NODE}"
+                            ),
+                        ));
+                    }
                 }
             }
+            factories.push((name, kinds));
         }
-        Ok(())
+        Ok(factories)
     }
 
     pub(crate) fn discover_nodes(
@@ -271,16 +301,35 @@ impl<'py> Buckets<'py> {
             modules.push(ImportedModule { file_path, module });
         }
         let mut direct: HashMap<usize, Bound<'py, PyAny>> = HashMap::new();
+        let mut declared: Vec<NodeModule> = Vec::new();
         for imported_module in &modules {
             self.append_audit_factories(project, imported_module)?;
+            let mut module_record = NodeModule {
+                relative_path: project
+                    .relative_to(&imported_module.file_path)?
+                    .replace('\\', "/"),
+                ..NodeModule::default()
+            };
             for function in module_functions(&imported_module.module)? {
-                if self.append_node((project, &imported_module.file_path), &function, providers)? {
-                    direct.insert(function.as_ptr() as usize, function);
+                let appended: Appended =
+                    self.append_node((project, &imported_module.file_path), &function, providers)?;
+                if appended == Appended::Nothing {
+                    continue;
                 }
+                if let Appended::Node(kind) = appended {
+                    let name: String = function.getattr("__name__")?.extract()?;
+                    module_record.direct.push((name, kind));
+                }
+                direct.insert(function.as_ptr() as usize, function);
             }
+            declared.push(module_record);
         }
-        for imported_module in &modules {
-            self.append_factory_nodes((project, imported_module), providers, &direct)?;
+        for (imported_module, module_record) in modules.iter().zip(declared.iter_mut()) {
+            module_record.factories =
+                self.append_factory_nodes((project, imported_module), providers, &direct)?;
+        }
+        if let Some(problem) = node_file_problems(&declared) {
+            return Err(discovery_error(project.py(), NODE_ERROR, problem));
         }
         Ok(())
     }

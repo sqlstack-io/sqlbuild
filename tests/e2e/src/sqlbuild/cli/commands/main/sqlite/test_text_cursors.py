@@ -56,8 +56,8 @@ def test_given_text_timestamp_cursor_when_building_twice_then_only_sqlite_accept
                 f"[connection]\n{test_case.connection}\n\n"
                 '[defaults]\nmaterialized = "table"\n\n[scopes]\nenforce_placement = false\n'
             ),
-            "models/orders.sql": _TWO_ORDERS,
-            "models/daily_orders.sql": (
+            "sql/models/orders.sql": _TWO_ORDERS,
+            "sql/models/daily_orders.sql": (
                 "MODEL (description 'Test model daily_orders.', materialized incremental,\n"
                 "  incremental_strategy delete_insert, cursor order_day, cursor_type timestamp,\n"
                 "  cursor_grain day, cursor_inputs (orders ordered_at));\n"
@@ -69,7 +69,7 @@ def test_given_text_timestamp_cursor_when_building_twice_then_only_sqlite_accept
     first: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build"), project_dir=project_dir
     )
-    _ = (project_dir / "models/orders.sql").write_text(_THREE_ORDERS, encoding="utf-8")
+    _ = (project_dir / "sql/models/orders.sql").write_text(_THREE_ORDERS, encoding="utf-8")
 
     second: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build"), project_dir=project_dir

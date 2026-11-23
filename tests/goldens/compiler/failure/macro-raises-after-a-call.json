@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro '@py.explode' in '<project>/models/staging/stg_orders.sql' failed: cannot render status"
+     "message": "Macro '@py.explode' in '<project>/sql/models/staging/stg_orders.sql' failed: cannot render status"
     }
    ]
   }

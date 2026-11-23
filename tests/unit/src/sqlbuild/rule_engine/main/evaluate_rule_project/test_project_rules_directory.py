@@ -53,7 +53,7 @@ def test_given_project_rule_when_evaluating_then_uses_its_own_rules_directory(
         test_case=RuleCase(
             description=test_case.description,
             source='MODEL (description "Orders");\nSELECT 1 AS order_id\n',
-            path="models/orders.sql",
+            path="sql/models/orders.sql",
             files=tuple(
                 RuleFile(path=path, source=source) for path, source in test_case.case_files
             ),

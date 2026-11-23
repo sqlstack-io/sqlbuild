@@ -57,7 +57,7 @@ def test_given_three_table_join_when_building_on_clickhouse_then_column_names_ma
             "sqlbuild_project.toml": build_clickhouse_project_toml(
                 project_name="clickhouse_names", schema_name=schema_name, config=config
             ),
-            "sources/raw.yml": (
+            "sql/sources/raw.yml": (
                 "sources:\n"
                 + "".join(
                     f"  - name: {name}\n    description: Synthetic {name}.\n"
@@ -65,7 +65,7 @@ def test_given_three_table_join_when_building_on_clickhouse_then_column_names_ma
                     for name in ("orders", "products", "payments")
                 )
             ),
-            "models/order_lines.sql": (
+            "sql/models/order_lines.sql": (
                 "MODEL (description 'One row per order.');\n\n"
                 f"SELECT {test_case.selected_order_id}, o.quantity AS quantity, "
                 "p.amount AS payment_cents\n"

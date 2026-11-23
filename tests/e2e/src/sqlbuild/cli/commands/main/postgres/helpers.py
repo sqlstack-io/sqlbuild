@@ -295,12 +295,18 @@ def prepare_postgres_waffle_shop(*, tmp_path: Path, config: dict[str, object]) -
     schema_name: str = build_unique_schema_name(prefix="sqb_waffle")
     project_dir: Path = prepare_waffle_shop(tmp_path)
 
-    (project_dir / "functions" / "sql" / "customer_orders.sql").unlink(missing_ok=True)
-    (project_dir / "functions" / "python" / "is_completed_order_py.py").unlink(missing_ok=True)
+    (project_dir / "sql" / "functions" / "sql" / "customer_orders.sql").unlink(missing_ok=True)
+    (project_dir / "sql" / "functions" / "python" / "is_completed_order_py.py").unlink(
+        missing_ok=True
+    )
     (project_dir / "tests" / "unit" / "test_customer_orders_table_fn.sql").unlink(missing_ok=True)
-    (project_dir / "models" / "marts" / "daily_order_partitioned.sql").unlink(missing_ok=True)
+    (project_dir / "sql" / "models" / "marts" / "daily_order_partitioned.sql").unlink(
+        missing_ok=True
+    )
     (project_dir / "tests" / "unit" / "test_is_completed_order_udf.sql").unlink(missing_ok=True)
-    is_completed_order_path: Path = project_dir / "functions" / "sql" / "is_completed_order.sql"
+    is_completed_order_path: Path = (
+        project_dir / "sql" / "functions" / "sql" / "is_completed_order.sql"
+    )
     is_completed_order_path.write_text(
         is_completed_order_path.read_text(encoding="utf-8")
         .replace("STRING", "TEXT")
@@ -308,7 +314,7 @@ def prepare_postgres_waffle_shop(*, tmp_path: Path, config: dict[str, object]) -
         encoding="utf-8",
     )
 
-    fact_orders_path: Path = project_dir / "models" / "marts" / "fact_orders.sql"
+    fact_orders_path: Path = project_dir / "sql" / "models" / "marts" / "fact_orders.sql"
     fact_orders_path.write_text(
         fact_orders_path.read_text(encoding="utf-8").replace(
             '__udf("is_completed_order_py")(o.status) AS is_completed_order_py,',
@@ -509,18 +515,18 @@ def write_migration_project(
             project_name="postgres_model_migrations", schema_name=schema_name, config=config
         )
         + _JANITOR_CONFIG,
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
             f"    schema: {raw_schema_name}\n"
             "    table: raw_orders\n"
         ),
     }
     project_dir: Path = tmp_path / "postgres_model_migrations"
-    models_dir: Path = project_dir / "models"
+    models_dir: Path = project_dir / "sql" / "models"
     stale: Path
     for stale in models_dir.glob("*.sql"):
         stale.unlink()
-    files.update({f"models/{name}.sql": sql for name, sql in models.items()})
+    files.update({f"sql/models/{name}.sql": sql for name, sql in models.items()})
     return prepare_inline_project(
         tmp_path=tmp_path, project_name="postgres_model_migrations", repo_files=files
     )
@@ -887,7 +893,7 @@ def build_long_model_name_project_files(
 
     return {
         "sqlbuild_project.toml": project_toml + 'contract = "enforced"\n',
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_orders\n"
             "    description: Raw orders.\n"
@@ -899,7 +905,7 @@ def build_long_model_name_project_files(
             "      - name: amount\n"
             "        type: INTEGER\n"
         ),
-        f"models/{model_name}.sql": (
+        f"sql/models/{model_name}.sql": (
             "MODEL (\n"
             "  description 'Order totals for a long-named model.',\n"
             "  materialized table,\n"

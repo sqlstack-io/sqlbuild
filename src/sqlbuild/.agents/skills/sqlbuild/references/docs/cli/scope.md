@@ -59,7 +59,7 @@ sqb scope macro:normalize_order_status
 sqb scope enum:order_status
 sqb scope constant:minimum_order_value
 
-sqb scope models/staging/orders/stg_orders.sql
+sqb scope sql/models/staging/orders/stg_orders.sql
 ```
 
 Models, sources, seeds, and functions share one project-wide namespace, so their bare names, such as `stg_orders`, are accepted and resolve to the qualified identity. Macros, enums, constants, tests, and audits can share names with each other and with resources, so they always need their prefix: a bare name such as `order_status` that names one of them fails with `C960` and shows the qualified form to use, and a bare name that matches both a resource and one of these declarations fails and lists every match. Public declaration identities are `macro:<name>`, `enum:<name>`, and `constant:<name>`.
@@ -131,34 +131,35 @@ that macro composes two project-wide macros:
 
 ```text
 project/
-├── macros/
-│   └── currency.py                 add_tax, round_money
-└── models/
-    └── commerce/
-        ├── macros/
-        │   └── orders.py           formatted_order_total
-        ├── orders.sql
-        └── returns/
-            └── returns.sql
+└── sql/
+    ├── macros/
+    │   └── currency.py                 add_tax, round_money
+    └── models/
+        └── commerce/
+            ├── macros/
+            │   └── orders.py           formatted_order_total
+            ├── orders.sql
+            └── returns/
+                └── returns.sql
 ```
 
 ```python
-# models/commerce/macros/python/orders.py
-from macros.python.currency import add_tax, round_money
+# sql/models/commerce/macros/python/orders.py
+from sql.macros.python.currency import add_tax, round_money
 
 def formatted_order_total(expression: str) -> str:
     return round_money(add_tax(expression))
 ```
 
 ```sql
--- models/commerce/orders.sql
+-- sql/models/commerce/orders.sql
 MODEL(description "Orders");
 
 SELECT @py.formatted_order_total("subtotal") AS total
 ```
 
 `returns/returns.sql` calls the same macro, so the declaration must remain available throughout
-`models/commerce/` and its descendants.
+`sql/models/commerce/` and its descendants.
 
 The default report puts actual usage next to the complete directory-derived scope. Unused globals
 stay collapsed, so the useful facts remain visible even in a large project:
@@ -168,18 +169,18 @@ $ sqb scope model:orders
 Scope
   Target: model:orders
   Resource: model:orders
-  Path: models/commerce/orders.sql
+  Path: sql/models/commerce/orders.sql
 
 Used (1)
-  └─ ● macro:formatted_order_total  models/commerce/macros/python/orders.py:5
+  └─ ● macro:formatted_order_total  sql/models/commerce/macros/python/orders.py:5
 
 Scope chain
-  ├─ exact-owner-private models/commerce (1)
+  ├─ exact-owner-private sql/models/commerce (1)
   ├─ descendant-public models (0)
   └─ project global (2)
 
 Available (1 of 3, 2 collapsed)
-  └─ ● macro:formatted_order_total  models/commerce/macros/python/orders.py:5
+  └─ ● macro:formatted_order_total  sql/models/commerce/macros/python/orders.py:5
   … 2 globals collapsed; run sqb scope model:orders --globals all
 
 ● used by this resource   ○ not used by this resource   --verbose for scope details
@@ -192,13 +193,13 @@ With `--verbose`, the same `Used` section shows why each declaration is visible:
 ```console
 $ sqb scope model:orders --verbose
 Used (1)
-  └─ ● macro:formatted_order_total  [macro; descendant-public; inherited_ancestor; params 1; role models/commerce/macros]  models/commerce/macros/python/orders.py:5:1
+  └─ ● macro:formatted_order_total  [macro; descendant-public; inherited_ancestor; params 1; role sql/models/commerce/macros]  sql/models/commerce/macros/python/orders.py:5:1
 ```
 
 This answers several questions without opening declaration files: what the model actually uses,
 where that declaration came from, which owner and parent folders SQLBuild checks, how many
 project-wide declarations are available, and whether the result is complete. The scope-chain count
-at `models/commerce` includes declarations owned there; the `exact-owner-private` chain label does
+at `sql/models/commerce` includes declarations owned there; the `exact-owner-private` chain label does
 not mean every declaration in that count is private.
 
 ### Follow composed macro dependencies
@@ -212,12 +213,12 @@ $ sqb scope model:orders --used-only --dependency-depth 1
 Scope
   Target: model:orders
   Resource: model:orders
-  Path: models/commerce/orders.sql
+  Path: sql/models/commerce/orders.sql
 
 Used (3)
-  ├─ ● macro:add_tax  macros/python/currency.py:1
-  ├─ ● macro:formatted_order_total  models/commerce/macros/python/orders.py:5
-  └─ ● macro:round_money  macros/python/currency.py:5
+  ├─ ● macro:add_tax  sql/macros/python/currency.py:1
+  ├─ ● macro:formatted_order_total  sql/models/commerce/macros/python/orders.py:5
+  └─ ● macro:round_money  sql/macros/python/currency.py:5
 ```
 
 The remaining report sections follow the `Used` section as usual. The dependency graph comes from
@@ -229,14 +230,14 @@ Explain the composed macro to inspect its direct graph and placement facts:
 ```console
 $ sqb scope model:orders --explain macro:formatted_order_total
 Explanation
-  └─ ● macro:formatted_order_total  [macro; descendant-public; inherited_ancestor; params 1; role models/commerce/macros]  models/commerce/macros/python/orders.py:5:1
+  └─ ● macro:formatted_order_total  [macro; descendant-public; inherited_ancestor; params 1; role sql/models/commerce/macros]  sql/models/commerce/macros/python/orders.py:5:1
      Owner: (none)
-     Owning path: models/commerce
+     Owning path: sql/models/commerce
      Consumers: model:orders, model:returns
      Dependencies: macro:add_tax, macro:round_money
      Grants: (none)
      Required scope: descendant-public
-     Required path: models/commerce
+     Required path: sql/models/commerce
      Promotion impact: (none)
 ```
 
@@ -253,7 +254,7 @@ sqb scope model:stg_orders --globals all
 sqb scope model:stg_orders \
   --kind constant \
   --kind enum \
-  --defined-under models/finance
+  --defined-under sql/models/finance
 
 # Find visible or used settlement declarations
 sqb scope model:stg_orders --match '*settlement*'
@@ -317,7 +318,7 @@ sqb scope model:stg_orders --used-only --dependency-depth 2
 Use `--at` before creating a resource. A prospective file receives the declarations implied by that exact authored path. A prospective directory describes what a direct child resource would receive.
 
 ```bash
-sqb scope --at models/staging/orders/new_model.sql
+sqb scope --at sql/models/staging/orders/new_model.sql
 sqb scope --at tests/unit/staging/orders/
 ```
 
@@ -336,7 +337,7 @@ independently of folder visibility.
 
 ```bash
 sqb scope model:stg_orders \
-  --as-path models/marts/orders/stg_orders.sql
+  --as-path sql/models/marts/orders/stg_orders.sql
 ```
 
 The destination must be a valid project-relative file path for that resource kind. This is a pure preview: `sqb scope` never moves files, edits declarations, or changes configuration.

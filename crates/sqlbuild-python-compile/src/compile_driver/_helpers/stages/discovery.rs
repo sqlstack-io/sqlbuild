@@ -34,6 +34,7 @@ use sqlbuild_python_front::discovery::main::python_files::discover_materializati
 use sqlbuild_python_front::discovery::main::python_files::discover_provider_classes::discover_provider_classes;
 use sqlbuild_python_front::discovery::main::python_files::discover_python_function_files::discover_python_function_files;
 use sqlbuild_python_front::discovery::main::python_files::discover_python_node_functions::discover_python_node_functions;
+use sqlbuild_python_front::discovery::main::python_files::reject_project_layout::reject_project_layout;
 use sqlbuild_python_front::discovery::main::python_files::reject_unsupported_python_paths::reject_unsupported_python_paths;
 use sqlbuild_python_front::discovery::main::records::discover_adapter_file::discover_adapter_file;
 use sqlbuild_python_front::discovery::main::records::discover_audit_files::discover_audit_files;
@@ -248,6 +249,8 @@ pub(crate) fn assembled_inputs<'py>(
         local_config: &local_config,
     })?;
     warn_deprecated_settings(py, project_dir)?;
+    let extra_paths: Vec<String> = native_field(&project_config, "extra_paths")?.extract()?;
+    reject_project_layout(project_dir, &extra_paths)?;
     reject_unsupported_python_paths(project_dir)?;
     let delta_settings: &Bound<'py, PyAny> =
         if native_field(&local_config, "setting_overrides")?.contains(DELTA_COMPILE_SETTING_KEY)? {

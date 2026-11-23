@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D005",
-     "message": "<project>/models/marts/schema.yml declares model metadata in 'models', but model metadata must live in the model file MODEL(...). Move description, columns, and audits into the model header."
+     "message": "<project>/sql/models/marts/schema.yml declares model metadata in 'models', but model metadata must live in the model file MODEL(...). Move description, columns, and audits into the model header."
     }
    ]
   }

@@ -148,7 +148,7 @@ def test_given_a_scheduled_docker_job_when_published_then_a_pinned_worker_execut
             [],
             launcher="docker",
             files_after_publication={
-                "models/orders.sql": "MODEL (description 'Orders.', materialized table);\nSELECT 41 AS amount\n"
+                "sql/models/orders.sql": "MODEL (description 'Orders.', materialized table);\nSELECT 41 AS amount\n"
             },
         )
     ],

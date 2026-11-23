@@ -75,12 +75,12 @@ def test_given_models_in_one_folder_when_compiling_then_folder_visibility_is_reb
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "models/domain/_enums/status.sql": "ENUM (name status, members [OPEN, SHIPPED]);",
-            "models/domain/customers.sql": (
+            "sql/models/domain/_enums/status.sql": "ENUM (name status, members [OPEN, SHIPPED]);",
+            "sql/models/domain/customers.sql": (
                 'MODEL (description "Test model customers.");\n'
                 'SELECT @enum("status").OPEN AS status\n'
             ),
-            "models/domain/orders.sql": (
+            "sql/models/domain/orders.sql": (
                 'MODEL (description "Test model orders.");\n'
                 'SELECT @enum("status").SHIPPED AS status\n'
             ),
@@ -106,27 +106,27 @@ def test_given_models_in_one_folder_when_compiling_then_folder_visibility_is_reb
     (
         ScopedDeclarationCompileTestCase(
             "global declaration",
-            {"constants/value.sql": "CONSTANT (name value, value 1);"},
-            "models/domain/child/orders.sql",
+            {"sql/constants/value.sql": "CONSTANT (name value, value 1);"},
+            "sql/models/domain/child/orders.sql",
             'MODEL (description "Test model orders.");\nSELECT @const("value") AS value\n',
             "SELECT 1 AS value",
         ),
         ScopedDeclarationCompileTestCase(
             "inherited declaration",
-            {"models/domain/constants/value.sql": "CONSTANT (name value, value 2);"},
-            "models/domain/child/orders.sql",
+            {"sql/models/domain/constants/value.sql": "CONSTANT (name value, value 2);"},
+            "sql/models/domain/child/orders.sql",
             'MODEL (description "Test model orders.");\nSELECT @const("value") AS value\n',
             "SELECT 2 AS value",
         ),
         ScopedDeclarationCompileTestCase(
             "all ancestor declarations",
             {
-                "models/domain/constants/parent.sql": "CONSTANT (name parent_value, value 2);",
-                "models/domain/child/constants/child.sql": (
+                "sql/models/domain/constants/parent.sql": "CONSTANT (name parent_value, value 2);",
+                "sql/models/domain/child/constants/child.sql": (
                     "CONSTANT (name child_value, value 3);"
                 ),
             },
-            "models/domain/child/grandchild/orders.sql",
+            "sql/models/domain/child/grandchild/orders.sql",
             (
                 'MODEL (description "Test model orders.");\nSELECT @const("parent_value") + @const("child_value") AS value\n'
             ),
@@ -134,15 +134,15 @@ def test_given_models_in_one_folder_when_compiling_then_folder_visibility_is_reb
         ),
         ScopedDeclarationCompileTestCase(
             "local declaration",
-            {"models/domain/_constants/value.sql": "CONSTANT (name value, value 4);"},
-            "models/domain/orders.sql",
+            {"sql/models/domain/_constants/value.sql": "CONSTANT (name value, value 4);"},
+            "sql/models/domain/orders.sql",
             'MODEL (description "Test model orders.");\nSELECT @const("value") AS value\n',
             "SELECT 4 AS value",
         ),
         ScopedDeclarationCompileTestCase(
             "private declaration",
             {},
-            "models/domain/orders.sql",
+            "sql/models/domain/orders.sql",
             'MODEL (description "Test model orders.", constants (_value 5));\nSELECT @const("_value") AS value\n',
             "SELECT 5 AS value",
         ),
@@ -173,63 +173,67 @@ def test_given_scoped_declaration_when_compiling_model_then_only_lexically_visib
         ScopedDeclarationErrorTestCase(
             "sibling declaration",
             {
-                "models/one/_constants/value.sql": "CONSTANT (name value, value 1);",
-                "models/two/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
+                "sql/models/one/_constants/value.sql": "CONSTANT (name value, value 1);",
+                "sql/models/two/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
             },
-            ("known but inaccessible", "models/one/_constants/value.sql", "models/two/orders.sql"),
+            (
+                "known but inaccessible",
+                "sql/models/one/_constants/value.sql",
+                "sql/models/two/orders.sql",
+            ),
         ),
         ScopedDeclarationErrorTestCase(
             "descendant declaration",
             {
-                "models/domain/child/_constants/value.sql": "CONSTANT (name value, value 1);",
-                "models/domain/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
+                "sql/models/domain/child/_constants/value.sql": "CONSTANT (name value, value 1);",
+                "sql/models/domain/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
             },
-            ("known but inaccessible", "models/domain/child/_constants/value.sql"),
+            ("known but inaccessible", "sql/models/domain/child/_constants/value.sql"),
         ),
         ScopedDeclarationErrorTestCase(
             "unknown declaration",
             {
-                "models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("missing") AS value'
+                "sql/models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("missing") AS value'
             },
             ("Unknown constant 'missing'", "Visible constants: none"),
         ),
         ScopedDeclarationErrorTestCase(
             "model private does not export to test",
             {
-                "models/orders.sql": "MODEL (description 'Test model orders.', constants (_value 1));\nSELECT 1 AS value",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.', constants (_value 1));\nSELECT 1 AS value",
                 "tests/unit/orders_test.sql": (
                     'TEST ();\nWITH __expected__orders AS (SELECT @const("_value") AS value) '
                     "SELECT 1"
                 ),
             },
-            ("known but inaccessible", "models/orders.sql", "tests/unit/orders_test.sql"),
+            ("known but inaccessible", "sql/models/orders.sql", "tests/unit/orders_test.sql"),
         ),
         ScopedDeclarationErrorTestCase(
             "filename resemblance without expected relationship",
             {
-                "models/domain/_constants/value.sql": "CONSTANT (name model_value, value 9);",
-                "models/domain/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
+                "sql/models/domain/_constants/value.sql": "CONSTANT (name model_value, value 9);",
+                "sql/models/domain/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
                 "tests/unit/orders_test.sql": (
                     "TEST ();\nWITH __ref__orders AS (SELECT 1 AS value), "
                     "__assert__valid AS (SELECT @const('model_value') WHERE FALSE) SELECT 1"
                 ),
             },
-            ("known but inaccessible", "models/domain/_constants/value.sql"),
+            ("known but inaccessible", "sql/models/domain/_constants/value.sql"),
         ),
         ScopedDeclarationErrorTestCase(
             "unrelated production scope is not granted",
             {
-                "models/orders/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
-                "models/customers/_constants/value.sql": (
+                "sql/models/orders/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
+                "sql/models/customers/_constants/value.sql": (
                     "CONSTANT (name customer_value, value 10);"
                 ),
-                "models/customers/customers.sql": "MODEL (description 'Test model customers.');\nSELECT 1 AS value",
+                "sql/models/customers/customers.sql": "MODEL (description 'Test model customers.');\nSELECT 1 AS value",
                 "tests/unit/check.sql": (
                     "TEST ();\nWITH __ref__orders AS (SELECT 1 AS value), "
                     "__expected__orders AS (SELECT @const('customer_value') AS value) SELECT 1"
                 ),
             },
-            ("known but inaccessible", "models/customers/_constants/value.sql"),
+            ("known but inaccessible", "sql/models/customers/_constants/value.sql"),
         ),
     ),
     ids=lambda case: case.description,
@@ -254,8 +258,8 @@ def test_given_inaccessible_or_unknown_declaration_when_compiling_then_diagnosti
         ScopedDeclarationSurfaceTestCase(
             "inline model hook",
             {
-                "models/domain/_constants/value.sql": "CONSTANT (name value, value 11);",
-                "models/domain/orders.sql": (
+                "sql/models/domain/_constants/value.sql": "CONSTANT (name value, value 11);",
+                "sql/models/domain/orders.sql": (
                     "MODEL (description 'Test model orders.', pre_hooks [inline_sql(\"SELECT @const('value')\")]);\nSELECT 1"
                 ),
             },
@@ -269,9 +273,9 @@ def test_given_inaccessible_or_unknown_declaration_when_compiling_then_diagnosti
         ScopedDeclarationSurfaceTestCase(
             "named hook definition path",
             {
-                "models/domain/_sqlbuild/_constants/value.sql": "CONSTANT (name value, value 12);",
-                "models/domain/_sqlbuild/_hooks/sql/typed.sql": 'HOOK (description "Test hook typed.");\nSELECT @const("value")',
-                "models/domain/orders.sql": 'MODEL (description "Test model orders.", post_hooks [sql("typed")]);\nSELECT 1',
+                "sql/models/domain/_sqlbuild/_constants/value.sql": "CONSTANT (name value, value 12);",
+                "sql/models/domain/_sqlbuild/_hooks/sql/typed.sql": 'HOOK (description "Test hook typed.");\nSELECT @const("value")',
+                "sql/models/domain/orders.sql": 'MODEL (description "Test model orders.", post_hooks [sql("typed")]);\nSELECT 1',
             },
             lambda inputs: (
                 cast(list[SqlHookEntry], inputs.model_inputs[0].config.values["post_hooks"])[
@@ -283,11 +287,11 @@ def test_given_inaccessible_or_unknown_declaration_when_compiling_then_diagnosti
         ScopedDeclarationSurfaceTestCase(
             "function definition path",
             {
-                "functions/sql/domain/_constants/value.sql": "CONSTANT (name value, value 13);",
-                "functions/sql/domain/value.sql": (
+                "sql/functions/sql/domain/_constants/value.sql": "CONSTANT (name value, value 13);",
+                "sql/functions/sql/domain/value.sql": (
                     'FUNCTION (description "Test function value.", returns INTEGER);\n@const("value")'
                 ),
-                "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1",
             },
             lambda inputs: inputs.sql_function_inputs[0].body_sql,
             "13",
@@ -295,13 +299,13 @@ def test_given_inaccessible_or_unknown_declaration_when_compiling_then_diagnosti
         ScopedDeclarationSurfaceTestCase(
             "standalone audit definition path",
             {
-                "models/domain/_sqlbuild/_constants/value.sql": "CONSTANT (name value, value 15);",
-                "models/domain/_sqlbuild/audits/singular/check.sql": (
+                "sql/models/domain/_sqlbuild/_constants/value.sql": "CONSTANT (name value, value 15);",
+                "sql/models/domain/_sqlbuild/audits/singular/check.sql": (
                     'AUDIT ();\nSELECT @const("value") FROM __ref("orders") '
                     'JOIN __ref("customers") ON TRUE'
                 ),
-                "models/domain/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1",
-                "models/domain/customers.sql": "MODEL (description 'Test model customers.');\nSELECT 1",
+                "sql/models/domain/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1",
+                "sql/models/domain/customers.sql": "MODEL (description 'Test model customers.');\nSELECT 1",
             },
             lambda inputs: inputs.audit_inputs[0].sql_body,
             'SELECT 15 FROM __ref("orders") JOIN __ref("customers") ON TRUE',
@@ -309,13 +313,13 @@ def test_given_inaccessible_or_unknown_declaration_when_compiling_then_diagnosti
         ScopedDeclarationSurfaceTestCase(
             "generic audit definition path",
             {
-                "models/domain/_sqlbuild/_constants/value.sql": (
+                "sql/models/domain/_sqlbuild/_constants/value.sql": (
                     "CONSTANT (name value, value 18);"
                 ),
-                "models/domain/_sqlbuild/_audits/generic/scoped.sql": (
+                "sql/models/domain/_sqlbuild/_audits/generic/scoped.sql": (
                     'AUDIT ();\nSELECT * FROM __ref("@model") WHERE @const("value") = 18'
                 ),
-                "models/domain/orders.sql": "MODEL (description 'Test model orders.', audits [scoped]);\nSELECT 1",
+                "sql/models/domain/orders.sql": "MODEL (description 'Test model orders.', audits [scoped]);\nSELECT 1",
             },
             lambda inputs: inputs.audit_inputs[0].sql_body,
             'SELECT * FROM __ref("orders") WHERE 18 = 18',
@@ -328,7 +332,7 @@ def test_given_inaccessible_or_unknown_declaration_when_compiling_then_diagnosti
                     "TEST ();\nWITH __ref__orders AS (SELECT 1 AS value), "
                     '__expected__orders AS (SELECT @const("value") AS value) SELECT 1'
                 ),
-                "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
             },
             lambda inputs: inputs.test_inputs[0].sql_body,
             "WITH __ref__orders AS (SELECT 1 AS value), "
@@ -342,7 +346,7 @@ def test_given_inaccessible_or_unknown_declaration_when_compiling_then_diagnosti
                     "SCENARIO (description 'Test scenario orders.');\nWITH __ref__orders AS (SELECT 1 AS value), "
                     '__expected__orders AS (SELECT @const("value") AS value) SELECT 1'
                 ),
-                "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
             },
             lambda inputs: inputs.scenario_inputs[0].sql_body,
             "WITH __ref__orders AS (SELECT 1 AS value), "
@@ -370,12 +374,12 @@ def test_given_scoped_declaration_when_compiling_sql_surface_then_uses_authored_
         ExpectedModelDeclarationGrantTestCase(
             description="single model inherited local constant and enum",
             files={
-                "models/domain/_constants/inherited.sql": (
+                "sql/models/domain/_constants/inherited.sql": (
                     "CONSTANT (name inherited_value, value 2);"
                 ),
-                "models/domain/_constants/local.sql": ("CONSTANT (name local_value, value 3);"),
-                "models/domain/_enums/state.sql": "ENUM (name state, members [OPEN, CLOSED]);",
-                "models/domain/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value, 'OPEN' AS state",
+                "sql/models/domain/_constants/local.sql": ("CONSTANT (name local_value, value 3);"),
+                "sql/models/domain/_enums/state.sql": "ENUM (name state, members [OPEN, CLOSED]);",
+                "sql/models/domain/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value, 'OPEN' AS state",
                 "tests/unit/check.sql": (
                     "TEST ();\nWITH __ref__orders AS (SELECT 1 AS value), "
                     "__expected__orders AS (SELECT @const('inherited_value') + "
@@ -392,10 +396,10 @@ def test_given_scoped_declaration_when_compiling_sql_surface_then_uses_authored_
         ExpectedModelDeclarationGrantTestCase(
             description="multiple expected models deterministic union",
             files={
-                "models/a/_constants/a.sql": "CONSTANT (name a_value, value 4);",
-                "models/a/a.sql": "MODEL (description 'Test model a.');\nSELECT 4 AS value",
-                "models/b/_constants/b.sql": "CONSTANT (name b_value, value 5);",
-                "models/b/b.sql": "MODEL (description 'Test model b.');\nSELECT 5 AS value",
+                "sql/models/a/_constants/a.sql": "CONSTANT (name a_value, value 4);",
+                "sql/models/a/a.sql": "MODEL (description 'Test model a.');\nSELECT 4 AS value",
+                "sql/models/b/_constants/b.sql": "CONSTANT (name b_value, value 5);",
+                "sql/models/b/b.sql": "MODEL (description 'Test model b.');\nSELECT 5 AS value",
                 "tests/unit/check.sql": (
                     "TEST ();\nWITH __ref__a AS (SELECT 1 AS value), "
                     "__expected__b AS (SELECT @const('b_value') AS value), "
@@ -411,8 +415,8 @@ def test_given_scoped_declaration_when_compiling_sql_surface_then_uses_authored_
         ExpectedModelDeclarationGrantTestCase(
             description="test path visibility remains separate from model grant",
             files={
-                "models/domain/_constants/model.sql": "CONSTANT (name model_value, value 6);",
-                "models/domain/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
+                "sql/models/domain/_constants/model.sql": "CONSTANT (name model_value, value 6);",
+                "sql/models/domain/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
                 "tests/unit/_constants/test.sql": "CONSTANT (name test_value, value 7);",
                 "tests/unit/check.sql": (
                     "TEST ();\nWITH __ref__orders AS (SELECT 1 AS value), "
@@ -426,13 +430,13 @@ def test_given_scoped_declaration_when_compiling_sql_surface_then_uses_authored_
         ExpectedModelDeclarationGrantTestCase(
             description="only macros called by the test are granted",
             files={
-                "models/domain/_sqlbuild/_macros/python/discount.py": (
+                "sql/models/domain/_sqlbuild/_macros/python/discount.py": (
                     'def discount(expression: str) -> str:\n    return f"({expression} - 1)"\n'
                 ),
-                "models/domain/_sqlbuild/_macros/python/surcharge.py": (
+                "sql/models/domain/_sqlbuild/_macros/python/surcharge.py": (
                     'def surcharge(expression: str) -> str:\n    return f"({expression} + 1)"\n'
                 ),
-                "models/domain/orders.sql": (
+                "sql/models/domain/orders.sql": (
                     "MODEL (description 'Test model orders.');\nSELECT @py.discount('10') AS value, @py.surcharge('10') AS fee"
                 ),
                 "tests/unit/check.sql": (
@@ -446,13 +450,13 @@ def test_given_scoped_declaration_when_compiling_sql_surface_then_uses_authored_
         ExpectedModelDeclarationGrantTestCase(
             description="macros called inside macro arguments are granted",
             files={
-                "models/domain/_sqlbuild/_macros/python/discount.py": (
+                "sql/models/domain/_sqlbuild/_macros/python/discount.py": (
                     'def discount(expression: str) -> str:\n    return f"({expression} - 1)"\n'
                 ),
-                "models/domain/_sqlbuild/_macros/python/surcharge.py": (
+                "sql/models/domain/_sqlbuild/_macros/python/surcharge.py": (
                     'def surcharge(expression: str) -> str:\n    return f"({expression} + 1)"\n'
                 ),
-                "models/domain/orders.sql": (
+                "sql/models/domain/orders.sql": (
                     "MODEL (description 'Test model orders.');\nSELECT @py.discount('10') AS value, @py.surcharge('10') AS fee"
                 ),
                 "tests/unit/check.sql": (
@@ -469,7 +473,7 @@ def test_given_scoped_declaration_when_compiling_sql_surface_then_uses_authored_
         ExpectedModelDeclarationGrantTestCase(
             description="model private declaration is not granted",
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Test model orders.', constants (_private 8));\nSELECT @const('_private') AS value"
                 ),
                 "tests/unit/check.sql": (
@@ -483,10 +487,10 @@ def test_given_scoped_declaration_when_compiling_sql_surface_then_uses_authored_
         ExpectedModelDeclarationGrantTestCase(
             description="filename resemblance and no expected model grant nothing",
             files={
-                "models/domain/customers.sql": (
+                "sql/models/domain/customers.sql": (
                     "MODEL (description 'Test model customers.');\nSELECT 1 AS value"
                 ),
-                "models/domain/orders.sql": (
+                "sql/models/domain/orders.sql": (
                     "MODEL (description 'Test model orders.');\n"
                     'SELECT value FROM __ref("customers")'
                 ),
@@ -501,8 +505,8 @@ def test_given_scoped_declaration_when_compiling_sql_surface_then_uses_authored_
         ExpectedModelDeclarationGrantTestCase(
             description="scenario expected model grant",
             files={
-                "models/domain/_constants/value.sql": "CONSTANT (name scenario_value, value 10);",
-                "models/domain/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
+                "sql/models/domain/_constants/value.sql": "CONSTANT (name scenario_value, value 10);",
+                "sql/models/domain/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
                 "tests/scenarios/check.sql": (
                     "SCENARIO (description 'Test scenario check.');\nWITH __ref__orders AS (SELECT 1 AS value), "
                     "__expected__orders AS (SELECT @const('scenario_value') AS value) SELECT 1"
@@ -553,8 +557,8 @@ def test_given_expected_models_when_compiling_then_public_declarations_are_grant
         RelationshipUsageTestCase(
             description="expected model provenance is retained",
             files={
-                "models/domain/_constants/value.sql": ("CONSTANT (name model_value, value 6);"),
-                "models/domain/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
+                "sql/models/domain/_constants/value.sql": ("CONSTANT (name model_value, value 6);"),
+                "sql/models/domain/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
                 "tests/unit/check.sql": (
                     "TEST ();\nWITH __ref__orders AS (SELECT 1 AS value), "
                     "__expected__orders AS "
@@ -593,16 +597,16 @@ def test_given_relationship_granted_reference_when_compiling_then_usage_retains_
         ScopePlacementCompileTestCase(
             description="exact local placement is accepted",
             files={
-                "models/domain/_constants/value.sql": ("CONSTANT (name value, value 1);"),
-                "models/domain/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
+                "sql/models/domain/_constants/value.sql": ("CONSTANT (name value, value 1);"),
+                "sql/models/domain/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
             },
         ),
         ScopePlacementCompileTestCase(
             description="inherited lowest common ancestor is accepted",
             files={
-                "models/domain/constants/value.sql": "CONSTANT (name value, value 1);",
-                "models/domain/a/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
-                "models/domain/b/customers.sql": 'MODEL (description "Test model customers.");\nSELECT @const("value") AS value',
+                "sql/models/domain/constants/value.sql": "CONSTANT (name value, value 1);",
+                "sql/models/domain/a/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
+                "sql/models/domain/b/customers.sql": 'MODEL (description "Test model customers.");\nSELECT @const("value") AS value',
             },
         ),
     ),
@@ -645,9 +649,9 @@ def test_given_models_in_same_directory_when_reusing_visibility_then_usage_consu
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "models/domain/area/_constants/value.sql": "CONSTANT (name value, value 1);",
-            "models/domain/area/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
-            "models/domain/area/customers.sql": 'MODEL (description "Test model customers.");\nSELECT @const("value") AS value',
+            "sql/models/domain/area/_constants/value.sql": "CONSTANT (name value, value 1);",
+            "sql/models/domain/area/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
+            "sql/models/domain/area/customers.sql": 'MODEL (description "Test model customers.");\nSELECT @const("value") AS value',
         },
     )
 
@@ -666,23 +670,23 @@ def test_given_models_in_same_directory_when_reusing_visibility_then_usage_consu
         ScopePlacementCompileTestCase(
             description="used global with one owner is rejected as over broad",
             files={
-                "constants/value.sql": "CONSTANT (name value, value 1);",
-                "models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
+                "sql/constants/value.sql": "CONSTANT (name value, value 1);",
+                "sql/models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
             },
             expected_fragment="required exact-owner-private at 'models'",
         ),
         ScopePlacementCompileTestCase(
             description="unused global is rejected",
             files={
-                "constants/value.sql": "CONSTANT (name value, value 1);",
-                "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
+                "sql/constants/value.sql": "CONSTANT (name value, value 1);",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
             },
             expected_fragment="Unused global declaration 'constant:value'",
         ),
         ScopePlacementCompileTestCase(
             description="unused private is rejected",
             files={
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     "MODEL (description 'Test model orders.', constants (_value 1));\nSELECT 1 AS value"
                 ),
             },
@@ -691,10 +695,10 @@ def test_given_models_in_same_directory_when_reusing_visibility_then_usage_consu
         ScopePlacementCompileTestCase(
             description="inherited declaration used in one directory must be local",
             files={
-                "models/domain/constants/value.sql": "CONSTANT (name value, value 1);",
-                "models/domain/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
+                "sql/models/domain/constants/value.sql": "CONSTANT (name value, value 1);",
+                "sql/models/domain/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
             },
-            expected_fragment="required exact-owner-private at 'models/domain'",
+            expected_fragment="required exact-owner-private at 'sql/models/domain'",
         ),
     ),
     ids=lambda case: case.description,
@@ -724,8 +728,8 @@ def test_given_invalid_declaration_placement_when_assembling_then_it_reports_an_
         ScopePlacementCompileTestCase(
             description="over broad global is advisory when placement enforcement is disabled",
             files={
-                "constants/value.sql": "CONSTANT (name value, value 1);",
-                "models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
+                "sql/constants/value.sql": "CONSTANT (name value, value 1);",
+                "sql/models/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
             },
             expected_model_names=("orders",),
             expected_diagnostics=(("S024", "warning"),),
@@ -762,8 +766,10 @@ def test_given_disabled_placement_enforcement_when_assembling_then_project_and_w
     (
         ScopedDeclarationCompileTestCase(
             description="inherited enum contract",
-            files={"models/domain/enums/state.sql": "ENUM (name state, members [OPEN, CLOSED]);"},
-            model_path="models/domain/child/orders.sql",
+            files={
+                "sql/models/domain/enums/state.sql": "ENUM (name state, members [OPEN, CLOSED]);"
+            },
+            model_path="sql/models/domain/child/orders.sql",
             model_sql=(
                 "MODEL (description 'Test model orders.', contract enforced, columns (state (type state)));\n"
                 'SELECT @enum("state").OPEN AS state'
@@ -801,10 +807,10 @@ def test_given_inherited_enum_when_compiling_contract_then_resolves_from_model_p
         ScopedDeclarationCompileTestCase(
             description="source authored path",
             files={
-                "sources/domain/_constants/value.sql": "CONSTANT (name value, value 14);",
-                "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1",
+                "sql/sources/domain/_constants/value.sql": "CONSTANT (name value, value 14);",
+                "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1",
             },
-            model_path="sources/domain/source.yml",
+            model_path="sql/sources/domain/source.yml",
             model_sql='SELECT @const("value")',
             expected_sql="SELECT 14",
         ),
@@ -856,13 +862,13 @@ def test_given_sources_in_same_file_when_reusing_visibility_then_usage_consumers
     tmp_path: Path,
     write_repo_files: Callable[[Path, dict[str, str]], None],
 ) -> None:
-    source_path: Path = tmp_path / "sources/domain/source.yml"
+    source_path: Path = tmp_path / "sql/sources/domain/source.yml"
     write_repo_files(
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "sources/domain/_constants/value.sql": "CONSTANT (name value, value 14);",
-            "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1",
+            "sql/sources/domain/_constants/value.sql": "CONSTANT (name value, value 14);",
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1",
         },
     )
     discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)
@@ -871,7 +877,7 @@ def test_given_sources_in_same_file_when_reusing_visibility_then_usage_consumers
         source_files=(
             DiscoveredSourceFile(
                 file_path=source_path,
-                relative_path=Path("sources/domain/source.yml"),
+                relative_path=Path("sql/sources/domain/source.yml"),
                 contents="",
                 source_entries=(
                     SourceEntry(name="customer_orders", expression='SELECT @const("value")'),
@@ -920,7 +926,7 @@ def test_given_tests_in_same_directory_when_reusing_visibility_then_usage_consum
         tmp_path,
         {
             "sqlbuild_project.toml": _PROJECT_FILE,
-            "models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS value",
             "tests/unit/domain/_constants/value.sql": "CONSTANT (name value, value 16);",
             "tests/unit/domain/customer_orders.sql": test_sql,
             "tests/unit/domain/inventory_orders.sql": test_sql,

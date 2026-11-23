@@ -8,8 +8,8 @@
      "phase": "compile",
      "severity": "error",
      "code": "D016",
-     "message": "Unsupported project Python path(s): helpers/formatting.py",
-     "help": "Move pipeline Python nodes and the helper modules they import under python/, or move SQLBuild extensions under their documented extension path."
+     "message": "Unsupported project Python path(s): sql/models/formatting.py",
+     "help": "Move pipeline Python nodes and the helper modules they import under python/nodes/, or move SQLBuild extensions under their documented extension path."
     }
    ]
   }

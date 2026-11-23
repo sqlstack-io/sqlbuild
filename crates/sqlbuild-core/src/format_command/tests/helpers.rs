@@ -20,7 +20,7 @@ pub(super) fn sample_report() -> LintReport {
         findings: vec![
             LintFinding {
                 file: "/p/models/orders.sql".to_owned(),
-                display_path: "models/orders.sql".to_owned(),
+                display_path: "sql/models/orders.sql".to_owned(),
                 line: 2,
                 column: 8,
                 end_line: Some(2),

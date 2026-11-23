@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P019",
-     "message": "SQL macros call each other in a cycle: x() -> y() -> x()\n  --> models/staging/_sqlbuild/_macros/sql/y.sql:3:1",
+     "message": "SQL macros call each other in a cycle: x() -> y() -> x()\n  --> sql/models/staging/_sqlbuild/_macros/sql/y.sql:3:1",
      "help": "SQL macros may call other SQL macros, but not back into themselves"
     }
    ]

@@ -236,8 +236,8 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
             extra_files=round_trip_variant(
                 "transitive_gate",
                 {
-                    "python/tasks/packaging.py": "packaging.py",
-                    "python/loaders/partner.py": "partner.py",
+                    "python/nodes/tasks/packaging.py": "packaging.py",
+                    "python/nodes/loaders/partner.py": "partner.py",
                 },
             ),
             expected_output_fragments=(
@@ -253,10 +253,10 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
             extra_files=round_trip_variant(
                 "ingress_gate",
                 {
-                    "python/tasks/rates.py": "rates_task.py",
-                    "python/loaders/rates.py": "rates_loader.py",
-                    "sources/rates.yml": "rates.yml",
-                    "python/loaders/partner.py": "partner.py",
+                    "python/nodes/tasks/rates.py": "rates_task.py",
+                    "python/nodes/loaders/rates.py": "rates_loader.py",
+                    "sql/sources/rates.yml": "rates.yml",
+                    "python/nodes/loaders/partner.py": "partner.py",
                 },
             ),
             expected_output_fragments=(
@@ -287,7 +287,9 @@ def test_given_a_built_round_trip_when_rebuilding_then_the_decision_follows_the_
         ),
     )
     project_dir: Path = database.parent
-    (project_dir / "models" / "orders.sql").write_text(test_case.orders_sql, encoding="utf-8")
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
+        test_case.orders_sql, encoding="utf-8"
+    )
     for relative, text in test_case.extra_files.items():
         (project_dir / relative).write_text(text, encoding="utf-8")
 

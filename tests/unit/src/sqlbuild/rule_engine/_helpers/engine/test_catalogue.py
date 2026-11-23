@@ -265,7 +265,7 @@ def test_given_minimum_test_rule_when_rendering_guidance_then_all_surfaces_have_
     test_case: PolicyGuidanceTestCase,
 ) -> None:
     override: ThresholdOverride = ThresholdOverride(
-        paths=("models/mart/**",),
+        paths=("sql/models/mart/**",),
         thresholds={"min_tests_per_model": 2},
         reason="marts require two focused tests",
     )
@@ -282,7 +282,7 @@ def test_given_minimum_test_rule_when_rendering_guidance_then_all_surfaces_have_
     result: RulesResult = evaluate(
         project=build_project(
             name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql="SELECT id + 1 AS id FROM orders",
             config_values={"materialized": "table"},
         ),

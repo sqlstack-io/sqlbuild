@@ -78,7 +78,7 @@ def test_given_typed_contract_when_compiling_then_type_proof_rules_follow_sql_an
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": test_case.project_toml,
-            "models/orders.sql": _ORDERS_MODEL,
+            "sql/models/orders.sql": _ORDERS_MODEL,
         },
     )
 
@@ -127,7 +127,7 @@ def test_given_typed_contract_when_building_without_sql_analysis_then_type_proof
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": test_case.project_toml,
-            "models/orders.sql": _ORDERS_MODEL,
+            "sql/models/orders.sql": _ORDERS_MODEL,
         },
     )
 

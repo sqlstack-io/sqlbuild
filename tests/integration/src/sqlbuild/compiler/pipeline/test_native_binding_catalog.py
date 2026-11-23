@@ -57,8 +57,8 @@ def test_given_quoted_case_semantics_when_compiling_then_resolves_native_aliases
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "snowflake"\n[rules]\nselect = []\n[connection]\nsession_parameters = { QUOTED_IDENTIFIERS_IGNORE_CASE = true }\n'
     )
-    (tmp_path / "models").mkdir()
-    (tmp_path / "models/orders.sql").write_text(
+    (tmp_path / "sql" / "models").mkdir(parents=True)
+    (tmp_path / "sql/models/orders.sql").write_text(
         "MODEL (description 'Test model orders.', database warehouse, schema analytics);\n"
         + test_case.sql
     )
@@ -90,11 +90,11 @@ def test_given_quoted_typo_when_validating_then_keeps_authored_spelling_and_span
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "snowflake"\n[rules]\nselect = []\n[connection]\nsession_parameters = { QUOTED_IDENTIFIERS_IGNORE_CASE = true }\n'
     )
-    (tmp_path / "models").mkdir()
+    (tmp_path / "sql" / "models").mkdir(parents=True)
     sql: str = (
         "MODEL (description 'Test model.', database warehouse, schema analytics);\n" + test_case.sql
     )
-    (tmp_path / "models/orders.sql").write_text(sql)
+    (tmp_path / "sql/models/orders.sql").write_text(sql)
     assert main(["--project-dir", str(tmp_path), "compile", "--json", "--no-cache"]) == 1
     payload: dict[str, Any] = json.loads(capsys.readouterr().out)
     (diagnostic,) = payload["diagnostics"]
@@ -119,12 +119,12 @@ def test_given_catalog_when_rebinding_physical_shapes_then_does_not_reuse_stale_
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "snowflake"\n[rules]\nselect = []\n[connection]\nsession_parameters = { QUOTED_IDENTIFIERS_IGNORE_CASE = true }\n'
     )
-    (tmp_path / "models").mkdir()
-    (tmp_path / "sources").mkdir()
-    (tmp_path / "sources/orders.yml").write_text(
+    (tmp_path / "sql" / "models").mkdir(parents=True)
+    (tmp_path / "sql" / "sources").mkdir(parents=True)
+    (tmp_path / "sql/sources/orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    table: orders\n"
     )
-    (tmp_path / "models/report.sql").write_text(
+    (tmp_path / "sql/models/report.sql").write_text(
         "MODEL (description 'Test model report.', database warehouse, schema analytics);\n"
         + test_case.sql
     )
@@ -182,12 +182,12 @@ def test_given_case_sensitive_snowflake_when_rebinding_listed_columns_then_unquo
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "snowflake"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "models").mkdir()
-    (tmp_path / "sources").mkdir()
-    (tmp_path / "sources/orders.yml").write_text(
+    (tmp_path / "sql" / "models").mkdir(parents=True)
+    (tmp_path / "sql" / "sources").mkdir(parents=True)
+    (tmp_path / "sql/sources/orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    table: orders\n"
     )
-    (tmp_path / "models/report.sql").write_text(
+    (tmp_path / "sql/models/report.sql").write_text(
         "MODEL (description 'Test model report.', database warehouse, schema analytics);\n"
         + test_case.sql
     )
@@ -281,16 +281,16 @@ def test_given_case_sensitive_dialect_when_listed_columns_bind_as_declared_then_
     (tmp_path / "sqlbuild_project.toml").write_text(
         f'name = "orders"\nadapter = "{test_case.dialect}"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "models").mkdir()
-    (tmp_path / "sources").mkdir()
-    (tmp_path / "sources/orders.yml").write_text(
+    (tmp_path / "sql" / "models").mkdir(parents=True)
+    (tmp_path / "sql" / "sources").mkdir(parents=True)
+    (tmp_path / "sql/sources/orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    table: orders\n"
         "    contract: enforced\n    columns:\n"
         + "".join(
             f"      - name: {name}\n        type: {kind}\n" for name, kind in _DECLARED_ORDERS
         )
     )
-    (tmp_path / "models/report.sql").write_text(
+    (tmp_path / "sql/models/report.sql").write_text(
         "MODEL (description 'Test model report.', database warehouse, schema analytics);\n"
         'SELECT order_id, status FROM __source("orders")'
     )
@@ -375,9 +375,9 @@ def test_given_source_gaining_columns_when_rebinding_then_reanalyses_models_they
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "snowflake"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "models").mkdir()
-    (tmp_path / "sources").mkdir()
-    (tmp_path / "sources/orders.yml").write_text(
+    (tmp_path / "sql" / "models").mkdir(parents=True)
+    (tmp_path / "sql" / "sources").mkdir(parents=True)
+    (tmp_path / "sql/sources/orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    table: orders\n"
         "    contract: enforced\n    columns:\n"
         + "".join(
@@ -385,7 +385,7 @@ def test_given_source_gaining_columns_when_rebinding_then_reanalyses_models_they
         )
     )
     for name, sql in test_case.models:
-        (tmp_path / f"models/{name}.sql").write_text(
+        (tmp_path / f"sql/models/{name}.sql").write_text(
             f"MODEL (description 'Test model {name}.', database warehouse, schema analytics);\n"
             + sql
         )
@@ -434,8 +434,8 @@ def test_given_sql_when_case_policy_enabled_then_fused_validation_is_reused(
         'name = "orders"\nadapter = "snowflake"\n[rules]\nselect = []\n'
         "[connection]\nsession_parameters = { QUOTED_IDENTIFIERS_IGNORE_CASE = true }\n"
     )
-    (tmp_path / "models").mkdir()
-    (tmp_path / "models/orders.sql").write_text(
+    (tmp_path / "sql" / "models").mkdir(parents=True)
+    (tmp_path / "sql/models/orders.sql").write_text(
         "MODEL (description 'Test model orders.', database warehouse, schema analytics);\n"
         + test_case.sql
     )
@@ -481,8 +481,8 @@ def test_given_target_cache_policy_when_compiling_twice_then_reuses_only_enabled
         f"compile_cache = {str(test_case.enabled).lower()}\n"
         "[targets.local.connection]\nsession_parameters = { QUOTED_IDENTIFIERS_IGNORE_CASE = true }\n"
     )
-    (tmp_path / "models").mkdir()
-    model: Path = tmp_path / "models/orders.sql"
+    (tmp_path / "sql" / "models").mkdir(parents=True)
+    model: Path = tmp_path / "sql/models/orders.sql"
     model.write_text(
         'MODEL (description "Test model orders.", database warehouse, schema analytics);\nSELECT SUM("Active") FROM (SELECT TRUE AS "Active") q'
     )
@@ -532,12 +532,12 @@ def test_given_quoted_catalog_binding_when_compiling_then_preserves_bound_expres
         'name = "orders"\nadapter = "snowflake"\n[rules]\nselect = []\n'
         "[connection]\nsession_parameters = { QUOTED_IDENTIFIERS_IGNORE_CASE = true }\n"
     )
-    (tmp_path / "sources").mkdir()
-    (tmp_path / "sources/orders.yml").write_text(
+    (tmp_path / "sql" / "sources").mkdir(parents=True)
+    (tmp_path / "sql/sources/orders.yml").write_text(
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    expression: SELECT 1 AS id, 2 AS amount\n"
     )
-    (tmp_path / "models").mkdir()
-    (tmp_path / "models/orders.sql").write_text(
+    (tmp_path / "sql" / "models").mkdir(parents=True)
+    (tmp_path / "sql/models/orders.sql").write_text(
         "MODEL (description 'Test model orders.', database warehouse, schema analytics); "
         + test_case.sql
     )

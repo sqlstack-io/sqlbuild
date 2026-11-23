@@ -392,7 +392,7 @@ _INT_MODEL_SQL: str = (
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/microbatch.py"),
+                    relative_path=Path("sql/hooks/python/microbatch.py"),
                     name="insert_hook_log",
                     function=insert_microbatch_hook_log,
                 ),
@@ -705,7 +705,7 @@ def test_given_warn_limit_when_pre_hook_fails_then_execution_metadata_is_preserv
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/microbatch.py"),
+                    relative_path=Path("sql/hooks/python/microbatch.py"),
                     name="skip_hook",
                     function=skip_microbatch_hook,
                 ),
@@ -990,7 +990,7 @@ def test_given_reconciliation_reduces_work_when_enforcing_limit_then_final_set_e
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/microbatch.py"),
+                    relative_path=Path("sql/hooks/python/microbatch.py"),
                     name="fail_hook",
                     function=fail_microbatch_hook,
                 ),
@@ -1098,7 +1098,7 @@ def test_given_reconciliation_reduces_work_when_enforcing_limit_then_final_set_e
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/microbatch.py"),
+                    relative_path=Path("sql/hooks/python/microbatch.py"),
                     name="fail_hook",
                     function=fail_microbatch_hook,
                 ),

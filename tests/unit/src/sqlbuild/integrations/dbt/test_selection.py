@@ -59,10 +59,10 @@ _SQLBUILD_TAGS: dict[str, tuple[str, ...]] = {
 }
 
 _SQLBUILD_PATHS: dict[str, str] = {
-    "stg_local": "models/staging/stg_local.sql",
-    "fact_orders": "models/marts/fact_orders.sql",
-    "mart_orders": "models/marts/mart_orders.sql",
-    "local_only": "models/local/local_only.sql",
+    "stg_local": "sql/models/staging/stg_local.sql",
+    "fact_orders": "sql/models/marts/fact_orders.sql",
+    "mart_orders": "sql/models/marts/mart_orders.sql",
+    "local_only": "sql/models/local/local_only.sql",
 }
 
 
@@ -328,7 +328,7 @@ _SQLBUILD_PATHS: dict[str, str] = {
             sqlbuild_model_sql_by_name=_SQLBUILD_SQL,
             sqlbuild_model_tags_by_name=_SQLBUILD_TAGS,
             sqlbuild_model_path_by_name=_SQLBUILD_PATHS,
-            select=("path:models/marts",),
+            select=("path:sql/models/marts",),
             exclude=(),
             dbt_anchor_unique_ids_by_term={},
             expected_sqlbuild_model_names=("fact_orders", "mart_orders"),
@@ -346,7 +346,7 @@ _SQLBUILD_PATHS: dict[str, str] = {
             dbt_anchor_unique_ids_by_term={},
             expected_sqlbuild_model_names=("fact_orders", "mart_orders"),
             expected_dbt_required_unique_ids=(),
-            expected_path_translations=(("path:models\\marts", "path:models/marts"),),
+            expected_path_translations=(("path:models\\marts", "path:sql/models/marts"),),
         ),
         DbtSelectionTestCase(
             description="selects SQLBuild explicit model path with upstream expansion",
@@ -354,7 +354,7 @@ _SQLBUILD_PATHS: dict[str, str] = {
             sqlbuild_model_sql_by_name=_SQLBUILD_SQL,
             sqlbuild_model_tags_by_name=_SQLBUILD_TAGS,
             sqlbuild_model_path_by_name=_SQLBUILD_PATHS,
-            select=("+path:models/marts",),
+            select=("+path:sql/models/marts",),
             exclude=(),
             dbt_anchor_unique_ids_by_term={},
             expected_sqlbuild_model_names=("fact_orders", "mart_orders"),
@@ -370,7 +370,7 @@ _SQLBUILD_PATHS: dict[str, str] = {
             sqlbuild_model_sql_by_name=_SQLBUILD_SQL,
             sqlbuild_model_tags_by_name=_SQLBUILD_TAGS,
             sqlbuild_model_path_by_name=_SQLBUILD_PATHS,
-            select=("path:models/marts+",),
+            select=("path:sql/models/marts+",),
             exclude=(),
             dbt_anchor_unique_ids_by_term={},
             expected_sqlbuild_model_names=("fact_orders", "mart_orders"),
@@ -528,7 +528,7 @@ def test_given_dbt_interop_selectors_when_resolving_then_returns_expected_sqlbui
             ),
             sqlbuild_model_sql_by_name={"fact_orders": "select 1"},
             sqlbuild_model_tags_by_name={},
-            sqlbuild_model_path_by_name={"fact_orders": "models/marts/fact_orders.sql"},
+            sqlbuild_model_path_by_name={"fact_orders": "sql/models/marts/fact_orders.sql"},
             select=("stg_orders~fact_orders",),
             expected_error_fragment="endpoint 'stg_orders' is ambiguous across dbt models",
         )

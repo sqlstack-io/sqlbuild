@@ -9,11 +9,11 @@
      "severity": "error",
      "code": "SQLCLEAN005",
      "message": "CTE is unreachable from the final query",
-     "path": "models/marts/customer_totals.sql",
+     "path": "sql/models/marts/customer_totals.sql",
      "line": 5,
      "column": 6,
      "location": {
-      "path": "models/marts/customer_totals.sql",
+      "path": "sql/models/marts/customer_totals.sql",
       "line": 5,
       "column": 6
      },
@@ -27,16 +27,16 @@
  ],
  "compiled": {},
  "compiled_failed": {
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "-- sqb: compile failed for this model; not buildable",
-   "-- SQLCLEAN005 at models/marts/customer_totals.sql:5:6: CTE is unreachable from the final query",
+   "-- SQLCLEAN005 at sql/models/marts/customer_totals.sql:5:6: CTE is unreachable from the final query",
    "WITH spare AS (SELECT 1 AS one)",
    "SELECT customer_id, SUM(amount) AS total_amount",
    "FROM __ref(\"stg_orders\")",
    "GROUP BY customer_id",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "SELECT order_id, customer_id, amount, status",
    "FROM __source(\"raw_orders\")",
    ""

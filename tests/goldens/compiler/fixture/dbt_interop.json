@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "C214",
-     "message": "Model file models/marts/downstream_orders.sql uses __dbt_ref(\"fact_orders\") but no dbt manifest was found",
+     "message": "Model file sql/models/marts/downstream_orders.sql uses __dbt_ref(\"fact_orders\") but no dbt manifest was found",
      "help": "Run dbt compile or configure dbt target_path so SQLBuild can read manifest.json."
     }
    ]
@@ -21,7 +21,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "C214",
-     "message": "Model file models/marts/downstream_orders.sql uses __dbt_ref(\"fact_orders\") but no dbt manifest was found",
+     "message": "Model file sql/models/marts/downstream_orders.sql uses __dbt_ref(\"fact_orders\") but no dbt manifest was found",
      "help": "Run dbt compile or configure dbt target_path so SQLBuild can read manifest.json."
     }
    ]
@@ -34,7 +34,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "C214",
-     "message": "Model file models/marts/downstream_orders.sql uses __dbt_ref(\"fact_orders\") but no dbt manifest was found",
+     "message": "Model file sql/models/marts/downstream_orders.sql uses __dbt_ref(\"fact_orders\") but no dbt manifest was found",
      "help": "Run dbt compile or configure dbt target_path so SQLBuild can read manifest.json."
     }
    ]
@@ -54,7 +54,7 @@
     "External manifest discovery  START",
     "External manifest discovery  OK  (<elapsed>)",
     "Compiling project...",
-    "error[C214]: Model file models/marts/downstream_orders.sql uses __dbt_ref(\"fact_orders\") but no dbt manifest was found",
+    "error[C214]: Model file sql/models/marts/downstream_orders.sql uses __dbt_ref(\"fact_orders\") but no dbt manifest was found",
     "  = help: Run dbt compile or configure dbt target_path so SQLBuild can read manifest.json.",
     "",
     ""

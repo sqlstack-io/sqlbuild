@@ -1586,8 +1586,8 @@ reason = "Bare lifecycle sink decorators are evaluated as decorator(function), r
 
 [[targets.python.rule_exceptions]]
 rule = "FFS120"
-path = "src/sqlbuild/runtime/event_exporting/main/command_output_sink.py"
-symbols = ["command_output_sink"]
+path = "src/sqlbuild/runtime/event_exporting/main/command_output_event_sink.py"
+symbols = ["command_output_event_sink"]
 reason = "Bare command-output sink decorators are evaluated as decorator(function), requiring positional function calling."
 
 [[targets.python.rule_exceptions]]

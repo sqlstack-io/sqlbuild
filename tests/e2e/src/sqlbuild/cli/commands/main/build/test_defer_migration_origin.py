@@ -25,15 +25,15 @@ _PROJECT_FILES: dict[str, str] = {
         '[targets.dev]\nschema = "dev"\n\n'
         '[targets.prod]\nschema = "preserve"\n'
     ),
-    "models/order_ledger.sql": (
+    "sql/models/order_ledger.sql": (
         'MODEL (description "Test model order_ledger.", materialized table, '
         "schema prod, migrate_from order_history);\n\nSELECT 1 AS order_id\n"
     ),
-    "models/order_report.sql": (
+    "sql/models/order_report.sql": (
         'MODEL (description "Test model order_report.", materialized table, schema prod);\n\n'
         'SELECT order_id FROM __ref("order_ledger")\n'
     ),
-    "models/order_archive.sql": (
+    "sql/models/order_archive.sql": (
         'MODEL (description "Test model order_archive.", materialized table, schema sales);\n\n'
         "SELECT 1 AS order_id\n"
     ),

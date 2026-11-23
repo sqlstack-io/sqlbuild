@@ -82,9 +82,9 @@ Details:
 
 ## Python tests
 
-Python tests are pytest modules named `test_*.py` under `tests/python/`, `tests/providers/` and
+Python tests are pytest modules named `test_*.py` under `tests/python/nodes/`, `tests/python/providers/` and
 `tests/orchestration/`. Each sits in the folder that mirrors the code it tests, so the tests of
-`python/orders/storefront_import/node.py` live in `tests/python/orders/storefront_import/`, and
+`python/nodes/orders/storefront_import/asset.py` live in `tests/python/nodes/orders/storefront_import/`, and
 the tests of the sensor `orchestration/sensors/orders/restock.py` in
 `tests/orchestration/sensors/orders/test_restock.py`.
 
@@ -97,7 +97,7 @@ the tests of the sensor `orchestration/sensors/orders/restock.py` in
 | `sqb build` | Yes | Never |
 
 pytest runs from the project directory with the same Python as SQLBuild and with
-`--import-mode=importlib`, so tests import project code as `python.orders...`, `providers...` or
+`--import-mode=importlib`, so tests import project code as `python.nodes.orders...`, `providers...` or
 `orchestration.sensors...`.
 Its output appears after the SQL test summary, followed by `Python tests passed` or
 `Python tests failed`. `sqb test` exits non-zero when either kind fails.
@@ -145,7 +145,7 @@ the node uses, resolved through [scopes](/docs/concepts/declaration-scopes). A c
 count; `meta` does.
 
 A macro counts as changed when the Python file that defines it changes, or any project module it
-imports, such as a helper under `python/`; when that code reads `ctx.vars`, a change to any project
+imports, such as a helper under `python/nodes/`; when that code reads `ctx.vars`, a change to any project
 variable counts too. A [SQL macro](/docs/concepts/macros/sql-macros) counts as changed when its
 arguments, result type or body change, or a project variable it reads; formatting, comments and its
 description do not count. A node that calls a SQL macro also uses every SQL macro that macro calls. An enum, constant or audit counts as changed when its declaration file
@@ -161,7 +161,7 @@ Some inputs reach every test, so a change to any of them selects every test:
 - the `[settings]` that shape compiled models;
 - the adapter, `[connection]` and `[connections]` (including connection settings and adapter
   extensions), `[targets]` and the target in use, and project-local adapter modules under
-  `adapters/`. Their values are compared by digest and never printed;
+  `python/adapters/`. Their values are compared by digest and never printed;
 - the Python environment as the project records it: the git-tracked `pyproject.toml`, `uv.lock`,
   `poetry.lock`, `pdm.lock`, `Pipfile.lock` and `requirements*.txt` in the project directory or at
   the repository root, compared with line endings normalised. Untracked and ignored copies do not

@@ -35,7 +35,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
             command=("build",),
             model_replacements=(
                 (
-                    "models/marts/daily_revenue.sql",
+                    "sql/models/marts/daily_revenue.sql",
                     '__ref("stg_payments")',
                     '__ref("missing_payments")',
                 ),

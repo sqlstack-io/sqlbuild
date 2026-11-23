@@ -1,4 +1,4 @@
-from python.loaders.partner import partner_scores
+from python.nodes.loaders.partner import partner_scores
 
 from sqlbuild.assets import asset
 

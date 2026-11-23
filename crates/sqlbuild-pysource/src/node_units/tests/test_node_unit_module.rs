@@ -61,13 +61,13 @@ fn given_imports_when_reading_then_each_bound_name_records_whether_only_depends_
             UnitImport {
                 only_in_depends_on: true,
                 ..import(
-                    "python.orders.daily.node",
+                    "python.nodes.orders.daily.node",
                     Some("daily"),
                     "upstream",
                     at(3, 38),
                 )
             },
-            import("python.utils.text", None, "python", at(4, 8)),
+            import("python.nodes.utils.text", None, "python", at(4, 8)),
         ],
     }];
     for test_case in test_cases {

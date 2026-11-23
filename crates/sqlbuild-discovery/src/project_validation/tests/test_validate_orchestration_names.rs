@@ -33,7 +33,7 @@ fn given_orchestration_names_when_validating_then_they_share_the_project_namespa
                 ..ProjectFacts::default()
             },
             expected_failure: collision(
-                "Project resource name 'orders' is declared as both model in models/orders.sql \
+                "Project resource name 'orders' is declared as both model in sql/models/orders.sql \
                  and job in orchestration/daily.py",
                 RENAME_DECLARATION,
             ),
@@ -57,13 +57,13 @@ fn given_orchestration_names_when_validating_then_they_share_the_project_namespa
         ValidationTestCase {
             description: "a calendar named like a provider",
             facts: ProjectFacts {
-                providers: vec![named("fulfillment", "providers/fulfillment.py")],
+                providers: vec![named("fulfillment", "python/providers/fulfillment.py")],
                 orchestration: vec![declared("fulfillment", "calendar")],
                 ..ProjectFacts::default()
             },
             expected_failure: collision(
                 "Project resource name 'fulfillment' is declared as both provider in \
-                 providers/fulfillment.py and calendar in orchestration/daily.py",
+                 python/providers/fulfillment.py and calendar in orchestration/daily.py",
                 RENAME_DECLARATION,
             ),
         },
@@ -78,7 +78,7 @@ fn given_orchestration_names_when_validating_then_they_share_the_project_namespa
                 ..ProjectFacts::default()
             },
             expected_failure: collision(
-                "Project resource name 'orders' is declared as both model in models/orders.sql \
+                "Project resource name 'orders' is declared as both model in sql/models/orders.sql \
                  and unit test in tests/orders.sql",
                 "",
             ),

@@ -167,6 +167,10 @@ SNAPSHOT_DEFAULT_VALID_TO_COLUMN: str
 PROJECT_CONFIG_FILENAME: str
 PYTHON_INIT_MODULE_STEM: str
 PYTHON_NODE_ROOT: str
+PYTHON_PACKAGE_NAME: str
+EVENT_SINKS_PATH: str
+ADAPTERS_PATH: str
+ADAPTER_FILE_PATH: str
 SETTINGS_SECTION: str
 TABLE_PROMOTION_MODE_SETTING_KEY: str
 STAGED_PROMOTION_MODE: str
@@ -8502,7 +8506,7 @@ class SchemaParseError(DiscoveryError):
     """Raised when a schema.yml file has an invalid shape."""
 
 class SourceParseError(DiscoveryError):
-    """Raised when a sources/*.yml file has an invalid shape."""
+    """Raised when a sql/sources/*.yml file has an invalid shape."""
 
 class DiscoveryConflictError(DiscoveryError):
     """Raised when discovered project inputs conflict across files."""
@@ -8530,6 +8534,9 @@ class EventExporterDiscoveryError(DiscoveryError):
 
 class OrchestrationDeclarationError(DiscoveryError):
     """Raised when an orchestration job, job group, calendar or sensor declaration is invalid."""
+
+class ProjectLayoutError(DiscoveryError):
+    """Raised when a project holds an entry outside the SQLBuild project layout."""
 
 class ProjectPythonPathError(DiscoveryError):
     """Raised when project-owned Python lives outside a supported extension root."""
@@ -12789,7 +12796,7 @@ class SourceFreshnessConfig(NativeRecord):
     ) -> None: ...
 
 class SourceColumnEntry(NativeRecord):
-    """One source column entry from sources/*.yml."""
+    """One source column entry from sql/sources/*.yml."""
 
     name: str
     type: str | None
@@ -12808,7 +12815,7 @@ class SourceColumnEntry(NativeRecord):
     ) -> None: ...
 
 class SourceEntry(NativeRecord):
-    """One source declaration from sources/*.yml."""
+    """One source declaration from sql/sources/*.yml."""
 
     name: str
     database: str | None

@@ -19,15 +19,15 @@ fn given_a_cached_python_run_when_running_again_then_only_changed_inputs_are_eva
         PythonCacheTestCase {
             description: "an unchanged project is answered from the cache",
             files: &[
-                ("hooks/python/notify.py", UNANNOTATED),
-                ("providers/settings.py", ANNOTATED),
+                ("sql/hooks/python/notify.py", UNANNOTATED),
+                ("python/providers/settings.py", ANNOTATED),
             ],
             config: json!({ "select": ["SQBRPYTHON101"] }),
             changes: &[],
             changed_config: json!({ "select": ["SQBRPYTHON101"] }),
             expected_runs: CachedRuns {
-                first_faults: named_faults(&[("SQBRPYTHON101", "hooks/python/notify.py")]),
-                second_faults: named_faults(&[("SQBRPYTHON101", "hooks/python/notify.py")]),
+                first_faults: named_faults(&[("SQBRPYTHON101", "sql/hooks/python/notify.py")]),
+                second_faults: named_faults(&[("SQBRPYTHON101", "sql/hooks/python/notify.py")]),
                 second_hits: 2,
                 second_misses: 0,
             },
@@ -35,14 +35,14 @@ fn given_a_cached_python_run_when_running_again_then_only_changed_inputs_are_eva
         PythonCacheTestCase {
             description: "an edited file is evaluated again and its old finding goes",
             files: &[
-                ("hooks/python/notify.py", UNANNOTATED),
-                ("providers/settings.py", ANNOTATED),
+                ("sql/hooks/python/notify.py", UNANNOTATED),
+                ("python/providers/settings.py", ANNOTATED),
             ],
             config: json!({ "select": ["SQBRPYTHON101"] }),
-            changes: &[("hooks/python/notify.py", ANNOTATED)],
+            changes: &[("sql/hooks/python/notify.py", ANNOTATED)],
             changed_config: json!({ "select": ["SQBRPYTHON101"] }),
             expected_runs: CachedRuns {
-                first_faults: named_faults(&[("SQBRPYTHON101", "hooks/python/notify.py")]),
+                first_faults: named_faults(&[("SQBRPYTHON101", "sql/hooks/python/notify.py")]),
                 second_faults: named_faults(&[]),
                 second_hits: 1,
                 second_misses: 1,
@@ -51,7 +51,7 @@ fn given_a_cached_python_run_when_running_again_then_only_changed_inputs_are_eva
         PythonCacheTestCase {
             description: "a changed option evaluates every file again",
             files: &[(
-                "python/orders/main/build.py",
+                "python/nodes/orders/main/build.py",
                 "def build() -> None:\n    a: int = 1\n    b: int = a\n    print(b)\n",
             )],
             config: json!({ "select": ["SQBRPYTHON501"] }),
@@ -62,7 +62,10 @@ fn given_a_cached_python_run_when_running_again_then_only_changed_inputs_are_eva
             }),
             expected_runs: CachedRuns {
                 first_faults: named_faults(&[]),
-                second_faults: named_faults(&[("SQBRPYTHON501", "python/orders/main/build.py")]),
+                second_faults: named_faults(&[(
+                    "SQBRPYTHON501",
+                    "python/nodes/orders/main/build.py",
+                )]),
                 second_hits: 0,
                 second_misses: 1,
             },
@@ -70,18 +73,21 @@ fn given_a_cached_python_run_when_running_again_then_only_changed_inputs_are_eva
         PythonCacheTestCase {
             description: "an unchanged file whose import target appears is evaluated again",
             files: &[(
-                "python/orders/main/export.py",
-                "from python.billing.main._totals import total\n",
+                "python/nodes/orders/main/export.py",
+                "from python.nodes.billing.main._totals import total\n",
             )],
             config: json!({ "select": ["SQBRPYTHON304"] }),
             changes: &[(
-                "python/billing/main/_totals.py",
+                "python/nodes/billing/main/_totals.py",
                 "def total() -> int:\n    return 1\n",
             )],
             changed_config: json!({ "select": ["SQBRPYTHON304"] }),
             expected_runs: CachedRuns {
                 first_faults: named_faults(&[]),
-                second_faults: named_faults(&[("SQBRPYTHON304", "python/orders/main/export.py")]),
+                second_faults: named_faults(&[(
+                    "SQBRPYTHON304",
+                    "python/nodes/orders/main/export.py",
+                )]),
                 second_hits: 0,
                 second_misses: 2,
             },
@@ -89,22 +95,25 @@ fn given_a_cached_python_run_when_running_again_then_only_changed_inputs_are_eva
         PythonCacheTestCase {
             description: "an unchanged domain package whose folder gains a subdomain is evaluated again",
             files: &[
-                ("python/inventory/__init__.py", ""),
-                ("python/inventory/main/__init__.py", ""),
+                ("python/nodes/inventory/__init__.py", ""),
+                ("python/nodes/inventory/main/__init__.py", ""),
                 (
-                    "python/inventory/main/publish.py",
+                    "python/nodes/inventory/main/publish.py",
                     "def publish() -> None:\n    pass\n",
                 ),
             ],
             config: json!({ "select": ["SQBRPYTHON613"] }),
             changes: &[
-                ("python/inventory/restock/__init__.py", ""),
-                ("python/inventory/restock/main/__init__.py", ""),
+                ("python/nodes/inventory/restock/__init__.py", ""),
+                ("python/nodes/inventory/restock/main/__init__.py", ""),
             ],
             changed_config: json!({ "select": ["SQBRPYTHON613"] }),
             expected_runs: CachedRuns {
                 first_faults: named_faults(&[]),
-                second_faults: named_faults(&[("SQBRPYTHON613", "python/inventory/__init__.py")]),
+                second_faults: named_faults(&[(
+                    "SQBRPYTHON613",
+                    "python/nodes/inventory/__init__.py",
+                )]),
                 second_hits: 0,
                 second_misses: 1,
             },

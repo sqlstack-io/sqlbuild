@@ -25,7 +25,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             description="an argument the audit never reads names itself for removal",
             arguments='group_columns "channel", where_condition "channel = \'web\'"',
             expected_message=(
-                "models/orders.sql audit 'unique_within_group' passes argument "
+                "sql/models/orders.sql audit 'unique_within_group' passes argument "
                 "'where_condition', which the audit's SQL in "
                 f"{GENERIC_AUDIT_PATH} never uses; remove 'where_condition' from the attachment"
             ),
@@ -90,7 +90,7 @@ def test_given_attached_generic_audit_when_compiling_then_rendered_sql_is_writte
         command=("--no-color", "compile"), project_dir=project_dir
     )
     rendered: str = audit_file.read_text(encoding="utf-8")
-    model_path: Path = project_dir / "models/orders.sql"
+    model_path: Path = project_dir / "sql/models/orders.sql"
     _ = model_path.write_text(
         model_path.read_text(encoding="utf-8").replace(
             f" (audits [unique_within_group ({test_case.arguments})])",

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro '@py.explode' in '<project>/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id"
+     "message": "Macro '@py.explode' in '<project>/sql/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id"
     }
    ]
   },
@@ -20,7 +20,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro '@py.explode' in '<project>/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id"
+     "message": "Macro '@py.explode' in '<project>/sql/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id"
     }
    ]
   },
@@ -37,7 +37,7 @@
     "Project assembly  OK  (<elapsed>)",
     "Project discovery  OK  (<elapsed>)",
     "Compiling project...",
-    "error[P001]: Macro '@py.explode' in '<project>/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id",
+    "error[P001]: Macro '@py.explode' in '<project>/sql/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id",
     "",
     ""
    ]
@@ -50,7 +50,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro '@py.explode' in '<project>/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id"
+     "message": "Macro '@py.explode' in '<project>/sql/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id"
     }
    ]
   },
@@ -62,7 +62,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro '@py.explode' in '<project>/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id"
+     "message": "Macro '@py.explode' in '<project>/sql/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id"
     }
    ]
   },
@@ -74,7 +74,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro '@py.explode' in '<project>/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id"
+     "message": "Macro '@py.explode' in '<project>/sql/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id"
     }
    ]
   },
@@ -90,7 +90,7 @@
     "Python discovery  OK  (<elapsed>)",
     "Project assembly  OK  (<elapsed>)",
     "Project discovery  OK  (<elapsed>)",
-    "error[P001]: Macro '@py.explode' in '<project>/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id",
+    "error[P001]: Macro '@py.explode' in '<project>/sql/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id",
     "",
     ""
    ],
@@ -110,7 +110,7 @@
     "Python discovery  OK  (<elapsed>)",
     "Project assembly  OK  (<elapsed>)",
     "Project discovery  OK  (<elapsed>)",
-    "error[P001]: Macro '@py.explode' in '<project>/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id",
+    "error[P001]: Macro '@py.explode' in '<project>/sql/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id",
     "",
     ""
    ],
@@ -130,7 +130,7 @@
     "Python discovery  OK  (<elapsed>)",
     "Project assembly  OK  (<elapsed>)",
     "Project discovery  OK  (<elapsed>)",
-    "error[P001]: Macro '@py.explode' in '<project>/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id",
+    "error[P001]: Macro '@py.explode' in '<project>/sql/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id",
     "",
     ""
    ],
@@ -150,7 +150,7 @@
     "Python discovery  OK  (<elapsed>)",
     "Project assembly  OK  (<elapsed>)",
     "Project discovery  OK  (<elapsed>)",
-    "error[P001]: Macro '@py.explode' in '<project>/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id",
+    "error[P001]: Macro '@py.explode' in '<project>/sql/models/sales/staging/stg_sales_0.sql' failed: cannot adjust id",
     "",
     ""
    ],

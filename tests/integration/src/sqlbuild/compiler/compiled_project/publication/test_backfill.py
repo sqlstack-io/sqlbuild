@@ -31,7 +31,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             expected_status="success",
             expected_rows=[(23,), (37,)],
             files={
-                "models/orders.sql": Path(
+                "sql/models/orders.sql": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/backfill_integer.sql"
                 ).read_text()
             },
@@ -46,7 +46,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
             expected_rows=[(23,), (37,)],
             launcher="docker",
             files={
-                "models/orders.sql": Path(
+                "sql/models/orders.sql": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/backfill_timestamp.sql"
                 ).read_text()
             },
@@ -72,7 +72,7 @@ def test_given_explicit_backfill_bounds_when_running_and_rerunning_a_group_then_
         test_case,
         files=test_case.files
         | {
-            "sources/raw_orders.yml": "sources:\n  - name: raw_orders\n    description: Synthetic order windows.\n    schema: main\n    table: raw_orders\n",
+            "sql/sources/raw_orders.yml": "sources:\n  - name: raw_orders\n    description: Synthetic order windows.\n    schema: main\n    table: raw_orders\n",
             "orchestration/jobs/windowed_orders_job.toml": (
                 'name = "windowed_orders_job"\n'
                 'description = "Windowed orders."\n'

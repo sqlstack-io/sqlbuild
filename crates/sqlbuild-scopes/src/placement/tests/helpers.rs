@@ -58,23 +58,23 @@ fn runtime(consumer: &str, declaration: &str) -> PlacementUsage {
     }
 }
 
-const SALES: (ScopeKind, Option<&str>) = (ScopeKind::Local, Some("models/sales"));
+const SALES: (ScopeKind, Option<&str>) = (ScopeKind::Local, Some("sql/models/sales"));
 
 /// A model and a descendant-folder model, a local macro both use, and an unused global macro.
 pub(super) fn descendant_models() -> PlacementIndex {
     PlacementIndex {
         resources: vec![
-            model_record("orders", "models/sales/orders.sql"),
-            model_record("customers", "models/sales/crm/customers.sql"),
+            model_record("orders", "sql/models/sales/orders.sql"),
+            model_record("customers", "sql/models/sales/crm/customers.sql"),
         ],
         declarations: vec![
-            macro_record("cents", "models/sales/_macros/python/cents.py", SALES),
+            macro_record("cents", "sql/models/sales/_macros/python/cents.py", SALES),
             macro_record(
                 "unused",
-                "macros/python/unused.py",
+                "sql/macros/python/unused.py",
                 (ScopeKind::Global, None),
             ),
-            macro_record("shared", "models/sales/_macros/python/shared.py", SALES),
+            macro_record("shared", "sql/models/sales/_macros/python/shared.py", SALES),
         ],
         usages: vec![
             runtime("orders", "cents"),
@@ -87,10 +87,10 @@ pub(super) fn descendant_models() -> PlacementIndex {
 /// One model using a local macro, which a further macro uses in turn.
 pub(super) fn chained_macros() -> PlacementIndex {
     PlacementIndex {
-        resources: vec![model_record("orders", "models/sales/orders.sql")],
+        resources: vec![model_record("orders", "sql/models/sales/orders.sql")],
         declarations: vec![
-            macro_record("cents", "models/sales/_macros/python/cents.py", SALES),
-            macro_record("round", "models/sales/_macros/python/round.py", SALES),
+            macro_record("cents", "sql/models/sales/_macros/python/cents.py", SALES),
+            macro_record("round", "sql/models/sales/_macros/python/round.py", SALES),
         ],
         usages: vec![
             runtime("orders", "cents"),
@@ -103,8 +103,8 @@ pub(super) fn chained_macros() -> PlacementIndex {
     }
 }
 
-const SALES_GROUPED: (ScopeKind, Option<&str>) = (ScopeKind::Local, Some("models/sales"));
-const SALES_SHARED: (ScopeKind, Option<&str>) = (ScopeKind::Inherited, Some("models/sales"));
+const SALES_GROUPED: (ScopeKind, Option<&str>) = (ScopeKind::Local, Some("sql/models/sales"));
+const SALES_SHARED: (ScopeKind, Option<&str>) = (ScopeKind::Inherited, Some("sql/models/sales"));
 
 /// Two sales models sharing a local `cents`, beside an optional descendant-public `labels`.
 fn shared_cents(cents_path: &str, labels_path: Option<&str>) -> PlacementIndex {
@@ -112,9 +112,9 @@ fn shared_cents(cents_path: &str, labels_path: Option<&str>) -> PlacementIndex {
     declarations.extend(labels_path.map(|path| macro_record("labels", path, SALES_SHARED)));
     PlacementIndex {
         resources: vec![
-            model_record("orders", "models/sales/orders.sql"),
-            model_record("refunds", "models/sales/refunds.sql"),
-            model_record("customers", "models/sales/crm/customers.sql"),
+            model_record("orders", "sql/models/sales/orders.sql"),
+            model_record("refunds", "sql/models/sales/refunds.sql"),
+            model_record("customers", "sql/models/sales/crm/customers.sql"),
         ],
         declarations,
         usages: vec![
@@ -128,30 +128,33 @@ fn shared_cents(cents_path: &str, labels_path: Option<&str>) -> PlacementIndex {
 
 /// A grouped `cents` and an empty descendant-public role.
 pub(super) fn grouped_cents_empty_role() -> PlacementIndex {
-    shared_cents("models/sales/_sqlbuild/_macros/python/money/cents.py", None)
+    shared_cents(
+        "sql/models/sales/_sqlbuild/_macros/python/money/cents.py",
+        None,
+    )
 }
 
 /// A grouped `cents` and a descendant-public role keeping its files in groups.
 pub(super) fn grouped_cents_grouped_role() -> PlacementIndex {
     shared_cents(
-        "models/sales/_sqlbuild/_macros/python/money/cents.py",
-        Some("models/sales/_sqlbuild/macros/python/text/labels.py"),
+        "sql/models/sales/_sqlbuild/_macros/python/money/cents.py",
+        Some("sql/models/sales/_sqlbuild/macros/python/text/labels.py"),
     )
 }
 
 /// A direct `cents` and a descendant-public role keeping its files in groups.
 pub(super) fn direct_cents_grouped_role() -> PlacementIndex {
     shared_cents(
-        "models/sales/_sqlbuild/_macros/python/cents.py",
-        Some("models/sales/_sqlbuild/macros/python/text/labels.py"),
+        "sql/models/sales/_sqlbuild/_macros/python/cents.py",
+        Some("sql/models/sales/_sqlbuild/macros/python/text/labels.py"),
     )
 }
 
 /// A grouped `cents` and a descendant-public role keeping its files directly.
 pub(super) fn grouped_cents_direct_role() -> PlacementIndex {
     shared_cents(
-        "models/sales/_sqlbuild/_macros/python/money/cents.py",
-        Some("models/sales/_sqlbuild/macros/python/labels.py"),
+        "sql/models/sales/_sqlbuild/_macros/python/money/cents.py",
+        Some("sql/models/sales/_sqlbuild/macros/python/labels.py"),
     )
 }
 
@@ -191,11 +194,11 @@ fn order_key(
 /// Diagnostics without a path or line first, then by path, line, code and message.
 pub(super) fn mixed_diagnostics() -> Vec<DiagnosticOrderKey> {
     vec![
-        order_key(Some("models/b.sql"), Some(2), "S010", "b"),
-        order_key(Some("models/a.sql"), Some(9), "S010", "a"),
+        order_key(Some("sql/models/b.sql"), Some(2), "S010", "b"),
+        order_key(Some("sql/models/a.sql"), Some(9), "S010", "a"),
         order_key(None, None, "S019", "parse"),
         order_key(Some(""), Some(0), "S019", "parse"),
-        order_key(Some("models/a.sql"), Some(9), "S007", "z"),
-        order_key(Some("models/b.sql"), None, "S010", "b"),
+        order_key(Some("sql/models/a.sql"), Some(9), "S007", "z"),
+        order_key(Some("sql/models/b.sql"), None, "S010", "b"),
     ]
 }

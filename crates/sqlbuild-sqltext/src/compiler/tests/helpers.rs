@@ -246,9 +246,9 @@ pub(crate) fn interpolation_host(context: bool) -> MapHost {
     }
 }
 
-/// Interpolate `sql` as `models/orders.sql`: the rendered SQL or the error message.
+/// Interpolate `sql` as `sql/models/orders.sql`: the rendered SQL or the error message.
 pub(crate) fn interpolated(host: &MapHost, sql: &str) -> Result<String, String> {
-    interpolate_sql(host, sql, "models/orders.sql")
+    interpolate_sql(host, sql, "sql/models/orders.sql")
         .map(|result| result.sql.unwrap_or_else(|| sql.to_owned()))
         .map_err(|failure| failure.message)
 }
@@ -258,7 +258,7 @@ pub(crate) fn interpolation_facts(
     host: &MapHost,
     sql: &str,
 ) -> (Vec<[usize; 4]>, Vec<InterpolationRead>) {
-    interpolate_sql(host, sql, "models/orders.sql").map_or_else(
+    interpolate_sql(host, sql, "sql/models/orders.sql").map_or_else(
         |failure| (Vec::new(), failure.reads),
         |result| (result.spans.iter().map(span_parts).collect(), result.reads),
     )

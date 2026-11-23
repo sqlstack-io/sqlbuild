@@ -128,7 +128,7 @@ def test_given_fresh_snapshot_when_loading_into_duckdb_then_creates_typed_tables
             expected_error_code=SCENARIO_LOCAL_JSONL_INVALID,
             expected_error_fragments=(
                 "invalid local snapshot JSONL",
-                "sources/raw__orders.jsonl",
+                "sql/sources/raw__orders.jsonl",
                 "relation 'source raw__orders'",
                 "line 2",
             ),
@@ -140,7 +140,7 @@ def test_given_fresh_snapshot_when_loading_into_duckdb_then_creates_typed_tables
             expected_error_code=SCENARIO_LOCAL_LOAD_FAILED,
             expected_error_fragments=(
                 "could not load local snapshot JSONL",
-                "sources/raw__orders.jsonl",
+                "sql/sources/raw__orders.jsonl",
                 "relation 'source raw__orders'",
                 "column 'order_date'",
                 "local_type 'DATE'",

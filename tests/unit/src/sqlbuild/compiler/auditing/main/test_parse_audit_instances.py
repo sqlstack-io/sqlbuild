@@ -40,7 +40,7 @@ def test_given_audit_list_when_parsing_then_returns_audit_instances(
 ) -> None:
     result: tuple[SchemaAuditInstance, ...] = parse_audit_instances(
         raw_audits=test_case.raw_audits,
-        file_path=Path("models/orders.yml"),
+        file_path=Path("sql/models/orders.yml"),
         label="model orders",
         error_class=ValueError,
         null_as_empty=test_case.null_as_empty,
@@ -56,13 +56,13 @@ def test_given_audit_list_when_parsing_then_returns_audit_instances(
             description="rejects null when null is not empty",
             raw_audits=None,
             null_as_empty=False,
-            expected_message="models/orders.yml model orders audits must be a list",
+            expected_message="sql/models/orders.yml model orders audits must be a list",
         ),
         ParseAuditInstancesErrorTestCase(
             description="rejects a mapping",
             raw_audits={"not_null": {}},
             null_as_empty=True,
-            expected_message="models/orders.yml model orders audits must be a list",
+            expected_message="sql/models/orders.yml model orders audits must be a list",
         ),
     ],
     ids=lambda case: case.description,
@@ -73,7 +73,7 @@ def test_given_invalid_audit_list_when_parsing_then_raises_injected_error(
     with pytest.raises(ValueError) as error:
         parse_audit_instances(
             raw_audits=test_case.raw_audits,
-            file_path=Path("models/orders.yml"),
+            file_path=Path("sql/models/orders.yml"),
             label="model orders",
             error_class=ValueError,
             null_as_empty=test_case.null_as_empty,

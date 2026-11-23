@@ -55,8 +55,8 @@ def test_given_project_roles_when_published_then_person_sql_follows_selector_cov
                 '[connections.local]\ndatabase = "warehouse.duckdb"\n'
                 '[targets.development]\nschema = "main"\n'
             ),
-            "models/orders.sql": tagged_model("orders", "support"),
-            "models/customers.sql": tagged_model("customers", "pii"),
+            "sql/models/orders.sql": tagged_model("orders", "support"),
+            "sql/models/customers.sql": tagged_model("customers", "pii"),
             "roles.toml": roles,
         },
     )
@@ -90,7 +90,7 @@ def test_given_project_roles_when_published_then_person_sql_follows_selector_cov
         assert read_person_sql(api, session, "model:customers") == (403, test_case.expected_denial)
         write_files(
             project_dir=project,
-            files={"models/customers.sql": tagged_model("customers", "pii, support")},
+            files={"sql/models/customers.sql": tagged_model("customers", "pii, support")},
         )
         grown: subprocess.CompletedProcess[str] = publish_generation(project, api, 2)
         assert grown.returncode == 0, grown.stderr

@@ -1,6 +1,6 @@
 """A sensor outside a domain folder that documents itself twice and reads a node module."""
 
-import python.report
+import python.nodes.report
 
 from sqlbuild.orchestration import SensorContext, SkipReason, sensor
 

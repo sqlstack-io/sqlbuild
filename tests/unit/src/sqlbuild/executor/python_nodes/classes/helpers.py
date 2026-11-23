@@ -154,7 +154,7 @@ def item_graph(
             asset_functions=tuple(
                 DiscoveredAssetFunction(
                     file_path=Path("/project/python/plan.py"),
-                    relative_path=Path("python/plan.py"),
+                    relative_path=Path("python/nodes/plan.py"),
                     name=name,
                     function=run_item,
                     depends_on=item_refs(parents),
@@ -268,7 +268,7 @@ def writing_graph(steps: tuple[str, ...]) -> PythonNodeGraph:
             asset_functions=tuple(
                 DiscoveredAssetFunction(
                     file_path=Path("/project/python/plan.py"),
-                    relative_path=Path("python/plan.py"),
+                    relative_path=Path("python/nodes/plan.py"),
                     name=step,
                     function=write_step,
                     discovered={

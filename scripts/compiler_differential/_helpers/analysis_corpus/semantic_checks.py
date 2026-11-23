@@ -19,14 +19,14 @@ _TIMED_STAGING: str = FAILURE_BASE_STAGING.replace(
     "amount, status", "amount, status, CAST('2026-01-01' AS TIMESTAMP) AS ordered_at"
 )
 
-_INTERMEDIATE_PATH: str = "models/intermediate/int_orders.sql"
+_INTERMEDIATE_PATH: str = "sql/models/intermediate/int_orders.sql"
 _INTERMEDIATE: str = (
     'MODEL (\n  description "Doubled order amounts",\n);\n\n'
     "SELECT customer_id, amount * 2 AS doubled_amount\n"
     'FROM __ref("stg_orders")\n'
 )
 
-_FUNCTION_PATH: str = "functions/sql/scaled_amount.sql"
+_FUNCTION_PATH: str = "sql/functions/sql/scaled_amount.sql"
 _SCALED_AMOUNT: str = (
     "FUNCTION (\n"
     '  description "Scale an amount by an integer factor",\n'
@@ -186,7 +186,7 @@ def _metadata_cases() -> tuple[FailureCase, ...]:
             expected_location=(21, 20),
             files={
                 FAILURE_SOURCES_PATH: FAILURE_BASE_SOURCES + _LOADED_SOURCE,
-                "python/loaders/raw_events.py": _LOADER,
+                "python/nodes/loaders/raw_events/loader.py": _LOADER,
             },
         ),
     )

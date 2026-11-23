@@ -42,7 +42,7 @@ def test_given_undecodable_selector_when_compiling_then_unknown_selector_error_i
         project_name="selectors",
         repo_files={
             "sqlbuild_project.toml": 'name = "selectors"\nadapter = "duckdb"\n',
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.', materialized view);\n\n"
                 "SELECT 1 AS order_id\n"
             ),

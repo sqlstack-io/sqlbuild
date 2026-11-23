@@ -17,7 +17,7 @@ pub(super) fn sample_report() -> DebugReport {
             DebugLine::checked("providers", "1", (DebugStatus::Ok, Some("discovered"))),
             DebugLine::checked(
                 "marker_provider",
-                "providers/marker.py:MarkerProvider",
+                "python/providers/marker.py:MarkerProvider",
                 (DebugStatus::Ok, Some("valid settings")),
             ),
         ],
@@ -48,7 +48,7 @@ pub(super) fn line_summary(line: &DebugLine) -> (&str, &str, Option<&str>) {
 pub(super) fn provider(name: &str, secrets: &[(&str, bool)]) -> DebugProvider {
     DebugProvider {
         name: name.to_owned(),
-        relative_path: format!("providers/{name}/provider.py"),
+        relative_path: format!("python/providers/{name}/provider.py"),
         class_name: "Provider".to_owned(),
         secrets: secrets
             .iter()

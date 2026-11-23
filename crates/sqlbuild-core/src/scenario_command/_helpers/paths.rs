@@ -30,29 +30,19 @@ pub(crate) fn safe_file_stem(name: &str) -> String {
     name.replace(['/', '\\'], "__")
 }
 
-/// A model's artifact path, always under `models/`.
+/// A model's artifact path, always under `sql/models/`.
 pub(crate) fn model_output_path(relative_path: &Path) -> PathBuf {
     let path: PathBuf = normalized(relative_path);
-    if path
-        .components()
-        .next()
-        .is_some_and(|first| first.as_os_str() == MODELS_DIR)
-    {
+    if path.starts_with(MODELS_DIR) {
         return path;
     }
     Path::new(MODELS_DIR).join(path)
 }
 
-/// A function's artifact path under `functions/<language>/`, with a `.sql` suffix.
+/// A function's artifact path under `sql/functions/<language>/`, with a `.sql` suffix.
 pub(crate) fn function_output_path(relative_path: &Path, language: &str) -> PathBuf {
     let path: PathBuf = normalized(relative_path);
-    let mut parts = path.components();
-    let under_language: bool = parts
-        .next()
-        .is_some_and(|first| first.as_os_str() == FUNCTIONS_DIR)
-        && parts
-            .next()
-            .is_some_and(|second| second.as_os_str() == language);
+    let under_language: bool = path.starts_with(Path::new(FUNCTIONS_DIR).join(language));
     let mut output: PathBuf = if under_language {
         path
     } else {

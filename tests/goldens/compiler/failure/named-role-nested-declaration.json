@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D013",
-     "message": "Declaration directory schemas/enums/ is not allowed inside the project-wide schemas/ role; scoped declarations belong under <folder>/_sqlbuild/ below a resource tree"
+     "message": "Declaration directory sql/schemas/enums/ is not allowed inside the project-wide sql/schemas/ role; scoped declarations belong under <folder>/_sqlbuild/ below a resource tree"
     }
    ]
   }

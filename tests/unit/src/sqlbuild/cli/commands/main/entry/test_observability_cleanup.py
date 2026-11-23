@@ -66,13 +66,13 @@ def test_given_no_public_sink_when_observability_runs_then_provider_import_is_sk
     write_repo_files(
         tmp_path,
         {
-            "providers/exploding.py": (
+            "python/providers/exploding.py": (
                 "from pathlib import Path\n"
                 f"Path({str(marker_path)!r}).write_text('imported', encoding='utf-8')\n"
                 "raise RuntimeError('provider must not import')\n"
             ),
-            "sinks/_private.py": "raise RuntimeError('private sink imported')\n",
-            "sinks/helpers.py": (
+            "python/event_sinks/_private.py": "raise RuntimeError('private sink imported')\n",
+            "python/event_sinks/helpers.py": (
                 "from pathlib import Path\n"
                 f"Path({str(helper_marker_path)!r}).write_text('imported', encoding='utf-8')\n"
                 "def encode(value):\n    return value\n"

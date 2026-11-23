@@ -66,13 +66,13 @@ def test_given_discovered_project_when_collecting_files_then_returns_exact_autho
     [
         SelectedProjectFilesTestCase(
             description="regular_file",
-            selected="models/orders/orders.sql",
-            expected_present=("models/orders/orders.sql",),
+            selected="sql/models/orders/orders.sql",
+            expected_present=("sql/models/orders/orders.sql",),
         ),
         SelectedProjectFilesTestCase(
             description="file_reached_through_links",
             selected="shared/customers.sql",
-            expected_present=("models/orders/customers_link.sql",),
+            expected_present=("sql/models/orders/customers_link.sql",),
         ),
     ],
     ids=lambda case: case.description,

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P016",
-     "message": "macro x() reads source:raw_orders through __source() in its body\n  --> models/staging/_sqlbuild/_macros/sql/x.sql:3:31",
+     "message": "macro x() reads source:raw_orders through __source() in its body\n  --> sql/models/staging/_sqlbuild/_macros/sql/x.sql:3:31",
      "help": "pass the relation in as a RELATION argument and write __source(\"raw_orders\") in the model"
     }
    ]

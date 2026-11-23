@@ -41,8 +41,8 @@ def test_given_unique_model_headers_when_discovering_then_header_values_and_loca
     tmp_path: Path,
     test_case: ExpectedCountTestCase,
 ) -> None:
-    models_dir: Path = tmp_path / "models"
-    models_dir.mkdir()
+    models_dir: Path = tmp_path / "sql" / "models"
+    models_dir.mkdir(parents=True)
     first_header = 'description "one", columns (café (type INTEGER))'
     second_header = 'description "two", columns (total (type DECIMAL(10,2)))'
     (models_dir / "first.sql").write_text(
@@ -63,7 +63,7 @@ def test_given_unique_model_headers_when_discovering_then_header_values_and_loca
         },
     ]
     assert discovered[0].header_column_locations["café"] == SourceLocation(
-        path=Path("models/first.sql"), line=1, column=36, end_line=1, end_column=40
+        path=Path("sql/models/first.sql"), line=1, column=36, end_line=1, end_column=40
     )
 
 
@@ -94,8 +94,8 @@ def test_given_multiple_invalid_model_headers_when_discovering_then_fault_order_
     tmp_path: Path,
     test_case: ExpectedCountTestCase,
 ) -> None:
-    models_dir: Path = tmp_path / "models"
-    models_dir.mkdir()
+    models_dir: Path = tmp_path / "sql" / "models"
+    models_dir.mkdir(parents=True)
     (models_dir / "first.sql").write_text(
         'MODEL (schema "unterminated); SELECT 1', encoding="utf-8"
     )
@@ -112,8 +112,8 @@ def test_given_multiple_invalid_model_headers_when_discovering_then_fault_order_
     assert discovered == ()
     assert len(faults) == test_case.expected_count
     assert [fault.path for fault in faults] == [
-        Path("models/first.sql"),
-        Path("models/second.sql"),
+        Path("sql/models/first.sql"),
+        Path("sql/models/second.sql"),
     ]
     assert "unterminated double-quoted string at position 7" in faults[0].message
     assert "unterminated template value at position 7" in faults[1].message
@@ -133,8 +133,8 @@ def test_given_deferred_output_locations_when_discovering_models_then_projection
     tmp_path: Path,
     test_case: DeferredModelOutputLocationTestCase,
 ) -> None:
-    models_dir: Path = tmp_path / "models"
-    models_dir.mkdir()
+    models_dir: Path = tmp_path / "sql" / "models"
+    models_dir.mkdir(parents=True)
     (models_dir / "orders.sql").write_text(
         "MODEL (materialized view);\n\nSELECT 1 AS order_id\n",
         encoding="utf-8",
@@ -761,8 +761,8 @@ def test_given_invalid_sql_model_contents_when_parsing_then_it_raises_clear_erro
                 "SELECT order_id FROM raw_orders\n"
             ),
             expected_locations={
-                "order_id": (Path("models/orders.sql"), 4, 5, 4, 13),
-                "customer_id": (Path("models/orders.sql"), 5, 5, 5, 16),
+                "order_id": (Path("sql/models/orders.sql"), 4, 5, 4, 13),
+                "customer_id": (Path("sql/models/orders.sql"), 5, 5, 5, 16),
             },
         ),
         ModelHeaderColumnLocationTestCase(
@@ -779,7 +779,7 @@ def test_given_invalid_sql_model_contents_when_parsing_then_it_raises_clear_erro
                 "SELECT status FROM raw_orders\n"
             ),
             expected_locations={
-                "status": (Path("models/orders.sql"), 3, 5, 3, 11),
+                "status": (Path("sql/models/orders.sql"), 3, 5, 3, 11),
             },
         ),
         ModelHeaderColumnLocationTestCase(
@@ -789,7 +789,7 @@ def test_given_invalid_sql_model_contents_when_parsing_then_it_raises_clear_erro
                 "columns (top (type INTEGER))); SELECT 1"
             ),
             expected_locations={
-                "top": (Path("models/orders.sql"), 1, 59, 1, 62),
+                "top": (Path("sql/models/orders.sql"), 1, 59, 1, 62),
             },
         ),
         ModelHeaderColumnLocationTestCase(
@@ -805,7 +805,7 @@ def test_given_model_header_columns_when_locating_then_returns_expected_location
 ) -> None:
     locations: dict[str, SourceLocation] = model_header_column_locations(
         contents=test_case.contents,
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
     )
 
     assert {
@@ -833,8 +833,8 @@ def test_given_model_header_columns_when_locating_then_returns_expected_location
                 "FROM raw_orders o\n"
             ),
             expected_locations={
-                "order_id": (Path("models/orders.sql"), 4, 3, 4, 13),
-                "amount_text": (Path("models/orders.sql"), 5, 3, 5, 43),
+                "order_id": (Path("sql/models/orders.sql"), 4, 3, 4, 13),
+                "amount_text": (Path("sql/models/orders.sql"), 5, 3, 5, 43),
             },
         ),
         ModelOutputColumnLocationTestCase(
@@ -847,8 +847,8 @@ def test_given_model_header_columns_when_locating_then_returns_expected_location
                 "FROM raw_customers\n"
             ),
             expected_locations={
-                "display_name": (Path("models/orders.sql"), 4, 3, 4, 61),
-                "customer_id": (Path("models/orders.sql"), 5, 3, 5, 14),
+                "display_name": (Path("sql/models/orders.sql"), 4, 3, 4, 61),
+                "customer_id": (Path("sql/models/orders.sql"), 5, 3, 5, 14),
             },
         ),
         ModelOutputColumnLocationTestCase(
@@ -864,15 +864,15 @@ def test_given_model_header_columns_when_locating_then_returns_expected_location
                 "FROM prepared\n"
             ),
             expected_locations={
-                "order_id": (Path("models/orders.sql"), 7, 3, 7, 11),
-                "total_cents": (Path("models/orders.sql"), 8, 3, 8, 30),
+                "order_id": (Path("sql/models/orders.sql"), 7, 3, 7, 11),
+                "total_cents": (Path("sql/models/orders.sql"), 8, 3, 8, 30),
             },
         ),
         ModelOutputColumnLocationTestCase(
             description="locates quoted output aliases",
             contents=('MODEL ();\n\nSELECT\n  amount_cents AS "amount cents"\nFROM raw_orders\n'),
             expected_locations={
-                "amount cents": (Path("models/orders.sql"), 4, 3, 4, 33),
+                "amount cents": (Path("sql/models/orders.sql"), 4, 3, 4, 33),
             },
         ),
         ModelOutputColumnLocationTestCase(
@@ -884,7 +884,7 @@ def test_given_model_header_columns_when_locating_then_returns_expected_location
                 "FROM raw_orders\n"
             ),
             expected_locations={
-                "max_payment_cents": (Path("models/orders.sql"), 4, 3, 4, 68),
+                "max_payment_cents": (Path("sql/models/orders.sql"), 4, 3, 4, 68),
             },
         ),
         ModelOutputColumnLocationTestCase(
@@ -898,14 +898,14 @@ def test_given_model_header_columns_when_locating_then_returns_expected_location
                 "MODEL ();\n\nSELECT\n  CAST(amount AS VARCHAR) amount_text\nFROM raw_orders\n"
             ),
             expected_locations={
-                "amount_text": (Path("models/orders.sql"), 4, 3, 4, 38),
+                "amount_text": (Path("sql/models/orders.sql"), 4, 3, 4, 38),
             },
         ),
         ModelOutputColumnLocationTestCase(
             description="locates select without from using sql_analysis projection identity",
             contents="MODEL ();\n\nSELECT 1 AS one\n",
             expected_locations={
-                "one": (Path("models/orders.sql"), 3, 8, 3, 16),
+                "one": (Path("sql/models/orders.sql"), 3, 8, 3, 16),
             },
         ),
         ModelOutputColumnLocationTestCase(
@@ -929,7 +929,7 @@ def test_given_model_select_outputs_when_locating_then_returns_expected_location
 ) -> None:
     locations: dict[str, SourceLocation] = model_output_column_locations(
         contents=test_case.contents,
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         extract_implicit_alias_columns=test_case.extract_implicit_alias_columns,
     )
 

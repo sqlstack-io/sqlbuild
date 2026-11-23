@@ -102,7 +102,7 @@ fn given_built_in_audit_on_missing_column_when_checking_then_reports_once_at_its
             attached_target: Some(("model".to_owned(), "orders".to_owned())),
             attached_column: Some(test_case.column.to_owned()),
             built_in: test_case.built_in,
-            path: format!("audits/generic/{}.sql", test_case.definition),
+            path: format!("sql/audits/generic/{}.sql", test_case.definition),
             contents: Arc::from(""),
             bodies: Vec::new(),
             opts_out: false,
@@ -114,7 +114,7 @@ fn given_built_in_audit_on_missing_column_when_checking_then_reports_once_at_its
                 let diagnostic = missing_column_diagnostic(missing).expect(test_case.description);
                 assert_eq!(diagnostic.code, "B002", "{}", test_case.description);
                 assert_eq!(
-                    diagnostic.path, "models/orders.sql",
+                    diagnostic.path, "sql/models/orders.sql",
                     "{}",
                     test_case.description
                 );

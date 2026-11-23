@@ -12,4 +12,5 @@ pub mod register_imported_python_nodes;
 pub mod register_python_function_files;
 pub mod register_python_hook_files;
 pub mod register_python_module_files;
+pub mod reject_project_layout;
 pub mod reject_unsupported_python_paths;

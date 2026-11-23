@@ -106,7 +106,7 @@ def test_given_sql_test_error_when_compiling_then_the_error_and_type_are_reporte
     project_dir: Path = tmp_path / "orders"
     files: dict[str, str] = {
         **case.files,
-        "macros/python/counted.py": _COUNTED_MACRO,
+        "sql/macros/python/counted.py": _COUNTED_MACRO,
         FAILURE_MART_PATH: FAILURE_BASE_MART.replace("SUM(amount)", "SUM(@py.counted('amount'))"),
         _CALL_LOG: "",
     }

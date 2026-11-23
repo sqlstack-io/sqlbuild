@@ -18,15 +18,15 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
             "model:orders",
             &["source:shop.raw_orders", "seed:currencies"],
             &["daily"],
-            Some("models/marts"),
+            Some("sql/models/marts"),
         ),
         resource(
             "model:order_totals",
             &["model:orders"],
             &["daily"],
-            Some("models/marts"),
+            Some("sql/models/marts"),
         ),
-        resource("model:customers", &[], &[], Some("models/staging")),
+        resource("model:customers", &[], &[], Some("sql/models/staging")),
         resource("source:shop.raw_orders", &[], &[], None),
         resource("seed:currencies", &[], &[], None),
         resource("sql_test:orders_keep_amounts", &["model:orders"], &[], None),
@@ -161,7 +161,7 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
         },
         AdhocPlanTestCase {
             description: "path selectors use the published folder",
-            command: &["build", "-s", "path:models/staging"],
+            command: &["build", "-s", "path:sql/models/staging"],
             expected_plan: Ok((&["model:customers"], json!({}))),
         },
         AdhocPlanTestCase {
@@ -361,25 +361,30 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
 #[test]
 fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_command_line() {
     let resources = [
-        resource("model:stg_orders", &[], &["orders"], Some("models/staging")),
+        resource(
+            "model:stg_orders",
+            &[],
+            &["orders"],
+            Some("sql/models/staging"),
+        ),
         resource(
             "model:orders",
             &["model:stg_orders"],
             &["orders"],
-            Some("models/marts"),
+            Some("sql/models/marts"),
         ),
-        resource("model:customers", &[], &[], Some("models/marts")),
+        resource("model:customers", &[], &[], Some("sql/models/marts")),
         resource(
             "asset:partner_orders_file",
             &["model:orders"],
             &["orders"],
-            Some("python/orders/partner_export"),
+            Some("python/nodes/orders/partner_export"),
         ),
         resource(
             "asset:request_carrier_collection",
             &["asset:partner_orders_file"],
             &["orders"],
-            Some("python/fulfillment/carrier_sync"),
+            Some("python/nodes/fulfillment/carrier_sync"),
         ),
         PlannerResource {
             loader: Some("raw_shipments".to_owned()),
@@ -389,15 +394,20 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
             "model:shipments",
             &["source:raw_shipments"],
             &[],
-            Some("models/marts"),
+            Some("sql/models/marts"),
         ),
         resource(
             "loader:raw_shipments",
             &["loader:stage_shipments"],
             &[],
-            Some("python/loaders"),
+            Some("python/nodes/loaders"),
         ),
-        resource("loader:stage_shipments", &[], &[], Some("python/loaders")),
+        resource(
+            "loader:stage_shipments",
+            &[],
+            &[],
+            Some("python/nodes/loaders"),
+        ),
     ];
     let jobs: PublishedJobs = PublishedJobs {
         selections: BTreeMap::from([(
@@ -448,7 +458,7 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
         },
         AdhocPlanTestCase {
             description: "a python folder selects the nodes under it",
-            command: &["build", "--select", "python/orders"],
+            command: &["build", "--select", "python/nodes/orders"],
             expected_plan: Ok((&["asset:partner_orders_file"], json!({}))),
         },
         AdhocPlanTestCase {

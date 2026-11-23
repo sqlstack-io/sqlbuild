@@ -18,20 +18,21 @@ The examples below use two domains with project-wide currency helpers:
 
 ```text
 project/
-├── macros/
-│   └── currency.py                      add_tax, round_money
-├── models/
-│   ├── commerce/
-│   │   ├── constants/limits.sql        minimum_order_value
-│   │   ├── enums/status.sql            order_status
-│   │   ├── macros/python/orders.py            formatted_order_total
-│   │   ├── orders.sql
-│   │   └── returns/returns.sql
-│   └── finance/
-│       ├── enums/status.sql            finance_status
-│       ├── macros/python/margin.py            calculate_margin
-│       ├── finance_summary.sql
-│       └── reports/margin_report.sql
+├── sql/
+│   ├── macros/
+│   │   └── currency.py                      add_tax, round_money
+│   └── models/
+│       ├── commerce/
+│       │   ├── constants/limits.sql        minimum_order_value
+│       │   ├── enums/status.sql            order_status
+│       │   ├── macros/python/orders.py            formatted_order_total
+│       │   ├── orders.sql
+│       │   └── returns/returns.sql
+│       └── finance/
+│           ├── enums/status.sql            finance_status
+│           ├── macros/python/margin.py            calculate_margin
+│           ├── finance_summary.sql
+│           └── reports/margin_report.sql
 └── tests/
     └── unit/orders__completed_only.sql
 ```
@@ -39,7 +40,7 @@ project/
 `formatted_order_total` composes the project-wide functions through ordinary Python calls:
 
 ```python
-from macros.python.currency import add_tax, round_money
+from sql.macros.python.currency import add_tax, round_money
 
 
 def formatted_order_total(expression: str) -> str:
@@ -61,21 +62,21 @@ $ sqb scope model:orders
 Scope
   Target: model:orders
   Resource: model:orders
-  Path: models/commerce/orders.sql
+  Path: sql/models/commerce/orders.sql
 
 Used (2)
-  ├─ ● constant:minimum_order_value  models/commerce/constants/limits.sql:1
-  └─ ● macro:formatted_order_total  models/commerce/macros/python/orders.py:4
+  ├─ ● constant:minimum_order_value  sql/models/commerce/constants/limits.sql:1
+  └─ ● macro:formatted_order_total  sql/models/commerce/macros/python/orders.py:4
 
 Scope chain
-  ├─ exact-owner-private models/commerce (3)
+  ├─ exact-owner-private sql/models/commerce (3)
   ├─ descendant-public models (0)
   └─ project global (2)
 
 Available (3 of 5, 2 collapsed)
-  ├─ ● constant:minimum_order_value  models/commerce/constants/limits.sql:1
-  ├─ ○ enum:order_status  models/commerce/enums/status.sql:1
-  └─ ● macro:formatted_order_total  models/commerce/macros/python/orders.py:4
+  ├─ ● constant:minimum_order_value  sql/models/commerce/constants/limits.sql:1
+  ├─ ○ enum:order_status  sql/models/commerce/enums/status.sql:1
+  └─ ● macro:formatted_order_total  sql/models/commerce/macros/python/orders.py:4
   … 2 globals collapsed; run sqb scope model:orders --globals all
 
 ● used by this resource   ○ not used by this resource   --verbose for scope details
@@ -88,7 +89,7 @@ dependency when `--dependency-depth` is nonzero. `○` marks a declaration prese
 not in `Used`.
 
 Add `--verbose` to see each declaration's access details, for example
-`[enum; descendant-public; inherited_ancestor; members 4; type VARCHAR; role models/commerce/enums]`.
+`[enum; descendant-public; inherited_ancestor; members 4; type VARCHAR; role sql/models/commerce/enums]`.
 Those labels translate to ordinary folder rules:
 
 | Output label | Meaning in this report |
@@ -97,7 +98,7 @@ Those labels translate to ordinary folder rules:
 | `descendant-public` | Available from a folder at or above this resource |
 | `exact-owner-private` | Available directly in this resource's owner folder only |
 | `inherited_ancestor` | Visible because an unprefixed role publishes it down the folder tree |
-| `role models/commerce/macros` | The declaration role begins at this path |
+| `role sql/models/commerce/macros` | The declaration role begins at this path |
 
 In the scope chain, the first path is the resource's owner folder, followed by parent folders and
 the project declaration roles. The counts show declarations defined at each path; the chain label
@@ -113,10 +114,10 @@ declarations. The expanded `Used` section is:
 ```console
 $ sqb scope model:orders --used-only --dependency-depth 1
 Used (4)
-  ├─ ● constant:minimum_order_value  models/commerce/constants/limits.sql:1
-  ├─ ● macro:add_tax  macros/python/currency.py:1
-  ├─ ● macro:formatted_order_total  models/commerce/macros/python/orders.py:4
-  └─ ● macro:round_money  macros/python/currency.py:5
+  ├─ ● constant:minimum_order_value  sql/models/commerce/constants/limits.sql:1
+  ├─ ● macro:add_tax  sql/macros/python/currency.py:1
+  ├─ ● macro:formatted_order_total  sql/models/commerce/macros/python/orders.py:4
+  └─ ● macro:round_money  sql/macros/python/currency.py:5
 ```
 
 SQLBuild derives these edges from actual Python calls, including nested calls and calls reached
@@ -129,14 +130,14 @@ ordinary report appears first; its `Explanation` section is:
 ```console
 $ sqb scope model:orders --explain macro:formatted_order_total
 Explanation
-  └─ ● macro:formatted_order_total  [macro; descendant-public; inherited_ancestor; params 1; role models/commerce/macros]  models/commerce/macros/python/orders.py:4:1
+  └─ ● macro:formatted_order_total  [macro; descendant-public; inherited_ancestor; params 1; role sql/models/commerce/macros]  sql/models/commerce/macros/python/orders.py:4:1
      Owner: (none)
-     Owning path: models/commerce
+     Owning path: sql/models/commerce
      Consumers: model:orders, model:returns
      Dependencies: macro:add_tax, macro:round_money
      Grants: (none)
      Required scope: descendant-public
-     Required path: models/commerce
+     Required path: sql/models/commerce
      Promotion impact: (none)
 ```
 
@@ -147,20 +148,20 @@ explanation would then show that descendant-public placement is broader than nec
 
 ```console
 Explanation
-  └─ ● macro:formatted_order_total  [macro; descendant-public; inherited_ancestor; params 1; role models/commerce/macros]  models/commerce/macros/python/orders.py:4:1
+  └─ ● macro:formatted_order_total  [macro; descendant-public; inherited_ancestor; params 1; role sql/models/commerce/macros]  sql/models/commerce/macros/python/orders.py:4:1
      Owner: (none)
-     Owning path: models/commerce
+     Owning path: sql/models/commerce
      Consumers: model:orders
      Dependencies: macro:add_tax, macro:round_money
      Grants: (none)
      Required scope: exact-owner-private
-     Required path: models/commerce
+     Required path: sql/models/commerce
      Promotion impact: model:orders
 
 ● used by this resource   ○ not used by this resource   --verbose for scope details
 
 Diagnostics (1)
-  ERROR S008 models/commerce/macros/python/orders.py: Declaration 'macro:formatted_order_total' is currently descendant-public at 'models/commerce' (models/commerce/macros/python/orders.py); required exact-owner-private at 'models/commerce'. Consumers: model:orders. Move it to 'models/commerce/_sqlbuild/_macros/'
+  ERROR S008 sql/models/commerce/macros/python/orders.py: Declaration 'macro:formatted_order_total' is currently descendant-public at 'sql/models/commerce' (sql/models/commerce/macros/python/orders.py); required exact-owner-private at 'sql/models/commerce'. Consumers: model:orders. Move it to 'sql/models/commerce/_sqlbuild/_macros/'
 Completeness: complete
 ```
 
@@ -174,26 +175,26 @@ cannot use it. The relevant section is:
 ```console
 $ sqb scope model:orders --include-nearby
 Nearby unavailable (2 of 2)
-  ├─ ○ enum:finance_status  models/finance/enums/status.sql:1
-  └─ ○ macro:calculate_margin  models/finance/macros/python/margin.py:4
+  ├─ ○ enum:finance_status  sql/models/finance/enums/status.sql:1
+  └─ ○ macro:calculate_margin  sql/models/finance/macros/python/margin.py:4
 ```
 
 The declarations are known, but they belong to a different folder branch. Here, the inspected
-resource belongs to `models/commerce`, while the declarations belong to `models/finance`.
+resource belongs to `sql/models/commerce`, while the declarations belong to `sql/models/finance`.
 `sibling_scope` is the compact output label for that situation. Ask for one complete explanation
 when you know a declaration's identity. After the ordinary report, the command adds:
 
 ```console
 $ sqb scope model:orders --explain macro:calculate_margin
 Explanation
-  └─ ○ macro:calculate_margin  [macro; descendant-public; sibling_scope; params 2; role models/finance/macros]  models/finance/macros/python/margin.py:4:1
+  └─ ○ macro:calculate_margin  [macro; descendant-public; sibling_scope; params 2; role sql/models/finance/macros]  sql/models/finance/macros/python/margin.py:4:1
      Owner: (none)
-     Owning path: models/finance
+     Owning path: sql/models/finance
      Consumers: model:finance_summary, model:margin_report
      Dependencies: (none)
      Grants: (none)
      Required scope: descendant-public
-     Required path: models/finance
+     Required path: sql/models/finance
      Promotion impact: (none)
 ```
 
@@ -211,10 +212,10 @@ report sections are:
 ```console
 $ sqb scope test:orders__completed_only --used-only
 Used (1)
-  └─ ● enum:order_status  models/commerce/enums/status.sql:1
+  └─ ● enum:order_status  sql/models/commerce/enums/status.sql:1
 
 Relationship grants (1 of 1)
-  └─ ● enum:order_status  models/commerce/enums/status.sql:1
+  └─ ● enum:order_status  sql/models/commerce/enums/status.sql:1
 ```
 
 With `--verbose`, these rows show the reason `expected_model through model:orders`, which means **available through expected output
@@ -231,21 +232,21 @@ Use `--as-path` to see the scope delta before moving an existing model, test, ho
 ordinary report is followed by:
 
 ```console
-$ sqb scope model:orders --as-path models/finance/orders.sql
+$ sqb scope model:orders --as-path sql/models/finance/orders.sql
 Move preview
   Resource: model:orders
-  Destination: models/finance/orders.sql
+  Destination: sql/models/finance/orders.sql
   Ownership root: models
   Retained (2)
-    ├─ ○ macro:add_tax  macros/python/currency.py:1
-    └─ ○ macro:round_money  macros/python/currency.py:5
+    ├─ ○ macro:add_tax  sql/macros/python/currency.py:1
+    └─ ○ macro:round_money  sql/macros/python/currency.py:5
   Gained (2)
-    ├─ ○ enum:finance_status  models/finance/enums/status.sql:1
-    └─ ○ macro:calculate_margin  models/finance/macros/python/margin.py:4
+    ├─ ○ enum:finance_status  sql/models/finance/enums/status.sql:1
+    └─ ○ macro:calculate_margin  sql/models/finance/macros/python/margin.py:4
   Lost (3)
-    ├─ ● constant:minimum_order_value  models/commerce/constants/limits.sql:1
-    ├─ ○ enum:order_status  models/commerce/enums/status.sql:1
-    └─ ● macro:formatted_order_total  models/commerce/macros/python/orders.py:4
+    ├─ ● constant:minimum_order_value  sql/models/commerce/constants/limits.sql:1
+    ├─ ○ enum:order_status  sql/models/commerce/enums/status.sql:1
+    └─ ● macro:formatted_order_total  sql/models/commerce/macros/python/orders.py:4
   Invalidated usages (2)
     - constant:minimum_order_value
     - macro:formatted_order_total
@@ -260,31 +261,31 @@ be available but were never used. The preview does not move or rewrite any file.
 Inspect visibility before a resource exists:
 
 ```console
-$ sqb scope --at models/commerce/returns/new_return.sql
+$ sqb scope --at sql/models/commerce/returns/new_return.sql
 Scope
-  Target: models/commerce/returns/new_return.sql
-  Path: models/commerce/returns/new_return.sql
+  Target: sql/models/commerce/returns/new_return.sql
+  Path: sql/models/commerce/returns/new_return.sql
   Status: prospective
 
 Used (0)
   (none)
 
 Scope chain
-  ├─ exact-owner-private models/commerce/returns (0)
-  ├─ descendant-public models/commerce (3)
+  ├─ exact-owner-private sql/models/commerce/returns (0)
+  ├─ descendant-public sql/models/commerce (3)
   ├─ descendant-public models (0)
   └─ project global (2)
 
 Available (3 of 5, 2 collapsed)
-  ├─ ○ constant:minimum_order_value  models/commerce/constants/limits.sql:1
-  ├─ ○ enum:order_status  models/commerce/enums/status.sql:1
-  └─ ○ macro:formatted_order_total  models/commerce/macros/python/orders.py:4
-  … 2 globals collapsed; run sqb scope --at models/commerce/returns/new_return.sql --globals all
+  ├─ ○ constant:minimum_order_value  sql/models/commerce/constants/limits.sql:1
+  ├─ ○ enum:order_status  sql/models/commerce/enums/status.sql:1
+  └─ ○ macro:formatted_order_total  sql/models/commerce/macros/python/orders.py:4
+  … 2 globals collapsed; run sqb scope --at sql/models/commerce/returns/new_return.sql --globals all
 
 ● used by this resource   ○ not used by this resource   --verbose for scope details
 
 Diagnostics (1)
-  ERROR S013 models/commerce/returns/new_return.sql: Runtime usage and relationship facts are unavailable for a prospective path
+  ERROR S013 sql/models/commerce/returns/new_return.sql: Runtime usage and relationship facts are unavailable for a prospective path
 Completeness: partial
 ```
 
@@ -302,13 +303,13 @@ $ sqb scope model:orders --browse global
 Scope folders
   Path: global
 
-  ├─ constants/  146 declarations, 18 used, 4 children; constant 146
+  ├─ sql/constants/  146 declarations, 18 used, 4 children; constant 146
      sqb scope model:orders --browse global/constants
      sqb scope model:orders --list global/constants
-  ├─ enums/  84 declarations, 11 used, 3 children; enum 84
+  ├─ sql/enums/  84 declarations, 11 used, 3 children; enum 84
      sqb scope model:orders --browse global/enums
      sqb scope model:orders --list global/enums
-  └─ macros/  231 declarations, 27 used, 8 children; macro 231
+  └─ sql/macros/  231 declarations, 27 used, 8 children; macro 231
      sqb scope model:orders --browse global/macros
      sqb scope model:orders --list global/macros
 

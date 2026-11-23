@@ -20,6 +20,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.providers._test_types import (
     SnowflakeKeyWarningE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.parametrize(
@@ -57,7 +58,7 @@ def test_given_provider_exporter_when_building_then_receives_redacted_events_bef
                 """
             ).strip()
             + "\n",
-            "providers/event_sink.py": dedent(
+            "python/providers/event_sink.py": dedent(
                 """
                 import json
                 import os
@@ -87,10 +88,10 @@ def test_given_provider_exporter_when_building_then_receives_redacted_events_bef
                 """
             ).strip()
             + "\n",
-            "sinks/events.py": dedent(
+            "python/event_sinks/events.py": dedent(
                 """
-                from providers.event_sink import EventSink
-                from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink
+                from python.providers.event_sink import EventSink
+                from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
                 import os
                 from pathlib import Path
 
@@ -109,7 +110,7 @@ def test_given_provider_exporter_when_building_then_receives_redacted_events_bef
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (description "Test model orders.", materialized table);
 
@@ -177,18 +178,18 @@ def test_given_command_output_sink_when_compiling_then_multiline_chunks_reconstr
                 """
             ).strip()
             + "\n",
-            "sinks/output.py": dedent(
+            "python/event_sinks/output.py": dedent(
                 """
                 import os
                 from pathlib import Path
 
-                from sqlbuild.sinks import (
+                from sqlbuild.event_sinks import (
                     CommandOutputRecord,
-                    command_output_sink,
+                    command_output_event_sink,
                     command_output_to_json,
                 )
 
-                @command_output_sink
+                @command_output_event_sink
                 def export_output(record: CommandOutputRecord) -> None:
                     path = Path(os.environ["COMMAND_OUTPUT_PATH"])
                     with path.open("a", encoding="utf-8") as stream:
@@ -196,7 +197,7 @@ def test_given_command_output_sink_when_compiling_then_multiline_chunks_reconstr
                 """
             ).strip()
             + "\n",
-            "models/orders.sql": "MODEL (description 'Test model orders.', materialized view);\n\nSELECT 1 AS order_id\n",
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized view);\n\nSELECT 1 AS order_id\n",
         },
     )
 
@@ -238,7 +239,7 @@ def test_given_configured_provider_and_sink_when_lineage_runs_then_skips_extensi
         project_name="read_only_lineage_project",
         repo_files={
             "sqlbuild_project.toml": 'name = "read_only_lineage_project"\nadapter = "duckdb"\n',
-            "providers/output.py": (
+            "python/providers/output.py": (
                 "from pathlib import Path\n"
                 "from sqlbuild.providers import Provider\n"
                 "class OutputProvider(Provider):\n"
@@ -250,14 +251,14 @@ def test_given_configured_provider_and_sink_when_lineage_runs_then_skips_extensi
                 "    def teardown(self):\n"
                 "        pass\n"
             ),
-            "sinks/output.py": (
-                "from providers.output import OutputProvider\n"
-                "from sqlbuild.sinks import command_output_sink\n"
-                "@command_output_sink\n"
+            "python/event_sinks/output.py": (
+                "from python.providers.output import OutputProvider\n"
+                "from sqlbuild.event_sinks import command_output_event_sink\n"
+                "@command_output_event_sink\n"
                 "def export_output(record, output_provider: OutputProvider):\n"
                 "    output_provider.write(record)\n"
             ),
-            "models/orders.sql": "MODEL (description 'Test model orders.', materialized view);\n\nSELECT 1 AS order_id\n",
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized view);\n\nSELECT 1 AS order_id\n",
         },
     )
 
@@ -298,17 +299,17 @@ def test_given_no_exporters_and_exploding_provider_when_non_provider_command_run
                 database = "no_exporter_project.duckdb"
                 """
             ).lstrip(),
-            "providers/exploding.py": (
+            "python/providers/exploding.py": (
                 "from pathlib import Path\n"
                 f"Path({str(marker_path)!r}).write_text('imported', encoding='utf-8')\n"
                 "raise RuntimeError('provider must not import')\n"
             ),
-            "sinks/helpers.py": (
+            "python/event_sinks/helpers.py": (
                 "from pathlib import Path\n"
                 f"Path({str(helper_marker_path)!r}).write_text('imported', encoding='utf-8')\n"
                 "def encode(value):\n    return value\n"
             ),
-            "models/example.sql": "MODEL (description 'Test model example.', materialized view);\n\nSELECT 1 AS value\n",
+            "sql/models/example.sql": "MODEL (description 'Test model example.', materialized view);\n\nSELECT 1 AS value\n",
         },
     )
 
@@ -336,7 +337,7 @@ def test_given_no_exporters_and_exploding_provider_when_non_provider_command_run
                 "Warning: lifecycle event export was incomplete: 0 of {accepted} event "
                 "deliveries dropped, 1 failed (sink 'failing_on_errors'). Check sink health: a "
                 "sink call slower than 1s drops that sink's events until it returns; events "
-                "still queued at exit need a longer sinks.lifecycle.shutdown_timeout."
+                "still queued at exit need a longer event_sinks.lifecycle.shutdown_timeout."
             ),
         ),
     ),
@@ -348,7 +349,7 @@ def test_given_filtered_and_failing_sinks_when_build_fails_then_delivery_and_war
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     output_dir: Path = tmp_path / "filtered"
-    output_dir.mkdir()
+    output_dir.mkdir(parents=True)
     monkeypatch.setenv("FILTERED_EXPORT_DIR", str(output_dir))
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,
@@ -362,16 +363,16 @@ def test_given_filtered_and_failing_sinks_when_build_fails_then_delivery_and_war
                 [connection]
                 database = "filtered_sink_project.duckdb"
 
-                [sinks.lifecycle.named.errors_only]
+                [event_sinks.lifecycle.named.errors_only]
                 min_severity = "error"
                 """
             ).lstrip(),
-            "sinks/filtered.py": dedent(
+            "python/event_sinks/filtered.py": dedent(
                 """
                 import os
                 from pathlib import Path
 
-                from sqlbuild.sinks import LifecycleEvent, LifecycleEventKind, lifecycle_event_sink
+                from sqlbuild.event_sinks import LifecycleEvent, LifecycleEventKind, lifecycle_event_sink
 
 
                 def _record(sink: str, event: LifecycleEvent) -> None:
@@ -395,11 +396,11 @@ def test_given_filtered_and_failing_sinks_when_build_fails_then_delivery_and_war
                     raise RuntimeError("destination detail must not be reported")
                 """
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.', materialized table);\n\n"
                 "SELECT 1 AS order_id\n"
             ),
-            "models/broken_orders.sql": (
+            "sql/models/broken_orders.sql": (
                 "MODEL (description 'Test model broken orders.', materialized table);\n\n"
                 'SELECT missing_column FROM __ref("orders")\n'
             ),
@@ -457,11 +458,11 @@ def test_given_sink_call_in_flight_at_shutdown_when_process_exits_then_teardown_
                 [connection]
                 database = "slow_sink_exit_project.duckdb"
 
-                [sinks.lifecycle]
+                [event_sinks.lifecycle]
                 shutdown_timeout = "0s"
                 """
             ).lstrip(),
-            "providers/destination.py": dedent(
+            "python/providers/destination.py": dedent(
                 """
                 import os
                 import sys
@@ -497,10 +498,10 @@ def test_given_sink_call_in_flight_at_shutdown_when_process_exits_then_teardown_
                             stream.write("teardown finished\\n")
                 """
             ).lstrip(),
-            "sinks/publish.py": dedent(
+            "python/event_sinks/publish.py": dedent(
                 """
-                from providers.destination import Destination
-                from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink
+                from python.providers.destination import Destination
+                from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
 
 
                 @lifecycle_event_sink
@@ -509,7 +510,7 @@ def test_given_sink_call_in_flight_at_shutdown_when_process_exits_then_teardown_
                     destination.publish()
                 """
             ).lstrip(),
-            "models/orders.sql": dedent(
+            "sql/models/orders.sql": dedent(
                 """
                 MODEL (
                   description "Test model orders.",
@@ -588,18 +589,18 @@ def test_given_sink_and_task_sharing_a_provider_when_building_then_it_is_set_up_
                 'name = "shared_sink_provider_project"\nadapter = "duckdb"\n\n'
                 '[connection]\ndatabase = "shared_sink_provider_project.duckdb"\n'
             ),
-            f"providers/{test_case.unused_provider_name}.py": SHARED_PROVIDER.format(
+            f"python/providers/{test_case.unused_provider_name}.py": SHARED_PROVIDER.format(
                 class_name="UnusedProvider", name=test_case.unused_provider_name
             )
             + "\n",
-            "providers/z_shared.py": SHARED_PROVIDER.format(
+            "python/providers/z_shared.py": SHARED_PROVIDER.format(
                 class_name="SharedProvider", name="z_shared"
             )
             + "\n",
-            "sinks/events.py": dedent(
+            "python/event_sinks/events.py": dedent(
                 """
-                from providers.z_shared import SharedProvider
-                from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink
+                from python.providers.z_shared import SharedProvider
+                from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
 
 
                 @lifecycle_event_sink
@@ -608,9 +609,11 @@ def test_given_sink_and_task_sharing_a_provider_when_building_then_it_is_set_up_
                 """
             ).strip()
             + "\n",
-            "python/tasks/uses_shared.py": dedent(
-                """
-                from providers.z_shared import SharedProvider
+            **node_module_files(
+                "python/nodes/tasks/uses_shared.py",
+                dedent(
+                    """
+                from python.providers.z_shared import SharedProvider
                 from sqlbuild.assets import asset
 
 
@@ -619,8 +622,9 @@ def test_given_sink_and_task_sharing_a_provider_when_building_then_it_is_set_up_
                     '''Test task uses_shared.'''
                     del ctx, shared_provider
                 """
-            ).strip()
-            + "\n",
+                ).strip()
+                + "\n",
+            ),
         },
     )
 
@@ -654,11 +658,11 @@ def test_given_snowflake_keys_and_a_sink_provider_when_running_then_warns_once(
                 'name = "snowflake_keys_project"\nadapter = "duckdb"\n\n'
                 '[connection]\ndatabase = "snowflake_keys_project.duckdb"\nwarehouse = "orders_wh"\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.', materialized table);\n\n"
                 "SELECT 1 AS order_id\n"
             ),
-            "providers/probe.py": dedent(
+            "python/providers/probe.py": dedent(
                 """
                 from sqlbuild.providers import Provider
 
@@ -671,10 +675,10 @@ def test_given_snowflake_keys_and_a_sink_provider_when_running_then_warns_once(
                 """
             ).strip()
             + "\n",
-            "sinks/events.py": dedent(
+            "python/event_sinks/events.py": dedent(
                 """
-                from providers.probe import Probe
-                from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink
+                from python.providers.probe import Probe
+                from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
 
 
                 @lifecycle_event_sink

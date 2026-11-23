@@ -139,7 +139,7 @@ def test_given_retained_artifact_of_another_type_when_rerunning_then_replaces_an
         command=(*test_case.command, "--retain"), project_dir=project_dir
     )
     assert retained.returncode == 0, retained.stdout + retained.stderr
-    orders_model: Path = project_dir / "models/orders.sql"
+    orders_model: Path = project_dir / "sql/models/orders.sql"
     orders_model.write_text(
         orders_model.read_text(encoding="utf-8").replace("materialized table", "materialized view"),
         encoding="utf-8",

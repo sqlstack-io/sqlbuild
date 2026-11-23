@@ -47,8 +47,10 @@ def build_warehouse_discovered_inputs(
 def write_case_adapter_file(*, project_dir: Path, contents: str) -> None:
     """Write the case's project-local adapter module, which may be empty."""
 
-    (project_dir / "adapters").mkdir(exist_ok=True)
-    (project_dir / "adapters" / "custom.py").write_text(contents, encoding="utf-8")
+    (project_dir / "python" / "adapters").mkdir(parents=True, exist_ok=True)
+    (project_dir / "python" / "adapters" / "custom.py").write_text(
+        contents, encoding="utf-8"
+    )
 
 
 def write_dbt_profile(profiles_dir: Path, *, profile: str, output: dict[str, object]) -> None:

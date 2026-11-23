@@ -40,7 +40,7 @@ _RULE_TEST: str = (
     "        test_case=RuleCase(\n"
     '            description="unprefixed orders model",\n'
     "            source='MODEL (description \"Orders\");\\nSELECT 1 AS order_id\\n',\n"
-    '            path="models/orders.sql",\n'
+    '            path="sql/models/orders.sql",\n'
     "            expected_finding_count=1,\n"
     "        ),\n"
     "    )\n"
@@ -51,7 +51,7 @@ _RULE_TEST: str = (
     "        test_case=RuleCase(\n"
     '            description="staged orders model",\n'
     "            source='MODEL (description \"Orders\");\\nSELECT 1 AS order_id\\n',\n"
-    '            path="models/stg_orders.sql",\n'
+    '            path="sql/models/stg_orders.sql",\n'
     "            expected_finding_count=0,\n"
     "        ),\n"
     "    )\n"

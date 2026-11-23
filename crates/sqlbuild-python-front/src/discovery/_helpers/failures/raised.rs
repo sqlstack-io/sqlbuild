@@ -17,7 +17,7 @@ const OS_MODULE: &str = "os";
 const DECODE_ENCODING: &str = "utf-8";
 
 /// The exception class of each native failure kind.
-const FAILURE_CLASSES: [(&str, ErrorId); 14] = [
+const FAILURE_CLASSES: [(&str, ErrorId); 15] = [
     ("model_sql", ErrorId::ModelSqlParse),
     ("declaration", ErrorId::DeclarationParse),
     ("sql_test", ErrorId::SqlTestParse),
@@ -31,6 +31,7 @@ const FAILURE_CLASSES: [(&str, ErrorId); 14] = [
     ("conflict", ErrorId::DiscoveryConflict),
     ("seed", ErrorId::SeedDiscovery),
     ("python_path", ErrorId::ProjectPythonPath),
+    ("project_layout", ErrorId::ProjectLayout),
     ("orchestration", ErrorId::OrchestrationDeclaration),
 ];
 

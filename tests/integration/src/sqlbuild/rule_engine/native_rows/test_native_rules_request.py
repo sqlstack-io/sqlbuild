@@ -23,14 +23,14 @@ from tests.integration.src.sqlbuild.rule_engine.native_rows.helpers import (
 _TYPE_PROOF_FINDINGS: tuple[FindingKey, ...] = (
     (
         "K002",
-        "models/orders.sql",
+        "sql/models/orders.sql",
         2,
         37,
         "column 'amount' inferred as INTEGER but declared type is BIGINT",
     ),
     (
         "SQBRCONTRACT105",
-        "models/orders.sql",
+        "sql/models/orders.sql",
         5,
         18,
         'output "amount" is a passthrough whose type is not proven against the declared '

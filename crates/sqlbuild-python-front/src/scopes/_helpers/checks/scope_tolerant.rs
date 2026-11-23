@@ -18,11 +18,11 @@ use sqlbuild_python_base::records::types::RecordId;
 
 /// Each authored resource root, in the order a prospective path is matched against them.
 const PROSPECTIVE_ROOTS: [(ResourceKind, &str); 5] = [
-    (ResourceKind::Model, "models"),
+    (ResourceKind::Model, "sql/models"),
     (ResourceKind::Test, "tests/unit"),
     (ResourceKind::Scenario, "tests/scenarios"),
-    (ResourceKind::Function, "functions/sql"),
-    (ResourceKind::Source, "sources"),
+    (ResourceKind::Function, "sql/functions/sql"),
+    (ResourceKind::Source, "sql/sources"),
 ];
 const RESOURCE_PARSE_ERROR: &str = "S019";
 const DECLARATION_PARSE_ERROR: &str = "S020";

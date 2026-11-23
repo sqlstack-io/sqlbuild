@@ -12,7 +12,7 @@ use crate::python_rules::_helpers::units::project::{
 };
 use crate::python_rules::constants::{
     NODE_DECLARED_IN_UNIT_CODE, NODE_UNIT_LAYOUT_CODE, PACKAGE_ROOT, UNIT_CHECKS_FILE,
-    UNIT_HELPERS_FOLDER, UNIT_MAIN_FILE, UNIT_NODE_FILE, UNIT_ROLE_FILES,
+    UNIT_DECLARATION_FILES, UNIT_HELPERS_FOLDER, UNIT_MAIN_FILE, UNIT_ROLE_FILES,
 };
 use crate::python_rules::models::{UnitFile, UnitProject};
 
@@ -30,9 +30,14 @@ pub(crate) fn unit_layout_faults(
                 .contains(format!("{PACKAGE_ROOT}/{unit}/{UNIT_MAIN_FILE}").as_str())
         })
         .filter_map(|unit| {
+            let anchor: String = UNIT_DECLARATION_FILES
+                .iter()
+                .chain([&UNIT_CHECKS_FILE])
+                .map(|file| format!("{PACKAGE_ROOT}/{unit}/{file}"))
+                .find(|path| project.paths.contains(path.as_str()))?;
             catalogue_fault(
                 NODE_UNIT_LAYOUT_CODE,
-                &format!("{PACKAGE_ROOT}/{unit}/{UNIT_NODE_FILE}"),
+                &anchor,
                 (1, 1),
                 &format!("{PACKAGE_ROOT}/{unit}/ has no {UNIT_MAIN_FILE}"),
             )
@@ -53,7 +58,8 @@ pub(crate) fn unit_layout_faults(
         let unit_path: String = format!("{PACKAGE_ROOT}/{}", parts[..depth].join("/"));
         let entry: &str = parts[depth];
         if parts.len() == depth + 1 {
-            let allowed: bool = [UNIT_NODE_FILE, UNIT_MAIN_FILE].contains(&entry)
+            let allowed: bool = UNIT_DECLARATION_FILES.contains(&entry)
+                || entry == UNIT_MAIN_FILE
                 || UNIT_ROLE_FILES.contains(&entry);
             if !allowed {
                 faults.extend(catalogue_fault(
@@ -78,7 +84,7 @@ pub(crate) fn unit_layout_faults(
     faults
 }
 
-/// Each node or factory declared outside a unit's `node.py`, and each check outside its unit's files.
+/// Each node or factory declared outside the unit file named for its kind, and each check outside its unit's files.
 pub(crate) fn declared_outside_unit_faults(project: &UnitProject<'_>) -> Vec<Fault> {
     let mut faults: Vec<Fault> = Vec::new();
     for file in &project.files {
@@ -108,13 +114,17 @@ fn misplaced(
     in_factory: bool,
 ) -> Option<Fault> {
     let (what, decorator) = declared(function)?;
-    let at_home: bool = match what {
-        Declared::Node(..) => home == Some(UNIT_NODE_FILE),
-        Declared::Factory => matches!(home, Some(UNIT_NODE_FILE | UNIT_CHECKS_FILE)),
-        Declared::Check => {
-            home == Some(UNIT_CHECKS_FILE) || (home == Some(UNIT_NODE_FILE) && in_factory)
-        }
+    let expected: Option<&str> = match what {
+        Declared::Node(kind, _) => Some(kind_file(kind)),
+        Declared::Factory => factory_file(function),
+        Declared::Check => Some(UNIT_CHECKS_FILE),
     };
+    let at_home: bool = match expected {
+        _ if in_factory && what != Declared::Factory => home.is_some_and(is_factory_file),
+        Some(expected) => home == Some(expected),
+        None => home.is_some_and(is_factory_file),
+    };
+    let expected: &str = expected.unwrap_or("factory.py");
     if at_home {
         return None;
     }
@@ -123,7 +133,7 @@ fn misplaced(
             format!("the {UNIT_CHECKS_FILE} of the unit folder whose node it checks")
         }
         _ => format!(
-            "{PACKAGE_ROOT}/{}/{}/{UNIT_NODE_FILE}",
+            "{PACKAGE_ROOT}/{}/{}/{expected}",
             domain(file),
             function.name
         ),
@@ -149,4 +159,40 @@ fn domain(file: &UnitFile<'_>) -> String {
     } else {
         (*first).to_owned()
     }
+}
+
+/// The file of one direct node of `kind`.
+fn kind_file(kind: &str) -> &'static str {
+    match kind {
+        "loader" => "loader.py",
+        _ => "asset.py",
+    }
+}
+
+/// The file of a factory, from the kinds of the nodes it declares inside: plural for one kind,
+/// `factory.py` for several.
+fn factory_file(function: &UnitFunction) -> Option<&'static str> {
+    let mut kinds: Vec<&str> = Vec::new();
+    for inner in &function.inner {
+        let kind: &str = match declared(inner) {
+            Some((Declared::Node(kind, _), _)) => kind,
+            Some((Declared::Check, _)) => "check",
+            _ => continue,
+        };
+        if !kinds.contains(&kind) {
+            kinds.push(kind);
+        }
+    }
+    match kinds.as_slice() {
+        [] => None,
+        ["loader"] => Some("loaders.py"),
+        ["asset"] => Some("assets.py"),
+        ["check"] => Some(UNIT_CHECKS_FILE),
+        _ => Some("factory.py"),
+    }
+}
+
+/// Whether `file` is a factory's declaration file.
+fn is_factory_file(file: &str) -> bool {
+    ["loaders.py", "assets.py", "factory.py", UNIT_CHECKS_FILE].contains(&file)
 }

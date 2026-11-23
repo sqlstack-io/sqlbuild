@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D012",
-     "message": "Duplicate provider name 'export_settings' found in providers/first.py and providers/second.py"
+     "message": "Duplicate provider name 'export_settings' found in python/providers/first.py and python/providers/second.py"
     }
    ]
   }

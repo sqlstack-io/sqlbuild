@@ -8,14 +8,14 @@ use crate::models::{Fault, PythonSource};
 use crate::python_rules::_helpers::engine::faults::catalogue_fault;
 use crate::python_rules::_helpers::engine::placement::package_anchor;
 use crate::python_rules::_helpers::units::project::{
-    absolute_module, dotted_names, files_naming, project_modules, rejected_import_faults,
-    unit_fault,
+    absolute_module, dotted_names, files_naming, module_below, project_modules,
+    rejected_import_faults, unit_fault,
 };
 use crate::python_rules::constants::{
-    INIT_FILE, ORCHESTRATION_ROOT, PACKAGE_ROOT, PRIVATE_PREFIX, PROVIDER_BASE, PROVIDER_FILE,
-    PROVIDER_IMPORT_BOUNDARIES_CODE, PROVIDER_LAYOUT_CODE, PROVIDER_MODULE_SHAPE_CODE,
-    PROVIDER_PRIVATE_FOLDERS, PROVIDER_ROLE_FILES, PROVIDER_RULE_CODES, PROVIDERS_ROOT,
-    SHARED_UTILITIES_PACKAGE, STAR_IMPORT,
+    INIT_FILE, ORCHESTRATION_ROOT, PACKAGE_MODULE, PACKAGE_ROOT, PRIVATE_PREFIX, PROVIDER_BASE,
+    PROVIDER_FILE, PROVIDER_IMPORT_BOUNDARIES_CODE, PROVIDER_LAYOUT_CODE,
+    PROVIDER_MODULE_SHAPE_CODE, PROVIDER_PRIVATE_FOLDERS, PROVIDER_ROLE_FILES, PROVIDER_RULE_CODES,
+    PROVIDERS_MODULE, PROVIDERS_ROOT, SHARED_UTILITIES_PACKAGE, STAR_IMPORT,
 };
 use crate::python_rules::models::ParsedFile;
 
@@ -34,12 +34,15 @@ pub(crate) fn provider_faults(
         return Vec::new();
     }
     let mut faults: Vec<Fault> = provider_layout_faults(sources);
-    let files: Vec<ParsedFile<'_>> = files_naming(sources, PROVIDERS_ROOT, python_version);
+    let files: Vec<ParsedFile<'_>> =
+        files_naming(sources, (PROVIDERS_ROOT, PROVIDERS_MODULE), python_version);
     let modules: BTreeSet<String> = project_modules(sources);
     let classes: ProviderClasses = provider_classes(&files, &modules);
     for file in &files {
-        if matches!(file.parts.as_slice(), [root, _, file_name] if *root == PROVIDERS_ROOT && *file_name == PROVIDER_FILE)
-        {
+        if matches!(
+            provider_parts(file.path).as_deref(),
+            Some([_, file_name]) if *file_name == PROVIDER_FILE
+        ) {
             faults.extend(provider_module_faults(file, &classes));
         }
         faults.extend(import_faults(file, &modules));
@@ -321,15 +324,25 @@ fn base_target(file: &ParsedFile<'_>, base: &str, modules: &BTreeSet<String>) ->
     }
 }
 
-/// The dotted module of a project file, such as `providers.storefront_api.provider`.
+/// The parts of a `python/providers/` file's path below that folder.
+fn provider_parts(path: &str) -> Option<Vec<&str>> {
+    Some(
+        path.strip_prefix(PROVIDERS_ROOT)?
+            .strip_prefix('/')?
+            .split('/')
+            .collect(),
+    )
+}
+
+/// The dotted module of a project file, such as `python.providers.storefront_api.provider`.
 fn file_module(path: &str) -> String {
     dotted_names(path).pop().unwrap_or_default()
 }
 
 /// Imports of another provider's private code, and a provider's imports of python/ outside utils/ or of orchestration/.
 fn import_faults(file: &ParsedFile<'_>, modules: &BTreeSet<String>) -> Vec<Fault> {
-    let capability: Option<&str> = match file.parts.as_slice() {
-        [root, capability, _, ..] if *root == PROVIDERS_ROOT => Some(capability),
+    let capability: Option<&str> = match provider_parts(file.path).as_deref() {
+        Some([capability, _, ..]) => Some(capability),
         _ => None,
     };
     rejected_import_faults(file, modules, |module| {
@@ -339,22 +352,20 @@ fn import_faults(file: &ParsedFile<'_>, modules: &BTreeSet<String>) -> Vec<Fault
 
 /// Why a file in provider `capability` (or outside providers/ when `None`) may not import `module`.
 fn boundary_detail(module: &str, capability: Option<&str>) -> Option<String> {
-    let parts: Vec<&str> = module.split('.').collect();
-    if let [root, owner, folder, ..] = parts.as_slice() {
-        let private: bool = *root == PROVIDERS_ROOT && PROVIDER_PRIVATE_FOLDERS.contains(folder);
-        if private && capability != Some(*owner) {
-            return Some(format!("which is private to {PROVIDERS_ROOT}/{owner}/"));
-        }
+    if let Some([owner, folder, ..]) = module_below(module, PROVIDERS_MODULE).as_deref()
+        && PROVIDER_PRIVATE_FOLDERS.contains(folder)
+        && capability != Some(*owner)
+    {
+        return Some(format!("which is private to {PROVIDERS_ROOT}/{owner}/"));
     }
     capability?;
-    match parts.as_slice() {
-        [root, utils, ..] if *root == PACKAGE_ROOT && *utils == SHARED_UTILITIES_PACKAGE => None,
-        [root, ..] if *root == PACKAGE_ROOT => Some(format!(
-            "but a provider imports only {PACKAGE_ROOT}/{SHARED_UTILITIES_PACKAGE}/ from {PACKAGE_ROOT}/"
-        )),
-        [root, ..] if *root == ORCHESTRATION_ROOT => Some(format!(
-            "but a provider never imports {ORCHESTRATION_ROOT}/"
-        )),
-        _ => None,
+    if let Some(below) = module_below(module, PACKAGE_MODULE) {
+        return (below.first() != Some(&SHARED_UTILITIES_PACKAGE)).then(|| {
+            format!(
+                "but a provider imports only {PACKAGE_ROOT}/{SHARED_UTILITIES_PACKAGE}/ from {PACKAGE_ROOT}/"
+            )
+        });
     }
+    module_below(module, ORCHESTRATION_ROOT)
+        .map(|_| format!("but a provider never imports {ORCHESTRATION_ROOT}/"))
 }

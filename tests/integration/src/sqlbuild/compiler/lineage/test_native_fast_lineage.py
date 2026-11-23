@@ -134,11 +134,11 @@ def test_given_root_star_over_opted_out_model_when_building_fast_lineage_then_re
         project_dir=tmp_path / "project",
         files={
             **generated_lineage_files(rng=random.Random(5), model_count=_MODEL_COUNT),
-            "models/orders_staged.sql": (
+            "sql/models/orders_staged.sql": (
                 'MODEL (description "Staged orders", sql_analysis false);\n\n'
                 'SELECT customer_id, order_id FROM __source("raw_orders")\n'
             ),
-            "models/orders_all.sql": (
+            "sql/models/orders_all.sql": (
                 'MODEL (description "All orders");\n\nSELECT * FROM __ref("orders_staged")\n'
             ),
         },

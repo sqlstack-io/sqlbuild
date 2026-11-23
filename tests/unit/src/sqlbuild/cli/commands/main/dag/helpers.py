@@ -31,7 +31,7 @@ def prepare_static_dag_project(root: Path) -> Path:
     """Create a minimal local project for dag command tests."""
 
     project_dir: Path = root / "project"
-    models_dir: Path = project_dir / "models"
+    models_dir: Path = project_dir / "sql" / "models"
     models_dir.mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         "\n".join(
@@ -63,10 +63,10 @@ def prepare_advisory_placement_dag_project(root: Path) -> Path:
         config_path.read_text(encoding="utf-8") + "\n[scopes]\nenforce_placement = false\n",
         encoding="utf-8",
     )
-    constants_dir: Path = project_dir / "constants"
-    constants_dir.mkdir()
+    constants_dir: Path = project_dir / "sql" / "constants"
+    constants_dir.mkdir(parents=True)
     (constants_dir / "value.sql").write_text("CONSTANT (name value, value 1);\n", encoding="utf-8")
-    (project_dir / "models" / "orders.sql").write_text(
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
         'MODEL (description "Test model orders.", '
         'materialized table);\n\nSELECT @const("value") AS order_id\n',
         encoding="utf-8",
@@ -78,10 +78,10 @@ def prepare_python_dag_project(root: Path) -> Path:
     """Create a local project with Python assets and checks."""
 
     project_dir: Path = prepare_static_dag_project(root)
-    tasks_dir: Path = project_dir / "python" / "tasks"
-    assets_dir: Path = project_dir / "python" / "assets"
-    loaders_dir: Path = project_dir / "python" / "loaders"
-    checks_dir: Path = project_dir / "python" / "checks"
+    tasks_dir: Path = project_dir / "python" / "nodes" / "tasks"
+    assets_dir: Path = project_dir / "python" / "nodes" / "assets"
+    loaders_dir: Path = project_dir / "python" / "nodes" / "loaders"
+    checks_dir: Path = project_dir / "python" / "nodes" / "checks"
     tasks_dir.mkdir(parents=True)
     assets_dir.mkdir(parents=True)
     loaders_dir.mkdir(parents=True)
@@ -110,7 +110,7 @@ def prepare_python_dag_project(root: Path) -> Path:
         "\n".join(
             (
                 "from sqlbuild.loaders import loader",
-                "from python.tasks.prepare_orders import prepare_orders",
+                "from python.nodes.tasks.prepare_orders import prepare_orders",
                 "",
                 "@loader(",
                 "    depends_on=(prepare_orders,),",
@@ -128,8 +128,8 @@ def prepare_python_dag_project(root: Path) -> Path:
         "\n".join(
             (
                 "from sqlbuild.assets import asset",
-                "from python.loaders.warehouse_export import warehouse_export",
-                "from python.tasks.prepare_orders import prepare_orders",
+                "from python.nodes.loaders.warehouse_export import warehouse_export",
+                "from python.nodes.tasks.prepare_orders import prepare_orders",
                 "",
                 "@asset(",
                 "    depends_on=(prepare_orders, warehouse_export),",
@@ -153,9 +153,9 @@ def prepare_python_dag_project(root: Path) -> Path:
         "\n".join(
             (
                 "from sqlbuild.checks import check",
-                "from python.assets.orders_export import orders_export",
-                "from python.loaders.warehouse_export import warehouse_export",
-                "from python.tasks.prepare_orders import prepare_orders",
+                "from python.nodes.assets.orders_export import orders_export",
+                "from python.nodes.loaders.warehouse_export import warehouse_export",
+                "from python.nodes.tasks.prepare_orders import prepare_orders",
                 "",
                 "@check(",
                 "    depends_on=(orders_export, prepare_orders, warehouse_export),",
@@ -175,7 +175,7 @@ def prepare_python_dag_project(root: Path) -> Path:
         "\n".join(
             (
                 "from sqlbuild.checks import check",
-                "from python.loaders.warehouse_export import warehouse_export",
+                "from python.nodes.loaders.warehouse_export import warehouse_export",
                 "",
                 "@check(depends_on=warehouse_export, tags=['loader'])",
                 "def check_loader_export(ctx):",

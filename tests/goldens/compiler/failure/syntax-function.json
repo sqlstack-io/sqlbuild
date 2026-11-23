@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "SQL syntax error in function 'scaled_amount' (<project>/functions/sql/scaled_amount.sql): Parse error at line 1, column 21: Expected RParen, got end of input ('') near [* (p_factor]",
+     "message": "SQL syntax error in function 'scaled_amount' (<project>/sql/functions/sql/scaled_amount.sql): Parse error at line 1, column 21: Expected RParen, got end of input ('') near [* (p_factor]",
      "help": "if this SQL is valid for your warehouse, please report it so the parser can support it\n  = help: SQL analysis is on for this project; to turn it off for every model, set this in sqlbuild_project.toml:\n            [settings]\n            sql_analysis = false\n  = help: to skip SQL analysis for one run, use `--no-sql-analysis`"
     }
    ]

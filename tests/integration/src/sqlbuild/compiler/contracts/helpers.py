@@ -54,25 +54,25 @@ _SOURCES: str = """sources:
         type: VARCHAR
 """
 _MODELS: dict[str, str] = {
-    "models/staging/stg_orders.sql": (
+    "sql/models/staging/stg_orders.sql": (
         'MODEL (\n  description "Staged orders",\n  contract enforced,\n  columns (\n'
         "    order_id (type INTEGER, nullable false),\n    amount (type DOUBLE),\n  ),\n);\n\n"
         'SELECT order_id, customer_id, amount, status FROM __source("raw_orders")\n'
     ),
-    "models/marts/customer_totals.sql": (
+    "sql/models/marts/customer_totals.sql": (
         'MODEL (\n  description "Totals per customer",\n  columns (\n'
         "    customer_id (type BIGINT),\n    total_amount (type DECIMAL(18, 2)),\n  ),\n);\n\n"
         "SELECT customer_id, SUM(amount) AS total_amount, COUNT(*) AS order_count,\n"
         "  MAX(status) AS last_status\n"
         'FROM __ref("stg_orders")\nGROUP BY customer_id\n'
     ),
-    "models/marts/order_flags.sql": (
+    "sql/models/marts/order_flags.sql": (
         'MODEL (\n  description "Order flags",\n);\n\n'
         "SELECT order_id, amount > 10 AS is_large, CAST(NULL AS VARCHAR) AS note,\n"
         "  status AS Status_Label\n"
         'FROM __ref("stg_orders")\n'
     ),
-    "models/marts/all_orders.sql": (
+    "sql/models/marts/all_orders.sql": (
         'MODEL (\n  description "Every order column",\n);\n\nSELECT * FROM __ref("stg_orders")\n'
     ),
 }
@@ -129,7 +129,7 @@ _OUTPUT_NAMES: list[str] = [
     "Order_ID",
 ]
 _ENFORCED_MODEL: str = "stg_orders"
-_NAMED_SCHEMA_PATH: Path = Path("schemas/orders_schema.sql")
+_NAMED_SCHEMA_PATH: Path = Path("sql/schemas/orders_schema.sql")
 _LIFECYCLE_KEYS: tuple[str, ...] = ("contract", "materialized", "incremental_mode")
 _FAMILY_NAMES: tuple[str, ...] = ("amount_*", "Amount_*", "count_*", "label_*")
 _REASONS: tuple[str | None, ...] = (None, "", "no supported pivot")
@@ -169,7 +169,7 @@ def compiled_contract_project(*, project_dir: Path) -> CompiledProjectView:
 
     files: dict[str, str] = {
         "sqlbuild_project.toml": _PROJECT_TOML,
-        "sources/raw.yml": _SOURCES,
+        "sql/sources/raw.yml": _SOURCES,
         **_MODELS,
     }
     for relative_path, contents in files.items():

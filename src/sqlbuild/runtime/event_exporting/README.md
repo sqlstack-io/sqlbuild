@@ -15,7 +15,7 @@ are dropped. This bounds concurrently hung threads to the number of exporters, b
 terminate those daemon threads or undo destination side effects if they eventually return.
 
 Shutdown stops acceptance, drains only until the shared deadline (CLI commands use
-`sinks.lifecycle.shutdown_timeout`, default two seconds), accounts queued and unattempted
+`event_sinks.lifecycle.shutdown_timeout`, default two seconds), accounts queued and unattempted
 deliveries as dropped, terminates the event dispatcher, and returns without waiting for timed-out
 invocation threads. Concurrent shutdown callers receive the same cached final accounting snapshot.
 The shared provider session is retained while any invocation remains live. Teardown runs exactly
@@ -37,8 +37,8 @@ it returns.
 and `error`. Omitted declaration filters opt into all kinds from `debug` upward. Options are
 validated and frozen when the function is decorated.
 
-Project config can only narrow that opt-in. `[sinks.lifecycle]` supplies global `event_kinds` and
-`min_severity`; `[sinks.lifecycle.named.<exporter_name>]` can narrow one exporter further. Effective
+Project config can only narrow that opt-in. `[event_sinks.lifecycle]` supplies global `event_kinds` and
+`min_severity`; `[event_sinks.lifecycle.named.<exporter_name>]` can narrow one exporter further. Effective
 kinds are the intersection of declaration, global, and named sets. Effective minimum severity is
 the strictest of those three values. Unknown names, kinds, and severities fail before execution.
 
@@ -73,10 +73,10 @@ dropped. Failure and health diagnostics use only exporter name, catalogued kind/
 type, counts, and queue dimensions. They bypass lifecycle publication and exporter enqueue, contain
 no event payload or destination/provider details, and reporter failures remain isolated.
 
-Startup first imports public Python modules under `sinks/` and collects decorated
+Startup first imports public Python modules under `python/event_sinks/` and collects decorated
 declarations without discovering providers. If those modules contain only helpers, SQLBuild does
 not import project providers or construct exporter queue, dispatcher, or notification threads.
 Normal command-owned project discovery remains responsible for providers needed by nodes and hooks.
 
 The project declaration, configuration, delivery, security, and failure contract is documented at
-[sqlbuild.com/docs/concepts/observability/sinks](https://sqlbuild.com/docs/concepts/observability/sinks/).
+[sqlbuild.com/docs/concepts/observability/event-sinks](https://sqlbuild.com/docs/concepts/observability/event-sinks/).

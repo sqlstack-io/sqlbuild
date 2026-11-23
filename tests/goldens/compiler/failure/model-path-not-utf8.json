@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D016",
-     "message": "Project path <project>/models/staging/caf\\xe9.sql is not valid UTF-8; rename it so SQLBuild can read it"
+     "message": "Project path <project>/sql/models/staging/caf\\xe9.sql is not valid UTF-8; rename it so SQLBuild can read it"
     }
    ]
   }

@@ -57,31 +57,31 @@ RAW_SOURCES: str = (
 )
 SCOPED_PROJECT: dict[str, str] = {
     "sqlbuild_project.toml": PROJECT_CONFIG,
-    "sources/raw.yml": RAW_SOURCES,
-    "macros/python/money.py": 'def cents(value: str) -> str:\n    return f"{value} * 100"\n',
-    "enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
-    "models/sales/_sqlbuild/macros/python/labels.py": (
+    "sql/sources/raw.yml": RAW_SOURCES,
+    "sql/macros/python/money.py": 'def cents(value: str) -> str:\n    return f"{value} * 100"\n',
+    "sql/enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
+    "sql/models/sales/_sqlbuild/macros/python/labels.py": (
         "def sales_label(value: str) -> str:\n    return f\"'sales:' || {value}\"\n"
     ),
-    "models/sales/_sqlbuild/constants/limits.sql": "CONSTANT (name sales_cap, value 3);\n",
-    "models/sales/eu/_macros/python/rates.py": (
+    "sql/models/sales/_sqlbuild/constants/limits.sql": "CONSTANT (name sales_cap, value 3);\n",
+    "sql/models/sales/eu/_macros/python/rates.py": (
         'def eu_rate(value: str) -> str:\n    return f"{value} * 2"\n'
     ),
-    "models/sales/eu/_enums/region.sql": "ENUM (name eu_region, members [NORTH, SOUTH]);\n",
-    "models/sales/orders.sql": (
+    "sql/models/sales/eu/_enums/region.sql": "ENUM (name eu_region, members [NORTH, SOUTH]);\n",
+    "sql/models/sales/orders.sql": (
         'MODEL (\n  description "Orders",\n  enums (\n    _state [OPEN, CLOSED],\n  ),\n);\n\n'
         "SELECT\n  order_id,\n  @py.sales_label('1') AS label,\n"
         '  @const("sales_cap") AS cap,\n  @enum("_state").OPEN AS state,\n'
         '  @enum("order_status").PLACED AS status\nFROM __source("raw_orders")\n'
     ),
-    "models/sales/eu/eu_orders.sql": (
+    "sql/models/sales/eu/eu_orders.sql": (
         'MODEL (\n  description "EU orders",\n);\n\n'
         "SELECT\n  order_id,\n  @py.eu_rate('2') AS rate,\n"
         "  @enum(\"eu_region\").NORTH AS region,\n  @py.cents('3') AS cents,\n"
         "  @py.sales_label('4') AS label,\n  @const(\"sales_cap\") AS cap\n"
         'FROM __ref("orders")\n'
     ),
-    "models/other/customers.sql": (
+    "sql/models/other/customers.sql": (
         'MODEL (\n  description "Customers",\n);\n\n'
         "SELECT 1 AS customer_id, @enum(\"order_status\").SHIPPED AS status, @py.cents('5') AS "
         "cents\n"
@@ -131,11 +131,11 @@ _BROKEN_SCENARIO_CTES: tuple[str, ...] = (
     "__expected__orders (SELECT 1)",
 )
 _FOLDERS: tuple[str, ...] = (
-    "models/sales",
-    "models/sales/eu",
-    "models/sales/eu/north",
-    "models/other",
-    "models/other/archive",
+    "sql/models/sales",
+    "sql/models/sales/eu",
+    "sql/models/sales/eu/north",
+    "sql/models/other",
+    "sql/models/other/archive",
 )
 _PLACEMENTS: tuple[str, ...] = (
     "{kind}s/f{index}",
@@ -161,7 +161,7 @@ def generated_scope_files(*, rng: random.Random) -> dict[str, str]:
 
     files: dict[str, str] = {
         "sqlbuild_project.toml": PROJECT_CONFIG,
-        "sources/raw.yml": RAW_SOURCES,
+        "sql/sources/raw.yml": RAW_SOURCES,
     }
     models: list[str] = [f"model_{index}" for index in range(rng.randint(1, 6))]
     for index, model in enumerate(models):
@@ -213,7 +213,7 @@ def _macro_writer(*, path: str, index: int, variant: int) -> tuple[str, str, tup
     name: str = f"macro_{index}"
     root, stem = path.rsplit("/", 1)
     return (
-        f"{root}/python/{stem}.py",
+        f"{root}/python/nodes/{stem}.py",
         f"def {name}(value: str) -> str:\n    return value\n",
         (name,),
     )

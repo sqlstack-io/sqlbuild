@@ -292,7 +292,7 @@ def test_given_an_invalid_cte_name_when_compiling_then_the_error_names_the_probl
                 "@sql.clean_orders(gb_raw, __cte := gb_orders)",
                 "@sql.clean_orders(fr_raw, __cte := fr_orders)",
             ),
-            inspected_paths=("models/marts/orders.sql",),
+            inspected_paths=("sql/models/marts/orders.sql",),
         ),
         SqlMacroCommandTestCase(
             description="lint_sees_renamed_ctes_as_hand_written",

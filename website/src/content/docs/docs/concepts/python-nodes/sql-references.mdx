@@ -74,7 +74,7 @@ with `P008`:
 
 ```
 error[P008]: asset:export_orders names model:fact_orders as 'fact_orders' in SQL passed to ctx.query()
-  --> python/exports/export.py:9
+  --> python/nodes/exports/export.py:9
   = help: declare it with depends_on=model("fact_orders") and use ctx.relation(model("fact_orders")) instead of the relation name
   = help: if 'fact_orders' is an external table that shares the name, qualify it with its schema
   = help: while migrating a project, allow hard-coded relation names with [references] enforce_explicit = false in sqlbuild_project.toml

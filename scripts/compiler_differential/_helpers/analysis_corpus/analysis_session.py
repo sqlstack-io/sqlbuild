@@ -12,13 +12,13 @@ from scripts.compiler_differential.models import FailureCase
 _ORDERS: str = '__ref("stg_orders")'
 _MART_HEADER: str = 'MODEL (\n  description "Order totals per customer",\n);\n\n'
 _STAGING_HEADER: str = 'MODEL (\n  description "Staged orders",\n);\n\n'
-_LAYERED_PATH: str = "models/marts/order_layers.sql"
+_LAYERED_PATH: str = "sql/models/marts/order_layers.sql"
 _LAYERED_MODEL: str = (
     'MODEL (\n  description "Orders layered over the staged star",\n);\n\n'
     f"SELECT s.*, s.amount * 2 AS doubled_amount\nFROM {_ORDERS} s\n"
 )
 
-_PIVOT_PATH: str = "models/marts/status_amounts.sql"
+_PIVOT_PATH: str = "sql/models/marts/status_amounts.sql"
 
 
 def _pivot_model(*, pivot_column: str, body: str) -> str:

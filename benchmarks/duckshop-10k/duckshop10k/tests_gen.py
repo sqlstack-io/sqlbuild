@@ -38,7 +38,7 @@ def _expected(names: list[str], rows: list[list[str]]) -> str:
 
 
 def _test_path(model: Model, behaviour: str) -> str:
-    folder = model.folder.removeprefix("models/")
+    folder = model.folder.removeprefix("sql/models/")
     return f"tests/unit/{folder}/test_{model.name}__{behaviour}.sql"
 
 

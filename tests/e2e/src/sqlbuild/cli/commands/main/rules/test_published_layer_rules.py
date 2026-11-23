@@ -22,18 +22,18 @@ _ALLOWLIST: str = (
     'allowed_qualifiers = [{ domain = "sales", qualifier = "finance", '
     'reason = "Finance reads a reviewed published variant." }]\n'
 )
-_FINANCE_PATH: str = "models/sales/mart/sales__mart__orders__finance.sql"
+_FINANCE_PATH: str = "sql/models/sales/mart/sales__mart__orders__finance.sql"
 _INTERMEDIATE: tuple[str, str] = (
-    "models/sales/intermediate/clean/sales__int_clean__orders.sql",
+    "sql/models/sales/intermediate/clean/sales__int_clean__orders.sql",
     "MODEL (description 'Clean orders.');\nSELECT 1 AS order_id\n",
 )
 _ORDERS: tuple[str, str] = (
-    "models/sales/mart/sales__mart__orders.sql",
+    "sql/models/sales/mart/sales__mart__orders.sql",
     "MODEL (description 'Published orders.');\n"
     'SELECT o.order_id FROM __ref("sales__int_clean__orders") AS o\n',
 )
 _CUSTOMERS: tuple[str, str] = (
-    "models/sales/mart/sales__mart__customers.sql",
+    "sql/models/sales/mart/sales__mart__customers.sql",
     "MODEL (description 'Published customers.');\n"
     'SELECT o.order_id FROM __ref("sales__int_clean__orders") AS o\n',
 )
@@ -43,17 +43,17 @@ _FINANCE_VARIANT: tuple[str, str] = (
     'SELECT o.order_id FROM __ref("sales__mart__orders") AS o\n',
 )
 _FINANCE_STAGING: tuple[str, str] = (
-    "models/finance/staging/finance__stg_v__orders.sql",
+    "sql/models/finance/staging/finance__stg_v__orders.sql",
     "MODEL (description 'Finance view of orders.');\n"
     'SELECT o.order_id FROM __ref("sales__mart__orders__finance") AS o\n',
 )
 _ORDERS_VIEW: tuple[str, str] = (
-    "models/sales/mart/sales__mart_v__orders.sql",
+    "sql/models/sales/mart/sales__mart_v__orders.sql",
     "MODEL (description 'Orders view.');\n"
     'SELECT o.order_id FROM __ref("sales__mart__orders") AS o\n',
 )
 _FINANCE_FROM_PUBLISHED: tuple[str, str] = (
-    "models/finance/staging/finance__stg_v__orders.sql",
+    "sql/models/finance/staging/finance__stg_v__orders.sql",
     "MODEL (description 'Finance view of orders.');\n"
     'SELECT o.order_id FROM __ref("sales__mart__orders") AS o\n',
 )
@@ -64,12 +64,12 @@ _COUNTRY_GLOB: str = (
 )
 _REGIONAL_PATHS: str = (
     "\n[rules.rule_options.SQBRPROJECT107]\n"
-    'allowed_qualifiers = [{ paths = ["models/sales/mart/regional/*"], '
+    'allowed_qualifiers = [{ paths = ["sql/models/sales/mart/regional/*"], '
     'reason = "Published once per country." }]\n'
 )
 _COUNTRIES: tuple[tuple[str, str], ...] = tuple(
     (
-        f"models/sales/mart/regional/sales__mart__orders__{country}.sql",
+        f"sql/models/sales/mart/regional/sales__mart__orders__{country}.sql",
         f"MODEL (description 'Orders published for {country}.');\n"
         'SELECT o.order_id FROM __ref("sales__int_clean__orders") AS o\n',
     )
@@ -112,8 +112,8 @@ _ORDERS_FINANCE: tuple[tuple[str, str], ...] = (
             files=_PER_COUNTRY,
             rules_toml="",
             expected_findings=(
-                ("SQBRPROJECT107", "models/sales/mart/sales__mart__customers.sql"),
-                ("SQBRPROJECT107", "models/sales/mart/sales__mart__orders.sql"),
+                ("SQBRPROJECT107", "sql/models/sales/mart/sales__mart__customers.sql"),
+                ("SQBRPROJECT107", "sql/models/sales/mart/sales__mart__orders.sql"),
             ),
             expected_exit=1,
         ),

@@ -4,7 +4,7 @@ use crate::compiler::tests::test_types::{InterpolationFactsTestCase, Interpolati
 
 #[test]
 fn given_sql_when_interpolating_then_text_and_errors_match_python() {
-    let unknown_variable = "unknown project variable '@@missing' in 'models/orders.sql'. \
+    let unknown_variable = "unknown project variable '@@missing' in 'sql/models/orders.sql'. \
                             Available vars: größe, layout, region, revision";
     let test_cases = [
         InterpolationTestCase {
@@ -60,39 +60,41 @@ fn given_sql_when_interpolating_then_text_and_errors_match_python() {
             sql: "SELECT @@ENV:SALES_REGION",
             context: false,
             expected_sql: Err(
-                "unknown environment variable '@@ENV:SALES_REGION' in 'models/orders.sql'",
+                "unknown environment variable '@@ENV:SALES_REGION' in 'sql/models/orders.sql'",
             ),
         },
         InterpolationTestCase {
             description: "an empty environment name",
             sql: "SELECT @@ENV:-1",
             context: false,
-            expected_sql: Err("invalid environment interpolation token in 'models/orders.sql'"),
+            expected_sql: Err("invalid environment interpolation token in 'sql/models/orders.sql'"),
         },
         InterpolationTestCase {
             description: "context outside hooks",
             sql: "SELECT @@CTX:this",
             context: false,
-            expected_sql: Err("SQL text in 'models/orders.sql' does not allow @@CTX templates"),
+            expected_sql: Err("SQL text in 'sql/models/orders.sql' does not allow @@CTX templates"),
         },
         InterpolationTestCase {
             description: "an empty context name",
             sql: "SELECT @@CTX:",
             context: true,
-            expected_sql: Err("invalid CTX interpolation token in 'models/orders.sql'"),
+            expected_sql: Err("invalid CTX interpolation token in 'sql/models/orders.sql'"),
         },
         InterpolationTestCase {
             description: "an unknown context key",
             sql: "SELECT @@CTX:that",
             context: true,
-            expected_sql: Err("SQL text in 'models/orders.sql' references unknown CTX key 'that'"),
+            expected_sql: Err(
+                "SQL text in 'sql/models/orders.sql' references unknown CTX key 'that'",
+            ),
         },
         InterpolationTestCase {
             description: "a context key without a value",
             sql: "SELECT @@CTX:run_id",
             context: true,
             expected_sql: Err(
-                "SQL text in 'models/orders.sql' references CTX key 'run_id' but no value is \
+                "SQL text in 'sql/models/orders.sql' references CTX key 'run_id' but no value is \
                  available",
             ),
         },

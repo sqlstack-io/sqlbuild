@@ -249,7 +249,7 @@ fn given_warehouse_run_when_building_artifacts_then_orders_and_terminates_statem
             model_entries: vec![
                 ModelArtifactEntry {
                     name: "orders".to_owned(),
-                    relative_path: PathBuf::from("models/marts/orders.sql"),
+                    relative_path: PathBuf::from("sql/models/marts/orders.sql"),
                 },
                 ModelArtifactEntry {
                     name: "staging".to_owned(),
@@ -269,15 +269,15 @@ fn given_warehouse_run_when_building_artifacts_then_orders_and_terminates_statem
                 "CREATE TABLE f AS SELECT 1;",
             ),
             (
-                PathBuf::from("seeds/countries.sql"),
+                PathBuf::from("sql/seeds/countries.sql"),
                 "INSERT INTO c VALUES (1);\n\n   ",
             ),
             (
-                PathBuf::from("models/marts/orders.sql"),
+                PathBuf::from("sql/models/marts/orders.sql"),
                 "CREATE TABLE o AS SELECT 1;",
             ),
             (
-                PathBuf::from("models/staging.sql"),
+                PathBuf::from("sql/models/staging.sql"),
                 "CREATE VIEW s AS SELECT 1;",
             ),
             (
@@ -315,7 +315,7 @@ fn given_local_replay_when_building_artifacts_then_writes_loads_functions_and_mo
             }],
             functions: vec![
                 FunctionStatements {
-                    relative_path: PathBuf::from("functions/sql/add_one.sql"),
+                    relative_path: PathBuf::from("sql/functions/sql/add_one.sql"),
                     language: "sql".to_owned(),
                     statements: statements(&["CREATE MACRO add_one(x) AS x + 1"]),
                 },
@@ -334,14 +334,14 @@ fn given_local_replay_when_building_artifacts_then_writes_loads_functions_and_mo
                 "-- loaded from /p/tests/_scenario_snapshots/s/sources/raw_orders.jsonl\n-- rows: 2\nCREATE TABLE \"__sqb_local__source__raw_orders\" AS SELECT * FROM '/p/tests/_scenario_snapshots/s/sources/raw_orders.jsonl';",
             ),
             (
-                PathBuf::from("functions/sql/add_one.sql"),
+                PathBuf::from("sql/functions/sql/add_one.sql"),
                 "CREATE MACRO add_one(x) AS x + 1;",
             ),
             (
-                PathBuf::from("functions/python/util/score.sql"),
+                PathBuf::from("sql/functions/python/util/score.sql"),
                 "CREATE FUNCTION score();\n\nSELECT 1;",
             ),
-            (PathBuf::from("models/orders.sql"), "SELECT 1\n\n"),
+            (PathBuf::from("sql/models/orders.sql"), "SELECT 1\n\n"),
             (
                 PathBuf::from("expectations/expected__order_totals.sql"),
                 "SELECT 1 EXCEPT SELECT 2",

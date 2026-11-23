@@ -29,8 +29,8 @@ _UNREACHABLE_WAREHOUSE_FILES: dict[str, str] = {
         "[targets.dev]\n"
         'schema = "dev"\n'
     ),
-    "seeds/order_statuses.csv": "status_id,status\n1,placed\n",
-    "seeds/order_statuses.yml": (
+    "sql/seeds/order_statuses.csv": "status_id,status\n1,placed\n",
+    "sql/seeds/order_statuses.yml": (
         "seeds:\n"
         "  - name: order_statuses\n"
         "    description: Order statuses.\n"
@@ -41,7 +41,7 @@ _UNREACHABLE_WAREHOUSE_FILES: dict[str, str] = {
         "      - name: status\n"
         "        type: VARCHAR\n"
     ),
-    "models/statuses.sql": (
+    "sql/models/statuses.sql": (
         "MODEL (description 'Statuses.', materialized table, "
         "columns (status_id (audits [not_null])));\n\n"
         'SELECT status_id FROM __seed("order_statuses")\n'
@@ -57,7 +57,7 @@ _FORBIDDEN_ADAPTER_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _UNREACHABLE_WAREHOUSE_FILES["sqlbuild_project.toml"]
     .replace('adapter = "duckdb"', 'adapter = "duckdb_forbidden"')
     .replace("missing_directory/nested/orders.duckdb", "orders.duckdb"),
-    "adapters/duckdb_forbidden.py": (
+    "python/adapters/duckdb_forbidden.py": (
         "from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter\n\n\n"
         "class Forbidden(Exception):\n"
         "    code = 403\n\n\n"

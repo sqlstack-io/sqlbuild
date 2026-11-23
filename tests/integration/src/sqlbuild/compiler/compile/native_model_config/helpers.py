@@ -48,7 +48,7 @@ def validation_outcome(*, values: dict[str, object]) -> object:
     request: ModelValidationRequest = ModelValidationRequest(
         model_file=DiscoveredSqlModelFile(
             file_path=Path("/project/models/marts/orders_daily.sql"),
-            relative_path=Path("models/marts/orders_daily.sql"),
+            relative_path=Path("sql/models/marts/orders_daily.sql"),
             contents="",
             header_values={},
             header_column_locations={},

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D002",
-     "message": "MODEL(...) in '<project>/models/marts/customer_totals.sql:2:34' contains invalid SQLBuild header syntax: a double quote ends this \"...\" string early; use \"\"\"…\"\"\" for text containing double quotes",
+     "message": "MODEL(...) in '<project>/sql/models/marts/customer_totals.sql:2:34' contains invalid SQLBuild header syntax: a double quote ends this \"...\" string early; use \"\"\"…\"\"\" for text containing double quotes",
      "help": "write the text between triple quotes, where quotes need no escaping: description \"\"\"Matches \"Miss\".\"\"\"; sqb format --fix rewrites a description that escapes its quotes as \\\" or doubles them as \"\""
     }
    ]

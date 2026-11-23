@@ -21,7 +21,7 @@ from tests.integration.src.sqlbuild.compiler.pipeline._test_types import (
     [
         DiagnosticUxCase(
             "root typo",
-            (("models/marts/fact_orders.sql", "  o.quantity,", "  o.qty,"),),
+            (("sql/models/marts/fact_orders.sql", "  o.quantity,", "  o.qty,"),),
             expected_fragments=(
                 "Unknown column 'qty' in stg_orders (as o)",
                 "^^^",
@@ -33,9 +33,9 @@ from tests.integration.src.sqlbuild.compiler.pipeline._test_types import (
         DiagnosticUxCase(
             "both root errors",
             (
-                ("models/marts/fact_orders.sql", "  o.quantity,", "  o.qty,"),
+                ("sql/models/marts/fact_orders.sql", "  o.quantity,", "  o.qty,"),
                 (
-                    "models/marts/fact_orders.sql",
+                    "sql/models/marts/fact_orders.sql",
                     "p ON o.order_id = p.order_id",
                     "p ON o.order_id = p.order_id\nWHERE o.ordered_at > 5",
                 ),
@@ -52,8 +52,8 @@ from tests.integration.src.sqlbuild.compiler.pipeline._test_types import (
         DiagnosticUxCase(
             "independent same input error",
             (
-                ("models/marts/fact_orders.sql", "  o.quantity,", "  o.qty,"),
-                ("models/marts/hourly_order_activity.sql", "SUM(o.quantity)", "SUM(o.missing)"),
+                ("sql/models/marts/fact_orders.sql", "  o.quantity,", "  o.qty,"),
+                ("sql/models/marts/hourly_order_activity.sql", "SUM(o.quantity)", "SUM(o.missing)"),
             ),
             expected_errors=2,
             expected_fragments=(
@@ -63,10 +63,10 @@ from tests.integration.src.sqlbuild.compiler.pipeline._test_types import (
         ),
         DiagnosticUxCase(
             "independent closed input error",
-            (("models/marts/fact_orders.sql", "  o.quantity,", "  o.qty,"),),
+            (("sql/models/marts/fact_orders.sql", "  o.quantity,", "  o.qty,"),),
             extra_files=(
                 (
-                    "models/independent.sql",
+                    "sql/models/independent.sql",
                     'MODEL (description "Test model independent.", materialized view);\nSELECT w.missing FROM __seed("waffle_types") w CROSS JOIN __ref("fact_orders") o\n',
                 ),
             ),
@@ -78,7 +78,7 @@ from tests.integration.src.sqlbuild.compiler.pipeline._test_types import (
         ),
         DiagnosticUxCase(
             "explicit output alias remains authoritative",
-            (("models/marts/fact_orders.sql", "  o.quantity,", "  o.qty AS qty,"),),
+            (("sql/models/marts/fact_orders.sql", "  o.quantity,", "  o.qty AS qty,"),),
             expected_errors=3,
             expected_fragments=("Unknown column 'quantity' in fact_orders", "error[B302]"),
         ),
@@ -87,15 +87,15 @@ from tests.integration.src.sqlbuild.compiler.pipeline._test_types import (
             (),
             extra_files=(
                 (
-                    "models/available.sql",
+                    "sql/models/available.sql",
                     "MODEL (description 'Test model available.', materialized view); SELECT 1 AS qty",
                 ),
                 (
-                    "models/predicate_bad.sql",
+                    "sql/models/predicate_bad.sql",
                     'MODEL (description "Test model predicate_bad.", materialized view); SELECT a.qty FROM __ref("available") a CROSS JOIN __ref("stg_orders") o WHERE o.qty > 5',
                 ),
                 (
-                    "models/independent_use.sql",
+                    "sql/models/independent_use.sql",
                     'MODEL (description "Test model independent_use.", materialized view); SELECT quantity FROM __ref("predicate_bad")',
                 ),
             ),
@@ -107,14 +107,14 @@ from tests.integration.src.sqlbuild.compiler.pipeline._test_types import (
         ),
         DiagnosticUxCase(
             "open source detail",
-            (("models/marts/fact_orders.sql", "  o.quantity,", "  o.qty,"),),
+            (("sql/models/marts/fact_orders.sql", "  o.quantity,", "  o.qty,"),),
             extra_files=(
                 (
-                    "sources/optional.yml",
+                    "sql/sources/optional.yml",
                     "sources:\n  - name: external_orders\n    description: Test source external_orders.\n    table: external_orders\n",
                 ),
                 (
-                    "models/open_read.sql",
+                    "sql/models/open_read.sql",
                     'MODEL (description "Test model open_read.", materialized view);\nSELECT id FROM __source("external_orders")\n',
                 ),
             ),
@@ -139,12 +139,12 @@ from tests.integration.src.sqlbuild.compiler.pipeline._test_types import (
             (),
             extra_files=(
                 (
-                    "models/wide.sql",
+                    "sql/models/wide.sql",
                     "MODEL (description 'Test model wide.', materialized view);\nSELECT 1 AS quantity, "
                     + ", ".join(f"1 AS field_{index}" for index in range(20)),
                 ),
                 (
-                    "models/wide_bad.sql",
+                    "sql/models/wide_bad.sql",
                     'MODEL (description "Test model wide_bad.", materialized view);\nSELECT w.qty FROM __ref("wide") w',
                 ),
             ),

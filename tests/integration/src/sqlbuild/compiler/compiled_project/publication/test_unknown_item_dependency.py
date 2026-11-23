@@ -23,6 +23,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_log,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _PLAN: str = '''\
 from sqlbuild.assets import AssetContext, asset
@@ -109,7 +110,7 @@ _PLACEHOLDER: frozenset[str] = frozenset({"asset:fulfil[*]", "asset:support[tria
             description="a reused set whose model was removed",
             first='model("inventory")',
             then='model("inventory")',
-            removed=("models/inventory.sql",),
+            removed=("sql/models/inventory.sql",),
             missing="inventory",
             expected_nodes=_PLACEHOLDER,
         ),
@@ -127,15 +128,15 @@ def test_given_an_item_naming_what_the_project_lacks_when_publishing_then_only_i
             "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "models/inventory.sql": "MODEL (description 'Stock.');\nSELECT 1 AS item_id\n",
-            "python/plan/nodes.py": first,
-            "python/support/nodes.py": _GOOD,
-            "sources/raw.yml": (
+            "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            "sql/models/inventory.sql": "MODEL (description 'Stock.');\nSELECT 1 AS item_id\n",
+            **node_module_files("python/nodes/plan/nodes.py", first),
+            "python/nodes/support/nodes/asset.py": _GOOD,
+            "sql/sources/raw.yml": (
                 "sources:\n  - name: raw_orders\n    description: Raw orders.\n    schema: main\n"
             ),
-            "seeds/regions.csv": "region_id\n1\n",
-            "seeds/regions.yml": (
+            "sql/seeds/regions.csv": "region_id\n1\n",
+            "sql/seeds/regions.yml": (
                 "seeds:\n  - name: regions\n    description: Regions.\n    columns:\n"
                 "      - name: region_id\n        type: INTEGER\n"
             ),
@@ -163,10 +164,14 @@ def test_given_an_item_naming_what_the_project_lacks_when_publishing_then_only_i
             arguments, log, tmp_path / "location.stdout", env=environment
         ) as process:
             _ = wait_for_generation(api, "development", 1, process, log)
-            (project / "models/orders.sql").write_text(
+            (project / "sql/models/orders.sql").write_text(
                 "MODEL (description 'Orders.');\nSELECT 2 AS order_id\n"
             )
-            (project / "python/plan/nodes.py").write_text(_PLAN.format(dependency=test_case.then))
+            edited: dict[str, str] = node_module_files(
+                "python/nodes/plan/nodes.py", _PLAN.format(dependency=test_case.then)
+            )
+            for path, text in edited.items():
+                (project / path).write_text(text)
             for removed in test_case.removed:
                 (project / removed).unlink()
             published: dict[str, Any] = wait_for_generation(api, "development", 2, process, log)
@@ -206,8 +211,10 @@ def test_given_an_item_naming_what_the_project_lacks_when_compiling_with_discove
             "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/plan/nodes.py": _PLAN.format(dependency=test_case.dependency),
+            "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            **node_module_files(
+                "python/nodes/plan/nodes.py", _PLAN.format(dependency=test_case.dependency)
+            ),
         },
     )
 
@@ -248,9 +255,11 @@ def test_given_an_item_naming_a_tag_no_node_carries_when_publishing_then_nothing
             "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/plan/nodes.py": _PLAN.format(dependency=test_case.dependency),
-            "python/support/nodes.py": _GOOD.replace(
+            "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            **node_module_files(
+                "python/nodes/plan/nodes.py", _PLAN.format(dependency=test_case.dependency)
+            ),
+            "python/nodes/support/nodes/asset.py": _GOOD.replace(
                 'after = (model("orders"), source("raw_orders"), seed("regions"), job("orders_job"))',
                 'after = (model("orders"),)',
             ),

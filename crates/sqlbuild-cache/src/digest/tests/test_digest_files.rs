@@ -9,22 +9,22 @@ fn given_paths_when_digesting_files_then_readable_files_digest_their_bytes() {
     let test_cases = [
         DigestFilesTestCase {
             description: "regular file",
-            path: |root| root.join("macros/cents.py"),
+            path: |root| root.join("sql/macros/cents.py"),
             expected_digest_of: Some("def cents(amount):\n    return amount\n"),
         },
         DigestFilesTestCase {
             description: "missing file",
-            path: |root| root.join("macros/missing.py"),
+            path: |root| root.join("sql/macros/missing.py"),
             expected_digest_of: None,
         },
         DigestFilesTestCase {
             description: "member path inside an archive",
-            path: |root| root.join("macros/cents.py/inner.py"),
+            path: |root| root.join("sql/macros/cents.py/inner.py"),
             expected_digest_of: None,
         },
         DigestFilesTestCase {
             description: "directory",
-            path: |root| root.join("macros"),
+            path: |root| root.join("sql/macros"),
             expected_digest_of: None,
         },
     ];
@@ -33,7 +33,7 @@ fn given_paths_when_digesting_files_then_readable_files_digest_their_bytes() {
         let project = tempfile::tempdir().expect("temporary project");
         write_file(
             project.path(),
-            "macros/cents.py",
+            "sql/macros/cents.py",
             "def cents(amount):\n    return amount\n",
         );
         let path: PathBuf = (test_case.path)(project.path());

@@ -25,6 +25,7 @@ from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.adapters.postgres.classes.postgres_adapter import PostgresAdapter
 from sqlbuild.compiler.compile.types import CompiledModelView, CompiledProjectView
 from sqlbuild.runtime.contracts.models import ConnectionHooks
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 if TYPE_CHECKING:
     from sqlbuild.compiler.compile.types import AuditInput
@@ -156,8 +157,8 @@ def write_semantic_binding_project(
     project_toml: str = SEMANTIC_BINDING_PROJECT_TOML,
 ) -> None:
     _ = (project_dir / "sqlbuild_project.toml").write_text(project_toml, encoding="utf-8")
-    models_dir: Path = project_dir / "models"
-    models_dir.mkdir()
+    models_dir: Path = project_dir / "sql" / "models"
+    models_dir.mkdir(parents=True)
     _ = (models_dir / "upstream.sql").write_text(upstream_sql, encoding="utf-8")
     _ = (models_dir / "downstream.sql").write_text(downstream_sql, encoding="utf-8")
 
@@ -170,8 +171,8 @@ def compile_reshaped_star_model(
     (project_dir / "sqlbuild_project.toml").write_text(
         _RESHAPED_STAR_PROJECT_TOML, encoding="utf-8"
     )
-    models: Path = project_dir / "models"
-    models.mkdir()
+    models: Path = project_dir / "sql" / "models"
+    models.mkdir(parents=True)
     for name, sql in RESHAPED_STAR_UPSTREAM_MODELS.items():
         (models / f"{name}.sql").write_text(
             f"MODEL (description 'Test model.', materialized table);\n{sql}", encoding="utf-8"
@@ -257,22 +258,23 @@ def set_dependency_project(
             'name = "set_dependencies"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
             '[connection]\ndatabase = ":memory:"\n\n[targets.dev]\nschema = "dev"\n'
         ),
-        "models/stg_orders.sql": model.format(name="stg_orders", tags="", sql="SELECT 1 AS id"),
-        "models/orders.sql": model.format(
+        "sql/models/stg_orders.sql": model.format(name="stg_orders", tags="", sql="SELECT 1 AS id"),
+        "sql/models/orders.sql": model.format(
             name="orders", tags=", tags [finance]", sql='SELECT id FROM __ref("stg_orders")'
         ),
-        "models/order_items.sql": model.format(
+        "sql/models/order_items.sql": model.format(
             name="order_items", tags=", tags [finance]", sql='SELECT id FROM __ref("stg_orders")'
         ),
-        "models/customers.sql": model.format(name="customers", tags="", sql="SELECT 2 AS id"),
+        "sql/models/customers.sql": model.format(name="customers", tags="", sql="SELECT 2 AS id"),
         "orchestration/jobs/nightly_job.toml": (
             'name = "nightly_job"\ndescription = "Nightly."\n'
             'select = "stg_orders orders order_items"\n'
         ),
-        "python/tasks/report.py": (
+        **node_module_files(
+            "python/nodes/tasks/report.py",
             "from sqlbuild.refs import job, model, tag\nfrom sqlbuild.assets import asset\n\n\n"
             f"@asset(depends_on={depends_on})\n"
-            'def report(ctx):\n    """Test task report."""\n    return None\n'
+            'def report(ctx):\n    """Test task report."""\n    return None\n',
         ),
     }
     files.update(dict(job_files))

@@ -6,7 +6,7 @@ DuckDB.
 
 | Project | Landing page |
 |---------|--------------|
-| `waffle-shop/` | Steps 01 to 07. It is `sqb playground waffle-shop` plus the custom Rule in `rules/layers.py` and its test, the scoped enum and macros under `models/marts/_sqlbuild/`, and the renamed `daily_order_rollup` model. |
+| `waffle-shop/` | Steps 01 to 07. It is `sqb playground waffle-shop` plus the custom Rule in `rules/layers.py` and its test, the scoped enum and macros under `sql/models/marts/_sqlbuild/`, and the renamed `daily_order_rollup` model. |
 | `tidy-shop/` | Step 08, the janitor. |
 | `hero-shop/` | The hero: a model moved and renamed. |
 
@@ -15,9 +15,9 @@ DuckDB.
 Step 01 shows the semantic compile checks for unknown columns and type mismatches. In a copy of
 `waffle-shop`:
 
-1. In `sources/raw.yml`, add `contract: enforced` to `raw__customers` and `raw__orders`, so the
+1. In `sql/sources/raw.yml`, add `contract: enforced` to `raw__customers` and `raw__orders`, so the
    columns and types that flow into the models are authoritative.
-2. In `models/marts/fact_orders.sql`, change `o.quantity,` to `o.qty,` and add
+2. In `sql/models/marts/fact_orders.sql`, change `o.quantity,` to `o.qty,` and add
    `WHERE o.ordered_at > 5` as the last line.
 3. Run `sqb compile`.
 
@@ -28,7 +28,7 @@ first:
 
 ```bash
 cd tidy-shop
-cat > models/weekly_revenue.sql <<'SQL'
+cat > sql/models/weekly_revenue.sql <<'SQL'
 MODEL (
   description "Weekly revenue totals",
   materialized table,
@@ -39,7 +39,7 @@ FROM __ref("daily_revenue")
 GROUP BY 1
 SQL
 sqb build
-rm models/weekly_revenue.sql
+rm sql/models/weekly_revenue.sql
 sqb janitor
 ```
 
@@ -50,8 +50,8 @@ it back:
 
 ```bash
 cd waffle-shop
-mv models/marts/daily_order_rollup.sql models/marts/daily_activity_rollup.sql
-sed -i 's/daily_order_rollup/daily_activity_rollup/g' models/marts/hourly_activity_with_daily_context.sql
+mv sql/models/marts/daily_order_rollup.sql sql/models/marts/daily_activity_rollup.sql
+sed -i 's/daily_order_rollup/daily_activity_rollup/g' sql/models/marts/hourly_activity_with_daily_context.sql
 sqb build
 sqb rename daily_activity_rollup daily_order_rollup
 sqb plan
@@ -59,14 +59,14 @@ sqb plan
 
 ## Hero: move and rename
 
-`hero-shop` shows the state after the move. The model started as `models/marts/revenue.sql`:
+`hero-shop` shows the state after the move. The model started as `sql/models/marts/revenue.sql`:
 
 ```bash
 cd hero-shop
-mkdir -p models/marts
-mv models/finance/daily_revenue.sql models/marts/revenue.sql
+mkdir -p sql/models/marts
+mv sql/models/finance/daily_revenue.sql sql/models/marts/revenue.sql
 sqb build
-sqb mv revenue models/finance/daily_revenue.sql
+sqb mv revenue sql/models/finance/daily_revenue.sql
 sqb plan
 ```
 

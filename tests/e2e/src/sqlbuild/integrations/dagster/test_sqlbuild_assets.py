@@ -109,7 +109,7 @@ def test_given_model_level_column_audits_when_loading_dagster_assets_then_checks
                 "[connection]\n"
                 'database = "column_audit_checks.duckdb"\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.',\n"
                 "  columns (\n"
                 "    order_id (),\n"
@@ -123,7 +123,9 @@ def test_given_model_level_column_audits_when_loading_dagster_assets_then_checks
                 ");\n\n"
                 "SELECT 1 AS order_id, 2 AS customer_id\n"
             ),
-            "audits/generic/model_is_empty.sql": ('AUDIT ();\n\nSELECT * FROM __ref("@model")\n'),
+            "sql/audits/generic/model_is_empty.sql": (
+                'AUDIT ();\n\nSELECT * FROM __ref("@model")\n'
+            ),
         },
     )
     sqlbuild_project: SqlBuildProject = SqlBuildProject(
@@ -544,20 +546,33 @@ def test_given_chained_source_loader_when_dagster_selects_source_then_reuses_int
                 "[connection]\n"
                 'database = "dagster_chained_source_loader.duckdb"\n'
             ),
-            "python/loaders/raw.py": (
-                "from sqlbuild.loaders import loader\n\n"
+            "python/nodes/loaders/raw/fetch_events/loader.py": (
+                "from sqlbuild.loaders import loader\n"
+                "\n"
+                "\n"
                 "@loader(write_strategy='table', columns=[\n"
                 "    {'name': 'event_id', 'type': 'INTEGER'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}]\n\n"
+                "    '''Test loader fetch_events.'''\n"
+                "    return [{'event_id': 1}]\n"
+            ),
+            "python/nodes/loaders/raw/raw_events/loader.py": (
+                "from sqlbuild.loaders import loader\n"
+                "from python.nodes.loaders.raw.fetch_events.loader import fetch_events\n"
+                "\n"
+                "\n"
                 "@loader(depends_on=[fetch_events])\n"
                 "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} AS "
-                "SELECT event_id FROM {events.destination}')\n"
+                "    '''Test loader raw_events.'''\n"
+                "    events = ctx.loader(fetch_events)\n"
+                "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} AS SELECT event_id FROM {events.destination}')\n"
             ),
-            "sources/raw.yml": "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n",
+            "python/nodes/loaders/raw/__init__.py": (
+                "from .fetch_events.loader import fetch_events\n"
+                "from .raw_events.loader import raw_events\n"
+            ),
+            "sql/sources/raw.yml": "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n",
         },
     )
     setup_result: subprocess.CompletedProcess[str] = run_sqb(
@@ -635,20 +650,33 @@ def test_given_chained_source_loader_when_dagster_selects_source_without_interme
                 "[connection]\n"
                 'database = "dagster_missing_intermediate_source_loader.duckdb"\n'
             ),
-            "python/loaders/raw.py": (
-                "from sqlbuild.loaders import loader\n\n"
+            "python/nodes/loaders/raw/fetch_events/loader.py": (
+                "from sqlbuild.loaders import loader\n"
+                "\n"
+                "\n"
                 "@loader(write_strategy='table', columns=[\n"
                 "    {'name': 'event_id', 'type': 'INTEGER'},\n"
                 "])\n"
                 "def fetch_events(ctx):\n"
-                "    '''Test loader fetch_events.'''\n    return [{'event_id': 1}]\n\n"
+                "    '''Test loader fetch_events.'''\n"
+                "    return [{'event_id': 1}]\n"
+            ),
+            "python/nodes/loaders/raw/raw_events/loader.py": (
+                "from sqlbuild.loaders import loader\n"
+                "from python.nodes.loaders.raw.fetch_events.loader import fetch_events\n"
+                "\n"
+                "\n"
                 "@loader(depends_on=[fetch_events])\n"
                 "def raw_events(ctx):\n"
-                "    '''Test loader raw_events.'''\n    events = ctx.loader(fetch_events)\n"
-                "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} AS "
-                "SELECT event_id FROM {events.destination}')\n"
+                "    '''Test loader raw_events.'''\n"
+                "    events = ctx.loader(fetch_events)\n"
+                "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} AS SELECT event_id FROM {events.destination}')\n"
             ),
-            "sources/raw.yml": "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n",
+            "python/nodes/loaders/raw/__init__.py": (
+                "from .fetch_events.loader import fetch_events\n"
+                "from .raw_events.loader import raw_events\n"
+            ),
+            "sql/sources/raw.yml": "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n",
         },
     )
     command_log_path: Path = tmp_path / "sqb_command_log.txt"
@@ -1040,7 +1068,7 @@ def test_given_emptied_cursor_inputs_when_executing_dagster_then_emits_declared_
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     project_dir: Path = prepare_empty_cursor_inputs_project(
-        tmp_path=tmp_path, models={"models/daily_revenue.sql": test_case.model_sql}
+        tmp_path=tmp_path, models={"sql/models/daily_revenue.sql": test_case.model_sql}
     )
     load_empty_cursor_payments(project_dir=project_dir)
     build_empty_cursor_project(project_dir=project_dir)

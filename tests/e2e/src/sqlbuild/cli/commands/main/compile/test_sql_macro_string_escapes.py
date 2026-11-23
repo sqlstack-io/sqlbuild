@@ -62,8 +62,8 @@ def test_given_string_with_backslash_when_compiling_sql_macro_call_then_call_exp
         project_name="order_notes",
         repo_files={
             "sqlbuild_project.toml": test_case.adapter_config,
-            "models/_macros/sql/shout.sql": _SHOUT_MACRO,
-            "models/order_notes.sql": (
+            "sql/models/_macros/sql/shout.sql": _SHOUT_MACRO,
+            "sql/models/order_notes.sql": (
                 'MODEL (description "Order notes after an escaped string.");\n'
                 f"SELECT {test_case.string_sql} AS note, @sql.shout('web') AS channel\n"
             ),
@@ -77,7 +77,7 @@ def test_given_string_with_backslash_when_compiling_sql_macro_call_then_call_exp
     assert compiled.returncode == 0, compiled.stdout + compiled.stderr
     assert "0 errors" in compiled.stdout, compiled.stdout
     compiled_sql: str = (
-        project_dir / "target" / "compiled" / "models" / "order_notes.sql"
+        project_dir / "target" / "compiled" / "sql" / "models" / "order_notes.sql"
     ).read_text(encoding="utf-8")
     assert test_case.expected_compiled_fragment in compiled_sql, compiled_sql
     assert test_case.string_sql in compiled_sql, compiled_sql

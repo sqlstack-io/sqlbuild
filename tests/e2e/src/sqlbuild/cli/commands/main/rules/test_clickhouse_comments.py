@@ -25,12 +25,12 @@ _PROJECT_TOML: str = (
         ClickHouseCommentE2ETestCase(
             description="a hash comment with an apostrophe is skipped, reported unavailable until SQLBuild parses the dialect",
             comment="# don't keep the star",
-            expected_location="models/orders.sql:1:1 [L007]",
+            expected_location="sql/models/orders.sql:1:1 [L007]",
         ),
         ClickHouseCommentE2ETestCase(
             description="a double-slash comment with an apostrophe is skipped, reported unavailable until SQLBuild parses the dialect",
             comment="// don't keep the star",
-            expected_location="models/orders.sql:1:1 [L007]",
+            expected_location="sql/models/orders.sql:1:1 [L007]",
         ),
     ],
     ids=lambda case: case.description,
@@ -43,7 +43,7 @@ def test_given_clickhouse_line_comment_when_running_rules_then_it_is_not_scanned
         project_name="shop",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.', materialized table);\n"
                 f"WITH o AS (SELECT 1 AS id)\n{test_case.comment}\nSELECT * FROM o\n"
             ),

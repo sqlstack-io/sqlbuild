@@ -76,7 +76,7 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
             # DuckShop's edge-case jobs take these pools, which its project file declares.
             "sqlbuild_project.toml": PUBLISHABLE_FILES["sqlbuild_project.toml"]
             + "\n[pools]\nedge_inventory_limit = 1\nedge_products_limit = 1\n",
-            "models/orders.sql": PUBLISHABLE_FILES["models/orders.sql"].replace(
+            "sql/models/orders.sql": PUBLISHABLE_FILES["sql/models/orders.sql"].replace(
                 "MODEL (", "MODEL (tags ['edge_case'],", 1
             ),
         }
@@ -104,7 +104,7 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
         assert frozenset(initial["nodes"]) == test_case.expected_nodes
         assert initial["nodes"]["model:orders"]["definition"]["deps"] == ["model:stg_orders"]
         edited: dict[str, str] = files | {
-            "models/stg_orders.sql": PUBLISHABLE_FILES["models/stg_orders.sql"].replace(
+            "sql/models/stg_orders.sql": PUBLISHABLE_FILES["sql/models/stg_orders.sql"].replace(
                 "CAST(5 AS INTEGER)", "CAST(9 AS INTEGER)"
             )
         }
@@ -262,9 +262,9 @@ def test_given_a_code_location_when_publishing_from_cli_then_compilation_isolate
         assert len(metadata[0]) == 40
         assert metadata[1:] == (1, "Orders Contributor", "sha256:synthetic-orders-image")
 
-        staging: Path = project_dir / "models/stg_orders.sql"
+        staging: Path = project_dir / "sql/models/stg_orders.sql"
         _ = staging.write_text(
-            files["models/stg_orders.sql"].replace("CAST(5 AS INTEGER)", "CAST(11 AS INTEGER)")
+            files["sql/models/stg_orders.sql"].replace("CAST(5 AS INTEGER)", "CAST(11 AS INTEGER)")
         )
         assert run_cli([*arguments, "--generation", "2"]) == 0
         second_output: CaptureResult[str] = capsys.readouterr()
@@ -281,7 +281,7 @@ def test_given_a_code_location_when_publishing_from_cli_then_compilation_isolate
         assert "Location command failed." in failed_output.err
         assert current_snapshot(api, test_case.target)["record"] == second
 
-        _ = staging.write_text(files["models/stg_orders.sql"])
+        _ = staging.write_text(files["sql/models/stg_orders.sql"])
         monkeypatch.setenv("SQLBUILD_LOCATION_TOKEN", "invalid-credential")
         assert run_cli([*arguments, "--generation", "3"]) != 0
         rejected_output: CaptureResult[str] = capsys.readouterr()

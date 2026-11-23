@@ -293,10 +293,10 @@ def test_given_compiled_project_when_validating_contracts_then_returns_expected_
         ContractLocationTestCase(
             description="uses declared column location",
             column_name="customer_id",
-            path=Path("models/orders.sql"),
+            path=Path("sql/models/orders.sql"),
             line=4,
             column=5,
-            expected_path=Path("models/orders.sql"),
+            expected_path=Path("sql/models/orders.sql"),
             expected_line=4,
             expected_column=5,
         )
@@ -334,10 +334,10 @@ def test_given_column_location_when_validating_contracts_then_diagnostic_uses_lo
         ContractLocationTestCase(
             description="deferred unexpected column location",
             column_name="amount",
-            path=Path("models/orders.sql"),
+            path=Path("sql/models/orders.sql"),
             line=4,
             column=3,
-            expected_path=Path("models/orders.sql"),
+            expected_path=Path("sql/models/orders.sql"),
             expected_line=4,
             expected_column=3,
         ),

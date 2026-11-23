@@ -19,8 +19,8 @@ use crate::python_rules::_helpers::units::modules::module_shape_faults;
 use crate::python_rules::_helpers::units::nodes::declaration_faults;
 use crate::python_rules::constants::{
     CHECK_KIND, FACTORY_DECORATORS, INIT_FILE, MIN_UNIT_DEPTH, NODE_KIND_DIRECTORIES, NODE_KINDS,
-    NODE_MODULE, PACKAGE_ROOT, ROLE_DIRECTORIES, SHARED_UTILITIES_PACKAGE, UNIT_NODE_FILE,
-    UNIT_RULE_CODES,
+    NODE_MODULES, PACKAGE_MODULE, PACKAGE_ROOT, ROLE_DIRECTORIES, SHARED_UTILITIES_PACKAGE,
+    UNIT_CHECKS_FILE, UNIT_DECLARATION_FILES, UNIT_RULE_CODES,
 };
 use crate::python_rules::models::{ParsedFile, UnitFile, UnitProject};
 
@@ -43,10 +43,10 @@ pub(crate) fn unit_faults(
     faults
 }
 
-/// The unit folder `parts` declares, when it is a `node.py` deep enough and outside every role folder.
+/// The unit folder `parts` declares, when it is a declaration file deep enough and outside every role folder.
 fn unit_folder(parts: &[&str]) -> Option<String> {
     let (last, folders) = parts.split_last()?;
-    let declares: bool = *last == UNIT_NODE_FILE
+    let declares: bool = (UNIT_DECLARATION_FILES.contains(last) || *last == UNIT_CHECKS_FILE)
         && folders.len() >= MIN_UNIT_DEPTH
         && !folders.iter().copied().any(is_role_folder);
     declares.then(|| folders.join("/"))
@@ -56,8 +56,8 @@ fn unit_project(sources: &[PythonSource], python_version: (u8, u8)) -> UnitProje
     let package: Vec<(&PythonSource, Vec<&str>)> = sources
         .iter()
         .filter_map(|source| {
-            let (root, rest) = source.relative_path.split_once('/')?;
-            (root == PACKAGE_ROOT).then(|| (source, rest.split('/').collect()))
+            let rest: &str = package_rest(&source.relative_path)?;
+            Some((source, rest.split('/').collect()))
         })
         .collect();
     let units: BTreeSet<String> = unit_folders(sources);
@@ -80,7 +80,11 @@ fn unit_project(sources: &[PythonSource], python_version: (u8, u8)) -> UnitProje
             .collect(),
         node_modules: units
             .iter()
-            .map(|unit| format!("{PACKAGE_ROOT}.{}.{NODE_MODULE}", unit.replace('/', ".")))
+            .flat_map(|unit| {
+                NODE_MODULES.iter().map(move |module| {
+                    format!("{PACKAGE_MODULE}.{}.{module}", unit.replace('/', "."))
+                })
+            })
             .collect(),
         files,
         units,
@@ -100,16 +104,20 @@ pub(crate) fn project_modules(sources: &[PythonSource]) -> BTreeSet<String> {
         .collect()
 }
 
-/// The files under `root/` or whose text names it, parsed; a file that does not parse is left out.
+/// The files under the folder `root/` or whose text names its module, parsed; a file that does not parse is left out.
 pub(crate) fn files_naming<'a>(
     sources: &'a [PythonSource],
-    root: &str,
+    (root, module): (&str, &str),
     python_version: (u8, u8),
 ) -> Vec<ParsedFile<'a>> {
     sources
         .par_iter()
         .filter(|source| {
-            source.relative_path.split('/').next() == Some(root) || source.text.contains(root)
+            source
+                .relative_path
+                .strip_prefix(root)
+                .is_some_and(|rest| rest.starts_with('/'))
+                || source.text.contains(module)
         })
         .filter_map(|source| {
             Some(ParsedFile {
@@ -148,16 +156,27 @@ pub(crate) fn rejected_import_faults(
         .collect()
 }
 
-/// The unit folders under `python/`, each relative to it.
+/// The path of a `python/nodes/` file below that folder.
+pub(crate) fn package_rest(path: &str) -> Option<&str> {
+    path.strip_prefix(PACKAGE_ROOT)?.strip_prefix('/')
+}
+
+/// The dotted parts of `module` below `package`, when it sits in that package.
+pub(crate) fn module_below<'m>(module: &'m str, package: &str) -> Option<Vec<&'m str>> {
+    let rest: &str = module.strip_prefix(package)?;
+    if rest.is_empty() {
+        return Some(Vec::new());
+    }
+    Some(rest.strip_prefix('.')?.split('.').collect())
+}
+
+/// The unit folders under `python/nodes/`, each relative to it.
 pub(crate) fn unit_folders(sources: &[PythonSource]) -> BTreeSet<String> {
     sources
         .iter()
         .filter_map(|source| {
-            let (root, rest) = source.relative_path.split_once('/')?;
-            let parts: Vec<&str> = rest.split('/').collect();
-            (root == PACKAGE_ROOT)
-                .then(|| unit_folder(&parts))
-                .flatten()
+            let parts: Vec<&str> = package_rest(&source.relative_path)?.split('/').collect();
+            unit_folder(&parts)
         })
         .collect()
 }
@@ -272,7 +291,7 @@ pub(crate) fn imported_module(
     file: &UnitFile<'_>,
     project: &UnitProject<'_>,
 ) -> Option<String> {
-    let mut folder: Vec<&str> = vec![PACKAGE_ROOT];
+    let mut folder: Vec<&str> = PACKAGE_MODULE.split('.').collect();
     folder.extend(&file.parts[..file.parts.len() - 1]);
     absolute_module(import, &folder, &project.modules)
 }
@@ -312,7 +331,7 @@ pub(crate) fn unit_imports<'f>(
 ) -> Vec<&'f UnitImport> {
     let targets: Vec<String> = modules
         .iter()
-        .map(|module| format!("{PACKAGE_ROOT}.{}.{module}", unit.replace('/', ".")))
+        .map(|module| format!("{PACKAGE_MODULE}.{}.{module}", unit.replace('/', ".")))
         .collect();
     file.module
         .imports

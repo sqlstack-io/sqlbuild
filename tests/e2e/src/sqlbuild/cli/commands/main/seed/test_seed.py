@@ -102,7 +102,7 @@ def test_given_empty_typed_seed_fields_when_loading_then_persists_nulls(
                 "[targets.dev.connection]\n"
                 'database = "warehouse.duckdb"\n'
             ),
-            "seeds/schema.yml": (
+            "sql/seeds/schema.yml": (
                 "seeds:\n"
                 "  - name: nullable_mappings\n    description: Test seed nullable_mappings.\n"
                 "    columns:\n"
@@ -111,7 +111,7 @@ def test_given_empty_typed_seed_fields_when_loading_then_persists_nulls(
                 "      - name: mapping_name\n"
                 "        type: VARCHAR\n"
             ),
-            "seeds/nullable_mappings.csv": "mapping_id,mapping_name\n1,mapped\n,\n",
+            "sql/seeds/nullable_mappings.csv": "mapping_id,mapping_name\n1,mapped\n,\n",
         },
     )
 
@@ -159,7 +159,7 @@ def test_given_standalone_seeds_when_writing_json_file_then_assets_are_complete_
                 "[targets.dev.connection]\n"
                 'database = "warehouse.duckdb"\n'
             ),
-            "seeds/schema.yml": (
+            "sql/seeds/schema.yml": (
                 "seeds:\n"
                 "  - name: first_seed\n    description: Test seed first_seed.\n"
                 "    columns:\n"
@@ -170,8 +170,8 @@ def test_given_standalone_seeds_when_writing_json_file_then_assets_are_complete_
                 "      - name: id\n"
                 "        type: INTEGER\n"
             ),
-            "seeds/first_seed.csv": "id\n1\n",
-            "seeds/second_seed.csv": "id\n2\n",
+            "sql/seeds/first_seed.csv": "id\n1\n",
+            "sql/seeds/second_seed.csv": "id\n2\n",
         },
     )
     output_path: Path = project_dir / "seed-results.json"
@@ -223,14 +223,14 @@ def test_given_failing_standalone_seed_when_writing_json_file_then_failure_is_ho
                 "[targets.dev.connection]\n"
                 'database = "warehouse.duckdb"\n'
             ),
-            "seeds/schema.yml": (
+            "sql/seeds/schema.yml": (
                 "seeds:\n"
                 "  - name: invalid_seed\n    description: Test seed invalid_seed.\n"
                 "    columns:\n"
                 "      - name: id\n"
                 "        type: INTEGER\n"
             ),
-            "seeds/invalid_seed.csv": "id\nnot-an-integer\n",
+            "sql/seeds/invalid_seed.csv": "id\nnot-an-integer\n",
         },
     )
     output_path: Path = project_dir / "seed-results.json"

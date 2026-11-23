@@ -37,7 +37,7 @@ FROM __ref("orders") r, LATERAL FLATTEN(input => r.payload:lines) o, LATERAL FLA
 
 ```text
 error[SQBRPERFORMANCE101]: line_json copies o.value whole onto every row flattened from o.value:options
-  --> models/line_options.sql:7:3
+  --> sql/models/line_options.sql:7:3
 ```
 
 The parent also counts as copied through a cast, a conversion such as `TO_JSON` or `TO_VARIANT`,
@@ -74,7 +74,7 @@ JOIN __ref("orders") o ON o.order_id = l.order_id
 
 ```text
 error[SQBRPERFORMANCE102]: order_payload copies VARIANT from orders, one row per (order_id), onto rows keyed by (order_id, line_no), so the same value repeats on every row
-  --> models/order_lines_enriched.sql:12:3
+  --> sql/models/order_lines_enriched.sql:12:3
 ```
 
 Read the fields the model needs, such as `o.payload:customer::string`, or leave the payload on the

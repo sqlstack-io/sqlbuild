@@ -25,6 +25,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
     run_sqb,
 )
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 SECRET_VARIABLE: str = "SECRETS_E2E_API_KEY"
 
@@ -40,7 +41,7 @@ MARKING_NODE: str = (
         import os
         from pathlib import Path
 
-        from providers.api import ApiProvider
+        from python.providers.api import ApiProvider
         from sqlbuild.{decorator}s import {decorator}
 
 
@@ -58,7 +59,7 @@ USES_API: str = ", api_provider: ApiProvider"
 
 PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": PROJECT_TOML,
-    "providers/api.py": dedent(
+    "python/providers/api.py": dedent(
         f"""
         from pydantic import Field, SecretStr
         from sqlbuild.providers import Provider
@@ -71,27 +72,37 @@ PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "python/tasks/uses_api.py": MARKING_NODE.format(
-        decorator="asset", arguments="", name="uses_api", parameter=USES_API, body=""
+    **node_module_files(
+        "python/nodes/tasks/uses_api.py",
+        MARKING_NODE.format(
+            decorator="asset", arguments="", name="uses_api", parameter=USES_API, body=""
+        ),
     ),
-    "python/tasks/no_api.py": MARKING_NODE.format(
-        decorator="asset", arguments="", name="no_api", parameter="", body=""
+    **node_module_files(
+        "python/nodes/tasks/no_api.py",
+        MARKING_NODE.format(decorator="asset", arguments="", name="no_api", parameter="", body=""),
     ),
-    "python/checks/api_check.py": MARKING_NODE.format(
-        decorator="check",
-        arguments="(depends_on=())",
-        name="api_check",
-        parameter=USES_API,
-        body="    return True\n",
+    **node_module_files(
+        "python/nodes/checks/api_check.py",
+        MARKING_NODE.format(
+            decorator="check",
+            arguments="(depends_on=())",
+            name="api_check",
+            parameter=USES_API,
+            body="    return True\n",
+        ),
     ),
-    "python/loaders/raw_api_events.py": MARKING_NODE.format(
-        decorator="loader",
-        arguments="",
-        name="raw_api_events",
-        parameter=USES_API,
-        body='    return [{"event_id": 1}]\n',
+    **node_module_files(
+        "python/nodes/loaders/raw_api_events.py",
+        MARKING_NODE.format(
+            decorator="loader",
+            arguments="",
+            name="raw_api_events",
+            parameter=USES_API,
+            body='    return [{"event_id": 1}]\n',
+        ),
     ),
-    "sources/raw.yml": dedent(
+    "sql/sources/raw.yml": dedent(
         """
         sources:
           - name: raw_api_events
@@ -107,7 +118,7 @@ PROJECT_FILES: dict[str, str] = {
 }
 
 SECRET_FREE_SINK: dict[str, str] = {
-    "providers/event_log.py": dedent(
+    "python/providers/event_log.py": dedent(
         """
         from sqlbuild.providers import Provider
 
@@ -118,10 +129,10 @@ SECRET_FREE_SINK: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "sinks/events.py": dedent(
+    "python/event_sinks/events.py": dedent(
         """
-        from providers.event_log import EventLog
-        from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink
+        from python.providers.event_log import EventLog
+        from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
 
 
         @lifecycle_event_sink
@@ -132,10 +143,10 @@ SECRET_FREE_SINK: dict[str, str] = {
     + "\n",
 }
 API_SINK: dict[str, str] = {
-    "sinks/events.py": dedent(
+    "python/event_sinks/events.py": dedent(
         """
-        from providers.api import ApiProvider
-        from sqlbuild.sinks import LifecycleEvent, lifecycle_event_sink
+        from python.providers.api import ApiProvider
+        from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink
 
 
         @lifecycle_event_sink
@@ -146,7 +157,7 @@ API_SINK: dict[str, str] = {
     + "\n",
 }
 READING_MODEL: dict[str, str] = {
-    "models/api_events.sql": (
+    "sql/models/api_events.sql": (
         "MODEL (description 'Test model api_events.', materialized table);\n\n"
         'SELECT event_id FROM __source("raw_api_events")\n'
     ),
@@ -169,7 +180,7 @@ SET_SECRET_VARIABLE: str = "SECRETS_E2E_SIGNING_KEY"
 SET_SECRET_VALUE: str = "signing-key-canary"
 # One secret is missing and one is set, and setting up the provider leaves a mark.
 MARKING_PROVIDER: dict[str, str] = {
-    "providers/api.py": dedent(
+    "python/providers/api.py": dedent(
         f"""
         import os
         from pathlib import Path
@@ -191,7 +202,7 @@ MARKING_PROVIDER: dict[str, str] = {
     + "\n",
 }
 REQUIRED_SETTING: dict[str, str] = {
-    "providers/region.py": (
+    "python/providers/region.py": (
         "from pydantic import Field\n"
         "from sqlbuild.providers import Provider\n\n\n"
         "class RegionProvider(Provider):\n"
@@ -200,13 +211,15 @@ REQUIRED_SETTING: dict[str, str] = {
     ),
 }
 POST_BUILD_CHECK: dict[str, str] = {
-    "python/checks/no_api_check.py": dedent(
-        """
+    **node_module_files(
+        "python/nodes/checks/no_api_check.py",
+        dedent(
+            """
         import os
         from pathlib import Path
 
-        from providers.api import ApiProvider
-        from python.tasks.no_api import no_api
+        from python.providers.api import ApiProvider
+        from python.nodes.tasks.no_api import no_api
         from sqlbuild.checks import check
 
 
@@ -217,12 +230,13 @@ POST_BUILD_CHECK: dict[str, str] = {
                 marker.write("no_api_check\\n")
             return True
         """
-    ).strip()
-    + "\n",
+        ).strip()
+        + "\n",
+    ),
 }
 
 MISSING_ERROR: str = (
-    f"provider 'api_provider' (providers/api.py) is missing secret {SECRET_VARIABLE}"
+    f"provider 'api_provider' (python/providers/api.py) is missing secret {SECRET_VARIABLE}"
 )
 ALLOWED_NOTICE: str = "1 provider has missing secrets (allowed): api_provider"
 SELECTION_ERROR: str = (
@@ -336,7 +350,7 @@ BUILD: tuple[str, ...] = ("--no-color", "build", "--no-tests", "--no-audits", "-
             extra_repo_files=REQUIRED_SETTING,
             expected_exit_code=1,
             expected_output_fragments=(
-                "provider 'region_provider' (providers/region.py) is missing secret SECRETS_E2E_REGION",
+                "provider 'region_provider' (python/providers/region.py) is missing secret SECRETS_E2E_REGION",
             ),
             expected_marker_entries=(),
         ),

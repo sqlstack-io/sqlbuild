@@ -28,7 +28,7 @@ def resolve_adapter(*, adapter_name: str, project_dir: Path | None = None) -> Ba
     if adapter_class is None:
         available: str = ", ".join(sorted(builtin_names))
         local_text: str = (
-            " Project-local adapters are discovered from adapters/**/*.py."
+            " Project-local adapters are discovered from python/adapters/**/*.py."
             if project_dir is not None
             else ""
         )

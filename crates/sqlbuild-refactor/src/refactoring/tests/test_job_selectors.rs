@@ -9,7 +9,7 @@ use crate::refactoring::tests::test_types::JobSelectorTestCase;
 const JOB: &str = "orchestration/jobs/orders/refresh.toml";
 
 /// A model the refactoring leaves alone keeps its name and path.
-const STAYS: (&str, &str, &str, &str) = ("customers", "models/marts/customers.sql", "", "");
+const STAYS: (&str, &str, &str, &str) = ("customers", "sql/models/marts/customers.sql", "", "");
 
 #[test]
 fn given_job_selectors_when_models_are_renamed_or_moved_then_exact_parts_follow()
@@ -20,9 +20,9 @@ fn given_job_selectors_when_models_are_renamed_or_moved_then_exact_parts_follow(
             models: &[
                 (
                     "orders",
-                    "models/marts/orders.sql",
+                    "sql/models/marts/orders.sql",
                     "sales",
-                    "models/marts/sales.sql",
+                    "sql/models/marts/sales.sql",
                 ),
                 STAYS,
             ],
@@ -35,9 +35,9 @@ fn given_job_selectors_when_models_are_renamed_or_moved_then_exact_parts_follow(
             models: &[
                 (
                     "orders",
-                    "models/marts/orders.sql",
+                    "sql/models/marts/orders.sql",
                     "sales",
-                    "models/marts/sales.sql",
+                    "sql/models/marts/sales.sql",
                 ),
                 STAYS,
             ],
@@ -50,20 +50,20 @@ fn given_job_selectors_when_models_are_renamed_or_moved_then_exact_parts_follow(
             models: &[
                 (
                     "orders",
-                    "models/staging/orders.sql",
+                    "sql/models/staging/orders.sql",
                     "orders",
-                    "models/core/orders.sql",
+                    "sql/models/core/orders.sql",
                 ),
                 (
                     "lines",
-                    "models/staging/sub/lines.sql",
+                    "sql/models/staging/sub/lines.sql",
                     "lines",
-                    "models/core/sub/lines.sql",
+                    "sql/models/core/sub/lines.sql",
                 ),
                 STAYS,
             ],
-            job: "select = \"models/staging/ path:models/staging +models/staging/sub+ models/stagingx models\"\n",
-            expected_job: "select = \"models/core/ path:models/core +models/core/sub+ models/stagingx models\"\n",
+            job: "select = \"sql/models/staging/ path:sql/models/staging +sql/models/staging/sub+ sql/models/stagingx models\"\n",
+            expected_job: "select = \"sql/models/core/ path:sql/models/core +sql/models/core/sub+ sql/models/stagingx models\"\n",
             expected_manual: &[],
         },
         JobSelectorTestCase {
@@ -71,16 +71,16 @@ fn given_job_selectors_when_models_are_renamed_or_moved_then_exact_parts_follow(
             models: &[
                 (
                     "orders",
-                    "models/staging/orders.sql",
+                    "sql/models/staging/orders.sql",
                     "orders",
-                    "models/core/orders.sql",
+                    "sql/models/core/orders.sql",
                 ),
-                ("lines", "models/staging/lines.sql", "", ""),
+                ("lines", "sql/models/staging/lines.sql", "", ""),
             ],
-            job: "name = \"x_job\"\nselect = \"models/staging orders\"\n",
-            expected_job: "name = \"x_job\"\nselect = \"models/staging orders\"\n",
+            job: "name = \"x_job\"\nselect = \"sql/models/staging orders\"\n",
+            expected_job: "name = \"x_job\"\nselect = \"sql/models/staging orders\"\n",
             expected_manual: &[
-                "2:10 this job selects folder 'models/staging', and orders moved out of it; check the job still selects what it should",
+                "2:10 this job selects folder 'sql/models/staging', and orders moved out of it; check the job still selects what it should",
             ],
         },
         JobSelectorTestCase {
@@ -88,26 +88,26 @@ fn given_job_selectors_when_models_are_renamed_or_moved_then_exact_parts_follow(
             models: &[
                 (
                     "orders",
-                    "models/staging/orders.sql",
+                    "sql/models/staging/orders.sql",
                     "orders",
-                    "models/marts/orders.sql",
+                    "sql/models/marts/orders.sql",
                 ),
                 STAYS,
             ],
-            job: "name = \"x_job\"\nselect = \"models/staging\"\nexclude = \"models/staging\"\n",
-            expected_job: "name = \"x_job\"\nselect = \"models/staging\"\nexclude = \"models/staging\"\n",
+            job: "name = \"x_job\"\nselect = \"sql/models/staging\"\nexclude = \"sql/models/staging\"\n",
+            expected_job: "name = \"x_job\"\nselect = \"sql/models/staging\"\nexclude = \"sql/models/staging\"\n",
             expected_manual: &[
-                "2:10 this job selects folder 'models/staging', and orders moved out of it; check the job still selects what it should",
-                "3:11 this job selects folder 'models/staging', and orders moved out of it; check the job still selects what it should",
+                "2:10 this job selects folder 'sql/models/staging', and orders moved out of it; check the job still selects what it should",
+                "3:11 this job selects folder 'sql/models/staging', and orders moved out of it; check the job still selects what it should",
             ],
         },
         JobSelectorTestCase {
             description: "a multi-line selector is reported instead of rewritten",
             models: &[(
                 "orders",
-                "models/marts/orders.sql",
+                "sql/models/marts/orders.sql",
                 "sales",
-                "models/marts/sales.sql",
+                "sql/models/marts/sales.sql",
             )],
             job: "select = \"\"\"\norders\"\"\"\n",
             expected_job: "select = \"\"\"\norders\"\"\"\n",

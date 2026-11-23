@@ -6,9 +6,9 @@ pub(crate) const PROJECT_ROOT_PATH: &str = ".";
 pub(crate) const DECLARATION_GROUP_DIRECTORY: &str = "_sqlbuild";
 /// Owners whose declaration roles sit directly below them.
 pub(crate) const AUTHORED_ROOT_PATHS: &[&str] = &[
-    "models",
+    "sql/models",
     "tests/unit",
     "tests/scenarios",
-    "functions/sql",
-    "sources",
+    "sql/functions/sql",
+    "sql/sources",
 ];

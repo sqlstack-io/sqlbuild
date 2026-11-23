@@ -114,7 +114,7 @@ def test_given_fingerprint_table_dropped_mid_build_when_building_then_later_mode
 
     code, output, counts, _ = run_counted(project_dir=project_dir, args=("build",), capsys=capsys)
     after_loss: dict[str, int] = fingerprint_rows(project_dir)
-    _ = (project_dir / "models" / f"{test_case.hooked_model}.sql").write_text(
+    _ = (project_dir / "sql" / "models" / f"{test_case.hooked_model}.sql").write_text(
         original, encoding="utf-8"
     )
     third_code, third_output, _, _ = run_counted(

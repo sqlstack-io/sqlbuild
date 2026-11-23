@@ -61,7 +61,7 @@ _RELATION_AUDIT_SQL: str = "AUDIT ();\n\nSELECT *\nFROM @relation\nWHERE NOT (@e
             seed_csv="waffle_type_id,price_cents\n1,450\n",
             expected_exit_code=1,
             expected_output_fragments=(
-                "seeds/waffle_types.yml is missing argument 'model' for generic audit "
+                "sql/seeds/waffle_types.yml is missing argument 'model' for generic audit "
                 "'expression_is_true'; a seed audit receives 'seed' and 'relation', not 'model', "
                 "so read the attached relation with @relation",
             ),
@@ -81,9 +81,9 @@ def test_given_documented_seed_yaml_audits_when_building_then_audits_run_on_the_
                 'name = "waffle_seed_audits"\nadapter = "duckdb"\n'
                 '[connection]\ndatabase = "waffles.duckdb"\n'
             ),
-            "seeds/waffle_types.csv": test_case.seed_csv,
-            "seeds/waffle_types.yml": _SEED_YAML,
-            "audits/generic/expression_is_true.sql": test_case.audit_sql,
+            "sql/seeds/waffle_types.csv": test_case.seed_csv,
+            "sql/seeds/waffle_types.yml": _SEED_YAML,
+            "sql/audits/generic/expression_is_true.sql": test_case.audit_sql,
         },
     )
 

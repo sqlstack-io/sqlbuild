@@ -78,7 +78,7 @@ _TYPED_MACRO: str = (
             expected_fragments=(
                 'error[SQBRCONTRACT105]: output "status_label" has an outer cast to VARCHAR(10),'
                 " which is not its declared contract type VARCHAR",
-                "--> models/labels.sql:12:3",
+                "--> sql/models/labels.sql:12:3",
                 "help: Change the outer cast to CAST(... AS VARCHAR).",
             ),
         ),
@@ -93,9 +93,9 @@ def test_given_outer_cast_on_contract_output_when_compiling_then_types_compare_a
         project_name="shop",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "macros/sql/status_label.sql": _STATUS_LABEL_MACRO,
-            "models/orders.sql": _ORDERS_MODEL,
-            "models/labels.sql": _LABELS_MODEL.format(projection=test_case.projection),
+            "sql/macros/sql/status_label.sql": _STATUS_LABEL_MACRO,
+            "sql/models/orders.sql": _ORDERS_MODEL,
+            "sql/models/labels.sql": _LABELS_MODEL.format(projection=test_case.projection),
         },
     )
 
@@ -138,7 +138,7 @@ def test_given_outer_cast_on_contract_output_when_compiling_then_types_compare_a
             expected_fragments=(
                 'error[SQBRCONTRACT105]: output "status_label" is a call to SQL macro '
                 "status_label(), which declares returns VARCHAR, but its body isn't cast to it",
-                "--> models/labels.sql:12:3",
+                "--> sql/models/labels.sql:12:3",
                 "help: Cast the result in the macro or at the call",
             ),
         ),
@@ -180,11 +180,11 @@ def test_given_typed_macro_call_on_contract_output_when_compiling_then_only_a_bo
         project_name="shop",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "macros/sql/status_label.sql": _TYPED_MACRO.format(
+            "sql/macros/sql/status_label.sql": _TYPED_MACRO.format(
                 returns=test_case.returns, body=test_case.body
             ),
-            "models/orders.sql": _ORDERS_MODEL,
-            "models/labels.sql": _LABELS_MODEL.format(projection=test_case.projection),
+            "sql/models/orders.sql": _ORDERS_MODEL,
+            "sql/models/labels.sql": _LABELS_MODEL.format(projection=test_case.projection),
         },
     )
 

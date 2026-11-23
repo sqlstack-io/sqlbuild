@@ -254,7 +254,7 @@ def test_given_an_edit_the_uncached_compile_reproduces_when_checking_then_accept
             uncached_report='{"models": 2}',
             incremental_files={"target/compiled/models/orders.sql": "SELECT 1"},
             uncached_files={"target/compiled/models/orders.sql": "SELECT 2"},
-            expected_message="models/orders.sql",
+            expected_message="sql/models/orders.sql",
         ),
     ),
     ids=lambda case: case.description,

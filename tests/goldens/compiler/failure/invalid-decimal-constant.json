@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D013",
-     "message": "<project>/models/staging/_sqlbuild/_constants/limits.sql constant 'minimum_amount' has invalid decimal value 'ten'"
+     "message": "<project>/sql/models/staging/_sqlbuild/_constants/limits.sql constant 'minimum_amount' has invalid decimal value 'ten'"
     }
    ]
   }

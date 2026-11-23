@@ -68,24 +68,24 @@ fn given_relative_path_when_building_run_paths_then_matches_python() {
     let test_cases = [
         RunPathTestCase {
             description: "paths already under their directory are kept",
-            relative_path: "models/a/b.sql",
+            relative_path: "sql/models/a/b.sql",
             language: "sql",
-            expected_model_path: "models/a/b.sql",
-            expected_function_path: "functions/sql/models/a/b.sql",
+            expected_model_path: "sql/models/a/b.sql",
+            expected_function_path: "sql/functions/sql/sql/models/a/b.sql",
         },
         RunPathTestCase {
             description: "other paths are nested and functions get a sql suffix",
             relative_path: "udfs/f.py",
             language: "python",
-            expected_model_path: "models/udfs/f.py",
-            expected_function_path: "functions/python/udfs/f.sql",
+            expected_model_path: "sql/models/udfs/f.py",
+            expected_function_path: "sql/functions/python/udfs/f.sql",
         },
         RunPathTestCase {
             description: "a function under its language directory is kept",
-            relative_path: "functions/sql/f.sql",
+            relative_path: "sql/functions/sql/f.sql",
             language: "sql",
-            expected_model_path: "models/functions/sql/f.sql",
-            expected_function_path: "functions/sql/f.sql",
+            expected_model_path: "sql/models/sql/functions/sql/f.sql",
+            expected_function_path: "sql/functions/sql/f.sql",
         },
     ];
 

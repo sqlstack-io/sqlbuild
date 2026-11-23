@@ -25,21 +25,21 @@ _PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "orders_lineage"\nadapter = "duckdb"\n\n[connection]\ndatabase = "orders.duckdb"\n'
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n  - name: raw_orders\n    description: Orders feed.\n    expression: >-\n"
         "      (SELECT 1 AS order_id, 10 AS customer_id, CAST(5 AS DOUBLE) AS amount)\n"
         "    columns:\n      - name: order_id\n        type: INTEGER\n"
         "      - name: customer_id\n        type: INTEGER\n      - name: amount\n        type: DOUBLE\n"
     ),
-    "models/staging/stg_orders.sql": (
+    "sql/models/staging/stg_orders.sql": (
         'MODEL (description "Staged orders");\n\nSELECT * FROM __source("raw_orders")\n'
     ),
-    "models/marts/order_union.sql": (
+    "sql/models/marts/order_union.sql": (
         'MODEL (description "Orders twice", sql_analysis false);\n\n'
         'SELECT o.*, 1 AS copy_number FROM __ref("stg_orders") o\n'
         'UNION ALL\nSELECT *, 2 FROM __ref("stg_orders")\n'
     ),
-    "models/marts/customer_totals.sql": (
+    "sql/models/marts/customer_totals.sql": (
         'MODEL (description "Totals per customer", sql_analysis false);\n\n'
         "WITH totals AS (\n"
         '  SELECT customer_id, SUM(amount) AS "Total_Amount" FROM __ref("order_union")\n'
@@ -47,7 +47,7 @@ _PROJECT_FILES: dict[str, str] = {
         'SELECT T.customer_id, "Total_Amount", CAST("Total_Amount" AS BIGINT) AS rounded\n'
         "FROM totals AS T\n"
     ),
-    "models/marts/order_copies.sql": (
+    "sql/models/marts/order_copies.sql": (
         'MODEL (description "Order copies");\n\n'
         'SELECT u.*, c.rounded FROM __ref("order_union") u\n'
         'JOIN __ref("customer_totals") c ON u.customer_id = c.customer_id\n'
@@ -63,15 +63,15 @@ _WARM_TARGETS: tuple[str, ...] = (
 _DEEP_UNION_BRANCHES: int = 480
 _DEEP_UNION_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _PROJECT_FILES["sqlbuild_project.toml"],
-    "sources/raw.yml": _PROJECT_FILES["sources/raw.yml"],
-    "models/marts/orders_union.sql": (
+    "sql/sources/raw.yml": _PROJECT_FILES["sql/sources/raw.yml"],
+    "sql/models/marts/orders_union.sql": (
         'MODEL (description "Orders repeated", sql_analysis false);\n\n'
         + " UNION ALL ".join(
             ['SELECT order_id, amount FROM __source("raw_orders")'] * _DEEP_UNION_BRANCHES
         )
         + "\n"
     ),
-    "models/marts/orders_second.sql": (
+    "sql/models/marts/orders_second.sql": (
         'MODEL (description "Order ids", sql_analysis false);\n\n'
         'SELECT order_id FROM __source("raw_orders")\n'
     ),
@@ -80,14 +80,14 @@ _DEEP_UNION_FILES: dict[str, str] = {
 
 _RICH_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _PROJECT_FILES["sqlbuild_project.toml"],
-    "sources/raw.yml": _PROJECT_FILES["sources/raw.yml"],
-    "seeds/regions.csv": "region_id,label\n1,north\n",
-    "seeds/regions.yml": (
+    "sql/sources/raw.yml": _PROJECT_FILES["sql/sources/raw.yml"],
+    "sql/seeds/regions.csv": "region_id,label\n1,north\n",
+    "sql/seeds/regions.yml": (
         "seeds:\n  - name: regions\n    description: Regions.\n    columns:\n"
         "      - name: region_id\n        type: INTEGER\n      - name: label\n        type: VARCHAR\n"
     ),
-    "models/staging/stg_orders.sql": _PROJECT_FILES["models/staging/stg_orders.sql"],
-    "models/marts/order_facts.sql": (
+    "sql/models/staging/stg_orders.sql": _PROJECT_FILES["sql/models/staging/stg_orders.sql"],
+    "sql/models/marts/order_facts.sql": (
         'MODEL (description "Order facts");\n\n'
         "WITH ranked AS (\n"
         "  SELECT o.*, r.label, CAST(o.amount AS BIGINT) AS whole_amount\n"
@@ -98,7 +98,7 @@ _RICH_FILES: dict[str, str] = {
         "  whole_amount, amount * 2 AS doubled, 'fixed' AS tag\n"
         "FROM ranked\n"
     ),
-    "models/marts/customer_totals.sql": (
+    "sql/models/marts/customer_totals.sql": (
         'MODEL (description "Totals per customer");\n\n'
         "SELECT customer_id, SUM(doubled) AS total_doubled, COUNT(*) AS order_count,\n"
         "  MAX(region_label) AS region_label\n"
@@ -106,7 +106,7 @@ _RICH_FILES: dict[str, str] = {
         "UNION ALL\n"
         'SELECT customer_id, amount, 1, NULL FROM __source("raw_orders")\n'
     ),
-    "models/marts/customer_copies.sql": (
+    "sql/models/marts/customer_copies.sql": (
         'MODEL (description "Customer copies");\n\n'
         'SELECT t.*, f.tag FROM __ref("customer_totals") AS t\n'
         'JOIN __ref("order_facts") AS f USING (customer_id)\n'

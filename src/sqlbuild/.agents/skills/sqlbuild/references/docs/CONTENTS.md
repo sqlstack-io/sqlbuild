@@ -49,7 +49,7 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [Overview](concepts/rules.md) (`concepts/rules`) - Turn repeated SQL and project review decisions into compiler-enforced requirements.
 - [Configuration and selection](concepts/rules/configuration-and-selection.md) (`concepts/rules/configuration-and-selection`) - Select built-in and custom Rules by exact code or family prefix.
 - [Findings and exceptions](concepts/rules/findings-and-exceptions.md) (`concepts/rules/findings-and-exceptions`) - Understand Rule diagnostics and record intentional exceptions safely.
-- [Python Rules](concepts/rules/python-rules.md) (`concepts/rules/python-rules`) - Check the project's Python for annotations, imports, function shape and the layout of python/.
+- [Python Rules](concepts/rules/python-rules.md) (`concepts/rules/python-rules`) - Check the project's Python for annotations, imports, function shape and the layout of python/nodes/.
 - [Orchestration Rules](concepts/rules/orchestration-rules.md) (`concepts/rules/orchestration-rules`) - Keep job and sensor selections from listing nodes one by one.
 - [Performance Rules](concepts/rules/performance-rules.md) (`concepts/rules/performance-rules`) - Catch semi-structured payloads that repeat on every row and multiply storage and scan cost.
 - [Execution and caching](concepts/rules/execution-and-caching.md) (`concepts/rules/execution-and-caching`) - Understand Rule enforcement order, focused runs, and dependency-aware reuse.
@@ -75,7 +75,7 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [Recall](concepts/observability/recall.md) (`concepts/observability/recall`) - The local history of every command: what ran, what it executed, and what it printed.
 - [Sharing Recall in ClickHouse](concepts/observability/recall-clickhouse.md) (`concepts/observability/recall-clickhouse`) - Keep one Recall history for a team or CI in ClickHouse: users, grants, setup, retention and reading.
 - [Observability](concepts/observability.md) (`concepts/observability`) - Find out what a run did, or send its events to your own systems.
-- [Typed Sinks](concepts/observability/sinks.md) (`concepts/observability/sinks`) - Export lifecycle facts and command output through project-owned providers.
+- [Event Sinks](concepts/observability/event-sinks.md) (`concepts/observability/event-sinks`) - Export lifecycle facts and command output through project-owned providers.
 
 ## Advanced
 

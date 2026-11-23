@@ -11,75 +11,75 @@ use crate::refactoring::models::RefactorPlan;
 
 const LAYER_CODES: &[&str] = &["SQBRPROJECT102", "SQBRPROJECT105"];
 const ENRICHED_COMMAND: &str = "sqb mv orders__int_clean__lines__web \
-    models/orders/intermediate/enriched/web/orders__int_enriched__lines__web.sql";
+    sql/models/orders/intermediate/enriched/web/orders__int_enriched__lines__web.sql";
 
 #[test]
 fn given_rename_compile_errors_when_suggesting_layer_move_then_one_step_mv_is_exact() {
     let test_cases = [
         LayerMoveTestCase {
             description: "int_clean to int_enriched keeps domain and sub-folders",
-            old_path: "models/orders/intermediate/clean/web/orders__int_clean__lines__web.sql",
+            old_path: "sql/models/orders/intermediate/clean/web/orders__int_clean__lines__web.sql",
             new_name: "orders__int_enriched__lines__web",
             codes: LAYER_CODES,
             project_dir: None,
             windows: false,
             expected_command: Some(ENRICHED_COMMAND),
-            expected_folder: Some("models/orders/intermediate/enriched"),
+            expected_folder: Some("sql/models/orders/intermediate/enriched"),
         },
         LayerMoveTestCase {
             description: "a bare intermediate folder becomes the int_clean folder",
-            old_path: "models/orders/intermediate/orders__int_v__totals.sql",
+            old_path: "sql/models/orders/intermediate/orders__int_v__totals.sql",
             new_name: "orders__int_clean__totals",
             codes: &["SQBRPROJECT102"],
             project_dir: None,
             windows: false,
             expected_command: Some(
                 "sqb mv orders__int_v__totals \
-                 models/orders/intermediate/clean/orders__int_clean__totals.sql",
+                 sql/models/orders/intermediate/clean/orders__int_clean__totals.sql",
             ),
-            expected_folder: Some("models/orders/intermediate/clean"),
+            expected_folder: Some("sql/models/orders/intermediate/clean"),
         },
         LayerMoveTestCase {
             description: "only the current layer's own folder is replaced",
-            old_path: "models/mart/orders/staging/orders__stg__order_lines_x.sql",
+            old_path: "sql/models/mart/orders/staging/orders__stg__order_lines_x.sql",
             new_name: "orders__int_clean__order_lines_x",
             codes: &["SQBRPROJECT102"],
             project_dir: None,
             windows: false,
             expected_command: Some(
                 "sqb mv orders__stg__order_lines_x \
-                 models/mart/orders/intermediate/clean/orders__int_clean__order_lines_x.sql",
+                 sql/models/mart/orders/intermediate/clean/orders__int_clean__order_lines_x.sql",
             ),
-            expected_folder: Some("models/mart/orders/intermediate/clean"),
+            expected_folder: Some("sql/models/mart/orders/intermediate/clean"),
         },
         LayerMoveTestCase {
             description: "no layer folder in the current path uses a placeholder",
-            old_path: "models/orders/web/order_lines.sql",
+            old_path: "sql/models/orders/web/order_lines.sql",
             new_name: "orders__stg__order_lines",
             codes: LAYER_CODES,
             project_dir: None,
             windows: false,
             expected_command: Some(
-                "sqb mv order_lines 'models/<folder>/orders__stg__order_lines.sql'",
+                "sqb mv order_lines 'sql/models/<folder>/orders__stg__order_lines.sql'",
             ),
             expected_folder: None,
         },
         LayerMoveTestCase {
             description: "a layer without a folder mapping uses a placeholder",
-            old_path: "models/orders/intermediate/clean/orders__int_clean__totals.sql",
+            old_path: "sql/models/orders/intermediate/clean/orders__int_clean__totals.sql",
             new_name: "orders__int_archive__totals",
             codes: LAYER_CODES,
             project_dir: None,
             windows: false,
             expected_command: Some(
                 "sqb mv orders__int_clean__totals \
-                 'models/<folder>/orders__int_archive__totals.sql'",
+                 'sql/models/<folder>/orders__int_archive__totals.sql'",
             ),
             expected_folder: None,
         },
         LayerMoveTestCase {
             description: "another rule failing as well gets no suggestion",
-            old_path: "models/orders/intermediate/clean/orders__int_clean__totals.sql",
+            old_path: "sql/models/orders/intermediate/clean/orders__int_clean__totals.sql",
             new_name: "orders__int_enriched__totals",
             codes: &["SQBRPROJECT105", "SQBRMODEL103"],
             project_dir: None,
@@ -89,31 +89,31 @@ fn given_rename_compile_errors_when_suggesting_layer_move_then_one_step_mv_is_ex
         },
         LayerMoveTestCase {
             description: "posix shells get POSIX quoting",
-            old_path: "models/orders/intermediate/clean/web/orders__int_clean__lines__web.sql",
+            old_path: "sql/models/orders/intermediate/clean/web/orders__int_clean__lines__web.sql",
             new_name: "orders__int_enriched__lines__web",
             codes: LAYER_CODES,
             project_dir: Some("/srv/order projects/orders"),
             windows: false,
             expected_command: Some(
                 "sqb mv orders__int_clean__lines__web \
-                 models/orders/intermediate/enriched/web/orders__int_enriched__lines__web.sql \
+                 sql/models/orders/intermediate/enriched/web/orders__int_enriched__lines__web.sql \
                  --project-dir '/srv/order projects/orders'",
             ),
-            expected_folder: Some("models/orders/intermediate/enriched"),
+            expected_folder: Some("sql/models/orders/intermediate/enriched"),
         },
         LayerMoveTestCase {
             description: "windows gets cmd.exe quoting",
-            old_path: "models/orders/intermediate/clean/web/orders__int_clean__lines__web.sql",
+            old_path: "sql/models/orders/intermediate/clean/web/orders__int_clean__lines__web.sql",
             new_name: "orders__int_enriched__lines__web",
             codes: LAYER_CODES,
             project_dir: Some("C:\\order projects\\orders"),
             windows: true,
             expected_command: Some(
                 "sqb mv orders__int_clean__lines__web \
-                 models/orders/intermediate/enriched/web/orders__int_enriched__lines__web.sql \
+                 sql/models/orders/intermediate/enriched/web/orders__int_enriched__lines__web.sql \
                  --project-dir \"C:\\order projects\\orders\"",
             ),
-            expected_folder: Some("models/orders/intermediate/enriched"),
+            expected_folder: Some("sql/models/orders/intermediate/enriched"),
         },
     ];
 
@@ -142,18 +142,18 @@ fn given_rename_compile_errors_when_suggesting_layer_move_then_one_step_mv_is_ex
 fn given_layer_failure_when_rendering_text_then_suggestion_follows_errors() {
     let test_cases = [RenderTestCase {
         description: "a refused rename lists errors, the one-step move and the status",
-        old_path: "models/orders/staging/orders__stg__lines.sql",
+        old_path: "sql/models/orders/staging/orders__stg__lines.sql",
         new_name: "orders__mart__lines",
         codes: &["SQBRPROJECT105"],
         expected_text: "Rename model  orders__stg__lines -> orders__mart__lines\n\
-            \u{2514}\u{2500}\u{2500} models/orders/staging/orders__mart__lines.sql  \
-            (moved from models/orders/staging/orders__stg__lines.sql)\n\
+            \u{2514}\u{2500}\u{2500} sql/models/orders/staging/orders__mart__lines.sql  \
+            (moved from sql/models/orders/staging/orders__stg__lines.sql)\n\
             Compile errors in the edited project\n\
             \u{2514}\u{2500}\u{2500} SQBRPROJECT105  \
-            models/orders/staging/orders__mart__lines.sql:1  SQBRPROJECT105 failed\n\
-            orders__mart__lines belongs under models/orders/mart/\n  \
+            sql/models/orders/staging/orders__mart__lines.sql:1  SQBRPROJECT105 failed\n\
+            orders__mart__lines belongs under sql/models/orders/mart/\n  \
             Rename and move in one step:\n    \
-            sqb mv orders__stg__lines models/orders/mart/orders__mart__lines.sql\n  \
+            sqb mv orders__stg__lines sql/models/orders/mart/orders__mart__lines.sql\n  \
             (change the folder if you want it somewhere else)\n\
             Compiled: failed; no files changed\n",
     }];

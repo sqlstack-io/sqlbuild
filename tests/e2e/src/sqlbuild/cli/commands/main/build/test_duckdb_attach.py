@@ -53,22 +53,22 @@ def test_given_attached_duckdb_file_when_building_then_models_land_in_it(
         project_name="shop",
         repo_files={
             "sqlbuild_project.toml": _PROJECT_TOML.format(attach_path=test_case.attach_path),
-            "models/archived_orders.sql": (
+            "sql/models/archived_orders.sql": (
                 "MODEL (description 'Test model archived_orders.', materialized table, "
                 "database archive, schema main);\nSELECT 1 AS order_id\n"
             ),
-            "models/customers.sql": (
+            "sql/models/customers.sql": (
                 "MODEL (description 'Test model customers.', materialized table);\n"
                 "SELECT 1 AS customer_id\n"
             ),
-            "models/order_ids.sql": (
+            "sql/models/order_ids.sql": (
                 "MODEL (description 'Test model order_ids.', materialized table);\n"
                 'SELECT o.order_id FROM __ref("archived_orders") AS o\n'
             ),
         },
     )
     home: Path = tmp_path / "home"
-    home.mkdir()
+    home.mkdir(parents=True)
     built: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build", "--concurrency", str(test_case.concurrency)),
         project_dir=project_dir,

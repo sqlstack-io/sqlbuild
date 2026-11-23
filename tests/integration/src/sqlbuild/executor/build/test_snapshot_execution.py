@@ -62,10 +62,10 @@ _NOT_NULL_AUDIT: str = 'AUDIT ();\n\nSELECT @column FROM __ref("@model") WHERE @
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -111,13 +111,13 @@ _NOT_NULL_AUDIT: str = 'AUDIT ();\n\nSELECT @column FROM __ref("@model") WHERE @
             model_name="customer_region_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_regions\n    description: Test source raw_customer_regions.\n"
                     "    schema: main\n"
                     "    table: raw_customer_regions\n"
                 ),
-                "models/customer_region_snapshot.sql": (
+                "sql/models/customer_region_snapshot.sql": (
                     "MODEL (description 'Test model customer_region_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id, region],\n"
@@ -174,10 +174,10 @@ _NOT_NULL_AUDIT: str = 'AUDIT ();\n\nSELECT @column FROM __ref("@model") WHERE @
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -328,13 +328,13 @@ def test_given_current_state_timestamp_snapshot_when_building_then_tracks_histor
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_extracts\n    description: Test source raw_customer_extracts.\n"
                     "    schema: main\n"
                     "    table: raw_customer_extracts\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -392,13 +392,13 @@ def test_given_current_state_timestamp_snapshot_when_building_then_tracks_histor
             model_name="customer_region_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_region_extracts\n    description: Test source raw_customer_region_extracts.\n"
                     "    schema: main\n"
                     "    table: raw_customer_region_extracts\n"
                 ),
-                "models/customer_region_snapshot.sql": (
+                "sql/models/customer_region_snapshot.sql": (
                     "MODEL (description 'Test model customer_region_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id, region],\n"
@@ -453,13 +453,13 @@ def test_given_current_state_timestamp_snapshot_when_building_then_tracks_histor
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_extracts\n    description: Test source raw_customer_extracts.\n"
                     "    schema: main\n"
                     "    table: raw_customer_extracts\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -503,13 +503,13 @@ def test_given_current_state_timestamp_snapshot_when_building_then_tracks_histor
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_changes\n    description: Test source raw_customer_changes.\n"
                     "    schema: main\n"
                     "    table: raw_customer_changes\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -571,13 +571,13 @@ def test_given_current_state_timestamp_snapshot_when_building_then_tracks_histor
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_region_changes\n    description: Test source raw_customer_region_changes.\n"
                     "    schema: main\n"
                     "    table: raw_customer_region_changes\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id, region],\n"
@@ -635,13 +635,13 @@ def test_given_current_state_timestamp_snapshot_when_building_then_tracks_histor
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_extracts\n    description: Test source raw_customer_extracts.\n"
                     "    schema: main\n"
                     "    table: raw_customer_extracts\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -756,10 +756,10 @@ def test_given_historical_timestamp_snapshot_when_building_then_uses_updated_his
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -785,10 +785,10 @@ def test_given_historical_timestamp_snapshot_when_building_then_uses_updated_his
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -810,10 +810,10 @@ def test_given_historical_timestamp_snapshot_when_building_then_uses_updated_his
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -837,10 +837,10 @@ def test_given_historical_timestamp_snapshot_when_building_then_uses_updated_his
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -864,13 +864,13 @@ def test_given_historical_timestamp_snapshot_when_building_then_uses_updated_his
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_extracts\n    description: Test source raw_customer_extracts.\n"
                     "    schema: main\n"
                     "    table: raw_customer_extracts\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -901,13 +901,13 @@ def test_given_historical_timestamp_snapshot_when_building_then_uses_updated_his
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_changes\n    description: Test source raw_customer_changes.\n"
                     "    schema: main\n"
                     "    table: raw_customer_changes\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -988,10 +988,10 @@ def test_given_invalid_timestamp_snapshot_source_when_building_then_fails_before
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1032,13 +1032,13 @@ def test_given_invalid_timestamp_snapshot_source_when_building_then_fails_before
             model_name="customer_region_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_regions\n    description: Test source raw_customer_regions.\n"
                     "    schema: main\n"
                     "    table: raw_customer_regions\n"
                 ),
-                "models/customer_region_snapshot.sql": (
+                "sql/models/customer_region_snapshot.sql": (
                     "MODEL (description 'Test model customer_region_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id, region],\n"
@@ -1092,10 +1092,10 @@ def test_given_invalid_timestamp_snapshot_source_when_building_then_fails_before
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1135,10 +1135,10 @@ def test_given_invalid_timestamp_snapshot_source_when_building_then_fails_before
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1178,10 +1178,10 @@ def test_given_invalid_timestamp_snapshot_source_when_building_then_fails_before
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1220,13 +1220,13 @@ def test_given_invalid_timestamp_snapshot_source_when_building_then_fails_before
             model_name="customer_region_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_regions\n    description: Test source raw_customer_regions.\n"
                     "    schema: main\n"
                     "    table: raw_customer_regions\n"
                 ),
-                "models/customer_region_snapshot.sql": (
+                "sql/models/customer_region_snapshot.sql": (
                     "MODEL (description 'Test model customer_region_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id, region],\n"
@@ -1286,10 +1286,10 @@ def test_given_invalid_timestamp_snapshot_source_when_building_then_fails_before
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1417,13 +1417,13 @@ def test_given_current_state_check_snapshot_when_building_then_tracks_checked_ch
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_daily\n    description: Test source raw_customer_daily.\n"
                     "    schema: main\n"
                     "    table: raw_customer_daily\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1475,13 +1475,13 @@ def test_given_current_state_check_snapshot_when_building_then_tracks_checked_ch
             model_name="customer_region_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_region_daily\n    description: Test source raw_customer_region_daily.\n"
                     "    schema: main\n"
                     "    table: raw_customer_region_daily\n"
                 ),
-                "models/customer_region_snapshot.sql": (
+                "sql/models/customer_region_snapshot.sql": (
                     "MODEL (description 'Test model customer_region_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id, region],\n"
@@ -1534,13 +1534,13 @@ def test_given_current_state_check_snapshot_when_building_then_tracks_checked_ch
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_daily\n    description: Test source raw_customer_daily.\n"
                     "    schema: main\n"
                     "    table: raw_customer_daily\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1579,13 +1579,13 @@ def test_given_current_state_check_snapshot_when_building_then_tracks_checked_ch
             model_name="customer_region_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_region_daily\n    description: Test source raw_customer_region_daily.\n"
                     "    schema: main\n"
                     "    table: raw_customer_region_daily\n"
                 ),
-                "models/customer_region_snapshot.sql": (
+                "sql/models/customer_region_snapshot.sql": (
                     "MODEL (description 'Test model customer_region_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id, region],\n"
@@ -1691,10 +1691,10 @@ def test_given_historical_check_snapshot_when_building_then_tracks_observed_hist
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1718,13 +1718,13 @@ def test_given_historical_check_snapshot_when_building_then_tracks_observed_hist
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_daily\n    description: Test source raw_customer_daily.\n"
                     "    schema: main\n"
                     "    table: raw_customer_daily\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1752,10 +1752,10 @@ def test_given_historical_check_snapshot_when_building_then_tracks_observed_hist
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1776,10 +1776,10 @@ def test_given_historical_check_snapshot_when_building_then_tracks_observed_hist
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1799,10 +1799,10 @@ def test_given_historical_check_snapshot_when_building_then_tracks_observed_hist
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1873,10 +1873,10 @@ def test_given_invalid_check_snapshot_source_when_building_then_fails_before_tar
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1918,10 +1918,10 @@ def test_given_invalid_check_snapshot_source_when_building_then_fails_before_tar
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1959,10 +1959,10 @@ def test_given_invalid_check_snapshot_source_when_building_then_fails_before_tar
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -1996,10 +1996,10 @@ def test_given_invalid_check_snapshot_source_when_building_then_fails_before_tar
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -2034,10 +2034,10 @@ def test_given_invalid_check_snapshot_source_when_building_then_fails_before_tar
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -2074,13 +2074,13 @@ def test_given_invalid_check_snapshot_source_when_building_then_fails_before_tar
             model_name="customer_region_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customer_regions\n    description: Test source raw_customer_regions.\n"
                     "    schema: main\n"
                     "    table: raw_customer_regions\n"
                 ),
-                "models/customer_region_snapshot.sql": (
+                "sql/models/customer_region_snapshot.sql": (
                     "MODEL (description 'Test model customer_region_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id, region],\n"
@@ -2171,11 +2171,11 @@ def test_given_current_state_snapshot_when_source_row_disappears_then_hard_delet
             description="timestamp snapshot appends new source column",
             initial_project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -2187,11 +2187,11 @@ def test_given_current_state_snapshot_when_source_row_disappears_then_hard_delet
             },
             changed_project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -2276,11 +2276,11 @@ def test_given_snapshot_source_adds_column_when_building_then_appends_target_col
             description="contract snapshot requires confirmation for declared new column",
             initial_project_files={
                 "sqlbuild_project.toml": _PROJECT_YML_CONFIRM_SCHEMA_CHANGE,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  contract enforced,\n"
@@ -2298,11 +2298,11 @@ def test_given_snapshot_source_adds_column_when_building_then_appends_target_col
             },
             changed_project_files={
                 "sqlbuild_project.toml": _PROJECT_YML_CONFIRM_SCHEMA_CHANGE,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  contract enforced,\n"
@@ -2394,11 +2394,11 @@ def test_given_contract_snapshot_adds_declared_column_when_building_then_require
             description="confirmed contract snapshot appends declared new column",
             initial_project_files={
                 "sqlbuild_project.toml": _PROJECT_YML_CONFIRM_SCHEMA_CHANGE,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  contract enforced,\n"
@@ -2416,11 +2416,11 @@ def test_given_contract_snapshot_adds_declared_column_when_building_then_require
             },
             changed_project_files={
                 "sqlbuild_project.toml": _PROJECT_YML_CONFIRM_SCHEMA_CHANGE,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  contract enforced,\n"
@@ -2513,11 +2513,11 @@ def test_given_confirmed_contract_snapshot_adds_declared_column_when_building_th
             description="wildcard check snapshot requires schema-change confirmation",
             initial_project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -2529,11 +2529,11 @@ def test_given_confirmed_contract_snapshot_adds_declared_column_when_building_th
             },
             changed_project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -2609,11 +2609,11 @@ def test_given_wildcard_check_snapshot_source_adds_column_when_building_then_req
             description="confirmed wildcard check snapshot appends new source column",
             initial_project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -2625,11 +2625,11 @@ def test_given_wildcard_check_snapshot_source_adds_column_when_building_then_req
             },
             changed_project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_customers\n    description: Test source raw_customers.\n    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -2712,13 +2712,13 @@ def test_given_confirmed_wildcard_schema_change_when_building_then_appends_targe
             model_name="customer_snapshot",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customers\n    description: Test source raw_customers.\n"
                     "    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -2806,13 +2806,13 @@ def test_given_hard_delete_snapshot_when_duplicate_keys_fail_then_target_history
             description="check snapshot initial_valid_from can use updated_at",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customers\n    description: Test source raw_customers.\n"
                     "    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -2874,13 +2874,13 @@ def test_given_check_snapshot_with_initial_valid_from_when_building_then_uses_co
             description="timestamp snapshot initial_valid_from can explicitly use updated_at",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customers\n    description: Test source raw_customers.\n"
                     "    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -2940,13 +2940,13 @@ def test_given_timestamp_snapshot_with_updated_at_initial_validity_when_building
             description="timestamp snapshot initial_valid_from can use execution time",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customers\n    description: Test source raw_customers.\n"
                     "    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -3006,13 +3006,13 @@ def test_given_timestamp_snapshot_with_execution_initial_validity_when_building_
             description="check snapshot explicitly accepts execution-time initial validity",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customers\n    description: Test source raw_customers.\n"
                     "    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -3074,13 +3074,13 @@ def test_given_check_snapshot_with_execution_initial_validity_when_building_then
             description="planner carries initial_valid_from into snapshot plan entries",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customers\n    description: Test source raw_customers.\n"
                     "    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -3132,13 +3132,13 @@ def test_given_snapshot_initial_validity_config_when_planning_then_plan_entry_pr
             description="check snapshot runs final column audits",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customers\n    description: Test source raw_customers.\n"
                     "    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -3148,7 +3148,7 @@ def test_given_snapshot_initial_validity_config_when_planning_then_plan_entry_pr
                     ");\n\n"
                     'SELECT customer_id, status FROM __source("raw_customers")'
                 ),
-                "audits/generic/not_null.sql": _NOT_NULL_AUDIT,
+                "sql/audits/generic/not_null.sql": _NOT_NULL_AUDIT,
             },
             setup_sql=(
                 "CREATE TABLE main.raw_customers AS SELECT 1 AS customer_id, 'active' AS status",
@@ -3205,13 +3205,13 @@ def test_given_check_snapshot_with_final_audit_when_building_then_runs_audit(
             description="check snapshot final audit failure fails after target update",
             project_files={
                 "sqlbuild_project.toml": _PROJECT_YML,
-                "sources/raw.yml": (
+                "sql/sources/raw.yml": (
                     "sources:\n"
                     "  - name: raw_customers\n    description: Test source raw_customers.\n"
                     "    schema: main\n"
                     "    table: raw_customers\n"
                 ),
-                "models/customer_snapshot.sql": (
+                "sql/models/customer_snapshot.sql": (
                     "MODEL (description 'Test model customer_snapshot.',\n"
                     "  materialized snapshot,\n"
                     "  unique_key [customer_id],\n"
@@ -3221,7 +3221,7 @@ def test_given_check_snapshot_with_final_audit_when_building_then_runs_audit(
                     ");\n\n"
                     'SELECT customer_id, status FROM __source("raw_customers")'
                 ),
-                "audits/generic/not_null.sql": _NOT_NULL_AUDIT,
+                "sql/audits/generic/not_null.sql": _NOT_NULL_AUDIT,
             },
             setup_sql=(
                 "CREATE TABLE main.raw_customers AS "

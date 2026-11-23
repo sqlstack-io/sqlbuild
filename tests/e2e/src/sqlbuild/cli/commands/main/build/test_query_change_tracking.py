@@ -35,7 +35,7 @@ _OLDER_SCHEME_PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "sources/raw.yml": dedent(
+    "sql/sources/raw.yml": dedent(
         """
         sources:
           - name: raw_orders
@@ -45,7 +45,7 @@ _OLDER_SCHEME_PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "models/stg_orders.sql": dedent(
+    "sql/models/stg_orders.sql": dedent(
         """
         MODEL (description "Test model stg_orders.");
 
@@ -53,7 +53,7 @@ _OLDER_SCHEME_PROJECT_FILES: dict[str, str] = {
         """
     ).strip()
     + "\n",
-    "models/fact_orders.sql": dedent(
+    "sql/models/fact_orders.sql": dedent(
         """
         MODEL (description "Test model fact_orders.");
 
@@ -98,7 +98,7 @@ _OLDER_SCHEME_PROJECT_FILES: dict[str, str] = {
                     """
                 ).strip()
                 + "\n",
-                "sources/raw.yml": dedent(
+                "sql/sources/raw.yml": dedent(
                     """
                     sources:
                       - name: raw_orders
@@ -108,7 +108,7 @@ _OLDER_SCHEME_PROJECT_FILES: dict[str, str] = {
                     """
                 ).strip()
                 + "\n",
-                "models/staging/stg_orders.sql": dedent(
+                "sql/models/staging/stg_orders.sql": dedent(
                     """
                     MODEL (description "Test model stg_orders.",
                       materialized view
@@ -123,7 +123,7 @@ _OLDER_SCHEME_PROJECT_FILES: dict[str, str] = {
                     """
                 ).strip()
                 + "\n",
-                "models/marts/fact_orders.sql": dedent(
+                "sql/models/marts/fact_orders.sql": dedent(
                     """
                     MODEL (description "Test model fact_orders.",
                       materialized table
@@ -276,7 +276,7 @@ def test_given_hashes_from_older_fingerprint_scheme_when_rebuilding_then_only_ed
         db_path=db_path,
         sql="UPDATE main._sqlbuild_fingerprints SET definition_hash = 'older-scheme-' || node_name",
     )
-    edited_model: Path = project_dir / "models" / "fact_orders.sql"
+    edited_model: Path = project_dir / "sql" / "models" / "fact_orders.sql"
     edited_model.write_text(
         edited_model.read_text(encoding="utf-8").replace("line_total_cents", "total_cents"),
         encoding="utf-8",

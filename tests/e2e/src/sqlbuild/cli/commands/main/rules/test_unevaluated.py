@@ -34,7 +34,7 @@ _SNOWFLAKE_RULES_PROJECT: str = (
     [
         UnevaluatedResourceCase(
             "model guard",
-            "models/staging/orders.sql",
+            "sql/models/staging/orders.sql",
             "MODEL (description 'Test model orders.');\nSELECT {expression} AS order_id",
             0,
         ),
@@ -103,10 +103,10 @@ def test_given_guarded_resource_when_running_rules_then_reports_failure_and_cove
             "SQLCLEAN035",
             expected_evaluated_models=2,
             expected_unevaluated_resources=0,
-            path="models/staging/_sqlbuild/audits/singular/orders.sql",
+            path="sql/models/staging/_sqlbuild/audits/singular/orders.sql",
             extra_files=(
                 (
-                    "models/staging/customers.sql",
+                    "sql/models/staging/customers.sql",
                     "MODEL (description 'Test model customers.');\nSELECT 1 AS order_id\n",
                 ),
             ),
@@ -168,7 +168,7 @@ def test_given_model_only_polyglot_parses_when_running_rules_then_reports_model_
 ) -> None:
     write_unevaluated_rules_project(
         project_dir=tmp_path,
-        resource_path="models/staging/orders.sql",
+        resource_path="sql/models/staging/orders.sql",
         resource_template="MODEL (description 'Test model orders.');\n" + test_case.sql,
         selected_rules=test_case.rules,
     )
@@ -215,7 +215,7 @@ def test_given_prefix_not_like_when_running_rules_then_evaluates_the_complete_mo
 ) -> None:
     write_unevaluated_rules_project(
         project_dir=tmp_path,
-        resource_path="models/staging/orders.sql",
+        resource_path="sql/models/staging/orders.sql",
         resource_template="MODEL (description 'Test model orders.', database warehouse, schema analytics);\n"
         + test_case.sql,
         adapter="snowflake",
@@ -256,7 +256,7 @@ def test_given_prefix_not_like_when_running_rules_then_evaluates_the_complete_mo
         ),
         UnevaluatedRuleCase(
             "explicit scoped rule ignore",
-            configuration='\n[[rules.rule_ignores]]\nrules = ["SQLCLEAN035"]\npaths = ["models/staging/orders.sql"]\nreason = "External SQL syntax"\n',
+            configuration='\n[[rules.rule_ignores]]\nrules = ["SQLCLEAN035"]\npaths = ["sql/models/staging/orders.sql"]\nreason = "External SQL syntax"\n',
             expected_exit=0,
         ),
     ],
@@ -305,7 +305,7 @@ def test_given_explicit_escape_hatch_when_running_rules_then_honors_policy(
             ("compile", "--json", "--no-cache"),
             "diagnostics",
             ("SQLCLEAN034",),
-            '\n[[rules.rule_ignores]]\nrules = ["SQLCLEAN035"]\npaths = ["models/staging/orders.sql"]\nreason = "External SQL syntax"\n',
+            '\n[[rules.rule_ignores]]\nrules = ["SQLCLEAN035"]\npaths = ["sql/models/staging/orders.sql"]\nreason = "External SQL syntax"\n',
         ),
     ],
     ids=lambda case: case.description,
@@ -340,13 +340,13 @@ def test_given_one_failed_resource_and_multiple_rules_when_running_cli_then_grou
             "scalar function expression body",
             (
                 (
-                    "functions/sql/next_quantity.sql",
+                    "sql/functions/sql/next_quantity.sql",
                     "FUNCTION (\n  description 'Next order quantity.',\n"
                     "  arguments (quantity INTEGER),\n  returns INTEGER,\n"
                     "  database warehouse,\n  schema analytics,\n);\n\nquantity + 1\n",
                 ),
                 (
-                    "models/orders.sql",
+                    "sql/models/orders.sql",
                     "MODEL (description 'Orders.', database warehouse, schema analytics);\n\n"
                     'SELECT __udf("next_quantity")(2) AS quantity\n',
                 ),
@@ -356,14 +356,14 @@ def test_given_one_failed_resource_and_multiple_rules_when_running_cli_then_grou
             "table function body opening with a parenthesis",
             (
                 (
-                    "functions/sql/open_orders.sql",
+                    "sql/functions/sql/open_orders.sql",
                     "FUNCTION (\n  description 'Open orders.',\n"
                     "  returns table (order_id INTEGER),\n"
                     "  database warehouse,\n  schema analytics,\n);\n\n"
                     "(\n  SELECT 1 AS order_id\n)\n",
                 ),
                 (
-                    "models/orders.sql",
+                    "sql/models/orders.sql",
                     "MODEL (description 'Orders.', database warehouse, schema analytics);\n\n"
                     'SELECT o.order_id\nFROM __table_fn("open_orders")() AS o\n',
                 ),
@@ -373,7 +373,7 @@ def test_given_one_failed_resource_and_multiple_rules_when_running_cli_then_grou
             "partitioned python table function call in a model and its test",
             (
                 (
-                    "functions/python/smooth_payments.py",
+                    "sql/functions/python/smooth_payments.py",
                     "import polars as pl\nfrom sqlbuild.functions import table_fn\n\n\n"
                     "@table_fn(\n"
                     '    arguments={"customer_id": "INTEGER", "amount": "FLOAT"},\n'
@@ -387,12 +387,12 @@ def test_given_one_failed_resource_and_multiple_rules_when_running_cli_then_grou
                     '    return payments.rename({"amount": "amount_smoothed"})\n',
                 ),
                 (
-                    "models/payments.sql",
+                    "sql/models/payments.sql",
                     "MODEL (description 'Payments.', database warehouse, schema analytics);\n\n"
                     "SELECT\n  1 AS customer_id,\n  10.0::FLOAT AS amount\n",
                 ),
                 (
-                    "models/smoothed_payments.sql",
+                    "sql/models/smoothed_payments.sql",
                     "MODEL (description 'Smoothed payments.', database warehouse, schema analytics);\n\n"
                     "SELECT\n  s.customer_id,\n  s.amount_smoothed\n"
                     'FROM __ref("payments") AS p, __table_fn("smooth_payments")(p.customer_id, p.amount)\n'
@@ -414,12 +414,12 @@ def test_given_one_failed_resource_and_multiple_rules_when_running_cli_then_grou
             "quoted hook argument where a string is required",
             (
                 (
-                    "hooks/sql/comment_on_relation.sql",
+                    "sql/hooks/sql/comment_on_relation.sql",
                     "HOOK (description 'Comment on a relation.');\n\n"
                     "COMMENT ON TABLE @relation IS @'comment'\n",
                 ),
                 (
-                    "models/orders.sql",
+                    "sql/models/orders.sql",
                     "MODEL (\n  description 'Orders.',\n  database warehouse,\n  schema analytics,\n"
                     "  post_hooks [\n"
                     '    sql("comment_on_relation", relation: "@@CTX:destination.qualified", '

@@ -238,17 +238,17 @@ def prepare_snowflake_diff_project(*, tmp_path: Path) -> tuple[Path, str, str]:
         "allow_as_clone_destination = false\n\n"
         "[defaults]\n"
         'materialized = "table"\n\n'
-        "models/staging/stg_orders.sql: invalid\n"
+        "sql/models/staging/stg_orders.sql: invalid\n"
     )
     project_dir.mkdir(parents=True, exist_ok=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         project_contents.replace(
-            "models/staging/stg_orders.sql: invalid\n",
+            "sql/models/staging/stg_orders.sql: invalid\n",
             "",
         ),
         encoding="utf-8",
     )
-    models_dir: Path = project_dir / "models"
+    models_dir: Path = project_dir / "sql" / "models"
     staging_dir: Path = models_dir / "staging"
     staging_dir.mkdir(parents=True, exist_ok=True)
     (staging_dir / "stg_orders.sql").write_text(

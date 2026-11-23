@@ -19,7 +19,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="empty selection disables policy",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql="SELECT * FROM raw.orders",
             config_values={},
             select=(),
@@ -28,7 +28,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="contract rule faults missing enforced contract",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql="WITH orders AS (SELECT id FROM source_orders) SELECT id FROM orders",
             config_values={"materialized": "table"},
             select=("SQBRCONTRACT101",),
@@ -37,7 +37,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="direct enum member comparison passes",
             model_name="commerce__int_clean__orders",
-            relative_path="models/intermediate/commerce__int_clean__orders.sql",
+            relative_path="sql/models/intermediate/commerce__int_clean__orders.sql",
             sql=(
                 'WITH upstream AS (SELECT * FROM __ref("commerce__stg__orders")), '
                 "filtered AS (SELECT status FROM upstream WHERE upstream.status = 'active') "
@@ -57,7 +57,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="modified controlled enum column faults",
             model_name="commerce__int_clean__orders",
-            relative_path="models/intermediate/commerce__int_clean__orders.sql",
+            relative_path="sql/models/intermediate/commerce__int_clean__orders.sql",
             sql=(
                 'WITH upstream AS (SELECT * FROM __ref("commerce__stg__orders")), '
                 "filtered AS (SELECT status FROM upstream "
@@ -78,7 +78,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="uppercased controlled enum column faults",
             model_name="commerce__int_clean__orders",
-            relative_path="models/intermediate/commerce__int_clean__orders.sql",
+            relative_path="sql/models/intermediate/commerce__int_clean__orders.sql",
             sql=(
                 'SELECT status FROM __ref("commerce__stg__orders") AS upstream '
                 "WHERE UPPER(upstream.status) = 'active'"
@@ -96,7 +96,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="cast controlled enum column faults",
             model_name="commerce__int_clean__orders",
-            relative_path="models/intermediate/commerce__int_clean__orders.sql",
+            relative_path="sql/models/intermediate/commerce__int_clean__orders.sql",
             sql=(
                 'SELECT status FROM __ref("commerce__stg__orders") AS upstream '
                 "WHERE CAST(upstream.status AS VARCHAR) = 'active'"
@@ -114,7 +114,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="direct source enum column modifier passes",
             model_name="commerce__stg__orders__vendor",
-            relative_path="models/staging/commerce__stg__orders__vendor.sql",
+            relative_path="sql/models/staging/commerce__stg__orders__vendor.sql",
             sql=(
                 'WITH raw_orders AS (SELECT * FROM __source("vendor_orders")), '
                 "filtered AS (SELECT status FROM raw_orders "
@@ -135,7 +135,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="transitive source enum column modifier faults",
             model_name="commerce__stg__orders__vendor",
-            relative_path="models/staging/commerce__stg__orders__vendor.sql",
+            relative_path="sql/models/staging/commerce__stg__orders__vendor.sql",
             sql=(
                 'WITH raw_orders AS (SELECT * FROM __source("vendor_orders")), '
                 "renamed AS (SELECT status FROM raw_orders), "
@@ -158,7 +158,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="modified enum member faults for direct source comparison",
             model_name="commerce__stg__orders__vendor",
-            relative_path="models/staging/commerce__stg__orders__vendor.sql",
+            relative_path="sql/models/staging/commerce__stg__orders__vendor.sql",
             sql=(
                 'WITH raw_orders AS (SELECT * FROM __source("vendor_orders")), '
                 "filtered AS (SELECT status FROM raw_orders "
@@ -179,7 +179,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="bare string faults for direct source comparison",
             model_name="commerce__stg__orders__vendor",
-            relative_path="models/staging/commerce__stg__orders__vendor.sql",
+            relative_path="sql/models/staging/commerce__stg__orders__vendor.sql",
             sql=(
                 'WITH raw_orders AS (SELECT * FROM __source("vendor_orders")), '
                 "filtered AS (SELECT status FROM raw_orders "
@@ -194,7 +194,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="numeric decision faults",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql="WITH filtered AS (SELECT id FROM items WHERE item_count > 7) SELECT id FROM filtered",
             config_values={"materialized": "table", "contract": "enforced"},
             select=("SQBRDECLARATION102",),
@@ -203,7 +203,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="numeric between bounds fault",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql="SELECT id FROM items WHERE item_count BETWEEN 30 AND 61",
             config_values={"materialized": "table", "contract": "enforced"},
             select=("SQBRDECLARATION102",),
@@ -212,7 +212,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="numeric value list faults",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql="SELECT id FROM items WHERE item_count IN (30, 31, 45)",
             config_values={"materialized": "table", "contract": "enforced"},
             select=("SQBRDECLARATION102",),
@@ -221,7 +221,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="canonical numeric decision passes",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql="WITH filtered AS (SELECT id FROM items WHERE item_count > 0) SELECT id FROM filtered",
             config_values={"materialized": "table", "contract": "enforced"},
             select=("SQBRDECLARATION102",),
@@ -230,7 +230,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="numeric decision in projected case faults",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql=(
                 "SELECT CASE WHEN item_count > 7 THEN 'large' ELSE 'small' END AS batch_size "
                 "FROM items"
@@ -242,7 +242,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="enum decision in projected case faults",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql=(
                 "SELECT CASE WHEN status = 'active' THEN 1 ELSE 0 END AS is_win "
                 'FROM __ref("commerce__stg__orders")'
@@ -256,7 +256,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="constant-backed numeric decision in projected case passes",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql=(
                 "SELECT CASE WHEN item_count > 7 THEN 'large' ELSE 'small' END AS batch_size "
                 "FROM items"
@@ -272,7 +272,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="cast precision does not authorize expanded constant value",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql=(
                 "SELECT CAST(CASE WHEN item_count > 38 THEN 1 ELSE 0 END "
                 "AS NUMBER(38, 0)) AS batch_size FROM items"
@@ -288,7 +288,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="authored numeric decision still faults when it matches cast precision",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql=(
                 "SELECT CAST(CASE WHEN item_count > 38 THEN 1 ELSE 0 END "
                 "AS NUMBER(38, 0)) AS batch_size FROM items"
@@ -300,7 +300,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="constant-backed numeric decision ignores digits in identifiers and strings",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql=(
                 "SELECT CASE WHEN item_count > 7 THEN 'tier 7' ELSE 'small' END AS batch_size_7 "
                 "FROM items"
@@ -316,7 +316,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="query-only numeric decision with model alias faults",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql=(
                 "SELECT CASE WHEN item_count > 7 THEN 'large' ELSE 'small' END AS model FROM items;"
             ),
@@ -327,7 +327,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="negative one and one numeric decisions pass",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql=("SELECT id FROM items WHERE previous_rank = -1 OR current_rank = 1"),
             config_values={"materialized": "table", "contract": "enforced"},
             select=("SQBRDECLARATION102",),
@@ -336,7 +336,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="projected boolean comparison outside case passes",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql="SELECT item_count > 7 AS is_large_batch FROM items",
             config_values={"materialized": "table", "contract": "enforced"},
             select=("SQBRDECLARATION102",),
@@ -345,7 +345,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="comparison-valued case result is not a decision site",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql=(
                 "SELECT CASE WHEN enabled THEN item_count > 7 ELSE FALSE END AS is_large FROM items"
             ),
@@ -356,7 +356,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="view marker mismatch faults",
             model_name="commerce__mart_v__orders",
-            relative_path="models/mart/commerce__mart_v__orders.sql",
+            relative_path="sql/models/mart/commerce__mart_v__orders.sql",
             sql="WITH orders AS (SELECT id FROM source_orders) SELECT id FROM orders",
             config_values={"materialized": "table", "contract": "enforced"},
             select=("SQBRMODEL103",),
@@ -365,7 +365,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="retired source token faults",
             model_name="sales__stg__orders__legacy_partner",
-            relative_path="models/staging/sales__stg__orders__legacy_partner.sql",
+            relative_path="sql/models/staging/sales__stg__orders__legacy_partner.sql",
             sql="WITH orders AS (SELECT id FROM source_orders) SELECT id FROM orders",
             config_values={"materialized": "table", "contract": "enforced"},
             select=("SQBRPROJECT103",),
@@ -377,7 +377,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="function and seed references are not source tokens",
             model_name="sales__stg__orders__partner",
-            relative_path="models/staging/sales__stg__orders__partner.sql",
+            relative_path="sql/models/staging/sales__stg__orders__partner.sql",
             sql="WITH orders AS (SELECT id FROM source_orders) SELECT id FROM orders",
             config_values={"materialized": "table", "contract": "enforced"},
             select=("SQBRPROJECT103",),
@@ -392,7 +392,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="lone star exemption passes",
             model_name="commerce__mart_v__orders",
-            relative_path="models/mart/commerce__mart_v__orders.sql",
+            relative_path="sql/models/mart/commerce__mart_v__orders.sql",
             sql="WITH orders AS (SELECT id FROM source_orders) SELECT * FROM orders",
             config_values={"materialized": "view", "contract": "enforced"},
             select=("SQBRMODEL102",),
@@ -400,7 +400,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
             rules_config=RulesConfig(
                 select_star_allow=(
                     SelectStarAllow(
-                        paths=("models/mart/*.sql",),
+                        paths=("sql/models/mart/*.sql",),
                         reason="Intentional passthrough view",
                     ),
                 )
@@ -409,7 +409,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="lone star over dynamic pivot passes",
             model_name="commerce__mart__order_totals",
-            relative_path="models/mart/commerce__mart__order_totals.sql",
+            relative_path="sql/models/mart/commerce__mart__order_totals.sql",
             sql=(
                 "SELECT * FROM source_orders "
                 "PIVOT(SUM(amount) FOR category IN (ANY ORDER BY category))"
@@ -421,7 +421,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="lone star over static pivot faults",
             model_name="commerce__mart__order_totals",
-            relative_path="models/mart/commerce__mart__order_totals.sql",
+            relative_path="sql/models/mart/commerce__mart__order_totals.sql",
             sql=(
                 "SELECT * FROM source_orders "
                 "PIVOT(SUM(amount) FOR category IN ('standard', 'priority'))"
@@ -433,7 +433,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="mixed star over dynamic pivot faults",
             model_name="commerce__mart__order_totals",
-            relative_path="models/mart/commerce__mart__order_totals.sql",
+            relative_path="sql/models/mart/commerce__mart__order_totals.sql",
             sql=(
                 "SELECT *, 1 AS marker FROM source_orders "
                 "PIVOT(SUM(amount) FOR category IN (ANY ORDER BY category))"
@@ -445,7 +445,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="lone star over joined dynamic pivot faults",
             model_name="commerce__mart__order_totals",
-            relative_path="models/mart/commerce__mart__order_totals.sql",
+            relative_path="sql/models/mart/commerce__mart__order_totals.sql",
             sql=(
                 "SELECT * FROM source_orders "
                 "PIVOT(SUM(amount) FOR category IN (ANY ORDER BY category)) totals "
@@ -458,7 +458,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="valid dependency import passes",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql=(
                 'WITH orders AS (SELECT * FROM __ref("commerce__stg__orders")), '
                 "final AS (SELECT id FROM orders) SELECT id FROM final"
@@ -471,7 +471,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="subject folder after intermediate refinement passes",
             model_name="commerce__int_clean__orders",
-            relative_path="models/commerce/intermediate/clean/payments/commerce__int_clean__orders.sql",
+            relative_path="sql/models/commerce/intermediate/clean/payments/commerce__int_clean__orders.sql",
             sql="SELECT 1 AS order_id",
             config_values={"materialized": "table"},
             select=("SQBRPROJECT102",),
@@ -480,7 +480,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="subject folder before complete intermediate refinement passes",
             model_name="commerce__int_clean__orders",
-            relative_path="models/commerce/payments/intermediate/clean/commerce__int_clean__orders.sql",
+            relative_path="sql/models/commerce/payments/intermediate/clean/commerce__int_clean__orders.sql",
             sql="SELECT 1 AS order_id",
             config_values={"materialized": "table"},
             select=("SQBRPROJECT102",),
@@ -489,7 +489,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="commented and quoted dependency text is ignored",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql=(
                 'WITH orders AS (SELECT * FROM __ref("commerce__stg__orders")), '
                 "final AS (SELECT id, '__ref(\"ignored_string\")' AS note FROM orders "
@@ -505,7 +505,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="transformed dependency import faults",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql=(
                 'WITH orders AS (SELECT p.id FROM __ref("commerce__stg__orders") p '
                 "JOIN lookup l ON p.id = l.id), final AS (SELECT id FROM orders) "
@@ -519,7 +519,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="duplicate dependency import faults",
             model_name="commerce__mart__orders",
-            relative_path="models/mart/commerce__mart__orders.sql",
+            relative_path="sql/models/mart/commerce__mart__orders.sql",
             sql=(
                 'WITH orders_a AS (SELECT * FROM __ref("commerce__stg__orders")), '
                 'orders_b AS (SELECT * FROM __ref("commerce__stg__orders")), '
@@ -533,7 +533,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="passthrough skips minimum checks",
             model_name="commerce__mart_v__orders",
-            relative_path="models/mart/commerce__mart_v__orders.sql",
+            relative_path="sql/models/mart/commerce__mart_v__orders.sql",
             sql=(
                 'WITH orders AS (SELECT * FROM __ref("commerce__stg__orders")) SELECT * FROM orders'
             ),
@@ -545,7 +545,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="plain column passthrough shares import and exemption classification",
             model_name="commerce__mart_v__orders",
-            relative_path="models/mart/commerce__mart_v__orders.sql",
+            relative_path="sql/models/mart/commerce__mart_v__orders.sql",
             sql=(
                 'WITH orders AS (SELECT * FROM __ref("commerce__stg__orders")) '
                 "SELECT id, price AS current_price FROM orders"
@@ -558,7 +558,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="join import is neither star-exempt nor passthrough",
             model_name="commerce__mart_v__orders",
-            relative_path="models/mart/commerce__mart_v__orders.sql",
+            relative_path="sql/models/mart/commerce__mart_v__orders.sql",
             sql=(
                 'WITH orders AS (SELECT * FROM __ref("commerce__stg__orders") p '
                 "JOIN lookup l ON p.id = l.id) SELECT id FROM orders"
@@ -571,7 +571,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="aggregate projection is not passthrough",
             model_name="commerce__mart_v__orders",
-            relative_path="models/mart/commerce__mart_v__orders.sql",
+            relative_path="sql/models/mart/commerce__mart_v__orders.sql",
             sql=(
                 'WITH orders AS (SELECT * FROM __ref("commerce__stg__orders")) '
                 "SELECT COUNT(id) AS price_count FROM orders"
@@ -584,7 +584,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="case projection is not passthrough",
             model_name="commerce__mart_v__orders",
-            relative_path="models/mart/commerce__mart_v__orders.sql",
+            relative_path="sql/models/mart/commerce__mart_v__orders.sql",
             sql=(
                 'WITH orders AS (SELECT * FROM __ref("commerce__stg__orders")) '
                 "SELECT CASE WHEN price > 0 THEN id ELSE NULL END AS id FROM orders"
@@ -597,7 +597,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="extra logical cte is not passthrough",
             model_name="commerce__mart_v__orders",
-            relative_path="models/mart/commerce__mart_v__orders.sql",
+            relative_path="sql/models/mart/commerce__mart_v__orders.sql",
             sql=(
                 'WITH orders AS (SELECT * FROM __ref("commerce__stg__orders")), '
                 "renamed AS (SELECT id FROM orders) SELECT id FROM renamed"
@@ -610,7 +610,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="extra dependency is not passthrough",
             model_name="commerce__mart_v__orders",
-            relative_path="models/mart/commerce__mart_v__orders.sql",
+            relative_path="sql/models/mart/commerce__mart_v__orders.sql",
             sql=(
                 'WITH orders AS (SELECT * FROM __ref("commerce__stg__orders")), '
                 'inventory AS (SELECT * FROM __ref("commerce__stg__inventory")) '
@@ -627,7 +627,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="derived expression is not passthrough",
             model_name="commerce__mart_v__orders",
-            relative_path="models/mart/commerce__mart_v__orders.sql",
+            relative_path="sql/models/mart/commerce__mart_v__orders.sql",
             sql=(
                 'WITH orders AS (SELECT * FROM __ref("commerce__stg__orders")) '
                 "SELECT price * 100 AS price_cents FROM orders"
@@ -640,7 +640,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="nontrivial filter is not passthrough",
             model_name="commerce__mart_v__orders",
-            relative_path="models/mart/commerce__mart_v__orders.sql",
+            relative_path="sql/models/mart/commerce__mart_v__orders.sql",
             sql=(
                 'WITH orders AS (SELECT * FROM __ref("commerce__stg__orders")) '
                 "SELECT id FROM orders WHERE price > 0"
@@ -653,7 +653,7 @@ from tests.unit.src.sqlbuild.rule_engine.main.evaluate.helpers import build_proj
         PolicyEvaluationTestCase(
             description="unrelated terminal source is not passthrough",
             model_name="commerce__mart_v__orders",
-            relative_path="models/mart/commerce__mart_v__orders.sql",
+            relative_path="sql/models/mart/commerce__mart_v__orders.sql",
             sql=(
                 'WITH orders AS (SELECT * FROM __ref("commerce__stg__orders")) '
                 "SELECT id FROM unrelated"
@@ -692,7 +692,7 @@ def test_given_selected_rules_when_evaluating_then_reports_expected_faults(
         PolicyEvaluationTestCase(
             description="architecture-named subject folder before intermediate refinement",
             model_name="commerce__int_clean__orders",
-            relative_path="models/commerce/intermediate/mart/clean/commerce__int_clean__orders.sql",
+            relative_path="sql/models/commerce/intermediate/mart/clean/commerce__int_clean__orders.sql",
             sql="SELECT 1 AS order_id",
             config_values={"materialized": "table"},
             select=("SQBRPROJECT102",),
@@ -723,7 +723,7 @@ def test_given_subject_before_layer_when_evaluating_then_reports_canonical_path(
         '"intermediate/clean" contiguous'
     )
     assert finding.remediation == (
-        'Move the model to "models/commerce/intermediate/clean/mart/'
+        'Move the model to "sql/models/commerce/intermediate/clean/mart/'
         'commerce__int_clean__orders.sql"; preserve subject folders outside '
         '"intermediate/clean". Use rules.layout with SQBRPROJECT201-204 to enforce '
         "domain and subdomain ordering."

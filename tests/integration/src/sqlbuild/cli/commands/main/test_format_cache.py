@@ -155,7 +155,7 @@ def test_given_file_with_fault_when_checking_twice_then_fault_is_reported_both_t
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     write_formatted_cache_project(project_dir=tmp_path)
-    products: Path = tmp_path / "models" / "products.sql"
+    products: Path = tmp_path / "sql" / "models" / "products.sql"
     _ = products.write_text(
         products.read_text(encoding="utf-8").replace(test_case.removed_text, ""),
         encoding="utf-8",

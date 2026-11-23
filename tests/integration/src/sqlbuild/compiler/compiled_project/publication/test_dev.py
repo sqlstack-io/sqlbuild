@@ -51,6 +51,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_warehouse_sync_health,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")
@@ -100,11 +101,13 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
         files=TYPE_PROOF_FILES
         | {
             "sqlbuild_project.toml": 'default_target = "development"\n'
+            # A control store inside the project writes its run output beside it.
+            + 'extra_paths = ["output/"]\n'
             + TYPE_PROOF_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '[targets.development]\nschema = "main"\n',
             "sqlbuild_local.toml": test_case.local_config,
-            "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(
+            "sql/models/orders.sql": TYPE_PROOF_FILES["sql/models/orders.sql"].replace(
                 "SELECT order_id, amount", "SELECT order_id, CAST(amount AS BIGINT) AS amount"
             ),
             **duckshop_orchestration("development_orders"),
@@ -258,7 +261,7 @@ def test_given_development_start_when_location_is_ready_then_project_python_is_d
             + PYTHON_PIPELINE_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '[targets.development]\nschema = "main"\n',
-            "python/probes/import_probe.py": probe,
+            **node_module_files("python/nodes/probes/import_probe.py", probe),
         },
     )
     executable: str = str(Path(sys.executable).with_name("sqb"))
@@ -358,7 +361,7 @@ def test_given_a_missing_secret_when_it_is_added_to_the_env_file_then_the_next_r
                 '[connections.local]\ndatabase = "warehouse.duckdb"\n'
                 '[targets.development]\nschema = "main"\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\n"
                 'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")\n'
             ),
@@ -428,7 +431,7 @@ def test_given_an_unparsable_env_file_when_a_run_starts_then_its_reason_names_th
                 '[connections.local]\ndatabase = "warehouse.duckdb"\n'
                 '[targets.development]\nschema = "main"\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\n"
                 'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")\n'
             ),
@@ -488,7 +491,7 @@ def test_given_an_opened_development_server_when_started_then_it_publishes_takes
             + TYPE_PROOF_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '[targets.development]\nschema = "main"\n',
-            "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(
+            "sql/models/orders.sql": TYPE_PROOF_FILES["sql/models/orders.sql"].replace(
                 "SELECT order_id, amount", "SELECT order_id, CAST(amount AS BIGINT) AS amount"
             ),
         },

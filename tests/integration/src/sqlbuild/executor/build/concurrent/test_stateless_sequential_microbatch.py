@@ -74,7 +74,7 @@ def test_given_sequential_microbatch_when_repeated_then_uses_only_physical_water
             """
         ).strip()
         + "\n",
-        "sources/raw.yml": dedent(
+        "sql/sources/raw.yml": dedent(
             """
             sources:
               - name: raw_events
@@ -84,7 +84,7 @@ def test_given_sequential_microbatch_when_repeated_then_uses_only_physical_water
             """
         ).strip()
         + "\n",
-        "models/orders.sql": dedent(
+        "sql/models/orders.sql": dedent(
             f"""
             MODEL (description "Test model orders.",
               materialized incremental,

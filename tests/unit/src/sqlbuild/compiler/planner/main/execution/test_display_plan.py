@@ -63,7 +63,7 @@ def test_given_incremental_override_when_building_display_plan_then_uses_effecti
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="orders"),
         deps=(),
         name="orders",
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         query_sql="SELECT 1 AS id",
         config=CompileModelConfig(
             values={

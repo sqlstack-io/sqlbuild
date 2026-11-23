@@ -21,7 +21,7 @@ SQL_HOOK_OUTPUT_FIELDS: tuple[str, ...] = (
 _NAMED_SQL_HOOK: SqlHookEntry = SqlHookEntry(
     statement="INSERT INTO order_audit SELECT 'orders'",
     name="record_order_access",
-    relative_path=Path("hooks/sql/record_order_access.sql"),
+    relative_path=Path("sql/hooks/sql/record_order_access.sql"),
     definition_sql="INSERT INTO order_audit SELECT {{ table_name }}",
     kwargs={"table_name": "'orders'"},
     description="Record order table access",
@@ -41,7 +41,7 @@ _NAMED_SQL_HOOK: SqlHookEntry = SqlHookEntry(
                     "type": "sql",
                     "statement": "INSERT INTO order_audit SELECT 'orders'",
                     "name": "record_order_access",
-                    "relative_path": "hooks/sql/record_order_access.sql",
+                    "relative_path": "sql/hooks/sql/record_order_access.sql",
                     "definition_sql": "INSERT INTO order_audit SELECT {{ table_name }}",
                     "kwargs": {"table_name": "'orders'"},
                     "description": "Record order table access",

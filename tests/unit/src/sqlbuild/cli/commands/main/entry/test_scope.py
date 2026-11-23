@@ -35,9 +35,9 @@ def test_given_all_scope_flags_when_dispatching_then_builds_typed_frozen_request
             "scope",
             "model:orders",
             "--as-path",
-            "models/marts/orders.sql",
+            "sql/models/marts/orders.sql",
             "--defined-under",
-            "macros/shared/",
+            "sql/macros/shared/",
             "--kind",
             "macro",
             "--kind",
@@ -71,8 +71,8 @@ def test_given_all_scope_flags_when_dispatching_then_builds_typed_frozen_request
     assert received == [
         ScopeCommandRequest(
             target="model:orders",
-            as_path="models/marts/orders.sql",
-            defined_under="macros/shared/",
+            as_path="sql/models/marts/orders.sql",
+            defined_under="sql/macros/shared/",
             kinds=("macro", "enum"),
             match="normal*",
             used_only=True,
@@ -98,10 +98,10 @@ def test_given_all_scope_flags_when_dispatching_then_builds_typed_frozen_request
     "test_case",
     (
         ScopeArgumentMisuseCase("missing_target", ("scope",)),
-        ScopeArgumentMisuseCase("target_and_at", ("scope", "model:x", "--at", "models/x.sql")),
+        ScopeArgumentMisuseCase("target_and_at", ("scope", "model:x", "--at", "sql/models/x.sql")),
         ScopeArgumentMisuseCase(
             "move_without_target",
-            ("scope", "--at", "models/x.sql", "--as-path", "models/y.sql"),
+            ("scope", "--at", "sql/models/x.sql", "--as-path", "sql/models/y.sql"),
         ),
         ScopeArgumentMisuseCase("zero_page", ("scope", "model:x", "--page-size", "0")),
         ScopeArgumentMisuseCase("negative_depth", ("scope", "model:x", "--nearby-depth", "-1")),

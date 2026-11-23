@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Model file models/marts/customer_totals.sql table function 'table_fn__orders_for' expects 1 argument but received 2"
+     "message": "Model file sql/models/marts/customer_totals.sql table function 'table_fn__orders_for' expects 1 argument but received 2"
     }
    ]
   }

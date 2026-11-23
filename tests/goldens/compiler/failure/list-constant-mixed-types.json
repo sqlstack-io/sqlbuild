@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D013",
-     "message": "<project>/models/staging/_sqlbuild/_constants/statuses.sql constant 'kept_statuses'[1] has type integer; expected string"
+     "message": "<project>/sql/models/staging/_sqlbuild/_constants/statuses.sql constant 'kept_statuses'[1] has type integer; expected string"
     }
    ]
   }

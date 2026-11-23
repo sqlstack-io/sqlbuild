@@ -22,18 +22,18 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                 "sqlbuild_project.toml": (
                     'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN"]\n'
                 ),
-                "models/staging/orders.sql": (
+                "sql/models/staging/orders.sql": (
                     'MODEL (description "Orders");\n'
                     "WITH unused_orders AS (SELECT 1 AS order_id), "
                     "kept AS (SELECT 2 AS order_id)\n"
                     'SELECT kept.order_id FROM kept WHERE @py.order_filter("kept.order_id")\n'
                 ),
-                "models/staging/customers.sql": (
+                "sql/models/staging/customers.sql": (
                     'MODEL (description "Customers");\r\n'
                     "WITH spare AS (SELECT 1 AS customer_id)\r\n"
                     "SELECT 1 AS customer_id\r\n"
                 ),
-                "models/staging/_sqlbuild/_macros/python/order_filter.py": (
+                "sql/models/staging/_sqlbuild/_macros/python/order_filter.py": (
                     'def order_filter(column: str) -> str:\n    return f"{column} > 0"\n'
                 ),
                 "tests/unit/test_orders.sql": (
@@ -44,13 +44,13 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                 ),
             },
             expected_findings=(
-                ("models/staging/customers.sql", 2, 6, "SQLCLEAN005"),
-                ("models/staging/customers.sql", 2, 6, "SQLCLEAN041"),
-                ("models/staging/customers.sql", 3, 1, "SQLCLEAN035"),
-                ("models/staging/orders.sql", 2, 6, "SQLCLEAN005"),
-                ("models/staging/orders.sql", 2, 47, "SQLCLEAN041"),
-                ("models/staging/orders.sql", 3, 1, "SQLCLEAN034"),
-                ("models/staging/orders.sql", 3, 1, "SQLCLEAN035"),
+                ("sql/models/staging/customers.sql", 2, 6, "SQLCLEAN005"),
+                ("sql/models/staging/customers.sql", 2, 6, "SQLCLEAN041"),
+                ("sql/models/staging/customers.sql", 3, 1, "SQLCLEAN035"),
+                ("sql/models/staging/orders.sql", 2, 6, "SQLCLEAN005"),
+                ("sql/models/staging/orders.sql", 2, 47, "SQLCLEAN041"),
+                ("sql/models/staging/orders.sql", 3, 1, "SQLCLEAN034"),
+                ("sql/models/staging/orders.sql", 3, 1, "SQLCLEAN035"),
                 ("tests/unit/test_orders.sql", 4, 1, "SQLCLEAN005"),
                 ("tests/unit/test_orders.sql", 5, 59, "SQLCLEAN004"),
             ),

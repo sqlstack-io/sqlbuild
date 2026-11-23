@@ -6,7 +6,7 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
 
-from sqlbuild._native import PythonNodeIdentity
+from sqlbuild._native import PYTHON_NODE_ROOT, PythonNodeIdentity
 from sqlbuild.compiler.python_nodes._helpers.identity import build_python_identity, identity_pass
 from sqlbuild.python_nodes.main.read_asset_definition import read_asset_definition
 from sqlbuild.python_nodes.main.read_check_definition import read_check_definition
@@ -39,9 +39,20 @@ def python_node_identity(
         node_type=kind,
         node_name=name,
         function=function,
-        project_dir=file_path.parent,
+        project_dir=_project_dir(file_path),
         decorator_config=decorator_config,
     )
+
+
+def _project_dir(file_path: Path) -> Path:
+    """The project holding node file `file_path`: the folder above its `python/nodes/`."""
+
+    node_root: tuple[str, ...] = Path(PYTHON_NODE_ROOT).parts
+    parent: Path
+    for parent in file_path.parents:
+        if parent.parts[-len(node_root) :] == node_root:
+            return parent.parents[len(node_root) - 1]
+    return file_path.parent
 
 
 def python_node_dependency_key(dependency: object) -> object | tuple[str, str]:

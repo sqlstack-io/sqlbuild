@@ -191,7 +191,7 @@ def test_given_private_view_access_when_evaluating_repeatedly_then_rule_is_never
             ),
             body=_FLAG_ORDERS.format(condition="'orders' in _owners(ctx)").strip(),
             expected_rerun_hits=0,
-            expected_finding_paths=("models/orders.sql",),
+            expected_finding_paths=("sql/models/orders.sql",),
         ),
     ),
     ids=lambda case: case.description,
@@ -243,7 +243,7 @@ def test_given_untracked_rule_reading_hidden_file_when_file_changes_then_rule_re
                 condition="'orders' in ctx.project.tree.read_text('config/owners.yaml')"
             ).strip(),
             expected_rerun_hits=1,
-            expected_finding_paths=("models/orders.sql",),
+            expected_finding_paths=("sql/models/orders.sql",),
         ),
     ),
     ids=lambda case: case.description,
@@ -264,7 +264,7 @@ def test_given_file_edited_while_rules_run_when_rerunning_then_new_contents_are_
         customers_sql=_CUSTOMERS_SQL, customers_config={}
     )
     site: Path = tmp_path.parent / f"{tmp_path.name}-site"
-    site.mkdir()
+    site.mkdir(parents=True)
     _ = (site / "sitecustomize.py").write_text(_STALE_OBSERVATION_SITECUSTOMIZE, encoding="utf-8")
     monkeypatch.setenv("PYTHONPATH", os.pathsep.join((str(site), os.environ.get("PYTHONPATH", ""))))
     during_edit: CustomRulesOutcome = evaluate_cached_custom_rules(

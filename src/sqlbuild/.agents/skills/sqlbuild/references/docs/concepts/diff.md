@@ -246,7 +246,7 @@ Use `--max-models` and `--max-columns` to put explicit hard limits around a broa
 fails visibly instead of truncating the selected models or compared columns:
 
 ```bash
-sqb diff prod:dev --bounded 14d --sample-rows 50000 --max-models 10 --max-columns 80 --select path:models/intermediate
+sqb diff prod:dev --bounded 14d --sample-rows 50000 --max-models 10 --max-columns 80 --select path:sql/models/intermediate
 ```
 
 These limits are optional and apply to the complete invocation. `--max-columns` checks the larger
@@ -261,7 +261,7 @@ Diff requires `--select` in the current version. You can use any selector syntax
 sqb diff prod:dev --full --select customer_status_snapshot
 
 # Diff all models in a path
-sqb diff prod:dev --schema-only --select path:models/marts
+sqb diff prod:dev --schema-only --select path:sql/models/marts
 
 # Diff models with a specific tag
 sqb diff prod:dev --full --select tag:acceptance

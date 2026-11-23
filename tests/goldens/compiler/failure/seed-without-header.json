@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D008",
-     "message": "Seed CSV seeds/lookups.csv has no matching declaration for seed 'lookups' under seeds/**/*.yml"
+     "message": "Seed CSV sql/seeds/lookups.csv has no matching declaration for seed 'lookups' under sql/seeds/**/*.yml"
     }
    ]
   }

@@ -1,4 +1,4 @@
-//! Loader for `[sinks]` and its lifecycle event sinks.
+//! Loader for `[event_sinks]` and its lifecycle event sinks.
 
 use crate::models::ConfigValue;
 use crate::project::_helpers::fields::{get, key_name, object};
@@ -90,7 +90,7 @@ fn named_filters(config: &Entries, file: ConfigFile) -> Loaded<Built> {
         Some(_) => {
             return Err(ConfigFailure::at(
                 file,
-                "sinks.lifecycle.named must be a mapping",
+                "event_sinks.lifecycle.named must be a mapping",
             ));
         }
     };
@@ -100,10 +100,10 @@ fn named_filters(config: &Entries, file: ConfigFile) -> Loaded<Built> {
         if name.is_empty() {
             return Err(ConfigFailure::at(
                 file,
-                "sinks.lifecycle.named contains an invalid name",
+                "event_sinks.lifecycle.named contains an invalid name",
             ));
         }
-        let label = format!("sinks.lifecycle.named.{name}");
+        let label = format!("event_sinks.lifecycle.named.{name}");
         let ConfigValue::Map(entries) = value else {
             return Err(ConfigFailure::at(
                 file,
@@ -135,7 +135,7 @@ fn shutdown_timeout(config: &Entries, file: ConfigFile) -> Loaded<(Built, Built)
         ConfigFailure::at(
             file,
             format!(
-                "sinks.lifecycle.{SHUTDOWN_TIMEOUT_KEY} must be a fixed duration from '0s' to \
+                "event_sinks.lifecycle.{SHUTDOWN_TIMEOUT_KEY} must be a fixed duration from '0s' to \
                  '10m' such as '30s'"
             ),
         )
@@ -158,11 +158,16 @@ fn lifecycle(payload: Option<&ConfigValue>, file: ConfigFile) -> Loaded<Built> {
     let config = match payload {
         None => return Ok(object("LifecycleEventSinksConfig", Vec::new())),
         Some(ConfigValue::Map(entries)) => entries,
-        Some(_) => return Err(ConfigFailure::at(file, "sinks.lifecycle must be a mapping")),
+        Some(_) => {
+            return Err(ConfigFailure::at(
+                file,
+                "event_sinks.lifecycle must be a mapping",
+            ));
+        }
     };
     let place = Place {
         file,
-        label: "sinks.lifecycle",
+        label: "event_sinks.lifecycle",
     };
     validate_allowed_keys(config, &EVENT_SINK_KEYS, place)?;
     let named = named_filters(config, file)?;
@@ -188,14 +193,14 @@ pub(crate) fn load_sinks(payload: Option<&ConfigValue>, file: ConfigFile) -> Loa
     let mapping = match payload {
         None => return Ok(object("SinksConfig", Vec::new())),
         Some(ConfigValue::Map(entries)) => entries,
-        Some(_) => return Err(ConfigFailure::at(file, "sinks must be a mapping")),
+        Some(_) => return Err(ConfigFailure::at(file, "event_sinks must be a mapping")),
     };
     validate_allowed_keys(
         mapping,
         &["lifecycle"],
         Place {
             file,
-            label: "sinks",
+            label: "event_sinks",
         },
     )?;
     Ok(object(

@@ -29,7 +29,7 @@ Use an exact exception for one known finding. Exceptions require a reason and ar
 ```toml
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN004"
-path = "models/examples/sample_orders.sql"
+path = "sql/models/examples/sample_orders.sql"
 reason = "This example intentionally demonstrates one sampled row."
 ```
 
@@ -49,7 +49,7 @@ that CTE, so an exception can cover exactly one join:
 ```toml
 [[rules.rule_exceptions]]
 rule = "SQLCLEAN038"
-path = "models/orders/order_checks.sql"
+path = "sql/models/orders/order_checks.sql"
 relation = "order_policy"
 cte = "policy_checks"   # optional: only the join inside this top-level CTE
 reason = "Every order is evaluated against every policy check."
@@ -79,7 +79,7 @@ Use a path ignore when a documented project area intentionally follows a differe
 ```toml
 [[rules.rule_ignores]]
 rules = ["SQLCLEAN"]
-paths = ["models/examples/**"]
+paths = ["sql/models/examples/**"]
 reason = "Examples retain intentionally minimal SQL."
 ```
 
@@ -104,7 +104,7 @@ matching, including SQL tests and audits that are not graph resources:
 ```toml
 [[rules.rule_ignores]]
 rules = ["SQLCLEAN021"]
-paths = ["models/**/intermediate_*.sql"]
+paths = ["sql/models/**/intermediate_*.sql"]
 reason = "These intermediate SQL files intentionally preserve upstream columns."
 ```
 
@@ -120,11 +120,11 @@ exact entry to add instead:
 
 ```text
 error[SQBRSUPPRESSION000]: Inline Rule suppressions are not supported; declare the exception in sqlbuild_project.toml
-  --> models/orders/order_checks.sql:4:1
+  --> sql/models/orders/order_checks.sql:4:1
   = help: Remove this comment, then fix the SQLCLEAN038 finding, or record it as a reviewed exception in sqlbuild_project.toml:
             [[rules.rule_exceptions]]
             rule = "SQLCLEAN038"
-            path = "models/orders/order_checks.sql"
+            path = "sql/models/orders/order_checks.sql"
             relation = "order_policy"
             reason = "every order meets every policy"
 ```

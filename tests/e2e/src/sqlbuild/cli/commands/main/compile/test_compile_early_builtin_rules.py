@@ -40,7 +40,7 @@ _LONG_NAME_RULE: str = (
     "        return []\n"
     "    return [ctx.finding(subject=model)]\n"
 )
-_STAR_FINDING: tuple[str, str, int, int] = ("SQBRMODEL102", "models/order_totals.sql", 2, 8)
+_STAR_FINDING: tuple[str, str, int, int] = ("SQBRMODEL102", "sql/models/order_totals.sql", 2, 8)
 
 
 @pytest.mark.parametrize(
@@ -50,8 +50,8 @@ _STAR_FINDING: tuple[str, str, int, int] = ("SQBRMODEL102", "models/order_totals
             description="clean graph answers built-in rules from the early evaluation",
             repo_files={
                 "sqlbuild_project.toml": _BUILTIN_PROJECT_TOML,
-                "models/orders.sql": _ORDERS_SQL,
-                "models/order_totals.sql": _STAR_TOTALS_SQL,
+                "sql/models/orders.sql": _ORDERS_SQL,
+                "sql/models/order_totals.sql": _STAR_TOTALS_SQL,
             },
             compile_arguments=(),
             expected_exit_code=1,
@@ -63,12 +63,12 @@ _STAR_FINDING: tuple[str, str, int, int] = ("SQBRMODEL102", "models/order_totals
             description="graph error skips rules and discards the early evaluation",
             repo_files={
                 "sqlbuild_project.toml": _BUILTIN_PROJECT_TOML,
-                "models/orders.sql": _ORDERS_SQL,
-                "models/order_totals.sql": _BROKEN_TOTALS_SQL,
+                "sql/models/orders.sql": _ORDERS_SQL,
+                "sql/models/order_totals.sql": _BROKEN_TOTALS_SQL,
             },
             compile_arguments=(),
             expected_exit_code=1,
-            expected_diagnostics=(("B002", "models/order_totals.sql", 2, 18),),
+            expected_diagnostics=(("B002", "sql/models/order_totals.sql", 2, 18),),
             expected_early_hits=0,
             expected_early_misses=0,
         ),
@@ -76,8 +76,8 @@ _STAR_FINDING: tuple[str, str, int, int] = ("SQBRMODEL102", "models/order_totals
             description="model selection evaluates rules without an early evaluation",
             repo_files={
                 "sqlbuild_project.toml": _BUILTIN_PROJECT_TOML,
-                "models/orders.sql": _ORDERS_SQL,
-                "models/order_totals.sql": _STAR_TOTALS_SQL,
+                "sql/models/orders.sql": _ORDERS_SQL,
+                "sql/models/order_totals.sql": _STAR_TOTALS_SQL,
             },
             compile_arguments=("--select", "order_totals"),
             expected_exit_code=1,
@@ -89,15 +89,15 @@ _STAR_FINDING: tuple[str, str, int, int] = ("SQBRMODEL102", "models/order_totals
             description="custom rules keep built-in rules in the rules phase",
             repo_files={
                 "sqlbuild_project.toml": _CUSTOM_PROJECT_TOML,
-                "models/orders.sql": _ORDERS_SQL,
-                "models/order_totals.sql": _STAR_TOTALS_SQL,
+                "sql/models/orders.sql": _ORDERS_SQL,
+                "sql/models/order_totals.sql": _STAR_TOTALS_SQL,
                 "rules/naming.py": _LONG_NAME_RULE,
             },
             compile_arguments=(),
             expected_exit_code=1,
             expected_diagnostics=(
                 _STAR_FINDING,
-                ("XSQBRNAME001", "models/order_totals.sql", 1, 1),
+                ("XSQBRNAME001", "sql/models/order_totals.sql", 1, 1),
             ),
             expected_early_hits=0,
             expected_early_misses=0,
@@ -132,7 +132,7 @@ def test_given_rules_project_when_compiling_cold_and_warm_then_early_rules_keep_
     (
         EarlyBuiltinRulesEditTestCase(
             description="editing one model reuses the other model's cached findings",
-            edited_path="models/orders.sql",
+            edited_path="sql/models/orders.sql",
             edited_sql='MODEL (description "Orders");\nSELECT 1 AS order_id, 3 AS amount\n',
             expected_diagnostics=(_STAR_FINDING,),
             expected_early_outcomes=((1, 0), (1, 0), (1, 0)),
@@ -150,8 +150,8 @@ def test_given_early_rules_when_compiling_cold_warm_and_edited_then_rule_cache_s
         project_name="commerce",
         repo_files={
             "sqlbuild_project.toml": _BUILTIN_PROJECT_TOML,
-            "models/orders.sql": _ORDERS_SQL,
-            "models/order_totals.sql": _STAR_TOTALS_SQL,
+            "sql/models/orders.sql": _ORDERS_SQL,
+            "sql/models/order_totals.sql": _STAR_TOTALS_SQL,
         },
     )
 

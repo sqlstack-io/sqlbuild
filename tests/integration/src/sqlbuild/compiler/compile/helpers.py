@@ -50,7 +50,7 @@ _DIFFERENTIAL_FRAGMENTS: tuple[str, ...] = (
     "-- @py.m(1)\n", "/* @py.n() */", "$$@py.m()$$", "`@py.m()`", "@@v",
     "@", " ", "\n", "\u3000", "é", "'", "(", ")", "SELECT ", ", ", "\"q\"", "@py.sur()",
 )  # fmt: skip
-_DIFFERENTIAL_FILE: Path = Path("models/orders_summary.sql")
+_DIFFERENTIAL_FILE: Path = Path("sql/models/orders_summary.sql")
 
 MACRO_BRIDGE_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
@@ -68,7 +68,7 @@ MACRO_BRIDGE_PROJECT_FILES: dict[str, str] = {
         "[scopes]\n"
         "enforce_placement = false\n"
     ),
-    "macros/python/common.py": (
+    "sql/macros/python/common.py": (
         '"""Shared macros for the bridge demo."""\n\n'
         "import os\n\n\n"
         "def cents(column: str) -> str:\n"
@@ -109,25 +109,29 @@ MACRO_BRIDGE_PROJECT_FILES: dict[str, str] = {
         '            log.write(column + "\\n")\n'
         "    return column\n"
     ),
-    "enums/order_status.sql": (
+    "sql/enums/order_status.sql": (
         'ENUM (\n  name order_status,\n  members (PLACED "placed", SHIPPED "shipped"),\n);\n'
     ),
-    "models/north/_sqlbuild/_macros/python/fmt.py": (
+    "sql/models/north/_sqlbuild/_macros/python/fmt.py": (
         'def fmt(value: str) -> str:\n    """Label a value."""\n    return f"\'north:{value}\'"\n'
     ),
-    "constants/base_rate.sql": "CONSTANT (name base_rate, value 1);\n",
-    "models/north/_sqlbuild/_constants/north_rate.sql": "CONSTANT (name north_rate, value 10);\n",
-    "models/south/_sqlbuild/_constants/south_rate.sql": "CONSTANT (name south_rate, value 20);\n",
-    "models/shared/customers.sql": (
+    "sql/constants/base_rate.sql": "CONSTANT (name base_rate, value 1);\n",
+    "sql/models/north/_sqlbuild/_constants/north_rate.sql": (
+        "CONSTANT (name north_rate, value 10);\n"
+    ),
+    "sql/models/south/_sqlbuild/_constants/south_rate.sql": (
+        "CONSTANT (name south_rate, value 20);\n"
+    ),
+    "sql/models/shared/customers.sql": (
         "MODEL (description \"Customers\");\n\nSELECT 1 AS id, 2 AS amount, 'north' AS region\n"
     ),
-    "models/shared/orders_source.sql": (
+    "sql/models/shared/orders_source.sql": (
         'MODEL (description "Orders source");\n\nSELECT 1 AS id, 3 AS amount\n'
     ),
-    "hooks/sql/stamp.sql": (
+    "sql/hooks/sql/stamp.sql": (
         "HOOK (description \"Stamp a value\");\n\nSELECT @py.cents('2') AS stamped\n"
     ),
-    "functions/sql/udf__cents_of.sql": (
+    "sql/functions/sql/udf__cents_of.sql": (
         "FUNCTION (\n"
         '  description "Convert a value to cents",\n'
         "  arguments (v INTEGER),\n"
@@ -135,10 +139,10 @@ MACRO_BRIDGE_PROJECT_FILES: dict[str, str] = {
         ");\n\n"
         '@py.cents("v")\n'
     ),
-    "audits/generic/positive_cents.sql": (
+    "sql/audits/generic/positive_cents.sql": (
         'AUDIT ();\n\nSELECT *\nFROM __ref("@model")\nWHERE @py.cents("amount") < 0\n'
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw__payments\n"
         "    description: Payments\n"
@@ -197,19 +201,19 @@ _NORTH_HOOKS: str = (
 )
 MACRO_BRIDGE_PROJECT_FILES.update(
     {
-        "models/north/orders_north.sql": _region_model(
+        "sql/models/north/orders_north.sql": _region_model(
             description="North orders",
             hooks=_NORTH_HOOKS,
             ref_tags=_NORTH_REF_TAGS,
             label='@py.fmt("x")',
         ),
-        "models/north/orders_north_copy.sql": _region_model(
+        "sql/models/north/orders_north_copy.sql": _region_model(
             description="North orders copy",
             hooks=_NORTH_HOOKS,
             ref_tags=_NORTH_REF_TAGS,
             label='@py.fmt("x")',
         ),
-        "models/south/orders_south.sql": _region_model(
+        "sql/models/south/orders_south.sql": _region_model(
             description="South orders", hooks="", ref_tags=_SOUTH_REF_TAGS, label="'south'"
         ),
     }
@@ -295,7 +299,7 @@ def _generated() -> str:
 
 
 def _loaded_macro(*, name: str, function: Callable[..., object]) -> LoadedMacro:
-    path: Path = Path(f"macros/python/{name}.py")
+    path: Path = Path(f"sql/macros/python/{name}.py")
     return LoadedMacro(
         name=name, file_path=path, relative_path=path, raw_source="", function=function
     )
@@ -428,13 +432,13 @@ def generated_failing_macro_project(*, rng: random.Random) -> dict[str, str]:
     models: dict[str, str] = dict(
         _generated_model(rng=rng, model=model) for model in range(rng.randint(2, 6))
     )
-    cyclic: dict[str, str] = {True: {"macros/python/cyclic.py": _CYCLIC_MACROS}, False: {}}[
+    cyclic: dict[str, str] = {True: {"sql/macros/python/cyclic.py": _CYCLIC_MACROS}, False: {}}[
         rng.choice(_CYCLE_CHANCE)
     ]
     return {
         "sqlbuild_project.toml": MACRO_BRIDGE_PROJECT_FILES["sqlbuild_project.toml"],
-        "macros/python/common.py": _FAILING_MACROS,
-        "models/marts/_sqlbuild/macros/python/local.py": _LOCAL_MACROS,
+        "sql/macros/python/common.py": _FAILING_MACROS,
+        "sql/models/marts/_sqlbuild/macros/python/local.py": _LOCAL_MACROS,
         **cyclic,
         **models,
     }
@@ -446,7 +450,7 @@ def _generated_model(*, rng: random.Random, model: int) -> tuple[str, str]:
         for call in range(rng.randint(1, 3))
     ]
     return (
-        f"models/{rng.choice(_MODEL_FOLDERS)}/m{model}.sql",
+        f"sql/models/{rng.choice(_MODEL_FOLDERS)}/m{model}.sql",
         f'MODEL (description "Generated {model}");\n\nSELECT {", ".join(calls)}\n',
     )
 

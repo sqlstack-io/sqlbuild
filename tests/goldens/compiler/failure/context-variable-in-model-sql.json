@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "SQL text in '<project>/models/staging/stg_orders.sql' does not allow @@CTX templates"
+     "message": "SQL text in '<project>/sql/models/staging/stg_orders.sql' does not allow @@CTX templates"
     }
    ]
   }

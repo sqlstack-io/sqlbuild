@@ -27,10 +27,10 @@ BASE_FILES: dict[str, str] = {
         "[scopes]\nenforce_placement = false\n\n"
         "[[rules.rule_ignores]]\n"
         'rules = ["SQLCLEAN018"]\n'
-        'paths = ["macros/sql/**", "models/**"]\n'
+        'paths = ["sql/macros/sql/**", "sql/models/**"]\n'
         'reason = "The dedup macros rank by updated_at alone; these tests cover expansion."\n'
     ),
-    "seeds/raw_orders.csv": (
+    "sql/seeds/raw_orders.csv": (
         "order_id,status,amount_cents,fee_cents,tax_cents,created_at,updated_at,is_deleted,"
         "country_code\n"
         "1,open,1250,100,20,2026-01-01 00:00:00,2026-01-02 00:00:00,false,GB\n"
@@ -38,22 +38,24 @@ BASE_FILES: dict[str, str] = {
         "2,closed,500,50,5,2026-01-01 00:00:00,2026-01-01 00:00:00,false,FR\n"
         "3,open,900,0,0,2026-01-01 00:00:00,2026-01-04 00:00:00,true,US\n"
     ),
-    "seeds/raw_orders.yml": "seeds:\n  - name: raw_orders\n    description: Raw orders.\n"
+    "sql/seeds/raw_orders.yml": "seeds:\n  - name: raw_orders\n    description: Raw orders.\n"
     "    columns:\n"
     + "".join(
         f"      - name: {name}\n        type: {data_type}\n" for name, data_type in _SEED_COLUMNS
     ),
-    "enums/order_status.sql": 'ENUM (name order_status, members (OPEN "open", CLOSED "closed"));\n',
-    "constants/supported_countries.sql": (
+    "sql/enums/order_status.sql": (
+        'ENUM (name order_status, members (OPEN "open", CLOSED "closed"));\n'
+    ),
+    "sql/constants/supported_countries.sql": (
         'CONSTANT (name supported_countries, value ["GB", "FR", "HK"]);\n'
     ),
-    "models/staging/stg_orders.sql": (
+    "sql/models/staging/stg_orders.sql": (
         'MODEL (description "Staged orders");\n\nSELECT * FROM __seed("raw_orders")\n'
     ),
 }
 
 CENTS_TO_DOLLARS: dict[str, str] = {
-    "macros/sql/cents_to_dollars.sql": (
+    "sql/macros/sql/cents_to_dollars.sql": (
         'MACRO (\n  description "Cents to dollars",\n'
         "  arguments (amount_cents BIGINT, places INT CONST DEFAULT 2),\n"
         "  returns DECIMAL(18, 2),\n);\n\n"
@@ -61,7 +63,7 @@ CENTS_TO_DOLLARS: dict[str, str] = {
     )
 }
 NET_AMOUNT: dict[str, str] = {
-    "macros/sql/net_amount.sql": (
+    "sql/macros/sql/net_amount.sql": (
         'MACRO (\n  description "Net amount in dollars",\n'
         "  arguments (gross_cents BIGINT, refund_cents BIGINT),\n"
         "  returns DECIMAL(18, 2),\n);\n\n"
@@ -69,7 +71,7 @@ NET_AMOUNT: dict[str, str] = {
     )
 }
 CLEAN_ORDERS: dict[str, str] = {
-    "macros/sql/clean_orders.sql": (
+    "sql/macros/sql/clean_orders.sql": (
         'MACRO (\n  description "Deduplicated, non-deleted orders",\n'
         "  arguments (src RELATION (order_id BIGINT, updated_at TIMESTAMP, is_deleted BOOLEAN)),\n"
         ");\n\n"
@@ -82,7 +84,7 @@ CLEAN_ORDERS: dict[str, str] = {
     )
 }
 AUDIT_COLUMNS: dict[str, str] = {
-    "macros/sql/audit_columns.sql": (
+    "sql/macros/sql/audit_columns.sql": (
         'MACRO (\n  description "Standard audit columns",\n'
         "  arguments (src RELATION (created_at TIMESTAMP, updated_at TIMESTAMP)),\n);\n\n"
         "SELECT @src.created_at, @src.updated_at, @src.updated_at > @src.created_at AS "
@@ -90,7 +92,7 @@ AUDIT_COLUMNS: dict[str, str] = {
     )
 }
 IS_OPEN_STATUS: dict[str, str] = {
-    "macros/sql/is_open_status.sql": (
+    "sql/macros/sql/is_open_status.sql": (
         'MACRO (\n  description "Whether a status is still open",\n'
         "  arguments (status VARCHAR, closed ENUM order_status DEFAULT "
         '@enum("order_status").CLOSED),\n'
@@ -98,14 +100,14 @@ IS_OPEN_STATUS: dict[str, str] = {
     )
 }
 IN_SUPPORTED_COUNTRY: dict[str, str] = {
-    "macros/sql/in_supported_country.sql": (
+    "sql/macros/sql/in_supported_country.sql": (
         'MACRO (\n  description "Whether a country code is supported",\n'
         '  arguments (country VARCHAR, countries LIST VARCHAR DEFAULT ["GB", "FR"]),\n'
         "  returns BOOLEAN,\n);\n\n@country IN @countries\n"
     )
 }
 LATEST_PER_KEY: dict[str, str] = {
-    "macros/sql/latest_per_key.sql": (
+    "sql/macros/sql/latest_per_key.sql": (
         'MACRO (\n  description "Latest row per key",\n'
         "  arguments (\n    src RELATION (updated_at TIMESTAMP, keys COLUMNS),\n  "
         "),\n);\n\n"
@@ -117,7 +119,7 @@ LATEST_PER_KEY: dict[str, str] = {
     )
 }
 BRACKET: dict[str, str] = {
-    "macros/python/labels.py": (
+    "sql/macros/python/labels.py": (
         "def bracket(expression: str) -> str:\n"
         '    """Wrap an expression in brackets."""\n'
         "    return f\"'[' || CAST({expression} AS VARCHAR) || ']'\"\n"
@@ -140,7 +142,7 @@ DATABASE: str = "shop.duckdb"
 def orders_model(sql: str) -> dict[str, str]:
     """The `orders` mart model with `sql` as its query."""
 
-    return {"models/marts/orders.sql": MODEL_HEADER + sql}
+    return {"sql/models/marts/orders.sql": MODEL_HEADER + sql}
 
 
 def run_project(
@@ -163,7 +165,7 @@ def wave_models(count: int) -> dict[str, str]:
     files: dict[str, str] = {}
     upstreams: list[str] = ["stg_orders", *(f"level_{level}" for level in range(1, count))]
     for level, upstream in enumerate(upstreams, start=1):
-        files[f"models/marts/level_{level}.sql"] = (
+        files[f"sql/models/marts/level_{level}.sql"] = (
             f'MODEL (description "Level {level}");\n\n'
             "SELECT o.order_id, o.status, o.amount_cents,\n"
             f"  @sql.cents_to_dollars(o.amount_cents) AS dollars_{level},\n"
@@ -189,7 +191,7 @@ def inspected_text(*, project_dir: Path, relative_paths: tuple[str, ...]) -> str
 
 
 WRAPPING_MACROS: dict[str, str] = {
-    "macros/python/wrapping.py": (
+    "sql/macros/python/wrapping.py": (
         "def wrap(expr: str) -> str:\n"
         '    """Wrap an expression in parentheses."""\n'
         '    return f"({expr})"\n\n\n'
@@ -204,7 +206,7 @@ WRAPPING_MACROS: dict[str, str] = {
         '    return f"UPPER({expr}) /* noted */"\n'
     )
 }
-CHECK_MACRO_PATH: str = "macros/sql/check.sql"
+CHECK_MACRO_PATH: str = "sql/macros/sql/check.sql"
 
 
 def with_rules(*codes: str) -> dict[str, str]:
@@ -239,10 +241,10 @@ def check_macro(arguments: str, body: str) -> dict[str, str]:
 
 
 def python_normalise_macros(names: list[str]) -> dict[str, str]:
-    """One Python macro file per name in the `normalise` bucket of `macros/python/`."""
+    """One Python macro file per name in the `normalise` bucket of `sql/macros/python/`."""
 
     return {
-        f"macros/python/normalise/{name}.py": (
+        f"sql/macros/python/normalise/{name}.py": (
             f"def {name}(expression: str) -> str:\n"
             f'    """Clean a value with {name}."""\n'
             '    return f"TRIM({expression})"\n'
@@ -252,10 +254,10 @@ def python_normalise_macros(names: list[str]) -> dict[str, str]:
 
 
 def sql_text_macros(folder: str, names: list[str]) -> dict[str, str]:
-    """One lower-casing SQL macro file per name in `macros/sql/<folder>/`."""
+    """One lower-casing SQL macro file per name in `sql/macros/sql/<folder>/`."""
 
     return {
-        f"macros/sql/{folder}/{name}.sql": (
+        f"sql/macros/sql/{folder}/{name}.sql": (
             f'MACRO (description "Tidy {name}", arguments (value VARCHAR), returns VARCHAR);\n\n'
             "LOWER(@value)\n"
         )
@@ -279,7 +281,7 @@ def _value_macro(name: str, declared: str, body: str, argument: str) -> dict[str
     """The SQL macro `name` taking one `argument`-typed value, with its `declared` header lines."""
 
     return {
-        f"macros/sql/{name}.sql": (
+        f"sql/macros/sql/{name}.sql": (
             f'MACRO (\n  description "Text from a value",\n  arguments (value {argument}),\n'
             f"{declared});\n\n{body}\n"
         )
@@ -290,7 +292,7 @@ def contract_model(name: str, columns: str, sql: str) -> dict[str, str]:
     """The mart model `name` with an enforced contract over `columns`."""
 
     return {
-        f"models/marts/{name}.sql": (
+        f"sql/models/marts/{name}.sql": (
             f'MODEL (\n  description "Typed {name}",\n  contract enforced,\n'
             f"  columns ({columns}),\n);\n\n{sql}"
         )
@@ -333,7 +335,7 @@ def picked_orders(body: str) -> dict[str, str]:
     """The CTE-list macro `pick` over relation `src` with `body`, called once as `__cte := a`."""
 
     return {
-        "macros/sql/pick.sql": (
+        "sql/macros/sql/pick.sql": (
             'MACRO (\n  description "Picked orders",\n'
             "  arguments (src RELATION (order_id BIGINT)),\n);\n\n" + body + "\n"
         ),
@@ -345,11 +347,11 @@ def picked_orders(body: str) -> dict[str, str]:
 
 
 WEEKLY_ORDERS: dict[str, str] = {
-    "seeds/weekly_orders.csv": (
+    "sql/seeds/weekly_orders.csv": (
         "week,product_id,region,orders_placed,refund_count\n"
         "1,10,EU,4,1\n1,10,US,6,0\n1,20,EU,5,2\n2,20,US,8,2\n"
     ),
-    "seeds/weekly_orders.yml": (
+    "sql/seeds/weekly_orders.yml": (
         "seeds:\n  - name: weekly_orders\n    description: Weekly orders per product and region.\n"
         "    columns:\n"
         "      - name: week\n        type: BIGINT\n"
@@ -366,7 +368,7 @@ def rates_macro(name: str, arguments: str, keys: tuple[str, str], orders: str) -
 
     aliased, plain = keys
     return {
-        f"macros/sql/{name}.sql": (
+        f"sql/macros/sql/{name}.sql": (
             f'MACRO (\n  description "Weekly refund rates",\n  arguments ({arguments}),\n);\n\n'
             "WITH counted AS (\n"
             "  SELECT\n"
@@ -417,7 +419,7 @@ def rates_model(name: str, per_product: str, per_product_region: str) -> dict[st
     """A model reading weekly refund rates at two grains through the two given macro calls."""
 
     return {
-        f"models/marts/{name}.sql": (
+        f"sql/models/marts/{name}.sql": (
             'MODEL (description "Refund rates per product, and per product and region");\n\n'
             'WITH weekly AS (SELECT * FROM __seed("weekly_orders")),\n'
             f"{per_product}\n"
@@ -450,7 +452,7 @@ def slot_model(call: str) -> dict[str, str]:
     """A model calling the weekly rates macro once with `call`'s mappings."""
 
     return {
-        "models/marts/rates.sql": (
+        "sql/models/marts/rates.sql": (
             'MODEL (description "Refund rates");\n\n'
             'WITH weekly AS (SELECT * FROM __seed("weekly_orders")),\n'
             f"@sql.weekly_rates(weekly, {call})\n"
@@ -460,14 +462,14 @@ def slot_model(call: str) -> dict[str, str]:
 
 
 ORDER_COLUMNS: dict[str, str] = {
-    "macros/sql/order_columns.sql": (
+    "sql/macros/sql/order_columns.sql": (
         'MACRO (\n  description "Grain and order count columns",\n'
         "  arguments (weekly RELATION (keys COLUMNS, order_count BIGINT)),\n);\n\n"
         "SELECT @weekly.keys, @weekly.order_count AS orders\n"
     )
 }
 UNNAMED_COUNT: dict[str, str] = {
-    "macros/sql/order_columns.sql": (
+    "sql/macros/sql/order_columns.sql": (
         'MACRO (\n  description "Order count column",\n'
         "  arguments (weekly RELATION (order_count BIGINT)),\n);\n\n"
         "SELECT @weekly.order_count\n"
@@ -476,7 +478,7 @@ UNNAMED_COUNT: dict[str, str] = {
 
 
 LINEAGE_MODEL: dict[str, str] = {
-    "models/marts/order_counts.sql": (
+    "sql/models/marts/order_counts.sql": (
         'MODEL (description "Order counts per product and region");\n\n'
         "SELECT @sql.order_columns(w, weekly.keys := (product_id, region), "
         "weekly.order_count := orders_placed)\n"
@@ -489,7 +491,7 @@ def rate_model(name: str, expression: str) -> dict[str, str]:
     """A model whose one `refund_rate` column is `expression` and is declared `VARCHAR`."""
 
     return {
-        f"models/marts/{name}.sql": (
+        f"sql/models/marts/{name}.sql": (
             'MODEL (\n  description "Refund rates",\n'
             "  contract enforced,\n  columns (refund_rate (type VARCHAR)),\n);\n\n"
             f"SELECT {expression} AS refund_rate\n"
@@ -499,7 +501,7 @@ def rate_model(name: str, expression: str) -> dict[str, str]:
 
 
 REFUND_RATE_MACRO: dict[str, str] = {
-    "macros/sql/refund_rate.sql": (
+    "sql/macros/sql/refund_rate.sql": (
         'MACRO (\n  description "Refund rate of one row",\n'
         "  arguments (weekly RELATION (order_count BIGINT, refund_count BIGINT)),\n);\n\n"
         "@weekly.refund_count / NULLIF(@weekly.order_count, 0)\n"
@@ -526,8 +528,8 @@ def hand_written(text: str) -> str:
 
 
 REFUNDS: dict[str, str] = {
-    "seeds/refunds.csv": "week,product_id,refund_count\n1,10,1\n2,20,2\n",
-    "seeds/refunds.yml": (
+    "sql/seeds/refunds.csv": "week,product_id,refund_count\n1,10,1\n2,20,2\n",
+    "sql/seeds/refunds.yml": (
         "seeds:\n  - name: refunds\n    description: Refunds per week and product.\n"
         "    columns:\n"
         "      - name: week\n        type: BIGINT\n"
@@ -541,7 +543,7 @@ def refunded_weeks(query: str) -> dict[str, str]:
     """A macro whose `refunded` CTE is `query`, and a model calling it on orders and refunds."""
 
     return {
-        "macros/sql/refunded_weeks.sql": (
+        "sql/macros/sql/refunded_weeks.sql": (
             'MACRO (\n  description "Weeks with refunds",\n'
             "  arguments (\n"
             "    weekly RELATION (keys COLUMNS, week BIGINT),\n"
@@ -550,7 +552,7 @@ def refunded_weeks(query: str) -> dict[str, str]:
             ");\n\n"
             f"WITH refunded AS ({query})\n"
         ),
-        "models/marts/refunded.sql": (
+        "sql/models/marts/refunded.sql": (
             'MODEL (description "Refunded weeks");\n\n'
             'WITH weekly AS (SELECT * FROM __seed("weekly_orders")),\n'
             'refunds AS (SELECT * FROM __seed("refunds")),\n'
@@ -564,7 +566,7 @@ def macro_file(name: str, arguments: str, body: str) -> dict[str, str]:
     """One SQL macro file called `name`, declaring `arguments`, whose body is `body`."""
 
     return {
-        f"macros/sql/{name}.sql": (
+        f"sql/macros/sql/{name}.sql": (
             f'MACRO (\n  description "Macro {name}",\n  arguments ({arguments}),\n);\n\n{body}\n'
         )
     }
@@ -577,7 +579,7 @@ def scoped_model(macros: dict[str, str], body: str) -> dict[str, str]:
         **WEEKLY_ORDERS,
         **REFUNDS,
         **macros,
-        "models/marts/scoped.sql": (
+        "sql/models/marts/scoped.sql": (
             'MODEL (description "Scoped slot reads");\n\n'
             'WITH weekly AS (SELECT * FROM __seed("weekly_orders")),\n'
             'refunds AS (SELECT * FROM __seed("refunds")),\n'
@@ -596,7 +598,7 @@ def rates_with_middle_cte(middle: str) -> dict[str, str]:
     """The docs' weekly refund rates macro with `middle` as a CTE between its two, and a model."""
 
     return {
-        "macros/sql/weekly_rates.sql": (
+        "sql/macros/sql/weekly_rates.sql": (
             'MACRO (\n  description "Weekly refund rate per grain",\n'
             "  arguments (weekly RELATION (keys COLUMNS, order_count BIGINT, refund_count BIGINT)),"
             "\n);\n\n"
@@ -616,7 +618,7 @@ def rates_with_middle_cte(middle: str) -> dict[str, str]:
             "  GROUP BY @weekly.keys\n"
             ")\n"
         ),
-        "models/marts/rates.sql": (
+        "sql/models/marts/rates.sql": (
             'MODEL (description "Refund rates");\n\n'
             'WITH weekly AS (SELECT * FROM __seed("weekly_orders")),\n'
             "@sql.weekly_rates(weekly, weekly.keys := (product_id, region), "

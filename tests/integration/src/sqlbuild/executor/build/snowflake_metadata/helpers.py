@@ -563,7 +563,7 @@ _PROJECT_FILES: dict[str, str] = {
         "[path_defaults.marts]\n"
         'schema = "marts"\n'
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    database: analytics\n"
@@ -577,15 +577,15 @@ _PROJECT_FILES: dict[str, str] = {
         "      - name: amount\n"
         "        type: NUMBER(10, 2)\n"
     ),
-    "models/marts/orders_table.sql": (
+    "sql/models/marts/orders_table.sql": (
         "MODEL (description 'Test model orders_table.',\n  materialized table,\n);\n\n"
         'SELECT order_id, ordered_at, amount FROM __source("raw_orders")\n'
     ),
-    "models/marts/orders_view.sql": (
+    "sql/models/marts/orders_view.sql": (
         'MODEL (description "Test model orders_view.",'
         '\n  materialized view,\n);\n\nSELECT order_id, amount FROM __ref("orders_table")\n'
     ),
-    "models/marts/orders_merge.sql": (
+    "sql/models/marts/orders_merge.sql": (
         "MODEL (description 'Test model orders_merge.',\n"
         "  materialized incremental,\n"
         "  incremental_strategy merge,\n"
@@ -598,7 +598,7 @@ _PROJECT_FILES: dict[str, str] = {
         ");\n\n"
         'SELECT order_id, ordered_at, amount FROM __source("raw_orders")\n'
     ),
-    "models/marts/orders_daily.sql": (
+    "sql/models/marts/orders_daily.sql": (
         "MODEL (description 'Test model orders_daily.',\n"
         "  materialized incremental,\n"
         "  incremental_strategy delete_insert,\n"
@@ -627,11 +627,11 @@ def write_bundles_project(*, project_dir: Path, select: str) -> None:
             'account = "example"\nuser = "example"\ndatabase = "analytics"\nschema = "marts"\n\n'
             '[defaults]\ndatabase = "analytics"\nschema = "marts"\nmaterialized = "table"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_bundles\n    description: Test source raw_bundles.\n"
             "    database: analytics\n    schema: raw\n    table: bundles\n"
         ),
-        "models/bundle_report.sql": (
+        "sql/models/bundle_report.sql": (
             "MODEL (description 'Test model bundle_report.');\n"
             f'SELECT {select} FROM __source("raw_bundles")\n'
         ),
@@ -774,7 +774,7 @@ def write_model_copies(
     )
     index: int
     for index in range(count):
-        _ = (project_dir / "models" / "marts" / f"order_copy_{index}.sql").write_text(
+        _ = (project_dir / "sql" / "models" / "marts" / f"order_copy_{index}.sql").write_text(
             f"MODEL ({header_options}description 'Copy {index} of the orders.', "
             "materialized table);\n\n"
             'SELECT order_id, ordered_at, amount FROM __ref("orders_table")\n',
@@ -824,20 +824,20 @@ def quoted_configured_column_files(
             'database = "analytics"\nschema = "marts"\n\n'
             '[defaults]\ndatabase = "analytics"\nschema = "marts"\nmaterialized = "table"\n'
         ),
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n"
             "  - name: raw_listings\n    description: Partner listings in quoted camelCase.\n"
             "    database: analytics\n    schema: raw\n    table: listings\n"
             "  - name: raw_listing_events\n    description: Partner listing events.\n"
             "    database: analytics\n    schema: raw\n    table: listing_events\n"
         ),
-        "models/listing_history.sql": (
+        "sql/models/listing_history.sql": (
             "MODEL (\n  description 'Listing price history.',\n  materialized snapshot,\n"
             f"  unique_key [{unique_key}],\n  snapshot_strategy timestamp,\n"
             f"  updated_at {updated_at},\n);\n\n"
             'SELECT "listingId", "unitPrice", "updatedAt" FROM __source("raw_listings")\n'
         ),
-        "models/listing_activity.sql": (
+        "sql/models/listing_activity.sql": (
             "MODEL (\n  description 'Listing events by hour.',\n  materialized incremental,\n"
             "  incremental_strategy delete_insert,\n  incremental_mode microbatch,\n"
             "  microbatch_strategy watermark,\n  cursor_watermark_mode all,\n"
@@ -876,14 +876,14 @@ def write_shifts_project(*, project_dir: Path, declared_type: str) -> None:
 
     files: dict[str, str] = {
         "sqlbuild_project.toml": _SHIFTS_PROJECT,
-        "sources/raw.yml": (
+        "sql/sources/raw.yml": (
             "sources:\n  - name: raw_shifts\n    description: Shift rows.\n"
             "    database: analytics\n    schema: raw\n    table: shifts\n"
             "    contract: enforced\n    columns:\n"
             "      - name: shift_id\n        type: NUMBER(38,0)\n"
             f"      - name: starts_at\n        type: {declared_type}\n"
         ),
-        "models/shift_report.sql": _SHIFTS_MODEL,
+        "sql/models/shift_report.sql": _SHIFTS_MODEL,
     }
     relative: str
     content: str

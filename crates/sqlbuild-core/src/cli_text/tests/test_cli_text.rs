@@ -36,13 +36,13 @@ fn given_diagnostics_when_rendering_then_matches_python_text() {
                 ..diagnostic("error", "C001", "bad column")
             },
             DiagnosticText {
-                path: Some("models/b.sql".to_owned()),
+                path: Some("sql/models/b.sql".to_owned()),
                 occurrences: 2,
                 ..diagnostic("warning", "W001", "careful")
             },
         ],
         style: CliStyle { use_color: true },
-        expected_text: "\x1b[38;5;167merror[C001]: bad column\x1b[0m\n  sql test: orders_test\n  --> models/a.sql:2:3\n    |\n  2 | FROM orders\u{e9} x\n    |   ^^^^\n\n  declared here:\n  --> models/a.sql:1:1\n    |\n  1 | SELECT 1\n    | ^^^^^^^^ here\n  \x1b[2m= note:\x1b[0m n1\n  \x1b[2m= affected Rules:\x1b[0m R1, R2\n  \x1b[2m= help:\x1b[0m fix it\n\n\x1b[33mwarning[W001]: careful\x1b[0m\n  --> models/b.sql\n  = 2 occurrences; all retained in JSON and the warning count",
+        expected_text: "\x1b[38;5;167merror[C001]: bad column\x1b[0m\n  sql test: orders_test\n  --> sql/models/a.sql:2:3\n    |\n  2 | FROM orders\u{e9} x\n    |   ^^^^\n\n  declared here:\n  --> sql/models/a.sql:1:1\n    |\n  1 | SELECT 1\n    | ^^^^^^^^ here\n  \x1b[2m= note:\x1b[0m n1\n  \x1b[2m= affected Rules:\x1b[0m R1, R2\n  \x1b[2m= help:\x1b[0m fix it\n\n\x1b[33mwarning[W001]: careful\x1b[0m\n  --> sql/models/b.sql\n  = 2 occurrences; all retained in JSON and the warning count",
     }];
 
     for test_case in test_cases {
@@ -386,23 +386,23 @@ fn given_coded_error_when_formatting_then_renders_consistently() {
             description: "renders multiline coded error without color unchanged",
             parts: (
                 "D012",
-                "Provider 'slack_provider' in providers/slack.py has invalid settings:\n1 validation error for SlackProvider\nSLACK_TOKEN",
+                "Provider 'slack_provider' in python/providers/slack.py has invalid settings:\n1 validation error for SlackProvider\nSLACK_TOKEN",
                 None,
             ),
             include_error_label: true,
             style: plain,
-            expected_rendered: "error[D012]: Provider 'slack_provider' in providers/slack.py has invalid settings:\n1 validation error for SlackProvider\nSLACK_TOKEN",
+            expected_rendered: "error[D012]: Provider 'slack_provider' in python/providers/slack.py has invalid settings:\n1 validation error for SlackProvider\nSLACK_TOKEN",
         },
         CodedErrorTestCase {
             description: "renders multiline coded error with muted continuation lines",
             parts: (
                 "D012",
-                "Provider 'slack_provider' in providers/slack.py has invalid settings:\n1 validation error for SlackProvider\nSLACK_TOKEN",
+                "Provider 'slack_provider' in python/providers/slack.py has invalid settings:\n1 validation error for SlackProvider\nSLACK_TOKEN",
                 None,
             ),
             include_error_label: true,
             style: color,
-            expected_rendered: "\x1b[38;5;167m\x1b[1merror[D012]:\x1b[0m Provider 'slack_provider' in providers/slack.py has invalid settings:\n\x1b[2m1 validation error for SlackProvider\x1b[0m\n\x1b[2mSLACK_TOKEN\x1b[0m",
+            expected_rendered: "\x1b[38;5;167m\x1b[1merror[D012]:\x1b[0m Provider 'slack_provider' in python/providers/slack.py has invalid settings:\n\x1b[2m1 validation error for SlackProvider\x1b[0m\n\x1b[2mSLACK_TOKEN\x1b[0m",
         },
     ];
 

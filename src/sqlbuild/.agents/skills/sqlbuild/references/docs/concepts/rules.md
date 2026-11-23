@@ -85,7 +85,7 @@ correctness still applies.
 Now consider a model that returns an arbitrary row because its `LIMIT` has no ordering:
 
 ```sql
--- models/orders.sql
+-- sql/models/orders.sql
 SELECT order_id FROM orders LIMIT 1
 ```
 
@@ -99,7 +99,7 @@ The selected Rule reports the source location, problem, and remediation:
 
 ```text
 error[SQLCLEAN004]: Row selection is nondeterministic
-  --> models/orders.sql:2:36
+  --> sql/models/orders.sql:2:36
     |
   2 | SELECT order_id FROM orders LIMIT 1
     |                                    ^
@@ -162,7 +162,7 @@ passes its configured Rules. This keeps diagnostics and source mutation separate
 SQLBuild maintains native built-in Rules for reusable requirements. SQL Rule codes begin with
 `SQLCLEAN`, for example `SQLCLEAN004`. Rules that read the project, such as `SQBRGRAPH101`, begin
 with `SQBR`. The `SQBRPYTHON` Rules check the project's Python: annotations, imports, function
-shape and the layout of `python/`. They run only when `select` names `SQBRPYTHON` or one of its
+shape and the layout of `python/nodes/`. They run only when `select` names `SQBRPYTHON` or one of its
 codes; see [Python Rules](rules/python-rules.md). `SQBRORCHESTRATION101` keeps job and
 sensor selections from listing nodes one by one; see
 [Orchestration Rules](rules/orchestration-rules.md). The `SQBRPERFORMANCE` Rules find
@@ -255,7 +255,7 @@ Rules add about 14% to a cold compile and nothing to a warm one. See
 
     Select exact Rules or families and configure project-owned options.
     Understand diagnostics, exact exceptions, path ignores, and stale checks.
-    Check the project's Python for annotations, imports, function shape and the layout of `python/`.
+    Check the project's Python for annotations, imports, function shape and the layout of `python/nodes/`.
     Keep each domain's published layer free of consumer-specific variants.
     Catch Snowflake JSON payloads copied onto every row of a finer grain.
     Learn evaluation order, focused execution, and dependency-aware reuse.

@@ -221,7 +221,7 @@ database = "preserve"
 schema = "preserve"
 """.strip()
             + "\n",
-            "seeds/schema.yml": """
+            "sql/seeds/schema.yml": """
 seeds:
   - name: country_codes
     columns:
@@ -229,8 +229,8 @@ seeds:
         type: VARCHAR
 """.strip()
             + "\n",
-            "seeds/country_codes.csv": "code\nUS\n",
-            "functions/sql/normalize.sql": "FUNCTION (returns VARCHAR);\n\n'normalized'\n",
+            "sql/seeds/country_codes.csv": "code\nUS\n",
+            "sql/functions/sql/normalize.sql": "FUNCTION (returns VARCHAR);\n\n'normalized'\n",
         },
     )
     discovered: DiscoveredProjectInputs = discover_project_inputs(project_dir=tmp_path)

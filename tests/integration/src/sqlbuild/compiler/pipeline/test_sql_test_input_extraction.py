@@ -30,9 +30,9 @@ def test_given_expanded_mixed_mode_tests_when_compiling_project_then_complete_in
         tmp_path,
         {
             "sqlbuild_project.toml": 'name = "demo"\nadapter = "duckdb"\n',
-            "models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS order_id\n",
-            "models/_constants/order_id.sql": "CONSTANT (name order_id, value 7);\n",
-            "functions/sql/increment.sql": (
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS order_id\n",
+            "sql/models/_constants/order_id.sql": "CONSTANT (name order_id, value 7);\n",
+            "sql/functions/sql/increment.sql": (
                 "FUNCTION (description 'Test function increment.', arguments (value INTEGER), returns INTEGER);\n\nvalue + 1\n"
             ),
             "tests/unit/a_orders.sql": (

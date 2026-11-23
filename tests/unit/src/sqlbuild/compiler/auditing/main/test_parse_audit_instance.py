@@ -39,7 +39,7 @@ def test_given_audit_mapping_when_parsing_then_always_run_is_reserved_option(
 ) -> None:
     result: SchemaAuditInstance = parse_audit_instance(
         raw_audit=test_case.raw_audit,
-        file_path=Path("models/orders.sql"),
+        file_path=Path("sql/models/orders.sql"),
         label="model orders",
         error_class=ValueError,
     )
@@ -84,7 +84,7 @@ def test_given_invalid_audit_option_when_parsing_then_raises_clear_error(
     with pytest.raises(ValueError) as error_info:
         parse_audit_instance(
             raw_audit=test_case.raw_audit,
-            file_path=Path("models/orders.sql"),
+            file_path=Path("sql/models/orders.sql"),
             label="model orders",
             error_class=ValueError,
         )
@@ -112,19 +112,19 @@ def test_given_all_directional_thresholds_when_parsing_then_typed_policies_are_r
                 "evidence_limit": 7,
             }
         },
-        file_path=Path("models/orders.sql"),
+        file_path=Path("sql/models/orders.sql"),
         label="model orders",
         error_class=ValueError,
     )
     above: SchemaAuditInstance = parse_audit_instance(
         raw_audit={"rate": {"thresholds": {"error": {"above": 10.5}}}},
-        file_path=Path("models/orders.sql"),
+        file_path=Path("sql/models/orders.sql"),
         label="model orders",
         error_class=ValueError,
     )
     outside: SchemaAuditInstance = parse_audit_instance(
         raw_audit={"rate": {"thresholds": {"warn": {"outside": (90, 110)}}}},
-        file_path=Path("models/orders.sql"),
+        file_path=Path("sql/models/orders.sql"),
         label="model orders",
         error_class=ValueError,
     )
@@ -164,14 +164,14 @@ def test_given_invalid_measurement_policy_options_when_parsing_then_clear_errors
     with pytest.raises(ValueError, match=test_case.expected_error_fragment):
         parse_audit_instance(
             raw_audit=test_case.raw_audit,
-            file_path=Path("models/orders.sql"),
+            file_path=Path("sql/models/orders.sql"),
             label="model orders",
             error_class=ValueError,
         )
     with pytest.raises(ValueError, match="outside threshold requires two numeric values"):
         parse_audit_instance(
             raw_audit={"rate": {"thresholds": {"warn": {"outside": (90,)}}}},
-            file_path=Path("models/orders.sql"),
+            file_path=Path("sql/models/orders.sql"),
             label="model orders",
             error_class=ValueError,
         )
@@ -200,7 +200,7 @@ def test_given_audit_meta_when_parsing_then_meta_is_not_an_argument(
 ) -> None:
     result: SchemaAuditInstance = parse_audit_instance(
         raw_audit=test_case.raw_audit,
-        file_path=Path("models/orders.sql"),
+        file_path=Path("sql/models/orders.sql"),
         label="model orders",
         error_class=ValueError,
     )
@@ -232,7 +232,7 @@ def test_given_invalid_audit_meta_when_parsing_then_compile_error_names_the_valu
     with pytest.raises(ValueError, match=test_case.expected_error_fragment):
         parse_audit_instance(
             raw_audit=test_case.raw_audit,
-            file_path=Path("models/orders.sql"),
+            file_path=Path("sql/models/orders.sql"),
             label="model orders",
             error_class=ValueError,
         )

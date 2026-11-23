@@ -40,7 +40,7 @@ fn given_providers_missing_secrets_when_the_dev_warning_is_built_then_allowed_pr
             .iter()
             .map(|(provider, allowed, variables)| MissingProviderSecrets {
                 provider: (*provider).to_owned(),
-                path: format!("providers/{provider}.py"),
+                path: format!("python/providers/{provider}.py"),
                 settings: variables
                     .iter()
                     .map(|variable| MissingProviderSetting {

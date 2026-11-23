@@ -30,7 +30,7 @@ adapter = "duckdb"
 sql_analysis = false
 sql_validation = false
 """
-_HOOK_PATH: str = "models/marts/_sqlbuild/_hooks/python/lookups.py"
+_HOOK_PATH: str = "sql/models/marts/_sqlbuild/_hooks/python/lookups.py"
 _HOOKED_HEADER: str = (
     'MODEL (description "Test model lookups.", post_hooks [python("refresh_lookup")]);'
 )
@@ -38,8 +38,8 @@ _COUNTRY_SEED: str = "seeds:\n  - name: country_codes\n    description: Test see
 _SOURCES: str = (
     "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    table: orders\n"
 )
-_SQL_HOOK_PATH: str = "models/marts/_sqlbuild/_hooks/sql/record_rows.sql"
-_MACRO_PATH: str = "models/marts/_sqlbuild/_macros/python/counts.py"
+_SQL_HOOK_PATH: str = "sql/models/marts/_sqlbuild/_hooks/sql/record_rows.sql"
+_MACRO_PATH: str = "sql/models/marts/_sqlbuild/_macros/python/counts.py"
 _IGNORING_MACRO: str = "def count_rows(relation):\n    return 'SELECT 1'\n"
 _NAMED_SQL_HOOK_HEADER: str = (
     'MODEL (description "Test model counts.", post_hooks [sql("record_rows")]);'
@@ -53,8 +53,8 @@ _NAMED_SQL_HOOK_HEADER: str = (
             description="hook reading a model makes the hooked model wait for it",
             files={
                 _HOOK_PATH: python_hook_source(reads='model("customers")'),
-                "models/marts/customers.sql": gate_model(sql="SELECT 1 AS customer_id"),
-                "models/marts/orders.sql": gate_model(
+                "sql/models/marts/customers.sql": gate_model(sql="SELECT 1 AS customer_id"),
+                "sql/models/marts/orders.sql": gate_model(
                     sql="SELECT 1 AS order_id", header=_HOOKED_HEADER
                 ),
             },
@@ -66,10 +66,10 @@ _NAMED_SQL_HOOK_HEADER: str = (
                 _HOOK_PATH: python_hook_source(
                     reads='[seed("country_codes"), source("raw_orders")]'
                 ),
-                "seeds/country_codes.yml": _COUNTRY_SEED,
-                "seeds/country_codes.csv": "code\nGB\n",
-                "sources/raw.yml": _SOURCES,
-                "models/marts/orders.sql": gate_model(
+                "sql/seeds/country_codes.yml": _COUNTRY_SEED,
+                "sql/seeds/country_codes.csv": "code\nGB\n",
+                "sql/sources/raw.yml": _SOURCES,
+                "sql/models/marts/orders.sql": gate_model(
                     sql="SELECT 1 AS order_id", header=_HOOKED_HEADER
                 ),
             },
@@ -78,8 +78,8 @@ _NAMED_SQL_HOOK_HEADER: str = (
         HookReadEdgeTestCase(
             description="inline SQL hook reading a model directly",
             files={
-                "models/marts/customers.sql": gate_model(sql="SELECT 1 AS customer_id"),
-                "models/marts/orders.sql": gate_model(
+                "sql/models/marts/customers.sql": gate_model(sql="SELECT 1 AS customer_id"),
+                "sql/models/marts/orders.sql": gate_model(
                     sql="SELECT 1 AS order_id",
                     header=inline_sql_hook_header('SELECT count(*) FROM __ref("customers")'),
                 ),
@@ -91,8 +91,8 @@ _NAMED_SQL_HOOK_HEADER: str = (
             files={
                 _MACRO_PATH: _IGNORING_MACRO,
                 _SQL_HOOK_PATH: 'HOOK (description "Test hook.");\n@py.count_rows(__ref("customers"))\n',
-                "models/marts/customers.sql": gate_model(sql="SELECT 1 AS customer_id"),
-                "models/marts/orders.sql": gate_model(
+                "sql/models/marts/customers.sql": gate_model(sql="SELECT 1 AS customer_id"),
+                "sql/models/marts/orders.sql": gate_model(
                     sql="SELECT 1 AS order_id", header=_NAMED_SQL_HOOK_HEADER
                 ),
             },
@@ -101,10 +101,10 @@ _NAMED_SQL_HOOK_HEADER: str = (
         HookReadEdgeTestCase(
             description="inline SQL hook reading a source and a seed",
             files={
-                "seeds/country_codes.yml": _COUNTRY_SEED,
-                "seeds/country_codes.csv": "code\nGB\n",
-                "sources/raw.yml": _SOURCES,
-                "models/marts/orders.sql": gate_model(
+                "sql/seeds/country_codes.yml": _COUNTRY_SEED,
+                "sql/seeds/country_codes.csv": "code\nGB\n",
+                "sql/sources/raw.yml": _SOURCES,
+                "sql/models/marts/orders.sql": gate_model(
                     sql="SELECT 1 AS order_id",
                     header=inline_sql_hook_header(
                         'SELECT * FROM __source("raw_orders"), __seed("country_codes")'
@@ -134,8 +134,8 @@ def test_given_hook_reads_when_compiling_then_hooked_model_runs_after_reads(
         HookReadEdgeTestCase(
             description="inline SQL hook read orders the build but is not lineage",
             files={
-                "models/marts/customers.sql": gate_model(sql="SELECT 1 AS customer_id"),
-                "models/marts/orders.sql": gate_model(
+                "sql/models/marts/customers.sql": gate_model(sql="SELECT 1 AS customer_id"),
+                "sql/models/marts/orders.sql": gate_model(
                     sql="SELECT 1 AS order_id",
                     header=inline_sql_hook_header('SELECT count(*) FROM __ref("customers")'),
                 ),
@@ -165,10 +165,10 @@ def test_given_sql_hook_read_when_compiling_then_lineage_and_selection_ignore_it
             description="hook reading a model built from its own model",
             files={
                 _HOOK_PATH: python_hook_source(reads='model("order_rollup")'),
-                "models/marts/orders.sql": gate_model(
+                "sql/models/marts/orders.sql": gate_model(
                     sql="SELECT 1 AS order_id", header=_HOOKED_HEADER
                 ),
-                "models/marts/order_rollup.sql": gate_model(
+                "sql/models/marts/order_rollup.sql": gate_model(
                     sql='SELECT count(*) AS n FROM __ref("orders")'
                 ),
             },
@@ -184,13 +184,13 @@ def test_given_sql_hook_read_when_compiling_then_lineage_and_selection_ignore_it
                 _HOOK_PATH: python_hook_source(
                     reads='[model("order_rollup"), model("order_count")]'
                 ),
-                "models/marts/orders.sql": gate_model(
+                "sql/models/marts/orders.sql": gate_model(
                     sql="SELECT 1 AS order_id", header=_HOOKED_HEADER
                 ),
-                "models/marts/order_rollup.sql": gate_model(
+                "sql/models/marts/order_rollup.sql": gate_model(
                     sql='SELECT count(*) AS n FROM __ref("orders")'
                 ),
-                "models/marts/order_count.sql": gate_model(
+                "sql/models/marts/order_count.sql": gate_model(
                     sql='SELECT count(*) AS n FROM __ref("orders")'
                 ),
             },
@@ -204,17 +204,17 @@ def test_given_sql_hook_read_when_compiling_then_lineage_and_selection_ignore_it
             files={
                 _MACRO_PATH: _IGNORING_MACRO,
                 _SQL_HOOK_PATH: 'HOOK (description "Test hook.");\n@py.count_rows(__ref("order_count"))\n',
-                "models/marts/orders.sql": gate_model(
+                "sql/models/marts/orders.sql": gate_model(
                     sql="SELECT 1 AS order_id",
                     header=(
                         "MODEL (description 'Test model orders.', pre_hooks [inline_sql('SELECT * FROM __ref(\"order_rollup\")')], "
                         'post_hooks [sql("record_rows")]);'
                     ),
                 ),
-                "models/marts/order_rollup.sql": gate_model(
+                "sql/models/marts/order_rollup.sql": gate_model(
                     sql='SELECT count(*) AS n FROM __ref("orders")'
                 ),
-                "models/marts/order_count.sql": gate_model(
+                "sql/models/marts/order_count.sql": gate_model(
                     sql='SELECT count(*) AS n FROM __ref("orders")'
                 ),
             },
@@ -247,7 +247,7 @@ def test_given_hook_reading_its_own_dependant_when_compiling_then_it_reports_p00
             description="hook reading an unknown model",
             files={
                 _HOOK_PATH: python_hook_source(reads='model("missing_customers")'),
-                "models/marts/orders.sql": gate_model(
+                "sql/models/marts/orders.sql": gate_model(
                     sql="SELECT 1 AS order_id", header=_HOOKED_HEADER
                 ),
             },
@@ -259,7 +259,7 @@ def test_given_hook_reading_its_own_dependant_when_compiling_then_it_reports_p00
         HookReadErrorTestCase(
             description="inline SQL hook reading an unknown model",
             files={
-                "models/marts/orders.sql": gate_model(
+                "sql/models/marts/orders.sql": gate_model(
                     sql="SELECT 1 AS order_id",
                     header=inline_sql_hook_header('SELECT * FROM __ref("missing_customers")'),
                 ),

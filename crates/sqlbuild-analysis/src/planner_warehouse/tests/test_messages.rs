@@ -17,7 +17,7 @@ fn given_missing_source_tables_when_reporting_then_lists_readers_and_remedies() 
             description: "one missing table",
             missing: vec![missing("orders", &["fact_orders"], None)],
             expected_message: "cannot build selected scope: 1 source table read by selected resources does not exist in the warehouse:\n  - source 'orders' (raw.orders), read by fact_orders",
-            expected_help: "create or load the table, correct its database, schema, or table in the source declaration, or stop reading it from the selected models; declared 'orders' at sources/orders.yml:2",
+            expected_help: "create or load the table, correct its database, schema, or table in the source declaration, or stop reading it from the selected models; declared 'orders' at sql/sources/orders.yml:2",
         },
         MissingSourceTestCase {
             description: "unreadable table names the role",
@@ -26,7 +26,7 @@ fn given_missing_source_tables_when_reporting_then_lists_readers_and_remedies() 
                 missing("customers", &["c"], Some("ANALYST")),
             ],
             expected_message: "cannot build selected scope: 2 source tables read by selected resources do not exist in the warehouse or are not readable by the current role:\n  - source 'orders' (raw.orders), read by a, b\n  - source 'customers' (raw.customers), read by c; the warehouse reports it does not exist or is not readable by role ANALYST",
-            expected_help: "create or load the table, grant SELECT on it to the role in use (ANALYST), correct its database, schema, or table in the source declaration, or stop reading it from the selected models; declared 'orders' at sources/orders.yml:2, 'customers' at sources/customers.yml:2",
+            expected_help: "create or load the table, grant SELECT on it to the role in use (ANALYST), correct its database, schema, or table in the source declaration, or stop reading it from the selected models; declared 'orders' at sql/sources/orders.yml:2, 'customers' at sql/sources/customers.yml:2",
         },
     ];
     for test_case in test_cases {

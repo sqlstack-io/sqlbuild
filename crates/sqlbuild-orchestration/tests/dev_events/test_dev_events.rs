@@ -23,7 +23,7 @@ fn given_each_event_when_encoding_then_one_prefixed_line_reads_back_unchanged() 
         RoundTripTestCase {
             description: "changed paths keep the count of further files",
             event: DevEvent::Changed {
-                paths: vec!["models/orders.sql".to_owned()],
+                paths: vec!["sql/models/orders.sql".to_owned()],
                 more: 2,
             },
             expected_newlines: 1,
@@ -50,7 +50,7 @@ fn given_each_event_when_encoding_then_one_prefixed_line_reads_back_unchanged() 
                 generation: 4,
                 message: "unknown column net_amount_usd\nat line 42".to_owned(),
                 position: Some(SourcePosition {
-                    path: "models/finance/fct_revenue.sql".to_owned(),
+                    path: "sql/models/finance/fct_revenue.sql".to_owned(),
                     line: 42,
                     column: 7,
                 }),
@@ -167,18 +167,18 @@ fn given_a_failed_generation_when_reported_then_the_first_source_location_is_its
     let test_cases = [
         PositionTestCase {
             description: "a compile error with line and column",
-            message: "SQB0101 models/finance/fct_revenue.sql:42:7: unknown column net_amount_usd",
+            message: "SQB0101 sql/models/finance/fct_revenue.sql:42:7: unknown column net_amount_usd",
             expected_position: Some(SourcePosition {
-                path: "models/finance/fct_revenue.sql".to_owned(),
+                path: "sql/models/finance/fct_revenue.sql".to_owned(),
                 line: 42,
                 column: 7,
             }),
         },
         PositionTestCase {
             description: "a Python traceback line without a column, in parentheses",
-            message: "failed to import (python/orders.py:12) because of a syntax error",
+            message: "failed to import (python/nodes/orders.py:12) because of a syntax error",
             expected_position: Some(SourcePosition {
-                path: "python/orders.py".to_owned(),
+                path: "python/nodes/orders.py".to_owned(),
                 line: 12,
                 column: 1,
             }),
@@ -190,7 +190,7 @@ fn given_a_failed_generation_when_reported_then_the_first_source_location_is_its
         },
         PositionTestCase {
             description: "a path without a line is not a position",
-            message: "models/orders.sql is not valid",
+            message: "sql/models/orders.sql is not valid",
             expected_position: None,
         },
     ];

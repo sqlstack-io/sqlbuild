@@ -47,7 +47,7 @@ def test_given_runtime_and_root_when_discovering_natively_then_supported_runs_an
     test_case: NativeRuntimeTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = tmp_path / test_case.project_name
-    write_project(project_dir=project_dir, files=(("models/orders.sql", _VALID_MODEL),))
+    write_project(project_dir=project_dir, files=(("sql/models/orders.sql", _VALID_MODEL),))
     capture: FailureCapture = FailureCapture()
     models: list[DiscoveredSqlModelFile] = []
 
@@ -72,7 +72,7 @@ def test_given_runtime_and_root_when_discovering_natively_then_supported_runs_an
     [
         SharedSnapshotTestCase(
             description="a Python file created after the model walk stays unseen",
-            created_file="models/marts/late.py",
+            created_file="sql/models/marts/late.py",
         ),
     ],
     ids=lambda case: case.description,
@@ -80,7 +80,7 @@ def test_given_runtime_and_root_when_discovering_natively_then_supported_runs_an
 def test_given_native_model_walk_when_globbing_models_later_in_the_pass_then_the_walk_is_shared(
     test_case: SharedSnapshotTestCase, tmp_path: Path
 ) -> None:
-    write_project(project_dir=tmp_path, files=(("models/marts/orders.sql", _VALID_MODEL),))
+    write_project(project_dir=tmp_path, files=(("sql/models/marts/orders.sql", _VALID_MODEL),))
     with directory_snapshot_scope(project_dir=tmp_path):
         _ = discover_model_files(
             project_dir=tmp_path,

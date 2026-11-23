@@ -305,22 +305,22 @@ note = "Package marker of the public sink decorators and the user-sink invocatio
 [[stays]]
 path = "runtime/event_exporting/main/lifecycle_event_sink.py"
 rule = 3
-note = "Rule 3 facade: the @lifecycle_event_sink decorator re-exported by sqlbuild.sinks, run when user sink modules are imported."
+note = "Rule 3 facade: the @lifecycle_event_sink decorator re-exported by sqlbuild.event_sinks, run when user event sink modules are imported."
 
 [[stays]]
-path = "runtime/event_exporting/main/command_output_sink.py"
+path = "runtime/event_exporting/main/command_output_event_sink.py"
 rule = 3
-note = "Rule 3 facade: the @command_output_sink decorator re-exported by sqlbuild.sinks, run when user sink modules are imported."
+note = "Rule 3 facade: the @command_output_event_sink decorator re-exported by sqlbuild.event_sinks, run when user event sink modules are imported."
 
 [[stays]]
 path = "runtime/event_exporting/main/get_lifecycle_event_sink_definition.py"
 rule = 3
-note = "Rule 3 facade: reads the decorator's definition off a user function; re-exported by sqlbuild.sinks."
+note = "Rule 3 facade: reads the decorator's definition off a user function; re-exported by sqlbuild.event_sinks."
 
 [[stays]]
-path = "runtime/event_exporting/main/get_command_output_sink_definition.py"
+path = "runtime/event_exporting/main/get_command_output_event_sink_definition.py"
 rule = 3
-note = "Rule 3 facade: reads the decorator's definition off a user function; re-exported by sqlbuild.sinks."
+note = "Rule 3 facade: reads the decorator's definition off a user function; re-exported by sqlbuild.event_sinks."
 
 [[stays]]
 path = "runtime/event_exporting/main/_invoke_lifecycle_event_sink.py"
@@ -340,12 +340,12 @@ note = "Thin shim that calls a user Recall replacement sink with its record and 
 [[stays]]
 path = "runtime/event_exporting/models.py"
 rule = 3
-note = "Rule 3 shape: LifecycleEventSinkDefinition re-exported by sqlbuild.sinks."
+note = "Rule 3 shape: LifecycleEventSinkDefinition re-exported by sqlbuild.event_sinks."
 
 [[stays]]
 path = "runtime/event_exporting/types.py"
 rule = 3
-note = "Rule 3 shape: LifecycleEventKind re-exported by sqlbuild.sinks."
+note = "Rule 3 shape: LifecycleEventKind re-exported by sqlbuild.event_sinks."
 
 [[stays]]
 path = "runtime/event_exporting/exceptions.py"
@@ -375,17 +375,17 @@ note = "Package marker of the public command-output shapes below."
 [[stays]]
 path = "runtime/output_capture/models.py"
 rule = 3
-note = "Rule 3 shapes: CommandOutputRecord and sink definitions re-exported by sqlbuild.sinks; validation is native validate_command_output_record."
+note = "Rule 3 shapes: CommandOutputRecord and sink definitions re-exported by sqlbuild.event_sinks; validation is native validate_command_output_record."
 
 [[stays]]
 path = "runtime/output_capture/types.py"
 rule = 3
-note = "Rule 3 shapes: CommandOutputStream re-exported by sqlbuild.sinks, priorities and the exporter protocol."
+note = "Rule 3 shapes: CommandOutputStream re-exported by sqlbuild.event_sinks, priorities and the exporter protocol."
 
 [[stays]]
 path = "runtime/output_capture/exceptions.py"
 rule = 3
-note = "Rule 3 shapes: CommandOutputValidationError re-exported by sqlbuild.sinks and raised by the native records."
+note = "Rule 3 shapes: CommandOutputValidationError re-exported by sqlbuild.event_sinks and raised by the native records."
 
 [[stays]]
 path = "runtime/output_capture/constants.py"

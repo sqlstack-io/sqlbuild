@@ -54,7 +54,7 @@ def test_given_untokenizable_tracked_model_when_planning_column_migrations_then_
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="orders"),
         deps=(),
         name="orders",
-        relative_path=Path("models/orders.sql"),
+        relative_path=Path("sql/models/orders.sql"),
         query_sql=test_case.query_sql,
         config=CompileModelConfig(values=dict(BASE_CONFIG)),
         destination=CompiledRelationLocation(

@@ -73,7 +73,7 @@ def build_protected_schema_replay_project() -> CompiledProjectView:
         key=CompiledObjectKey(resource_type=CompiledResourceType.MODEL, name="order_history"),
         deps=(),
         name="order_history",
-        relative_path=Path("models/order_history.sql"),
+        relative_path=Path("sql/models/order_history.sql"),
         query_sql="SELECT 1 AS id, 2 AS amount",
         config=CompileModelConfig(
             values={

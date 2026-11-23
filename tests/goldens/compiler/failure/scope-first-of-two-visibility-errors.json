@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Enum 'staged_status' is known but inaccessible in '<project>/models/marts/customer_totals.sql'. It is defined at models/staging/_enums/status.sql:1:1 with local scope owned by 'models/staging'; consumer path: '<project>/models/marts/customer_totals.sql'"
+     "message": "Enum 'staged_status' is known but inaccessible in '<project>/sql/models/marts/customer_totals.sql'. It is defined at sql/models/staging/_enums/status.sql:1:1 with local scope owned by 'sql/models/staging'; consumer path: '<project>/sql/models/marts/customer_totals.sql'"
     }
    ]
   }

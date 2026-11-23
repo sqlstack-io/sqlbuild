@@ -64,6 +64,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     worker_result,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 ENV_FILE_REGION_FILES: dict[str, str] = {
     ".env": "WORKER_ENV_REGION_CODE=42\nWORKER_ENV_TOKEN=worker-token\n"
@@ -126,7 +127,7 @@ ENV_FILE_REGION_FILES: dict[str, str] = {
             expected_totals=("cancelled", None),
             expected_marts_started=False,
             files={
-                "models/broken_orders.sql": (
+                "sql/models/broken_orders.sql": (
                     "MODEL (description 'Critical orders.', materialized table, critical true);\n"
                     "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS INTEGER) AS amount FROM source\n"
                 ),
@@ -139,23 +140,23 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
     test_case: GroupExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     with duckdb.connect(str(project_dir / "warehouse.duckdb")) as warehouse:
         warehouse.execute("CREATE TABLE broken_orders AS SELECT 99 AS amount")
     test_case = replace(
         test_case,
         files={
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Independent orders.', materialized table);\n"
                 'SELECT amount FROM __ref("stg_orders")\n'
             ),
-            "models/stg_orders.sql": (
+            "sql/models/stg_orders.sql": (
                 "MODEL (description 'Staged orders.', materialized table);\nSELECT 11 AS amount\n"
             ),
-            "models/broken_orders.sql": (
+            "sql/models/broken_orders.sql": (
                 "MODEL (description 'Source values.', materialized table);\n" + test_case.model_sql
             ),
-            "models/totals.sql": (
+            "sql/models/totals.sql": (
                 "MODEL (description 'Dependent totals.', materialized table);\n"
                 'SELECT amount FROM __ref("broken_orders")\n'
             ),
@@ -238,15 +239,15 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "partial",
             [(0,)],
             files={
-                "models/raw_orders.sql": (
+                "sql/models/raw_orders.sql": (
                     "MODEL (description 'Raw orders.', materialized table);\n"
                     "SELECT 1 AS order_id, 10 AS amount\n"
                 ),
-                "models/stg_orders.sql": (
+                "sql/models/stg_orders.sql": (
                     "MODEL (description 'Staged orders.', materialized table);\n"
                     'SELECT order_id, amount * 2 AS amount FROM __ref("raw_orders")\n'
                 ),
-                "models/order_totals.sql": (
+                "sql/models/order_totals.sql": (
                     "MODEL (description 'Order totals.', materialized table);\n"
                     'SELECT SUM(amount) AS total FROM __ref("stg_orders")\n'
                 ),
@@ -280,15 +281,15 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "partial",
             [(0,)],
             files={
-                "models/raw_orders.sql": (
+                "sql/models/raw_orders.sql": (
                     "MODEL (description 'Raw orders.', materialized table);\n"
                     "SELECT 1 AS order_id, 10 AS amount\n"
                 ),
-                "models/stg_orders.sql": (
+                "sql/models/stg_orders.sql": (
                     "MODEL (description 'Staged orders.', materialized table);\n"
                     'SELECT order_id, amount * 2 AS amount FROM __ref("raw_orders")\n'
                 ),
-                "models/order_totals.sql": (
+                "sql/models/order_totals.sql": (
                     "MODEL (description 'Order totals.', materialized table);\n"
                     'SELECT SUM(amount) AS total FROM __ref("stg_orders")\n'
                 ),
@@ -322,15 +323,15 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "partial",
             [(0,)],
             files={
-                "models/raw_orders.sql": (
+                "sql/models/raw_orders.sql": (
                     "MODEL (description 'Raw orders.', materialized table);\n"
                     "SELECT 1 AS order_id, 10 AS amount\n"
                 ),
-                "models/stg_orders.sql": (
+                "sql/models/stg_orders.sql": (
                     "MODEL (description 'Staged orders.', materialized table);\n"
                     'SELECT order_id, amount * 2 AS amount FROM __ref("raw_orders")\n'
                 ),
-                "models/order_totals.sql": (
+                "sql/models/order_totals.sql": (
                     "MODEL (description 'Order totals.', materialized table);\n"
                     'SELECT SUM(amount) AS total FROM __ref("stg_orders")\n'
                 ),
@@ -364,20 +365,20 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "partial",
             [(0,)],
             files={
-                "functions/sql/udf__order_band.sql": (
+                "sql/functions/sql/udf__order_band.sql": (
                     "FUNCTION (description 'Size band of an order amount.', "
                     "arguments (amount INT), returns VARCHAR);\n"
                     "CASE WHEN amount >= 20 THEN 'large' ELSE 'small' END\n"
                 ),
-                "models/raw_orders.sql": (
+                "sql/models/raw_orders.sql": (
                     "MODEL (description 'Raw orders.', materialized table);\n"
                     "SELECT 1 AS order_id, 10 AS amount\n"
                 ),
-                "models/stg_orders.sql": (
+                "sql/models/stg_orders.sql": (
                     "MODEL (description 'Staged orders.', materialized table);\n"
                     'SELECT order_id, __udf("udf__order_band")(amount) AS band FROM __ref("raw_orders")\n'
                 ),
-                "models/order_totals.sql": (
+                "sql/models/order_totals.sql": (
                     "MODEL (description 'Order totals.', materialized table);\n"
                     'SELECT band, COUNT(*) AS orders FROM __ref("stg_orders") GROUP BY band\n'
                 ),
@@ -413,20 +414,20 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "success",
             [(2,)],
             files={
-                "functions/sql/udf__order_band.sql": (
+                "sql/functions/sql/udf__order_band.sql": (
                     "FUNCTION (description 'Size band of an order amount.', "
                     "arguments (amount INT), returns VARCHAR);\n"
                     "CASE WHEN amount >= 20 THEN 'large' ELSE 'small' END\n"
                 ),
-                "models/raw_orders.sql": (
+                "sql/models/raw_orders.sql": (
                     "MODEL (description 'Raw orders.', materialized table);\n"
                     "SELECT 1 AS order_id, 10 AS amount\n"
                 ),
-                "models/stg_orders.sql": (
+                "sql/models/stg_orders.sql": (
                     "MODEL (description 'Staged orders.', materialized table);\n"
                     'SELECT order_id, __udf("udf__order_band")(amount) AS band FROM __ref("raw_orders")\n'
                 ),
-                "models/order_totals.sql": (
+                "sql/models/order_totals.sql": (
                     "MODEL (description 'Order totals.', materialized table);\n"
                     'SELECT band, COUNT(*) AS orders FROM __ref("stg_orders") GROUP BY band\n'
                 ),
@@ -457,16 +458,16 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "success",
             [(1,)],
             files={
-                "functions/sql/udf__band.sql": (
+                "sql/functions/sql/udf__band.sql": (
                     "FUNCTION (description 'Band.', arguments (amount INT), returns VARCHAR);\n"
                     "CASE WHEN amount >= 20 THEN 'large' ELSE 'small' END\n"
                 ),
-                "models/parity_lookup.sql": (
+                "sql/models/parity_lookup.sql": (
                     "MODEL (description 'Lookup.', materialized table, "
                     "columns (id (type INTEGER, audits [not_null])));\n"
                     "SELECT CAST(NULL AS INTEGER) AS id\n"
                 ),
-                "models/parity_events.sql": (
+                "sql/models/parity_events.sql": (
                     "MODEL (description 'Events.', materialized incremental, "
                     "incremental_strategy append);\n"
                     'SELECT 1 AS event_id, __udf("udf__band")(5) AS band\n'
@@ -475,7 +476,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                     "TEST();\n\nWITH\n__ref__parity_lookup AS (SELECT 1 AS id),\n"
                     "__expected__parity_events AS (SELECT 99 AS event_id, 'x' AS band)\nSELECT 1\n"
                 ),
-                "audits/singular/events_have_lookups.sql": (
+                "sql/audits/singular/events_have_lookups.sql": (
                     'AUDIT (name "events_have_lookups", severity error);\n'
                     'SELECT e.event_id FROM __ref("parity_events") e '
                     'LEFT JOIN __ref("parity_lookup") l ON e.event_id = l.id WHERE l.id IS NULL\n'
@@ -531,18 +532,18 @@ def test_given_a_failing_unit_test_when_a_worker_builds_then_its_model_fails_and
             "partial",
             [(2,), (11,)],
             files={
-                "sources/raw.yml": Path(
+                "sql/sources/raw.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/worker_freshness_skip.yml"
                 ).read_text(),
-                "models/stale_orders.sql": (
+                "sql/models/stale_orders.sql": (
                     "MODEL (description 'Stale orders.', materialized table);\n"
                     'SELECT order_id FROM __source("raw_orders")\n'
                 ),
-                "models/late_orders.sql": (
+                "sql/models/late_orders.sql": (
                     "MODEL (description 'Late orders.', materialized table);\n"
                     'SELECT order_id FROM __source("raw_orders")\n'
                 ),
-                "models/returns.sql": (
+                "sql/models/returns.sql": (
                     "MODEL (description 'Returns.', materialized table);\n"
                     'SELECT return_id FROM __source("raw_returns")\n'
                 ),
@@ -594,11 +595,11 @@ def test_given_a_stale_source_when_a_worker_builds_then_blocked_nodes_finish_ski
             expected_status="partial",
             expected_rows=[(0,)],
             files={
-                "seeds/order_codes.csv": "code\nA\nZ\n",
-                "seeds/order_codes.yml": Path(
+                "sql/seeds/order_codes.csv": "code\nA\nZ\n",
+                "sql/seeds/order_codes.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/worker_failed_seed_audit.yml"
                 ).read_text(),
-                "models/coded_orders.sql": (
+                "sql/models/coded_orders.sql": (
                     "MODEL (description 'Coded orders.', materialized table);\n"
                     'SELECT code FROM __seed("order_codes")\n'
                 ),
@@ -656,7 +657,7 @@ def test_given_a_failing_seed_audit_when_a_worker_builds_then_its_seed_fails_wit
             pools={"orders_limit": 2, "inventory_limit": 2},
             launcher_settings={"pool_caps": {"orders_limit": 1, "inventory_limit": 1}},
             files={
-                "models/inventory.sql": (
+                "sql/models/inventory.sql": (
                     "MODEL (description 'Inventory.', materialized table);\nSELECT 23 AS amount\n"
                 ),
                 "orchestration/jobs/orders_job.toml": (
@@ -736,14 +737,14 @@ def test_given_opposing_group_limits_when_scheduled_then_each_group_holds_every_
     [
         SnapshotWorkerTestCase(
             description="unselected dependency drift",
-            model_file="models/stg_orders.sql",
+            model_file="sql/models/stg_orders.sql",
             original_sql="CAST(5 AS INTEGER)",
             replacement_sql="CAST(17 AS INTEGER)",
             expected_error="node content differs",
         ),
         SnapshotWorkerTestCase(
             description="selected model drift",
-            model_file="models/orders.sql",
+            model_file="sql/models/orders.sql",
             original_sql="SELECT order_id, amount",
             replacement_sql="SELECT order_id, amount * CAST(2 AS BIGINT) AS amount",
             expected_error="node content differs",
@@ -878,12 +879,15 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
             "success",
             [(1,)],
             files={
-                "sources/orders.yml": Path(
+                "sql/sources/orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/managed_orders.yml"
                 ).read_text(),
-                "python/loaders/orders.py": Path(
-                    "benchmarks/duckshop/edge_cases/orchestration/orders_loader.py"
-                ).read_text(),
+                **node_module_files(
+                    "python/nodes/loaders/orders.py",
+                    Path(
+                        "benchmarks/duckshop/edge_cases/orchestration/orders_loader.py"
+                    ).read_text(),
+                ),
             },
         ),
         WorkerExecutionTestCase(
@@ -977,7 +981,7 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
             [(23,)],
             expected_node_count=2,
             files={
-                "sources/raw_orders.yml": Path(
+                "sql/sources/raw_orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
                 **duckshop_orchestration("upstream_source_orders"),
@@ -998,7 +1002,7 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
             [(0,)],
             expected_node_counts={"success": 1, "failed": 1},
             files={
-                "sources/raw_orders.yml": Path(
+                "sql/sources/raw_orders.yml": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
                 **duckshop_orchestration("upstream_source_orders"),
@@ -1035,7 +1039,7 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
             [(46,)],
             expected_node_count=2,
             files={
-                "functions/sql/order_total.sql": (
+                "sql/functions/sql/order_total.sql": (
                     "FUNCTION (description 'Order total.', "
                     "arguments (amount BIGINT), returns BIGINT);\nSELECT amount * 2\n"
                 )
@@ -1049,7 +1053,7 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
             [(31,)],
             expected_node_count=2,
             files={
-                "functions/sql/order_amounts.sql": (
+                "sql/functions/sql/order_amounts.sql": (
                     "FUNCTION (description 'Order amounts.', returns table (amount BIGINT));\n"
                     "SELECT CAST(31 AS BIGINT) AS amount\n"
                 )
@@ -1264,7 +1268,7 @@ def test_given_a_busy_control_store_when_a_build_runs_then_the_scheduler_retries
             "SELECT amount FROM orders",
             "success",
             [(17,)],
-            files={"python/checks/orders.py": "initial"},
+            files={"python/nodes/checks/orders/checks.py": "initial"},
         ),
         WorkerExecutionTestCase(
             "attached Python check changed after publication",
@@ -1272,8 +1276,8 @@ def test_given_a_busy_control_store_when_a_build_runs_then_the_scheduler_retries
             "SELECT amount FROM orders",
             "failed",
             [],
-            files={"python/checks/orders.py": "initial"},
-            files_after_publication={"python/checks/orders.py": "changed"},
+            files={"python/nodes/checks/orders/checks.py": "initial"},
+            files_after_publication={"python/nodes/checks/orders/checks.py": "changed"},
         ),
     ],
     ids=lambda case: case.description,
@@ -1347,7 +1351,10 @@ def test_given_an_attached_check_when_a_worker_executes_then_its_own_outcome_is_
         Path("benchmarks/duckshop/edge_cases/orchestration/attached_checks.json").read_text()
     )
     test_case = replace(
-        test_case, files={"python/checks/orders.py": fixture[test_case.description]}
+        test_case,
+        files={
+            **node_module_files("python/nodes/checks/orders.py", fixture[test_case.description])
+        },
     )
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
@@ -1386,11 +1393,11 @@ def test_given_an_attached_check_when_a_worker_executes_then_its_own_outcome_is_
             "success",
             [(59,)],
             files={
-                "python/checks/orders.py": "failed",
+                "python/nodes/checks/orders/checks.py": "failed",
                 "orchestration/jobs/annual_orders_job.toml": "on_failure_job",
                 "orchestration/jobs/refresh_inventory_job.toml": "on_failure_destination",
                 "orchestration/sensors/failed_orders_sensor.py": "on_failure_sensor",
-                "models/inventory.sql": "inventory",
+                "sql/models/inventory.sql": "inventory",
             },
         ),
         WorkerExecutionTestCase(
@@ -1400,11 +1407,11 @@ def test_given_an_attached_check_when_a_worker_executes_then_its_own_outcome_is_
             "success",
             [(59,)],
             files={
-                "python/checks/orders.py": "failed",
+                "python/nodes/checks/orders/checks.py": "failed",
                 "orchestration/jobs/annual_orders_job.toml": "on_failure_job",
                 "orchestration/jobs/refresh_inventory_job.toml": "on_failure_destination",
                 "orchestration/sensors/failed_orders_sensor.py": "on_check_event_sensor",
-                "models/inventory.sql": "inventory",
+                "sql/models/inventory.sql": "inventory",
             },
         ),
     ],
@@ -1450,11 +1457,11 @@ def test_given_an_attached_check_failure_when_a_sensor_observes_it_then_its_dest
             "cancelled",
             [(17,)],
             files={
-                "python/checks/orders.py": "cancelled",
+                "python/nodes/checks/orders/checks.py": "cancelled",
                 "orchestration/jobs/annual_orders_job.toml": "on_failure_job",
                 "orchestration/jobs/refresh_inventory_job.toml": "on_failure_destination",
                 "orchestration/sensors/failed_orders_sensor.py": "on_failure_sensor",
-                "models/inventory.sql": "inventory",
+                "sql/models/inventory.sql": "inventory",
             },
         ),
     ],
@@ -1585,7 +1592,7 @@ def test_given_a_real_group_completion_when_a_run_sensor_matches_then_one_destin
             [(67,)],
             expected_origin="sensor",
             files={
-                "models/stg_orders.sql": "MODEL (description 'Staging orders.');\nSELECT 71 AS amount\n",
+                "sql/models/stg_orders.sql": "MODEL (description 'Staging orders.');\nSELECT 71 AS amount\n",
                 "orchestration/jobs/source_orders_job.toml": (
                     'name = "source_orders_job"\ndescription = "Source orders."\nselect = "orders"\n'
                 ),
@@ -1683,10 +1690,10 @@ def test_given_an_executing_scheduled_worker_when_cancelled_then_the_statement_s
                     '[connections.local]\ndatabase = "warehouse.duckdb"\n'
                     '[targets.development]\nschema = "main"\nconcurrency = 2\n'
                 ),
-                "models/refunds.sql": (
+                "sql/models/refunds.sql": (
                     "MODEL (description 'Refunds.', materialized table);\nSELECT 2 AS amount\n"
                 ),
-                "models/returns.sql": (
+                "sql/models/returns.sql": (
                     "MODEL (description 'Returns.', materialized table);\n"
                     'SELECT amount FROM __ref("orders")\n'
                 ),
@@ -1735,7 +1742,7 @@ def test_given_a_rejected_node_report_when_concurrent_then_the_run_stops_before_
             "cancelled",
             [(0,)],
             files={
-                "models/totals.sql": (
+                "sql/models/totals.sql": (
                     "MODEL (description 'Downstream totals.', materialized table);\n"
                     'SELECT amount FROM __ref("orders")\n'
                 ),
@@ -2089,7 +2096,7 @@ def test_given_a_provider_missing_secrets_when_a_location_publishes_then_its_hea
                 '[connections.local]\ndatabase = "warehouse.duckdb"\n'
                 f'[targets.development]\nschema = "main"\nallow_missing_secrets = [{allowed}]\n'
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Orders.', materialized table);\n"
                 'SELECT CAST(code AS BIGINT) AS amount FROM __source("raw_regions")\n'
             ),
@@ -2103,7 +2110,7 @@ def test_given_a_provider_missing_secrets_when_a_location_publishes_then_its_hea
     assert health["providers"] == [
         {
             "provider": "region",
-            "path": "providers/region.py",
+            "path": "python/providers/region.py",
             "settings": [
                 {"field": "token", "variable": "WORKER_ENV_TOKEN", "line": 7},
                 {"field": "code", "variable": "WORKER_ENV_REGION_CODE", "line": 8},
@@ -2183,7 +2190,7 @@ FRESHNESS_SOURCES: str = (
                 "SELECT amount FROM orders",
                 "success",
                 [(23,)],
-                files={"sources/raw.yml": FRESHNESS_SOURCES},
+                files={"sql/sources/raw.yml": FRESHNESS_SOURCES},
             ),
             ["freshness", "--select", "raw_orders"],
             "success",
@@ -2221,38 +2228,41 @@ def test_given_a_worker_run_when_its_output_is_captured_then_it_holds_no_json_re
 
 
 NODE_RESULT_FILES: dict[str, str] = {
-    "python/loaders.py": (
-        "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
-        "from sqlbuild.loaders import loader\n\n\n"
-        "@loader\n"
-        "def raw_gate(ctx):\n"
-        '    """A gate that stays closed."""\n'
-        '    return ctx.skip(reason="gate closed", mode=SkipMode.HARD)\n\n\n'
-        "@loader(depends_on=[raw_gate])\n"
-        "def raw_gated(ctx):\n"
-        '    """Rows behind the gate."""\n'
-        '    return [{"gated_id": 1}]\n\n\n'
-        "@loader\n"
-        "def raw_events(ctx):\n"
-        '    """Three events."""\n'
-        '    return [{"event_id": event_id} for event_id in range(3)]\n'
+    **node_module_files(
+        "python/nodes/loaders/node_results.py",
+        (
+            "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
+            "from sqlbuild.loaders import loader\n\n\n"
+            "@loader\n"
+            "def raw_gate(ctx):\n"
+            '    """A gate that stays closed."""\n'
+            '    return ctx.skip(reason="gate closed", mode=SkipMode.HARD)\n\n\n'
+            "@loader(depends_on=[raw_gate])\n"
+            "def raw_gated(ctx):\n"
+            '    """Rows behind the gate."""\n'
+            '    return [{"gated_id": 1}]\n\n\n'
+            "@loader\n"
+            "def raw_events(ctx):\n"
+            '    """Three events."""\n'
+            '    return [{"event_id": event_id} for event_id in range(3)]\n'
+        ),
     ),
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_gated\n    description: Gated rows.\n    managed: true\n"
         "    write_strategy: table\n"
         "  - name: raw_events\n    description: Events.\n    managed: true\n"
         "    write_strategy: table\n"
     ),
-    "models/events.sql": (
+    "sql/models/events.sql": (
         "MODEL (description 'Events.', materialized table);\n"
         'SELECT event_id FROM __source("raw_events")\n'
     ),
-    "models/event_view.sql": (
+    "sql/models/event_view.sql": (
         "MODEL (description 'Events as a view.', materialized view);\n"
         'SELECT event_id FROM __ref("events")\n'
     ),
-    "models/gated.sql": (
+    "sql/models/gated.sql": (
         "MODEL (description 'Gated rows.', materialized table);\n"
         'SELECT gated_id FROM __source("raw_gated")\n'
     ),
@@ -2293,7 +2303,7 @@ NODE_RESULT_FILES: dict[str, str] = {
             [],
             files=NODE_RESULT_FILES
             | {
-                "python/broken.py": (
+                "python/nodes/broken.py": (
                     "import os\n"
                     "if 'SQLBUILD_RUN_TOKEN' in os.environ:\n"
                     "    raise RuntimeError('this module breaks inside a worker')\n"

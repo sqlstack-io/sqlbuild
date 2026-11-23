@@ -57,12 +57,12 @@ def test_given_python_udf_when_testing_on_several_connections_then_every_test_ca
                 f'[connection]\ndatabase = "{test_case.database}"\n\n'
                 "[scopes]\nenforce_placement = false\n"
             ),
-            "functions/python/is_completed_order.py": _UDF,
-            "models/order_statuses.sql": (
+            "sql/functions/python/is_completed_order.py": _UDF,
+            "sql/models/order_statuses.sql": (
                 "MODEL (description 'Test model order_statuses.');\n"
                 "SELECT 'completed' AS order_status\n"
             ),
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 "MODEL (description 'Test model orders.');\n"
                 'SELECT s.order_status, __udf("is_completed_order")(s.order_status) AS is_completed\n'
                 'FROM __ref("order_statuses") AS s\n'

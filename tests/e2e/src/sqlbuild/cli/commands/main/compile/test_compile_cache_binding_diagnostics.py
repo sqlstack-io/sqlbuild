@@ -40,10 +40,10 @@ def test_given_cached_model_with_binding_diagnostic_when_recompiling_then_diagno
         project_name="orders",
         repo_files={
             "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-            "models/orders.sql": (
+            "sql/models/orders.sql": (
                 'MODEL (description "Orders");\n\nSELECT 1 AS order_id, 10 AS quantity\n'
             ),
-            "models/order_quantities.sql": (
+            "sql/models/order_quantities.sql": (
                 'MODEL (description "Order quantities");\n\n' + test_case.query_sql
             ),
         },
@@ -51,7 +51,7 @@ def test_given_cached_model_with_binding_diagnostic_when_recompiling_then_diagno
 
     cold: dict[str, Any] = compile_with_binding_error(project_dir)
     # An upstream comment defeats whole-project reuse; the diagnosed model's analysis stays cached.
-    upstream: Path = project_dir / "models" / "orders.sql"
+    upstream: Path = project_dir / "sql" / "models" / "orders.sql"
     upstream.write_text(
         upstream.read_text(encoding="utf-8") + "\n-- upstream comment\n", encoding="utf-8"
     )

@@ -15,7 +15,7 @@ There are two kinds:
 |---|---|---|
 | Written as | A `.sql` file: a `MACRO` header and a SQL body | A Python function that returns SQL |
 | Called as | `@sql.name(...)` | `@py.name(...)` |
-| Lives in | `macros/sql/` | `macros/python/` |
+| Lives in | `sql/macros/sql/` | `sql/macros/python/` |
 | Arguments | Typed SQL expressions, checked against the caller's column types | Python values: strings, numbers, lists, dictionaries, references |
 | Logic | None: the body is SQL | Any Python: loops, conditions, adapter and target context |
 | Checks and tools | Each macro is checked on its own; `sqb format`, Rules and lineage see inside every call | Rules and lineage see the SQL each call returns |
@@ -32,16 +32,17 @@ Each kind has its own folder:
 
 ```text
 my_project/
-├── macros/
-│   ├── python/
-│   │   └── labels.py
-│   └── sql/
-│       └── cents_to_dollars.sql
-├── models/
+├── sql/
+│   ├── macros/
+│   │   ├── python/
+│   │   │   └── labels.py
+│   │   └── sql/
+│   │       └── cents_to_dollars.sql
+│   └── models/
 └── sqlbuild_project.toml
 ```
 
-A file directly under a `macros/` folder fails with `D013`, which names the subfolder to move it
+A file directly under a `sql/macros/` folder fails with `D013`, which names the subfolder to move it
 to. A macro used by only part of the project can live in that folder instead, as
 `_sqlbuild/macros/sql/` or `_sqlbuild/_macros/python/`, and is then visible only there. See
 [Declarations and Scopes](declaration-scopes.md).
@@ -90,7 +91,7 @@ exception because their contents are SQL.
 
 A macro that only tests use follows the usual [placement](declaration-scopes/placement.md)
 rule: it must be private to the narrowest folder that contains its uses, so the project-wide
-`macros/` directory rejects it with `S024`. Put it in `_sqlbuild/_macros/python/` or
+`sql/macros/` directory rejects it with `S024`. Put it in `_sqlbuild/_macros/python/` or
 `_sqlbuild/_macros/sql/` in the folder of the tests that call it, such as
 `tests/unit/orders/_sqlbuild/_macros/python/`, or, when those tests define `__expected__` output
 for a model, in that model's `_sqlbuild/_macros/`. The `S024` error names the folder to use.

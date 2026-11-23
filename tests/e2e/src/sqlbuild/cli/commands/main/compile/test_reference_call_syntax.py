@@ -61,7 +61,7 @@ def test_given_double_quoted_reference_calls_when_building_then_relations_resolv
                 (
                     "P012",
                     "__ref(stg_orders) is not a valid __ref() call",
-                    "models/marts/order_totals.sql",
+                    "sql/models/marts/order_totals.sql",
                     4,
                     6,
                     '__ref() takes exactly one double-quoted name, with no comments or extra spaces inside the parentheses: __ref("stg_orders")',
@@ -76,7 +76,7 @@ def test_given_double_quoted_reference_calls_when_building_then_relations_resolv
                 (
                     "P012",
                     "__ref( /* upstream */ 'stg_orders') is not a valid __ref() call",
-                    "models/marts/order_totals.sql",
+                    "sql/models/marts/order_totals.sql",
                     4,
                     6,
                     '__ref() takes exactly one double-quoted name, with no comments or extra spaces inside the parentheses: __ref("stg_orders")',
@@ -91,7 +91,7 @@ def test_given_double_quoted_reference_calls_when_building_then_relations_resolv
                 (
                     "P012",
                     "__source('raw_orders') is not a valid __source() call",
-                    "models/staging/stg_orders.sql",
+                    "sql/models/staging/stg_orders.sql",
                     3,
                     36,
                     '__source() takes exactly one double-quoted name, with no comments or extra spaces inside the parentheses: __source("raw_orders")',
@@ -106,7 +106,7 @@ def test_given_double_quoted_reference_calls_when_building_then_relations_resolv
                 (
                     "P012",
                     "__ref(stg_orders) is not a valid __ref() call",
-                    "models/marts/order_totals.sql",
+                    "sql/models/marts/order_totals.sql",
                     4,
                     6,
                     '__ref() takes exactly one double-quoted name, with no comments or extra spaces inside the parentheses: __ref("stg_orders")',
@@ -114,7 +114,7 @@ def test_given_double_quoted_reference_calls_when_building_then_relations_resolv
                 (
                     "P012",
                     "__source('raw_orders') is not a valid __source() call",
-                    "models/staging/stg_orders.sql",
+                    "sql/models/staging/stg_orders.sql",
                     3,
                     36,
                     '__source() takes exactly one double-quoted name, with no comments or extra spaces inside the parentheses: __source("raw_orders")',

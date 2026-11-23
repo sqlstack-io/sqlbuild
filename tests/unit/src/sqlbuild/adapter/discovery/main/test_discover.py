@@ -35,18 +35,18 @@ class NestedDuckDbAdapter(DuckDbAdapter):
         ProjectAdapterDiscoveryTestCase(
             description="loads public adapter files recursively",
             files={
-                "adapters/duckdb_plus.py": VALID_DUCKDB_ADAPTER,
-                "adapters/warehouse/nested.py": NESTED_DUCKDB_ADAPTER,
+                "python/adapters/duckdb_plus.py": VALID_DUCKDB_ADAPTER,
+                "python/adapters/warehouse/nested.py": NESTED_DUCKDB_ADAPTER,
             },
             expected_adapter_names=("duckdb_plus", "nested_duckdb"),
         ),
         ProjectAdapterDiscoveryTestCase(
             description="skips private files init files and private directories",
             files={
-                "adapters/duckdb_plus.py": VALID_DUCKDB_ADAPTER,
-                "adapters/__init__.py": NESTED_DUCKDB_ADAPTER,
-                "adapters/_private.py": NESTED_DUCKDB_ADAPTER,
-                "adapters/_shared/nested.py": NESTED_DUCKDB_ADAPTER,
+                "python/adapters/duckdb_plus.py": VALID_DUCKDB_ADAPTER,
+                "python/adapters/__init__.py": NESTED_DUCKDB_ADAPTER,
+                "python/adapters/_private.py": NESTED_DUCKDB_ADAPTER,
+                "python/adapters/_shared/nested.py": NESTED_DUCKDB_ADAPTER,
             },
             expected_adapter_names=("duckdb_plus",),
         ),
@@ -73,15 +73,15 @@ def test_given_project_adapter_files_when_discovering_then_returns_expected_adap
         ProjectAdapterDiscoveryErrorTestCase(
             description="rejects duplicate adapter names",
             files={
-                "adapters/one.py": VALID_DUCKDB_ADAPTER,
-                "adapters/two.py": VALID_DUCKDB_ADAPTER,
+                "python/adapters/one.py": VALID_DUCKDB_ADAPTER,
+                "python/adapters/two.py": VALID_DUCKDB_ADAPTER,
             },
             expected_error_fragment="Duplicate project-local adapter_name 'duckdb_plus'",
         ),
         ProjectAdapterDiscoveryErrorTestCase(
             description="rejects built in adapter shadowing",
             files={
-                "adapters/duckdb.py": VALID_DUCKDB_ADAPTER.replace("duckdb_plus", "duckdb"),
+                "python/adapters/duckdb.py": VALID_DUCKDB_ADAPTER.replace("duckdb_plus", "duckdb"),
             },
             reserved_names=frozenset({"duckdb"}),
             expected_error_fragment="shadows a built-in adapter name",
@@ -89,7 +89,7 @@ def test_given_project_adapter_files_when_discovering_then_returns_expected_adap
         ProjectAdapterDiscoveryErrorTestCase(
             description="rejects adapter subclass without adapter name",
             files={
-                "adapters/missing_name.py": """
+                "python/adapters/missing_name.py": """
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 
 
@@ -102,7 +102,7 @@ class MissingNameAdapter(DuckDbAdapter):
         ProjectAdapterDiscoveryErrorTestCase(
             description="rejects non adapter class with adapter name",
             files={
-                "adapters/not_adapter.py": """
+                "python/adapters/not_adapter.py": """
 class NotAdapter:
     adapter_name = "not_adapter"
 """,
@@ -111,7 +111,7 @@ class NotAdapter:
         ),
         ProjectAdapterDiscoveryErrorTestCase(
             description="reports import errors with file path",
-            files={"adapters/broken.py": "raise RuntimeError('boom')\n"},
+            files={"python/adapters/broken.py": "raise RuntimeError('boom')\n"},
             expected_error_fragment="Error importing project-local adapter module",
         ),
     ],

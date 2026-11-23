@@ -17,8 +17,8 @@ fn given_providers_missing_secrets_when_health_is_read_then_a_warning_names_them
             reports: vec![vec![("region", vec!["REGION_TOKEN", "REGION_CODE"])]],
             expected_tail: vec![
                 "\u{26a0} warn   1 provider has missing secrets                          missing secret",
-                "  at     providers/region.py:9   region_token  \u{2190} REGION_TOKEN",
-                "         providers/region.py:10  region_code   \u{2190} REGION_CODE",
+                "  at     python/providers/region.py:9   region_token  \u{2190} REGION_TOKEN",
+                "         python/providers/region.py:10  region_code   \u{2190} REGION_CODE",
                 "  why    runs that use it stop at the provider check, before the warehouse; 2",
                 "         nodes need it (raw_regions, stg_regions)",
                 "  fix    set them in config/dev.env and press r, or set them in the environment",
@@ -43,7 +43,7 @@ fn given_providers_missing_secrets_when_health_is_read_then_a_warning_names_them
             reports: vec![vec![("region", vec!["REGION_TOKEN"])]],
             expected_tail: vec![
                 "\u{26a0} warn   1 provider has missing secrets                          missing secret",
-                "  at     providers/region.py:9  region_token  \u{2190} REGION_TOKEN",
+                "  at     python/providers/region.py:9  region_token  \u{2190} REGION_TOKEN",
                 "  why    runs that use it stop at the provider check, before the warehouse; 7",
                 "         nodes need it (raw_regions, a, b, c, d and 2 more)",
                 "  fix    set it in the environment you start sqb dev from, then quit and run",
@@ -75,7 +75,7 @@ fn given_providers_missing_secrets_when_health_is_read_then_a_warning_names_them
             expected_tail: vec![
                 "  triggers   41 paused",
                 "\u{26a0} warn   1 provider has missing secrets                          missing secret",
-                "  at     providers/region.py:9  region_token  \u{2190} REGION_TOKEN",
+                "  at     python/providers/region.py:9  region_token  \u{2190} REGION_TOKEN",
                 "  why    runs that use it stop at the provider check, before the warehouse",
                 "  fix    set it in .env and press r, or set it in the environment you start sqb",
                 "         dev from, then quit and run sqb dev again",

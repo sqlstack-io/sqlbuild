@@ -24,10 +24,11 @@ from tests.e2e.src.sqlbuild.cli.commands.main.test.helpers import (
     write_project_files,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
+from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _FILES: dict[str, str] = build_since_project_files()
-_STAGING: str = "models/stg_orders.sql"
-_MACRO: str = "models/_macros/python/money.py"
+_STAGING: str = "sql/models/stg_orders.sql"
+_MACRO: str = "sql/models/_macros/python/money.py"
 _EDITED_STAGING: str = _FILES[_STAGING].replace(
     "SELECT order_id, status", "SELECT order_id, LOWER(status) AS status"
 )
@@ -37,7 +38,7 @@ _REFORMATTED_STAGING: str = (
     "-- one row per order\nselect\n  order_id,\n  status,\n  amount_cents\n"
     'from __source("raw_orders")\n'
 )
-_ARCHIVE: str = "models/order_archive.sql"
+_ARCHIVE: str = "sql/models/order_archive.sql"
 _ARCHIVE_SQL: str = (
     "MODEL (description 'Archived orders.');\n\nSELECT order_id FROM __ref(\"stg_orders\")\n"
 )
@@ -49,10 +50,10 @@ _SCENARIO_COMMAND: tuple[str, ...] = ("--no-color", "scenario", "test", "--since
 _EXPLAINED_TESTS: tuple[str, ...] = (*_TEST_COMMAND, "--explain")
 _EXPLAINED_SCENARIOS: tuple[str, ...] = (*_SCENARIO_COMMAND, "--explain")
 _SQL_MACROS: dict[str, str] = build_since_sql_macro_files()
-_INNER_SQL_MACRO: str = "models/_macros/sql/round_cents.sql"
-_OUTER_SQL_MACRO: str = "models/_macros/sql/net_dollars.sql"
-_SLOT_MACRO: str = "models/_macros/sql/status_totals.sql"
-_SLOT_MODEL: str = "models/order_status_totals.sql"
+_INNER_SQL_MACRO: str = "sql/models/_macros/sql/round_cents.sql"
+_OUTER_SQL_MACRO: str = "sql/models/_macros/sql/net_dollars.sql"
+_SLOT_MACRO: str = "sql/models/_macros/sql/status_totals.sql"
+_SLOT_MODEL: str = "sql/models/order_status_totals.sql"
 _SLOT_FILES: dict[str, str] = {
     _SLOT_MACRO: (
         "MACRO (\n  description 'Order totals per grain.',\n"
@@ -166,7 +167,7 @@ _SLOT_FILES: dict[str, str] = {
         SinceSelectionE2ETestCase(
             description="a pure rename through migrate_from selects nothing",
             edits={
-                "models/order_history.sql": _ARCHIVE_SQL.replace(
+                "sql/models/order_history.sql": _ARCHIVE_SQL.replace(
                     "MODEL (", "MODEL (migrate_from order_archive, "
                 ),
             },
@@ -263,7 +264,7 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         ),
         SinceSelectionE2ETestCase(
             description="a helper module a macro imports changes the macro",
-            edits={"python/_rates.py": 'DIVISOR = "100.0"\n'},
+            edits={"python/nodes/_rates.py": 'DIVISOR = "100.0"\n'},
             command=_EXPLAINED_TESTS,
             expected_exit_code=0,
             expected_fragments=(
@@ -277,7 +278,7 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         SinceSelectionE2ETestCase(
             description="a function body change selects the test that calls it",
             edits={
-                "functions/sql/is_open.sql": _INDIRECT["functions/sql/is_open.sql"].replace(
+                "sql/functions/sql/is_open.sql": _INDIRECT["sql/functions/sql/is_open.sql"].replace(
                     "order_status = 'open'", "LOWER(order_status) = 'open'"
                 )
             },
@@ -292,9 +293,9 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         SinceSelectionE2ETestCase(
             description="an audit definition change selects tests of models it is attached to",
             edits={
-                "audits/generic/at_least.sql": _INDIRECT["audits/generic/at_least.sql"].replace(
-                    "@column < @minimum", "@column <= @minimum"
-                )
+                "sql/audits/generic/at_least.sql": _INDIRECT[
+                    "sql/audits/generic/at_least.sql"
+                ].replace("@column < @minimum", "@column <= @minimum")
             },
             command=_EXPLAINED_TESTS,
             expected_exit_code=0,
@@ -322,14 +323,14 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         SinceSelectionE2ETestCase(
             description="a rename through migrate_from that also changes the SQL is a change",
             edits={
-                "models/order_history.sql": _INDIRECT["models/order_archive.sql"]
+                "sql/models/order_history.sql": _INDIRECT["sql/models/order_archive.sql"]
                 .replace("MODEL (", "MODEL (migrate_from order_archive, ")
                 .replace('__ref("stg_orders")', '__ref("stg_orders") WHERE order_id > 0'),
-                "models/archive_counts.sql": _INDIRECT["models/archive_counts.sql"].replace(
+                "sql/models/archive_counts.sql": _INDIRECT["sql/models/archive_counts.sql"].replace(
                     "order_archive", "order_history"
                 ),
             },
-            deletions=("models/order_archive.sql",),
+            deletions=("sql/models/order_archive.sql",),
             command=_EXPLAINED_TESTS,
             expected_exit_code=0,
             expected_fragments=(
@@ -342,7 +343,7 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         ),
         SinceSelectionE2ETestCase(
             description="seed data a test mocks selects nothing",
-            edits={"seeds/regions.csv": "region_id,region_name\n1,south\n"},
+            edits={"sql/seeds/regions.csv": "region_id,region_name\n1,south\n"},
             command=_TEST_COMMAND,
             expected_exit_code=0,
             expected_fragments=(
@@ -352,7 +353,7 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         ),
         SinceSelectionE2ETestCase(
             description="seed data selects the scenario that loads the seed",
-            edits={"seeds/regions.csv": "region_id,region_name\n1,south\n"},
+            edits={"sql/seeds/regions.csv": "region_id,region_name\n1,south\n"},
             command=_EXPLAINED_SCENARIOS,
             expected_exit_code=0,
             expected_fragments=(
@@ -364,7 +365,7 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         SinceSelectionE2ETestCase(
             description="a seed column type selects the scenario that loads the seed",
             edits={
-                "seeds/regions.yml": _INDIRECT["seeds/regions.yml"].replace(
+                "sql/seeds/regions.yml": _INDIRECT["sql/seeds/regions.yml"].replace(
                     "type: VARCHAR", "type: TEXT"
                 )
             },
@@ -375,9 +376,9 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         SinceSelectionE2ETestCase(
             description="an audit definition change selects scenarios that build its model",
             edits={
-                "audits/generic/at_least.sql": _INDIRECT["audits/generic/at_least.sql"].replace(
-                    "@column < @minimum", "@column <= @minimum"
-                )
+                "sql/audits/generic/at_least.sql": _INDIRECT[
+                    "sql/audits/generic/at_least.sql"
+                ].replace("@column < @minimum", "@column <= @minimum")
             },
             command=_EXPLAINED_SCENARIOS,
             expected_exit_code=0,
@@ -401,7 +402,7 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         SinceSelectionE2ETestCase(
             description="a mocked source's declared column type selects the tests that mock it",
             edits={
-                "sources/raw.yml": _FILES["sources/raw.yml"].replace(
+                "sql/sources/raw.yml": _FILES["sql/sources/raw.yml"].replace(
                     "amount_cents\n        type: INTEGER", "amount_cents\n        type: BIGINT"
                 )
             },
@@ -445,7 +446,7 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         SinceSelectionE2ETestCase(
             description="a macro another project-wide macro imports changes both",
             edits={
-                "macros/python/taxes.py": _INDIRECT["macros/python/taxes.py"].replace(
+                "sql/macros/python/taxes.py": _INDIRECT["sql/macros/python/taxes.py"].replace(
                     "+ 0", "+ 1 - 1"
                 )
             },
@@ -462,8 +463,8 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         SinceSelectionE2ETestCase(
             description="a scoped macro another scoped macro imports changes both",
             edits={
-                "models/_macros/python/currency.py": _INDIRECT[
-                    "models/_macros/python/currency.py"
+                "sql/models/_macros/python/currency.py": _INDIRECT[
+                    "sql/models/_macros/python/currency.py"
                 ].replace("* 1)", "* 1.0)")
             },
             command=_EXPLAINED_TESTS,
@@ -478,8 +479,8 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         SinceSelectionE2ETestCase(
             description="a macro a parameterized test's own fixture calls selects every case",
             edits={
-                "macros/python/fixture_values.py": _INDIRECT[
-                    "macros/python/fixture_values.py"
+                "sql/macros/python/fixture_values.py": _INDIRECT[
+                    "sql/macros/python/fixture_values.py"
                 ].replace("\"''\"", "\"'x'\"")
             },
             command=_EXPLAINED_TESTS,
@@ -547,8 +548,11 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         SinceSelectionE2ETestCase(
             description="a Python node change is listed",
             edits={
-                "python/tasks/report.py": _INDIRECT["python/tasks/report.py"].replace(
-                    "payload={}", 'payload={"orders": 1}'
+                **node_module_files(
+                    "python/nodes/tasks/report.py",
+                    _INDIRECT["python/nodes/tasks/report.py"].replace(
+                        "payload={}", 'payload={"orders": 1}'
+                    ),
                 )
             },
             command=_TEST_COMMAND,
@@ -582,12 +586,12 @@ def test_given_indirect_changes_since_ref_when_testing_then_selects_what_execute
         SinceBrokenBaseE2ETestCase(
             description="a base revision that does not compile fails and says what to do",
             base_files={
-                "models/broken.sql": (
+                "sql/models/broken.sql": (
                     "MODEL (description 'Reads a model that does not exist.');\n\n"
                     'SELECT order_id FROM __ref("missing_orders")\n'
                 )
             },
-            deletions=("models/broken.sql",),
+            deletions=("sql/models/broken.sql",),
             command=_TEST_COMMAND,
             expected_exit_code=1,
             expected_fragments=(
@@ -832,12 +836,12 @@ def test_given_unwritable_cache_when_testing_since_then_warns_and_succeeds(
         SinceSelectionE2ETestCase(
             description="naming the CTEs of a CTE-list sql macro call selects the caller's test",
             edits={
-                "models/_macros/sql/live_orders.sql": (
+                "sql/models/_macros/sql/live_orders.sql": (
                     "MACRO (\n  description 'Orders still open.',\n"
                     "  arguments (src RELATION (order_id INTEGER, status VARCHAR)),\n);\n\n"
                     "WITH live AS (SELECT * FROM @src WHERE status = 'open')\n"
                 ),
-                "models/order_live.sql": (
+                "sql/models/order_live.sql": (
                     "MODEL (description 'Live orders.');\n\n"
                     'WITH raw AS (SELECT * FROM __ref("stg_orders")),\n'
                     "@sql.live_orders(raw, __cte := open_orders)\n"

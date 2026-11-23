@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P017",
-     "message": "call to macro cents() is missing argument amount DOUBLE\n  model: stg_orders\n  --> models/staging/stg_orders.sql:5:31\n  --> models/staging/_sqlbuild/_macros/sql/cents.sql:7:1"
+     "message": "call to macro cents() is missing argument amount DOUBLE\n  model: stg_orders\n  --> sql/models/staging/stg_orders.sql:5:31\n  --> sql/models/staging/_sqlbuild/_macros/sql/cents.sql:7:1"
     }
    ]
   }

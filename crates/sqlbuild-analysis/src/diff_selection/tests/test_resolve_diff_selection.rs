@@ -19,7 +19,7 @@ fn given_selectors_when_resolving_diff_selection_then_matches_python_semantics()
         },
         DiffSelectionTestCase {
             description: "a comma intersects tag and path",
-            select: &["tag:finance,path:models\\marts\\"],
+            select: &["tag:finance,path:sql\\models\\marts\\"],
             exclude: &[],
             expected_selection: Ok(&[2, 3]),
         },
@@ -49,7 +49,7 @@ fn given_selectors_when_resolving_diff_selection_then_matches_python_semantics()
         },
         DiffSelectionTestCase {
             description: "an unknown path",
-            select: &["path:models/intermediate"],
+            select: &["path:sql/models/intermediate"],
             exclude: &[],
             expected_selection: Err("S009"),
         },

@@ -31,7 +31,7 @@ def test_given_typed_constant_when_building_native_row_then_value_and_type_are_p
     declaration: ConstantDeclaration = ConstantDeclaration(
         name="rules",
         value=normalize_sql_value(raw_value=test_case.raw_value, context="constant 'rules'"),
-        relative_path=Path("constants/rules.sql"),
+        relative_path=Path("sql/constants/rules.sql"),
     )
 
     _, _, members, value, value_type, render_as = declaration_rows(

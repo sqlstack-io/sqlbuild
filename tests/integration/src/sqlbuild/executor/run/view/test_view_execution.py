@@ -88,7 +88,7 @@ from tests.integration.src.sqlbuild.executor.run.view.helpers import (
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/view.py"),
+                    relative_path=Path("sql/hooks/python/view.py"),
                     name="create_view_data",
                     function=create_python_view_hook_data,
                 ),
@@ -121,7 +121,7 @@ from tests.integration.src.sqlbuild.executor.run.view.helpers import (
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/view.py"),
+                    relative_path=Path("sql/hooks/python/view.py"),
                     name="create_order_step",
                     function=create_python_view_order_step,
                 ),
@@ -216,7 +216,7 @@ def test_given_view_when_executing_then_succeeds(
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/view.py"),
+                    relative_path=Path("sql/hooks/python/view.py"),
                     name="fail_hook",
                     function=fail_python_view_hook,
                 ),
@@ -244,7 +244,7 @@ def test_given_view_when_executing_then_succeeds(
             hook_functions=(
                 DiscoveredHookFunction(
                     file_path=Path(__file__),
-                    relative_path=Path("hooks/python/view.py"),
+                    relative_path=Path("sql/hooks/python/view.py"),
                     name="fail_hook",
                     function=fail_python_view_hook,
                 ),

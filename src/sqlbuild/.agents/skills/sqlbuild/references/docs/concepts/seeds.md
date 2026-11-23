@@ -15,11 +15,11 @@ Online: https://sqlbuild.com/docs/concepts/seeds/
 - Target overrides
 - CSV settings
 
-Seeds are CSV files under `seeds/` that SQLBuild loads as tables in the warehouse. They're useful for small, static reference data like lookup tables, category mappings, or configuration values.
+Seeds are CSV files under `sql/seeds/` that SQLBuild loads as tables in the warehouse. They're useful for small, static reference data like lookup tables, category mappings, or configuration values.
 
 ## Defining a seed
 
-Place a CSV file in your `seeds/` directory:
+Place a CSV file in your `sql/seeds/` directory:
 
 ```csv
 waffle_type_id,waffle_name,category,price_cents
@@ -29,10 +29,10 @@ waffle_type_id,waffle_name,category,price_cents
 4,Cheddar Herb,savory,1050
 ```
 
-Declare the seed's column types in any `.yml` file under `seeds/`. You can use any filename and organize declarations however you like - one file per seed, or group related seeds together:
+Declare the seed's column types in any `.yml` file under `sql/seeds/`. You can use any filename and organize declarations however you like - one file per seed, or group related seeds together:
 
 ```yaml
-# seeds/lookups.yml
+# sql/seeds/lookups.yml
 seeds:
   - name: waffle_types
     description: Waffle menu items with pricing.
@@ -55,7 +55,7 @@ Seed YAML accepts only these keys; any other key is a compile error:
 | Seed | `name`, `description`, `database`, `schema`, `meta`, `tags`, `csv_settings`, `columns`, `audits` |
 | Column | `name`, `type`, `nullable`, `description`, `meta`, `audits` |
 
-Every seed must have a YAML declaration with a non-empty `description` ([Descriptions](models/configuration.md#descriptions)) and at least one typed column. CSV filenames must be unique across the entire `seeds/` directory (including subdirectories). The seed name in the YAML must match the CSV filename (without the `.csv` extension).
+Every seed must have a YAML declaration with a non-empty `description` ([Descriptions](models/configuration.md#descriptions)) and at least one typed column. CSV filenames must be unique across the entire `sql/seeds/` directory (including subdirectories). The seed name in the YAML must match the CSV filename (without the `.csv` extension).
 
 ## Referencing seeds
 
@@ -106,7 +106,7 @@ seeds:
 works on seeds reads the attached relation through `@relation`:
 
 ```sql
--- audits/generic/expression_is_true.sql
+-- sql/audits/generic/expression_is_true.sql
 AUDIT ();
 
 SELECT *

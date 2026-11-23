@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D007",
-     "message": "Managed source 'loaded_products' in sources/raw.yml requires loader 'loaded_products'"
+     "message": "Managed source 'loaded_products' in sql/sources/raw.yml requires loader 'loaded_products'"
     }
    ]
   }

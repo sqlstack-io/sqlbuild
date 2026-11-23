@@ -35,7 +35,7 @@ fn given_project_name_when_scaffolding_then_writes_config_and_summary() {
         description: "a plain project",
         project_name: "demo",
         expected_toml_start: "name = \"demo\"\nadapter = \"duckdb\"\ndefault_target = \"dev\"\n\n[connections.developer]\ndatabase = \"demo.duckdb\"\n",
-        expected_summary_start: "SQLBuild project created\n\n  Project: demo\n  Config:  sqlbuild_project.toml\n\nNext steps:\n  1. Add sources to sources/\n",
+        expected_summary_start: "SQLBuild project created\n\n  Project: demo\n  Config:  sqlbuild_project.toml\n\nNext steps:\n  1. Add sources to sql/sources/\n",
     }];
 
     for test_case in test_cases {

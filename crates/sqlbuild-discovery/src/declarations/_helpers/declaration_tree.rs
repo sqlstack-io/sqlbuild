@@ -2,11 +2,11 @@
 
 use crate::constants::{
     CANONICAL_AUTHORED_ROOTS, DECLARATION_GROUP_DIRECTORY, GLOBAL_DECLARATION_DIRECTORIES,
-    LOCAL_DECLARATION_DIRECTORIES, PYTHON_FILE_SUFFIX, PYTHON_MACROS_DIRECTORY,
+    GLOBAL_ROLE_PARENT, LOCAL_DECLARATION_DIRECTORIES, PYTHON_FILE_SUFFIX, PYTHON_MACROS_DIRECTORY,
     SCOPED_DECLARATION_DIRECTORIES, SQL_FILE_SUFFIX, SQL_MACROS_DIRECTORY,
 };
 use crate::declarations::_helpers::declaration_groups::validate_declaration_groups;
-use crate::declarations::_helpers::paths::{directory_facts, name, parent, stem};
+use crate::declarations::_helpers::paths::{directory_facts, join, name, parent, stem};
 use crate::declarations::_helpers::scan::{declaration_failure, shown};
 use crate::declarations::errors::ScanError;
 use crate::declarations::models::{DeclarationFileFact, DeclarationKind, ScopeKind};
@@ -46,13 +46,14 @@ pub(crate) fn declaration_file_facts(
     let mut facts: Vec<DeclarationFileFact> = Vec::new();
     let mut global: Vec<&str> = GLOBAL_DECLARATION_DIRECTORIES.to_vec();
     global.sort_unstable();
-    for directory in global {
-        if is_kind(kind, directory) && tree.is_dir(directory) {
+    for name in global {
+        let directory: String = join(GLOBAL_ROLE_PARENT, name);
+        if is_kind(kind, name) && tree.is_dir(&directory) {
             facts.extend(files_under_root(
                 tree,
                 &DeclarationRoot {
-                    ownership_root: directory,
-                    directory,
+                    ownership_root: &directory,
+                    directory: &directory,
                     owning_path: None,
                     scope_kind: ScopeKind::Global,
                 },

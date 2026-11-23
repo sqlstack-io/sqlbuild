@@ -71,12 +71,12 @@ def test_given_unsorted_index_when_building_lookup_then_records_and_edges_are_ca
                 "\U0001f600",
             ),
             expected_paths=(
-                "models/Zed.sql",
-                "models/\u00a0x.sql",
-                "models/cafe.sql",
-                "models/caf\u00e9.sql",
-                "models/e\u0301.sql",
-                "models/\U0001f600.sql",
+                "sql/models/Zed.sql",
+                "sql/models/\u00a0x.sql",
+                "sql/models/cafe.sql",
+                "sql/models/caf\u00e9.sql",
+                "sql/models/e\u0301.sql",
+                "sql/models/\U0001f600.sql",
             ),
         ),
     ],
@@ -89,7 +89,7 @@ def test_given_non_ascii_keys_when_building_lookup_then_mappings_follow_python_r
     resources: tuple[ResourceRecord, ...] = tuple(
         ResourceRecord(
             identity=ResourceIdentity(kind=ResourceKind.MODEL, name=name),
-            path=f"models/{name}.sql",
+            path=f"sql/models/{name}.sql",
             ownership_root=root,
         )
         for name in test_case.names
@@ -172,7 +172,7 @@ def test_given_typed_constant_when_projecting_default_metadata_then_value_is_abs
     assert projection["schema_version"] == 3
     assert constant["role"] == "constants"
     assert constant["visibility"] == "descendant_public"
-    assert constant["role_root"] == "models/staging/constants"
+    assert constant["role_root"] == "sql/models/staging/constants"
     assert constant["bucket_path"] is None
     assert constant["metadata"]["constant"] == {
         "logical_type": "integer",
@@ -190,16 +190,16 @@ def test_given_typed_constant_when_projecting_default_metadata_then_value_is_abs
     (
         DeclarationContainerProjectionCase(
             description="legacy declaration role has no navigation bucket",
-            path="models/orders/constants/policy.sql",
-            owning_path="models/orders",
-            expected_role_root="models/orders/constants",
+            path="sql/models/orders/constants/policy.sql",
+            owning_path="sql/models/orders",
+            expected_role_root="sql/models/orders/constants",
             expected_bucket_path=None,
         ),
         DeclarationContainerProjectionCase(
             description="grouped declaration role has no navigation bucket",
-            path="models/orders/_sqlbuild/constants/policy.sql",
-            owning_path="models/orders",
-            expected_role_root="models/orders/_sqlbuild/constants",
+            path="sql/models/orders/_sqlbuild/constants/policy.sql",
+            owning_path="sql/models/orders",
+            expected_role_root="sql/models/orders/_sqlbuild/constants",
             expected_bucket_path=None,
         ),
     ),

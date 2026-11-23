@@ -13,7 +13,7 @@ _PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "demo"\nadapter = "duckdb"\n\n[connection]\ndatabase = "demo.duckdb"\n'
     ),
-    "models/orders.sql": (
+    "sql/models/orders.sql": (
         "MODEL (description 'Test model orders.',\n"
         "  materialized table,\n"
         "  contract enforced,\n"
@@ -24,7 +24,7 @@ _PROJECT_FILES: dict[str, str] = {
         ");\n\n"
         "SELECT 1 AS order_id, 5 AS amount\n"
     ),
-    "models/order_totals.sql": (
+    "sql/models/order_totals.sql": (
         'MODEL (description "Test model order_totals.", materialized table);\n\nSELECT order_id, amount * 2 AS doubled FROM __ref("orders")\n'
     ),
     "tests/unit/test_order_totals.sql": (

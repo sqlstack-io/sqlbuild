@@ -16,6 +16,7 @@ use crate::scope_cache::constants::{
     RELATIONSHIP_ROOTS, SOURCE_SUFFIXES, TARGET_VARS_KEY, TARGETS_KEY, TOML_SUFFIX,
 };
 use crate::scope_cache::models::FingerprintInputs;
+use crate::scope_index::constants::GLOBAL_ROLE_PARENT;
 
 /// A config value `json.dumps` cannot serialize.
 pub(crate) struct Unserializable;
@@ -28,9 +29,13 @@ fn suffix(path: &str) -> &str {
 /// `_source_role`: declaration, macro, relationship or resource.
 pub(crate) fn source_role(relative: &str, inputs: &FingerprintInputs) -> &'static str {
     let parts: Vec<&str> = relative.split('/').collect();
+    let role: &str = match parts.as_slice() {
+        [parent, role, ..] if *parent == GLOBAL_ROLE_PARENT => role,
+        _ => parts[0],
+    };
     let mut declared: bool = inputs
         .named_declaration_directories
-        .contains(&parts[0].to_owned());
+        .contains(&role.to_owned());
     for part in &parts {
         declared |= inputs.declaration_directories.contains(&(*part).to_owned());
     }

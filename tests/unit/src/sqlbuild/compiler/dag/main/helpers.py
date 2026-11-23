@@ -67,21 +67,21 @@ def build_dag_artifact_test_graph() -> ProjectGraph:
         columns=(SourceColumnEntry(name="order_id", type="INTEGER"),),
     )
     source_file: DiscoveredSourceFile = DiscoveredSourceFile(
-        file_path=Path("sources/raw.yml"),
-        relative_path=Path("sources/raw.yml"),
+        file_path=Path("sql/sources/raw.yml"),
+        relative_path=Path("sql/sources/raw.yml"),
         contents="",
         source_entries=(source_entry,),
     )
     schema_file: DiscoveredSchemaFile = DiscoveredSchemaFile(
-        file_path=Path("models/schema.yml"),
-        relative_path=Path("models/schema.yml"),
+        file_path=Path("sql/models/schema.yml"),
+        relative_path=Path("sql/models/schema.yml"),
         contents="",
         model_entries=(),
         seed_entries=(),
     )
     seed_file: DiscoveredSeedFile = DiscoveredSeedFile(
-        file_path=Path("seeds/country_codes.csv"),
-        relative_path=Path("seeds/country_codes.csv"),
+        file_path=Path("sql/seeds/country_codes.csv"),
+        relative_path=Path("sql/seeds/country_codes.csv"),
     )
     model_target: CompiledRelationLocation = CompiledRelationLocation(
         database=None,
@@ -104,14 +104,14 @@ def build_dag_artifact_test_graph() -> ProjectGraph:
         effective_target_schema="raw",
         loader_functions=(
             DiscoveredLoaderFunction(
-                file_path=Path("python/loaders/orders.py"),
-                relative_path=Path("python/loaders/orders.py"),
+                file_path=Path("python/nodes/loaders/orders.py"),
+                relative_path=Path("python/nodes/loaders/orders.py"),
                 name="shared_order_feed",
                 function=shared_order_feed,
             ),
             DiscoveredLoaderFunction(
-                file_path=Path("python/loaders/orders.py"),
-                relative_path=Path("python/loaders/orders.py"),
+                file_path=Path("python/nodes/loaders/orders.py"),
+                relative_path=Path("python/nodes/loaders/orders.py"),
                 name="raw_orders_loader",
                 function=raw_orders_loader,
                 depends_on=(shared_order_feed,),
@@ -153,7 +153,7 @@ def build_dag_artifact_test_graph() -> ProjectGraph:
                 key=function_key,
                 deps=(),
                 name="normalize_email",
-                relative_path=Path("functions/normalize_email.sql"),
+                relative_path=Path("sql/functions/normalize_email.sql"),
                 arguments=(FunctionArgument(name="email", type="TEXT"),),
                 returns="TEXT",
                 body_sql="lower(email)",
@@ -168,7 +168,7 @@ def build_dag_artifact_test_graph() -> ProjectGraph:
                 key=model_key,
                 deps=(source_key, seed_key, function_key),
                 name="orders",
-                relative_path=Path("models/orders.sql"),
+                relative_path=Path("sql/models/orders.sql"),
                 query_sql="SELECT 1 AS order_id",
                 authored_sql="MODEL (materialized table);\n\nSELECT 1 AS order_id",
                 config=CompileModelConfig(values={"materialized": "table", "tags": ["daily"]}),
@@ -202,8 +202,8 @@ def build_dag_artifact_test_graph() -> ProjectGraph:
                 name="orders_audit",
                 definition_name="test_audit",
                 audit_file=DiscoveredAuditFile(
-                    file_path=Path("audits/orders.sql"),
-                    relative_path=Path("audits/orders.sql"),
+                    file_path=Path("sql/audits/orders.sql"),
+                    relative_path=Path("sql/audits/orders.sql"),
                     contents="",
                     blocks=(),
                 ),

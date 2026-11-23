@@ -10,27 +10,27 @@ from sqlbuild.compiler.compile.types import CompiledProjectView
 
 PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-    "sources/raw.yml": (
+    "sql/sources/raw.yml": (
         "sources:\n"
         "  - name: raw_orders\n    description: Raw orders.\n"
         '    expression: "(SELECT 1 AS id, 2 AS customer_id)"\n'
     ),
-    "seeds/regions.csv": "region_id,name\n1,north\n",
-    "seeds/regions.yml": (
+    "sql/seeds/regions.csv": "region_id,name\n1,north\n",
+    "sql/seeds/regions.yml": (
         "seeds:\n  - name: regions\n    description: Regions.\n    columns:\n"
         "      - name: region_id\n        type: INTEGER\n"
         "      - name: name\n        type: VARCHAR\n"
     ),
-    "constants/policy.sql": "CONSTANT (name minimum_amount, value 7);\n",
-    "enums/order_status.sql": "ENUM (name order_status, members [PAID, OPEN]);\n",
-    "functions/sql/is_paid.sql": (
+    "sql/constants/policy.sql": "CONSTANT (name minimum_amount, value 7);\n",
+    "sql/enums/order_status.sql": "ENUM (name order_status, members [PAID, OPEN]);\n",
+    "sql/functions/sql/is_paid.sql": (
         "FUNCTION (\n  arguments (status STRING),\n  returns BOOLEAN,\n);\n\nstatus = 'PAID'\n"
     ),
-    "models/staging/stg_orders.sql": (
+    "sql/models/staging/stg_orders.sql": (
         "MODEL (\n  columns (\n    order_id (type INTEGER, audits [not_null]),\n  ),\n);\n\n"
         'SELECT CAST(id AS INTEGER) AS order_id FROM __source("raw_orders")\n'
     ),
-    "models/marts/order_totals.sql": (
+    "sql/models/marts/order_totals.sql": (
         'MODEL (description "Order totals");\n\nSELECT o.order_id FROM __ref("stg_orders") AS o\n'
     ),
     "tests/unit/test_order_totals.sql": (

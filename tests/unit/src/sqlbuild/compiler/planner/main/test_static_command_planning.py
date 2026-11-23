@@ -146,7 +146,7 @@ def test_given_selected_seed_when_planning_then_identity_and_reason_are_preserve
                 project.seeds[0],
                 seed_file=DiscoveredSeedFile(
                     file_path=seed_path,
-                    relative_path=Path("seeds/countries.csv"),
+                    relative_path=Path("sql/seeds/countries.csv"),
                 ),
             ),
         ),
@@ -215,7 +215,7 @@ def test_given_selected_seed_without_state_table_when_reading_reason_then_only_s
         project.seeds[0],
         seed_file=DiscoveredSeedFile(
             file_path=seed_path,
-            relative_path=Path("seeds/countries.csv"),
+            relative_path=Path("sql/seeds/countries.csv"),
         ),
         destination=replace(project.seeds[0].destination, schema="analytics"),
     )

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Model file models/fulfillment/staging/stg_fulfillment_2.sql references unknown model 'missing_model'"
+     "message": "Model file sql/models/fulfillment/staging/stg_fulfillment_2.sql references unknown model 'missing_model'"
     }
    ]
   },
@@ -20,7 +20,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Model file models/fulfillment/staging/stg_fulfillment_2.sql references unknown model 'missing_model'"
+     "message": "Model file sql/models/fulfillment/staging/stg_fulfillment_2.sql references unknown model 'missing_model'"
     }
    ]
   },
@@ -37,7 +37,7 @@
     "Project assembly  OK  (<elapsed>)",
     "Project discovery  OK  (<elapsed>)",
     "Compiling project...",
-    "error[P001]: Model file models/fulfillment/staging/stg_fulfillment_2.sql references unknown model 'missing_model'",
+    "error[P001]: Model file sql/models/fulfillment/staging/stg_fulfillment_2.sql references unknown model 'missing_model'",
     "",
     ""
    ]

@@ -24,16 +24,16 @@ fn given_usages_when_validating_placement_then_unused_and_misplaced_declarations
                 (
                     1,
                     "S010",
-                    "Unused global declaration 'macro:unused' at macros/python/unused.py; remove it or \
+                    "Unused global declaration 'macro:unused' at sql/macros/python/unused.py; remove it or \
                      add a genuine runtime use",
                 ),
                 (
                     2,
                     "S007",
                     "Declaration 'macro:shared' is currently exact-owner-private at \
-                     'models/sales' (models/sales/_macros/python/shared.py); required descendant-public \
-                     at 'models/sales'. Consumers: model:customers, model:orders. Move it to \
-                     'models/sales/_sqlbuild/macros/python/'",
+                     'sql/models/sales' (sql/models/sales/_macros/python/shared.py); required descendant-public \
+                     at 'sql/models/sales'. Consumers: model:customers, model:orders. Move it to \
+                     'sql/models/sales/_sqlbuild/macros/python/'",
                 ),
             ],
         },
@@ -69,7 +69,7 @@ fn given_placement_when_choosing_directory_then_role_folders_match_python() {
             description: "a global macro",
             kind: DeclarationKind::Macro,
             scope: ScopeKind::Global,
-            path: Some("models/sales"),
+            path: Some("sql/models/sales"),
             expected_directory: "macros",
         },
         DeclarationDirectoryTestCase {
@@ -77,14 +77,14 @@ fn given_placement_when_choosing_directory_then_role_folders_match_python() {
             kind: DeclarationKind::Audit,
             scope: ScopeKind::Local,
             path: Some("models"),
-            expected_directory: "models/_audits/generic",
+            expected_directory: "sql/models/_audits/generic",
         },
         DeclarationDirectoryTestCase {
             description: "an inherited hook below a nested folder",
             kind: DeclarationKind::SqlHook,
             scope: ScopeKind::Inherited,
-            path: Some("models/sales"),
-            expected_directory: "models/sales/_sqlbuild/hooks/sql",
+            path: Some("sql/models/sales"),
+            expected_directory: "sql/models/sales/_sqlbuild/hooks/sql",
         },
         DeclarationDirectoryTestCase {
             description: "an inherited enum without a folder",
@@ -110,24 +110,24 @@ fn given_resource_move_when_relocating_then_chained_local_declarations_follow() 
         RelocationTestCase {
             description: "a model and the macro chain it uses move to a new folder",
             index: chained_macros,
-            destination: "models/finance/orders.sql",
+            destination: "sql/models/finance/orders.sql",
             expected_relocations: Some(&[
                 (
                     0,
-                    "models/finance/_sqlbuild/_macros/python/cents.py",
-                    Some("models/finance"),
+                    "sql/models/finance/_sqlbuild/_macros/python/cents.py",
+                    Some("sql/models/finance"),
                 ),
                 (
                     1,
-                    "models/finance/_sqlbuild/_macros/python/round.py",
-                    Some("models/finance"),
+                    "sql/models/finance/_sqlbuild/_macros/python/round.py",
+                    Some("sql/models/finance"),
                 ),
             ]),
         },
         RelocationTestCase {
             description: "a move within the same folder relocates nothing",
             index: chained_macros,
-            destination: "models/sales/renamed.sql",
+            destination: "sql/models/sales/renamed.sql",
             expected_relocations: Some(&[]),
         },
     ];
@@ -157,45 +157,49 @@ fn given_destination_role_layout_when_carrying_declaration_then_its_shape_is_mat
         CarriedLayoutTestCase {
             description: "an empty destination role keeps the source group",
             index: grouped_cents_empty_role,
-            moves: &[("orders", "models/sales/eu/orders.sql")],
+            moves: &[("orders", "sql/models/sales/eu/orders.sql")],
             expected_relocations: &[(
                 0,
-                "models/sales/_sqlbuild/macros/python/money/cents.py",
+                "sql/models/sales/_sqlbuild/macros/python/money/cents.py",
                 false,
             )],
         },
         CarriedLayoutTestCase {
             description: "a grouped destination role keeps the source group",
             index: grouped_cents_grouped_role,
-            moves: &[("orders", "models/sales/eu/orders.sql")],
+            moves: &[("orders", "sql/models/sales/eu/orders.sql")],
             expected_relocations: &[(
                 0,
-                "models/sales/_sqlbuild/macros/python/money/cents.py",
+                "sql/models/sales/_sqlbuild/macros/python/money/cents.py",
                 false,
             )],
         },
         CarriedLayoutTestCase {
             description: "a direct source in a grouped destination role needs a group",
             index: direct_cents_grouped_role,
-            moves: &[("orders", "models/sales/eu/orders.sql")],
-            expected_relocations: &[(0, "models/sales/_sqlbuild/macros/python/cents.py", true)],
+            moves: &[("orders", "sql/models/sales/eu/orders.sql")],
+            expected_relocations: &[(0, "sql/models/sales/_sqlbuild/macros/python/cents.py", true)],
         },
         CarriedLayoutTestCase {
             description: "a direct destination role drops the source group",
             index: grouped_cents_direct_role,
-            moves: &[("orders", "models/sales/eu/orders.sql")],
-            expected_relocations: &[(0, "models/sales/_sqlbuild/macros/python/cents.py", false)],
+            moves: &[("orders", "sql/models/sales/eu/orders.sql")],
+            expected_relocations: &[(
+                0,
+                "sql/models/sales/_sqlbuild/macros/python/cents.py",
+                false,
+            )],
         },
         CarriedLayoutTestCase {
             description: "moving every user together places the macro once at their new folder",
             index: grouped_cents_grouped_role,
             moves: &[
-                ("orders", "models/sales/eu/orders.sql"),
-                ("refunds", "models/sales/eu/refunds.sql"),
+                ("orders", "sql/models/sales/eu/orders.sql"),
+                ("refunds", "sql/models/sales/eu/refunds.sql"),
             ],
             expected_relocations: &[(
                 0,
-                "models/sales/eu/_sqlbuild/_macros/python/money/cents.py",
+                "sql/models/sales/eu/_sqlbuild/_macros/python/money/cents.py",
                 false,
             )],
         },

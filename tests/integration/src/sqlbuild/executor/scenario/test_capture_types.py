@@ -118,7 +118,7 @@ def test_given_typed_duckdb_relation_when_capturing_then_jsonl_reloads_with_mani
                     name="typed_capture_source",
                     qualified_name="typed_capture_source",
                 ),
-                file_path=Path("sources/typed_source.jsonl"),
+                file_path=Path("sql/sources/typed_source.jsonl"),
                 capture_sql="SELECT * FROM typed_capture_source",
             ),
         ),

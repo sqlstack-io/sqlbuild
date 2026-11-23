@@ -12,15 +12,15 @@ def prepare_lineage_cache_project(*, tmp_path: Path) -> Path:
         project_name="lineage_cache_project",
         repo_files={
             "sqlbuild_project.toml": 'name = "lineage_cache_project"\nadapter = "duckdb"\n',
-            "models/stg_orders.sql": (
+            "sql/models/stg_orders.sql": (
                 "MODEL (description 'Test model stg_orders.', "
                 "materialized view);\n\nSELECT 1 AS order_id, 10 AS customer_id\n"
             ),
-            "models/stg_customers.sql": (
+            "sql/models/stg_customers.sql": (
                 "MODEL (description 'Test model stg_customers.', "
                 "materialized view);\n\nSELECT 10 AS customer_id\n"
             ),
-            "models/fact_orders.sql": (
+            "sql/models/fact_orders.sql": (
                 'MODEL (description "Test model fact_orders.", '
                 'materialized view);\n\nSELECT * FROM __ref("stg_orders")\n'
             ),
@@ -52,17 +52,17 @@ def prepare_diamond_lineage_project(*, tmp_path: Path) -> Path:
 
     files: dict[str, str] = {
         "sqlbuild_project.toml": 'name = "diamond_lineage"\nadapter = "duckdb"\n',
-        "models/orders_0.sql": "MODEL (description 'Test model orders_0.', "
+        "sql/models/orders_0.sql": "MODEL (description 'Test model orders_0.', "
         "materialized view);\n\nSELECT 1 AS order_id, 10 AS amount\n",
     }
     for layer in range(1, DIAMOND_LAYERS + 1):
         previous: str = f"orders_{layer - 1}"
         for side in ("left", "right"):
-            files[f"models/orders_{side}_{layer}.sql"] = (
+            files[f"sql/models/orders_{side}_{layer}.sql"] = (
                 'MODEL (description "Test model.", '
                 f'materialized view);\n\nSELECT order_id, amount FROM __ref("{previous}")\n'
             )
-        files[f"models/orders_{layer}.sql"] = (
+        files[f"sql/models/orders_{layer}.sql"] = (
             "MODEL (description 'Test model.', materialized view);\n\n"
             "SELECT l.order_id, l.amount + r.amount AS amount\n"
             f'FROM __ref("orders_left_{layer}") AS l\n'

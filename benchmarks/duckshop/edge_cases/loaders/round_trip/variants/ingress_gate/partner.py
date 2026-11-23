@@ -1,5 +1,5 @@
-from python.tasks.rates import fetch_rates
-from python.tasks.scoring import score_orders
+from python.nodes.tasks.rates import fetch_rates
+from python.nodes.tasks.scoring import score_orders
 
 from sqlbuild.loaders import loader
 

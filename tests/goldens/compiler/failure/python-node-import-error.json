@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D011",
-     "message": "Failed to import Python node file python/tasks/exports.py: No module named 'missing_orders_client'"
+     "message": "Failed to import Python node file python/nodes/tasks/exports/asset.py: No module named 'missing_orders_client'"
     }
    ]
   }

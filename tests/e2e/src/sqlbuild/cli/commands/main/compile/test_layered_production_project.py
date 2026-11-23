@@ -51,7 +51,7 @@ def test_given_layered_production_project_when_compiling_then_reports_no_diagnos
         audit_count=test_case.audit_count,
     )
     model_sql: str = "".join(
-        path.read_text(encoding="utf-8") for path in (project_dir / "models").rglob("*.sql")
+        path.read_text(encoding="utf-8") for path in (project_dir / "sql" / "models").rglob("*.sql")
     )
     for fragment in ("__seed(", "__udf(", "@py.macro_", "model_schema benchmark_row"):
         assert fragment in model_sql

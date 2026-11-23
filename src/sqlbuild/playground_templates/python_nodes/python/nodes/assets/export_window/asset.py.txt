@@ -1,0 +1,10 @@
+"""An upstream asset that names the export window."""
+
+from sqlbuild.assets import asset
+
+
+@asset(tags=["python", "optional"], group="exports")
+def export_window(ctx):
+    """Successful sibling that lets downstream fan-in continue."""
+
+    return ctx.result(payload={"window": "daily"})

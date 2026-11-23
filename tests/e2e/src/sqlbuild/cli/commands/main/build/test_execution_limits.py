@@ -51,8 +51,8 @@ schema = "main"
 max_models = 1
 remediation = "Automated tools must request approval before changing this policy."
 """.strip(),
-            "models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS id\n",
-            "models/order_items.sql": "MODEL (description 'Test model order_items.', materialized table);\n\nSELECT 1 AS id\n",
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS id\n",
+            "sql/models/order_items.sql": "MODEL (description 'Test model order_items.', materialized table);\n\nSELECT 1 AS id\n",
         },
     )
 
@@ -112,8 +112,8 @@ max_models = 1
 [targets.dev.execution_limits]
 max_models = 2
 """.strip(),
-            "models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS id\n",
-            "models/order_items.sql": "MODEL (description 'Test model order_items.', materialized table);\n\nSELECT 1 AS id\n",
+            "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS id\n",
+            "sql/models/order_items.sql": "MODEL (description 'Test model order_items.', materialized table);\n\nSELECT 1 AS id\n",
         },
     )
 

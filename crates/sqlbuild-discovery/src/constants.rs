@@ -1,7 +1,7 @@
 //! Project layout names shared by native discovery.
 
 /// Root of SQL model files.
-pub const MODELS_DIRECTORY: &str = "models";
+pub const MODELS_DIRECTORY: &str = sqlbuild_core::constants::MODELS_PATH;
 /// Root of code-location orchestration declarations, never imported by the scheduler.
 pub const ORCHESTRATION_DIRECTORY: &str = "orchestration";
 /// Suffix of SQL files.
@@ -19,11 +19,11 @@ pub const SCOPED_DECLARATION_DIRECTORIES: [&str; 6] = [
 ];
 /// Resource trees that may hold scoped declarations, in Python's lookup order.
 pub const CANONICAL_AUTHORED_ROOTS: [&[&str]; 5] = [
-    &["models"],
+    &["sql", "models"],
     &["tests", "unit"],
     &["tests", "scenarios"],
-    &["functions", "sql"],
-    &["sources"],
+    &["sql", "functions", "sql"],
+    &["sql", "sources"],
 ];
 /// The SQL test root, whose `macros/` SQL files are tests rather than declarations.
 pub const SQL_TESTS_ROOT: &[&str] = &["tests", "unit"];
@@ -33,6 +33,8 @@ pub const SQL_SCENARIOS_ROOT: &str = "tests/scenarios";
 pub const MACRO_TESTS_DIRECTORY: &str = "macros";
 /// Inherited declaration directories, which may also be project-wide global roots.
 pub const GLOBAL_DECLARATION_DIRECTORIES: [&str; 3] = ["macros", "enums", "constants"];
+/// The project folder holding the project-wide declaration and named roles.
+pub const GLOBAL_ROLE_PARENT: &str = sqlbuild_core::constants::SQL_DIRECTORY;
 /// Folder-local declaration directories.
 pub const LOCAL_DECLARATION_DIRECTORIES: [&str; 3] = ["_macros", "_enums", "_constants"];
 /// Directories a declaration group may hold for named declarations.
@@ -49,6 +51,8 @@ pub const PYTHON_MACROS_DIRECTORY: &str = "python";
 pub const SQL_MACROS_DIRECTORY: &str = "sql";
 /// The project-wide audit role directory.
 pub const AUDIT_ROLE_DIRECTORY: &str = "audits";
+/// The project-wide audit role folder.
+pub const AUDIT_ROLE_PATH: &str = sqlbuild_core::constants::AUDITS_PATH;
 /// The folder-local audit role directory inside a declaration group.
 pub const LOCAL_AUDIT_ROLE_DIRECTORY: &str = "_audits";
 /// The singular audit directory below an audit role.

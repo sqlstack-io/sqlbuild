@@ -54,8 +54,8 @@ _REQUIRED_ANALYSIS_TOML: str = (
 )
 _OPT_OUT_HEADER: str = 'MODEL (\n  description "Orders",\n  sql_analysis false,\n'
 _SEED_FILES: dict[str, str] = {
-    "seeds/countries.csv": "n\n1\n",
-    "models/orders.sql": _ORDERS_MODEL,
+    "sql/seeds/countries.csv": "n\n1\n",
+    "sql/models/orders.sql": _ORDERS_MODEL,
 }
 
 
@@ -157,7 +157,7 @@ def test_given_projects_python_rejects_when_assembling_natively_then_matches_pyt
             description="model SQL the parser rejects",
             files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/orders.sql": 'MODEL (description "Orders");\n\nSELECT FROM WHERE (\n',
+                "sql/models/orders.sql": 'MODEL (description "Orders");\n\nSELECT FROM WHERE (\n',
             },
             expected_message_fragment=(
                 "the duckdb parser cannot read Syntax error at or near 'WHERE' at line 3, column 13"
@@ -167,7 +167,7 @@ def test_given_projects_python_rejects_when_assembling_natively_then_matches_pyt
             description="hook SQL the parser rejects",
             files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     'MODEL (\n  description "Orders",\n  pre_hooks [inline_sql("SELECT FROM (")],\n'
                     ");\n\nSELECT 1 AS n\n"
                 ),
@@ -215,7 +215,7 @@ def test_given_windows_environment_when_assembling_natively_then_env_lookups_mat
         project_dir=tmp_path,
         files={
             "sqlbuild_project.toml": _PROJECT_TOML,
-            "seeds/lookups.yml": seed_yml(test_case.seed_schema),
+            "sql/seeds/lookups.yml": seed_yml(test_case.seed_schema),
             **_SEED_FILES,
         },
     )
@@ -231,9 +231,9 @@ def test_given_windows_environment_when_assembling_natively_then_env_lookups_mat
         OptOutTestCase(
             description="parseable, unparseable and unparseable-hook opt-outs",
             models={
-                "models/parses.sql": f"{_OPT_OUT_HEADER});\n\nSELECT 1 AS n\n",
-                "models/broken_query.sql": f"{_OPT_OUT_HEADER});\n\nSELECT FROM WHERE (\n",
-                "models/broken_hook.sql": (
+                "sql/models/parses.sql": f"{_OPT_OUT_HEADER});\n\nSELECT 1 AS n\n",
+                "sql/models/broken_query.sql": f"{_OPT_OUT_HEADER});\n\nSELECT FROM WHERE (\n",
+                "sql/models/broken_hook.sql": (
                     f'{_OPT_OUT_HEADER}  post_hooks [inline_sql("SELECT FROM (")],\n);\n\n'
                     "SELECT 1 AS n\n"
                 ),
@@ -264,7 +264,7 @@ def test_given_sql_analysis_opt_outs_when_attaching_natively_then_python_rejecti
             description="a T-SQL hook the parser once panicked on",
             files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
-                "models/orders.sql": (
+                "sql/models/orders.sql": (
                     'MODEL (\n  description "Orders",\n'
                     '  pre_hooks [inline_sql("SELECT IF(region > 1, re")],\n);\n\nSELECT 1 AS n\n'
                 ),

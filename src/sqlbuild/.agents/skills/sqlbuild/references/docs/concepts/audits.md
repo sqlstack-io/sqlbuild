@@ -46,7 +46,7 @@ For `warn` severity audits, the build continues and the failure is reported in t
 A reusable measurement audit separates the aggregate query from optional bounded evidence:
 
 ```sql
--- audits/generic/valid_order_rate.sql
+-- sql/audits/generic/valid_order_rate.sql
 AUDIT (
   evaluation measurement,
   value valid_rate,
@@ -162,7 +162,7 @@ is published as each audit finishes.
 
 ## Built-in audits
 
-SQLBuild includes four generic audits out of the box. You do not need to define these in `audits/generic/` - they are available automatically:
+SQLBuild includes four generic audits out of the box. You do not need to define these in `sql/audits/generic/` - they are available automatically:
 
 | Audit | Description | Parameters |
 |-------|-------------|------------|
@@ -199,7 +199,7 @@ MODEL (
 
 ### Overriding built-in audits
 
-If you define a generic audit with the same name as a built-in (e.g. `audits/generic/not_null.sql`), your definition takes precedence. SQLBuild emits a warning so you're aware of the override:
+If you define a generic audit with the same name as a built-in (e.g. `sql/audits/generic/not_null.sql`), your definition takes precedence. SQLBuild emits a warning so you're aware of the override:
 
 ```
 warning[P003]: project audit 'not_null' overrides built-in audit 'not_null'
@@ -211,18 +211,18 @@ Beyond the built-ins, you can define reusable SQL templates in a generic audit r
 
 | Location | Who can attach it |
 |----------|-------------------|
-| `audits/generic/` | Resources anywhere in the project |
+| `sql/audits/generic/` | Resources anywhere in the project |
 | `<folder>/_sqlbuild/audits/generic/` | Resources in `<folder>` and below |
 | `<folder>/_sqlbuild/_audits/generic/` | Resources directly in `<folder>` only |
 
 A generic audit must live under the nearest folder that contains every model, source, seed, or
 audit factory that attaches it. A top-level generic audit used only by models under
-`models/marts/` fails to compile and names the folder it belongs in:
+`sql/models/marts/` fails to compile and names the folder it belongs in:
 
 ```
-error[S024]: Declaration 'audit:non_negative' is currently project at 'audits/generic' (audits/generic/non_negative.sql); required exact-owner-private at 'models/marts'. Consumers: model:daily_revenue. Move it to 'models/marts/_sqlbuild/_audits/generic/'
+error[S024]: Declaration 'audit:non_negative' is currently project at 'sql/audits/generic' (sql/audits/generic/non_negative.sql); required exact-owner-private at 'sql/models/marts'. Consumers: model:daily_revenue. Move it to 'sql/models/marts/_sqlbuild/_audits/generic/'
   audit: non_negative
-  --> audits/generic/non_negative.sql:1:1
+  --> sql/audits/generic/non_negative.sql:1:1
 ```
 
 Attaching a scoped generic audit from a folder that cannot see it fails with `S006`. Built-in
@@ -230,7 +230,7 @@ audits are available everywhere and are unaffected. See
 [Where to Put Declarations](declaration-scopes/placement.md).
 
 ```sql
--- audits/generic/expression_is_true.sql
+-- sql/audits/generic/expression_is_true.sql
 AUDIT ();
 
 SELECT *
@@ -252,8 +252,8 @@ Generic audit SQL uses `@name` for parameter placeholders. These are resolved by
 
 Generic and singular audit SQL uses macros, constants, and enums available from the folder that owns
 the audit, not from a model or source that uses the audit. An audit in
-`models/marts/_sqlbuild/_audits/generic/` sees the declarations a model in `models/marts/` sees; an
-audit in the top-level `audits/` roles sees only project-wide declarations. Using a declaration
+`sql/models/marts/_sqlbuild/_audits/generic/` sees the declarations a model in `sql/models/marts/` sees; an
+audit in the top-level `sql/audits/` roles sees only project-wide declarations. Using a declaration
 that is not visible from there is a compile error. See
 [How Visibility Works](declaration-scopes/visibility.md).
 
@@ -277,7 +277,7 @@ Every argument an attachment passes must be read by the audit's SQL or evidence 
 the argument to remove, so a check is never silently broader or narrower than its attachment says:
 
 ```text
-models/marts/fct_orders.sql audit 'expression_is_true' passes argument 'where_condition', which the audit's SQL in audits/generic/expression_is_true.sql never uses; remove 'where_condition' from the attachment
+sql/models/marts/fct_orders.sql audit 'expression_is_true' passes argument 'where_condition', which the audit's SQL in sql/audits/generic/expression_is_true.sql never uses; remove 'where_condition' from the attachment
 ```
 
 An argument that repeats one the attached resource supplies, such as `column`, is not checked.
@@ -288,7 +288,7 @@ An attached audit can read other models, sources, seeds, and table functions bes
 for example to check that every value appears in a lookup table:
 
 ```sql
--- audits/generic/known_status.sql
+-- sql/audits/generic/known_status.sql
 AUDIT ();
 
 SELECT o.*
@@ -325,7 +325,7 @@ to wait for its own dependants. That fails to compile with `P005`:
 error[P005]: Audit 'known_status' on model 'orders' reads model 'order_summary', which depends on
 'orders'; an attached audit gates its target, so it cannot wait for a resource built from that
 target
-  = help: write a singular audit under audits/singular/ that references both 'orders' and
+  = help: write a singular audit under sql/audits/singular/ that references both 'orders' and
   'order_summary'; it runs once both are built
 ```
 
@@ -336,7 +336,7 @@ cross-resource: a singular audit references two or more models, or at least one 
 source, seed, or table function, through `__ref()`, `__source()`, `__seed()`, or `__table_fn()`.
 
 ```sql
--- models/marts/_sqlbuild/audits/singular/orders_have_payments.sql
+-- sql/models/marts/_sqlbuild/audits/singular/orders_have_payments.sql
 AUDIT (
   name "completed_orders_have_payments",
   severity error
@@ -361,12 +361,12 @@ Singular audits live only in a `singular/` role:
 
 | Location | What it may reference |
 |----------|-----------------------|
-| `audits/singular/` | Resources whose nearest shared folder is the project root, such as models in sibling folders or a model and a source |
+| `sql/audits/singular/` | Resources whose nearest shared folder is the project root, such as models in sibling folders or a model and a source |
 | `<folder>/_sqlbuild/audits/singular/` | Resources in `<folder>` and below |
 
 There is no `_audits/singular/` role, because singular audits are never attached by name. A
 singular audit must live under the nearest folder containing everything it references. Audit files
-directly under `audits/` or in any other `audits/` child are compile errors.
+directly under `sql/audits/` or in any other `sql/audits/` child are compile errors.
 
 SQLBuild infers where a singular audit runs from its references. When one referenced model is
 downstream of every other referenced model, the audit attaches to that model. Otherwise it runs at

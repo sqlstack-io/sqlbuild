@@ -7,8 +7,8 @@ fn given_slash_separated_paths_when_printed_then_they_match_python_as_posix() {
     let test_cases = [
         PosixPathTestCase {
             description: "empty and current components are dropped",
-            path: "models//./orders.sql",
-            expected_text: "models/orders.sql",
+            path: "sql/models//./orders.sql",
+            expected_text: "sql/models/orders.sql",
             expected_parent: "models",
         },
         PosixPathTestCase {

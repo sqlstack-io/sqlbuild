@@ -1,0 +1,10 @@
+"""An optional upstream asset that soft-skips."""
+
+from sqlbuild.assets import SkipMode, asset
+
+
+@asset(tags=["python", "optional"], group="exports")
+def optional_partner_feed(ctx):
+    """Soft-skip an optional upstream without blocking sibling fan-in."""
+
+    return ctx.skip(reason="partner feed is not configured", mode=SkipMode.SOFT)
