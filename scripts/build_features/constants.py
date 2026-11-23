@@ -1,8 +1,6 @@
 """Stable build feature alignment constants."""
 
 SQB_PACKAGE: str = "sqlbuild-cli"
-# The wheel builds' features: sqb embeds the UI, and the extension enables the same `ui` so the
-# sqb build reuses the crates the extension build compiled.
 SQB_FEATURES: str = "ui"
 EXTENSION_PACKAGE: str = "sqlbuild-python"
 EXTENSION_FEATURES: str = "extension-module,sqlbuild-cli/ui"
