@@ -17,6 +17,7 @@
 
 	const tails = getContext<CompactTails | undefined>(COMPACT_TAILS);
 	const tail = $derived(tails?.tail(id) ?? title);
+	const lead = $derived(tails?.lead?.(id) ?? 0);
 	/**
 	 * The name's size on screen at each level, fitted at the level's lowest zoom, where the card is
 	 * narrowest; measured again once the name's font has loaded.
@@ -26,7 +27,7 @@
 		void fonts.version,
 		COMPACT_LEVELS.map((zoom) => {
 			const px = pillFont(tail, pillRoom(zoom), measureCompact);
-			return { px, text: pillText(tail, px, pillRoom(zoom), measureCompact) };
+			return { px, text: pillText(tail, px, pillRoom(zoom), measureCompact, lead) };
 		}))
 	);
 	/** The icon's size on screen. */

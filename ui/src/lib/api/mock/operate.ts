@@ -23,6 +23,7 @@ import type {
 	TriggerStateEvent
 } from '../types';
 import { CI_ACCOUNT, DEMO_USER, OPS_USER, SCHEDULER, SENSOR_DAEMON } from './principals';
+import { DISCOVERED_PLANS } from './discovered';
 import { BIG_GROUP, bigGroupFile, bigGroupSelect, bigGroupShape } from './big-group';
 import { resolveSelection, setJobResolver, writeSetOf } from './operate-graph';
 import type { RunEnd, RunRecord, RunScript } from './run-detail';
@@ -398,6 +399,30 @@ JOB_DEFS.push(
 		criticalNodes: [],
 		declaration: decl('orchestration/warehouse.py', 60, `${BIG_GROUP} = job_group("${BIG_GROUP}", jobs=[...])`)
 	}
+);
+
+// Mockup: a job per discovered forecast plan, selecting its steps and the node completing them (discovered.ts).
+JOB_DEFS.push(
+	...DISCOVERED_PLANS.map(
+		(p): JobDef => ({
+			key: p.job,
+			kind: 'job',
+			description: `Demand forecast v2 for ${p.region}, one node per step of the release plan`,
+			select: `group:forecast_${p.region.toLowerCase()}`,
+			exclude: [],
+			members: [],
+			overlap: 'skip',
+			onFailure: null,
+			pools: {},
+			priority: 0,
+			sourceFile: `src/forecast_pipelines/definitions/models/regions/${p.region.toLowerCase()}/jobs.py`,
+			settings: {},
+			targets: null,
+			owner: 'forecasting',
+			criticalNodes: [],
+			declaration: decl(`src/forecast_pipelines/definitions/models/regions/${p.region.toLowerCase()}/jobs.py`, 12, `${p.job} = job("${p.job}", select="group:forecast_${p.region.toLowerCase()}")`)
+		})
+	)
 );
 
 /** Waits a group declares instead of those its members' lineage gives: the big group's whole upstreams. */

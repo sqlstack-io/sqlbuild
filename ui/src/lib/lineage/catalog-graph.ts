@@ -1,6 +1,8 @@
 // Lineage cards from catalog nodes. Pure; no side effects.
 
 import type { Edge, Node } from '@xyflow/svelte';
+import { cardLabel } from './discovered-labels';
+import { labelRule } from './label-rule.svelte';
 import type { CatalogNode, StaleReason } from '$lib/api';
 import { FUNCTION_KINDS, PYTHON_KINDS, kindLine, nodeIconKey, shortName } from '$lib/build-area/labels';
 
@@ -35,7 +37,7 @@ export function checksBadge(node: CatalogNode): { checks?: string; checksColor?:
 export function cardData(node: CatalogNode): Record<string, unknown> {
 	return {
 		name: node.key,
-		label: shortName(node.key),
+		label: labelRule.on ? cardLabel(node.key) : shortName(node.key),
 		kind: kindLine(node),
 		group: node.group,
 		nodeKind: node.kind,

@@ -40,7 +40,8 @@
 	import ViewSummaryPanel from '$lib/components/lineage/view-summary.svelte';
 	import { createDetailsPanel } from '$lib/state/details-panel.svelte';
 	import { viewSummary } from '$lib/lineage/view-summary';
-	import { tick, untrack } from 'svelte';
+	import { onDestroy, tick, untrack } from 'svelte';
+	import { labelRule } from '$lib/lineage/label-rule.svelte';
 	import { READABLE_ZOOM, anchoredViewport, absolutePosition as positionOn } from '$lib/lineage/fit';
 	import { CHANGED_PLAN_HREF, changedBuildCounts, changedBuildLabel, planHref } from '$lib/run/command';
 	import { page } from '$app/state';
@@ -65,6 +66,11 @@
 	import { MAX_DRAWN, expandAll, folderBoxId, folderCardId, opensByFolder, tooManyToDraw, folderTree, layoutFolderGraph, withFolderClosed, withFoldersOpen, type FolderTree } from '$lib/lineage/folder-graph';
 	import { FOLDERS_PARAM, NODES_PARAM, foldersParam, foldersToOpen, inSelection, lineageGraph, parseFolders, parseNodes, shownNodes, withFolderAdded, withFolderToggled } from '$lib/lineage/folder-selection';
 	import JobBoxNode from '$lib/lineage/job-box-node.svelte';
+	// Mockup (discovered-node variants): `?variant` names discovered cards by their step.
+	$effect(() => {
+		labelRule.on = page.url.searchParams.has('variant');
+	});
+	onDestroy(() => (labelRule.on = false));
 
 	let browserOpen = $state(false);
 	// Closed until something is selected, then as the person last left it (remembered in this browser).

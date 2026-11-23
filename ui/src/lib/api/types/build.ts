@@ -81,6 +81,30 @@ export type CatalogNode = {
 	checks: CheckCounts | null;
 };
 
+// ---- discovered sets (mockup) ----
+
+/**
+ * One discovered set of the current snapshot, as `readDiscovered` reads it back, plus the nodes its
+ * items became. The readback has the set's facts; `assets` and `nodes` are not in it yet.
+ */
+export type DiscoveredSet = {
+	name: string;
+	status: 'ok' | 'failed' | 'never';
+	items: number;
+	fetchedAt: Iso | null;
+	lastGoodAt: Iso | null;
+	digest: string | null;
+	/** Why the newest fetch failed, secrets masked. */
+	error: string | null;
+	checkEverySeconds: number | null;
+	/** The tags of the result the set serves, such as `release` and `plan_digest`. */
+	tags: Record<string, string>;
+	/** The `for_each` assets reading the set. */
+	assets: string[];
+	/** Each item's node, with the item's arguments. */
+	nodes: { key: string; asset: string; step: string; args: Record<string, string> }[];
+};
+
 // ---- node states ----
 
 /** A node's build state, the part of a catalog node that changes between publications. */

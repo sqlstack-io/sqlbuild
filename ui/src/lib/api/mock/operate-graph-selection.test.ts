@@ -22,8 +22,9 @@ describe('mock selection evaluation', () => {
 	});
 
 	it('counts models of every materialization as one kind', () => {
+		// 4 plus the discovered-variants mockup's 44 discovered and completing nodes (discovered.ts).
 		expect(mockVocabulary().kinds).toEqual([
-			{ value: 'asset', count: 4 },
+			{ value: 'asset', count: 48 },
 			{ value: 'loader', count: 2 },
 			{ value: 'model', count: 31 },
 			{ value: 'seed', count: 1 },

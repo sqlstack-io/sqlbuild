@@ -31,6 +31,14 @@
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
 	import OutcomeStrip from '$lib/components/build-area/outcome-strip.svelte';
 	import { formatMs } from '$lib/build-area/labels';
+	import { page } from '$app/state';
+	import { onDestroy } from 'svelte';
+	import BreakableName from '$lib/components/names/breakable-name.svelte';
+	import PathTail from '$lib/components/names/path-tail.svelte';
+	import { labelRule } from '$lib/lineage/label-rule.svelte';
+	import { COMPACT_LEVELS } from '$lib/lineage/fit';
+	import DiscoveredFacts from './discovered/discovered-facts.svelte';
+	import { discoveredBoxes, itemOf, setsInJob, variantOf } from './discovered/utils';
 
 	let { name }: { name: string } = $props();
 
@@ -47,6 +55,15 @@
 	}, ['jobs', 'runs', 'snapshot']);
 
 	const def = $derived(job.data ?? null);
+	// Mockup (discovered-node variants): `?variant=a|b|c`; without it the page draws as before.
+	const variant = $derived(variantOf(page.url.searchParams.get('variant')));
+	$effect(() => {
+		labelRule.on = variant !== null;
+	});
+	onDestroy(() => (labelRule.on = false));
+	const discovered = createResource((client, scope) => (client.readDiscovered ? client.readDiscovered(scope) : Promise.resolve([])), ['snapshot']);
+	const jobSets = $derived(variant && def ? setsInJob(discovered.data ?? [], def.resolvedNodes) : []);
+	const boxes = $derived(variant === 'b' || variant === 'c' ? discoveredBoxes(jobSets, def?.resolvedNodes ?? []) : []);
 	// Why each member waits for another, node by node, from the catalog's lineage.
 	// Why members wait, node by node: as the server publishes it, or worked out from lineage for a
 	// snapshot that predates published reasons.
@@ -177,6 +194,9 @@
 			{/if}
 		{/if}
 	</div>
+	{#if variant === 'a'}
+		{#each jobSets as set (set.name)}<DiscoveredFacts {set} layout="row" />{/each}
+	{/if}
 	{#if job.error}
 		<div class="msg err">Couldn't load this job: {job.error}</div>
 	{:else if job.data === null}
@@ -199,7 +219,9 @@
 						<!-- A group draws its member jobs; each member's page draws that job's nodes. -->
 						<MemberGraph members={def.groupMembers ?? []} info={memberJobs.data ?? new Map()} catalog={catalog.data ?? []} {links} bind:selection={memberSelection} details={{ open: details.open, toggle: details.toggle }} />
 					{:else if catalog.data}
-						<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={liveCatalog ?? catalog.data} onselect={(keys) => (picked = keys)} />
+						{#key boxes.length}
+							<ScopeGraph bind:this={graph} keys={def.resolvedNodes} catalog={liveCatalog ?? catalog.data} {boxes} wholeFloor={variant ? COMPACT_LEVELS[0] : undefined} startCollapsed={variant === 'c' ? boxes.map((b) => b.jobKey) : []} onselect={(keys) => (picked = keys)} />
+						{/key}
 					{:else}
 						{#if catalog.error}<p class="faint graph-wait">{catalog.error}</p>{:else}<div class="graph-wait"><Loading /></div>{/if}
 					{/if}
@@ -253,21 +275,35 @@
 						</InspectorSection>
 					{:else if pickedNodes.length === 1}
 						{@const n = pickedNodes[0]}
+						{@const found = variant === 'b' || variant === 'c' ? itemOf(jobSets, n.key) : null}
 						<p class="label">{kindLine(n)}</p>
-						<h2 class="mono">{n.key}</h2>
+						{#if variant}<h2 class="mono wrap-name"><BreakableName text={n.key} /></h2>{:else}<h2 class="mono">{n.key}</h2>{/if}
 						<a class="open" href={to(`/catalog/${n.key}`)}>Open in Catalog ↗</a>
 						{#if n.description}<p class="desc">{n.description}</p>{/if}
 						<dl>
 							{#if n.lastOutcome || n.lastBuild}<div><dt>Last build</dt><dd><i style:background={nodeOutcomeTone[n.lastOutcome ?? 'success']}></i>{n.lastOutcome ? nodeOutcomeLabel[n.lastOutcome] : 'Built'}{n.lastBuild ? ` · ${formatAgo(n.lastBuild.builtAt, app.now)}` : ''}</dd></div>{/if}
 							{#if n.relation}<div><dt>Writes</dt><dd class="mono">{[n.relation.database, n.relation.schema, n.relation.name].filter(Boolean).join('.')}</dd></div>{/if}
-							{#if n.path}<div><dt>Defined in</dt><dd class="mono">{n.path}</dd></div>{/if}
+							{#if n.path}<div><dt>Defined in</dt>{#if variant}<dd class="path"><PathTail path={n.path} /></dd>{:else}<dd class="mono">{n.path}</dd>{/if}</div>{/if}
 						</dl>
+						{#if found}
+							<p class="label sub">Item</p>
+							<dl>
+								<div><dt>Step</dt><dd class="mono">{found.item.step}</dd></div>
+								<div><dt>Asset</dt><dd class="mono"><BreakableName text={found.item.asset} /></dd></div>
+								{#each Object.entries(found.item.args).filter(([k]) => k !== 'step') as [k, v] (k)}<div><dt class="mono">{k}</dt><dd class="mono">{v}</dd></div>{/each}
+							</dl>
+							<p class="label sub">Discovered</p>
+							<DiscoveredFacts set={found.set} layout="list" />
+						{/if}
 					{:else if pickedNodes.length > 1}
 						<h2>{pickedNodes.length} nodes selected</h2>
 						<ul class="picked">
 							{#each pickedNodes as n (n.key)}<li><a href={to(`/catalog/${n.key}`)} class="mono">{n.key}</a></li>{/each}
 						</ul>
 					{:else}
+						{#if variant === 'b' || variant === 'c'}
+							{#each jobSets as set (set.name)}<InspectorSection title="Discovered"><DiscoveredFacts {set} layout="list" /></InspectorSection>{/each}
+						{/if}
 						{#if def.description}<InspectorSection title="Description"><p class="about-text">{def.description}</p></InspectorSection>{/if}
 						<InspectorSection title="Recent runs">
 							{#snippet meta()}{#if runs.length}<Button variant="link" size="inline" class="text-[12px]" onclick={() => (tab = 'runs')}>All runs →</Button>{/if}{/snippet}
@@ -302,7 +338,7 @@
 							{#if def.select || def.exclude.length}<p class="label">Selection</p><div class="chips"><SelectionChips select={def.select ?? ''} exclude={def.exclude.join(' ')} /></div>{/if}
 							<dl>
 								{#if def.owner}<div><dt>Owner</dt><dd>{def.owner}</dd></div>{/if}
-								{#if def.sourceFile}<div><dt>Defined in</dt><dd class="mono">{def.sourceFile}</dd></div>{/if}
+								{#if def.sourceFile}<div><dt>Defined in</dt>{#if variant}<dd class="path"><PathTail path={def.sourceFile} /></dd>{:else}<dd class="mono">{def.sourceFile}</dd>{/if}</div>{/if}
 								{#if def.memberOf?.length}
 									<div><dt>In groups</dt><dd>{#each def.memberOf as g, i (g)}{i ? ', ' : ''}<a href={to(`/jobs/${g}`)}>{g}</a>{/each}</dd></div>
 								{/if}
@@ -467,6 +503,20 @@
 		font-size: 13.5px;
 		font-weight: 600;
 		word-break: break-all;
+	}
+	/* Mockup: names wrap between their words only. */
+	.rail h2.wrap-name {
+		word-break: normal;
+		overflow-wrap: normal;
+	}
+	dd.path {
+		flex: 1;
+		min-width: 0;
+	}
+	.label.sub {
+		margin: 14px 0 4px;
+		padding-top: 10px;
+		border-top: 1px solid var(--border);
 	}
 	.rail.sections {
 		padding: 0;

@@ -2,7 +2,8 @@
 	import '@xyflow/svelte/dist/style.css';
 	import { Controls, SvelteFlow, ViewportPortal, type Edge, type Node, type Viewport } from '@xyflow/svelte';
 	import { setContext, untrack } from 'svelte';
-	import { COMPACT_TAILS, compactTitleOf, siblingTails, type CompactTails } from './compact-tails';
+	import { COMPACT_TAILS, compactTitleOf, siblingLeads, siblingTails, type CompactTails } from './compact-tails';
+	import { labelRule } from '$lib/lineage/label-rule.svelte';
 	import { unzoom } from '$lib/lineage/hit-area';
 	import { obstacles, shareObstacles } from '$lib/lineage/edge-routes';
 	import type { ComponentProps, Snippet } from 'svelte';
@@ -27,6 +28,7 @@
 		setViewport = $bindable(),
 		readable = true,
 		fitFloor = READABLE_ZOOM,
+		wholeFloor,
 		controls = 'fit',
 		showLock = false,
 		framed = false,
@@ -48,6 +50,8 @@
 		readable?: boolean;
 		/** The lowest zoom an automatic fit goes to: the readable zoom, unless a page draws a very large graph whole. */
 		fitFloor?: number;
+		/** Mockup: the lowest zoom a modest graph is shown whole at (`LABEL_MIN_ZOOM` by default). */
+		wholeFloor?: number;
 		/** `fit`: zoom buttons with a readable fit; `full`: the library's own controls, for a very large graph drawn whole. */
 		controls?: 'fit' | 'full' | 'none';
 		showLock?: boolean;
@@ -133,7 +137,9 @@
 	const titled = $derived(cardKey ? cardKey.split('\n').map((line) => line.split('\t')).filter(([, , title]) => title).map(([id, parent, title]) => ({ id, parent, title })) : []);
 	const tails = $derived(siblingTails(titled));
 	const parents = $derived(new Map(titled.map((c) => [c.id, c.parent])));
-	setContext<CompactTails>(COMPACT_TAILS, { tail: (id) => tails.get(id), parent: (id) => parents.get(id) });
+	// Mockup (discovered-node variants): the prefix each pill name shares with a sibling's, dropped first when it doesn't fit.
+	const leads = $derived(labelRule.on ? siblingLeads(titled, tails) : null);
+	setContext<CompactTails>(COMPACT_TAILS, { tail: (id) => tails.get(id), parent: (id) => parents.get(id), lead: (id) => leads?.get(id) ?? 0 });
 	const compact = $derived(level > 0);
 	const titleUnzoom = $derived(compact ? 1 / Math.max(settledZoom, LABEL_MIN_ZOOM) : 1);
 	const controlScale = $derived(unzoom(settledZoom));
@@ -141,7 +147,7 @@
 
 <div class="graph-canvas sb-flow" class:framed class:compact class:moving class:unfitted={!fitted && nodes.length > 0} data-compact={level || undefined} style:--sb-title-unzoom={titleUnzoom} style:--sb-unzoom={controlScale} bind:this={element} onpointerdowncapture={onpointerdown} onpointermovecapture={onpointermove} onclickcapture={onclick}>
 	<SvelteFlow bind:nodes bind:edges edgeTypes={allEdgeTypes} fitView={fitOnInit || undefined} elevateEdgesOnSelect={false} minZoom={0.1} proOptions={{ hideAttribution: true }} {...flow}>
-		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport {fitFloor} {readable} />
+		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport {fitFloor} {readable} {wholeFloor} />
 		<!-- The dot grid lives in the viewport, so it moves and scales with the graph's layer. -->
 		<ViewportPortal target="back">
 			<div class="grid" style:transform="translate({gridArea.x}px, {gridArea.y}px)" style:width="{gridArea.width}px" style:height="{gridArea.height}px"></div>

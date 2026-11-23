@@ -24,8 +24,10 @@
 		catalog,
 		boxes = [],
 		members = [],
+		startCollapsed = [],
+		wholeFloor,
 		onselect
-	}: { keys: string[]; catalog: CatalogNode[]; boxes?: JobBox[]; members?: JobGroupMember[]; onselect: (keys: string[]) => void } = $props();
+	}: { keys: string[]; catalog: CatalogNode[]; boxes?: JobBox[]; members?: JobGroupMember[]; startCollapsed?: string[]; wholeFloor?: number; onselect: (keys: string[]) => void } = $props();
 
 	const nodeTypes = { asset: AssetNode, job: JobBoxNode, folder: FolderNode, folderBox: JobBoxNode };
 	const edgeTypes = { count: CountEdge };
@@ -36,7 +38,7 @@
 	let shape = '';
 	let laidOut = '';
 	/** Boxes showing only their header. */
-	let collapsed = $state<ReadonlySet<string>>(new Set());
+	let collapsed = $state<ReadonlySet<string>>(untrack(() => new Set(startCollapsed)));
 	function toggle(jobKey: string) {
 		const next = new Set(collapsed);
 		if (!next.delete(jobKey)) next.add(jobKey);
@@ -80,7 +82,7 @@
 	async function reset() {
 		focusKeys = null;
 		open = new Set();
-		collapsed = new Set();
+		collapsed = new Set(startCollapsed);
 		grouped = keys.length > GROUPED_ABOVE;
 		expandNote = '';
 		await tick();
@@ -154,6 +156,7 @@
 		bind:edges
 		bind:fit
 		bind:fitted
+		{wholeFloor}
 		{nodeTypes}
 		{edgeTypes}
 		nodesDraggable={false}

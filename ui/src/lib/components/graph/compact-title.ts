@@ -34,9 +34,22 @@ function middleCut(text: string, kept: number): string {
 	return `${text.slice(0, head)}…${kept - head ? text.slice(-(kept - head)) : ''}`;
 }
 
-/** `text` at `font` as it fits `room`: whole, or with its middle cut to the most characters that fit. */
-export function pillText(text: string, font: number, room: number, measure: Measure): string {
+/**
+ * `text` at `font` as it fits `room`: whole, or with its middle cut to the most characters that fit.
+ * With a `lead` (mockup), the cut falls in the first `lead` characters, shared with a sibling, so the
+ * rest, which tells it apart, stays whole: `genea…trainer`.
+ */
+export function pillText(text: string, font: number, room: number, measure: Measure, lead = 0): string {
 	if (measure(text, font, PILL.weight) <= room) return text;
+	if (lead > 0) {
+		const rest = text.slice(lead);
+		// As much of the shared prefix's start as fits, then the distinct rest whole.
+		for (let k = lead - 1; k >= 0; k--) if (measure(`${text.slice(0, k)}…${rest}`, font, PILL.weight) <= room) return `${text.slice(0, k)}…${rest}`;
+		// Still too long: keep as much of the rest's start as fits, since siblings differ there.
+		let kept = rest.length - 1;
+		while (kept > 1 && measure(`…${rest.slice(0, kept)}…`, font, PILL.weight) > room) kept--;
+		return `…${rest.slice(0, kept)}…`;
+	}
 	let [lo, hi] = [0, text.length - 1];
 	while (lo < hi) {
 		const mid = Math.ceil((lo + hi) / 2);

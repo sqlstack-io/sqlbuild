@@ -22,6 +22,7 @@
 	import CompactFace from '$lib/components/graph/compact-face.svelte';
 	import { fonts } from '$lib/components/graph/fonts.svelte';
 	import { fitStatus } from '$lib/lineage/status-line';
+	import { labelRule } from '$lib/lineage/label-rule.svelte';
 
 	type AssetData = {
 		name: string;
@@ -129,7 +130,8 @@
 
 	<div class="head">
 		<Glyph size={14} strokeWidth={1.75} class="glyph" />
-		<span class="name" title={d.name}>{d.label ?? d.name}</span>
+		<!-- Mockup (discovered-node variants): a name too long gives way at its start, so its distinct end stays. -->
+		<span class="name" class:tail-first={labelRule.on} title={d.name}><bdi>{d.label ?? d.name}</bdi></span>
 		{#if f.kind}<span class="kind">{kindShort}</span>{/if}
 	</div>
 
@@ -204,6 +206,14 @@
 		font-weight: 600;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	.name.tail-first {
+		direction: rtl;
+		text-align: left;
+	}
+	.name bdi {
+		direction: ltr;
+		unicode-bidi: isolate;
 	}
 	.kind {
 		flex: 0 0 auto;

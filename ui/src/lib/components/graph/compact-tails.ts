@@ -1,3 +1,4 @@
+import { sharedLeads } from '$lib/lineage/discovered-labels';
 // The part of each card's name a zoomed-out pill shows: the shortest run of its last `__` parts that no
 // sibling card (in the same box, or loose on the graph) ends with, so `orders__stg__events` reads
 // `events` unless a sibling shares that ending. Pure.
@@ -44,7 +45,17 @@ export function siblingTails(cards: { id: string; parent: string; title: string 
 	return byId;
 }
 
+/** Mockup: each card's pill name's shared lead among its siblings' pill names (`sharedLeads`), by card id. */
+export function siblingLeads(cards: { id: string; parent: string }[], tails: Map<string, string>): Map<string, number> {
+	const byId = new Map<string, number>();
+	for (const siblings of Map.groupBy(cards, (c) => c.parent).values()) {
+		const leads = sharedLeads(siblings.map((c) => tails.get(c.id) ?? ''));
+		for (const c of siblings) byId.set(c.id, leads.get(tails.get(c.id) ?? '') ?? 0);
+	}
+	return byId;
+}
+
 /** The context key a graph canvas gives its cards their pill names under. */
 export const COMPACT_TAILS = Symbol('compact-tails');
 /** A card's pill name and its parent box, by card id; undefined outside a graph canvas. */
-export type CompactTails = { tail: (id: string) => string | undefined; parent: (id: string) => string | undefined };
+export type CompactTails = { tail: (id: string) => string | undefined; parent: (id: string) => string | undefined; lead?: (id: string) => number };

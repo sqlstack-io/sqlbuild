@@ -21,6 +21,7 @@ import type {
 	BuiltInRole,
 	Capability,
 	CurrentUser,
+	DiscoveredSet,
 	Job,
 	JobDetail,
 	JobLaunchOptions,
@@ -60,6 +61,7 @@ import { MockOperate } from './operate-store';
 import type { PlatformApi } from '../platform-client';
 import { MockPlatformApi } from './platform';
 import { MockBuild } from './build';
+import { discoveredSets } from './discovered';
 
 export type MockOptions = {
 	role?: BuiltInRole;
@@ -192,6 +194,10 @@ export class MockApiClient implements ApiClient {
 		this.#location(args[0]);
 		return this.#build.overview(args[0]);
 	}
+	readDiscovered(_scope: Scope): Promise<DiscoveredSet[]> {
+		return this.#reply(discoveredSets(this.#createdAt));
+	}
+
 	listCatalogNodes(...args: Parameters<ApiClient['listCatalogNodes']>) {
 		this.#location(args[0]);
 		return this.#build.listCatalogNodes(...args);

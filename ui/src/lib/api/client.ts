@@ -1,4 +1,5 @@
 import type {
+	DiscoveredSet,
 	AdhocRunCheck,
 	PlanResult,
 	PlanPage,
@@ -87,6 +88,8 @@ export interface ApiClient extends PlatformApi {
 	 * through the shared catalog store (`$lib/state/catalog.svelte`), which reads it once per snapshot.
 	 */
 	listCatalogNodes(scope: Scope): Promise<CatalogNode[]>;
+	/** Mockup: the current snapshot's discovered sets and the nodes their items became; the mock client only. */
+	readDiscovered?(scope: Scope): Promise<DiscoveredSet[]>;
 	/** Every node's build state at the current status version, for applying `node_status` changes to a listing. */
 	listNodeStates(scope: Scope): Promise<NodeStates>;
 	/** `listing` and `checks` are current `listCatalogNodes` and `listChecks` results the caller already holds, so they aren't read again. */

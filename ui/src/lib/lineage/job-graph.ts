@@ -16,6 +16,8 @@ const EMPTY_HEIGHT = 44;
 const COLLAPSED_HEIGHT = HEADER + 2;
 /** Wide enough for a header's name, node count and last run on one line. */
 const COLLAPSED_WIDTH = 380;
+/** Mockup: a collapsed discovered set's header also names its release and status. */
+const DISCOVERED_COLLAPSED_WIDTH = 470;
 /** Space between cards stacked in one column. */
 const STACK_GAP = 20;
 /** Space dagre leaves between cards, and between boxes and cards outside them. */
@@ -23,7 +25,9 @@ const CARD_GAP = 24;
 const BOX_GAP = 24 + HEADER;
 const MARGIN = 24;
 
-export type JobBox = { jobKey: string; nodes: string[]; lastRun?: RunRef | null };
+/** Mockup: a box framing a discovered set's steps, under their asset's name. */
+export type DiscoveredBox = { set: string; status: 'ok' | 'failed' | 'never'; release: string | null; releaseFull: string | null; error: string | null };
+export type JobBox = { jobKey: string; nodes: string[]; lastRun?: RunRef | null; discovered?: DiscoveredBox };
 
 const edgeStyle = 'stroke: var(--sb-edge); stroke-width: 1.5;';
 const waitStyle = 'stroke: var(--sb-edge); stroke-width: 1.5; stroke-dasharray: 5 4;';
@@ -63,7 +67,7 @@ export function jobGraph(
 		id: boxId(b.jobKey),
 		type: 'job',
 		position: { x: 0, y: 0 },
-		width: collapsed.has(b.jobKey) ? COLLAPSED_WIDTH : NODE_WIDTH + 2 * PAD,
+		width: collapsed.has(b.jobKey) ? (b.discovered ? DISCOVERED_COLLAPSED_WIDTH : COLLAPSED_WIDTH) : NODE_WIDTH + 2 * PAD,
 		height: collapsed.has(b.jobKey) ? COLLAPSED_HEIGHT : EMPTY_HEIGHT,
 		selectable: false,
 		data: {
@@ -71,7 +75,8 @@ export function jobGraph(
 			lastRun: b.lastRun ?? null,
 			nodeCount: built.get(b.jobKey)!.length,
 			drawnElsewhere: built.get(b.jobKey)!.filter((n) => owner.get(n) !== b.jobKey).length,
-			collapsed: collapsed.has(b.jobKey)
+			collapsed: collapsed.has(b.jobKey),
+			...(b.discovered ? { discovered: b.discovered } : {})
 		}
 	}));
 	const cards: Node[] = nodes.filter((key) => shownAs(key) === key).map((key) => {

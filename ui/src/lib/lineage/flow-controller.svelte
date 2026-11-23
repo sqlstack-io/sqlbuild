@@ -15,7 +15,8 @@
 		setViewport = $bindable(),
 		fitted = $bindable(false),
 		fitFloor,
-		readable = false
+		readable = false,
+		wholeFloor = LABEL_MIN_ZOOM
 	}: {
 		fitView?: (opts?: { duration?: number }) => void;
 		viewport?: Viewport;
@@ -23,6 +24,8 @@
 		fitted?: boolean;
 		fitFloor?: number;
 		readable?: boolean;
+		/** Mockup: the lowest zoom a modest graph is shown whole at; below it, it opens readable on its start. */
+		wholeFloor?: number;
 	} = $props();
 
 	const flow = useSvelteFlow();
@@ -54,13 +57,13 @@
 		const anchorId = focus ? rects.find((r) => r.box && r.x === focus.x && r.y === focus.y)?.id : start?.id;
 		store.domNode?.setAttribute('data-fit-anchor', anchorId ?? '');
 		// A modest graph is shown whole; a larger one opens readable on its start card.
-		const minZoom = all.length <= WHOLE_FIT_CARDS ? LABEL_MIN_ZOOM : fitFloor;
+		const minZoom = all.length <= WHOLE_FIT_CARDS ? wholeFloor : fitFloor;
 		void flow.setViewport(fitViewport(bounds, width, height, { minZoom, focus, start }), { duration });
 		return true;
 	}
 
 	/** The lowest zoom a fit goes to: low enough to show a modest graph whole, else the page's floor. */
-	const floorFor = () => (fitFloor !== undefined && flow.getNodes().length <= WHOLE_FIT_CARDS ? Math.min(fitFloor, LABEL_MIN_ZOOM) : fitFloor);
+	const floorFor = () => (fitFloor !== undefined && flow.getNodes().length <= WHOLE_FIT_CARDS ? Math.min(fitFloor, wholeFloor) : fitFloor);
 
 	fitView = (opts) => {
 		// Nothing to fit yet; a fit now would count the graph as shown before its cards exist.
