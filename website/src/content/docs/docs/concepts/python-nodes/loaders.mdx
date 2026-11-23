@@ -352,7 +352,7 @@ The `@loader` decorator accepts optional parameters that can also be set in the 
 
 | Parameter | Description |
 |-----------|-------------|
-| `depends_on` | List of loader and asset functions this loader depends on. Depending on one that reads SQL is a [warehouse round trip](/docs/concepts/python-nodes/overview#warehouse-round-trips) |
+| `depends_on` | List of loader and asset functions this loader depends on, and [`job()` or `tag()` sets](/docs/concepts/python-nodes/sql-references#depending-on-a-job-or-a-tag), as for assets. Depending on one that reads SQL is a [warehouse round trip](/docs/concepts/python-nodes/overview#warehouse-round-trips) |
 | `destination` | Override the destination relation name (can include schema or database) |
 | `write_strategy` | `table`, `append`, `delete_insert`, or `merge` |
 | `cursor_column` | Column used for incremental cursor tracking |

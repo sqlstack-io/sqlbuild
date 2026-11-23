@@ -123,7 +123,8 @@ set [`[references] enforce_explicit = false`](../project-configuration.md#refere
 ## Depending on a job or a tag
 
 Naming every upstream model ties a node to model names that change with each rename or split.
-`job()` and `tag()` from `sqlbuild.refs` depend on a whole set instead:
+`job()` and `tag()` from `sqlbuild.refs` depend on a whole set instead, in an asset's or a loader's
+`depends_on`:
 
 ```python
 from sqlbuild.refs import job, tag
@@ -171,7 +172,6 @@ Compile fails when:
   by job, so if the dependant's job waits for the job it depends on while that job reads a node of
   the dependant's job, neither can start. The error names the nodes that close the loop; move
   them to another job;
-- a loader declares one: loaders depend on loaders and assets named one by one;
 - the name has a code location prefix such as `job("billing:nightly_job")`, which is reserved for
   depending on other locations' jobs.
 

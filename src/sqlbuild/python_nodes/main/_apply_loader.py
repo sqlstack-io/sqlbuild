@@ -14,7 +14,7 @@ from sqlbuild.python_nodes._helpers.loader_normalization import (
     normalize_unique_key,
     normalize_write_strategy,
 )
-from sqlbuild.python_nodes.models import LoaderDefinition
+from sqlbuild.python_nodes.models import LoaderDefinition, NodeSetRef
 from sqlbuild.python_nodes.types import LoaderColumnSpec
 
 
@@ -22,7 +22,8 @@ def apply_loader(
     *,
     function: Callable[..., object] | None = None,
     name: str | None = None,
-    depends_on: tuple[Callable[..., object], ...] | list[Callable[..., object]] = (),
+    depends_on: tuple[Callable[..., object] | NodeSetRef, ...]
+    | list[Callable[..., object] | NodeSetRef] = (),
     destination: str | None = None,
     write_strategy: str | None = None,
     cursor_column: str | None = None,
@@ -33,7 +34,9 @@ def apply_loader(
 ) -> Callable[..., object] | Callable[[Callable[..., object]], Callable[..., object]]:
     """Apply SQLBuild loader metadata to a Python function."""
 
-    normalized_deps: tuple[Callable[..., object], ...] = normalize_loader_dependencies(depends_on)
+    normalized_deps: tuple[Callable[..., object] | NodeSetRef, ...] = normalize_loader_dependencies(
+        depends_on
+    )
 
     def decorate(inner: Callable[..., object]) -> Callable[..., object]:
         inner_function: Any = cast(Any, inner)

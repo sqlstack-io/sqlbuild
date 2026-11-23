@@ -247,10 +247,19 @@ def postgres_semantic_shapes(
     return semantic_shapes(project=project)
 
 
+# The import and decorator of each kind of node that can depend on a job or a tag.
+_SET_DEPENDANT_DECORATORS: dict[str, str] = {
+    "asset": "from sqlbuild.assets import asset\n\n\n@asset",
+    "loader": "from sqlbuild.loaders import loader\n\n\n@loader",
+}
+
+
 def set_dependency_project(
-    *, depends_on: str, job_files: tuple[tuple[str, str], ...] = ()
+    *, depends_on: str, job_files: tuple[tuple[str, str], ...] = (), kind: str = "asset"
 ) -> dict[str, str]:
-    """Four models, a `nightly_job` over three of them, and a `report` task on `depends_on`."""
+    """Four models, a `nightly_job` over three of them, and a `report` asset or loader."""
+
+    decorator: str = _SET_DEPENDANT_DECORATORS[kind]
 
     model: str = "MODEL (description 'Test model {name}.', materialized table{tags});\n{sql}\n"
     files: dict[str, str] = {
@@ -272,8 +281,7 @@ def set_dependency_project(
         ),
         **node_module_files(
             "python/nodes/tasks/report.py",
-            "from sqlbuild.refs import job, model, tag\nfrom sqlbuild.assets import asset\n\n\n"
-            f"@asset(depends_on={depends_on})\n"
+            f"from sqlbuild.refs import job, model, tag\n{decorator}(depends_on={depends_on})\n"
             'def report(ctx):\n    """Test task report."""\n    return None\n',
         ),
     }

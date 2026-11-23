@@ -9,7 +9,7 @@ use crate::node_set_dependencies::_helpers::labels::{
     excluding, listed, node_label, node_name, set_label,
 };
 use crate::node_set_dependencies::constants::{
-    DEPENDABLE_PYTHON_KINDS, DEPENDABLE_SQL_KINDS, JOB_SET, LOADER_KIND, LOCATION_SEPARATOR,
+    DEPENDABLE_PYTHON_KINDS, DEPENDABLE_SQL_KINDS, JOB_SET, LOCATION_SEPARATOR,
     NODE_SET_CODE, TAG_SET,
 };
 use crate::node_set_dependencies::models::{
@@ -49,12 +49,6 @@ pub(crate) fn members(
 ) -> Result<BTreeSet<GraphNode>, SelectorError> {
     let owner: String = format!("{} '{}'", dependant.kind, dependant.name);
     let set: String = set_label(dependency);
-    if dependant.kind == LOADER_KIND {
-        return Err(failure(
-            format!("{owner} depends on {set}; loaders cannot depend on a job or a tag"),
-            Some("name the loaders or assets it depends on one by one".to_owned()),
-        ));
-    }
     if dependency.name.contains(LOCATION_SEPARATOR) {
         return Err(failure(
             format!("{owner} depends on {set}, a job of another code location"),
