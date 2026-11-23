@@ -652,8 +652,9 @@ forwards and backwards, read the last lines, fold runs of similar lines, search 
 jump to error and warning lines, or download a node's output whole. No read loads a whole log at
 once.
 
-A worker sends what it prints in batches of about 4 MB, or every 2 seconds. When a node prints
-faster than the worker can send, the node waits for the worker. If the server stops accepting
+A worker sends what it prints in batches of about 4 MB, or every 2 seconds. Each line keeps the
+time the worker read it, to the millisecond. When a node prints faster than the worker can send,
+the node waits for the worker. If the server stops accepting
 output for 30 seconds, the worker drops what it cannot send. It prints
 `Run output: N bytes of run output were not stored` to its log, with the reason, and adds the same
 warning to the run.

@@ -3141,6 +3141,11 @@ export interface components {
             dropped_bytes?: number;
             /** @description The node that printed the lines, keyed `<kind>:<name>`; `None` for lines printed outside a node. */
             node_key?: string | null;
+            /**
+             * Format: date-time
+             * @description When the worker read these lines from the command's output, to the millisecond.
+             */
+            read_at: string;
             stream: components["schemas"]["OutputStream"];
             text: string;
         };

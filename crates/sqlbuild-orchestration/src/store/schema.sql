@@ -231,6 +231,7 @@ CREATE TABLE sqb_run_output_segments (
     line_count BIGINT NOT NULL,
     text_offset BIGINT NOT NULL,
     text_bytes BIGINT NOT NULL,
+    read_at {time},
     PRIMARY KEY (run_id, run_line),
     FOREIGN KEY (run_id, chunk) REFERENCES sqb_run_output_chunks(run_id, chunk)
 );

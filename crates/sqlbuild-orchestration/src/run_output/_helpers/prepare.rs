@@ -59,6 +59,7 @@ pub(crate) fn prepared(
             line_count: line_count(&segment.text),
             text_offset: counter(text.len())?,
             text_bytes: counter(segment.text.len())?,
+            read_at: segment.read_at,
             marks,
         });
         dropped = dropped.saturating_add(segment.dropped_bytes);
