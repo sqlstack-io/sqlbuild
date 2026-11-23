@@ -401,7 +401,7 @@ JOB_DEFS.push(
 	}
 );
 
-// A job per discovered forecast plan, selecting its steps and the node completing them (discovered.ts).
+// A job per discovered forecast plan, selecting its steps (discovered.ts).
 JOB_DEFS.push(
 	...DISCOVERED_PLANS.map(
 		(p): JobDef => ({

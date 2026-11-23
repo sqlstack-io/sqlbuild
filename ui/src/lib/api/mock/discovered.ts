@@ -1,5 +1,5 @@
 // Two discovered sets, each feeding a `for_each` asset whose
-// items become one node per step, as `asset:<asset>[<step>]`, plus a node completing the set.
+// items become one node per step, as `asset:<asset>[<step>]`.
 // One set is fresh; the other's newest fetch failed, so its nodes keep the last good items. Pure.
 
 import type { SnapshotNode } from '../types';
@@ -68,15 +68,12 @@ export const DISCOVERED_PLANS: Plan[] = [
 ];
 
 const stepKey = (asset: string, step: string) => `asset:${asset}[${step}]`;
-export const completeKey = (asset: string) => `asset:${asset}_complete`;
 const pathOf = (asset: string) => `src/forecast_pipelines/definitions/models/regions/${asset.split('_')[1]}/discovered_model_steps.py`;
 
-/** Every step node and each set's completing node, in the snapshot's shape. */
+/** Every step node, in the snapshot's shape. */
 export const DISCOVERED_NODES: SnapshotNode[] = DISCOVERED_PLANS.flatMap((p) => {
 	const group = `forecast_${p.region.toLowerCase()}`;
-	const steps = p.steps.map(([step, upstream]): SnapshotNode => ({ key: stepKey(p.asset, step), kind: 'asset', group, tags: ['forecast', group, 'discovered'], path: pathOf(p.asset), cursor: null, upstream: upstream.map((u) => stepKey(p.asset, u)) }));
-	const leaves = p.steps.filter(([step]) => !p.steps.some(([, up]) => up.includes(step))).map(([step]) => stepKey(p.asset, step));
-	return [...steps, { key: completeKey(p.asset), kind: 'asset', group, tags: ['forecast', group], path: pathOf(p.asset), cursor: null, upstream: leaves }];
+	return p.steps.map(([step, upstream]): SnapshotNode => ({ key: stepKey(p.asset, step), kind: 'asset', group, tags: ['forecast', group, 'discovered'], path: pathOf(p.asset), cursor: null, upstream: upstream.map((u) => stepKey(p.asset, u)) }));
 });
 
 /** The sets as `readDiscovered` would report them, with the nodes each item became. */
