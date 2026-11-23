@@ -35,7 +35,7 @@ _HELPER_PACKAGE_FILES: dict[str, str] = {
     "python/nodes/helpers/values.py": """
 from pathlib import Path
 
-Path(__file__).resolve().parents[2].joinpath("init_count.txt").open("a").write("values\\n")
+Path(__file__).resolve().parents[3].joinpath("init_count.txt").open("a").write("values\\n")
 STATUS = "shipped"
 """,
     "python/nodes/helpers/clean.py": """

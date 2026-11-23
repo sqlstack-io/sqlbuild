@@ -59,7 +59,7 @@ def assert_source_only_ingress_dependency_case(
                 "@asset\n"
                 "def prepare_events(ctx):\n"
                 "    '''Test task prepare_events.'''\n"
-                "    Path(__file__).parents[2].joinpath('prepared.txt').write_text('prepared')\n"
+                "    Path(__file__).parents[4].joinpath('prepared.txt').write_text('prepared')\n"
                 "    return ctx.result()\n"
             ),
         },

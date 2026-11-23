@@ -60,7 +60,7 @@ def test_given_managed_loader_watermark_when_reloaded_then_incremental_consumes_
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_orders(ctx):\n"
-                "    '''Test loader raw_orders.'''\n    maximum = int(Path(__file__).parents[2].joinpath('maximum.txt').read_text())\n"
+                "    '''Test loader raw_orders.'''\n    maximum = int(Path(__file__).parents[4].joinpath('maximum.txt').read_text())\n"
                 "    return [{'id': value, 'amount': value * 100} "
                 "for value in range(1, maximum + 1)]\n"
             ),

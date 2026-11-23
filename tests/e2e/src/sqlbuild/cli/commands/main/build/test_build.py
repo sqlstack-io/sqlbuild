@@ -940,7 +940,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def prepare_orders(ctx):\n"
-                    "    '''Test task prepare_orders.'''\n    marker = Path(__file__).parents[2].joinpath('prepared.txt')\n"
+                    "    '''Test task prepare_orders.'''\n    marker = Path(__file__).parents[4].joinpath('prepared.txt')\n"
                     "    marker.write_text('prepared')\n"
                     "    return ctx.result(payload={'order_id': 3})\n"
                 ),
@@ -969,7 +969,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "from sqlbuild.assets import asset\n\n"
                     "@asset(depends_on=model('fact_orders'))\n"
                     "def profile_fact(ctx):\n"
-                    "    '''Test task profile_fact.'''\n    marker = Path(__file__).parents[2].joinpath('profile.txt')\n"
+                    "    '''Test task profile_fact.'''\n    marker = Path(__file__).parents[4].joinpath('profile.txt')\n"
                     "    marker.write_text('profiled')\n"
                     "    return ctx.result()\n"
                 ),
@@ -1017,7 +1017,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "def profile_raw_orders(ctx):\n"
                     "    '''Test task profile_raw_orders.'''\n    relation = ctx.relation(source('raw_orders'))\n"
                     "    value = ctx.query(f'SELECT order_id FROM {relation}').fetchall()[0][0]\n"
-                    "    marker = Path(__file__).parents[2].joinpath('source_profile.txt')\n"
+                    "    marker = Path(__file__).parents[4].joinpath('source_profile.txt')\n"
                     "    marker.write_text(str(value))\n"
                     "    return ctx.result(metadata={'source_order_id': value})\n"
                 ),
@@ -1116,7 +1116,7 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def prepare_events(ctx):\n"
-                    "    '''Test task prepare_events.'''\n    marker = Path(__file__).parents[2].joinpath('prepared.txt')\n"
+                    "    '''Test task prepare_events.'''\n    marker = Path(__file__).parents[4].joinpath('prepared.txt')\n"
                     "    marker.write_text('prepared')\n"
                     "    return ctx.result()\n"
                 ),
@@ -1385,7 +1385,7 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "@asset(depends_on=prepare_orders)\n"
                 "def publish_prepared_orders(ctx):\n"
                 "    '''Test asset publish_prepared_orders.'''\n    payload = ctx.result_of(node_function=prepare_orders).payload\n"
-                "    marker = Path(__file__).parents[2].joinpath('prepared_order_id.txt')\n"
+                "    marker = Path(__file__).parents[4].joinpath('prepared_order_id.txt')\n"
                 "    marker.write_text(str(payload['order_id']))\n"
                 "    return ctx.result(payload=payload, materialized=True)\n"
             ),
@@ -1395,7 +1395,7 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader(depends_on=(publish_prepared_orders,))\n"
                 "def raw_orders(ctx):\n"
-                "    '''Test loader raw_orders.'''\n    marker = Path(__file__).parents[2].joinpath('prepared_order_id.txt')\n"
+                "    '''Test loader raw_orders.'''\n    marker = Path(__file__).parents[4].joinpath('prepared_order_id.txt')\n"
                 "    return [{'order_id': int(marker.read_text())}]\n"
             ),
             "sql/sources/raw.yml": (
@@ -1434,7 +1434,7 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "@asset(depends_on=export_fact_orders)\n"
                 "def notify_fact_orders(ctx):\n"
                 "    '''Test task notify_fact_orders.'''\n    payload = ctx.result_of(node_function=export_fact_orders).payload\n"
-                "    output = Path(__file__).parents[2].joinpath('notify.txt')\n"
+                "    output = Path(__file__).parents[4].joinpath('notify.txt')\n"
                 "    output.write_text(str(payload['order_id']))\n"
                 "    return ctx.result(metadata={'notified': True})\n"
             ),
@@ -1684,7 +1684,7 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                 "@asset\n"
                 "def consume_loader_result(ctx):\n"
                 "    '''Test task consume_loader_result.'''\n    result = ctx.result_of(node_function=raw_events)\n"
-                "    output = Path(__file__).parents[2].joinpath('loader_result.txt')\n"
+                "    output = Path(__file__).parents[4].joinpath('loader_result.txt')\n"
                 "    output.write_text(\n"
                 "        f\"{result.metadata['loader_name']}:{result.metadata['source_name']}:\"\n"
                 "        f\"{result.metadata['rows_loaded']}\"\n"
@@ -2191,7 +2191,7 @@ def test_given_same_node_results_in_multiple_targets_when_reading_then_uses_acti
                 "@asset\n"
                 "def consume_result(ctx):\n"
                 "    '''Test task consume_result.'''\n    result = ctx.result_of(node_function=produce_result)\n"
-                "    output = Path(__file__).parents[2].joinpath('target_result.txt')\n"
+                "    output = Path(__file__).parents[4].joinpath('target_result.txt')\n"
                 "    output.write_text(str(result.payload['target']))\n"
                 "    return ctx.result()\n"
             ),

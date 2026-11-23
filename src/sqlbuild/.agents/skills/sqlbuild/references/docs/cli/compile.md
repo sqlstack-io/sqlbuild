@@ -143,10 +143,10 @@ argument rendered:
 
 | Path | Contents |
 |------|----------|
-| `sql/models/<path>.sql` | Each model's query |
+| `sql/models/<path>.sql` | Each model's query, at its path in the project |
 | `sql/functions/<language>/<path>.sql` | Each function's `CREATE FUNCTION` statements |
-| `sql/audits/generic/<resource>/<audit>__<column>.sql` | Each attached generic audit, under the model, source or seed it checks; column audits end in `__<column>`, and an audit's `name` replaces the audit name |
-| `sql/audits/singular/<audit>.sql` | Each singular audit |
+| `audits/generic/<resource>/<audit>__<column>.sql` | Each attached generic audit, under the model, source or seed it checks; column audits end in `__<column>`, and an audit's `name` replaces the audit name |
+| `audits/singular/<audit>.sql` | Each singular audit |
 | `tests/...` | Each SQL unit test's comparison query |
 
 Read an audit's file to see how its arguments were spliced into the SQL, without running it.

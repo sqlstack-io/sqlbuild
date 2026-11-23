@@ -224,7 +224,7 @@ from sqlbuild.loaders import loader
 from sqlbuild.assets import asset
 
 
-PROJECT_DIR = Path(__file__).parents[2]
+PROJECT_DIR = Path(__file__).parents[4]
 
 
 @factory
@@ -426,7 +426,7 @@ def test_given_task_selector_when_running_run_then_task_executes(
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def prepare_orders(ctx):\n"
-                "    '''Test task prepare_orders.'''\n    Path(__file__).parents[2].joinpath('task_marker.txt').write_text('ran')\n"
+                "    '''Test task prepare_orders.'''\n    Path(__file__).parents[4].joinpath('task_marker.txt').write_text('ran')\n"
                 "    return ctx.result(payload={'status': 'ok'})\n"
             ),
         },
@@ -481,7 +481,7 @@ def test_given_asset_selector_when_running_run_then_asset_executes(
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def prepared_orders(ctx):\n"
-                "    '''Test asset prepared_orders.'''\n    Path(__file__).parents[2].joinpath('asset_marker.txt').write_text('ran')\n"
+                "    '''Test asset prepared_orders.'''\n    Path(__file__).parents[4].joinpath('asset_marker.txt').write_text('ran')\n"
                 "    return ctx.result(payload={'status': 'ok'}, materialized=True)\n"
             ),
         },
@@ -677,7 +677,7 @@ def test_given_task_loader_source_model_chain_when_running_model_then_task_runs_
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def prepare_orders(ctx):\n"
-                "    '''Test task prepare_orders.'''\n    Path(__file__).parents[2].joinpath('orders_ready.txt').write_text('ready')\n"
+                "    '''Test task prepare_orders.'''\n    Path(__file__).parents[4].joinpath('orders_ready.txt').write_text('ready')\n"
                 "    return ctx.result(metadata={'prepared': True})\n"
             ),
             "python/nodes/loaders/orders/loader.py": (
@@ -686,7 +686,7 @@ def test_given_task_loader_source_model_chain_when_running_model_then_task_runs_
                 "from python.nodes.tasks.orders.asset import prepare_orders\n\n"
                 "@loader(depends_on=(prepare_orders,))\n"
                 "def raw_orders(ctx):\n"
-                "    '''Test loader raw_orders.'''\n    marker = Path(__file__).parents[2].joinpath('orders_ready.txt')\n"
+                "    '''Test loader raw_orders.'''\n    marker = Path(__file__).parents[4].joinpath('orders_ready.txt')\n"
                 "    if not marker.exists():\n"
                 "        raise RuntimeError('orders were not prepared')\n"
                 "    return [{'order_id': 1, 'amount_cents': 100}]\n"
@@ -772,7 +772,7 @@ def test_given_model_and_task_selector_when_running_run_then_task_can_read_built
                 "def summarize_orders(ctx):\n"
                 "    '''Test task summarize_orders.'''\n    orders = ctx.relation(model('fact_orders'))\n"
                 "    rows = ctx.query(f'SELECT COUNT(*) FROM {orders}').fetchall()[0][0]\n"
-                "    Path(__file__).parents[2].joinpath('summary.txt').write_text(str(rows))\n"
+                "    Path(__file__).parents[4].joinpath('summary.txt').write_text(str(rows))\n"
                 "    return ctx.result(metadata={'rows': rows})\n"
             ),
         },
@@ -844,7 +844,7 @@ def test_given_asset_depends_on_terminal_model_when_running_run_then_asset_reads
                 "def export_fact_orders(ctx):\n"
                 "    '''Test asset export_fact_orders.'''\n    orders = ctx.relation(model('fact_orders'))\n"
                 "    rows = ctx.query(f'SELECT COUNT(*) FROM {orders}').fetchall()[0][0]\n"
-                "    Path(__file__).parents[2].joinpath('export.txt').write_text(str(rows))\n"
+                "    Path(__file__).parents[4].joinpath('export.txt').write_text(str(rows))\n"
                 "    return ctx.result(metadata={'rows': rows}, materialized=True)\n"
             ),
         },
@@ -910,7 +910,7 @@ def test_given_task_asset_task_chain_when_running_final_task_then_chain_executes
                 "@asset(depends_on=publish_orders)\n"
                 "def notify_orders(ctx):\n"
                 "    '''Test task notify_orders.'''\n    metadata = ctx.result_of(node_function=publish_orders).metadata\n"
-                "    output = Path(__file__).parents[2].joinpath('notify.txt')\n"
+                "    output = Path(__file__).parents[4].joinpath('notify.txt')\n"
                 "    output.write_text(str(metadata['published']))\n"
                 "    return ctx.result()\n"
             ),
@@ -1146,7 +1146,7 @@ def test_given_independent_python_and_sql_selectors_when_running_run_then_all_br
                 "@asset\n"
                 "def branch_a(ctx):\n"
                 "    '''Test task branch_a.'''\n"
-                "    Path(__file__).parents[2].joinpath('branch_a.txt').write_text('a')\n"
+                "    Path(__file__).parents[5].joinpath('branch_a.txt').write_text('a')\n"
                 "    return ctx.result()\n"
             ),
             "python/nodes/tasks/branches/branch_b/asset.py": (
@@ -1157,7 +1157,7 @@ def test_given_independent_python_and_sql_selectors_when_running_run_then_all_br
                 "@asset\n"
                 "def branch_b(ctx):\n"
                 "    '''Test task branch_b.'''\n"
-                "    Path(__file__).parents[2].joinpath('branch_b.txt').write_text('b')\n"
+                "    Path(__file__).parents[5].joinpath('branch_b.txt').write_text('b')\n"
                 "    return ctx.result()\n"
             ),
             "python/nodes/tasks/branches/__init__.py": (
@@ -1609,7 +1609,7 @@ def test_given_loader_task_loader_chain_when_running_model_then_ingress_orders_c
                 "@asset(depends_on=load_window_orders)\n"
                 "def prepare_raw_orders(ctx):\n"
                 "    '''Test task prepare_raw_orders.'''\n    rows = ctx.query('SELECT COUNT(*) FROM window_orders').fetchall()[0][0]\n"
-                "    Path(__file__).parents[2].joinpath('prepared.txt').write_text(str(rows))\n"
+                "    Path(__file__).parents[4].joinpath('prepared.txt').write_text(str(rows))\n"
                 "    return ctx.result(metadata={'rows': rows})\n"
             ),
             "python/nodes/loaders/raw/loader.py": (
@@ -1618,7 +1618,7 @@ def test_given_loader_task_loader_chain_when_running_model_then_ingress_orders_c
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader(depends_on=(prepare_raw_orders,))\n"
                 "def raw_orders(ctx):\n"
-                "    '''Test loader raw_orders.'''\n    marker = Path(__file__).parents[2].joinpath('prepared.txt')\n"
+                "    '''Test loader raw_orders.'''\n    marker = Path(__file__).parents[4].joinpath('prepared.txt')\n"
                 "    if marker.read_text() != '1':\n"
                 "        raise RuntimeError('window orders were not prepared')\n"
                 "    return [{'order_id': 1}]\n"
@@ -1691,7 +1691,7 @@ def test_given_task_asset_loader_chain_when_running_model_then_ingress_orders_ch
                 "@asset(depends_on=fetch_orders)\n"
                 "def publish_orders(ctx):\n"
                 "    '''Test asset publish_orders.'''\n    payload = ctx.result_of(node_function=fetch_orders).payload\n"
-                "    marker = Path(__file__).parents[2].joinpath('asset_ready.txt')\n"
+                "    marker = Path(__file__).parents[4].joinpath('asset_ready.txt')\n"
                 "    marker.write_text(str(payload['order_id']))\n"
                 "    return ctx.result(payload=payload, materialized=True)\n"
             ),
@@ -1701,7 +1701,7 @@ def test_given_task_asset_loader_chain_when_running_model_then_ingress_orders_ch
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader(depends_on=(publish_orders,))\n"
                 "def raw_orders(ctx):\n"
-                "    '''Test loader raw_orders.'''\n    marker = Path(__file__).parents[2].joinpath('asset_ready.txt')\n"
+                "    '''Test loader raw_orders.'''\n    marker = Path(__file__).parents[4].joinpath('asset_ready.txt')\n"
                 "    if marker.read_text() != '1':\n"
                 "        raise RuntimeError('asset was not ready')\n"
                 "    return [{'order_id': 1}]\n"
@@ -1778,7 +1778,7 @@ def test_given_loader_asset_loader_chain_when_running_model_then_ingress_orders_
                 "@asset(depends_on=load_window_orders)\n"
                 "def prepare_asset_orders(ctx):\n"
                 "    '''Test asset prepare_asset_orders.'''\n    rows = ctx.query('SELECT COUNT(*) FROM window_orders').fetchall()[0][0]\n"
-                "    Path(__file__).parents[2].joinpath('asset_ready.txt').write_text(str(rows))\n"
+                "    Path(__file__).parents[4].joinpath('asset_ready.txt').write_text(str(rows))\n"
                 "    return ctx.result(metadata={'rows': rows}, materialized=True)\n"
             ),
             "python/nodes/loaders/raw/loader.py": (
@@ -1787,7 +1787,7 @@ def test_given_loader_asset_loader_chain_when_running_model_then_ingress_orders_
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader(depends_on=(prepare_asset_orders,))\n"
                 "def raw_orders(ctx):\n"
-                "    '''Test loader raw_orders.'''\n    marker = Path(__file__).parents[2].joinpath('asset_ready.txt')\n"
+                "    '''Test loader raw_orders.'''\n    marker = Path(__file__).parents[4].joinpath('asset_ready.txt')\n"
                 "    if marker.read_text() != '1':\n"
                 "        raise RuntimeError('asset orders were not prepared')\n"
                 "    return [{'order_id': 1}]\n"
@@ -1945,7 +1945,7 @@ def test_given_loader_task_asset_loader_model_task_asset_task_spine_when_running
                 "@asset(depends_on=prepare_orders)\n"
                 "def publish_prepared_orders(ctx):\n"
                 "    '''Test asset publish_prepared_orders.'''\n    payload = ctx.result_of(node_function=prepare_orders).payload\n"
-                "    marker = Path(__file__).parents[2].joinpath('prepared_order_id.txt')\n"
+                "    marker = Path(__file__).parents[4].joinpath('prepared_order_id.txt')\n"
                 "    marker.write_text(str(payload['order_id']))\n"
                 "    return ctx.result(payload=payload, materialized=True)\n"
             ),
@@ -1955,7 +1955,7 @@ def test_given_loader_task_asset_loader_model_task_asset_task_spine_when_running
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader(depends_on=(publish_prepared_orders,))\n"
                 "def raw_orders(ctx):\n"
-                "    '''Test loader raw_orders.'''\n    marker = Path(__file__).parents[2].joinpath('prepared_order_id.txt')\n"
+                "    '''Test loader raw_orders.'''\n    marker = Path(__file__).parents[4].joinpath('prepared_order_id.txt')\n"
                 "    return [{'order_id': int(marker.read_text())}]\n"
             ),
             "sql/sources/raw.yml": (
@@ -1994,7 +1994,7 @@ def test_given_loader_task_asset_loader_model_task_asset_task_spine_when_running
                 "@asset(depends_on=export_fact_orders)\n"
                 "def notify_fact_orders(ctx):\n"
                 "    '''Test task notify_fact_orders.'''\n    payload = ctx.result_of(node_function=export_fact_orders).payload\n"
-                "    output = Path(__file__).parents[2].joinpath('notify.txt')\n"
+                "    output = Path(__file__).parents[4].joinpath('notify.txt')\n"
                 "    output.write_text(str(payload['order_id']))\n"
                 "    return ctx.result(metadata={'notified': True})\n"
             ),
