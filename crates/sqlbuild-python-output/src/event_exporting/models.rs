@@ -435,10 +435,10 @@ impl EventExporterDispatcher {
         Ok(summary)
     }
 
-    /// Run `finalizer` on the calling thread, never a daemon delivery thread, once delivery is idle or the idle wait ends.
+    /// Run `finalizer` on the calling thread, never a daemon delivery thread, once delivery is idle or the idle wait ends; its error is raised.
     pub(crate) fn finalize_when_idle(&self, py: Python<'_>, finalizer: Py<PyAny>) -> PyResult<()> {
         self.shared.await_idle(py)?;
-        drop(finalizer.bind(py).call0());
+        finalizer.bind(py).call0()?;
         Ok(())
     }
 

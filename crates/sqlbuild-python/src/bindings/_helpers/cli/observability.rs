@@ -11,7 +11,8 @@ use pyo3::types::{PyBool, PyList, PyString, PyTuple, PyTupleMethods};
 use pyo3::{IntoPyObjectExt, pyclass, pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_cli::dispatch::main::closing_status::closing_status;
 use sqlbuild_cli::dispatch::main::event_export_warning::event_export_warning;
-use sqlbuild_cli::dispatch::models::{ExportSummary, ExporterLoss};
+use sqlbuild_cli::dispatch::main::export_summary::export_summary;
+use sqlbuild_cli::dispatch::models::ExportSummary;
 use sqlbuild_core::event_export::constants::DEFAULT_EVENT_EXPORT_SHUTDOWN_TIMEOUT_SECONDS;
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
@@ -24,7 +25,9 @@ use sqlbuild_python_base::build_progress::main::progress::machine_output_mode::m
 use sqlbuild_python_base::build_progress::models::NativeProgressProjector;
 use sqlbuild_python_base::cli::main::withhold_launch_record::withhold_launch_record;
 use sqlbuild_python_base::event_exporting::main::event_exporter_command_scope::event_exporter_command_scope;
-use sqlbuild_python_base::event_exporting::models::EventExporterCommandScope;
+use sqlbuild_python_base::event_exporting::models::{
+    EventExportSummary, EventExporterCommandScope,
+};
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect_stdout_to_stderr;
 use sqlbuild_python_base::presentation_text::main::stdout_supports_color::stdout_supports_color;
@@ -190,32 +193,19 @@ fn run_cleanup<T>(py: Python<'_>, result: PyResult<T>, phase: &str) {
     }
 }
 
-/// Native export accounting of a Python `EventExportSummary`.
-fn export_summary(summary: &Bound<'_, PyAny>) -> PyResult<ExportSummary> {
-    let mut per_exporter: Vec<ExporterLoss> = Vec::new();
-    for exporter in native_field(summary, "per_exporter")?.try_iter()? {
-        let exporter: Bound<'_, PyAny> = exporter?;
-        let counts: Bound<'_, PyAny> = native_field(&exporter, "counts")?;
-        per_exporter.push(ExporterLoss {
-            exporter_name: native_field(&exporter, "exporter_name")?.extract()?,
-            dropped: native_field(&counts, "dropped")?.extract()?,
-            failed: native_field(&counts, "failed")?.extract()?,
-        });
-    }
-    Ok(ExportSummary {
-        accepted: native_field(summary, "accepted")?.extract()?,
-        dropped: native_field(summary, "dropped")?.extract()?,
-        failed: native_field(summary, "failed")?.extract()?,
-        per_exporter,
-    })
-}
-
 /// Print the incomplete-export warning to stderr, closed by the command's success, ignoring write failures.
 fn warn_incomplete_export(
-    summary: &Bound<'_, PyAny>,
+    (summary, scope): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
     (command, command_succeeded): (&str, bool),
 ) -> PyResult<()> {
-    let Some(message) = event_export_warning(&export_summary(summary)?, command_succeeded) else {
+    let accounting: ExportSummary = export_summary(
+        &summary.cast::<EventExportSummary>()?.get().snapshot,
+        scope
+            .cast::<EventExporterCommandScope>()?
+            .get()
+            .teardown_failures()?,
+    );
+    let Some(message) = event_export_warning(&accounting, command_succeeded) else {
         return Ok(());
     };
     let closing: String = if command_succeeded {
@@ -306,11 +296,14 @@ impl Observed {
             projector.call_method1("restore", (&self.projector_token,)),
             "progress_context_restore",
         );
-        if let Some(summary) = summary.filter(|summary| !summary.is_none()) {
+        if let (Some(summary), Some(scope)) = (
+            summary.filter(|summary| !summary.is_none()),
+            self.exporter_scope.as_ref(),
+        ) {
             let succeeded: bool = self.outcome.get().succeeded.load(Ordering::SeqCst);
             run_cleanup(
                 py,
-                warn_incomplete_export(&summary, (&self.command, succeeded)),
+                warn_incomplete_export((&summary, scope.bind(py)), (&self.command, succeeded)),
                 "event_exporter_warning",
             );
         }

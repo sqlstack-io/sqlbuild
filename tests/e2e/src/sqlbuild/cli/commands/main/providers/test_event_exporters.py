@@ -16,6 +16,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.providers._test_types import (
     NoExporterCommandE2ETestCase,
     ReadOnlyProviderE2ETestCase,
     SharedSinkProviderE2ETestCase,
+    SinkTeardownFailureE2ETestCase,
     SlowSinkExitE2ETestCase,
     SnowflakeKeyWarningE2ETestCase,
 )
@@ -699,3 +700,56 @@ def test_given_snowflake_keys_and_a_sink_provider_when_running_then_warns_once(
     assert (result.stdout + result.stderr).count(
         "Snowflake-like keys: warehouse."
     ) == test_case.expected_warnings, result.stderr
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        SinkTeardownFailureE2ETestCase(
+            description="a sink provider whose teardown raises",
+            teardown_error="flush failed with destination detail",
+            expected_warning=(
+                "sink provider teardown failed ('flaky_sink' (FlakySink) raised RuntimeError); "
+                "events the provider still held may not have been delivered."
+            ),
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_sink_provider_teardown_raises_when_command_ends_then_the_export_warning_reports_it(
+    test_case: SinkTeardownFailureE2ETestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="sink_teardown_project",
+        repo_files={
+            "sqlbuild_project.toml": (
+                'name = "sink_teardown_project"\nadapter = "duckdb"\n\n'
+                '[connection]\ndatabase = "sink_teardown_project.duckdb"\n'
+            ),
+            "python/providers/flaky_sink.py": (
+                "from sqlbuild.providers import Provider\n\n\n"
+                "class FlakySink(Provider):\n"
+                '    """Test provider FlakySink."""\n\n'
+                "    def teardown(self):\n"
+                f'        raise RuntimeError("{test_case.teardown_error}")\n'
+            ),
+            "python/event_sinks/events.py": (
+                "from python.providers.flaky_sink import FlakySink\n"
+                "from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink\n\n\n"
+                "@lifecycle_event_sink\n"
+                "def export_event(event: LifecycleEvent, flaky_sink: FlakySink) -> None:\n"
+                "    del event, flaky_sink\n"
+            ),
+            "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+        },
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build"), project_dir=project_dir
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert test_case.expected_warning in result.stderr, result.stderr
+    assert test_case.teardown_error not in result.stdout + result.stderr

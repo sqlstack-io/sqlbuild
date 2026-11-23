@@ -130,6 +130,11 @@ durability. SQLBuild core does not provide a Kafka or ClickHouse implementation.
   A successful command then ends with
   `sqb audit completed successfully; only its lifecycle event export is affected.` The exit code
   and stdout, including `--json` output, are unchanged.
+- When a sink provider's `teardown` raises, the same warning reports it with the provider and the
+  error type, for example
+  `sink provider teardown failed ('kafka' (KafkaProducer) raised KafkaException); events the provider still held may not have been delivered.`
+  The error's message is not printed, because it can carry destination details. The exit code is
+  unchanged. In a run, the warning appears with the run's output and events.
 - Provider setup and declaration errors fail before execution because the project configuration is
   invalid.
 - Providers shared by multiple sinks are set up and torn down once per command.
