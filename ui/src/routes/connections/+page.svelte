@@ -53,7 +53,7 @@
 	{#snippet row(c)}
 		{@const bad = failing(c.tables)}
 		{@const fullAt = lastFullSync(c.tables)}
-		<tr class:opened={isOpen(c)} onclick={() => toggle(c)}>
+		<tr class="expandable" class:opened={isOpen(c)} onclick={() => toggle(c)}>
 			<td>
 				<div class="cell-name">
 					<DisclosureButton open={isOpen(c)} class="min-w-0">

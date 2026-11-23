@@ -111,8 +111,8 @@
 		{#snippet row(r)}
 			{#if r.kind === 'folder'}
 				{@const f = r.folder}
-				<tr class:quiet={!needsAttention(f)} data-path={f.path} aria-level={f.depth + 1}>
-					<td class="label" class:toggles={r.expandable} onclick={(e) => labelClick(e, r)} data-testid="folder-label">
+				<tr class:quiet={!needsAttention(f)} class:expandable={r.expandable} data-path={f.path} aria-level={f.depth + 1} onclick={(e) => labelClick(e, r)}>
+					<td class="label" class:toggles={r.expandable} data-testid="folder-label">
 						<div class="inner" style:padding-left="{f.depth * INDENT}px">
 							{#if r.expandable}
 								<Button variant="ghost" size="icon-xs" class="chev {r.expanded ? 'open' : ''}" aria-expanded={r.expanded} aria-label="{r.expanded ? 'Collapse' : 'Expand'} {f.path}" onclick={() => toggle(f.path)} data-testid="folder-toggle"><ChevronRightIcon /></Button>
@@ -120,7 +120,7 @@
 								<span class="chev-space"></span>
 							{/if}
 							{#if r.expanded}<FolderOpenIcon size={14} class="ficon" />{:else}<FolderIcon size={14} class="ficon" />{/if}
-							<a href={href(f.selection)} onclick={(e) => open(e, f.selection)} title="Open {f.path} in the catalog" data-testid="folder-name">{f.group}</a>
+							<a class="row-name" href={href(f.selection)} onclick={(e) => open(e, f.selection)} title="Open {f.path} in the catalog" data-testid="folder-name">{f.group}</a>
 							{#if !r.expanded && f.children.length}<small>{f.children.length} subfolders</small>{/if}
 						</div>
 					</td>
