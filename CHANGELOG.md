@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.259.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.258.0...v0.259.0) (2026-11-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* discovered nodes, run output and node results, service accounts and republish
+* **deploy:** This release changes the control store, the location and worker protocol, Python nodes, reruns and command output.
+    - Upgrade: the server, its schedulers, every location and every worker must run this release. Work polls require `scope`, a location's publication request carries `generation`, `rediscover`, `previous` and `seed`, and a run's execution always carries `discovered`.
+    - Control store: migrations 0006 to 0009 add node results, the run output index, a snapshot's discovered document and service accounts.
+    - Run page: it has no rerun buttons. Plan these opens the plan page for the selection, and running that plan starts a new run with its own `ctx.root_run_id`. To resume a run, rerun it from failure in the Runs list or with `sqb admin rerun-run --from-failure`, which keep its `ctx.root_run_id`.
+    - Reruns: rerun from failure, and automatic retries of runs nobody cancelled, include cancelled nodes as well as failed, skipped and unreached ones.
+    - Python nodes: `ctx.log` is a logger; use `ctx.log.info`, `ctx.log.warning` or `ctx.log.error`.
+    - Discovered nodes: a @discover function that returns no items fails its set, which keeps its last good items. Providers used by steps of a set with `max_parallel` must be thread-safe, and new SQL waits while those steps run. On in-memory DuckDB, MotherDuck or SQLite targets the items run one at a time.
+    - Cancels: a cancel waits 5 seconds for discovered steps still running, then records them cancelled and exits without tearing down the providers they may still use, and a sink's forced close leaves them open too.
+    - Ctrl+C: a command interrupted by Ctrl+C prints `error: interrupted (Ctrl+C)` and exits with 130, instead of a KeyboardInterrupt traceback and death by SIGINT.
+    - sqb plan: a missing provider secret no longer fails it with D012. It lists what the secret stops under Can't run and in `cant_run`, and no longer prints the note naming providers allowed to miss their secrets.
+    - sqb admin: it prints JSON only with `--json`; add it to scripts that parse its output.
+    - Run output: with a SQLite control database it is kept in `output` beside the database; with PostgreSQL in the service user's state folder (`$XDG_STATE_HOME/sqlbuild/output` or `~/.local/state/sqlbuild/output`). Set `[output] store` to keep it on a persistent volume, in the same change as the upgrade, as earlier releases refuse an `[output]` section.
+
+### Features
+
+* **admin:** sqb admin prints one line naming what it did, and JSON with --json ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **dev:** sqb dev accepts named hosts with --allow-host and a listen address with --host ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* discovered nodes, run output and node results, service accounts and republish ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **location:** republish a served location on request, with sqb location republish, the API or the UI, and read its discovered sets back ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **python-nodes:** discovered nodes, with [@discover](https://github.com/discover) and [@asset](https://github.com/asset)(for_each=...), run in parallel up to max_parallel ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **runs:** keep run output in a local or S3 output store, with paged, searchable and downloadable reads, a per-run byte cap and retention ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **runs:** record what each run node did: table rows, progress, no-change reason and not run ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **server:** service accounts with sqbk_ API keys, managed with sqb admin and in the UI ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **ui:** the run page shows each node's rows, checks, logged lines and output, and plans a selection with Plan these ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+
+
+### Bug Fixes
+
+* **cli:** Ctrl+C stops any command at any point, including at a sign-in prompt, with exit code 130 ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **compiler:** keep an expansion from opening or extending a comment ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **deploy:** the server image and compose.yml keep run output on a volume ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **dev:** sqb dev doesn't republish when a run writes its output inside the project ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **discovery:** a discovered item that names a node the project lacks fails only its own set ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **plan:** sqb plan plans as usual when a provider secret is missing and lists what can't run ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **runs:** keep error and diagnostic text without NUL, or redacted, so PostgreSQL stores it ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **secrets:** give advice that fits the command when a provider secret is missing ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **sensors:** an unreadable stored tick no longer fails the sensor page or trigger list, and manual builds send check events ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+* **triggers:** pause or resume a schedule whose job can't be read, with trigger.toggle on every node of its target ([a5059af](https://github.com/sqlstack-io/sqlbuild/commit/a5059af348eb97fa339824c66783e50e79d5ff76))
+
 ## [0.258.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.257.0...v0.258.0) (2026-11-22)
 
 
