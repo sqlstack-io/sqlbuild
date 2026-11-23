@@ -2,10 +2,9 @@
 
 from python.nodes.loaders._registry import load
 
-from sqlbuild.factories import factory
 from sqlbuild.executor.load.models import LoaderContext
+from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
-
 
 
 @factory
@@ -50,5 +49,15 @@ def catalogue_loaders() -> list[object]:
     def catalogue__supplier_costs(ctx: LoaderContext) -> object:
         return load(ctx, "catalogue__supplier_costs")
 
-
-    return [catalogue__brands, catalogue__categories, catalogue__products, catalogue__product_variants, catalogue__price_lists, catalogue__product_media, catalogue__bundles, catalogue__bundle_components, catalogue__suppliers, catalogue__supplier_costs]
+    return [
+        catalogue__brands,
+        catalogue__categories,
+        catalogue__products,
+        catalogue__product_variants,
+        catalogue__price_lists,
+        catalogue__product_media,
+        catalogue__bundles,
+        catalogue__bundle_components,
+        catalogue__suppliers,
+        catalogue__supplier_costs,
+    ]

@@ -232,7 +232,8 @@ _CANT_RUN: list[dict[str, object]] = [
         PlanPreviewTestCase(
             description="an edited expression plans its declared columns and says so",
             edited_files={
-                "sql/sources/raw.yml": _SOURCES.format(expression=f"{_EXPRESSION} WHERE true") + "\n"
+                "sql/sources/raw.yml": _SOURCES.format(expression=f"{_EXPRESSION} WHERE true")
+                + "\n"
             },
             injected_sql=(),
             expected_window_models=("orders",),
@@ -377,7 +378,9 @@ def test_given_an_edited_model_when_the_location_plans_what_changed_then_it_publ
         'MODEL (description "Order count summary.", materialized table);\n\n'
         'SELECT order_count FROM __ref("order_count")\n'
     )
-    write_files(project_dir=project, files=_PROJECT_FILES | {"sql/models/order_summary.sql": summary})
+    write_files(
+        project_dir=project, files=_PROJECT_FILES | {"sql/models/order_summary.sql": summary}
+    )
     built: subprocess.CompletedProcess[str] = run_sqb(project, "build", "--target", "development")
     assert built.returncode == 0, built.stderr
     edited: str = _PROJECT_FILES["sql/models/order_count.sql"].replace(*test_case.edit)

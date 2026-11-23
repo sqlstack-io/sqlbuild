@@ -7,8 +7,8 @@ and they never touch the core tables, so core outputs and expectations stay the 
 from python.nodes.loaders._edge_cases import DELIVERY_BATCH_VAR, TABLES, delivery_updates
 from python.nodes.loaders._writer import statements
 
-from sqlbuild.factories import factory
 from sqlbuild.executor.load.models import LoaderContext
+from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 
 
@@ -17,7 +17,6 @@ def _load(ctx: LoaderContext, source_name: str) -> object:
     for sql in statements(ctx.destination, source_name, rows):
         ctx.execute_sql(sql)
     return ctx.result(metadata={"rows": len(rows)})
-
 
 
 @factory
@@ -82,5 +81,19 @@ def edge_cases_loaders() -> list[object]:
             ctx.execute_sql(sql)
         return ctx.result(metadata={"rows": len(rows), "batch": batch})
 
-
-    return [edge__partner_payloads, edge__gateway_callbacks, edge__price_windows, edge__customer_profiles, edge__ledger_entries, edge__ticket_notes, edge__partner_listings, edge__basket_lines, edge__date_texts, edge__amount_checks, edge__variant_values, edge__category_links, edge__supplier_notes, edge__delivery_updates]
+    return [
+        edge__partner_payloads,
+        edge__gateway_callbacks,
+        edge__price_windows,
+        edge__customer_profiles,
+        edge__ledger_entries,
+        edge__ticket_notes,
+        edge__partner_listings,
+        edge__basket_lines,
+        edge__date_texts,
+        edge__amount_checks,
+        edge__variant_values,
+        edge__category_links,
+        edge__supplier_notes,
+        edge__delivery_updates,
+    ]

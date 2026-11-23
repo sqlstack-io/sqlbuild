@@ -121,7 +121,10 @@ pub(crate) fn image() -> ProjectImage {
         }]),
         lint_model_keys: Some(pairs(&[("sql/models/orders.sql", "lint-key")])),
         lint_file_keys: Some(vec![
-            ("sql/models/orders.sql".to_owned(), Some("file-key".to_owned())),
+            (
+                "sql/models/orders.sql".to_owned(),
+                Some("file-key".to_owned()),
+            ),
             ("sql/models/customers.sql".to_owned(), None),
         ]),
         header_keys: BTreeMap::from([(

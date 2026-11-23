@@ -125,7 +125,10 @@ def test_given_project_when_running_command_then_project_discovery_runs_only_whe
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,
         project_name="orders_project",
-        repo_files={"sqlbuild_project.toml": PROJECT_TOML, "sql/models/orders.sql": VALID_MODEL_SQL},
+        repo_files={
+            "sqlbuild_project.toml": PROJECT_TOML,
+            "sql/models/orders.sql": VALID_MODEL_SQL,
+        },
     )
     argv: list[str] = ["--project-dir", str(project_dir), *test_case.command]
 

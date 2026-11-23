@@ -19,11 +19,11 @@ fn given_project_python_when_listing_supported_paths_then_only_documented_roots_
                 "python/nodes/__pycache__/main.py",
             ],
             expected_supported: &[
+                "orchestration/sensors/stock.py",
                 "python/adapter.py",
+                "python/nodes/orders/main.py",
                 "sql/functions/python/f.py",
                 "sql/models/a/_sqlbuild/hooks/python/h.py",
-                "orchestration/sensors/stock.py",
-                "python/nodes/orders/main.py",
             ],
         },
         SupportedPathsTestCase {

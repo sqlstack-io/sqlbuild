@@ -50,7 +50,9 @@ ORDINARY_SINKS: str = (
         RecallSinkDiscoveryTestCase(
             description="one replacement per stream, by writer type under any parameter name",
             sink_files={
-                "python/event_sinks/recall.py": RECALL_SINK_IMPORTS + LIFECYCLE_REPLACEMENT + OUTPUT_REPLACEMENT,
+                "python/event_sinks/recall.py": RECALL_SINK_IMPORTS
+                + LIFECYCLE_REPLACEMENT
+                + OUTPUT_REPLACEMENT,
                 "python/event_sinks/logs.py": RECALL_SINK_IMPORTS + ORDINARY_SINKS,
             },
             expected_replacements=((("keep_runs", "history"),), (("redact", "writer"),)),

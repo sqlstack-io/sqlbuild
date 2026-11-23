@@ -9,8 +9,8 @@ from scripts.compiler_differential._helpers.corpus.case_builder import (
 from scripts.compiler_differential.constants import (
     FAILURE_BASE_CONFIG,
     FAILURE_BASE_MART,
-    FAILURE_CONFIG_PATH,
     FAILURE_BASE_STAGING,
+    FAILURE_CONFIG_PATH,
     FAILURE_MART_PATH,
     GENERATOR_MISSING_ENV_VAR,
 )
@@ -156,7 +156,9 @@ def _macro_cases() -> tuple[FailureCase, ...]:
                     columns='amount, @py.explode("status") AS status',
                     files={_STAGING_MACROS: _CENTS_MACRO + _EXPLODE_MACRO},
                 ),
-                "sql/macros/python/explode.py": _EXPLODE_MACRO.replace("def explode", "def blow_up"),
+                "sql/macros/python/explode.py": _EXPLODE_MACRO.replace(
+                    "def explode", "def blow_up"
+                ),
                 FAILURE_MART_PATH: FAILURE_BASE_MART.replace(
                     "SUM(amount)", 'SUM(@py.blow_up("total"))'
                 ),

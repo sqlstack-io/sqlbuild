@@ -252,7 +252,9 @@ def migrated_project(tmp_path: Path) -> Path:
     )
     assert first.returncode == 0, first.stdout + first.stderr
     (project_dir / "sql/models/revenue.sql").unlink()
-    (project_dir / "sql/models/daily_revenue.sql").write_text(_DAILY_REVENUE_MODEL, encoding="utf-8")
+    (project_dir / "sql/models/daily_revenue.sql").write_text(
+        _DAILY_REVENUE_MODEL, encoding="utf-8"
+    )
     migrated: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build"), project_dir=project_dir
     )

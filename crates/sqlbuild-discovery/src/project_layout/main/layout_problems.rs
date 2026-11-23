@@ -11,7 +11,8 @@ use sqlbuild_core::constants::{
 
 use crate::project_layout::_helpers::ignored::IgnoreRules;
 use crate::project_layout::constants::{
-    DATABASE_FILE_SUFFIXES, HIDDEN_PREFIX, OUTPUT_DIRECTORIES, PYTHON_CACHE_DIRECTORY,
+    DATABASE_COMPANION_SUFFIXES, DATABASE_FILE_SUFFIXES, HIDDEN_PREFIX, OUTPUT_DIRECTORIES,
+    PYTHON_CACHE_DIRECTORY,
 };
 use crate::project_layout::models::LayoutProblem;
 
@@ -74,7 +75,9 @@ fn folder_problems(
     checked: &Checked<'_>,
     (ignored, extra): (&IgnoreRules, &[String]),
 ) -> Vec<LayoutProblem> {
-    let directory: PathBuf = checked.folder.map_or(root.to_path_buf(), |name| root.join(name));
+    let directory: PathBuf = checked
+        .folder
+        .map_or(root.to_path_buf(), |name| root.join(name));
     let Ok(entries) = fs::read_dir(&directory) else {
         return Vec::new();
     };
@@ -98,7 +101,11 @@ fn folder_problems(
             continue;
         }
         problems.push(LayoutProblem {
-            path: if is_dir { format!("{relative}/") } else { relative },
+            path: if is_dir {
+                format!("{relative}/")
+            } else {
+                relative
+            },
             folder: checked.folder,
             allowed: allowed(checked),
         });
@@ -118,10 +125,19 @@ fn always_allowed(folder: Option<&str>, name: &str, is_dir: bool) -> bool {
     if is_dir {
         OUTPUT_DIRECTORIES.contains(&name)
     } else {
-        DATABASE_FILE_SUFFIXES
-            .iter()
-            .any(|suffix| name.ends_with(suffix))
+        is_database_file(name)
     }
+}
+
+/// A local database file, or the log, shared-memory or journal file beside one.
+fn is_database_file(name: &str) -> bool {
+    let base: &str = DATABASE_COMPANION_SUFFIXES
+        .iter()
+        .find_map(|suffix| name.strip_suffix(suffix))
+        .unwrap_or(name);
+    DATABASE_FILE_SUFFIXES
+        .iter()
+        .any(|suffix| base.ends_with(suffix))
 }
 
 fn allowed(checked: &Checked<'_>) -> Vec<String> {

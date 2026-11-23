@@ -1584,8 +1584,13 @@ pub(crate) const PRIVATE_PREFIX: &str = "_";
 /// The name a `from module import *` binds.
 pub(crate) const STAR_IMPORT: &str = "*";
 /// The files that declare a unit's nodes and make its folder a unit, one per unit.
-pub(crate) const UNIT_DECLARATION_FILES: [&str; 5] =
-    ["loader.py", "asset.py", "loaders.py", "assets.py", "factory.py"];
+pub(crate) const UNIT_DECLARATION_FILES: [&str; 5] = [
+    "loader.py",
+    "asset.py",
+    "loaders.py",
+    "assets.py",
+    "factory.py",
+];
 /// The file holding a unit's checks.
 pub(crate) const UNIT_CHECKS_FILE: &str = "checks.py";
 /// The files a unit folder may hold beside its declaration file and `main.py`.

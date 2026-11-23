@@ -66,7 +66,10 @@ fn given_moved_modules_when_rewriting_imports_then_each_import_follows_or_is_ref
                     "from .rates import RATE\nfrom . import rounding\n\n\n\
                      def to_cents(x):\n    return x * RATE\n",
                 ),
-                ("sql/models/staging/_sqlbuild/_macros/rates.py", "RATE = 100\n"),
+                (
+                    "sql/models/staging/_sqlbuild/_macros/rates.py",
+                    "RATE = 100\n",
+                ),
                 (
                     "sql/models/staging/_sqlbuild/_macros/totals.py",
                     "from .cents import to_cents\n",

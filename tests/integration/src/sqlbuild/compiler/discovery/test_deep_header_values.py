@@ -45,7 +45,9 @@ def test_given_header_values_at_the_limit_when_discovering_on_a_deep_stack_then_
 ) -> None:
     write_project(
         project_dir=tmp_path,
-        files=(("sql/models/orders.sql", f"MODEL ({test_case.header});\nSELECT 1 AS id\n".encode()),),
+        files=(
+            ("sql/models/orders.sql", f"MODEL ({test_case.header});\nSELECT 1 AS id\n".encode()),
+        ),
     )
     parsed: object = on_deep_stack(
         frames=test_case.stack_frames,

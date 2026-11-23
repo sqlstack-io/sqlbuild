@@ -158,7 +158,9 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
                     "where_condition \"is_marked = TRUE AND 'is_flagged' <> ''\"",
                     'where_condition "NOT is_marked"',
                 ),
-                "sql/models/marts/flagged_order_summary.sql": ('where_condition "is_marked IS NULL"',),
+                "sql/models/marts/flagged_order_summary.sql": (
+                    'where_condition "is_marked IS NULL"',
+                ),
             },
             expected_columns={
                 "flagged_orders": ("order_id", "is_marked"),

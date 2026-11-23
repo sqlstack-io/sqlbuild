@@ -26,8 +26,8 @@ use crate::project::_helpers::targets::{
 use crate::project::_helpers::values::is_truthy;
 use crate::project::constants::{
     ALLOW_MISSING_SECRETS_KEY, COLUMN_CONTRACT_MODES, ENV_FILE_KEY, EXTRA_PATHS_KEY,
-    LEGACY_COLUMN_CONTRACT_MODE_KEY, LOCAL_CONFIG_FILENAME, POOLS_KEY,
-    QUERY_CHANGE_TRACKING_KEY, REQUIRE_SQL_ANALYSIS_KEY, SHARED_POLICY_SETTINGS, SQL_ANALYSIS_KEY,
+    LEGACY_COLUMN_CONTRACT_MODE_KEY, LOCAL_CONFIG_FILENAME, POOLS_KEY, QUERY_CHANGE_TRACKING_KEY,
+    REQUIRE_SQL_ANALYSIS_KEY, SHARED_POLICY_SETTINGS, SQL_ANALYSIS_KEY,
 };
 use crate::project::errors::{ConfigFailure, FailureClass, LoadFailure, MessagePiece};
 use crate::project::models::{

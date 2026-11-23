@@ -287,7 +287,9 @@ def test_given_invalid_sql_hook_when_parsing_then_raises(
 ) -> None:
     with pytest.raises(SqlHookParseError, match=test_case.expected_error_fragment):
         discover_declaration_file(
-            project_dir=tmp_path, relative_path="sql/hooks/sql/invalid.sql", contents=test_case.contents
+            project_dir=tmp_path,
+            relative_path="sql/hooks/sql/invalid.sql",
+            contents=test_case.contents,
         )
 
 

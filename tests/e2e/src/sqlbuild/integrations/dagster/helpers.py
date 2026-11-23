@@ -217,7 +217,9 @@ _STDOUT_POLL_OUTCOMES: MappingProxyType[bool, Callable[[str, Event], None]] = Ma
 def add_failing_daily_revenue_audits(*, project_dir: Path) -> None:
     """Add violation and measurement failures to the copied project."""
 
-    audits_dir: Path = project_dir / "sql" / "models" / "marts" / "_sqlbuild" / "_audits" / "generic"
+    audits_dir: Path = (
+        project_dir / "sql" / "models" / "marts" / "_sqlbuild" / "_audits" / "generic"
+    )
     audits_dir.mkdir(parents=True, exist_ok=True)
     failing_audit_sql: str = 'AUDIT ();\n\nSELECT *\nFROM __ref("@model")\nWHERE 1 = 1\n'
     (audits_dir / "forced_warning_failure.sql").write_text(

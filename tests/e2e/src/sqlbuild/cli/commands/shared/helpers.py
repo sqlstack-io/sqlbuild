@@ -705,8 +705,8 @@ def build_real_warehouse_existing_snapshot_project_files(*, project_toml: str) -
             "SELECT customer_id, plan, updated_at\n"
             'FROM __ref("current_delete_customers")\n'
         ),
-        "sql/models/historical_timestamp_extracts.sql": build_historical_timestamp_extracts_model_sql(
-            changed=False
+        "sql/models/historical_timestamp_extracts.sql": (
+            build_historical_timestamp_extracts_model_sql(changed=False)
         ),
         "sql/models/historical_timestamp_snapshot.sql": (
             "MODEL (description 'Test model historical_timestamp_snapshot.',\n"
@@ -721,7 +721,9 @@ def build_real_warehouse_existing_snapshot_project_files(*, project_toml: str) -
             "SELECT customer_id, plan, updated_at, observed_at\n"
             'FROM __ref("historical_timestamp_extracts")\n'
         ),
-        "sql/models/historical_check_daily.sql": build_historical_check_daily_model_sql(changed=False),
+        "sql/models/historical_check_daily.sql": build_historical_check_daily_model_sql(
+            changed=False
+        ),
         "sql/models/historical_check_snapshot.sql": (
             "MODEL (description 'Test model historical_check_snapshot.',\n"
             "  materialized snapshot,\n"

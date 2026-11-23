@@ -296,11 +296,17 @@ def prepare_postgres_waffle_shop(*, tmp_path: Path, config: dict[str, object]) -
     project_dir: Path = prepare_waffle_shop(tmp_path)
 
     (project_dir / "sql" / "functions" / "sql" / "customer_orders.sql").unlink(missing_ok=True)
-    (project_dir / "sql" / "functions" / "python" / "nodes" / "is_completed_order_py.py").unlink(missing_ok=True)
+    (project_dir / "sql" / "functions" / "python" / "nodes" / "is_completed_order_py.py").unlink(
+        missing_ok=True
+    )
     (project_dir / "tests" / "unit" / "test_customer_orders_table_fn.sql").unlink(missing_ok=True)
-    (project_dir / "sql" / "models" / "marts" / "daily_order_partitioned.sql").unlink(missing_ok=True)
+    (project_dir / "sql" / "models" / "marts" / "daily_order_partitioned.sql").unlink(
+        missing_ok=True
+    )
     (project_dir / "tests" / "unit" / "test_is_completed_order_udf.sql").unlink(missing_ok=True)
-    is_completed_order_path: Path = project_dir / "sql" / "functions" / "sql" / "is_completed_order.sql"
+    is_completed_order_path: Path = (
+        project_dir / "sql" / "functions" / "sql" / "is_completed_order.sql"
+    )
     is_completed_order_path.write_text(
         is_completed_order_path.read_text(encoding="utf-8")
         .replace("STRING", "TEXT")

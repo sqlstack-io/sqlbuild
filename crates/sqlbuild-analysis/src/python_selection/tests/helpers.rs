@@ -92,7 +92,14 @@ fn failure(error: SelectorError) -> OwnedFailure {
 
 /// The orders nodes plus `step`, a `for_each` asset with items `a` and `b`, and `step_total`.
 const DISCOVERED_NODES: &[NodeSpec] = &[
-    ("step[a]", "asset", "python/nodes/plan/node.py", &[], &[], &[]),
+    (
+        "step[a]",
+        "asset",
+        "python/nodes/plan/node.py",
+        &[],
+        &[],
+        &[],
+    ),
     (
         "step[b]",
         "asset",

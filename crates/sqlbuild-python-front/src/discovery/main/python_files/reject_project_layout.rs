@@ -46,7 +46,10 @@ pub fn reject_project_layout(
         .iter()
         .filter_map(|folder| {
             let problem: &LayoutProblem = problems.iter().find(|item| item.folder == *folder)?;
-            Some(format!("move it under one of: {},", problem.allowed.join(", ")))
+            Some(format!(
+                "move it under one of: {},",
+                problem.allowed.join(", ")
+            ))
         })
         .collect();
     Err(discovery_error(

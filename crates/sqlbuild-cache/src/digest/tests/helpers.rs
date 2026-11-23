@@ -8,7 +8,10 @@ pub(crate) const EXCLUDED_MODEL: &str = "sql/models/orders.sql";
 pub(crate) fn write_project(root: &Path) {
     for (relative_path, contents) in [
         ("sqlbuild_project.toml", "name = \"orders\"\n"),
-        ("sql/macros/cents.py", "def cents(amount):\n    return amount\n"),
+        (
+            "sql/macros/cents.py",
+            "def cents(amount):\n    return amount\n",
+        ),
         (EXCLUDED_MODEL, "SELECT 1 AS id\n"),
         ("target/cache/store.bin", "old"),
         ("sql/macros/__pycache__/cents.pyc", "bytecode"),

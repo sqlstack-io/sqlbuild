@@ -131,13 +131,17 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="audit-parse",
             expected_code="D004",
             files={
-                "sql/models/marts/_sqlbuild/audits/singular/broken.sql": "AUDIT (name);\n\nSELECT 1\n"
+                "sql/models/marts/_sqlbuild/audits/singular/broken.sql": (
+                    "AUDIT (name);\n\nSELECT 1\n"
+                )
             },
         ),
         failure_case(
             name="schema-unterminated-declaration",
             expected_code="D013",
-            files={"sql/models/staging/_sqlbuild/_schemas/orders.sql": "SCHEMA (\n  name orders,\n"},
+            files={
+                "sql/models/staging/_sqlbuild/_schemas/orders.sql": "SCHEMA (\n  name orders,\n"
+            },
         ),
         failure_case(
             name="source-parse",
@@ -185,7 +189,9 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="enum-parse",
             expected_code="D013",
-            files={"sql/enums/order_status.sql": "ENUM (\n  name order_status,\n  members [,\n);\n"},
+            files={
+                "sql/enums/order_status.sql": "ENUM (\n  name order_status,\n  members [,\n);\n"
+            },
         ),
         failure_case(
             name="hook-without-header",

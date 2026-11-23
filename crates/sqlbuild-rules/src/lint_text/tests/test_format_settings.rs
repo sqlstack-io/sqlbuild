@@ -113,7 +113,15 @@ fn given_project_paths_when_classifying_named_roles_then_kinds_match_python() {
         },
         crate::lint_text::tests::test_types::RoleKindTestCase {
             description: "a local SQL hook in a declaration group",
-            relative_parts: &["sql", "models", "orders", "_sqlbuild", "_hooks", "sql", "h.sql"],
+            relative_parts: &[
+                "sql",
+                "models",
+                "orders",
+                "_sqlbuild",
+                "_hooks",
+                "sql",
+                "h.sql",
+            ],
             expected_kind: Some("sql_hook"),
         },
         crate::lint_text::tests::test_types::RoleKindTestCase {

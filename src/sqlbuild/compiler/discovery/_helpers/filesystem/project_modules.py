@@ -154,7 +154,10 @@ def install_python_root_package(*, node_root: Path, project_dir: Path) -> dict[s
 
 
 def _ensure_python_package(*, project_dir: Path) -> dict[str, ModuleType]:
-    """Bind python to `project_dir`'s python/ folder unless it already is; keep its loaded modules."""
+    """Bind python to `project_dir`'s python/ folder unless it already is.
+
+    A package already bound to this folder keeps its loaded modules.
+    """
 
     package_root: Path = project_dir / PYTHON_PACKAGE_NAME
     existing: ModuleType | None = sys.modules.get(PYTHON_PACKAGE_NAME)

@@ -80,15 +80,19 @@ _TEST_EDITED: dict[str, str] = {
         FactDigestEditTestCase(
             "project seeds",
             ("project.seeds",),
-            {"sql/seeds/regions.yml": PROJECT_FILES["sql/seeds/regions.yml"].replace("Regions", "Areas")},
+            {
+                "sql/seeds/regions.yml": PROJECT_FILES["sql/seeds/regions.yml"].replace(
+                    "Regions", "Areas"
+                )
+            },
         ),
         FactDigestEditTestCase(
             "project functions",
             ("project.functions",),
             {
-                "sql/functions/sql/is_paid.sql": PROJECT_FILES["sql/functions/sql/is_paid.sql"].replace(
-                    "'PAID'", "'OPEN'"
-                )
+                "sql/functions/sql/is_paid.sql": PROJECT_FILES[
+                    "sql/functions/sql/is_paid.sql"
+                ].replace("'PAID'", "'OPEN'")
             },
         ),
         FactDigestEditTestCase("project tests", ("project.tests",), _TEST_EDITED),
@@ -99,7 +103,9 @@ _TEST_EDITED: dict[str, str] = {
         FactDigestEditTestCase(
             "public enums",
             ("declarations.public_enums",),
-            {"sql/enums/order_status.sql": "ENUM (name order_status, members [PAID, OPEN, VOID]);\n"},
+            {
+                "sql/enums/order_status.sql": "ENUM (name order_status, members [PAID, OPEN, VOID]);\n"
+            },
         ),
         FactDigestEditTestCase(
             "all enums",
@@ -151,7 +157,9 @@ _TEST_EDITED: dict[str, str] = {
             "read text", ("tree.read_text", "config/owners.yaml"), {"config/owners.yaml": "a: 2\n"}
         ),
         FactDigestEditTestCase(
-            "missing model appears", ("sql.for_model", "sql/models/marts/order_counts.sql"), _NEW_MODEL
+            "missing model appears",
+            ("sql.for_model", "sql/models/marts/order_counts.sql"),
+            _NEW_MODEL,
         ),
     ),
     ids=lambda case: case.description,

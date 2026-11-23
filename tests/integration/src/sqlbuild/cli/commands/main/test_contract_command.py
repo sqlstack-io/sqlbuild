@@ -57,7 +57,9 @@ def test_given_physical_drift_when_diffing_contracts_then_reports_without_writin
     assert "missing_declaration" in output
     assert "model:orders" in output
     assert "source:raw_orders" in output
-    assert (tmp_path / "sql" / "models" / "orders.sql").read_text(encoding="utf-8") == original_model
+    assert (tmp_path / "sql" / "models" / "orders.sql").read_text(
+        encoding="utf-8"
+    ) == original_model
     assert database.is_file()
 
 
@@ -701,7 +703,9 @@ def test_given_relative_project_directory_when_diffing_contract_then_private_mac
         "MODEL (description 'Test model orders.', materialized table);\nSELECT @py.order_id() AS id, CAST('a' AS VARCHAR) AS name\n",
         encoding="utf-8",
     )
-    macro_path: Path = model_path.parent / "_sqlbuild" / "_macros" / "python" / "nodes" / "order_id.py"
+    macro_path: Path = (
+        model_path.parent / "_sqlbuild" / "_macros" / "python" / "nodes" / "order_id.py"
+    )
     macro_path.parent.mkdir(parents=True)
     _ = macro_path.write_text(
         'def order_id() -> str:\n    return "CAST(1 AS INTEGER)"\n', encoding="utf-8"

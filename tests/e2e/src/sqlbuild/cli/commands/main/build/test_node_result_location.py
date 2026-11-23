@@ -166,14 +166,18 @@ def test_given_target_location_when_building_and_loading_then_node_results_stay_
         PreservedTargetRefusalE2ETestCase(
             description="a task under a preserved schema needs a loader schema",
             python_files={
-                "python/nodes/tasks/announce.py": _TASK.replace('depends_on=source("raw_orders")', "")
+                "python/nodes/tasks/announce.py": _TASK.replace(
+                    'depends_on=source("raw_orders")', ""
+                )
             },
             expected_error="error[S105]: Target 'dev' keeps each model's own schema",
         ),
         PreservedTargetRefusalE2ETestCase(
             description="a loader schema whose var resolves to empty is no loader schema",
             python_files={
-                "python/nodes/tasks/announce.py": _TASK.replace('depends_on=source("raw_orders")', "")
+                "python/nodes/tasks/announce.py": _TASK.replace(
+                    'depends_on=source("raw_orders")', ""
+                )
             },
             expected_error="error[S105]: Target 'dev' keeps each model's own schema",
             target_lines='loader_schema = "${results_schema}"\n\n[vars]\nresults_schema = ""\n',
@@ -181,7 +185,9 @@ def test_given_target_location_when_building_and_loading_then_node_results_stay_
         PreservedTargetRefusalE2ETestCase(
             description="a loader schema that resolves only inside a model is no loader schema",
             python_files={
-                "python/nodes/tasks/announce.py": _TASK.replace('depends_on=source("raw_orders")', "")
+                "python/nodes/tasks/announce.py": _TASK.replace(
+                    'depends_on=source("raw_orders")', ""
+                )
             },
             expected_error="error[S105]: Target 'dev' keeps each model's own schema",
             target_lines='loader_schema = "raw_${CTX:model.name}"\n',

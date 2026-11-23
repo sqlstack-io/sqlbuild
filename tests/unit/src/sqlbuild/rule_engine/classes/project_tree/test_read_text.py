@@ -42,11 +42,15 @@ def test_given_readable_project_file_when_reading_text_twice_then_returns_its_co
         ReadTextTestCase("missing file", "sql/models/missing.sql", expected_error="does not exist"),
         ReadTextTestCase("directory", "models", expected_error="does not exist"),
         ReadTextTestCase("project root", "", expected_error="does not exist"),
-        ReadTextTestCase("beneath a file", "sql/models/orders.sql/x.sql", expected_error="not exist"),
+        ReadTextTestCase(
+            "beneath a file", "sql/models/orders.sql/x.sql", expected_error="not exist"
+        ),
         ReadTextTestCase(
             "folder linked outside", "outside_models/customers.sql", expected_error="not exist"
         ),
-        ReadTextTestCase("file linked outside", "sql/models/customers.sql", expected_error="not exist"),
+        ReadTextTestCase(
+            "file linked outside", "sql/models/customers.sql", expected_error="not exist"
+        ),
         ReadTextTestCase("untracked suffix", "sql/models/notes.txt", expected_error="tracked file"),
         ReadTextTestCase("parent escape", "../outside/customers.sql", expected_error="escapes"),
     ),

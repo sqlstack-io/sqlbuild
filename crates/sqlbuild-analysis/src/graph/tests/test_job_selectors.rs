@@ -196,7 +196,12 @@ fn given_selectors_when_scanning_then_only_job_references_need_jobs() {
         },
         NeedsJobsTestCase {
             description: "patterns, paths and folders",
-            selectors: &["night*", "orders~nightly", "path:sql/models/mart", "tag:daily"],
+            selectors: &[
+                "night*",
+                "orders~nightly",
+                "path:sql/models/mart",
+                "tag:daily",
+            ],
             also_known: &[],
             expected_needs_jobs: false,
         },

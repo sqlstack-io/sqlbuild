@@ -624,7 +624,9 @@ def test_given_unrelated_python_package_restored_when_building_identity_then_hel
     monkeypatch.delitem(sys.modules, "python.nodes.orders", raising=False)
     monkeypatch.syspath_prepend(str(tmp_path / "site"))
     monkeypatch.setitem(sys.modules, "python", importlib.import_module("python"))
-    monkeypatch.setitem(sys.modules, "python.nodes.orders", importlib.import_module("python.nodes.orders"))
+    monkeypatch.setitem(
+        sys.modules, "python.nodes.orders", importlib.import_module("python.nodes.orders")
+    )
 
     task: DiscoveredAssetFunction = discover_python_node_functions(project_dir=project_dir).assets[
         0

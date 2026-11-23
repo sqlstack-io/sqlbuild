@@ -158,7 +158,12 @@ fn lifecycle(payload: Option<&ConfigValue>, file: ConfigFile) -> Loaded<Built> {
     let config = match payload {
         None => return Ok(object("LifecycleEventSinksConfig", Vec::new())),
         Some(ConfigValue::Map(entries)) => entries,
-        Some(_) => return Err(ConfigFailure::at(file, "event_sinks.lifecycle must be a mapping")),
+        Some(_) => {
+            return Err(ConfigFailure::at(
+                file,
+                "event_sinks.lifecycle must be a mapping",
+            ));
+        }
     };
     let place = Place {
         file,

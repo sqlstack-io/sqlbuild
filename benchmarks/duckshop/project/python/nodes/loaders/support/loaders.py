@@ -2,10 +2,9 @@
 
 from python.nodes.loaders._registry import load
 
-from sqlbuild.factories import factory
 from sqlbuild.executor.load.models import LoaderContext
+from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
-
 
 
 @factory
@@ -42,5 +41,13 @@ def support_loaders() -> list[object]:
     def support__sla_policies(ctx: LoaderContext) -> object:
         return load(ctx, "support__sla_policies")
 
-
-    return [support__tickets, support__ticket_comments, support__csat_responses, support__agents, support__agent_shifts, support__chat_transcripts, support__call_records, support__sla_policies]
+    return [
+        support__tickets,
+        support__ticket_comments,
+        support__csat_responses,
+        support__agents,
+        support__agent_shifts,
+        support__chat_transcripts,
+        support__call_records,
+        support__sla_policies,
+    ]

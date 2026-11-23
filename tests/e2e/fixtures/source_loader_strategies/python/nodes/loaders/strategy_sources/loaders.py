@@ -5,7 +5,6 @@ from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 
 
-
 @factory
 def strategy_sources_loaders() -> list[object]:
     @loader
@@ -92,6 +91,5 @@ def strategy_sources_loaders() -> list[object]:
             f"CREATE TABLE {ctx.destination} AS "
             "SELECT 1 AS status_id, 'loaded' AS status_name, 'self_managed' AS loaded_by"
         )
-
 
     return [raw_countries, raw_webhook_events, raw_order_events, raw_customers, raw_loader_status]

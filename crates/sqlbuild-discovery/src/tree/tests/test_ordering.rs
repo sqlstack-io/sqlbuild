@@ -4,10 +4,10 @@ use crate::tree::tests::test_types::PathOrderTestCase;
 #[test]
 fn given_paths_when_sorting_then_order_matches_python_path_order_per_platform() {
     let paths: &[&str] = &[
-        "sql/models/b.sql",
-        "sql/models/A.sql",
-        "sql/models/a-c.sql",
-        "sql/models/a/b.sql",
+        "models/b.sql",
+        "models/A.sql",
+        "models/a-c.sql",
+        "models/a/b.sql",
     ];
     let test_cases = [
         PathOrderTestCase {
@@ -15,10 +15,10 @@ fn given_paths_when_sorting_then_order_matches_python_path_order_per_platform() 
             case_insensitive: false,
             paths,
             expected_paths: &[
-                "sql/models/A.sql",
-                "sql/models/a/b.sql",
-                "sql/models/a-c.sql",
-                "sql/models/b.sql",
+                "models/A.sql",
+                "models/a/b.sql",
+                "models/a-c.sql",
+                "models/b.sql",
             ],
         },
         PathOrderTestCase {
@@ -26,17 +26,17 @@ fn given_paths_when_sorting_then_order_matches_python_path_order_per_platform() 
             case_insensitive: true,
             paths,
             expected_paths: &[
-                "sql/models/a/b.sql",
-                "sql/models/a-c.sql",
-                "sql/models/A.sql",
-                "sql/models/b.sql",
+                "models/a/b.sql",
+                "models/a-c.sql",
+                "models/A.sql",
+                "models/b.sql",
             ],
         },
         PathOrderTestCase {
             description: "lowercasing is Unicode-aware",
             case_insensitive: true,
-            paths: &["sql/models/É.sql", "sql/models/f.sql", "sql/models/é/x.sql"],
-            expected_paths: &["sql/models/f.sql", "sql/models/é/x.sql", "sql/models/É.sql"],
+            paths: &["models/É.sql", "models/f.sql", "models/é/x.sql"],
+            expected_paths: &["models/f.sql", "models/é/x.sql", "models/É.sql"],
         },
     ];
     for test_case in test_cases {

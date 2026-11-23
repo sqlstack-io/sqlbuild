@@ -311,12 +311,22 @@ def test_given_relative_project_directory_when_compiling_then_private_macro_is_v
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    (project_dir / "sql" / "models" / "orders" / "_sqlbuild" / "_macros" / "python").mkdir(parents=True)
+    (project_dir / "sql" / "models" / "orders" / "_sqlbuild" / "_macros" / "python").mkdir(
+        parents=True
+    )
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     (
-        project_dir / "sql" / "models" / "orders" / "_sqlbuild" / "_macros" / "python" / "nodes" / "order_id.py"
+        project_dir
+        / "sql"
+        / "models"
+        / "orders"
+        / "_sqlbuild"
+        / "_macros"
+        / "python"
+        / "nodes"
+        / "order_id.py"
     ).write_text('def order_id() -> str:\n    return "CAST(1 AS INTEGER)"\n', encoding="utf-8")
     (project_dir / "sql" / "models" / "orders" / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized table);\nSELECT @py.order_id() AS order_id\n",

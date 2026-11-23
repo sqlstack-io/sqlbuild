@@ -123,7 +123,9 @@ def test_given_model_level_column_audits_when_loading_dagster_assets_then_checks
                 ");\n\n"
                 "SELECT 1 AS order_id, 2 AS customer_id\n"
             ),
-            "sql/audits/generic/model_is_empty.sql": ('AUDIT ();\n\nSELECT * FROM __ref("@model")\n'),
+            "sql/audits/generic/model_is_empty.sql": (
+                'AUDIT ();\n\nSELECT * FROM __ref("@model")\n'
+            ),
         },
     )
     sqlbuild_project: SqlBuildProject = SqlBuildProject(

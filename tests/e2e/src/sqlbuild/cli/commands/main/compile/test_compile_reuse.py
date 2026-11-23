@@ -102,7 +102,10 @@ _CONTRACT_ERROR_MODEL: str = (
         CompileReuseInvalidationTestCase(
             description="model_sql_edit",
             edit=lambda root: replace_project_text(
-                root, "sql/models/staging/stg_orders.sql", "  quantity,", "  quantity + 0 AS quantity,"
+                root,
+                "sql/models/staging/stg_orders.sql",
+                "  quantity,",
+                "  quantity + 0 AS quantity,",
             ),
         ),
         CompileReuseInvalidationTestCase(
@@ -182,7 +185,10 @@ _CONTRACT_ERROR_MODEL: str = (
         CompileReuseInvalidationTestCase(
             description="enum_declaration_edit",
             edit=lambda root: replace_project_text(
-                root, "sql/models/marts/_sqlbuild/_enums/order_channel.sql", 'WEB "web"', 'WEB "online"'
+                root,
+                "sql/models/marts/_sqlbuild/_enums/order_channel.sql",
+                'WEB "web"',
+                'WEB "online"',
             ),
         ),
         CompileReuseInvalidationTestCase(
@@ -241,7 +247,10 @@ _CONTRACT_ERROR_MODEL: str = (
         CompileReuseInvalidationTestCase(
             description="stopped_compile_is_never_replayed",
             edit=lambda root: replace_project_text(
-                root, "sql/models/staging/stg_orders.sql", "materialized view,", "materialized view,,(("
+                root,
+                "sql/models/staging/stg_orders.sql",
+                "materialized view,",
+                "materialized view,,((",
             ),
             expected_returncode=1,
             expected_rewarm_hit=False,

@@ -131,7 +131,9 @@ def grouped_role_files(*, cents_path: str, labels_path: str) -> dict[str, str]:
     return {
         "sqlbuild_project.toml": project_toml() + _LAYOUT_RULES,
         cents_path: CENTS_MACRO["sql/models/staging/_sqlbuild/_macros/python/cents.py"],
-        "sql/models/staging/stg_order_cents.sql": CENTS_MACRO["sql/models/staging/stg_order_cents.sql"],
+        "sql/models/staging/stg_order_cents.sql": CENTS_MACRO[
+            "sql/models/staging/stg_order_cents.sql"
+        ],
         "sql/models/staging/stg_order_refunds.sql": ORDER_REFUNDS[
             "sql/models/staging/stg_order_refunds.sql"
         ].replace(
@@ -166,7 +168,9 @@ def same_named_local_macros() -> dict[str, str]:
         "sql/models/staging/_sqlbuild/_macros/python/helpers.py": CENTS_MACRO[
             "sql/models/staging/_sqlbuild/_macros/python/cents.py"
         ],
-        "sql/models/staging/stg_order_cents.sql": CENTS_MACRO["sql/models/staging/stg_order_cents.sql"],
+        "sql/models/staging/stg_order_cents.sql": CENTS_MACRO[
+            "sql/models/staging/stg_order_cents.sql"
+        ],
         "sql/models/marts/_sqlbuild/_macros/python/helpers.py": _LABEL_MACRO,
         "sql/models/marts/order_labels.sql": _label_model("order_labels"),
     }

@@ -17,7 +17,9 @@ _WARM_TARGET_PROJECT_FILES: dict[str, str] = {
     "sql/models/sales/daily/totals.sql": (
         "MODEL (description 'Test model totals.');\nSELECT order_id FROM __ref(\"orders\")\n"
     ),
-    "sql/models/inventory.sql": "MODEL (description 'Test model inventory.');\nSELECT 2 AS item_id\n",
+    "sql/models/inventory.sql": (
+        "MODEL (description 'Test model inventory.');\nSELECT 2 AS item_id\n"
+    ),
 }
 
 

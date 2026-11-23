@@ -125,7 +125,9 @@ _SINGULAR_BASE_FILES: dict[str, str] = {
             "inherited generic audit used below its owner",
             {
                 "sql/models/marts/_sqlbuild/audits/generic/order_check.sql": _GENERIC_AUDIT,
-                "sql/models/marts/daily/orders.sql": model_header(key="audits", value="[order_check]"),
+                "sql/models/marts/daily/orders.sql": model_header(
+                    key="audits", value="[order_check]"
+                ),
                 "sql/models/marts/weekly/orders_weekly.sql": model_header(
                     key="audits", value="[order_check]"
                 ),
@@ -335,7 +337,9 @@ def test_given_invalid_named_declaration_layout_when_compiling_then_error_names_
             "top-level generic audit used across sibling sub-folders",
             {
                 "sql/audits/generic/order_check.sql": _GENERIC_AUDIT,
-                "sql/models/marts/daily/orders.sql": model_header(key="audits", value="[order_check]"),
+                "sql/models/marts/daily/orders.sql": model_header(
+                    key="audits", value="[order_check]"
+                ),
                 "sql/models/marts/weekly/orders_weekly.sql": model_header(
                     key="audits", value="[order_check]"
                 ),
@@ -384,7 +388,9 @@ def test_given_invalid_named_declaration_layout_when_compiling_then_error_names_
             "top-level schema used under one folder",
             {
                 "sql/schemas/order_shape.sql": _SCHEMA,
-                "sql/models/marts/orders.sql": model_header(key="model_schema", value="order_shape"),
+                "sql/models/marts/orders.sql": model_header(
+                    key="model_schema", value="order_shape"
+                ),
             },
             ("Move it to 'sql/models/marts/_sqlbuild/_schemas/'",),
         ),
@@ -392,7 +398,9 @@ def test_given_invalid_named_declaration_layout_when_compiling_then_error_names_
             "top-level SQL hook used under one folder",
             {
                 "sql/hooks/sql/touch.sql": _SQL_HOOK,
-                "sql/models/marts/orders.sql": model_header(key="pre_hooks", value='[sql("touch")]'),
+                "sql/models/marts/orders.sql": model_header(
+                    key="pre_hooks", value='[sql("touch")]'
+                ),
             },
             ("Move it to 'sql/models/marts/_sqlbuild/_hooks/sql/'",),
         ),
@@ -400,7 +408,9 @@ def test_given_invalid_named_declaration_layout_when_compiling_then_error_names_
             "top-level Python hook used under one folder",
             {
                 "sql/hooks/python/lifecycle.py": _PYTHON_HOOK,
-                "sql/models/marts/orders.sql": model_header(key="pre_hooks", value='[python("mark")]'),
+                "sql/models/marts/orders.sql": model_header(
+                    key="pre_hooks", value='[python("mark")]'
+                ),
             },
             ("Move it to 'sql/models/marts/_sqlbuild/_hooks/python/'",),
         ),
@@ -420,7 +430,9 @@ def test_given_invalid_named_declaration_layout_when_compiling_then_error_names_
             {
                 "sql/models/marts/_sqlbuild/audits/generic/order_check.sql": _GENERIC_AUDIT,
                 "sql/models/staging/orders.sql": model_header(key="audits", value="[order_check]"),
-                "sql/models/staging/customers.sql": model_header(key="audits", value="[order_check]"),
+                "sql/models/staging/customers.sql": model_header(
+                    key="audits", value="[order_check]"
+                ),
             },
             (
                 "[S006] Generic audit 'order_check' is not visible from "
@@ -440,7 +452,9 @@ def test_given_invalid_named_declaration_layout_when_compiling_then_error_names_
             "scoped schema bound from a sibling folder",
             {
                 "sql/models/marts/_sqlbuild/_schemas/order_shape.sql": _SCHEMA,
-                "sql/models/staging/orders.sql": model_header(key="model_schema", value="order_shape"),
+                "sql/models/staging/orders.sql": model_header(
+                    key="model_schema", value="order_shape"
+                ),
             },
             ("Schema 'order_shape' is not visible from 'sql/models/staging/orders.sql'",),
         ),
@@ -448,7 +462,9 @@ def test_given_invalid_named_declaration_layout_when_compiling_then_error_names_
             "scoped schema bound from a parent folder",
             {
                 "sql/models/marts/daily/_sqlbuild/schemas/order_shape.sql": _SCHEMA,
-                "sql/models/marts/orders.sql": model_header(key="model_schema", value="order_shape"),
+                "sql/models/marts/orders.sql": model_header(
+                    key="model_schema", value="order_shape"
+                ),
             },
             ("Schema 'order_shape' is not visible from 'sql/models/marts/orders.sql'",),
         ),
@@ -456,7 +472,9 @@ def test_given_invalid_named_declaration_layout_when_compiling_then_error_names_
             "scoped SQL hook called from a sibling folder",
             {
                 "sql/models/marts/_sqlbuild/_hooks/sql/touch.sql": _SQL_HOOK,
-                "sql/models/staging/orders.sql": model_header(key="pre_hooks", value='[sql("touch")]'),
+                "sql/models/staging/orders.sql": model_header(
+                    key="pre_hooks", value='[sql("touch")]'
+                ),
             },
             ("SQL hook 'touch' is not visible from 'sql/models/staging/orders.sql'",),
         ),
@@ -464,7 +482,9 @@ def test_given_invalid_named_declaration_layout_when_compiling_then_error_names_
             "scoped SQL hook called from a parent folder",
             {
                 "sql/models/marts/daily/_sqlbuild/hooks/sql/touch.sql": _SQL_HOOK,
-                "sql/models/marts/orders.sql": model_header(key="pre_hooks", value='[sql("touch")]'),
+                "sql/models/marts/orders.sql": model_header(
+                    key="pre_hooks", value='[sql("touch")]'
+                ),
             },
             ("SQL hook 'touch' is not visible from 'sql/models/marts/orders.sql'",),
         ),
@@ -482,7 +502,9 @@ def test_given_invalid_named_declaration_layout_when_compiling_then_error_names_
             "scoped Python hook called from a parent folder",
             {
                 "sql/models/marts/daily/_sqlbuild/hooks/python/lifecycle.py": _PYTHON_HOOK,
-                "sql/models/marts/orders.sql": model_header(key="pre_hooks", value='[python("mark")]'),
+                "sql/models/marts/orders.sql": model_header(
+                    key="pre_hooks", value='[python("mark")]'
+                ),
             },
             ("Python hook 'mark' is not visible from 'sql/models/marts/orders.sql'",),
         ),
@@ -494,7 +516,9 @@ def test_given_invalid_named_declaration_layout_when_compiling_then_error_names_
                     "SCHEMA (name daily_shape, extends order_shape, "
                     "columns (order_date (type DATE)));"
                 ),
-                "sql/models/marts/orders.sql": model_header(key="model_schema", value="daily_shape"),
+                "sql/models/marts/orders.sql": model_header(
+                    key="model_schema", value="daily_shape"
+                ),
                 "sql/models/staging/orders_stage.sql": model_header(
                     key="model_schema", value="order_shape"
                 ),
@@ -542,7 +566,9 @@ def test_given_invalid_named_declaration_use_when_compiling_then_diagnostics_nam
             "advisory placement keeps a misplaced scoped schema compiling",
             {
                 "sql/schemas/order_shape.sql": _SCHEMA,
-                "sql/models/marts/orders.sql": model_header(key="model_schema", value="order_shape"),
+                "sql/models/marts/orders.sql": model_header(
+                    key="model_schema", value="order_shape"
+                ),
             },
             "S024",
         ),

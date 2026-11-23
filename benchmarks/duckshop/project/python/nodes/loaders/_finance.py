@@ -7,7 +7,12 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 
 from python.nodes.loaders._core import ChangeLog, EventLog, at, chance, emit, in_zone, rng
-from python.nodes.loaders._storefront import gateway_reference, payments_plan, provider_for, refunds_plan
+from python.nodes.loaders._storefront import (
+    gateway_reference,
+    payments_plan,
+    provider_for,
+    refunds_plan,
+)
 from python.nodes.loaders._world import STOREFRONTS, World
 
 Rows = list[dict[str, object]]

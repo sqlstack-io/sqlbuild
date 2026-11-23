@@ -292,9 +292,9 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         SinceSelectionE2ETestCase(
             description="an audit definition change selects tests of models it is attached to",
             edits={
-                "sql/audits/generic/at_least.sql": _INDIRECT["sql/audits/generic/at_least.sql"].replace(
-                    "@column < @minimum", "@column <= @minimum"
-                )
+                "sql/audits/generic/at_least.sql": _INDIRECT[
+                    "sql/audits/generic/at_least.sql"
+                ].replace("@column < @minimum", "@column <= @minimum")
             },
             command=_EXPLAINED_TESTS,
             expected_exit_code=0,
@@ -375,9 +375,9 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         SinceSelectionE2ETestCase(
             description="an audit definition change selects scenarios that build its model",
             edits={
-                "sql/audits/generic/at_least.sql": _INDIRECT["sql/audits/generic/at_least.sql"].replace(
-                    "@column < @minimum", "@column <= @minimum"
-                )
+                "sql/audits/generic/at_least.sql": _INDIRECT[
+                    "sql/audits/generic/at_least.sql"
+                ].replace("@column < @minimum", "@column <= @minimum")
             },
             command=_EXPLAINED_SCENARIOS,
             expected_exit_code=0,

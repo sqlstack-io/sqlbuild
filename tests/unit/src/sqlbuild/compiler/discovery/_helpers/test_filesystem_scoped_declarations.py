@@ -53,7 +53,9 @@ class _DiscoveredFile(Protocol):
         DiscoverScopedDeclarationTestCase("models", "models", "models"),
         DiscoverScopedDeclarationTestCase("unit_tests", "tests/unit", "tests/unit"),
         DiscoverScopedDeclarationTestCase("scenarios", "tests/scenarios", "tests/scenarios"),
-        DiscoverScopedDeclarationTestCase("sql_functions", "sql/functions/sql", "sql/functions/sql"),
+        DiscoverScopedDeclarationTestCase(
+            "sql_functions", "sql/functions/sql", "sql/functions/sql"
+        ),
         DiscoverScopedDeclarationTestCase("sources", "sources", "sources"),
     ),
     ids=lambda case: case.description,

@@ -400,7 +400,9 @@ def test_given_broken_declaration_category_when_loading_then_other_categories_re
         TolerantMacroInventoryCase(
             description="scope-invalid macro import is omitted with diagnostic",
             files={
-                "sql/models/sales/_macros/python/shared.py": ("def shared():\n    return 'shared'\n"),
+                "sql/models/sales/_macros/python/shared.py": (
+                    "def shared():\n    return 'shared'\n"
+                ),
                 "sql/models/finance/macros/python/consumer.py": (
                     "from sql.models.sales._macros.python.shared import shared\n\n"
                     "def consumer():\n    return shared()\n"

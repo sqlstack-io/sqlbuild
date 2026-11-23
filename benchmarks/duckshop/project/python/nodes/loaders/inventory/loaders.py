@@ -2,10 +2,9 @@
 
 from python.nodes.loaders._registry import load
 
-from sqlbuild.factories import factory
 from sqlbuild.executor.load.models import LoaderContext
+from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
-
 
 
 @factory
@@ -42,5 +41,13 @@ def inventory_loaders() -> list[object]:
     def inventory__bin_locations(ctx: LoaderContext) -> object:
         return load(ctx, "inventory__bin_locations")
 
-
-    return [inventory__warehouses, inventory__stock_movements, inventory__stock_counts, inventory__purchase_orders, inventory__po_receipts, inventory__stock_transfers, inventory__stock_reservations, inventory__bin_locations]
+    return [
+        inventory__warehouses,
+        inventory__stock_movements,
+        inventory__stock_counts,
+        inventory__purchase_orders,
+        inventory__po_receipts,
+        inventory__stock_transfers,
+        inventory__stock_reservations,
+        inventory__bin_locations,
+    ]

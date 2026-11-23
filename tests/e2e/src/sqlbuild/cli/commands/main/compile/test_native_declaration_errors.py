@@ -99,7 +99,9 @@ _STATUS_ENUM: dict[str, str] = {
         ),
         NativeDeclarationErrorTestCase(
             description="invalid_enum_declaration_file",
-            project_files={"sql/enums/order_status.sql": "ENUM (name order_status, members [held]);\n"},
+            project_files={
+                "sql/enums/order_status.sql": "ENUM (name order_status, members [held]);\n"
+            },
             expected_report_text="member identifiers must be uppercase",
             expected_macro_calls=0,
         ),

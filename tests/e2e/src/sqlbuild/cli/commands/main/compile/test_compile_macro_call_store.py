@@ -140,7 +140,10 @@ _EDIT_STEPS: tuple[MacroCallStoreEditStep, ...] = (
     MacroCallStoreEditStep(
         description="macro_body_edit",
         edit=lambda root: replace_project_text(
-            root, "sql/macros/python/common.py", 'return f"{column} * 100"', 'return f"{column} * 1000"'
+            root,
+            "sql/macros/python/common.py",
+            'return f"{column} * 100"',
+            'return f"{column} * 1000"',
         ),
         expected_logged_calls=3,
     ),

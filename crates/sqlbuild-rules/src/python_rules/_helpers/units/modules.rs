@@ -8,8 +8,8 @@ use crate::python_rules::_helpers::units::project::{
     unit_member,
 };
 use crate::python_rules::constants::{
-    CHECKS_MODULE_SHAPE_CODE, MAIN_MODULE_SHAPE_CODE, MAIN_NAME, MAIN_RESULTS, NODE_MODULES,
-    NODE_MODULE_SHAPE_CODE, UNIT_CHECKS_FILE, UNIT_DECLARATION_FILES, UNIT_MAIN_FILE,
+    CHECKS_MODULE_SHAPE_CODE, MAIN_MODULE_SHAPE_CODE, MAIN_NAME, MAIN_RESULTS,
+    NODE_MODULE_SHAPE_CODE, NODE_MODULES, UNIT_CHECKS_FILE, UNIT_DECLARATION_FILES, UNIT_MAIN_FILE,
 };
 use crate::python_rules::models::{UnitFile, UnitProject};
 
@@ -228,7 +228,10 @@ fn checks_module_faults(file: &UnitFile<'_>, project: &UnitProject<'_>) -> Vec<F
 }
 
 /// The unit's declaration file, if it has one.
-fn declaration_member<'p, 'a>(project: &'p UnitProject<'a>, unit: &str) -> Option<&'p UnitFile<'a>> {
+fn declaration_member<'p, 'a>(
+    project: &'p UnitProject<'a>,
+    unit: &str,
+) -> Option<&'p UnitFile<'a>> {
     UNIT_DECLARATION_FILES
         .iter()
         .find_map(|name| unit_member(project, unit, name))

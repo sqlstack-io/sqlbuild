@@ -4,13 +4,13 @@ use std::collections::BTreeSet;
 
 use sqlbuild_core::json::models::{JsonInteger, JsonValue};
 
+use crate::scope_index::constants::GLOBAL_ROLE_PARENT;
 use crate::scope_index::main::format_identity::format_identity;
 use crate::scope_index::models::{
     DeclarationKind, DeclarationRecord, QualifiedIdentity, ScopeKind,
 };
 use crate::scope_report::_helpers::context::Context;
 use crate::scope_report::_helpers::paths::safe_scope_path;
-use crate::scope_index::constants::GLOBAL_ROLE_PARENT;
 use crate::scope_report::constants::{ENUM_MEMBER_PREVIEW, GROUP_DIRECTORY, PATH_SEPARATOR};
 use crate::scope_report::models::{
     DeclarationReport, DeclarationValues, MacroValues, Provenance, SourceLocation,

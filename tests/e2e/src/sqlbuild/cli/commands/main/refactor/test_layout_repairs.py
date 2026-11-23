@@ -57,7 +57,9 @@ from tests.e2e.src.sqlbuild.cli.commands.main.refactor.helpers import (
             arguments=("fact_orders", "sql/models/staging/"),
             expected_status="compile_failed",
             expected_baseline={"before": 1, "remaining": 0, "resolved": 0},
-            expected_blocking=("XSQBRLAYOUT001 sql/models/staging holds 6 models; the maximum is 3",),
+            expected_blocking=(
+                "XSQBRLAYOUT001 sql/models/staging holds 6 models; the maximum is 3",
+            ),
         ),
         LayoutRepairE2ETestCase(
             description="filling another folder past the limit is a new failure",
@@ -181,14 +183,19 @@ def test_given_existing_rule_failures_when_dry_run_then_baseline_and_result_are_
             description="an over-full folder and a reference to a missing model",
             files={
                 **OVER_FULL_STAGING,
-                "sql/models/marts/order_gaps.sql": layout_view("order_gaps", '__ref("missing_orders")'),
+                "sql/models/marts/order_gaps.sql": layout_view(
+                    "order_gaps", '__ref("missing_orders")'
+                ),
             },
             command=("mv", "stg_order_notes", "sql/models/support/"),
             expected_codes=("P001",),
         ),
         RefusedBaselineE2ETestCase(
             description="an over-full folder and a unit test that cannot be planned",
-            files={**OVER_FULL_STAGING, "sql/models/marts/fact_orders.sql": RESERVED_CTE_FACT_ORDERS},
+            files={
+                **OVER_FULL_STAGING,
+                "sql/models/marts/fact_orders.sql": RESERVED_CTE_FACT_ORDERS,
+            },
             command=("mv", "customer_totals", "sql/models/support/"),
             expected_codes=("XSQBRLAYOUT001", "P001"),
         ),

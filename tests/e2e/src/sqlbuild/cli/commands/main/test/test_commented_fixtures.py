@@ -115,7 +115,9 @@ _MISMATCH_FRAGMENT: str = (
             description="nested model CTEs and marker lookalikes preserve mocked source results",
             test_files={
                 "sql/macros/python/status.py": "",
-                "sql/models/_macros/python/status.py": _PROJECT_FILES["sql/macros/python/status.py"],
+                "sql/models/_macros/python/status.py": _PROJECT_FILES[
+                    "sql/macros/python/status.py"
+                ],
                 "sql/models/orders.sql": (
                     "MODEL (description 'Orders through nested CTEs.');\n"
                     'WITH "recent" AS (\n'

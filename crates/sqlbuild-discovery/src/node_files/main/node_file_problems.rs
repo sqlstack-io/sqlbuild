@@ -56,7 +56,11 @@ fn module_problem(module: &NodeModule) -> Option<String> {
         }
     }
     if SINGLE_NODE_FILES.contains(&file) && module.direct.len() > 1 {
-        let names: Vec<&str> = module.direct.iter().map(|(name, _)| name.as_str()).collect();
+        let names: Vec<&str> = module
+            .direct
+            .iter()
+            .map(|(name, _)| name.as_str())
+            .collect();
         return Some(format!(
             "{path} declares {} nodes ({}); {file} declares exactly one, so give each its own \
              unit folder or use a factory",

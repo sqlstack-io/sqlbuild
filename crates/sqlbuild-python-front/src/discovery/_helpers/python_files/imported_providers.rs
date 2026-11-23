@@ -1,8 +1,8 @@
 //! Provider classes and lifecycle-event sinks from imported providers/ and sinks/ modules.
 
-use sqlbuild_core::constants::{EVENT_SINKS_PATH, PROVIDERS_PATH};
 use crate::discovery::main::python_files::provider_by_name::provider_by_name;
 use crate::discovery::main::python_files::provider_usages::provider_usages;
+use sqlbuild_core::constants::{EVENT_SINKS_PATH, PROVIDERS_PATH};
 use std::collections::HashSet;
 
 use pyo3::exceptions::PyRuntimeError;
@@ -314,7 +314,8 @@ pub(crate) fn discover_event_exporter_declarations<'py>(
     let mut declarations: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut seen: Vec<(String, Bound<'py, PyAny>)> = Vec::new();
     for file_path in project.module_files(EVENT_SINKS_PATH, true)? {
-        let module: Bound<'py, PyAny> = project.load(UserCodeHost::LoadEventSinkModule, &file_path)?;
+        let module: Bound<'py, PyAny> =
+            project.load(UserCodeHost::LoadEventSinkModule, &file_path)?;
         let mut seen_functions: HashSet<usize> = HashSet::new();
         for function in module_functions(&module)? {
             if !seen_functions.insert(function.as_ptr() as usize) {

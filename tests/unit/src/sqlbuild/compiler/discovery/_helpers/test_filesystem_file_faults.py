@@ -91,7 +91,10 @@ _MODULE_DISCOVERIES: dict[str, Callable[..., object]] = {
                 "sql/sources/notes.txt",
                 "sql/sources/nested/products.yml",
             ),
-            expected_fault_paths=(Path("sql/sources/customers.yaml"), Path("sql/sources/orders.yml")),
+            expected_fault_paths=(
+                Path("sql/sources/customers.yaml"),
+                Path("sql/sources/orders.yml"),
+            ),
         ),
         DiscoverFileFaultsTestCase(
             description="sql functions fault underscore-prefixed files",

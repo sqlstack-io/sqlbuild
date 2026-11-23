@@ -138,7 +138,9 @@ def test_given_noncanonical_name_when_validating_resource_identity_then_coded_er
         ),
         DiscoveredResourceIdentityErrorTestCase(
             description="SQL function filename",
-            project_files={"sql/functions/sql/CalculateTax.sql": "FUNCTION (returns INTEGER);\n\n1\n"},
+            project_files={
+                "sql/functions/sql/CalculateTax.sql": "FUNCTION (returns INTEGER);\n\n1\n"
+            },
             expected_error_fragment="Invalid function identity 'CalculateTax'",
         ),
         DiscoveredResourceIdentityErrorTestCase(
@@ -148,7 +150,9 @@ def test_given_noncanonical_name_when_validating_resource_identity_then_coded_er
         ),
         DiscoveredResourceIdentityErrorTestCase(
             description="standalone audit name",
-            project_files={"sql/audits/singular/orders.sql": "AUDIT (name OrderRule);\n\nSELECT 1\n"},
+            project_files={
+                "sql/audits/singular/orders.sql": "AUDIT (name OrderRule);\n\nSELECT 1\n"
+            },
             expected_error_fragment="Invalid audit identity 'OrderRule'",
         ),
         DiscoveredResourceIdentityErrorTestCase(

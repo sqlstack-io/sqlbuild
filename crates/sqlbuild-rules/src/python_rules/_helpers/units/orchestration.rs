@@ -16,8 +16,8 @@ use crate::python_rules::constants::{
     ORCHESTRATION_MODULE_PATHS_CODE, ORCHESTRATION_MODULE_SURFACE_CODE,
     ORCHESTRATION_NO_DOCSTRING_CODE, ORCHESTRATION_PRIVATE_SUPPORT_CODE,
     ORCHESTRATION_PYTHON_ROLES, ORCHESTRATION_ROOT, ORCHESTRATION_RULE_CODES,
-    ORCHESTRATION_SUPPORT_FILES, ORCHESTRATION_SUPPORT_FOLDER, PACKAGE_MODULE, PACKAGE_ROOT, PRIVATE_PREFIX,
-    PROVIDERS_ROOT, SHARED_UTILITIES_PACKAGE,
+    ORCHESTRATION_SUPPORT_FILES, ORCHESTRATION_SUPPORT_FOLDER, PACKAGE_MODULE, PACKAGE_ROOT,
+    PRIVATE_PREFIX, PROVIDERS_ROOT, SHARED_UTILITIES_PACKAGE,
 };
 use crate::python_rules::models::ParsedFile;
 
@@ -37,7 +37,11 @@ pub(crate) fn orchestration_faults(
         return Vec::new();
     }
     let mut faults: Vec<Fault> = sources.iter().filter_map(layout_fault).collect();
-    let files: Vec<ParsedFile<'_>> = files_naming(sources, (ORCHESTRATION_ROOT, ORCHESTRATION_ROOT), python_version);
+    let files: Vec<ParsedFile<'_>> = files_naming(
+        sources,
+        (ORCHESTRATION_ROOT, ORCHESTRATION_ROOT),
+        python_version,
+    );
     let modules: BTreeSet<String> = project_modules(sources);
     let units: BTreeSet<String> = unit_folders(sources);
     for file in &files {

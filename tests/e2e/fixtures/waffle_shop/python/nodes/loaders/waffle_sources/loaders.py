@@ -56,7 +56,6 @@ ORDERS: list[tuple[int, int, int, int, datetime, str]] = [
 ]
 
 
-
 @factory
 def waffle_sources_loaders() -> list[object]:
     @loader
@@ -78,6 +77,5 @@ def waffle_sources_loaders() -> list[object]:
                 "ordered_at": ordered_at,
                 "status": status,
             }
-
 
     return [raw_customers, raw_orders]

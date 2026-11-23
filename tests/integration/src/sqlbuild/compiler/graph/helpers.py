@@ -12,7 +12,9 @@ ORDERS_PROJECT_FILES: dict[str, str] = {
     "sql/models/marts/orders.sql": (
         "MODEL (description 'Orders.');\nSELECT order_id FROM __ref(\"stg_orders\")\n"
     ),
-    "sql/models/marts/customers.sql": "MODEL (description 'Customers.');\nSELECT 1 AS customer_id\n",
+    "sql/models/marts/customers.sql": (
+        "MODEL (description 'Customers.');\nSELECT 1 AS customer_id\n"
+    ),
 }
 MODEL_NAMES: frozenset[str] = frozenset({"stg_orders", "orders", "customers"})
 

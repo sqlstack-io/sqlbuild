@@ -318,8 +318,18 @@ def test_given_complete_usage_when_validating_then_exact_placement_is_enforced(
         DeclarationChainPlacementCase(
             description="diamond chain shares an intermediate consumer",
             declarations=(
-                ("base", ScopeKind.LOCAL, "sql/models/domain", "sql/models/domain/_macros/python/base.py"),
-                ("left", ScopeKind.LOCAL, "sql/models/domain", "sql/models/domain/_macros/python/left.py"),
+                (
+                    "base",
+                    ScopeKind.LOCAL,
+                    "sql/models/domain",
+                    "sql/models/domain/_macros/python/base.py",
+                ),
+                (
+                    "left",
+                    ScopeKind.LOCAL,
+                    "sql/models/domain",
+                    "sql/models/domain/_macros/python/left.py",
+                ),
                 (
                     "right",
                     ScopeKind.LOCAL,
@@ -340,7 +350,12 @@ def test_given_complete_usage_when_validating_then_exact_placement_is_enforced(
                     "sql/models/domain",
                     "sql/models/domain/_macros/python/alpha.py",
                 ),
-                ("beta", ScopeKind.LOCAL, "sql/models/domain", "sql/models/domain/_macros/python/beta.py"),
+                (
+                    "beta",
+                    ScopeKind.LOCAL,
+                    "sql/models/domain",
+                    "sql/models/domain/_macros/python/beta.py",
+                ),
             ),
             declaration_usages=(("alpha", "beta"), ("beta", "alpha")),
             model_consumers=(("sql/models/domain/orders.sql", ("beta",)),),
@@ -355,7 +370,12 @@ def test_given_complete_usage_when_validating_then_exact_placement_is_enforced(
                     "sql/models/domain",
                     "sql/models/domain/macros/python/base.py",
                 ),
-                ("mid", ScopeKind.LOCAL, "sql/models/domain", "sql/models/domain/_macros/python/mid.py"),
+                (
+                    "mid",
+                    ScopeKind.LOCAL,
+                    "sql/models/domain",
+                    "sql/models/domain/_macros/python/mid.py",
+                ),
             ),
             declaration_usages=(("base", "mid"),),
             model_consumers=(("sql/models/domain/orders.sql", ("mid",)),),
@@ -376,7 +396,12 @@ def test_given_complete_usage_when_validating_then_exact_placement_is_enforced(
                     "sql/models/domain",
                     "sql/models/domain/_macros/python/base_two.py",
                 ),
-                ("mid", ScopeKind.LOCAL, "sql/models/domain", "sql/models/domain/_macros/python/mid.py"),
+                (
+                    "mid",
+                    ScopeKind.LOCAL,
+                    "sql/models/domain",
+                    "sql/models/domain/_macros/python/mid.py",
+                ),
             ),
             declaration_usages=(("base_one", "mid"), ("base_two", "mid")),
             model_consumers=(("sql/models/domain/orders.sql", ("mid",)),),

@@ -7,25 +7,25 @@ fn given_project_layouts_when_globbing_then_paths_match_python_rglob_and_sort() 
         GlobTestCase {
             description: "paths sort part by part, hidden files and directories match",
             files: &[
-                "sql/models/a-c.sql",
-                "sql/models/a/b.sql",
-                "sql/models/b.sql",
-                "sql/models/a/.x.sql",
+                "models/a-c.sql",
+                "models/a/b.sql",
+                "models/b.sql",
+                "models/a/.x.sql",
             ],
-            directories: &["sql/models/dir.sql"],
+            directories: &["models/dir.sql"],
             links: &[],
             suffix: ".sql",
             expected_paths: &[
-                "sql/models/a/.x.sql",
-                "sql/models/a/b.sql",
-                "sql/models/a-c.sql",
-                "sql/models/b.sql",
-                "sql/models/dir.sql",
+                "models/a/.x.sql",
+                "models/a/b.sql",
+                "models/a-c.sql",
+                "models/b.sql",
+                "models/dir.sql",
             ],
         },
         GlobTestCase {
             description: "missing root finds nothing",
-            files: &["sql/seeds/a.sql"],
+            files: &["seeds/a.sql"],
             directories: &[],
             links: &[],
             suffix: ".sql",
@@ -47,11 +47,11 @@ fn given_project_layouts_when_globbing_then_paths_match_python_rglob_and_sort() 
 fn given_a_directory_link_when_globbing_then_it_matches_by_name_but_is_not_walked() {
     let test_cases = [GlobTestCase {
         description: "a directory link matches by name but is not walked",
-        files: &["elsewhere/inner.sql", "sql/models/x.txt"],
+        files: &["elsewhere/inner.sql", "models/x.txt"],
         directories: &[],
-        links: &[("sql/models/linked.sql", "elsewhere")],
+        links: &[("models/linked.sql", "elsewhere")],
         suffix: ".sql",
-        expected_paths: &["sql/models/linked.sql"],
+        expected_paths: &["models/linked.sql"],
     }];
     for test_case in test_cases {
         assert_eq!(

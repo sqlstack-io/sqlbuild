@@ -9,15 +9,15 @@ fn given_names_that_are_not_utf8_when_walking_then_each_file_keeps_its_own_ident
         UndecodableWalkTestCase {
             description: "lossy names sort, resolve to real files and fail only when read",
             files: &[
-                b"sql/models/orders.sql",
-                b"sql/models/notes\xe9.txt",
-                b"sql/models/old\xe9/inner.sql",
-                b"sql/models/caf\xe9.sql",
+                b"models/orders.sql",
+                b"models/notes\xe9.txt",
+                b"models/old\xe9/inner.sql",
+                b"models/caf\xe9.sql",
             ],
             expected_paths: &[
-                "sql/models/caf\\xe9.sql",
-                "sql/models/old\\xe9/inner.sql",
-                "sql/models/orders.sql",
+                "models/caf\\xe9.sql",
+                "models/old\\xe9/inner.sql",
+                "models/orders.sql",
             ],
             expected_failures: &[
                 Some("Project path project/models/caf\\xe9.sql"),
@@ -29,18 +29,18 @@ fn given_names_that_are_not_utf8_when_walking_then_each_file_keeps_its_own_ident
         UndecodableWalkTestCase {
             description: "names sharing a lossy name stay distinct and a valid name is not blamed",
             files: &[
-                b"sql/models/st\xe9.sql",
-                b"sql/models/st\xe8.sql",
-                b"sql/models/st\xef\xbf\xbd.sql",
-                b"sql/models/a\xe9/x.sql",
-                b"sql/models/a\xe8/y.sql",
+                b"models/st\xe9.sql",
+                b"models/st\xe8.sql",
+                b"models/st\xef\xbf\xbd.sql",
+                b"models/a\xe9/x.sql",
+                b"models/a\xe8/y.sql",
             ],
             expected_paths: &[
-                "sql/models/a\\xe8/y.sql",
-                "sql/models/a\\xe9/x.sql",
-                "sql/models/st\\xe8.sql",
-                "sql/models/st\\xe9.sql",
-                "sql/models/st\u{FFFD}.sql",
+                "models/a\\xe8/y.sql",
+                "models/a\\xe9/x.sql",
+                "models/st\\xe8.sql",
+                "models/st\\xe9.sql",
+                "models/st\u{FFFD}.sql",
             ],
             expected_failures: &[
                 Some("Project path project/models/a\\xe8/y.sql"),

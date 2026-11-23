@@ -173,7 +173,9 @@ fn given_folder_changed_during_the_walk_when_recording_then_no_stamp_is_kept() {
     let test_cases = [
         WalkRaceTestCase {
             description: "folder changed after the walk started",
-            change_during_walk: |compiled| place(&compiled.join("sql/models/stray.sql"), b"select 0\n"),
+            change_during_walk: |compiled| {
+                place(&compiled.join("sql/models/stray.sql"), b"select 0\n")
+            },
             expected_stamped: false,
         },
         WalkRaceTestCase {
@@ -188,7 +190,9 @@ fn given_folder_changed_during_the_walk_when_recording_then_no_stamp_is_kept() {
         let compiled: PathBuf = folder.path().join("compiled");
         let stamp: PathBuf = folder.path().join("cache/compiled-tree.bin");
         place(&compiled.join("sql/models/orders.sql"), b"select 1\n");
-        let managed: HashSet<PathBuf> = [compiled.join("sql/models/orders.sql")].into_iter().collect();
+        let managed: HashSet<PathBuf> = [compiled.join("sql/models/orders.sql")]
+            .into_iter()
+            .collect();
         std::thread::sleep(std::time::Duration::from_millis(30));
         let since_ns: i64 = now_ns();
         let folders: Vec<PathBuf> = vec![compiled.clone(), compiled.join("sql/models")];

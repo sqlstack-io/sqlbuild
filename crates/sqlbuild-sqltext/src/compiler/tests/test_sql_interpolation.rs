@@ -85,7 +85,9 @@ fn given_sql_when_interpolating_then_text_and_errors_match_python() {
             description: "an unknown context key",
             sql: "SELECT @@CTX:that",
             context: true,
-            expected_sql: Err("SQL text in 'sql/models/orders.sql' references unknown CTX key 'that'"),
+            expected_sql: Err(
+                "SQL text in 'sql/models/orders.sql' references unknown CTX key 'that'",
+            ),
         },
         InterpolationTestCase {
             description: "a context key without a value",

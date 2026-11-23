@@ -340,7 +340,9 @@ def build_compiled_project_with_model_specs(
     model_name: str
     sql: str
     for model_name, sql in sql_by_model_name.items():
-        relative_path: Path = Path(path_by_model_name.get(model_name, f"sql/models/{model_name}.sql"))
+        relative_path: Path = Path(
+            path_by_model_name.get(model_name, f"sql/models/{model_name}.sql")
+        )
         model_file: DiscoveredSqlModelFile = DiscoveredSqlModelFile(
             file_path=Path("/repo") / relative_path,
             relative_path=relative_path,

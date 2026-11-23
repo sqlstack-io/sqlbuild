@@ -58,7 +58,7 @@ pub(crate) fn validate_declared_seed_files(facts: &ProjectFacts) -> Result<(), V
     for seed in &facts.seeds {
         if !declared.contains(seed.file.name.as_str()) {
             return Err(seed_error(format!(
-                "Seed CSV {} has no matching declaration for seed '{}' under seeds/**/*.yml",
+                "Seed CSV {} has no matching declaration for seed '{}' under sql/seeds/**/*.yml",
                 seed.file.path, seed.file.name
             )));
         }

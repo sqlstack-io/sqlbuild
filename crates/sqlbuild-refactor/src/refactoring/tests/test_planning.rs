@@ -18,7 +18,10 @@ use crate::refactoring::tests::test_types::{
 fn given_taken_name_or_destination_when_planning_then_collisions_block() -> Result<(), RefactorError>
 {
     let project = tempfile::tempdir().map_err(|error| RefactorError::value(error.to_string()))?;
-    write_files(project.path(), &[("sql/models/finance/orders.sql", "SELECT 1")])?;
+    write_files(
+        project.path(),
+        &[("sql/models/finance/orders.sql", "SELECT 1")],
+    )?;
     let project_facts = facts(
         &project.path().to_string_lossy(),
         vec![
@@ -34,7 +37,11 @@ fn given_taken_name_or_destination_when_planning_then_collisions_block() -> Resu
         },
         CollisionTestCase {
             description: "a move onto an existing file",
-            request: request(RefactorOperation::MoveModel, "", Some("sql/models/finance/")),
+            request: request(
+                RefactorOperation::MoveModel,
+                "",
+                Some("sql/models/finance/"),
+            ),
             expected_reasons: &["sql/models/finance/orders.sql: destination file already exists"],
         },
     ];
@@ -253,7 +260,9 @@ fn given_scope_placement_when_moving_across_folders_then_declaration_files_follo
                 declarations: Vec::new(),
             },
             expected_moves: &[],
-            expected_blocking: &["sql/models/marts/orders.sql:0 Move source model:orders is unknown"],
+            expected_blocking: &[
+                "sql/models/marts/orders.sql:0 Move source model:orders is unknown",
+            ],
         },
         DeclarationMovesTestCase {
             description: "an unsettled placement without reasons blocks with the default reason",
@@ -278,7 +287,10 @@ fn given_scope_placement_when_moving_across_folders_then_declaration_files_follo
                     relocated("enum:a", "sql/models/marts/_sqlbuild/_enums/both.sql"),
                     relocated("enum:b", "sql/models/other/_sqlbuild/_enums/both.sql"),
                     relocated("macro:cents", "sql/models/marts/_sqlbuild/_macros/cents.py"),
-                    relocated("macro:generated", "sql/models/marts/_sqlbuild/_macros/gen.py"),
+                    relocated(
+                        "macro:generated",
+                        "sql/models/marts/_sqlbuild/_macros/gen.py",
+                    ),
                 ]),
                 diagnostics: Vec::new(),
                 declarations: vec![
@@ -320,8 +332,14 @@ fn given_scope_placement_when_moving_across_folders_then_declaration_files_follo
                 ]),
                 diagnostics: Vec::new(),
                 declarations: vec![
-                    placed("macro:cents", "sql/models/_sqlbuild/_macros/money/helpers.sql"),
-                    placed("macro:label", "sql/models/_sqlbuild/_macros/text/helpers.sql"),
+                    placed(
+                        "macro:cents",
+                        "sql/models/_sqlbuild/_macros/money/helpers.sql",
+                    ),
+                    placed(
+                        "macro:label",
+                        "sql/models/_sqlbuild/_macros/text/helpers.sql",
+                    ),
                 ],
             },
             expected_moves: &[
@@ -348,17 +366,32 @@ fn given_scope_placement_when_moving_across_folders_then_declaration_files_follo
             ],
             moves: &[
                 ("sql/models/sales/orders.sql", "sql/models/marts/orders.sql"),
-                ("sql/models/crm/customers.sql", "sql/models/marts/customers.sql"),
+                (
+                    "sql/models/crm/customers.sql",
+                    "sql/models/marts/customers.sql",
+                ),
             ],
             placement: DeclarationPlacement {
                 relocated: Some(vec![
-                    relocated("macro:cents", "sql/models/marts/_sqlbuild/_macros/helpers.sql"),
-                    relocated("macro:label", "sql/models/marts/_sqlbuild/_macros/helpers.sql"),
+                    relocated(
+                        "macro:cents",
+                        "sql/models/marts/_sqlbuild/_macros/helpers.sql",
+                    ),
+                    relocated(
+                        "macro:label",
+                        "sql/models/marts/_sqlbuild/_macros/helpers.sql",
+                    ),
                 ]),
                 diagnostics: Vec::new(),
                 declarations: vec![
-                    placed("macro:cents", "sql/models/sales/_sqlbuild/_macros/helpers.sql"),
-                    placed("macro:label", "sql/models/crm/_sqlbuild/_macros/helpers.sql"),
+                    placed(
+                        "macro:cents",
+                        "sql/models/sales/_sqlbuild/_macros/helpers.sql",
+                    ),
+                    placed(
+                        "macro:label",
+                        "sql/models/crm/_sqlbuild/_macros/helpers.sql",
+                    ),
                 ],
             },
             expected_moves: &[
@@ -437,7 +470,11 @@ fn given_unit_tests_of_model_when_renaming_or_moving_then_tests_follow() -> Resu
         },
         FollowedUnitTestTestCase {
             description: "a move takes mirrored tests to the mirrored folder and leaves others",
-            request: request(RefactorOperation::MoveModel, "", Some("sql/models/finance/")),
+            request: request(
+                RefactorOperation::MoveModel,
+                "",
+                Some("sql/models/finance/"),
+            ),
             rebound: &[],
             expected_changes: followed_test_changes(&[(
                 "tests/unit/marts/test_orders__keeps_rows.sql -> tests/unit/finance/test_orders__keeps_rows.sql",
@@ -447,7 +484,11 @@ fn given_unit_tests_of_model_when_renaming_or_moving_then_tests_follow() -> Resu
         },
         FollowedUnitTestTestCase {
             description: "a move leaves a test whose declarations would rebind in its folder",
-            request: request(RefactorOperation::MoveModel, "", Some("sql/models/finance/")),
+            request: request(
+                RefactorOperation::MoveModel,
+                "",
+                Some("sql/models/finance/"),
+            ),
             rebound: &["macro:mock_orders"],
             expected_changes: Vec::new(),
             expected_notes: &[
@@ -514,9 +555,11 @@ fn given_several_moves_when_planning_together_then_chains_pass_and_conflicts_blo
                 move_request("orders", "sql/models/customers.sql"),
                 move_request("customers", "sql/models/clients.sql"),
             ],
-            expected_blocking: &["sql/models/customers.sql: model:orders would take the name \
+            expected_blocking: &[
+                "sql/models/customers.sql: model:orders would take the name \
                                   model:customers gives up in this batch; the old name must \
-                                  stay free for its history, so move them in separate runs"],
+                                  stay free for its history, so move them in separate runs",
+            ],
             expected_moves: &[
                 "sql/models/customers.sql -> sql/models/clients.sql",
                 "sql/models/orders.sql -> sql/models/customers.sql",
@@ -626,7 +669,11 @@ fn given_pending_migration_when_moving_under_same_name_then_only_relation_moves_
     let test_cases = [
         PendingMigrationTestCase {
             description: "a same-name move passes the pending-migration refusal",
-            request: request(RefactorOperation::MoveModel, "", Some("sql/models/finance/")),
+            request: request(
+                RefactorOperation::MoveModel,
+                "",
+                Some("sql/models/finance/"),
+            ),
             after: vec![pending.clone()],
             expected_refusals: vec![],
             expected_blocking: vec![],
@@ -644,7 +691,11 @@ fn given_pending_migration_when_moving_under_same_name_then_only_relation_moves_
         },
         PendingMigrationTestCase {
             description: "a same-name move that changes the relation is blocked",
-            request: request(RefactorOperation::MoveModel, "", Some("sql/models/finance/")),
+            request: request(
+                RefactorOperation::MoveModel,
+                "",
+                Some("sql/models/finance/"),
+            ),
             after: vec![
                 model("orders", Some("table"), "finance"),
                 model("customers", Some("table"), "analytics"),

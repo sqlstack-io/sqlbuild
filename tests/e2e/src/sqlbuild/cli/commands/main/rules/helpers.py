@@ -160,7 +160,10 @@ def split_model_files(model_count: int) -> tuple[tuple[str, str], ...]:
     """Return numbered order models beside the project's `sql/models/orders.sql`."""
 
     return tuple(
-        (f"sql/models/orders_{index:03d}.sql", 'MODEL (description "Orders");\nSELECT 1 AS order_id\n')
+        (
+            f"sql/models/orders_{index:03d}.sql",
+            'MODEL (description "Orders");\nSELECT 1 AS order_id\n',
+        )
         for index in range(model_count)
     )
 
@@ -169,7 +172,8 @@ def split_expected_findings(model_count: int) -> tuple[tuple[str, str], ...]:
     """Return what one host reports for the duplicate-parity and flagged-suffix order rules."""
 
     names: tuple[str, ...] = tuple(f"orders_{index:03d}" for index in range(model_count))
-    # `sql/models/orders.sql` sorts first and is the first odd model; `orders_000` is the first even.
+    # `sql/models/orders.sql` sorts first and is the first odd model;
+    # `orders_000` is the first even.
     duplicates: tuple[tuple[str, str], ...] = tuple(
         ("XSQBRSPLIT001", f"sql/models/{name}.sql") for name in names[1:]
     )

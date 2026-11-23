@@ -287,7 +287,9 @@ def test_given_a_built_round_trip_when_rebuilding_then_the_decision_follows_the_
         ),
     )
     project_dir: Path = database.parent
-    (project_dir / "sql" / "models" / "orders.sql").write_text(test_case.orders_sql, encoding="utf-8")
+    (project_dir / "sql" / "models" / "orders.sql").write_text(
+        test_case.orders_sql, encoding="utf-8"
+    )
     for relative, text in test_case.extra_files.items():
         (project_dir / relative).write_text(text, encoding="utf-8")
 

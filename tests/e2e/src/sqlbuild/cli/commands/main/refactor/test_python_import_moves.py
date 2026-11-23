@@ -133,7 +133,9 @@ def test_given_python_imports_of_a_moved_macro_when_moving_then_imports_follow_a
         ),
         PythonImportRefusalE2ETestCase(
             description="a project Python file that is not UTF-8",
-            files=cents_check("from sql.models.staging._sqlbuild._macros.python.cents import to_cents"),
+            files=cents_check(
+                "from sql.models.staging._sqlbuild._macros.python.cents import to_cents"
+            ),
             binary_files={"rules/legacy.py": b"LABEL = '\xe9'\n"},
             expected_location="rules/legacy.py",
             expected_reason="this Python file cannot be read as UTF-8",

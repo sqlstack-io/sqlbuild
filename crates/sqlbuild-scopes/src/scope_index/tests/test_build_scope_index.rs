@@ -18,7 +18,14 @@ fn given_authored_projects_when_building_then_orders_and_diagnostics_match_pytho
             declarations: &[
                 ("macro", "pick", "sql/macros/b.py", 10, "global", None),
                 ("macro", "pick_more", "sql/macros/a.py", 9, "global", None),
-                ("constant", "limit", "sql/constants/a.sql", 1, "global", None),
+                (
+                    "constant",
+                    "limit",
+                    "sql/constants/a.sql",
+                    1,
+                    "global",
+                    None,
+                ),
             ],
             expected_resource_order: &["model:zeta", "model:alpha", "seed:lookup", "test:alpha"],
             expected_canonical_resources: &[
@@ -27,7 +34,11 @@ fn given_authored_projects_when_building_then_orders_and_diagnostics_match_pytho
                 "seed:lookup",
                 "test:alpha",
             ],
-            expected_declaration_order: &["sql/constants/a.sql:1", "sql/macros/b.py:10", "sql/macros/a.py:9"],
+            expected_declaration_order: &[
+                "sql/constants/a.sql:1",
+                "sql/macros/b.py:10",
+                "sql/macros/a.py:9",
+            ],
             expected_canonical_declarations: &[
                 "sql/constants/a.sql:1",
                 "sql/macros/b.py:10",
@@ -50,8 +61,22 @@ fn given_authored_projects_when_building_then_orders_and_diagnostics_match_pytho
                     "local",
                     Some("sql/models/a"),
                 ),
-                ("constant", "rate", "sql/constants/rates.sql", 1, "global", None),
-                ("enum", "__status", "sql/enums/status.sql", 1, "global", None),
+                (
+                    "constant",
+                    "rate",
+                    "sql/constants/rates.sql",
+                    1,
+                    "global",
+                    None,
+                ),
+                (
+                    "enum",
+                    "__status",
+                    "sql/enums/status.sql",
+                    1,
+                    "global",
+                    None,
+                ),
                 ("enum", "_status", "sql/enums/other.sql", 1, "global", None),
                 (
                     "constant",

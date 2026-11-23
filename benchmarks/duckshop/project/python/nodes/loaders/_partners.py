@@ -5,7 +5,16 @@ from __future__ import annotations
 import hashlib
 from datetime import date, timedelta
 
-from python.nodes.loaders._core import ChangeLog, EventLog, at, chance, emit, in_zone, random_instant, rng
+from python.nodes.loaders._core import (
+    ChangeLog,
+    EventLog,
+    at,
+    chance,
+    emit,
+    in_zone,
+    random_instant,
+    rng,
+)
 from python.nodes.loaders._world import CURRENCY_EXPONENT, PER_USD, World
 
 Rows = list[dict[str, object]]

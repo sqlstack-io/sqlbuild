@@ -313,11 +313,15 @@ EXPLICIT_REFERENCE_PROJECTS: tuple[tuple[str, dict[str, str], str], ...] = (
             **_SEED,
             **_EXTERNAL,
             "sql/audits/generic/gated_lookup.sql": _GATED_AUDIT.format(read='__ref("enriched")'),
-            "sql/audits/generic/source_lookup.sql": _GATED_AUDIT.format(read='__ref("landing_view")'),
+            "sql/audits/generic/source_lookup.sql": _GATED_AUDIT.format(
+                read='__ref("landing_view")'
+            ),
             "sql/models/marts/base.sql": _gate_model("SELECT 'GB' AS code", "gated_lookup"),
             "sql/models/marts/enriched.sql": _model('SELECT * FROM __ref("base")'),
             "sql/audits/generic/seed_lookup.sql": _GATED_AUDIT.format(read='__ref("coded")'),
-            "sql/models/marts/landing_view.sql": _model('SELECT * FROM __source("landing_audited")'),
+            "sql/models/marts/landing_view.sql": _model(
+                'SELECT * FROM __source("landing_audited")'
+            ),
             "sql/models/marts/coded.sql": _model('SELECT * FROM __seed("audited_codes")'),
             "sql/sources/landing_audits.yml": (
                 "sources:\n  - name: landing_audited\n    description: Landing audited.\n"

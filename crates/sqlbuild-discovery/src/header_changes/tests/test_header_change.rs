@@ -48,7 +48,8 @@ fn given_an_edited_model_header_when_compared_then_the_change_is_classified() {
             ),
             recorded: true,
             expected_change: HeaderChange::Unsupported(
-                "sql/models/orders.sql changed its materialization beyond views and tables".to_owned(),
+                "sql/models/orders.sql changed its materialization beyond views and tables"
+                    .to_owned(),
             ),
         },
         HeaderChangeTestCase {

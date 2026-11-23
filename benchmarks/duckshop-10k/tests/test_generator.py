@@ -127,8 +127,13 @@ def test_given_declarations_when_placing_then_follow_their_users() -> None:
     assert _placement({"sql/models/staging/a/x", "sql/models/staging/b/y"}, "sql/macros/sql") == (
         "sql/models/staging/_sqlbuild/macros/sql"
     )
-    assert _placement({"sql/models/staging/a"}, "constants") == "sql/models/staging/a/_sqlbuild/_constants"
-    assert _placement({"sql/models/staging/a", "tests/unit/b"}, "sql/macros/sql") == "sql/macros/sql"
+    assert (
+        _placement({"sql/models/staging/a"}, "constants")
+        == "sql/models/staging/a/_sqlbuild/_constants"
+    )
+    assert (
+        _placement({"sql/models/staging/a", "tests/unit/b"}, "sql/macros/sql") == "sql/macros/sql"
+    )
     assert _placement({"sql/models/a", "sql/models/b"}, "enums") == "enums"
 
 

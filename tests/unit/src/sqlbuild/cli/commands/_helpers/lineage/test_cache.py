@@ -245,7 +245,10 @@ def test_given_authored_files_when_fingerprinting_then_hashes_exactly_the_expect
         ),
         UncacheableFingerprintTestCase(
             description="dynamic context in Python source",
-            files={"sql/macros/python/run.py": "RUN = 'CTX:run_id'\n", "sql/models/a.sql": "SELECT 1\n"},
+            files={
+                "sql/macros/python/run.py": "RUN = 'CTX:run_id'\n",
+                "sql/models/a.sql": "SELECT 1\n",
+            },
             expected_fingerprint=None,
         ),
         UncacheableFingerprintTestCase(

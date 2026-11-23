@@ -1524,7 +1524,12 @@ def test_given_shallow_waffle_shop_snapshots_when_sources_change_then_cli_reruns
         "customer_plan_change_records_snapshot",
     ):
         compiled_path: Path = (
-            project_dir / "target" / "compiled" / "sql" / "models" / (f"{snapshot_artifact_name}.sql")
+            project_dir
+            / "target"
+            / "compiled"
+            / "sql"
+            / "models"
+            / (f"{snapshot_artifact_name}.sql")
         )
         run_path: Path = (
             project_dir / "target" / "run" / "sql" / "models" / (f"{snapshot_artifact_name}.sql")

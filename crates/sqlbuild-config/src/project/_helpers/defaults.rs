@@ -1,6 +1,5 @@
 //! Loaders for `[defaults]`, `[path_defaults]` and `[materialization_defaults]`.
 
-use sqlbuild_core::constants::SQL_DIRECTORY;
 use crate::models::ConfigValue;
 use crate::project::_helpers::durations::parse_duration;
 use crate::project::_helpers::fields::{
@@ -22,6 +21,7 @@ use crate::project::errors::ConfigFailure;
 use crate::project::models::{Built, ConfigFile};
 use crate::project::types::{Entries, Fields, Loaded};
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
+use sqlbuild_core::constants::SQL_DIRECTORY;
 use sqlbuild_core::constants::ZERO_DAY_DURATION;
 
 /// A retention or table-type field: where it lives and whether `'inherit'` is accepted.

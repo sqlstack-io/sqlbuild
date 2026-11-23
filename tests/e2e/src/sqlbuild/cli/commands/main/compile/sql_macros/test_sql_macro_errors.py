@@ -61,7 +61,9 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         ),
         SqlMacroErrorTestCase(
             description="sql_file_in_python_folder",
-            files={"sql/macros/python/c.sql": CENTS_TO_DOLLARS["sql/macros/sql/cents_to_dollars.sql"]},
+            files={
+                "sql/macros/python/c.sql": CENTS_TO_DOLLARS["sql/macros/sql/cents_to_dollars.sql"]
+            },
             expected_code="D013",
             expected_fragments=(
                 "macro file sql/macros/python/c.sql must live in sql/macros/python/ or sql/macros/sql/",
@@ -115,7 +117,9 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
             description="sql_body_calls_python_macro",
             files={
                 **BRACKET,
-                "sql/macros/sql/x.sql": _X_HEADER.format(args="v BIGINT", returns=", returns BIGINT")
+                "sql/macros/sql/x.sql": _X_HEADER.format(
+                    args="v BIGINT", returns=", returns BIGINT"
+                )
                 + "@py.bracket(@v) + 1\n",
                 **_CALL_X,
             },
@@ -343,7 +347,9 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="returns_that_disagrees_with_the_body_is_reported_at_the_macro_file",
             files={
-                "sql/macros/sql/x.sql": _X_HEADER.format(args="v VARCHAR", returns=", returns BIGINT")
+                "sql/macros/sql/x.sql": _X_HEADER.format(
+                    args="v VARCHAR", returns=", returns BIGINT"
+                )
                 + "UPPER(@v)\n",
                 **orders_model("SELECT @sql.x('a') AS a\n"),
             },
@@ -380,7 +386,9 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="type_the_adapter_cannot_parse",
             files={
-                "sql/macros/sql/x.sql": _X_HEADER.format(args="v FOO BAR", returns=", returns BIGINT")
+                "sql/macros/sql/x.sql": _X_HEADER.format(
+                    args="v FOO BAR", returns=", returns BIGINT"
+                )
                 + "@v + 1\n",
                 **_CALL_X,
             },
@@ -434,7 +442,9 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="cte_macro_declaring_returns",
             files={
-                "sql/macros/sql/x.sql": _X_HEADER.format(args="v BIGINT", returns=", returns BIGINT")
+                "sql/macros/sql/x.sql": _X_HEADER.format(
+                    args="v BIGINT", returns=", returns BIGINT"
+                )
                 + "WITH y AS (SELECT @v AS a)\n",
                 **orders_model("WITH @sql.x(1)\nSELECT * FROM y\n"),
             },
@@ -446,7 +456,9 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="built_in_parameter_name",
             files={
-                "sql/macros/sql/x.sql": _X_HEADER.format(args="enum BIGINT", returns=", returns BIGINT")
+                "sql/macros/sql/x.sql": _X_HEADER.format(
+                    args="enum BIGINT", returns=", returns BIGINT"
+                )
                 + "1\n",
                 **_CALL_X,
             },
@@ -456,7 +468,9 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="undeclared_parameter",
             files={
-                "sql/macros/sql/x.sql": _X_HEADER.format(args="v BIGINT", returns=", returns BIGINT")
+                "sql/macros/sql/x.sql": _X_HEADER.format(
+                    args="v BIGINT", returns=", returns BIGINT"
+                )
                 + "@v + @w\n",
                 **_CALL_X,
             },
@@ -624,7 +638,9 @@ _CALL_X: dict[str, str] = orders_model("SELECT @sql.x(1) AS a\n")
         SqlMacroErrorTestCase(
             description="sql_and_python_macro_sharing_a_name",
             files={
-                "sql/macros/sql/same.sql": _X_HEADER.format(args="v BIGINT", returns=", returns BIGINT")
+                "sql/macros/sql/same.sql": _X_HEADER.format(
+                    args="v BIGINT", returns=", returns BIGINT"
+                )
                 + "@v + 1\n",
                 "sql/macros/python/same.py": "def same(v):\n    return v\n",
                 **orders_model('SELECT @sql.same(amount_cents) AS a FROM __ref("stg_orders")\n'),

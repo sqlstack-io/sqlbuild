@@ -219,7 +219,9 @@ def test_given_generic_audit_arguments_when_linting_then_template_is_analyzed(
     tmp_path: Path,
 ) -> None:
     _ = (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
-    audit: Path = tmp_path / "sql" / "audits" / "generic" / "measurement" / "accepted_values_where.sql"
+    audit: Path = (
+        tmp_path / "sql" / "audits" / "generic" / "measurement" / "accepted_values_where.sql"
+    )
     audit.parent.mkdir(parents=True)
     _ = audit.write_text(
         "AUDIT (evaluation measurement, value measured_value);\n\n"

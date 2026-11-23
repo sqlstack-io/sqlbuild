@@ -174,7 +174,9 @@ def _declaration_reference_cases() -> tuple[FailureCase, ...]:
             files=_staging_after_macro(
                 where='amount > @const("order_cap")',
                 files={
-                    "sql/models/marts/_constants/limits.sql": "CONSTANT (name order_cap, value 3);\n"
+                    "sql/models/marts/_constants/limits.sql": (
+                        "CONSTANT (name order_cap, value 3);\n"
+                    )
                 },
             ),
         ),

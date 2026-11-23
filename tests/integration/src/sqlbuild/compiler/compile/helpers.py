@@ -116,8 +116,12 @@ MACRO_BRIDGE_PROJECT_FILES: dict[str, str] = {
         'def fmt(value: str) -> str:\n    """Label a value."""\n    return f"\'north:{value}\'"\n'
     ),
     "sql/constants/base_rate.sql": "CONSTANT (name base_rate, value 1);\n",
-    "sql/models/north/_sqlbuild/_constants/north_rate.sql": "CONSTANT (name north_rate, value 10);\n",
-    "sql/models/south/_sqlbuild/_constants/south_rate.sql": "CONSTANT (name south_rate, value 20);\n",
+    "sql/models/north/_sqlbuild/_constants/north_rate.sql": (
+        "CONSTANT (name north_rate, value 10);\n"
+    ),
+    "sql/models/south/_sqlbuild/_constants/south_rate.sql": (
+        "CONSTANT (name south_rate, value 20);\n"
+    ),
     "sql/models/shared/customers.sql": (
         "MODEL (description \"Customers\");\n\nSELECT 1 AS id, 2 AS amount, 'north' AS region\n"
     ),

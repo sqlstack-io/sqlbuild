@@ -554,7 +554,9 @@ FUNCTION_PROJECT_FILES: dict[str, str] = {
         'amount_type = "DECIMAL(10, 2)"\n\n[defaults]\nfunction_schema = "udfs_${region}"\n'
     ),
     "sql/enums/status.sql": "ENUM (name order_status, members [PLACED, SHIPPED]);\n",
-    "sql/models/orders.sql": "MODEL (description 'Orders.', schema analytics);\nSELECT 1 AS order_id\n",
+    "sql/models/orders.sql": (
+        "MODEL (description 'Orders.', schema analytics);\nSELECT 1 AS order_id\n"
+    ),
     "sql/functions/sql/order_total.sql": (
         "FUNCTION (description 'Order total.', tags [finance],"
         " arguments (amount ${amount_type}), returns ${amount_type});\nSELECT amount * 2\n"

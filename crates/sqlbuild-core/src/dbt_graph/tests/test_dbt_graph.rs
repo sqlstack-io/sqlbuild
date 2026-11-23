@@ -117,7 +117,7 @@ fn given_selectors_when_resolving_then_returns_models_dbt_nodes_and_anchors() {
                 )],
                 path_translations: vec![(
                     "path:models\\marts".to_owned(),
-                    "path:sql/models/marts".to_owned(),
+                    "path:models/marts".to_owned(),
                 )],
                 ..selection(&["fact", "mart"], &["model.a.int"])
             }),

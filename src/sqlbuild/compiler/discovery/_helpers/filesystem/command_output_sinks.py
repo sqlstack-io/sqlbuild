@@ -27,7 +27,10 @@ from sqlbuild.runtime.event_exporting.main.get_command_output_event_sink_definit
     get_command_output_event_sink_definition,
 )
 from sqlbuild.runtime.output_capture.constants import COMMAND_OUTPUT_SINK_RECORD_PARAMETER_NAME
-from sqlbuild.runtime.output_capture.models import CommandOutputRecord, CommandOutputEventSinkDefinition
+from sqlbuild.runtime.output_capture.models import (
+    CommandOutputEventSinkDefinition,
+    CommandOutputRecord,
+)
 
 
 def discover_command_output_sink_functions(
@@ -81,8 +84,8 @@ def discover_command_output_sink_declarations(
             if function_id in seen_function_ids:
                 continue
             seen_function_ids.add(function_id)
-            definition: CommandOutputEventSinkDefinition | None = get_command_output_event_sink_definition(
-                value
+            definition: CommandOutputEventSinkDefinition | None = (
+                get_command_output_event_sink_definition(value)
             )
             if definition is None:
                 continue

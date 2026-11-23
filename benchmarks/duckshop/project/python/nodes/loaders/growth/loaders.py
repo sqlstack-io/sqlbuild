@@ -2,10 +2,9 @@
 
 from python.nodes.loaders._registry import load
 
-from sqlbuild.factories import factory
 from sqlbuild.executor.load.models import LoaderContext
+from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
-
 
 
 @factory
@@ -38,5 +37,12 @@ def growth_loaders() -> list[object]:
     def growth__influencer_posts(ctx: LoaderContext) -> object:
         return load(ctx, "growth__influencer_posts")
 
-
-    return [growth__campaigns, growth__campaign_spend, growth__affiliate_conversions, growth__referral_invites, growth__newsletter_subscriptions, growth__survey_responses, growth__influencer_posts]
+    return [
+        growth__campaigns,
+        growth__campaign_spend,
+        growth__affiliate_conversions,
+        growth__referral_invites,
+        growth__newsletter_subscriptions,
+        growth__survey_responses,
+        growth__influencer_posts,
+    ]

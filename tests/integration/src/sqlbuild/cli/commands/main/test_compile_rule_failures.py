@@ -286,7 +286,10 @@ def test_given_failing_and_passing_compiles_when_alternating_then_compiled_faile
     assert not failed.exists()
 
     edited(
-        {"sql/models/open_orders.sql": open_orders_model(_FAILING), "sql/models/new_orders.sql": _ORDERS}
+        {
+            "sql/models/open_orders.sql": open_orders_model(_FAILING),
+            "sql/models/new_orders.sql": _ORDERS,
+        }
     )
     compiled_once(1)
     assert artifact_tree(compiled) == first_pass
@@ -388,7 +391,8 @@ def test_given_resources_edited_while_rules_fail_when_the_fix_passes_then_compil
         assert main(compile_args) == 1
         _ = capsys.readouterr()
         write_project_files(
-            project_dir=project_dir, files={"sql/models/open_orders.sql": open_orders_model(_PASSING)}
+            project_dir=project_dir,
+            files={"sql/models/open_orders.sql": open_orders_model(_PASSING)},
         )
         exit_code: int = main(compile_args)
         stdout, stderr = capsys.readouterr()

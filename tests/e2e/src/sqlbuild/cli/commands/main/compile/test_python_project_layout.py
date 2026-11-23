@@ -10,6 +10,7 @@ import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     FactoryModuleNodePlanTestCase,
+    PythonLayoutBuildTestCase,
     PythonProjectLayoutCompileTestCase,
     UnrelatedPythonPackageBuildTestCase,
 )
@@ -584,6 +585,239 @@ def test_given_unrelated_python_package_on_path_when_building_then_project_pytho
         command=("--no-color", "build"),
         project_dir=project_dir,
         env={"PYTHONPATH": str(site_dir)},
+    )
+
+    output: str = result.stdout + result.stderr
+    assert result.returncode == 0, output
+    assert all(fragment in output for fragment in test_case.expected_build_fragments)
+
+
+_LAYOUT_CONFIG: str = 'name = "python_layout"\nadapter = "duckdb"\n'
+_ASSET_MODULE: str = (
+    "from sqlbuild.assets import asset\n\n\n"
+    "@asset\n"
+    "def orders(ctx):\n"
+    "    '''Test task orders.'''\n    return None\n"
+)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        PythonProjectLayoutCompileTestCase(
+            description="unknown folder inside sql",
+            repo_files={"sqlbuild_project.toml": _LAYOUT_CONFIG, "sql/notes/readme.md": ""},
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D018]",
+                "'sql/notes/' is not part of a SQLBuild project",
+                "move it under one of: sql/models/,",
+                "or list it in extra_paths in sqlbuild_project.toml",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="unknown module inside python",
+            repo_files={"sqlbuild_project.toml": _LAYOUT_CONFIG, "python/helpers.py": ""},
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D018]",
+                "'python/helpers.py' is not part of a SQLBuild project",
+                "move it under one of: python/nodes/,",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="several unknown entries are named together",
+            repo_files={
+                "sqlbuild_project.toml": _LAYOUT_CONFIG,
+                "notes.txt": "",
+                "models/orders.sql": "",
+            },
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D018]: 'models/' and 'notes.txt' are not part of a SQLBuild project",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="extra_paths allows listed entries",
+            repo_files={
+                "sqlbuild_project.toml": 'extra_paths = ["docs/", "sql/notes"]\n' + _LAYOUT_CONFIG,
+                "docs/guide.md": "",
+                "sql/notes/readme.md": "",
+            },
+            expected_exit_code=0,
+            expected_stderr_fragments=(),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="gitignored, hidden and SQLBuild-written entries are allowed",
+            repo_files={
+                "sqlbuild_project.toml": _LAYOUT_CONFIG,
+                ".gitignore": "scratch/\n*.log\n",
+                "scratch/notes.md": "",
+                "build.log": "",
+                ".env": "",
+                "README.md": "",
+                "warehouse.duckdb": "",
+                "logs/run.log": "",
+            },
+            expected_exit_code=0,
+            expected_stderr_fragments=(),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="an asset in node.py",
+            repo_files={
+                "sqlbuild_project.toml": _LAYOUT_CONFIG,
+                "python/nodes/orders/export/node.py": _ASSET_MODULE,
+            },
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D011]: @asset 'orders' is declared in python/nodes/orders/export/node.py; "
+                "an @asset is declared in asset.py",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="an asset in loader.py",
+            repo_files={
+                "sqlbuild_project.toml": _LAYOUT_CONFIG,
+                "python/nodes/orders/export/loader.py": _ASSET_MODULE,
+            },
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D011]: @asset 'orders' is declared in python/nodes/orders/export/loader.py; "
+                "an @asset is declared in asset.py",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="a loaders.py factory returning an asset",
+            repo_files={
+                "sqlbuild_project.toml": _LAYOUT_CONFIG,
+                "python/nodes/orders/export/loaders.py": (
+                    "from sqlbuild.assets import asset\n"
+                    "from sqlbuild.factories import factory\n\n\n"
+                    "@factory\n"
+                    "def order_nodes():\n"
+                    "    @asset(name='orders')\n"
+                    "    def orders(ctx):\n"
+                    "        '''Test task orders.'''\n        return None\n"
+                    "    return [orders]\n"
+                ),
+            },
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D011]: @factory 'order_nodes' in python/nodes/orders/export/loaders.py "
+                "makes only assets; a factory that makes only assets is declared in assets.py",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="a factory.py making one kind",
+            repo_files={
+                "sqlbuild_project.toml": _LAYOUT_CONFIG,
+                "python/nodes/orders/export/factory.py": (
+                    "from sqlbuild.assets import asset\n"
+                    "from sqlbuild.factories import factory\n\n\n"
+                    "@factory\n"
+                    "def order_nodes():\n"
+                    "    @asset(name='orders')\n"
+                    "    def orders(ctx):\n"
+                    "        '''Test task orders.'''\n        return None\n"
+                    "    return [orders]\n"
+                ),
+            },
+            expected_exit_code=1,
+            expected_stderr_fragments=(
+                "error[D011]: @factory 'order_nodes' in python/nodes/orders/export/factory.py "
+                "makes only assets; a factory that makes only assets is declared in assets.py",
+            ),
+        ),
+        PythonProjectLayoutCompileTestCase(
+            description="kind-named files and checks beside an asset compile",
+            repo_files={
+                "sqlbuild_project.toml": _LAYOUT_CONFIG,
+                "python/nodes/orders/export/asset.py": _ASSET_MODULE,
+                "python/nodes/orders/export/checks.py": (
+                    "from python.nodes.orders.export.asset import orders\n"
+                    "from sqlbuild.checks import check\n\n\n"
+                    "@check(depends_on=orders)\n"
+                    "def orders_ok(ctx):\n"
+                    "    '''Test check orders_ok.'''\n    return ctx.pass_()\n"
+                ),
+            },
+            expected_exit_code=0,
+            expected_stderr_fragments=(),
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_project_layout_when_compiling_then_layout_and_node_file_names_are_checked(
+    test_case: PythonProjectLayoutCompileTestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="python_layout",
+        repo_files=test_case.repo_files,
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "compile"),
+        project_dir=project_dir,
+    )
+
+    assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
+    assert all(fragment in result.stderr for fragment in test_case.expected_stderr_fragments), (
+        result.stderr
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        PythonLayoutBuildTestCase(
+            description="a provider imported by its python.providers path keeps its class identity",
+            repo_files={
+                "sqlbuild_project.toml": (
+                    'name = "provider_identity"\nadapter = "duckdb"\n\n'
+                    '[connection]\ndatabase = ":memory:"\n'
+                ),
+                "python/providers/warehouse/provider.py": (
+                    "from sqlbuild.providers import Provider\n\n\n"
+                    "class Warehouse(Provider):\n"
+                    "    '''Test provider Warehouse.'''\n\n"
+                    "    region: str = 'north'\n"
+                ),
+                "python/nodes/utils/regions.py": (
+                    "from python.providers.warehouse.provider import Warehouse\n\n\n"
+                    "def region_of(warehouse: Warehouse) -> str:\n"
+                    "    return warehouse.region\n"
+                ),
+                "python/nodes/orders/export/asset.py": (
+                    "from python.nodes.utils.regions import region_of\n"
+                    "from python.providers.warehouse.provider import Warehouse\n"
+                    "from sqlbuild.assets import asset\n\n\n"
+                    "@asset\n"
+                    "def orders_export(ctx, warehouse: Warehouse):\n"
+                    "    '''Test task orders_export.'''\n"
+                    "    assert isinstance(warehouse, Warehouse)\n"
+                    "    return ctx.result(payload={'region': region_of(warehouse)})\n"
+                ),
+            },
+            expected_build_fragments=("orders_export", "✓ Completed successfully"),
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_provider_imported_by_path_when_building_then_its_type_check_holds(
+    test_case: PythonLayoutBuildTestCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="provider_identity",
+        repo_files=test_case.repo_files,
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build"),
+        project_dir=project_dir,
     )
 
     output: str = result.stdout + result.stderr

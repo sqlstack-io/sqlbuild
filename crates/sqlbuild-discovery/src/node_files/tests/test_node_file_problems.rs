@@ -26,17 +26,37 @@ fn given_node_modules_when_checking_file_names_then_each_declaration_sits_in_its
         NodeFilesTestCase {
             description: "kind-named files and checks beside a node",
             modules: vec![
-                module("python/nodes/sales/orders/asset.py", &[("orders", "asset")], &[]),
-                module("python/nodes/sales/orders/checks.py", &[("orders_ok", "check")], &[]),
-                module("python/nodes/raw/load/loaders.py", &[], &[("make", &["loader"])]),
-                module("python/nodes/mix/build/factory.py", &[], &[("make", &["asset", "check"])]),
+                module(
+                    "python/nodes/sales/orders/asset.py",
+                    &[("orders", "asset")],
+                    &[],
+                ),
+                module(
+                    "python/nodes/sales/orders/checks.py",
+                    &[("orders_ok", "check")],
+                    &[],
+                ),
+                module(
+                    "python/nodes/raw/load/loaders.py",
+                    &[],
+                    &[("make", &["loader"])],
+                ),
+                module(
+                    "python/nodes/mix/build/factory.py",
+                    &[],
+                    &[("make", &["asset", "check"])],
+                ),
                 module("python/nodes/sales/helpers.py", &[], &[]),
             ],
             expected: None,
         },
         NodeFilesTestCase {
             description: "an asset in node.py",
-            modules: vec![module("python/nodes/sales/orders/node.py", &[("orders", "asset")], &[])],
+            modules: vec![module(
+                "python/nodes/sales/orders/node.py",
+                &[("orders", "asset")],
+                &[],
+            )],
             expected: Some(
                 "@asset 'orders' is declared in python/nodes/sales/orders/node.py; an @asset is \
                  declared in asset.py",
@@ -44,7 +64,11 @@ fn given_node_modules_when_checking_file_names_then_each_declaration_sits_in_its
         },
         NodeFilesTestCase {
             description: "an asset in loader.py",
-            modules: vec![module("python/nodes/raw/x/loader.py", &[("x", "asset")], &[])],
+            modules: vec![module(
+                "python/nodes/raw/x/loader.py",
+                &[("x", "asset")],
+                &[],
+            )],
             expected: Some(
                 "@asset 'x' is declared in python/nodes/raw/x/loader.py; an @asset is declared in \
                  asset.py",
@@ -52,7 +76,11 @@ fn given_node_modules_when_checking_file_names_then_each_declaration_sits_in_its
         },
         NodeFilesTestCase {
             description: "a loaders.py factory returning an asset",
-            modules: vec![module("python/nodes/raw/x/loaders.py", &[], &[("make", &["asset"])])],
+            modules: vec![module(
+                "python/nodes/raw/x/loaders.py",
+                &[],
+                &[("make", &["asset"])],
+            )],
             expected: Some(
                 "@factory 'make' in python/nodes/raw/x/loaders.py makes only assets; a factory \
                  that makes only assets is declared in assets.py",
@@ -60,7 +88,11 @@ fn given_node_modules_when_checking_file_names_then_each_declaration_sits_in_its
         },
         NodeFilesTestCase {
             description: "a factory.py making one kind",
-            modules: vec![module("python/nodes/raw/x/factory.py", &[], &[("make", &["loader"])])],
+            modules: vec![module(
+                "python/nodes/raw/x/factory.py",
+                &[],
+                &[("make", &["loader"])],
+            )],
             expected: Some(
                 "@factory 'make' in python/nodes/raw/x/factory.py makes only loaders; a factory \
                  that makes only loaders is declared in loaders.py",

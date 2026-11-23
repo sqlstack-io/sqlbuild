@@ -361,7 +361,12 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
 #[test]
 fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_command_line() {
     let resources = [
-        resource("model:stg_orders", &[], &["orders"], Some("sql/models/staging")),
+        resource(
+            "model:stg_orders",
+            &[],
+            &["orders"],
+            Some("sql/models/staging"),
+        ),
         resource(
             "model:orders",
             &["model:stg_orders"],
@@ -397,7 +402,12 @@ fn given_published_python_nodes_when_planned_then_selectors_resolve_as_on_the_co
             &[],
             Some("python/nodes/loaders"),
         ),
-        resource("loader:stage_shipments", &[], &[], Some("python/nodes/loaders")),
+        resource(
+            "loader:stage_shipments",
+            &[],
+            &[],
+            Some("python/nodes/loaders"),
+        ),
     ];
     let jobs: PublishedJobs = PublishedJobs {
         selections: BTreeMap::from([(

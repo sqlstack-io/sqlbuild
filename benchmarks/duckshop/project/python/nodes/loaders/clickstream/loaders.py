@@ -2,10 +2,9 @@
 
 from python.nodes.loaders._registry import load
 
-from sqlbuild.factories import factory
 from sqlbuild.executor.load.models import LoaderContext
+from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
-
 
 
 @factory
@@ -30,5 +29,10 @@ def clickstream_loaders() -> list[object]:
     def clickstream__experiment_assignments(ctx: LoaderContext) -> object:
         return load(ctx, "clickstream__experiment_assignments")
 
-
-    return [clickstream__web_events, clickstream__app_events, clickstream__search_queries, clickstream__email_events, clickstream__experiment_assignments]
+    return [
+        clickstream__web_events,
+        clickstream__app_events,
+        clickstream__search_queries,
+        clickstream__email_events,
+        clickstream__experiment_assignments,
+    ]

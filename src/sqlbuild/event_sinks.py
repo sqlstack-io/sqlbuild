@@ -27,10 +27,10 @@ from sqlbuild.runtime.output_capture.exceptions import (
     CommandOutputValidationError as CommandOutputValidationError,
 )
 from sqlbuild.runtime.output_capture.models import (
-    CommandOutputRecord as CommandOutputRecord,
+    CommandOutputEventSinkDefinition as CommandOutputEventSinkDefinition,
 )
 from sqlbuild.runtime.output_capture.models import (
-    CommandOutputEventSinkDefinition as CommandOutputEventSinkDefinition,
+    CommandOutputRecord as CommandOutputRecord,
 )
 from sqlbuild.runtime.output_capture.types import CommandOutputStream as CommandOutputStream
 

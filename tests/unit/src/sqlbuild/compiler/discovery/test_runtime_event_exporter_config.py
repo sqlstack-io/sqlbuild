@@ -54,7 +54,9 @@ def test_given_global_and_named_filters_when_discovering_then_effective_filter_i
     "test_case",
     (
         LifecycleShutdownTimeoutTestCase("default", "", None),
-        LifecycleShutdownTimeoutTestCase("zero", '[event_sinks.lifecycle]\nshutdown_timeout = "0s"\n', 0),
+        LifecycleShutdownTimeoutTestCase(
+            "zero", '[event_sinks.lifecycle]\nshutdown_timeout = "0s"\n', 0
+        ),
         LifecycleShutdownTimeoutTestCase(
             "seconds", '[event_sinks.lifecycle]\nshutdown_timeout = "30s"\n', 30
         ),

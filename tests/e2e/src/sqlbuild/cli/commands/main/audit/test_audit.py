@@ -195,7 +195,8 @@ def test_given_attached_audit_reads_sibling_model_when_building_and_auditing_the
     )
     audit_path: Path = (
         project_dir
-        / "sql" / "models"
+        / "sql"
+        / "models"
         / "staging"
         / "_sqlbuild"
         / "_audits"

@@ -46,7 +46,9 @@ _HELP: bool = True
         ),
         AuthoredFileFailureTestCase(
             description="a binary value is unsupported at its node",
-            files=(("sql/sources/raw.yml", _SOURCE_HEAD + b"    meta:\n      blob: !!binary aGk=\n"),),
+            files=(
+                ("sql/sources/raw.yml", _SOURCE_HEAD + b"    meta:\n      blob: !!binary aGk=\n"),
+            ),
             expected_error="SourceParseError",
             expected_message=(
                 "{project}/sql/sources/raw.yml uses YAML that SQLBuild does not support at line 4, "

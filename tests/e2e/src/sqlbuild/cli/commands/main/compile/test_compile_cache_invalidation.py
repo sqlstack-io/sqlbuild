@@ -29,7 +29,10 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
         CompileCacheInvalidationTestCase(
             description="model_sql_body_edit",
             edit=lambda root: replace_project_text(
-                root, "sql/models/staging/stg_orders.sql", "  quantity,", "  quantity + 0 AS quantity,"
+                root,
+                "sql/models/staging/stg_orders.sql",
+                "  quantity,",
+                "  quantity + 0 AS quantity,",
             ),
         ),
         CompileCacheInvalidationTestCase(
@@ -44,7 +47,10 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
         CompileCacheInvalidationTestCase(
             description="model_header_syntax_error",
             edit=lambda root: replace_project_text(
-                root, "sql/models/staging/stg_orders.sql", "materialized view,", "materialized view,,(("
+                root,
+                "sql/models/staging/stg_orders.sql",
+                "materialized view,",
+                "materialized view,,((",
             ),
             expected_failure=True,
         ),
@@ -64,7 +70,9 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
         CompileCacheInvalidationTestCase(
             description="model_moved_between_folders",
             edit=lambda root: move_project_file(
-                root, "sql/models/staging/stg_payments.sql", "sql/models/staging/payments/stg_payments.sql"
+                root,
+                "sql/models/staging/stg_payments.sql",
+                "sql/models/staging/payments/stg_payments.sql",
             ),
         ),
         CompileCacheInvalidationTestCase(
@@ -140,7 +148,10 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
         CompileCacheInvalidationTestCase(
             description="enum_member_value_edit",
             edit=lambda root: replace_project_text(
-                root, "sql/models/marts/_sqlbuild/_enums/order_channel.sql", 'WEB "web"', 'WEB "online"'
+                root,
+                "sql/models/marts/_sqlbuild/_enums/order_channel.sql",
+                'WEB "web"',
+                'WEB "online"',
             ),
         ),
         CompileCacheInvalidationTestCase(

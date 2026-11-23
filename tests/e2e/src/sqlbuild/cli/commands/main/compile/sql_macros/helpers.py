@@ -43,7 +43,9 @@ BASE_FILES: dict[str, str] = {
     + "".join(
         f"      - name: {name}\n        type: {data_type}\n" for name, data_type in _SEED_COLUMNS
     ),
-    "sql/enums/order_status.sql": 'ENUM (name order_status, members (OPEN "open", CLOSED "closed"));\n',
+    "sql/enums/order_status.sql": (
+        'ENUM (name order_status, members (OPEN "open", CLOSED "closed"));\n'
+    ),
     "sql/constants/supported_countries.sql": (
         'CONSTANT (name supported_countries, value ["GB", "FR", "HK"]);\n'
     ),

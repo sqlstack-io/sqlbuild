@@ -48,7 +48,8 @@ def discover_runtime_extensions(*, project_dir: Path) -> DiscoveredRuntimeExtens
     unknown_names: frozenset[str] = frozenset(config.named) - declaration_names
     if unknown_names:
         raise ProjectConfigError(
-            "event_sinks.lifecycle.named contains unknown event sink(s): " + ", ".join(sorted(unknown_names))
+            "event_sinks.lifecycle.named contains unknown event sink(s): "
+            + ", ".join(sorted(unknown_names))
         )
     if not declarations and not output_declarations:
         return DiscoveredRuntimeExtensions()

@@ -239,7 +239,9 @@ def test_given_existing_artifacts_when_rules_fail_then_staged_changes_are_not_pu
     assert failed["has_errors"] is True
     changed: Path = compiled / "sql" / "models" / "orders_000.sql"
     assert {path: path.read_bytes() for path in before} == before
-    assert (tmp_path / "target" / "compiled-failed" / "sql" / "models" / "orders_000.sql").read_bytes() == (
+    assert (
+        tmp_path / "target" / "compiled-failed" / "sql" / "models" / "orders_000.sql"
+    ).read_bytes() == (
         b"-- sqb: compile failed for this model; not buildable\n"
         b"-- XSQBRARCH001 at sql/models/orders_000.sql:1:1: Model rejected\n"
         b"SELECT CAST(2 AS INTEGER) AS order_id\n"
@@ -294,7 +296,9 @@ def test_given_leftover_staging_when_compiling_then_only_abandoned_staging_is_re
     assert exit_code == 0
     assert payload["has_errors"] is False
     assert tuple(remaining) == test_case.expected_remaining
-    assert len(list((target / "compiled" / "sql" / "models").glob("*.sql"))) == test_case.model_count
+    assert (
+        len(list((target / "compiled" / "sql" / "models").glob("*.sql"))) == test_case.model_count
+    )
 
 
 @pytest.mark.skipif(

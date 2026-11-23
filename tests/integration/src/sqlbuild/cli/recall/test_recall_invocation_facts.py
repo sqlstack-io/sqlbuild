@@ -84,7 +84,9 @@ def test_given_an_orchestrated_build_when_running_the_documented_queries_then_th
     test_case: DocumentedQueryTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = write_project(tmp_path / "orders_shop", extra_toml=WARNING_AUDITS)
-    _ = (project_dir / "sql" / "models" / "customers.sql").write_text(CUSTOMERS_MODEL, encoding="utf-8")
+    _ = (project_dir / "sql" / "models" / "customers.sql").write_text(
+        CUSTOMERS_MODEL, encoding="utf-8"
+    )
     built: subprocess.CompletedProcess[bytes] = run(
         project_dir, "build", SQLBUILD_INVOCATION_CONTEXT_JSON=ORCHESTRATED_CONTEXT
     )

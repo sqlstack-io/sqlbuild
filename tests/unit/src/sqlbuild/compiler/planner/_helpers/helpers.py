@@ -1310,7 +1310,9 @@ def build_seed_identity_compiled_seed(
         key=CompiledObjectKey(resource_type=CompiledResourceType.SEED, name="orders"),
         deps=(),
         name="orders",
-        seed_file=DiscoveredSeedFile(file_path=file_path, relative_path=Path("sql/seeds/orders.csv")),
+        seed_file=DiscoveredSeedFile(
+            file_path=file_path, relative_path=Path("sql/seeds/orders.csv")
+        ),
         schema_entry=schema_entry,
         schema_file=DiscoveredSchemaFile(
             file_path=file_path.parent / "schema.yml",

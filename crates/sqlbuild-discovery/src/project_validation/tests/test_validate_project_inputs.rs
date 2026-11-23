@@ -133,7 +133,7 @@ fn given_discovered_facts_when_validating_then_reports_python_first_conflict() {
         },
         ValidationTestCase {
             description: "accepts Windows-style model paths that match path defaults",
-            facts: path_default_facts(&["models\\staging\\orders.sql"], &["staging"]),
+            facts: path_default_facts(&["sql\\models\\staging\\orders.sql"], &["staging"]),
             expected_failure: Ok(()),
         },
         ValidationTestCase {

@@ -46,7 +46,9 @@ _ALLOWED_SEED: str = "seeds:\n  - name: allowed_codes\n    description: Test see
             {
                 "sql/audits/generic/code_check.sql": gate_audit(read='__ref("allowed")'),
                 "sql/models/allowed.sql": gate_model(sql="SELECT 'A' AS code"),
-                "sql/models/orders.sql": gate_model(sql="SELECT 'A' AS code", header=_AUDITED_HEADER),
+                "sql/models/orders.sql": gate_model(
+                    sql="SELECT 'A' AS code", header=_AUDITED_HEADER
+                ),
             },
             (("orders", "allowed"),),
         ),
@@ -56,8 +58,12 @@ _ALLOWED_SEED: str = "seeds:\n  - name: allowed_codes\n    description: Test see
                 "sql/audits/generic/code_check.sql": gate_audit(read='__ref("allowed")'),
                 "sql/sources/raw.yml": _SOURCES_WITH_AUDIT,
                 "sql/models/allowed.sql": gate_model(sql="SELECT 'A' AS code"),
-                "sql/models/staged_orders.sql": gate_model(sql='SELECT * FROM __source("raw_orders")'),
-                "sql/models/other_orders.sql": gate_model(sql='SELECT * FROM __source("raw_orders")'),
+                "sql/models/staged_orders.sql": gate_model(
+                    sql='SELECT * FROM __source("raw_orders")'
+                ),
+                "sql/models/other_orders.sql": gate_model(
+                    sql='SELECT * FROM __source("raw_orders")'
+                ),
             },
             (("other_orders", "allowed"), ("staged_orders", "allowed")),
         ),
@@ -107,7 +113,9 @@ def test_given_attached_audit_reading_another_resource_when_compiling_then_it_ad
             "model audit reading a model built from its target",
             {
                 "sql/audits/generic/code_check.sql": gate_audit(read='__ref("orders_mart")'),
-                "sql/models/orders.sql": gate_model(sql="SELECT 'A' AS code", header=_AUDITED_HEADER),
+                "sql/models/orders.sql": gate_model(
+                    sql="SELECT 'A' AS code", header=_AUDITED_HEADER
+                ),
                 "sql/models/orders_mart.sql": gate_model(sql='SELECT * FROM __ref("orders")'),
             },
             (
@@ -121,7 +129,9 @@ def test_given_attached_audit_reading_another_resource_when_compiling_then_it_ad
             {
                 "sql/audits/generic/code_check.sql": gate_audit(read='__ref("staged_orders")'),
                 "sql/sources/raw.yml": _SOURCES_WITH_AUDIT,
-                "sql/models/staged_orders.sql": gate_model(sql='SELECT * FROM __source("raw_orders")'),
+                "sql/models/staged_orders.sql": gate_model(
+                    sql='SELECT * FROM __source("raw_orders")'
+                ),
             },
             (
                 "[P005]",
@@ -135,7 +145,9 @@ def test_given_attached_audit_reading_another_resource_when_compiling_then_it_ad
                 "sql/audits/generic/code_check.sql": gate_audit(read='__ref("coded_orders")'),
                 "sql/seeds/order_codes.yml": _SEED_WITH_AUDIT,
                 "sql/seeds/order_codes.csv": "code\nA\n",
-                "sql/models/coded_orders.sql": gate_model(sql='SELECT * FROM __seed("order_codes")'),
+                "sql/models/coded_orders.sql": gate_model(
+                    sql='SELECT * FROM __seed("order_codes")'
+                ),
             },
             (
                 "[P005]",
@@ -148,7 +160,9 @@ def test_given_attached_audit_reading_another_resource_when_compiling_then_it_ad
             {
                 "sql/audits/generic/code_check.sql": gate_audit(read='__ref("customers")'),
                 "sql/audits/generic/order_check.sql": gate_audit(read='__ref("orders")'),
-                "sql/models/orders.sql": gate_model(sql="SELECT 'A' AS code", header=_AUDITED_HEADER),
+                "sql/models/orders.sql": gate_model(
+                    sql="SELECT 'A' AS code", header=_AUDITED_HEADER
+                ),
                 "sql/models/customers.sql": gate_model(
                     sql="SELECT 'A' AS code", header=_ORDER_CHECK_HEADER
                 ),

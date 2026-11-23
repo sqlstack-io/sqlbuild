@@ -39,9 +39,11 @@ const MIRRORED_ROOTS: [&str; 3] = ["python/nodes", "python/providers", "orchestr
 /// What the test at `path`, such as `tests/python/nodes/orders/test_export.py`, mirrors that the project lacks.
 fn missing_counterpart(path: &str, paths: &BTreeSet<&str>) -> Option<String> {
     let below: &str = path.strip_prefix("tests/")?;
-    let root: &str = MIRRORED_ROOTS
-        .iter()
-        .find(|root| below.strip_prefix(**root).is_some_and(|rest| rest.starts_with('/')))?;
+    let root: &str = MIRRORED_ROOTS.iter().find(|root| {
+        below
+            .strip_prefix(**root)
+            .is_some_and(|rest| rest.starts_with('/'))
+    })?;
     let parts: Vec<&str> = below[root.len() + 1..].split('/').collect();
     let [folders @ .., file] = parts.as_slice() else {
         return None;

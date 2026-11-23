@@ -1,6 +1,5 @@
 //! Custom materialization Python files under materializations/.
 
-use sqlbuild_core::constants::MATERIALIZATIONS_PATH;
 use crate::discovery::_helpers::python_files::imported_modules::{
     ProjectDir, discovered, tuple_of,
 };
@@ -9,6 +8,7 @@ use crate::discovery::main::python_files::provider_usages::provider_usages;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyDict;
+use sqlbuild_core::constants::MATERIALIZATIONS_PATH;
 use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
 use sqlbuild_python_base::records::types::RecordId;

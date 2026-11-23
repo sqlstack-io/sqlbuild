@@ -87,7 +87,8 @@ def attachment_failure_cases() -> tuple[FailureCase, ...]:
             name="model-schema-redeclared-column",
             expected_code="P001",
             expected_message=(
-                "Schema 'order_row' in sql/schemas/orders.sql redeclares inherited column 'ID' from "
+                "Schema 'order_row' in sql/schemas/orders.sql redeclares inherited column "
+                "'ID' from "
                 "sql/schemas/orders.sql:1; column overrides are not supported"
             ),
             files={

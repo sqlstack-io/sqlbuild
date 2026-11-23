@@ -256,6 +256,12 @@ _SQLITE_TOML: str = (
     f'schema = "{SCHEMA}"\n'
 )
 
+_CURRENT_ORDERS_SQL: str = """MODEL (description "Current order state.", materialized table);
+
+SELECT order_id, amount_cents, ordered_at AS updated_at FROM __seed("order_events")
+"""
+
+
 STRATEGY_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _SQLITE_TOML,
     "sql/seeds/order_events.csv": FIRST_EVENTS_CSV,
@@ -303,10 +309,7 @@ GROUP BY 1
 
 SELECT order_id, amount_cents, ordered_at FROM __seed("order_events")
 """,
-    "sql/models/current_orders.sql": """MODEL (description "Current order state.", materialized table);
-
-SELECT order_id, amount_cents, ordered_at AS updated_at FROM __seed("order_events")
-""",
+    "sql/models/current_orders.sql": _CURRENT_ORDERS_SQL,
     "sql/models/order_history.sql": """MODEL (
   description "Order history by update time.",
   materialized snapshot,
@@ -382,6 +385,14 @@ SELECT 1 AS order_id
 }
 
 
+_CUSTOMER_TOTALS_SQL: str = """MODEL (description 'Totals per customer.', materialized table);
+
+SELECT customer_id, SUM(amount) AS total_amount, COUNT(*) AS order_count
+FROM __ref("orders")
+GROUP BY customer_id
+"""
+
+
 SCENARIO_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": _SQLITE_TOML,
     "sql/sources/raw.yml": """sources:
@@ -403,12 +414,7 @@ SCENARIO_PROJECT_FILES: dict[str, str] = {
 
 SELECT id AS order_id, customer_id, amount, ordered_at FROM __source("raw_orders")
 """,
-    "sql/models/customer_totals.sql": """MODEL (description 'Totals per customer.', materialized table);
-
-SELECT customer_id, SUM(amount) AS total_amount, COUNT(*) AS order_count
-FROM __ref("orders")
-GROUP BY customer_id
-""",
+    "sql/models/customer_totals.sql": _CUSTOMER_TOTALS_SQL,
     "sql/models/daily_orders.sql": """MODEL (
   description 'Orders by day, incremental.',
   materialized incremental,
@@ -714,12 +720,15 @@ STAGING_ORDERS_FILES: dict[str, str] = {
 SELECT 1 AS order_id
 """,
 }
-MAIN_STAGING_ORDERS_FILES: dict[str, str] = {
-    "sqlbuild_project.toml": _SCHEMA_PER_MODEL_TOML,
-    "sql/models/staging__orders.sql": """MODEL (description "Orders kept in main.", materialized table);
+_STAGING_ORDERS_SQL: str = """MODEL (description "Orders kept in main.", materialized table);
 
 SELECT 2 AS order_id
-""",
+"""
+
+
+MAIN_STAGING_ORDERS_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": _SCHEMA_PER_MODEL_TOML,
+    "sql/models/staging__orders.sql": _STAGING_ORDERS_SQL,
 }
 
 

@@ -651,7 +651,13 @@ def test_given_every_resource_kind_undescribed_when_compiling_then_one_run_repor
                     1,
                 ),
                 ("P010", "seed 'product_types' has no description", "sql/seeds/products.yml", 2, 1),
-                ("P010", "seed 'product_labels' has no description", "sql/seeds/products.yml", 8, 1),
+                (
+                    "P010",
+                    "seed 'product_labels' has no description",
+                    "sql/seeds/products.yml",
+                    8,
+                    1,
+                ),
                 ("P010", "source 'raw_orders' has no description", "sql/sources/raw.yml", 2, 1),
                 ("P010", "source 'raw_refunds' has no description", "sql/sources/raw.yml", 8, 1),
                 ("P010", "source 'raw_customers' has no description", "sql/sources/raw.yml", 11, 1),
@@ -809,7 +815,9 @@ def test_given_path_default_description_when_compiling_then_every_model_keeps_it
         ),
         FormatDescriptionResolutionE2ECase(
             description="a genuinely missing description is still reported",
-            extra_files=(("sql/models/bare.sql", "MODEL (materialized table);\n\nSELECT 1 AS id\n"),),
+            extra_files=(
+                ("sql/models/bare.sql", "MODEL (materialized table);\n\nSELECT 1 AS id\n"),
+            ),
             expected_returncode=1,
             expected_faults=(("sql/models/bare.sql", "description-present"),),
         ),

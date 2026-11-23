@@ -2,10 +2,9 @@
 
 from python.nodes.loaders._registry import load
 
-from sqlbuild.factories import factory
 from sqlbuild.executor.load.models import LoaderContext
+from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
-
 
 
 @factory
@@ -46,5 +45,14 @@ def fulfilment_loaders() -> list[object]:
     def fulfilment__delivery_exceptions(ctx: LoaderContext) -> object:
         return load(ctx, "fulfilment__delivery_exceptions")
 
-
-    return [fulfilment__shipments, fulfilment__shipment_packages, fulfilment__carrier_webhooks, fulfilment__returns, fulfilment__return_inspections, fulfilment__carrier_rate_cards, fulfilment__delivery_slots, fulfilment__pick_tasks, fulfilment__delivery_exceptions]
+    return [
+        fulfilment__shipments,
+        fulfilment__shipment_packages,
+        fulfilment__carrier_webhooks,
+        fulfilment__returns,
+        fulfilment__return_inspections,
+        fulfilment__carrier_rate_cards,
+        fulfilment__delivery_slots,
+        fulfilment__pick_tasks,
+        fulfilment__delivery_exceptions,
+    ]

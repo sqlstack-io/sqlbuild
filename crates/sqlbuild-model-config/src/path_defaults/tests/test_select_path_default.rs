@@ -21,7 +21,7 @@ fn given_path_default_keys_when_selecting_then_the_python_choice_is_made() {
         },
         SelectTestCase {
             description: "the most literal wildcard wins",
-            model_path: "models\\marts\\finance\\revenue.sql",
+            model_path: "sql\\models\\marts\\finance\\revenue.sql",
             keys: &["**/finance", "marts/*", "marts/**/finance"],
             expected_choice: PathDefaultChoice::Selected(Some("marts/**/finance".to_owned())),
         },
@@ -59,7 +59,7 @@ fn given_path_default_keys_when_selecting_then_the_python_choice_is_made() {
         },
         SelectTestCase {
             description: "a literal prefix outranks a recursive glob on a Windows path",
-            model_path: "models\\commerce\\partner_feed\\staging\\orders.sql",
+            model_path: "sql\\models\\commerce\\partner_feed\\staging\\orders.sql",
             keys: &["commerce/**/staging", "commerce/partner_feed/staging"],
             expected_choice: PathDefaultChoice::Selected(Some(
                 "commerce/partner_feed/staging".to_owned(),

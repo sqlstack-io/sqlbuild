@@ -406,7 +406,9 @@ def test_given_typed_macro_references_and_hook_reads_when_building_then_graph_an
             description="loader literal SQL naming a source fails compile with ctx.source help",
             overrides={
                 "sql/sources/raw.yml": _RAW_SOURCES,
-                "python/nodes/loaders/raw.py": explicit_reference_literal_loader(table="raw_regions"),
+                "python/nodes/loaders/raw.py": explicit_reference_literal_loader(
+                    table="raw_regions"
+                ),
             },
             command=("--no-color", "compile"),
             expected_exit_code=1,
@@ -419,7 +421,9 @@ def test_given_typed_macro_references_and_hook_reads_when_building_then_graph_an
             description="loader literal SQL naming a model fails compile",
             overrides={
                 "sql/sources/raw.yml": _RAW_SOURCES,
-                "python/nodes/loaders/raw.py": explicit_reference_literal_loader(table="stg_customers"),
+                "python/nodes/loaders/raw.py": explicit_reference_literal_loader(
+                    table="stg_customers"
+                ),
             },
             command=("--no-color", "compile"),
             expected_exit_code=1,

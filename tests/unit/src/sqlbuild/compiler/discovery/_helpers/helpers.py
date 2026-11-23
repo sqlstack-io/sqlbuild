@@ -133,9 +133,7 @@ def discover_declaration_file(*, project_dir: Path, relative_path: str, contents
     file_path.parent.mkdir(parents=True, exist_ok=True)
     _ = file_path.write_text(contents, encoding="utf-8")
     role: str = relative_path.removeprefix("sql/").split("/")[0]
-    discovered: tuple[object, ...] = _DECLARATION_FILE_DISCOVERERS[role](
-        project_dir=project_dir
-    )
+    discovered: tuple[object, ...] = _DECLARATION_FILE_DISCOVERERS[role](project_dir=project_dir)
     return discovered[0]
 
 

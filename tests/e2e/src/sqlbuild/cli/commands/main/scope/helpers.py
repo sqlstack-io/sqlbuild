@@ -93,7 +93,9 @@ def write_unicode_macro_project(*, project_dir: Path, macro_names: tuple[str, ..
     macro_source: str = "\n\n".join(
         f"def {name}(expression: str) -> str:\n    return expression\n" for name in macro_names
     )
-    (project_dir / "sql" / "macros" / "python" / "nodes" / "names.py").write_text(macro_source, encoding="utf-8")
+    (project_dir / "sql" / "macros" / "python" / "nodes" / "names.py").write_text(
+        macro_source, encoding="utf-8"
+    )
 
 
 def _write_scope_model(*, model_dir: Path, model_index: int, macro_name: str) -> None:

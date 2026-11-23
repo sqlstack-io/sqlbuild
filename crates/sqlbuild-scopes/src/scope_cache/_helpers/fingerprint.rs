@@ -33,7 +33,9 @@ pub(crate) fn source_role(relative: &str, inputs: &FingerprintInputs) -> &'stati
         [parent, role, ..] if *parent == GLOBAL_ROLE_PARENT => role,
         _ => parts[0],
     };
-    let mut declared: bool = inputs.named_declaration_directories.contains(&role.to_owned());
+    let mut declared: bool = inputs
+        .named_declaration_directories
+        .contains(&role.to_owned());
     for part in &parts {
         declared |= inputs.declaration_directories.contains(&(*part).to_owned());
     }

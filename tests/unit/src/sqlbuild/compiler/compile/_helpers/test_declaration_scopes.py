@@ -176,7 +176,11 @@ def test_given_scoped_declaration_when_compiling_model_then_only_lexically_visib
                 "sql/models/one/_constants/value.sql": "CONSTANT (name value, value 1);",
                 "sql/models/two/orders.sql": 'MODEL (description "Test model orders.");\nSELECT @const("value") AS value',
             },
-            ("known but inaccessible", "sql/models/one/_constants/value.sql", "sql/models/two/orders.sql"),
+            (
+                "known but inaccessible",
+                "sql/models/one/_constants/value.sql",
+                "sql/models/two/orders.sql",
+            ),
         ),
         ScopedDeclarationErrorTestCase(
             "descendant declaration",
@@ -762,7 +766,9 @@ def test_given_disabled_placement_enforcement_when_assembling_then_project_and_w
     (
         ScopedDeclarationCompileTestCase(
             description="inherited enum contract",
-            files={"sql/models/domain/enums/state.sql": "ENUM (name state, members [OPEN, CLOSED]);"},
+            files={
+                "sql/models/domain/enums/state.sql": "ENUM (name state, members [OPEN, CLOSED]);"
+            },
             model_path="sql/models/domain/child/orders.sql",
             model_sql=(
                 "MODEL (description 'Test model orders.', contract enforced, columns (state (type state)));\n"

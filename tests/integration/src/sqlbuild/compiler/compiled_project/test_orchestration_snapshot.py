@@ -124,7 +124,11 @@ _PRICE_MODELS: dict[str, str] = {
                 for path, value in FUNCTION_PROJECT_FILES.items()
                 if path != "sql/enums/status.sql"
             }
-            | {"sql/functions/sql/_enums/status.sql": FUNCTION_PROJECT_FILES["sql/enums/status.sql"]},
+            | {
+                "sql/functions/sql/_enums/status.sql": FUNCTION_PROJECT_FILES[
+                    "sql/enums/status.sql"
+                ]
+            },
             frozenset({"model", "udf", "table_fn"}),
         ),
         SnapshotCatalogTestCase(
@@ -1876,7 +1880,9 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         SnapshotDiscoveryRejectionTestCase(
             description="DuckShop jobs cannot reuse a model name",
             files=duckshop_orchestration("name_collision")
-            | {"sql/models/orders_job.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n"},
+            | {
+                "sql/models/orders_job.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n"
+            },
             expected_error=DiscoveryConflictError,
             expected_message=re.escape(
                 "Project resource name 'orders_job' is declared as both model in "

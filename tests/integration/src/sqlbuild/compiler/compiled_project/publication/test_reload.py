@@ -143,7 +143,9 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             )
             assert current_snapshot(api, test_case.target)["record"] == second["record"]
             _ = staging.write_text(
-                files["sql/models/stg_orders.sql"].replace("CAST(5 AS INTEGER)", "CAST(14 AS INTEGER)")
+                files["sql/models/stg_orders.sql"].replace(
+                    "CAST(5 AS INTEGER)", "CAST(14 AS INTEGER)"
+                )
             )
             recovered: dict[str, Any] = wait_for_generation(api, test_case.target, 3, process, log)
             assert int(compiler_pid.read_text()) == first_interpreter

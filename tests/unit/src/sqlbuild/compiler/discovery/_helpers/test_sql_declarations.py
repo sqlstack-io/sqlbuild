@@ -159,7 +159,9 @@ def test_given_typed_public_constants_when_parsing_then_returns_normalized_value
     declarations: tuple[ConstantDeclaration, ...] = cast(
         DiscoveredConstantFile,
         discover_declaration_file(
-            project_dir=tmp_path, relative_path="sql/constants/domain.sql", contents=test_case.contents
+            project_dir=tmp_path,
+            relative_path="sql/constants/domain.sql",
+            contents=test_case.contents,
         ),
     ).declarations
 
@@ -256,7 +258,9 @@ def test_given_invalid_typed_constant_when_parsing_then_raises_contextual_error(
 ) -> None:
     with pytest.raises(DeclarationParseError, match=test_case.expected_error_fragment):
         discover_declaration_file(
-            project_dir=tmp_path, relative_path="sql/constants/domain.sql", contents=test_case.contents
+            project_dir=tmp_path,
+            relative_path="sql/constants/domain.sql",
+            contents=test_case.contents,
         )
 
 
@@ -377,7 +381,9 @@ def test_given_model_schema_declarations_when_parsing_then_returns_typed_columns
     declarations: tuple[ModelSchemaDeclaration, ...] = cast(
         DiscoveredModelSchemaFile,
         discover_declaration_file(
-            project_dir=tmp_path, relative_path="sql/schemas/orders.sql", contents=test_case.contents
+            project_dir=tmp_path,
+            relative_path="sql/schemas/orders.sql",
+            contents=test_case.contents,
         ),
     ).declarations
 

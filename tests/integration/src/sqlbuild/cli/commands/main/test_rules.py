@@ -210,9 +210,9 @@ _SURFACE_FILES: dict[str, str] = {
     ),
 }
 _SURFACE_STAGING_EDIT: dict[str, str] = {
-    "sql/models/staging/stg_orders.sql": _SURFACE_FILES["sql/models/staging/stg_orders.sql"].replace(
-        "AS order_id, amount,", "AS order_id,\n  amount,"
-    )
+    "sql/models/staging/stg_orders.sql": _SURFACE_FILES[
+        "sql/models/staging/stg_orders.sql"
+    ].replace("AS order_id, amount,", "AS order_id,\n  amount,")
 }
 
 _EARLY_LINT_SLOW_HOOKS: int = 8
@@ -2902,7 +2902,8 @@ def test_given_subject_before_layer_when_running_folder_rule_then_canonical_move
     )
     model: Path = (
         tmp_path
-        / "sql" / "models"
+        / "sql"
+        / "models"
         / "commerce"
         / "intermediate"
         / "payments"
@@ -3381,7 +3382,9 @@ def test_given_star_in_set_operation_branches_when_compiling_then_each_branch_is
         "MODEL (description 'Test model orders.', materialized view);\nSELECT 1 AS order_id\n",
         encoding="utf-8",
     )
-    (tmp_path / "sql" / "models" / "order_ids.sql").write_text(test_case.model_sql, encoding="utf-8")
+    (tmp_path / "sql" / "models" / "order_ids.sql").write_text(
+        test_case.model_sql, encoding="utf-8"
+    )
 
     exit_code: int = main(["--project-dir", str(tmp_path), "compile", "--json", "--no-cache"])
     result: dict[str, object] = json.loads(capsys.readouterr().out)

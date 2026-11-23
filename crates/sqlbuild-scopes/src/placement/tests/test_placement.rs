@@ -184,7 +184,11 @@ fn given_destination_role_layout_when_carrying_declaration_then_its_shape_is_mat
             description: "a direct destination role drops the source group",
             index: grouped_cents_direct_role,
             moves: &[("orders", "sql/models/sales/eu/orders.sql")],
-            expected_relocations: &[(0, "sql/models/sales/_sqlbuild/macros/python/cents.py", false)],
+            expected_relocations: &[(
+                0,
+                "sql/models/sales/_sqlbuild/macros/python/cents.py",
+                false,
+            )],
         },
         CarriedLayoutTestCase {
             description: "moving every user together places the macro once at their new folder",

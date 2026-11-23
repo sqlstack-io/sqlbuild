@@ -182,12 +182,21 @@ def test_given_all_scope_tiers_when_resolving_then_classifies_without_shadow_res
             scope=ScopeKind.INHERITED,
             owner_path=r"models\.\sales\daily\..",
         ),
-        declaration_record(name="local", scope=ScopeKind.LOCAL, owner_path="sql/models/sales/daily"),
         declaration_record(
-            name="_private", scope=ScopeKind.PRIVATE, owner_path="sql/models/sales/daily", owner=target
+            name="local", scope=ScopeKind.LOCAL, owner_path="sql/models/sales/daily"
         ),
-        declaration_record(name="parent_local", scope=ScopeKind.LOCAL, owner_path="sql/models/sales"),
-        declaration_record(name="sibling", scope=ScopeKind.INHERITED, owner_path="sql/models/finance"),
+        declaration_record(
+            name="_private",
+            scope=ScopeKind.PRIVATE,
+            owner_path="sql/models/sales/daily",
+            owner=target,
+        ),
+        declaration_record(
+            name="parent_local", scope=ScopeKind.LOCAL, owner_path="sql/models/sales"
+        ),
+        declaration_record(
+            name="sibling", scope=ScopeKind.INHERITED, owner_path="sql/models/finance"
+        ),
         declaration_record(
             name="descendant", scope=ScopeKind.INHERITED, owner_path="sql/models/sales/daily/child"
         ),
@@ -250,8 +259,12 @@ def test_given_out_of_scope_declarations_when_resolving_then_returns_specific_re
         OwnershipRoot("models", resource_kind=ResourceKind.MODEL),
     )
     declarations: tuple[DeclarationRecord, ...] = (
-        declaration_record(name="parent_local", scope=ScopeKind.LOCAL, owner_path="sql/models/sales"),
-        declaration_record(name="sibling", scope=ScopeKind.INHERITED, owner_path="sql/models/finance"),
+        declaration_record(
+            name="parent_local", scope=ScopeKind.LOCAL, owner_path="sql/models/sales"
+        ),
+        declaration_record(
+            name="sibling", scope=ScopeKind.INHERITED, owner_path="sql/models/finance"
+        ),
         declaration_record(
             name="descendant",
             scope=ScopeKind.INHERITED,

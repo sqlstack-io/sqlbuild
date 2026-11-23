@@ -83,7 +83,9 @@ def test_given_derived_native_facts_when_compiling_then_contract_and_execution_a
 
     assert exit_code == test_case.expected_exit_code
     assert tuple(item["code"] for item in diagnostics) == test_case.expected_diagnostics
-    compiled_sql: str = (tmp_path / "target" / "compiled" / "sql" / "models" / "orders.sql").read_text()
+    compiled_sql: str = (
+        tmp_path / "target" / "compiled" / "sql" / "models" / "orders.sql"
+    ).read_text()
     with duckdb.connect() as connection:
         rows: tuple[tuple[int, ...], ...] = tuple(connection.execute(compiled_sql).fetchall())
     assert rows == test_case.expected_rows
@@ -288,7 +290,9 @@ def test_given_duckdb_keyword_function_when_compiling_then_compiled_sql_executes
 
     assert exit_code == test_case.expected_exit_code
     assert codes == test_case.expected_diagnostics
-    compiled_sql: str = (tmp_path / "target" / "compiled" / "sql" / "models" / "orders.sql").read_text()
+    compiled_sql: str = (
+        tmp_path / "target" / "compiled" / "sql" / "models" / "orders.sql"
+    ).read_text()
     with duckdb.connect() as connection:
         assert len(connection.execute(compiled_sql).fetchall()) == 1
 
@@ -469,7 +473,9 @@ def test_given_bound_wildcard_or_using_join_when_compiling_then_facts_match_exec
     compiled_models: list[dict[str, object]] = cast(list[dict[str, object]], resources["models"])
     lineage: dict[str, object] = cast(dict[str, object], compiled_models[0]["lineage"])
     assert lineage["edge_count"] == test_case.expected_edges
-    sql: str = (tmp_path / "target" / "compiled" / "sql" / "models" / "selected_orders.sql").read_text()
+    sql: str = (
+        tmp_path / "target" / "compiled" / "sql" / "models" / "selected_orders.sql"
+    ).read_text()
     with duckdb.connect() as connection:
         connection.execute(
             "CREATE TABLE orders_input (order_id BIGINT, category VARCHAR, amount DOUBLE)"

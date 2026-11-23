@@ -17,7 +17,8 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
     let python_and_sql: Vec<String> = (0..6)
         .map(|index| format!("sql/models/commerce/_macros/python/normalise/item_{index}.py"))
         .chain(
-            (0..7).map(|index| format!("sql/models/commerce/_macros/sql/normalise/item_{index}.sql")),
+            (0..7)
+                .map(|index| format!("sql/models/commerce/_macros/sql/normalise/item_{index}.sql")),
         )
         .collect();
     let oversized_sql: Vec<String> = (0..11)
@@ -264,7 +265,9 @@ fn given_owner_and_declaration_layouts_when_evaluating_then_returns_expected_fau
         test_types::DomainLayoutTestCase {
             description: "explicit nested domain root resolves",
             code: "SQBRPROJECT201",
-            models: json!([helpers::model("sql/models/commerce/orders/mart/core/model.sql")]),
+            models: json!([helpers::model(
+                "sql/models/commerce/orders/mart/core/model.sql"
+            )]),
             thresholds: json!({}),
             layout: json!({"levels": ["mart"], "domain_roots": ["commerce/orders"]}),
             scope_index: helpers::scope_index(),

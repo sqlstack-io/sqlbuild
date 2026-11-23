@@ -26,7 +26,10 @@ from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
                 "sql/macros/python/nested/__init__.py": "raise RuntimeError('must not load')\n",
                 "sql/macros/python/nested/dates.py": "def current_date(): return 'CURRENT_DATE'\n",
             },
-            expected_relative_paths=("sql/macros/python/nested/dates.py", "sql/macros/python/orders.py"),
+            expected_relative_paths=(
+                "sql/macros/python/nested/dates.py",
+                "sql/macros/python/orders.py",
+            ),
         ),
     ],
     ids=lambda case: case.description,

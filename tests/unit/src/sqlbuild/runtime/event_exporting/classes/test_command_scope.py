@@ -16,8 +16,8 @@ from sqlbuild._native import (
     EventExporterDispatcher,
     EventExportSummary,
 )
-from sqlbuild.providers import Provider
 from sqlbuild.event_sinks import CommandOutputRecord, CommandOutputStream
+from sqlbuild.providers import Provider
 from tests.unit.src.sqlbuild.runtime.event_exporting.classes._test_types import (
     EventExporterTeardownTestCase,
     SharedSinkProviderTestCase,

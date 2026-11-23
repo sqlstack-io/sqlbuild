@@ -304,14 +304,18 @@ def prepare_clickhouse_waffle_shop(
     )
     for model_name in ("dim_customers", "fact_orders", "scenario_order_prices"):
         _alias_qualified_columns(project_dir / "sql" / "models" / "marts" / f"{model_name}.sql")
-    materialization_path: Path = project_dir / "python" / "nodes" / "python" / "materializations" / "partition_tracked.py"
+    materialization_path: Path = (
+        project_dir / "python" / "nodes" / "python" / "materializations" / "partition_tracked.py"
+    )
     materialization_path.write_text(
         materialization_path.read_text(encoding="utf-8").replace(
             "CURRENT_TIMESTAMP", "CURRENT_TIMESTAMP()"
         ),
         encoding="utf-8",
     )
-    time_macros_path: Path = project_dir / "sql" / "models" / "marts" / "_macros" / "python" / "nodes" / "time.py"
+    time_macros_path: Path = (
+        project_dir / "sql" / "models" / "marts" / "_macros" / "python" / "nodes" / "time.py"
+    )
     time_macros_path.write_text(
         time_macros_path.read_text(encoding="utf-8").replace(
             "return f\"DATE_TRUNC('{grain}', {expression})\"",

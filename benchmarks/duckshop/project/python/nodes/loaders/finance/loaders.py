@@ -2,10 +2,9 @@
 
 from python.nodes.loaders._registry import load
 
-from sqlbuild.factories import factory
 from sqlbuild.executor.load.models import LoaderContext
+from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
-
 
 
 @factory
@@ -34,5 +33,11 @@ def finance_loaders() -> list[object]:
     def finance__settlement_reports(ctx: LoaderContext) -> object:
         return load(ctx, "finance__settlement_reports")
 
-
-    return [finance__invoices, finance__ledger_entries, finance__payouts, finance__tax_rates, finance__chargebacks, finance__settlement_reports]
+    return [
+        finance__invoices,
+        finance__ledger_entries,
+        finance__payouts,
+        finance__tax_rates,
+        finance__chargebacks,
+        finance__settlement_reports,
+    ]

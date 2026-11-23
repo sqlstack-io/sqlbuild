@@ -38,8 +38,12 @@ fn given_table_function_calls_when_checking_arity_then_first_mismatch_is_reporte
 
     for test_case in test_cases {
         assert_eq!(
-            table_function_arity_error("Model file sql/models/report.sql", &test_case.calls, &counts)
-                .as_deref(),
+            table_function_arity_error(
+                "Model file sql/models/report.sql",
+                &test_case.calls,
+                &counts
+            )
+            .as_deref(),
             test_case.expected_error,
             "{}",
             test_case.description

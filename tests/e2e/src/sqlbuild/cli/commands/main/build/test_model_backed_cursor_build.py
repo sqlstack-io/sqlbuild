@@ -231,7 +231,13 @@ def test_given_inline_project_when_building_model_backed_cursor_models_then_it_s
         assert tuple(tuple(row) for row in actual_rows) == expected_rows
 
     runtime_sql_paths: tuple[Path, ...] = (
-        project_dir / "target" / "run" / "sql" / "models" / "intermediate" / "order_status_index.sql",
+        project_dir
+        / "target"
+        / "run"
+        / "sql"
+        / "models"
+        / "intermediate"
+        / "order_status_index.sql",
         project_dir / "target" / "run" / "sql" / "models" / "marts" / "hourly_order_activity.sql",
     )
     runtime_sql_path: Path

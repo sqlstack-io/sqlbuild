@@ -921,7 +921,8 @@ def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
         ),
         **duckshop_orchestration("python_node_jobs"),
         "python/nodes/tasks/reports.py": (
-            "from python.nodes.tasks.counts import count_orders\nfrom sqlbuild.assets import asset\n\n\n"
+            "from python.nodes.tasks.counts import count_orders\n"
+            "from sqlbuild.assets import asset\n\n\n"
             "@asset(depends_on=count_orders)\n"
             "def report_order_count(ctx):\n"
             "    '''Test task report_order_count.'''\n"
@@ -1016,7 +1017,9 @@ def prepare_emptied_cursor_project(
     load_empty_cursor_payments(project_dir=project_dir)
     build_empty_cursor_project(project_dir=project_dir)
     execute_empty_cursor_sql(project_dir=project_dir, sql="DELETE FROM main.raw_payments")
-    (project_dir / "sql" / "models" / "daily_revenue.sql").write_text(changed_model_sql, encoding="utf-8")
+    (project_dir / "sql" / "models" / "daily_revenue.sql").write_text(
+        changed_model_sql, encoding="utf-8"
+    )
     return project_dir
 
 

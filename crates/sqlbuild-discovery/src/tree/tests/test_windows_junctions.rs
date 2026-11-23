@@ -5,7 +5,7 @@ use crate::tree::tests::test_types::JunctionWalkTestCase;
 fn given_a_junction_when_walking_then_it_is_walked_like_python_walks_a_directory() {
     let test_cases = [JunctionWalkTestCase {
         description: "a junction is a real directory to Python's os.scandir",
-        expected_paths: &["sql/models/linked/orders.sql"],
+        expected_paths: &["models/linked/orders.sql"],
     }];
     for test_case in test_cases {
         assert_eq!(

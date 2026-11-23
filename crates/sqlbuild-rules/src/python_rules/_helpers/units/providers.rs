@@ -8,16 +8,14 @@ use crate::models::{Fault, PythonSource};
 use crate::python_rules::_helpers::engine::faults::catalogue_fault;
 use crate::python_rules::_helpers::engine::placement::package_anchor;
 use crate::python_rules::_helpers::units::project::{
-    module_below,
-    absolute_module, dotted_names, files_naming, project_modules, rejected_import_faults,
-    unit_fault,
+    absolute_module, dotted_names, files_naming, module_below, project_modules,
+    rejected_import_faults, unit_fault,
 };
 use crate::python_rules::constants::{
     INIT_FILE, ORCHESTRATION_ROOT, PACKAGE_MODULE, PACKAGE_ROOT, PRIVATE_PREFIX, PROVIDER_BASE,
-    PROVIDER_FILE, PROVIDERS_MODULE,
-    PROVIDER_IMPORT_BOUNDARIES_CODE, PROVIDER_LAYOUT_CODE, PROVIDER_MODULE_SHAPE_CODE,
-    PROVIDER_PRIVATE_FOLDERS, PROVIDER_ROLE_FILES, PROVIDER_RULE_CODES, PROVIDERS_ROOT,
-    SHARED_UTILITIES_PACKAGE, STAR_IMPORT,
+    PROVIDER_FILE, PROVIDER_IMPORT_BOUNDARIES_CODE, PROVIDER_LAYOUT_CODE,
+    PROVIDER_MODULE_SHAPE_CODE, PROVIDER_PRIVATE_FOLDERS, PROVIDER_ROLE_FILES, PROVIDER_RULE_CODES,
+    PROVIDERS_MODULE, PROVIDERS_ROOT, SHARED_UTILITIES_PACKAGE, STAR_IMPORT,
 };
 use crate::python_rules::models::ParsedFile;
 
@@ -36,7 +34,8 @@ pub(crate) fn provider_faults(
         return Vec::new();
     }
     let mut faults: Vec<Fault> = provider_layout_faults(sources);
-    let files: Vec<ParsedFile<'_>> = files_naming(sources, (PROVIDERS_ROOT, PROVIDERS_MODULE), python_version);
+    let files: Vec<ParsedFile<'_>> =
+        files_naming(sources, (PROVIDERS_ROOT, PROVIDERS_MODULE), python_version);
     let modules: BTreeSet<String> = project_modules(sources);
     let classes: ProviderClasses = provider_classes(&files, &modules);
     for file in &files {

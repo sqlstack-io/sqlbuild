@@ -53,8 +53,12 @@ fn given_function_references_when_validating_then_first_unresolved_one_is_report
 
     for test_case in test_cases {
         assert_eq!(
-            function_reference_error("sql/functions/sql/lookup.sql", &test_case.references, &known)
-                .as_deref(),
+            function_reference_error(
+                "sql/functions/sql/lookup.sql",
+                &test_case.references,
+                &known
+            )
+            .as_deref(),
             test_case.expected_error,
             "{}",
             test_case.description

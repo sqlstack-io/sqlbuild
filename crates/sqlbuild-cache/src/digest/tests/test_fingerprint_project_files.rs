@@ -38,8 +38,11 @@ fn given_project_edit_when_fingerprinting_then_only_covered_content_changes_it()
         FingerprintProjectFilesTestCase {
             description: "file renamed with the same content",
             edit: |root| {
-                std::fs::rename(root.join("sql/macros/cents.py"), root.join("sql/macros/money.py"))
-                    .expect("renamed");
+                std::fs::rename(
+                    root.join("sql/macros/cents.py"),
+                    root.join("sql/macros/money.py"),
+                )
+                .expect("renamed");
             },
             expected_changed: true,
         },

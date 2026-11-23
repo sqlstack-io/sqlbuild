@@ -102,7 +102,11 @@ def slow_once_sink_source(*, slow_call: int) -> str:
         import time
         from pathlib import Path
 
-        from sqlbuild.event_sinks import LifecycleEvent, lifecycle_event_sink, lifecycle_event_to_json
+        from sqlbuild.event_sinks import (
+            LifecycleEvent,
+            lifecycle_event_sink,
+            lifecycle_event_to_json,
+        )
 
         CALLS: list[int] = []
 

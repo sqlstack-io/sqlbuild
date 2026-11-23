@@ -211,7 +211,9 @@ def write_declarations(out: pathlib.Path) -> None:
                 owners.setdefault(name, set()).add(path.parent)
     keep: dict[pathlib.Path, str] = {}
     for name, folders in owners.items():
-        folder = folders.pop() / "_sqlbuild" / "_enums" if len(folders) == 1 else out / "sql" / "enums"
+        folder = (
+            folders.pop() / "_sqlbuild" / "_enums" if len(folders) == 1 else out / "sql" / "enums"
+        )
         keep[folder / f"{name}.sql"] = types(enums[name].read_text())
     for gone in ("tests", "macros", "rules", "constants", "enums"):
         shutil.rmtree(out / gone, ignore_errors=True)

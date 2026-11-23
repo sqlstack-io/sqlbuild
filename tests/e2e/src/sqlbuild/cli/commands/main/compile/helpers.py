@@ -1888,7 +1888,9 @@ def _scope_single_folder_macros(*, project_dir: Path) -> None:
     assert all(len(folders) == 1 for folders in consumer_folders.values())
     for stem, folders in sorted(consumer_folders.items()):
         (folder,) = folders
-        scoped_dir: Path = project_dir / "sql" / "models" / folder / "_sqlbuild" / "_macros" / "python"
+        scoped_dir: Path = (
+            project_dir / "sql" / "models" / folder / "_sqlbuild" / "_macros" / "python"
+        )
         scoped_dir.mkdir(parents=True, exist_ok=True)
         (macros_dir / f"{stem}.py").rename(scoped_dir / f"{stem}.py")
 

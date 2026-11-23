@@ -95,7 +95,11 @@ fn given_project_module_when_reading_project_closure_then_lists_imported_project
                 ("python/nodes/unused.py", "VALUE = 2\n"),
             ],
             source: "sql/macros/money.py",
-            expected_closure: vec!["sql/macros/_rates.py", "python/__init__.py", "python/nodes/shared.py"],
+            expected_closure: vec![
+                "sql/macros/_rates.py",
+                "python/__init__.py",
+                "python/nodes/shared.py",
+            ],
         },
         ProjectClosureTestCase {
             description: "a module importing nothing local has an empty closure",

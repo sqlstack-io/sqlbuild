@@ -297,7 +297,8 @@ class DiscoveryFeatureWriter:
     def _lifecycle_sink(self) -> None:
         self._features.add("lifecycle_sink")
         self._files["python/event_sinks/lifecycle.py"] = (
-            "from sqlbuild.event_sinks import LifecycleEvent, LifecycleEventKind, lifecycle_event_sink\n"
+            "from sqlbuild.event_sinks import LifecycleEvent, LifecycleEventKind, "
+            "lifecycle_event_sink\n"
             "\n\n"
             "@lifecycle_event_sink(\n"
             "    event_kinds={LifecycleEventKind.RUN, LifecycleEventKind.RESOURCE}\n"
@@ -537,7 +538,13 @@ class DiscoveryFeatureWriter:
         self.expected_error_code = GENERATOR_DBT_REF_ERROR_CODE
         self.succeeding_commands = (PLAN_LABEL,)
         self.config_lines.extend(
-            ['extra_paths = ["dbt"]', "", "[dbt]", 'project_dir = "dbt"', 'target_path = "dbt/artifacts"']
+            [
+                'extra_paths = ["dbt"]',
+                "",
+                "[dbt]",
+                'project_dir = "dbt"',
+                'target_path = "dbt/artifacts"',
+            ]
         )
         self._files["dbt/dbt_project.yml"] = "name: upstream\nversion: '1.0.0'\nprofile: upstream\n"
         self._files["dbt/artifacts/manifest.json"] = GENERATOR_DBT_MANIFEST
@@ -568,9 +575,9 @@ class DiscoveryFeatureWriter:
             ),
         )
         self._files[path] = self._files[path].replace("\n  ", "\n\t").replace("\n", GENERATOR_CRLF)
-        self._files["sql/sources/raw.yml"] = GENERATOR_BOM + self._files["sql/sources/raw.yml"].replace(
-            "\n", GENERATOR_CRLF
-        )
+        self._files["sql/sources/raw.yml"] = GENERATOR_BOM + self._files[
+            "sql/sources/raw.yml"
+        ].replace("\n", GENERATOR_CRLF)
 
 
 def feature_blocks_for_seed(*, seed: int, rng: random.Random) -> tuple[str, ...]:

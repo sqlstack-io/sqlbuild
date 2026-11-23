@@ -128,7 +128,10 @@ fn shared_cents(cents_path: &str, labels_path: Option<&str>) -> PlacementIndex {
 
 /// A grouped `cents` and an empty descendant-public role.
 pub(super) fn grouped_cents_empty_role() -> PlacementIndex {
-    shared_cents("sql/models/sales/_sqlbuild/_macros/python/money/cents.py", None)
+    shared_cents(
+        "sql/models/sales/_sqlbuild/_macros/python/money/cents.py",
+        None,
+    )
 }
 
 /// A grouped `cents` and a descendant-public role keeping its files in groups.

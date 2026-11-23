@@ -1531,7 +1531,9 @@ def test_given_bigquery_waffle_shop_model_when_building_then_portable_sql_succee
 
         assert result.returncode == test_case.expected_return_code, result.stdout + result.stderr
         compiled_files: tuple[Path, ...] = tuple(
-            (project_dir / "target" / "run" / "sql" / "models").glob(f"**/{test_case.model_name}.sql")
+            (project_dir / "target" / "run" / "sql" / "models").glob(
+                f"**/{test_case.model_name}.sql"
+            )
         )
         assert len(compiled_files) == 1
         assert test_case.expected_sql_fragment in compiled_files[0].read_text(encoding="utf-8")

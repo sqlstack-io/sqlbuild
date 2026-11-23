@@ -15,7 +15,7 @@ fn link(project: &Path, (link, target): (&str, &str)) {
     std::os::unix::fs::symlink(project.join(target), project.join(link)).expect("symlink");
 }
 
-/// Build the case's project and glob `sql/models/` for its suffix.
+/// Build the case's project and glob `models/` for its suffix.
 pub(super) fn globbed_paths(test_case: &GlobTestCase) -> Vec<String> {
     let project = tempfile::tempdir().expect("temporary project");
     test_case
@@ -76,15 +76,15 @@ pub(super) fn undecodable_walk(
     (shown, failures, contents)
 }
 
-/// Walk `sql/models/` through a junction `sql/models/linked` to a directory holding `orders.sql`.
+/// Walk `models/` through a junction `models/linked` to a directory holding `orders.sql`.
 #[cfg(windows)]
 pub(super) fn junction_walk() -> Vec<String> {
     let project = tempfile::tempdir().expect("temporary project");
     let target = project.path().join("elsewhere");
     fs::create_dir_all(&target).expect("target directory");
     fs::write(target.join("orders.sql"), "MODEL ();\nSELECT 1").expect("file");
-    fs::create_dir_all(project.path().join("sql/models")).expect("models directory");
-    junction::create(&target, project.path().join("sql/models").join("linked")).expect("junction");
+    fs::create_dir_all(project.path().join("models")).expect("models directory");
+    junction::create(&target, project.path().join("models").join("linked")).expect("junction");
     rglob(&ProjectTree::new(project.path()), "models", |entry| {
         entry.name.ends_with(".sql")
     })
@@ -108,7 +108,7 @@ pub(super) fn wide_name_walk(
 ) -> (Vec<String>, Vec<bool>, Vec<String>) {
     use std::os::windows::ffi::OsStringExt;
     let project = tempfile::tempdir().expect("temporary project");
-    let models = project.path().join("sql/models");
+    let models = project.path().join("models");
     fs::create_dir_all(&models).expect("models directory");
     for (index, name) in test_case.names.iter().enumerate() {
         fs::write(

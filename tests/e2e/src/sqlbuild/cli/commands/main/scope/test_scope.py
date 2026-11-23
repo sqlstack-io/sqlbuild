@@ -47,7 +47,9 @@ def test_given_minimal_project_when_running_scope_aliases_then_outputs_are_offli
         alias="sqb", project_dir=project_dir, args=("--at", "sql/models/new/")
     )
     (project_dir / "sql" / "macros" / "python").mkdir(parents=True)
-    (project_dir / "sql" / "macros" / "python" / "nodes" / "broken.py").write_text("def broken(:\n", encoding="utf-8")
+    (project_dir / "sql" / "macros" / "python" / "nodes" / "broken.py").write_text(
+        "def broken(:\n", encoding="utf-8"
+    )
     broken: subprocess.CompletedProcess[str] = run_scope_alias(
         alias="sqb", project_dir=project_dir, args=("model:orders", "--json", "--no-cache")
     )

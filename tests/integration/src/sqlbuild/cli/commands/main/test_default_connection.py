@@ -288,7 +288,9 @@ def test_given_freshness_without_strategy_or_type_when_observing_then_both_are_i
 ) -> None:
     write_default_connection_project(project_dir=tmp_path, project_toml=_ONE_CONNECTION_PROJECT)
     (tmp_path / "sql" / "sources").mkdir()
-    _ = (tmp_path / "sql" / "sources" / "raw.yml").write_text(test_case.sources_yaml, encoding="utf-8")
+    _ = (tmp_path / "sql" / "sources" / "raw.yml").write_text(
+        test_case.sources_yaml, encoding="utf-8"
+    )
     execute_duckdb_sql(
         db_path=tmp_path / "shop.duckdb",
         sql=(

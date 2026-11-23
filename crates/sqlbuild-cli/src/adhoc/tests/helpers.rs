@@ -31,7 +31,12 @@ pub(super) fn owned_plan(
 pub(super) fn orders_publication()
 -> std::sync::Arc<dyn sqlbuild_orchestration::runs::types::PreparedPublication> {
     let resources = vec![
-        resource("model:stg_orders", &[], &["orders"], Some("sql/models/staging")),
+        resource(
+            "model:stg_orders",
+            &[],
+            &["orders"],
+            Some("sql/models/staging"),
+        ),
         resource(
             "model:orders",
             &["model:stg_orders"],
@@ -67,7 +72,12 @@ pub(super) fn orders_publication()
             &[],
             Some("python/nodes/loaders"),
         ),
-        resource("loader:stage_shipments", &[], &[], Some("python/nodes/loaders")),
+        resource(
+            "loader:stage_shipments",
+            &[],
+            &[],
+            Some("python/nodes/loaders"),
+        ),
     ];
     let jobs = sqlbuild_orchestration::runs::models::PublishedJobs {
         selections: std::collections::BTreeMap::from([(

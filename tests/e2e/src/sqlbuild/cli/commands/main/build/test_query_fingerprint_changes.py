@@ -65,7 +65,11 @@ _PROJECT_FILES: dict[str, str] = {
             description="comment and keyword case edits are unchanged",
             edits=(
                 ("sql/models/stg_orders.sql", "SELECT id", "-- Staged orders.\nselect id"),
-                ("sql/functions/sql/is_large_order.sql", "amount_cents > 100", "amount_cents  >  100"),
+                (
+                    "sql/functions/sql/is_large_order.sql",
+                    "amount_cents > 100",
+                    "amount_cents  >  100",
+                ),
             ),
             format_flags=("--check",),
             expected_format_summary="3 files checked, 3 changed",

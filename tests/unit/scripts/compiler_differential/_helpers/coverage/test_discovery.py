@@ -282,7 +282,9 @@ def test_given_discovered_project_inputs_when_listing_required_kinds_then_collec
         CaptureProblemsTestCase(
             description="sound_capture",
             capture=empty_inputs_capture(
-                asset_functions=[{"function": {"__callable__": "python.nodes.assets.orders:export"}}]
+                asset_functions=[
+                    {"function": {"__callable__": "python.nodes.assets.orders:export"}}
+                ]
             ),
             expected_problem_count=0,
         ),

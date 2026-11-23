@@ -142,7 +142,9 @@ def test_given_an_interactive_adapter_when_developing_then_sign_in_happens_once_
             "sqlbuild_project.toml": DEVELOPMENT_PROJECT.replace(
                 'adapter = "duckdb"', 'adapter = "duckdb_sign_in"'
             ),
-            "python/adapters/duckdb_sign_in.py": SIGN_IN_ADAPTER.replace("READ_CODE", test_case.read_code),
+            "python/adapters/duckdb_sign_in.py": SIGN_IN_ADAPTER.replace(
+                "READ_CODE", test_case.read_code
+            ),
         },
     )
     environment: dict[str, str] = development_environment(

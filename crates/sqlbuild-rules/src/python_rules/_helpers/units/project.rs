@@ -20,8 +20,7 @@ use crate::python_rules::_helpers::units::nodes::declaration_faults;
 use crate::python_rules::constants::{
     CHECK_KIND, FACTORY_DECORATORS, INIT_FILE, MIN_UNIT_DEPTH, NODE_KIND_DIRECTORIES, NODE_KINDS,
     NODE_MODULES, PACKAGE_MODULE, PACKAGE_ROOT, ROLE_DIRECTORIES, SHARED_UTILITIES_PACKAGE,
-    UNIT_CHECKS_FILE, UNIT_DECLARATION_FILES,
-    UNIT_RULE_CODES,
+    UNIT_CHECKS_FILE, UNIT_DECLARATION_FILES, UNIT_RULE_CODES,
 };
 use crate::python_rules::models::{ParsedFile, UnitFile, UnitProject};
 

@@ -5,7 +5,16 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from functools import lru_cache
 
-from python.nodes.loaders._core import ChangeLog, at, chance, emit, in_zone, random_instant, rng, weighted
+from python.nodes.loaders._core import (
+    ChangeLog,
+    at,
+    chance,
+    emit,
+    in_zone,
+    random_instant,
+    rng,
+    weighted,
+)
 from python.nodes.loaders._world import World, build_world
 
 Rows = list[dict[str, object]]

@@ -93,7 +93,9 @@ def write_staging_directory(*, target_dir: Path, name: str) -> Path:
 
     directory: Path = target_dir / name
     (directory / "compiled" / "sql" / "models").mkdir(parents=True)
-    (directory / "compiled" / "sql" / "models" / "orders.sql").write_text("SELECT 1\n", encoding="utf-8")
+    (directory / "compiled" / "sql" / "models" / "orders.sql").write_text(
+        "SELECT 1\n", encoding="utf-8"
+    )
     return directory
 
 
@@ -552,7 +554,9 @@ def write_dropped_relation_project(
         "        type: VARCHAR\n",
         encoding="utf-8",
     )
-    _ = (project_dir / "sql" / "models" / f"{model_name}.sql").write_text(model_sql, encoding="utf-8")
+    _ = (project_dir / "sql" / "models" / f"{model_name}.sql").write_text(
+        model_sql, encoding="utf-8"
+    )
     db_path: Path = project_dir / "orders.duckdb"
     execute_duckdb_sql(
         db_path=db_path,
@@ -1235,7 +1239,9 @@ def write_project_scratch_rules(project_dir: Path) -> None:
                 "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n"
             ),
             "sql/models/orders.sql": 'MODEL (description "Orders");\nSELECT 1 AS order_id\n',
-            "sql/models/customers.sql": ('MODEL (description "Customers");\nSELECT 1 AS customer_id\n'),
+            "sql/models/customers.sql": (
+                'MODEL (description "Customers");\nSELECT 1 AS customer_id\n'
+            ),
             "rules/scratch.py": PROJECT_SCRATCH_RULES,
         },
     )

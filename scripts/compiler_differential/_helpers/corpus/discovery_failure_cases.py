@@ -219,7 +219,11 @@ def _layout_cases() -> tuple[FailureCase, ...]:
             ("declaration-group-unsupported-entry", "sql/models/marts/_sqlbuild/notes.txt", ""),
             ("named-role-nested-declaration", "sql/schemas/enums/order_status.sql", ""),
             ("audit-role-unsupported-entry", "sql/audits/at_least.sql", ""),
-            ("local-singular-audit", "sql/models/marts/_sqlbuild/_audits/singular/at_least.sql", ""),
+            (
+                "local-singular-audit",
+                "sql/models/marts/_sqlbuild/_audits/singular/at_least.sql",
+                "",
+            ),
             ("hook-role-unsupported-entry", "sql/models/marts/_sqlbuild/hooks/notes.sql", ""),
         )
     )
@@ -333,7 +337,9 @@ def _conflict_cases() -> tuple[FailureCase, ...]:
             name="resource-name-collision",
             expected_code="D007",
             files={
-                "sql/seeds/stg_orders.yml": _SEED_DECLARATION.replace("order_channels", "stg_orders"),
+                "sql/seeds/stg_orders.yml": _SEED_DECLARATION.replace(
+                    "order_channels", "stg_orders"
+                ),
                 "sql/seeds/stg_orders.csv": "id,label\n1,web\n",
             },
         ),
@@ -376,7 +382,10 @@ def _python_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="python-node-import-error",
             expected_code="D011",
-            files={"python/nodes/tasks/exports/asset.py": "import missing_orders_client\n" + _TASK_MODULE},
+            files={
+                "python/nodes/tasks/exports/asset.py": "import missing_orders_client\n"
+                + _TASK_MODULE
+            },
         ),
         failure_case(
             name="duplicate-hook",
@@ -451,7 +460,9 @@ def _python_cases() -> tuple[FailureCase, ...]:
             expected_code="D015",
             files={
                 "python/event_sinks/output.py": (
-                    "from sqlbuild.event_sinks import CommandOutputRecord, command_output_event_sink\n\n\n"
+                    "from sqlbuild.event_sinks import CommandOutputRecord, "
+                    "command_output_event_sink\n"
+                    "\n\n"
                     '@command_output_event_sink(streams={"stdout"})\n'
                     "def publish_output(record: CommandOutputRecord, destination_client) -> None:\n"
                     "    return None\n"

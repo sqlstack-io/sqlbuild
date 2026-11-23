@@ -2,10 +2,9 @@
 
 from python.nodes.loaders._registry import load
 
-from sqlbuild.factories import factory
 from sqlbuild.executor.load.models import LoaderContext
+from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
-
 
 
 @factory
@@ -90,5 +89,25 @@ def storefront_loaders() -> list[object]:
     def storefront__store_credit_ledger(ctx: LoaderContext) -> object:
         return load(ctx, "storefront__store_credit_ledger")
 
-
-    return [storefront__customers, storefront__customer_addresses, storefront__customer_consents, storefront__loyalty_accounts, storefront__loyalty_ledger, storefront__wishlists, storefront__gift_cards, storefront__gift_card_transactions, storefront__orders, storefront__order_lines, storefront__order_status_events, storefront__payments, storefront__refunds, storefront__promotions, storefront__promotion_redemptions, storefront__carts, storefront__reviews, storefront__subscriptions, storefront__subscription_events, storefront__store_credit_ledger]
+    return [
+        storefront__customers,
+        storefront__customer_addresses,
+        storefront__customer_consents,
+        storefront__loyalty_accounts,
+        storefront__loyalty_ledger,
+        storefront__wishlists,
+        storefront__gift_cards,
+        storefront__gift_card_transactions,
+        storefront__orders,
+        storefront__order_lines,
+        storefront__order_status_events,
+        storefront__payments,
+        storefront__refunds,
+        storefront__promotions,
+        storefront__promotion_redemptions,
+        storefront__carts,
+        storefront__reviews,
+        storefront__subscriptions,
+        storefront__subscription_events,
+        storefront__store_credit_ledger,
+    ]

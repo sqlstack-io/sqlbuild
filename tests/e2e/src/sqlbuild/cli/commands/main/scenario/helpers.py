@@ -398,7 +398,8 @@ def maybe_corrupt_scenario_snapshot_jsonl(
             / "tests"
             / "_scenario_snapshots"
             / scenario_name
-            / "sql" / "sources"
+            / "sql"
+            / "sources"
             / "raw_orders.jsonl"
         )
         jsonl_path.write_text('{"id": 1, "amount": 10}\nnot-json\n', encoding="utf-8")

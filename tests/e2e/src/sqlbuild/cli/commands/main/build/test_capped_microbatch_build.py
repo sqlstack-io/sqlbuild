@@ -301,9 +301,9 @@ def test_given_cap_from_end_watermark_jump_when_rebuilding_then_producer_leaves_
     tmp_path: Path, test_case: CappedMicrobatchScenarioE2ETestCase
 ) -> None:
     project_files: dict[str, str] = capped_microbatch_project_files(limit_action="cap_from_end")
-    project_files["sql/models/capped_events.sql"] = project_files["sql/models/capped_events.sql"].replace(
-        "cursor_end '2026-01-06'", "cursor_end '2026-01-12'"
-    )
+    project_files["sql/models/capped_events.sql"] = project_files[
+        "sql/models/capped_events.sql"
+    ].replace("cursor_end '2026-01-06'", "cursor_end '2026-01-12'")
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,
         project_name="cap_from_end_watermark_jump",

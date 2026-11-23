@@ -1,6 +1,7 @@
 """Write each shipped order as one carrier line."""
 
 from python.nodes.utils.currency import amounts
+
 from sqlbuild.assets import AssetContext
 from sqlbuild.executor.python_nodes.models import PythonNodeResult
 

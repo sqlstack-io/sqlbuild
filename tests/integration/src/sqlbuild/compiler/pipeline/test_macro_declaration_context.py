@@ -420,7 +420,9 @@ def test_given_macro_context_declarations_when_compiling_resources_then_all_expa
             description="unknown constant reports visible alternatives",
             project_files={
                 "sqlbuild_project.toml": 'name = "demo"\nadapter = "duckdb"\n',
-                "sql/models/_constants/policy.sql": ("CONSTANT (name minimum_quantity, value 2);\n"),
+                "sql/models/_constants/policy.sql": (
+                    "CONSTANT (name minimum_quantity, value 2);\n"
+                ),
                 "sql/models/_macros/python/policy.py": (
                     "def missing_quantity(ctx) -> str:\n"
                     "    return ctx.render_constant('maximum_quantity')\n"

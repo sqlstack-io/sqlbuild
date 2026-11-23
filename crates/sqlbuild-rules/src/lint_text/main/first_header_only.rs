@@ -18,7 +18,7 @@ pub fn first_header_only(relative_parts: &[String]) -> bool {
     let rest: &[String] = &relative_parts[MODELS_DIRECTORY.len()..];
     let folders: &[String] = rest.split_last().map_or(&[], |(_, folders)| folders);
     !folders.iter().any(|folder| {
-            folder == DECLARATION_GROUP_DIRECTORY
-                || SCOPED_DECLARATION_DIRECTORIES.contains(&folder.as_str())
-        })
+        folder == DECLARATION_GROUP_DIRECTORY
+            || SCOPED_DECLARATION_DIRECTORIES.contains(&folder.as_str())
+    })
 }

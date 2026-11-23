@@ -297,7 +297,9 @@ def test_given_sink_slow_once_when_building_then_later_and_outcome_events_still_
         repo_files={
             "sqlbuild_project.toml": delivery_project_toml(lifecycle_config=""),
             **delivery_model_files(),
-            "python/event_sinks/orders_events.py": slow_once_sink_source(slow_call=test_case.slow_call),
+            "python/event_sinks/orders_events.py": slow_once_sink_source(
+                slow_call=test_case.slow_call
+            ),
         },
     )
 
