@@ -23,12 +23,14 @@
 	import { formatNodeCounts, isActiveRun, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
 	import { kindLine, shortName } from '$lib/build-area/labels';
 	import { planHref } from '$lib/run/command';
-	import { CONCURRENCY_DOCS, formatCost, narrowingText, onFailureText, overlapHelp, overlapWhileRunning, poolText, runConcurrencyText, shortRunId } from '$lib/operate/labels';
+	import { CONCURRENCY_DOCS, formatCost, narrowingText, onFailureText, overlapHelp, overlapPlain, poolText, runConcurrencyHelp, shortRunId } from '$lib/operate/labels';
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import MemberGraph from '$lib/lineage/member-graph.svelte';
 	import { memberLinks, publishedLinks, waitReasons, type MemberInfo, type MemberSelection } from '$lib/lineage/member-graph';
 	import InspectorHead from '$lib/components/lineage/inspector-head.svelte';
 	import InspectorSection from '$lib/components/lineage/inspector-section.svelte';
+	import HelpTip from '$lib/components/help-tip.svelte';
+	import KeyValues from '$lib/components/platform/key-values.svelte';
 	import OutcomeStrip from '$lib/components/build-area/outcome-strip.svelte';
 	import { formatMs } from '$lib/build-area/labels';
 
@@ -308,35 +310,36 @@
 								{/if}
 							</dl>
 						</InspectorSection>
-						<!-- Concurrency as plain facts: models at once inside a run, write claims, overlap and pools. -->
+						<!-- Concurrency as facts, each explained in a help tip: nodes at once, shared tables, overlap and pools. -->
 						<InspectorSection title="Concurrency">
+							{#snippet meta()}<HelpTip text="How this job's runs share the warehouse with other runs." docs={CONCURRENCY_DOCS} label="How concurrency works" />{/snippet}
 							{@const resolved = def.resolvedConcurrency}
-							<ul class="concurrency">
-								{#if resolved}
-									<li>{runConcurrencyText(resolved.limit, def.kind)}</li>
-								{/if}
-								<li>Never alongside runs writing the same tables <span class="muted">(automatic)</span></li>
-								{#if def.overlap}
-									<li title="{overlapHelp[def.overlap]} (overlap = {def.overlap})">If triggered while running: {overlapWhileRunning[def.overlap]}</li>
-								{/if}
-								{#if !pools.length}
-									<li>Pools: none</li>
-								{:else}
-									{#each pools as use (use.pool)}
-										{@const text = poolText(use)}
-										{@const holders = holdersOf(use.pool)}
-										<li class="pool" class:clamped={text.clamped}>
-											<span
-												>{#if text.clamped}<TriangleAlertIcon size={12} class="inline-icon" />{/if}{text.text}{#if text.detail}&nbsp;<span class:muted={!text.clamped}>({text.detail})</span>{/if}{#if text.shared.length}, shared with {#each text.shared as other, i (other)}{i ? ', ' : ''}<a href={to(`/jobs/${other}`)}>{other}</a>{/each}{#if text.more}&nbsp;+{text.more} more{/if}{/if}</span
-											>
-											{#if holders.length}
-												<span class="muted">Running now: {#each holders as h, i (h)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${h}`)} title={h}>{shortRunId(h)}</a>{/each}</span>
-											{/if}
-										</li>
-									{/each}
-								{/if}
-							</ul>
-							<a class="docs" href={CONCURRENCY_DOCS} target="_blank" rel="noreferrer">How concurrency works ↗</a>
+							<div class="concurrency">
+								{#snippet poolList()}
+									<ul class="pools">
+										{#each pools as use (use.pool)}
+											{@const text = poolText(use)}
+											{@const holders = holdersOf(use.pool)}
+											<li class="pool" class:clamped={text.clamped}>
+												<span
+													>{#if text.clamped}<TriangleAlertIcon size={12} class="inline-icon" />{/if}{text.text}{#if text.detail}&nbsp;<span class:muted={!text.clamped}>({text.detail})</span>{/if}{#if text.shared.length}, shared with {#each text.shared as other, i (other)}{i ? ', ' : ''}<a href={to(`/jobs/${other}`)}>{other}</a>{/each}{#if text.more}&nbsp;+{text.more} more{/if}{/if}</span
+												>
+												{#if holders.length}
+													<span class="muted">Running now: {#each holders as h, i (h)}{i ? ', ' : ''}<a class="mono" href={to(`/runs/${h}`)} title={h}>{shortRunId(h)}</a>{/each}</span>
+												{/if}
+											</li>
+										{/each}
+									</ul>
+								{/snippet}
+								<KeyValues
+									rows={[
+										...(resolved ? [{ label: 'Nodes at once', value: String(resolved.limit), help: runConcurrencyHelp(def.kind) }] : []),
+										{ label: 'Shared tables', value: 'Exclusive · automatic', help: 'Never runs alongside runs writing the same tables.' },
+										...(def.overlap ? [{ label: 'When already running', value: overlapPlain[def.overlap], title: `${overlapHelp[def.overlap]} (overlap = ${def.overlap})` }] : []),
+										pools.length ? { label: 'Pools', content: poolList } : { label: 'Pools', value: 'None' }
+									]}
+								/>
+							</div>
 						</InspectorSection>
 						{#if hasSettings}
 							<InspectorSection title="Settings">
@@ -531,47 +534,43 @@
 	.picked li {
 		padding: 2px 0;
 	}
-	/* The Concurrency panel: one plain fact per line, any detail quieter beside it. */
-	.concurrency {
+	/* The Concurrency panel: key-value facts; pools list one per line, any detail quieter beside it. */
+	.concurrency :global(dd) {
+		white-space: normal;
+	}
+	.pools {
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
 		margin: 0;
 		padding: 0;
 		list-style: none;
-		font-size: 12.5px;
 		line-height: 1.4;
 	}
-	.concurrency .muted {
+	.pools .muted {
 		color: var(--muted-foreground);
 	}
-	.concurrency .pool {
+	.pools .pool {
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
 	}
 	/* A pool this server caps below what the job asks: it takes the whole pool, so it runs alone there. */
-	.concurrency .pool.clamped {
+	.pools .pool.clamped {
 		padding: 4px 8px;
 		border-left: 3px solid var(--sb-warning);
 		border-radius: 2px;
 		background: color-mix(in srgb, var(--sb-warning) 10%, transparent);
 		color: var(--sb-warning);
 	}
-	.concurrency .pool.clamped a {
+	.pools .pool.clamped a {
 		color: inherit;
 		text-decoration: underline;
 	}
-	.concurrency :global(.inline-icon) {
+	.pools :global(.inline-icon) {
 		display: inline;
 		margin-right: 4px;
 		vertical-align: -1px;
-	}
-	.docs {
-		display: inline-block;
-		margin-top: 10px;
-		color: var(--primary);
-		font-size: 12px;
 	}
 	code,
 	.mono {

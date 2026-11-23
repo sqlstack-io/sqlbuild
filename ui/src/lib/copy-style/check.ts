@@ -69,6 +69,21 @@ const lineOf = (source: string, index: number) => source.slice(0, index).split('
 const MAP = /export const (\w+)\s*:\s*Record<[^>]+,\s*string>\s*=\s*\{([\s\S]*?)\n\};/g;
 const SKIP_MAP = /(Help|Hint|Technical|Tone)$/;
 const STRING = /(['"`])((?:\\.|(?!\1)[^\\\n])*)\1/g;
+/** Exported functions in label files; those named for explanations or tooltips are skipped. */
+const FUNCTION = /export function (\w+)\([^)]*\)[^{]*\{/g;
+const SKIP_FUNCTION = /(Help|Hint|Technical|Tone|Title|Explanation|Tooltip)$/;
+/** A string a function returns, directly or as a branch of a conditional. */
+const RETURNED = /(?:\breturn|[?:])\s*(['"`])((?:\\.|(?!\1)[^\\\n])*)\1/g;
+
+/** The body of the function whose `{` ends just before `start`, and where it starts. */
+function functionBody(source: string, start: number): { text: string; start: number } {
+	let depth = 1;
+	for (let i = start; i < source.length; i++) {
+		if (source[i] === '{') depth++;
+		else if (source[i] === '}' && !--depth) return { text: source.slice(start, i), start };
+	}
+	return { text: source.slice(start), start };
+}
 
 /** The copy sites in one file. `labelFile` turns on label-map scanning for labels.ts-style files. */
 export function findCopy(file: string, source: string, labelFile = false): CopySite[] {
@@ -79,6 +94,12 @@ export function findCopy(file: string, source: string, labelFile = false): CopyS
 			if (SKIP_MAP.test(m[1])) continue;
 			const bodyStart = m.index + m[0].indexOf(m[2]);
 			for (const v of m[2].matchAll(/:\s*(['"`])((?:\\.|(?!\1)[^\\\n])*)\1/g)) add(bodyStart + v.index, 'value', v[2]);
+		}
+		// Values made by functions: each string an exported function returns, except explanations.
+		for (const m of source.matchAll(FUNCTION)) {
+			if (SKIP_FUNCTION.test(m[1])) continue;
+			const body = functionBody(source, m.index + m[0].length);
+			for (const r of body.text.matchAll(RETURNED)) add(body.start + r.index, 'value', r[2]);
 		}
 	}
 	if (!file.endsWith('.svelte')) return sites;
@@ -97,6 +118,11 @@ export function findCopy(file: string, source: string, labelFile = false): CopyS
 		else for (const s of m[2].matchAll(STRING)) add(m.index, 'empty', s[2]);
 	}
 	for (const m of source.matchAll(/<StatusLabel\b[^>]*?\blabel="([^"]*)"/g)) add(m.index, 'value', m[1]);
+	for (const m of source.matchAll(/<InspectorSection\b[^>]*?\btitle="([^"]*)"/g)) add(m.index, 'label', m[1]);
+	// List items written into the markup are facts, like values: one text per `{#if}` branch.
+	for (const m of source.matchAll(/<li\b[^>]*>/g)) {
+		for (const text of blockTexts(source, 'li', m.index + m[0].length)) if (/[a-z]/i.test(text)) add(m.index, 'value', text);
+	}
 	// Column headers, keys and short values written into the markup.
 	for (const m of source.matchAll(/<(th|dt)\b[^>]*>([^<{]*[a-z][^<{]*)<\/\1>/gi)) add(m.index, 'label', m[2]);
 	for (const m of source.matchAll(/<dd\b[^>]*>([^<{]*[a-z][^<{]*)<\/dd>/gi)) add(m.index, 'value', m[1]);
@@ -131,6 +157,7 @@ function blockTexts(source: string, tag: string, start: number): string[] {
 	}
 	return text
 		.replace(/<[^>]*>/g, ' ')
+		.replace(/&(?:[a-z]+|#\d+);/gi, ' ')
 		.split('\u0000')
 		.map((part) => part.replace(/\s+/g, ' ').trim())
 		.filter(Boolean);
