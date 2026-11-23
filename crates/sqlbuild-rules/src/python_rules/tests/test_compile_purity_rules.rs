@@ -144,12 +144,18 @@ fn given_compile_time_python_when_evaluating_compile_time_purity_then_reports_ca
         PythonRunTestCase {
             description: "module scope, factory bodies and the project functions they call are followed to each external call",
             files: &[
-                ("python/nodes/inventory/snapshots/asset.py", QUERYING_FACTORY),
+                (
+                    "python/nodes/inventory/snapshots/asset.py",
+                    QUERYING_FACTORY,
+                ),
                 (
                     "python/nodes/inventory/snapshots/_helpers/spec_loading.py",
                     SPEC_LOADING,
                 ),
-                ("python/nodes/orders/storefront_import/constants.py", REGIONS),
+                (
+                    "python/nodes/orders/storefront_import/constants.py",
+                    REGIONS,
+                ),
                 ("orchestration/sensors/inventory/stock_feed.py", SENSOR),
                 ("orchestration/sensors/inventory/_helpers/feed.py", FEED),
                 ("python/nodes/utils/network.py", NETWORK),
@@ -163,10 +169,6 @@ fn given_compile_time_python_when_evaluating_compile_time_purity_then_reports_ca
                     3,
                     10,
                 ),
-                ("SQBRPYTHON022", "python/providers/carrier_api/constants.py", 6, 10),
-                ("SQBRPYTHON022", "python/providers/carrier_api/constants.py", 7, 11),
-                ("SQBRPYTHON022", "python/providers/carrier_api/constants.py", 8, 8),
-                ("SQBRPYTHON022", "python/providers/carrier_api/constants.py", 9, 9),
                 (
                     "SQBRPYTHON022",
                     "python/nodes/inventory/snapshots/asset.py",
@@ -185,6 +187,30 @@ fn given_compile_time_python_when_evaluating_compile_time_purity_then_reports_ca
                     3,
                     22,
                 ),
+                (
+                    "SQBRPYTHON022",
+                    "python/providers/carrier_api/constants.py",
+                    6,
+                    10,
+                ),
+                (
+                    "SQBRPYTHON022",
+                    "python/providers/carrier_api/constants.py",
+                    7,
+                    11,
+                ),
+                (
+                    "SQBRPYTHON022",
+                    "python/providers/carrier_api/constants.py",
+                    8,
+                    8,
+                ),
+                (
+                    "SQBRPYTHON022",
+                    "python/providers/carrier_api/constants.py",
+                    9,
+                    9,
+                ),
             ],
         },
         PythonRunTestCase {
@@ -195,14 +221,27 @@ fn given_compile_time_python_when_evaluating_compile_time_purity_then_reports_ca
             ],
             config: json!({ "select": ["SQBRPYTHON022"] }),
             expected_faults: vec![
-                ("SQBRPYTHON022", "python/nodes/orders/export/constants.py", 7, 24),
-                ("SQBRPYTHON022", "python/nodes/orders/export/constants.py", 12, 5),
+                (
+                    "SQBRPYTHON022",
+                    "python/nodes/orders/export/constants.py",
+                    7,
+                    24,
+                ),
+                (
+                    "SQBRPYTHON022",
+                    "python/nodes/orders/export/constants.py",
+                    12,
+                    5,
+                ),
             ],
         },
         PythonRunTestCase {
             description: "an approved loader boundary stops the walk at exactly that function",
             files: &[
-                ("python/nodes/inventory/snapshots/asset.py", QUERYING_FACTORY),
+                (
+                    "python/nodes/inventory/snapshots/asset.py",
+                    QUERYING_FACTORY,
+                ),
                 (
                     "python/nodes/inventory/snapshots/_helpers/spec_loading.py",
                     SPEC_LOADING,
@@ -224,7 +263,10 @@ fn given_compile_time_python_when_evaluating_compile_time_purity_then_reports_ca
         PythonRunTestCase {
             description: "an approved factory runs its body unchecked",
             files: &[
-                ("python/nodes/inventory/snapshots/asset.py", QUERYING_FACTORY),
+                (
+                    "python/nodes/inventory/snapshots/asset.py",
+                    QUERYING_FACTORY,
+                ),
                 (
                     "python/nodes/inventory/snapshots/_helpers/spec_loading.py",
                     SPEC_LOADING,
@@ -256,7 +298,10 @@ fn given_a_boundary_naming_a_module_when_evaluating_compile_time_purity_then_the
     let test_cases = [PythonRunFailureTestCase {
         description: "a module is not a loader boundary",
         files: &[
-            ("python/nodes/inventory/snapshots/asset.py", QUERYING_FACTORY),
+            (
+                "python/nodes/inventory/snapshots/asset.py",
+                QUERYING_FACTORY,
+            ),
             (
                 "python/nodes/inventory/snapshots/_helpers/spec_loading.py",
                 SPEC_LOADING,

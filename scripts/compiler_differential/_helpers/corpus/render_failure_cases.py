@@ -7,7 +7,9 @@ from scripts.compiler_differential._helpers.corpus.case_builder import (
     staging_files,
 )
 from scripts.compiler_differential.constants import (
+    FAILURE_BASE_CONFIG,
     FAILURE_BASE_MART,
+    FAILURE_CONFIG_PATH,
     FAILURE_BASE_STAGING,
     FAILURE_MART_PATH,
     GENERATOR_MISSING_ENV_VAR,
@@ -495,7 +497,9 @@ def _reference_cases() -> tuple[FailureCase, ...]:
             name="dbt-reference-without-manifest",
             expected_code="C214",
             files={
-                **config_files('\n[dbt]\nproject_dir = "dbt"\n'),
+                FAILURE_CONFIG_PATH: 'extra_paths = ["dbt"]\n'
+                + FAILURE_BASE_CONFIG
+                + '\n[dbt]\nproject_dir = "dbt"\n',
                 "dbt/dbt_project.yml": _UPSTREAM_DBT_PROJECT,
                 **mart_body_files(
                     "SELECT customer_id, COUNT(*) AS order_count\n"
@@ -507,7 +511,7 @@ def _reference_cases() -> tuple[FailureCase, ...]:
             name="hard-coded-relation-in-python",
             expected_code="P008",
             files={
-                "python/nodes/tasks/exports.py": (
+                "python/nodes/tasks/exports/asset.py": (
                     "from sqlbuild.assets import asset\n\n\n"
                     '@asset\ndef export_orders(ctx):\n    """Export orders."""\n'
                     '    return ctx.query("SELECT * FROM stg_orders")\n'

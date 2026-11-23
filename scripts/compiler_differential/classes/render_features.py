@@ -79,7 +79,7 @@ class RenderFeatureWriter:
         self._files[self._owned(role="enums", name="render_channel.sql")] = (
             'ENUM (\n  name render_channel,\n  members (WEB "web", STORE "store"),\n);\n'
         )
-        self._files[self._owned(role="macros", name="python/nodes/policy.py")] = (
+        self._files[self._owned(role="macros", name="python/policy.py")] = (
             "import os\n\n\n"
             "def minimum_amount_filter(ctx, column: str) -> str:\n"
             '    """Keep rows at or above the configured minimum amount."""\n'
@@ -117,7 +117,7 @@ class RenderFeatureWriter:
             else (self._staging * 2)
         )
         source: str = self._random.choice(self._sources)
-        self._files[self._owned(role="macros", name="python/nodes/relations.py")] = (
+        self._files[self._owned(role="macros", name="python/relations.py")] = (
             "from sqlbuild.refs import SqlResourceRef\n\n\n"
             "def union_ids(relations: list[SqlResourceRef]) -> str:\n"
             '    """Union the ids of several relations."""\n'
@@ -152,7 +152,7 @@ class RenderFeatureWriter:
         self._features.add("macro_generated_reference")
         base: ModelPlan = self._base()
         self.config_lines.extend(["", "[references]", "enforce_explicit = false"])
-        self._files[self._owned(role="macros", name="python/nodes/legacy.py")] = (
+        self._files[self._owned(role="macros", name="python/legacy.py")] = (
             "def legacy_events() -> str:\n"
             '    """Return a staged relation the way a migrated project wrote it."""\n'
             f"    return '__ref(\"{base.name}\")'\n"
@@ -187,11 +187,11 @@ class RenderFeatureWriter:
     def _interpolation(self) -> None:
         self._features.add("interpolation")
         base: ModelPlan = self._base()
-        self._files[self._owned(role="sql/hooks/sql", name="announce_refresh.sql")] = (
+        self._files[self._owned(role="hooks/sql", name="announce_refresh.sql")] = (
             'HOOK (\n  description "Announce one refreshed relation"\n);\n\n'
             "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label\n"
         )
-        self._files[self._owned(role="macros", name="python/nodes/notes.py")] = (
+        self._files[self._owned(role="macros", name="python/notes.py")] = (
             "def refresh_note(relation: str) -> str:\n"
             '    """Describe one refreshed relation."""\n'
             "    return f\"'refreshed ' || '{relation}'\"\n"
@@ -277,7 +277,7 @@ class RenderFeatureWriter:
             '    """Trim and lower-case a label."""\n'
             '    return f"LOWER(TRIM({expression}))"\n'
         )
-        self._files[self._owned(role="sql/audits/generic", name="tidy_status.sql")] = (
+        self._files[self._owned(role="audits/generic", name="tidy_status.sql")] = (
             'AUDIT ();\n\nSELECT *\nFROM __ref("@model")\nWHERE @column <> '
             '@py.tidy_label("@column")\n'
         )
@@ -411,7 +411,7 @@ class RenderFeatureWriter:
             "      - name: label\n"
             "        type: VARCHAR\n"
         )
-        self._files[self._owned(role="sql/audits/generic", name="amount_floor.sql")] = (
+        self._files[self._owned(role="audits/generic", name="amount_floor.sql")] = (
             'AUDIT ();\n\nSELECT *\nFROM __ref("@model")\nWHERE amount < @minimum\n'
         )
         self._model(
@@ -430,7 +430,7 @@ class RenderFeatureWriter:
         self._features.add("model_config")
         self.templated_target = True
         base: ModelPlan = self._base()
-        self._files[self._owned(role="sql/audits/generic", name="configured_floor.sql")] = (
+        self._files[self._owned(role="audits/generic", name="configured_floor.sql")] = (
             'AUDIT ();\n\nSELECT *\nFROM __ref("@model")\nWHERE amount < @minimum\n'
         )
         self._model(

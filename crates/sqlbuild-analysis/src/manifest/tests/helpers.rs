@@ -43,7 +43,7 @@ pub(crate) fn model(meta: Option<PythonValue>, config: ManifestConfigInput) -> M
         name: "orders".to_owned(),
         path: ManifestPathInput {
             text: "sql/models/orders.sql".to_owned(),
-            parent_parts: vec!["models".to_owned()],
+            parent_parts: vec!["sql".to_owned(), "models".to_owned()],
             stem: "orders".to_owned(),
         },
         destination: ManifestRelationInput::default(),

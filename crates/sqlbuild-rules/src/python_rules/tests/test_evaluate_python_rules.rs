@@ -27,7 +27,10 @@ fn given_project_python_when_evaluating_python_rules_then_reports_fensu_findings
                 ("python/nodes/_helpers/Alpha.py", "\"\"\"Alpha.\"\"\"\n"),
                 ("python/nodes/_helpers/__init__.py", ""),
                 ("python/nodes/orders/daily/asset.py", "\"\"\"Daily.\"\"\"\n"),
-                ("python/nodes/utils/currency/format.py", "\"\"\"Format.\"\"\"\n"),
+                (
+                    "python/nodes/utils/currency/format.py",
+                    "\"\"\"Format.\"\"\"\n",
+                ),
             ],
             config: json!({ "select": ["SQBRPYTHON001"] }),
             expected_faults: vec![
@@ -41,7 +44,10 @@ fn given_project_python_when_evaluating_python_rules_then_reports_fensu_findings
             files: &[
                 ("python/nodes/orders/common/b.py", "\"\"\"B.\"\"\"\n"),
                 ("python/nodes/orders/common/a.py", "\"\"\"A.\"\"\"\n"),
-                ("python/nodes/utils/currency/format.py", "\"\"\"Format.\"\"\"\n"),
+                (
+                    "python/nodes/utils/currency/format.py",
+                    "\"\"\"Format.\"\"\"\n",
+                ),
                 ("python/nodes/utils/shared/text.py", "\"\"\"Text.\"\"\"\n"),
                 ("python/nodes/helpers/rows.py", "\"\"\"Rows.\"\"\"\n"),
             ],
@@ -110,7 +116,12 @@ fn given_project_python_when_evaluating_python_rules_then_reports_fensu_findings
                 "select": ["SQBRPYTHON610"],
                 "rule_options": { "SQBRPYTHON610": { "max_helpers_container_modules": 1 } },
             }),
-            expected_faults: vec![("SQBRPYTHON610", "python/nodes/orders/_helpers/first.py", 1, 1)],
+            expected_faults: vec![(
+                "SQBRPYTHON610",
+                "python/nodes/orders/_helpers/first.py",
+                1,
+                1,
+            )],
         },
         PythonRunTestCase {
             description: "a public main entry nobody outside its domain imports",
@@ -196,7 +207,12 @@ fn given_project_python_when_evaluating_python_rules_then_reports_fensu_findings
                 ),
             ],
             config: json!({ "select": ["SQBRPYTHON306"] }),
-            expected_faults: vec![("SQBRPYTHON306", "python/nodes/orders/_helpers/unused.py", 1, 1)],
+            expected_faults: vec![(
+                "SQBRPYTHON306",
+                "python/nodes/orders/_helpers/unused.py",
+                1,
+                1,
+            )],
         },
         PythonRunTestCase {
             description: "an audit factory under python/nodes/ is loaded",

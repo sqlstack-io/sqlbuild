@@ -7,7 +7,7 @@ from sqlbuild.rules import Finding, Model, RuleContext, rule
     remediation="Reference a staging model with __ref() instead.",
 )
 def marts_use_staging(*, model: Model, ctx: RuleContext) -> list[Finding]:
-    layer = ctx.project.tree.relative_parts(path=model.path, under="models")[0]
+    layer = ctx.project.tree.relative_parts(path=model.path, under="sql/models")[0]
     sql = ctx.sql.for_model(model).authored.source
     if layer != "marts" or "__source(" not in sql:
         return []

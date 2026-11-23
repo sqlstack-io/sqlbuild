@@ -220,7 +220,6 @@ from ._helpers.window import window
             ],
             config: json!({ "select": ["SQBRPYTHON008", "SQBRPYTHON017", "SQBRPYTHON019"] }),
             expected_faults: vec![
-                ("SQBRPYTHON019", "sql/hooks/python/notify.py", 1, 8),
                 (
                     "SQBRPYTHON017",
                     "orchestration/sensors/inventory/_helpers/age.py",
@@ -231,7 +230,7 @@ from ._helpers.window import window
                     "SQBRPYTHON019",
                     "orchestration/sensors/inventory/_helpers/age.py",
                     2,
-                    38,
+                    44,
                 ),
                 (
                     "SQBRPYTHON017",
@@ -243,10 +242,11 @@ from ._helpers.window import window
                     "SQBRPYTHON019",
                     "orchestration/sensors/orders/refund_spike.py",
                     2,
-                    38,
+                    44,
                 ),
                 ("SQBRPYTHON019", "python/nodes/orders/daily/main.py", 1, 58),
                 ("SQBRPYTHON008", "python/nodes/orders/weekly/main.py", 1, 58),
+                ("SQBRPYTHON019", "sql/hooks/python/notify.py", 1, 8),
             ],
         },
     ];

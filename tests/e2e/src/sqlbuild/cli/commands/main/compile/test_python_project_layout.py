@@ -21,15 +21,15 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
     "test_case",
     (
         PythonProjectLayoutCompileTestCase(
-            description="unsupported project Python root",
+            description="Python inside the models folder",
             repo_files={
                 "sqlbuild_project.toml": 'name = "python_layout"\nadapter = "duckdb"\n',
-                "audit_helpers/measurements.py": "def build_cases(): return []\n",
+                "sql/models/measurements.py": "def build_cases(): return []\n",
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
                 "error[D016]",
-                "Unsupported project Python path(s): audit_helpers/measurements.py",
+                "Unsupported project Python path(s): sql/models/measurements.py",
                 "Move pipeline Python nodes and the helper modules they import under python/nodes/",
             ),
         ),
@@ -145,8 +145,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
-                "error[D016]",
-                "Unsupported project Python path(s): tasks/orders.py",
+                "error[D018]",
+                "'tasks/' is not part of a SQLBuild project",
             ),
         ),
         PythonProjectLayoutCompileTestCase(
@@ -157,8 +157,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
-                "error[D016]",
-                "Unsupported project Python path(s): assets/orders.py",
+                "error[D018]",
+                "'assets/' is not part of a SQLBuild project",
             ),
         ),
         PythonProjectLayoutCompileTestCase(
@@ -169,8 +169,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
-                "error[D016]",
-                "Unsupported project Python path(s): checks/orders.py",
+                "error[D018]",
+                "'checks/' is not part of a SQLBuild project",
             ),
         ),
         PythonProjectLayoutCompileTestCase(
@@ -181,8 +181,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
-                "error[D016]",
-                "Unsupported project Python path(s): loaders/orders.py",
+                "error[D018]",
+                "'loaders/' is not part of a SQLBuild project",
             ),
         ),
         PythonProjectLayoutCompileTestCase(
@@ -193,8 +193,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
-                "error[D016]",
-                "Unsupported project Python path(s): factories/orders.py",
+                "error[D018]",
+                "'factories/' is not part of a SQLBuild project",
             ),
         ),
         PythonProjectLayoutCompileTestCase(
@@ -205,8 +205,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
-                "error[D016]",
-                "Unsupported project Python path(s): libs/cleaning.py",
+                "error[D018]",
+                "'libs/' is not part of a SQLBuild project",
             ),
         ),
         PythonProjectLayoutCompileTestCase(
@@ -217,8 +217,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
-                "error[D016]",
-                "Unsupported project Python path(s): dagster/definitions.py",
+                "error[D018]",
+                "'dagster/' is not part of a SQLBuild project",
             ),
         ),
         PythonProjectLayoutCompileTestCase(
@@ -229,8 +229,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
-                "error[D016]",
-                "Unsupported project Python path(s): rivers_pipeline/definitions.py",
+                "error[D018]",
+                "'rivers_pipeline/' is not part of a SQLBuild project",
             ),
         ),
         PythonProjectLayoutCompileTestCase(
@@ -241,8 +241,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             },
             expected_exit_code=1,
             expected_stderr_fragments=(
-                "error[D016]",
-                "Unsupported project Python path(s): definitions.py",
+                "error[D018]",
+                "'definitions.py' is not part of a SQLBuild project",
             ),
         ),
     ),
@@ -345,14 +345,14 @@ def test_given_rule_harness_test_when_compiling_then_python_test_path_is_accepte
                     "        {'order_id': 2, 'status': normalize_status('PENDING')},\n"
                     "    ]\n"
                 ),
-                "python/nodes/loaders/orders.py": (
+                "python/nodes/loaders/raw_orders/loader.py": (
                     "from python.nodes.orders.utils import order_rows\n"
                     "from sqlbuild.loaders import loader\n\n\n"
                     "@loader\n"
                     "def raw_orders(ctx):\n"
                     "    '''Test loader raw_orders.'''\n    return order_rows()\n"
                 ),
-                "python/nodes/orders/exports/assets.py": (
+                "python/nodes/orders/exports/asset.py": (
                     "from sqlbuild.assets import asset\n"
                     "from sqlbuild.refs import model\n\n\n"
                     "@asset(depends_on=model('fact_orders'))\n"
@@ -362,7 +362,7 @@ def test_given_rule_harness_test_when_compiling_then_python_test_path_is_accepte
                     "    return ctx.result(payload={'order_count': int(rows[0][0])})\n"
                 ),
                 "python/nodes/orders/exports/checks.py": (
-                    "from python.nodes.orders.exports.assets import orders_export\n"
+                    "from python.nodes.orders.exports.asset import orders_export\n"
                     "from sqlbuild.checks import check\n\n\n"
                     "@check(depends_on=orders_export)\n"
                     "def orders_export_not_empty(ctx):\n"
@@ -424,7 +424,7 @@ def test_given_python_root_project_when_compiling_and_building_then_nodes_run_wi
                 "sqlbuild_project.toml": (
                     'name = "factory_layout"\nadapter = "duckdb"\n\n[connection]\ndatabase = ":memory:"\n'
                 ),
-                "python/nodes/factories/orders.py": (
+                "python/nodes/orders/orders/asset.py": (
                     "from sqlbuild.factories import factory\n"
                     "from sqlbuild.assets import asset\n\n\n"
                     "@asset\n"
@@ -443,7 +443,7 @@ def test_given_python_root_project_when_compiling_and_building_then_nodes_run_wi
                 "sqlbuild_project.toml": (
                     'name = "factory_layout"\nadapter = "duckdb"\n\n[connection]\ndatabase = ":memory:"\n'
                 ),
-                "python/nodes/factories/orders.py": (
+                "python/nodes/orders/orders/assets.py": (
                     "from sqlbuild.factories import factory\n"
                     "from sqlbuild.assets import asset\n\n\n"
                     "@factory\n"
@@ -492,12 +492,15 @@ def test_given_factory_returning_module_node_when_planning_then_node_registers_o
                 "sqlbuild_project.toml": (
                     'name = "factory_layout"\nadapter = "duckdb"\n\n[connection]\ndatabase = ":memory:"\n'
                 ),
-                "python/nodes/factories/orders.py": (
-                    "from sqlbuild.factories import factory\n"
+                "python/nodes/orders/orders/asset.py": (
                     "from sqlbuild.assets import asset\n\n\n"
                     "@asset\n"
                     "def orders(ctx):\n"
-                    "    '''Test task orders.'''\n    return None\n\n\n"
+                    "    '''Test task orders.'''\n    return None\n"
+                ),
+                "python/nodes/orders/generated/assets.py": (
+                    "from sqlbuild.factories import factory\n"
+                    "from sqlbuild.assets import asset\n\n\n"
                     "@factory\n"
                     "def order_nodes():\n"
                     "    @asset(name='orders')\n"
@@ -549,12 +552,12 @@ def test_given_factory_returning_distinct_same_name_node_when_planning_then_conf
                 "python/nodes/helpers/clean.py": (
                     "from .values import STATUS\n\n\ndef label():\n    return STATUS\n"
                 ),
-                "python/nodes/orders.py": (
+                "python/nodes/orders/orders/asset.py": (
                     "import python.nodes.helpers.clean\n"
                     "from sqlbuild.assets import asset\n\n\n"
                     "@asset\n"
                     "def orders(ctx):\n"
-                    "    '''Test task orders.'''\n    return ctx.result(payload={'status': python.helpers.clean.label()})\n"
+                    "    '''Test task orders.'''\n    return ctx.result(payload={'status': python.nodes.helpers.clean.label()})\n"
                 ),
             },
             expected_build_fragments=("orders", "\u2713 Completed successfully"),

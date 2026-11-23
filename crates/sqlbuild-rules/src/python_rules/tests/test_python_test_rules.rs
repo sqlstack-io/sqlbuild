@@ -155,9 +155,15 @@ fn given_project_python_tests_when_evaluating_test_rules_then_reports_misplaced_
                 RUNTIME_FILES[0],
                 RUNTIME_FILES[1],
                 ("tests/python/nodes/orders/_test_types.py", CASE_TYPES),
-                ("tests/python/nodes/orders/test_storefront.py", ROW_MAPPING_TEST),
+                (
+                    "tests/python/nodes/orders/test_storefront.py",
+                    ROW_MAPPING_TEST,
+                ),
                 ("tests/python/nodes/inventory/_test_types.py", CASE_TYPES),
-                ("tests/python/nodes/inventory/test_stock.py", ROW_MAPPING_TEST),
+                (
+                    "tests/python/nodes/inventory/test_stock.py",
+                    ROW_MAPPING_TEST,
+                ),
                 ("tests/python/nodes/_test_types.py", CASE_TYPES),
                 ("tests/python/nodes/test_everything.py", ROW_MAPPING_TEST),
             ],
@@ -182,7 +188,12 @@ fn given_project_python_tests_when_evaluating_test_rules_then_reports_misplaced_
                     1,
                     1,
                 ),
-                ("SQBRPYTHON021", "tests/python/nodes/test_everything.py", 1, 1),
+                (
+                    "SQBRPYTHON021",
+                    "tests/python/nodes/test_everything.py",
+                    1,
+                    1,
+                ),
             ],
         },
         PythonRunTestCase {

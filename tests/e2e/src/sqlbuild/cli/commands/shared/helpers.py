@@ -86,7 +86,7 @@ def prepare_dbt_profile_workspace(*, tmp_path: Path, profiles_yml: str) -> Path:
     workspace: Path = tmp_path / "workspace"
     dbt_project_dir: Path = workspace / "dbt_project"
     profiles_dir: Path = workspace / "profiles"
-    (dbt_project_dir / "sql" / "models").mkdir(parents=True)
+    (dbt_project_dir / "models").mkdir(parents=True)
     profiles_dir.mkdir(parents=True)
     (dbt_project_dir / "dbt_project.yml").write_text(
         "name: analytics\n"

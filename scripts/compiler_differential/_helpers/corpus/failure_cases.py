@@ -163,7 +163,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="python-node-missing-description",
             expected_code="P010",
             files={
-                "python/nodes/tasks/exports.py": (
+                "python/nodes/tasks/exports/asset.py": (
                     "from sqlbuild.assets import AssetContext, asset\n\n\n"
                     "@asset\ndef export_orders(ctx: AssetContext):\n    return None\n"
                 )
@@ -173,7 +173,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             name="python-node-description-too-long",
             expected_code="P027",
             files={
-                "python/nodes/tasks/exports.py": (
+                "python/nodes/tasks/exports/asset.py": (
                     "from sqlbuild.assets import AssetContext, asset\n\n\n"
                     "@asset\ndef export_orders(ctx: AssetContext):\n"
                     '    """'
@@ -614,7 +614,7 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="python-node-syntax",
             expected_code="D011",
-            files={"python/nodes/tasks/exports.py": "def broken(:\n    pass\n"},
+            files={"python/nodes/tasks/exports/asset.py": "def broken(:\n    pass\n"},
         ),
         failure_case(
             name="hook-unknown-argument",

@@ -426,7 +426,7 @@ def _target_cases() -> tuple[FailureCase, ...]:
                 FAILURE_CONFIG_PATH: FAILURE_BASE_CONFIG
                 + '\n[targets.dev]\nschema = "dev"\nloader_schema = "raw"\n'
                 + '\n[targets.prod]\nschema = "prod"\nloader_schema = "raw"\n',
-                "python/nodes/loaders/orders.py": (
+                "python/nodes/loaders/orders/loader.py": (
                     "from sqlbuild.loaders import loader\n\n\n"
                     "@loader\n"
                     "def loaded_orders(ctx):\n"
@@ -466,7 +466,7 @@ def _target_cases() -> tuple[FailureCase, ...]:
                     'adapter = "duckdb"\n', 'adapter = "duckdb"\ndefault_target = "dev"\n'
                 )
                 + '\n[defaults]\nschema = "mart"\n\n[targets.dev]\nschema = "preserve"\n',
-                "python/nodes/tasks/announce.py": (
+                "python/nodes/tasks/announce/asset.py": (
                     "from sqlbuild.assets import asset\n\n\n"
                     "@asset\n"
                     "def announce_orders(ctx):\n"

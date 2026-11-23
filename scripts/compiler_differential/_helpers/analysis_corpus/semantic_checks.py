@@ -186,7 +186,7 @@ def _metadata_cases() -> tuple[FailureCase, ...]:
             expected_location=(21, 20),
             files={
                 FAILURE_SOURCES_PATH: FAILURE_BASE_SOURCES + _LOADED_SOURCE,
-                "python/nodes/loaders/raw_events.py": _LOADER,
+                "python/nodes/loaders/raw_events/loader.py": _LOADER,
             },
         ),
     )

@@ -213,7 +213,9 @@ class ProjectBuilder:
                     ]
                 )
         self._features.add("path_defaults_wildcard")
-        lines.extend(extra_lines)
+        top_level: list[str] = [line for line in extra_lines if line.startswith("extra_paths")]
+        lines[0:0] = top_level
+        lines.extend(line for line in extra_lines if not line.startswith("extra_paths"))
         lines.extend(GENERATOR_SQL_RULE_IGNORES)
         self._files["sqlbuild_project.toml"] = "\n".join(lines) + "\n"
 
@@ -489,7 +491,7 @@ class ProjectBuilder:
             self._features.add("tree_scope")
             return f"sql/models/{domains.pop()}/_sqlbuild/{role}"
         self._features.add("project_scope")
-        return role
+        return f"sql/{role}"
 
     def _write_models(self) -> None:
         for model in self._models:
@@ -562,16 +564,20 @@ class ProjectBuilder:
         if not self._chance(GENERATOR_HALF):
             return
         self._features.add("python_nodes")
-        self._files["python/nodes/tasks/exports.py"] = (
-            "from sqlbuild.assets import AssetContext, asset\n\n\n"
-            "@asset\n"
-            "def collect_exports(ctx: AssetContext):\n"
-            '    """Collect generated exports."""\n'
-            '    return ctx.result(payload={"rows": 3})\n\n\n'
-            "@asset(depends_on=collect_exports)\n"
-            "def publish_exports(ctx: AssetContext):\n"
-            '    """Publish generated exports."""\n'
-            '    return ctx.result(metadata={"published": True})\n'
+        self._files["python/nodes/tasks/exports/assets.py"] = (
+            "from sqlbuild.assets import AssetContext, asset\n"
+            "from sqlbuild.factories import factory\n\n\n"
+            "@factory\n"
+            "def export_assets():\n"
+            "    @asset\n"
+            "    def collect_exports(ctx: AssetContext):\n"
+            '        """Collect generated exports."""\n'
+            '        return ctx.result(payload={"rows": 3})\n\n'
+            "    @asset(depends_on=collect_exports)\n"
+            "    def publish_exports(ctx: AssetContext):\n"
+            '        """Publish generated exports."""\n'
+            '        return ctx.result(metadata={"published": True})\n\n'
+            "    return [collect_exports, publish_exports]\n"
         )
 
     def _write_tests_and_scenarios(self) -> None:

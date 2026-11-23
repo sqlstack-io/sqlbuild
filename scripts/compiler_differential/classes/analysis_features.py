@@ -324,7 +324,7 @@ class AnalysisFeatureWriter:
 
     def _python_sql(self) -> None:
         self._features.add("python_sql")
-        self._files["python/nodes/tasks/flag_exports.py"] = (
+        self._files["python/nodes/tasks/flag_exports/asset.py"] = (
             "from sqlbuild.assets import AssetContext, asset\n\n\n"
             "@asset\n"
             "def count_flagged_events(ctx: AssetContext):\n"

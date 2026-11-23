@@ -60,7 +60,7 @@ def _header_tags(sql: str) -> tuple[set[str], int]:
     ),
 )
 def edge_area_is_tagged(*, model: Model, ctx: RuleContext) -> list[Finding]:
-    parts = ctx.project.tree.relative_parts(path=model.path, under="models")
+    parts = ctx.project.tree.relative_parts(path=model.path, under="sql/models")
     in_area = EDGE_FOLDER in parts
     tags, line = _header_tags(ctx.sql.for_model(model).authored.source)
     if in_area == (EDGE_TAG in tags):

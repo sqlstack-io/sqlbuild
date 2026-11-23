@@ -204,7 +204,7 @@ class DiscoveryFeatureWriter:
             "      - name: id\n        type: INTEGER\n"
             "      - name: label\n        type: VARCHAR\n"
         )
-        self._files["python/nodes/loaders/products.py"] = (
+        self._files["python/nodes/loaders/products/loader.py"] = (
             "from sqlbuild.loaders import loader\n\n\n"
             "@loader\n"
             "def loaded_products(ctx):\n"
@@ -221,23 +221,27 @@ class DiscoveryFeatureWriter:
     def _asset_and_check(self) -> None:
         self._features.add("asset_and_check")
         base: ModelPlan = self._base()
-        self._files["python/nodes/assets/exports.py"] = (
+        self._files["python/nodes/assets/exports/factory.py"] = (
             "from sqlbuild.assets import asset\n"
             "from sqlbuild.checks import check\n"
+            "from sqlbuild.factories import factory\n"
             "from sqlbuild.refs import model\n\n\n"
-            f'@asset(depends_on=model("{base.name}"), tags=("export",))\n'
-            f"def export_{base.name}(ctx):\n"
-            '    """Export one staged model."""\n'
-            '    return ctx.result(metadata={"rows": 3}, materialized=True)\n\n\n'
-            f'@check(depends_on=export_{base.name}, severity="warn")\n'
-            f"def export_{base.name}_ready(ctx):\n"
-            '    """Check that the export ran."""\n'
-            "    return ctx.pass_()\n"
+            "@factory\n"
+            "def export_nodes():\n"
+            f'    @asset(depends_on=model("{base.name}"), tags=("export",))\n'
+            f"    def export_{base.name}(ctx):\n"
+            '        """Export one staged model."""\n'
+            '        return ctx.result(metadata={"rows": 3}, materialized=True)\n\n'
+            f'    @check(depends_on=export_{base.name}, severity="warn")\n'
+            f"    def export_{base.name}_ready(ctx):\n"
+            '        """Check that the export ran."""\n'
+            "        return ctx.pass_()\n\n"
+            f"    return [export_{base.name}, export_{base.name}_ready]\n"
         )
 
     def _discovered_set(self) -> None:
         self._features.add("discovered_set")
-        self._files["python/nodes/assets/steps.py"] = (
+        self._files["python/nodes/assets/steps/asset.py"] = (
             "from sqlbuild.assets import asset\n"
             "from sqlbuild.discovery import Discovered, Item, discover\n\n\n"
             '@discover(check_every="60s")\n'
@@ -282,7 +286,7 @@ class DiscoveryFeatureWriter:
             f'    region: str = "{self._random.choice(("north", "south"))}"\n'
             "    batch_size: int = 50\n"
         )
-        self._files["python/nodes/tasks/provided.py"] = (
+        self._files["python/nodes/tasks/provided/asset.py"] = (
             "from sqlbuild.assets import asset\n\n\n"
             "@asset\n"
             "def provided_export(ctx, export_settings):\n"
@@ -533,7 +537,7 @@ class DiscoveryFeatureWriter:
         self.expected_error_code = GENERATOR_DBT_REF_ERROR_CODE
         self.succeeding_commands = (PLAN_LABEL,)
         self.config_lines.extend(
-            ["", "[dbt]", 'project_dir = "dbt"', 'target_path = "dbt/artifacts"']
+            ['extra_paths = ["dbt"]', "", "[dbt]", 'project_dir = "dbt"', 'target_path = "dbt/artifacts"']
         )
         self._files["dbt/dbt_project.yml"] = "name: upstream\nversion: '1.0.0'\nprofile: upstream\n"
         self._files["dbt/artifacts/manifest.json"] = GENERATOR_DBT_MANIFEST

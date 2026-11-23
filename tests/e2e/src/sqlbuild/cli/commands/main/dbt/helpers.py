@@ -40,7 +40,7 @@ def prepare_dbt_init_duckdb_workspace(*, tmp_path: Path, workspace_name: str) ->
     workspace: Path = tmp_path / workspace_name
     dbt_project_dir: Path = workspace / "dbt_project"
     profiles_dir: Path = workspace / "profiles"
-    dbt_models_dir: Path = dbt_project_dir / "sql" / "models"
+    dbt_models_dir: Path = dbt_project_dir / "models"
     dbt_models_dir.mkdir(parents=True)
     profiles_dir.mkdir(parents=True)
     db_path: Path = workspace / "warehouse.duckdb"

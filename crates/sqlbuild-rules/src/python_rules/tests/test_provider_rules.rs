@@ -33,7 +33,10 @@ class StorefrontApi(Provider):
 "#,
                 ),
                 ("python/providers/storefront_api/models.py", ""),
-                ("python/providers/storefront_api/_classes/page_cursor.py", ""),
+                (
+                    "python/providers/storefront_api/_classes/page_cursor.py",
+                    "",
+                ),
                 ("python/providers/storefront_api/_helpers/paging.py", ""),
                 ("python/nodes/utils/retries.py", ""),
                 (
@@ -54,8 +57,18 @@ class StorefrontApi(Provider):
             ],
             config: json!({ "select": ["SQBRPYTHON013"] }),
             expected_faults: vec![
-                ("SQBRPYTHON013", "python/providers/carrier_api/client.py", 1, 1),
-                ("SQBRPYTHON013", "python/providers/carrier_api/client.py", 1, 1),
+                (
+                    "SQBRPYTHON013",
+                    "python/providers/carrier_api/client.py",
+                    1,
+                    1,
+                ),
+                (
+                    "SQBRPYTHON013",
+                    "python/providers/carrier_api/client.py",
+                    1,
+                    1,
+                ),
                 (
                     "SQBRPYTHON013",
                     "python/providers/partner_sftp/sftp/connection.py",
@@ -238,10 +251,30 @@ class StorefrontApi(Provider):
             ],
             config: json!({ "select": ["SQBRPYTHON014"] }),
             expected_faults: vec![
-                ("SQBRPYTHON014", "python/providers/carrier_api/provider.py", 1, 1),
-                ("SQBRPYTHON014", "python/providers/carrier_api/provider.py", 4, 7),
-                ("SQBRPYTHON014", "python/providers/returns_api/provider.py", 1, 1),
-                ("SQBRPYTHON014", "python/providers/returns_api/provider.py", 1, 7),
+                (
+                    "SQBRPYTHON014",
+                    "python/providers/carrier_api/provider.py",
+                    1,
+                    1,
+                ),
+                (
+                    "SQBRPYTHON014",
+                    "python/providers/carrier_api/provider.py",
+                    4,
+                    7,
+                ),
+                (
+                    "SQBRPYTHON014",
+                    "python/providers/returns_api/provider.py",
+                    1,
+                    1,
+                ),
+                (
+                    "SQBRPYTHON014",
+                    "python/providers/returns_api/provider.py",
+                    1,
+                    7,
+                ),
                 (
                     "SQBRPYTHON014",
                     "python/providers/storefront_api/provider.py",
@@ -297,12 +330,12 @@ from python.providers.carrier_api.provider import CarrierApi
             ],
             config: json!({ "select": ["SQBRPYTHON015"] }),
             expected_faults: vec![
-                ("SQBRPYTHON015", "sql/hooks/python/notify.py", 1, 8),
+                ("SQBRPYTHON015", "python/nodes/orders/daily/main.py", 1, 61),
                 (
                     "SQBRPYTHON015",
                     "python/providers/storefront_api/provider.py",
                     2,
-                    38,
+                    44,
                 ),
                 (
                     "SQBRPYTHON015",
@@ -314,9 +347,9 @@ from python.providers.carrier_api.provider import CarrierApi
                     "SQBRPYTHON015",
                     "python/providers/storefront_api/provider.py",
                     4,
-                    49,
+                    56,
                 ),
-                ("SQBRPYTHON015", "python/nodes/orders/daily/main.py", 1, 54),
+                ("SQBRPYTHON015", "sql/hooks/python/notify.py", 1, 8),
             ],
         },
     ];

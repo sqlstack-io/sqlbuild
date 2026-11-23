@@ -62,7 +62,10 @@ fn given_a_cached_python_run_when_running_again_then_only_changed_inputs_are_eva
             }),
             expected_runs: CachedRuns {
                 first_faults: named_faults(&[]),
-                second_faults: named_faults(&[("SQBRPYTHON501", "python/nodes/orders/main/build.py")]),
+                second_faults: named_faults(&[(
+                    "SQBRPYTHON501",
+                    "python/nodes/orders/main/build.py",
+                )]),
                 second_hits: 0,
                 second_misses: 1,
             },
@@ -81,7 +84,10 @@ fn given_a_cached_python_run_when_running_again_then_only_changed_inputs_are_eva
             changed_config: json!({ "select": ["SQBRPYTHON304"] }),
             expected_runs: CachedRuns {
                 first_faults: named_faults(&[]),
-                second_faults: named_faults(&[("SQBRPYTHON304", "python/nodes/orders/main/export.py")]),
+                second_faults: named_faults(&[(
+                    "SQBRPYTHON304",
+                    "python/nodes/orders/main/export.py",
+                )]),
                 second_hits: 0,
                 second_misses: 2,
             },
@@ -104,7 +110,10 @@ fn given_a_cached_python_run_when_running_again_then_only_changed_inputs_are_eva
             changed_config: json!({ "select": ["SQBRPYTHON613"] }),
             expected_runs: CachedRuns {
                 first_faults: named_faults(&[]),
-                second_faults: named_faults(&[("SQBRPYTHON613", "python/nodes/inventory/__init__.py")]),
+                second_faults: named_faults(&[(
+                    "SQBRPYTHON613",
+                    "python/nodes/inventory/__init__.py",
+                )]),
                 second_hits: 0,
                 second_misses: 1,
             },

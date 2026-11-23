@@ -29,7 +29,7 @@ def _change_log_sources(ctx: RuleContext) -> set[str]:
     ),
 )
 def staging_uses_cdc_latest(*, model: Model, ctx: RuleContext) -> list[Finding]:
-    parts = ctx.project.tree.relative_parts(path=model.path, under="models")
+    parts = ctx.project.tree.relative_parts(path=model.path, under="sql/models")
     if not parts or parts[0] != "staging":
         return []
     sql = ctx.sql.for_model(model).authored.source

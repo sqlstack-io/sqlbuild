@@ -39,7 +39,7 @@ def _is_change_log(ctx: RuleContext, source: str) -> bool:
     ),
 )
 def staging_uses_change_log_macro(*, model: Model, ctx: RuleContext) -> list[Finding]:
-    parts = ctx.project.tree.relative_parts(path=model.path, under="models")
+    parts = ctx.project.tree.relative_parts(path=model.path, under="sql/models")
     if not parts or parts[0] != "staging":
         return []
     sql = ctx.sql.for_model(model).authored.source

@@ -210,7 +210,6 @@ def _layout_cases() -> tuple[FailureCase, ...]:
     return tuple(
         failure_case(name=name, expected_code="D013", files={path: contents})
         for name, path, contents in (
-            ("scoped-root-at-project-root", "_enums/order_status.sql", ""),
             (
                 "declaration-group-below-root",
                 "sql/models/_sqlbuild/macros/python/money.py",
@@ -352,15 +351,15 @@ def _conflict_cases() -> tuple[FailureCase, ...]:
             name="duplicate-python-node",
             expected_code="D007",
             files={
-                "python/nodes/tasks/first.py": _TASK_MODULE,
-                "python/nodes/tasks/second.py": _TASK_MODULE,
+                "python/nodes/tasks/first/asset.py": _TASK_MODULE,
+                "python/nodes/tasks/second/asset.py": _TASK_MODULE,
             },
         ),
         failure_case(
             name="check-depends-on-check",
             expected_code="D007",
             files={
-                "python/nodes/checks/orders.py": (
+                "python/nodes/checks/orders/checks.py": (
                     "from sqlbuild.checks import check\nfrom sqlbuild.refs import model\n\n\n"
                     '@check(depends_on=model("stg_orders"))\ndef orders_present(ctx):\n'
                     '    """Orders present."""\n    return ctx.pass_()\n\n\n'
@@ -377,7 +376,7 @@ def _python_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="python-node-import-error",
             expected_code="D011",
-            files={"python/nodes/tasks/exports.py": "import missing_orders_client\n" + _TASK_MODULE},
+            files={"python/nodes/tasks/exports/asset.py": "import missing_orders_client\n" + _TASK_MODULE},
         ),
         failure_case(
             name="duplicate-hook",
@@ -422,11 +421,6 @@ def _python_cases() -> tuple[FailureCase, ...]:
                 )
             },
             expected_message="files cannot sit directly in orchestration/",
-        ),
-        failure_case(
-            name="legacy-event-exporters-directory",
-            expected_code="D015",
-            files={"event_exporters/publish.py": "VALUE = 1\n"},
         ),
         failure_case(
             name="lifecycle-sink-default-parameter",
@@ -478,6 +472,15 @@ def _python_cases() -> tuple[FailureCase, ...]:
         failure_case(
             name="python-outside-extension-root",
             expected_code="D016",
-            files={"helpers/formatting.py": "VALUE = 1\n"},
+            files={"sql/models/formatting.py": "VALUE = 1\n"},
+        ),
+        *(
+            failure_case(name=name, expected_code="D018", files={path: contents})
+            for name, path, contents in (
+                ("project-layout-unknown-top-level-folder", "event_exporters/publish.py", ""),
+                ("project-layout-scoped-root-at-project-root", "_enums/order_status.sql", ""),
+                ("project-layout-unknown-sql-folder", "sql/notes/readme.md", ""),
+                ("project-layout-unknown-python-module", "python/helpers.py", "VALUE = 1\n"),
+            )
         ),
     )

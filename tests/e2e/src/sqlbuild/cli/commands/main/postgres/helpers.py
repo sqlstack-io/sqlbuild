@@ -370,8 +370,8 @@ def prepare_postgres_dbt_seed_change_workspace(
     dbt_project_dir: Path = workspace / "dbt_project"
     profiles_dir: Path = workspace / "profiles"
     sqlbuild_project_dir: Path = workspace / "sqlbuild_project"
-    dbt_models_dir: Path = dbt_project_dir / "sql" / "models"
-    dbt_seeds_dir: Path = dbt_project_dir / "sql" / "seeds"
+    dbt_models_dir: Path = dbt_project_dir / "models"
+    dbt_seeds_dir: Path = dbt_project_dir / "seeds"
     dbt_models_dir.mkdir(parents=True)
     dbt_seeds_dir.mkdir(parents=True)
     profiles_dir.mkdir(parents=True)
