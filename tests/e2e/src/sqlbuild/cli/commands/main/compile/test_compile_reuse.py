@@ -899,6 +899,13 @@ def test_given_large_data_file_when_storing_and_reusing_then_it_is_read_only_aft
     test_case: CompileReuseLargeFileTestCase,
 ) -> None:
     project_dir: Path = compile_reuse_project
+    project_file: Path = project_dir / "sqlbuild_project.toml"
+    # A data folder at the top level is part of the project only when the project lists it.
+    _ = project_file.write_text(
+        f'extra_paths = ["{test_case.relative_path.split("/")[0]}/"]\n'
+        + project_file.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
     data_file: Path = write_large_file(
         project_dir=project_dir,
         relative_path=test_case.relative_path,
