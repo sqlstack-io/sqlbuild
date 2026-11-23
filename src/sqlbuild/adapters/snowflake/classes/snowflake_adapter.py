@@ -2586,7 +2586,10 @@ class SnowflakeAdapter(
 
     @staticmethod
     def _fetch_show_rows(
-        *, connection: _SnowflakeConnection, query: str
+        *,
+        connection: _SnowflakeConnection,
+        query: str,
+        answers_empty: Callable[[Exception], bool] | None = None,
     ) -> list[dict[str, object]]:
         """Run one SHOW command and return its rows keyed by lowercase output column."""
 
@@ -2599,21 +2602,21 @@ class SnowflakeAdapter(
             finally:
                 cursor.close()
 
-        return run_recorded_inspection_query(sql=query, run=fetch)
+        return run_recorded_inspection_query(sql=query, run=fetch, answers_empty=answers_empty)
 
     def _fetch_schema_show_rows(
         self, *, connection: _SnowflakeConnection, query: str, show_database: str, schema: str
     ) -> list[dict[str, object]]:
-        """Run SHOW ... IN SCHEMA; a schema that does not exist lists nothing, as before."""
+        """Run SHOW ... IN SCHEMA; a schema that does not exist lists nothing, recorded as such."""
 
-        try:
-            return self._fetch_show_rows(connection=connection, query=query)
-        except Exception as error:
-            if not is_missing_object_error(error) or self._schema_exists(
+        def schema_missing(error: Exception) -> bool:
+            return is_missing_object_error(error) and not self._schema_exists(
                 connection=connection, show_database=show_database, schema=schema
-            ):
-                raise
-            return []
+            )
+
+        return self._fetch_show_rows(
+            connection=connection, query=query, answers_empty=schema_missing
+        )
 
     def _schema_exists(
         self, *, connection: _SnowflakeConnection, show_database: str, schema: str

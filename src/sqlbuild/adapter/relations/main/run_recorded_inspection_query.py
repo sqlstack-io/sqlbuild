@@ -10,22 +10,34 @@ from sqlbuild.adapter.relations._helpers.inspection_context import emit_inspecti
 from sqlbuild.adapter.relations.models import InspectionQueryRecord
 
 
-def run_recorded_inspection_query(*, sql: str, run: Callable[[], list[Any]]) -> list[Any]:
-    """Run one inspection read, then record its text, elapsed time, and row count."""
+def run_recorded_inspection_query(
+    *,
+    sql: str,
+    run: Callable[[], list[Any]],
+    answers_empty: Callable[[Exception], bool] | None = None,
+) -> list[Any]:
+    """Record one inspection read; an error ``answers_empty`` accepts records as an empty read."""
 
     started: float = time.monotonic()
     try:
         rows: list[Any] = run()
     except Exception as error:
-        _ = emit_inspection_record(
-            record=InspectionQueryRecord(
-                sql=sql,
-                elapsed_seconds=time.monotonic() - started,
-                row_count=None,
-                error=str(error),
-            )
+        elapsed: float = time.monotonic() - started
+        failure: InspectionQueryRecord = InspectionQueryRecord(
+            sql=sql, elapsed_seconds=elapsed, row_count=None, error=str(error)
         )
-        raise
+        try:
+            empty: bool = answers_empty is not None and answers_empty(error)
+        except Exception:
+            _ = emit_inspection_record(record=failure)
+            raise
+        if not empty:
+            _ = emit_inspection_record(record=failure)
+            raise
+        _ = emit_inspection_record(
+            record=InspectionQueryRecord(sql=sql, elapsed_seconds=elapsed, row_count=0)
+        )
+        return []
     _ = emit_inspection_record(
         record=InspectionQueryRecord(
             sql=sql, elapsed_seconds=time.monotonic() - started, row_count=len(rows)
