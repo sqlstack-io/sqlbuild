@@ -13,6 +13,7 @@ Online: https://sqlbuild.com/docs/cli/dev/
 - Set provider secrets
 - Sign in to the warehouse
 - Keys
+- Republish from a script
 - Stop
 - Plain output
 - Run scheduled jobs locally
@@ -162,6 +163,20 @@ location reads warehouse history once the connection succeeds.
 | Ctrl+\\ | Stop at once, without cancelling runs |
 
 Ctrl+Z is not supported: `sqb dev` does not suspend. Stop it with `q` or Ctrl+C instead.
+
+## Republish from a script
+
+[`sqb location republish`](location.md#republish) asks the location `sqb dev` serves to
+compile and publish again, the same as pressing `r`: every discover function runs. Use the
+address and the location ID from the ready box. `sqb dev` has no sign-in, so `SQLBUILD_API_KEY`
+can be any value; the command needs one to call over `http://`:
+
+```bash
+SQLBUILD_API_KEY=local sqb location republish --server http://127.0.0.1:8000 \
+  --location-id 01a1d7ff-0b3a-7631-ba35-e44d44d072f2 --target dev --wait
+```
+
+A `curl` request to the [republish endpoint](location.md#republish) needs no key either.
 
 ## Stop
 
