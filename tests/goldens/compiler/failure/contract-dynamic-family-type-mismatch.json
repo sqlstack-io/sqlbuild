@@ -11,21 +11,21 @@
      "message": "dynamic column family 'status_amounts' inferred as DOUBLE but declared type is VARCHAR",
      "resource_type": "model",
      "resource_name": "customer_totals",
-     "path": "models/marts/customer_totals.sql",
+     "path": "sql/models/marts/customer_totals.sql",
      "help": "correct the family type or the pivot aggregate input type"
     }
    ]
   }
  ],
  "compiled": {
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "PIVOT __ref(\"stg_orders\")",
    "ON status",
    "USING MAX(amount)",
    "GROUP BY customer_id",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "SELECT CAST(order_id AS INTEGER) AS order_id,",
    "  CAST(customer_id AS INTEGER) AS customer_id,",
    "  CAST(amount AS DOUBLE) AS amount, CAST(status AS VARCHAR) AS status",
@@ -41,8 +41,8 @@
     "name": "customer_totals",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/customer_totals.sql",
-    "original_file_path": "models/marts/customer_totals.sql",
+    "path": "sql/models/marts/customer_totals.sql",
+    "original_file_path": "sql/models/marts/customer_totals.sql",
     "unique_id": "model.failure_corpus.customer_totals",
     "fqn": [
      "failure_corpus",
@@ -133,8 +133,8 @@
     "name": "stg_orders",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/staging/stg_orders.sql",
-    "original_file_path": "models/staging/stg_orders.sql",
+    "path": "sql/models/staging/stg_orders.sql",
+    "original_file_path": "sql/models/staging/stg_orders.sql",
     "unique_id": "model.failure_corpus.stg_orders",
     "fqn": [
      "failure_corpus",
@@ -241,8 +241,8 @@
     "name": "raw_orders",
     "resource_type": "source",
     "package_name": "failure_corpus",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.failure_corpus.raw_orders",
     "fqn": [
      "failure_corpus",

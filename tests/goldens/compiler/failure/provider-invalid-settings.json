@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D012",
-     "message": "provider 'export_settings' (providers/export_settings.py) is missing secret API_TOKEN",
+     "message": "provider 'export_settings' (python/providers/export_settings.py) is missing secret API_TOKEN",
      "help": "set API_TOKEN in this shell, or pass --allow-missing-secrets where secrets aren't available"
     }
    ]

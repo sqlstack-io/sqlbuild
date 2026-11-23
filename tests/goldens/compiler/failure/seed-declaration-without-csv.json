@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D008",
-     "message": "Seed declaration 'order_channels' in seeds/order_channels.yml has no matching CSV file under seeds/"
+     "message": "Seed declaration 'order_channels' in sql/seeds/order_channels.yml has no matching CSV file under seeds/"
     }
    ]
   }

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D005",
-     "message": "Seed declaration file seeds/order_channels.yaml must use .yml; .yaml is not supported"
+     "message": "Seed declaration file sql/seeds/order_channels.yaml must use .yml; .yaml is not supported"
     }
    ]
   }

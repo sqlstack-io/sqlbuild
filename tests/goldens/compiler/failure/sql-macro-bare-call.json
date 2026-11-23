@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P014",
-     "message": "macro call @cents() does not say which kind of macro it calls\n  model: stg_orders\n  --> models/staging/stg_orders.sql:5:31",
+     "message": "macro call @cents() does not say which kind of macro it calls\n  model: stg_orders\n  --> sql/models/staging/stg_orders.sql:5:31",
      "help": "write @sql.cents(...) to call a SQL macro or @py.cents(...) to call a Python macro"
     }
    ]

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro '@py.wrapped' in '<project>/models/staging/stg_orders.sql' returned SQLBuild call(s) @py.cents(). Macro output must be final SQL. Compose macros with ordinary Python imports and function calls instead; nested @py.macro() calls are supported only when explicitly authored in SQL"
+     "message": "Macro '@py.wrapped' in '<project>/sql/models/staging/stg_orders.sql' returned SQLBuild call(s) @py.cents(). Macro output must be final SQL. Compose macros with ordinary Python imports and function calls instead; nested @py.macro() calls are supported only when explicitly authored in SQL"
     }
    ]
   }

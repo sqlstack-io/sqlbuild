@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "SQL function file functions/sql/order_label.sql tags entries must be non-empty strings"
+     "message": "SQL function file sql/functions/sql/order_label.sql tags entries must be non-empty strings"
     }
    ]
   }

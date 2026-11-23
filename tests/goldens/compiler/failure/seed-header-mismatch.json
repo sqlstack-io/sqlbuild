@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D008",
-     "message": "seeds/order_channels.csv header ('id', 'name') does not match declared seed columns ('id', 'label') for 'order_channels'"
+     "message": "sql/seeds/order_channels.csv header ('id', 'name') does not match declared seed columns ('id', 'label') for 'order_channels'"
     }
    ]
   }

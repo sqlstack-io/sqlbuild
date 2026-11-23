@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P024",
-     "message": "macro x() declares returns DOUBLE, but its body is VARCHAR\n  model: stg_orders\n  --> models/staging/_sqlbuild/_macros/sql/x.sql:3:1\n  --> models/staging/stg_orders.sql:5:31",
+     "message": "macro x() declares returns DOUBLE, but its body is VARCHAR\n  model: stg_orders\n  --> sql/models/staging/_sqlbuild/_macros/sql/x.sql:3:1\n  --> sql/models/staging/stg_orders.sql:5:31",
      "help": "declare returns VARCHAR, CAST the body to DOUBLE, or remove returns to use the inferred type"
     }
    ]

@@ -42,7 +42,7 @@ _OMITTED_DISCOVERY_FIELDS: frozenset[str] = STAGE_CAPTURE_OMITTED_ATTRIBUTES.get
     "sqlbuild.compiler.discovery.models:DiscoveredProjectInputs", frozenset()
 )
 
-_CROSS_FILE_MACRO_IMPORT: re.Pattern[str] = re.compile(r"^(?:from|import) macros\.", re.MULTILINE)
+_CROSS_FILE_MACRO_IMPORT: re.Pattern[str] = re.compile(r"^(?:from|import) sql\.macros\.", re.MULTILINE)
 _NON_ASCII_COMMENT: re.Pattern[str] = re.compile(r"--[^\n]*[^\x00-\x7f]")
 _NON_ASCII_STRING: re.Pattern[str] = re.compile(r"'[^'\n]*[^\x00-\x7f][^'\n]*'")
 

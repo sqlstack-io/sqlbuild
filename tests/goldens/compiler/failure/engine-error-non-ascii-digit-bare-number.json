@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D013",
-     "message": "<project>/enums/order_priority.sql has the bare number '٣', written with non-ASCII digits",
+     "message": "<project>/sql/enums/order_priority.sql has the bare number '٣', written with non-ASCII digits",
      "help": "Quote it to keep it as text (\"٣\"), or write the number with ASCII digits 0-9"
     }
    ]

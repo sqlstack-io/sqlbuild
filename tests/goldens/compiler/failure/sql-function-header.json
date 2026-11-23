@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D002",
-     "message": "FUNCTION(...) in '<project>/functions/sql/is_placed.sql' contains invalid SQLBuild header syntax: expected value at position 42"
+     "message": "FUNCTION(...) in '<project>/sql/functions/sql/is_placed.sql' contains invalid SQLBuild header syntax: expected value at position 42"
     }
    ]
   }

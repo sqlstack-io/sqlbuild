@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D002",
-     "message": "SQL model '<project>/models/staging/stg_orders.sql' must start with a MODEL(...) header as the first non-whitespace content"
+     "message": "SQL model '<project>/sql/models/staging/stg_orders.sql' must start with a MODEL(...) header as the first non-whitespace content"
     }
    ]
   }

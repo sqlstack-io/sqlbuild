@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D013",
-     "message": "Grouped declaration root models/_sqlbuild/ must be below a concrete owner directory; use the project-wide macros/, enums/, constants/, audits/, schemas/, or hooks/ root instead"
+     "message": "Grouped declaration root sql/models/_sqlbuild/ must be below a concrete owner directory; use the project-wide macros/, enums/, constants/, audits/, schemas/, or hooks/ root instead"
     }
    ]
   }

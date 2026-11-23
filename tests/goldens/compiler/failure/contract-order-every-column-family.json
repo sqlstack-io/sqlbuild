@@ -12,11 +12,11 @@
      "resource_type": "model",
      "resource_name": "stg_orders",
      "column_name": "status",
-     "path": "models/staging/stg_orders.sql",
+     "path": "sql/models/staging/stg_orders.sql",
      "line": 12,
      "column": 64,
      "location": {
-      "path": "models/staging/stg_orders.sql",
+      "path": "sql/models/staging/stg_orders.sql",
       "line": 12,
       "column": 64,
       "end_line": 12,
@@ -32,11 +32,11 @@
      "resource_type": "model",
      "resource_name": "stg_orders",
      "column_name": "order_id",
-     "path": "models/staging/stg_orders.sql",
+     "path": "sql/models/staging/stg_orders.sql",
      "line": 5,
      "column": 5,
      "location": {
-      "path": "models/staging/stg_orders.sql",
+      "path": "sql/models/staging/stg_orders.sql",
       "line": 5,
       "column": 5,
       "end_line": 5,
@@ -46,7 +46,7 @@
       {
        "label": "output",
        "location": {
-        "path": "models/staging/stg_orders.sql",
+        "path": "sql/models/staging/stg_orders.sql",
         "line": 12,
         "column": 8,
         "end_line": 12,
@@ -65,11 +65,11 @@
      "resource_type": "model",
      "resource_name": "stg_orders",
      "column_name": "customer_id",
-     "path": "models/staging/stg_orders.sql",
+     "path": "sql/models/staging/stg_orders.sql",
      "line": 6,
      "column": 5,
      "location": {
-      "path": "models/staging/stg_orders.sql",
+      "path": "sql/models/staging/stg_orders.sql",
       "line": 6,
       "column": 5,
       "end_line": 6,
@@ -79,7 +79,7 @@
       {
        "label": "output",
        "location": {
-        "path": "models/staging/stg_orders.sql",
+        "path": "sql/models/staging/stg_orders.sql",
         "line": 12,
         "column": 18,
         "end_line": 12,
@@ -98,11 +98,11 @@
      "resource_type": "model",
      "resource_name": "stg_orders",
      "column_name": "shipped_at",
-     "path": "models/staging/stg_orders.sql",
+     "path": "sql/models/staging/stg_orders.sql",
      "line": 7,
      "column": 5,
      "location": {
-      "path": "models/staging/stg_orders.sql",
+      "path": "sql/models/staging/stg_orders.sql",
       "line": 7,
       "column": 5,
       "end_line": 7,
@@ -114,13 +114,13 @@
   }
  ],
  "compiled": {
-  "models/marts/customer_totals.sql": [
+  "sql/models/marts/customer_totals.sql": [
    "SELECT customer_id, SUM(amount) AS total_amount",
    "FROM __ref(\"stg_orders\")",
    "GROUP BY customer_id",
    ""
   ],
-  "models/staging/stg_orders.sql": [
+  "sql/models/staging/stg_orders.sql": [
    "SELECT order_id, CAST(NULL AS INTEGER) AS customer_id, amount, status",
    "FROM __source(\"raw_orders\")",
    ""
@@ -134,8 +134,8 @@
     "name": "customer_totals",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/marts/customer_totals.sql",
-    "original_file_path": "models/marts/customer_totals.sql",
+    "path": "sql/models/marts/customer_totals.sql",
+    "original_file_path": "sql/models/marts/customer_totals.sql",
     "unique_id": "model.failure_corpus.customer_totals",
     "fqn": [
      "failure_corpus",
@@ -203,8 +203,8 @@
     "name": "stg_orders",
     "resource_type": "model",
     "package_name": "failure_corpus",
-    "path": "models/staging/stg_orders.sql",
-    "original_file_path": "models/staging/stg_orders.sql",
+    "path": "sql/models/staging/stg_orders.sql",
+    "original_file_path": "sql/models/staging/stg_orders.sql",
     "unique_id": "model.failure_corpus.stg_orders",
     "fqn": [
      "failure_corpus",
@@ -311,8 +311,8 @@
     "name": "raw_orders",
     "resource_type": "source",
     "package_name": "failure_corpus",
-    "path": "sources/raw.yml",
-    "original_file_path": "sources/raw.yml",
+    "path": "sql/sources/raw.yml",
+    "original_file_path": "sql/sources/raw.yml",
     "unique_id": "source.failure_corpus.raw_orders",
     "fqn": [
      "failure_corpus",

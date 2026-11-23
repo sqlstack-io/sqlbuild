@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Model file models/marts/customer_totals.sql references unknown model 'stg_payments'"
+     "message": "Model file sql/models/marts/customer_totals.sql references unknown model 'stg_payments'"
     }
    ]
   }

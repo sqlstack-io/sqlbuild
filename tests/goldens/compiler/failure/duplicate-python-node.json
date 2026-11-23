@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D007",
-     "message": "Duplicate Python node found for 'export_orders' in python/tasks/first.py and python/tasks/second.py; loader, asset, and check names must be globally unique"
+     "message": "Duplicate Python node found for 'export_orders' in python/nodes/tasks/first/asset.py and python/nodes/tasks/second/asset.py; loader, asset, and check names must be globally unique"
     }
    ]
   }

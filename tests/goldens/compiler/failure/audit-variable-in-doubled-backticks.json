@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "unknown project variable '@@floor_amount' in '<project>/models/staging/_sqlbuild/_audits/generic/floor.sql'. Available vars: region"
+     "message": "unknown project variable '@@floor_amount' in '<project>/sql/models/staging/_sqlbuild/_audits/generic/floor.sql'. Available vars: region"
     }
    ]
   }

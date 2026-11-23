@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Unknown member 'HELD' for enum 'staged_status' in '<project>/models/staging/stg_orders.sql'. Available members: PLACED"
+     "message": "Unknown member 'HELD' for enum 'staged_status' in '<project>/sql/models/staging/stg_orders.sql'. Available members: PLACED"
     }
    ]
   }

@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Schema 'order_row' in schemas/orders.sql extends unknown schema 'base_row'"
+     "message": "Schema 'order_row' in sql/schemas/orders.sql extends unknown schema 'base_row'"
     }
    ]
   }

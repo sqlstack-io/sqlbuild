@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro '@py.cents' in '<project>/models/staging/stg_orders.sql' is inaccessible. Defined at 'models/marts/_sqlbuild/_macros/python/orders.py:1:1' with scope owner 'models/marts'; consumer/definition path is '<project>/models/staging/stg_orders.sql'. Visible macros: none"
+     "message": "Macro '@py.cents' in '<project>/sql/models/staging/stg_orders.sql' is inaccessible. Defined at 'sql/models/marts/_sqlbuild/_macros/python/orders.py:1:1' with scope owner 'sql/models/marts'; consumer/definition path is '<project>/sql/models/staging/stg_orders.sql'. Visible macros: none"
     }
    ]
   }

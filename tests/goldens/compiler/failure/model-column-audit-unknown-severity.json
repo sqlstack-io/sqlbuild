@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "models/staging/stg_orders.sql model column 'amount' audit 'not_null' 'severity' must be one of: warn, error"
+     "message": "sql/models/staging/stg_orders.sql model column 'amount' audit 'not_null' 'severity' must be one of: warn, error"
     }
    ]
   }

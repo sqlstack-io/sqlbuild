@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "SQL function functions/sql/order_label.sql returns references unsupported template namespace 'VAR'"
+     "message": "SQL function sql/functions/sql/order_label.sql returns references unsupported template namespace 'VAR'"
     }
    ]
   }

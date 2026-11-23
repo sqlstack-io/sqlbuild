@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D002",
-     "message": "MODEL(...) in '<project>/models/staging/stg_orders.sql:3' contains invalid SQLBuild header syntax: values nest deeper than 256 levels",
+     "message": "MODEL(...) in '<project>/sql/models/staging/stg_orders.sql:3' contains invalid SQLBuild header syntax: values nest deeper than 256 levels",
      "help": "flatten the value so it nests at most 256 levels deep"
     }
    ]
