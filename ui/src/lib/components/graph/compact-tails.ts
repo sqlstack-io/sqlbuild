@@ -59,4 +59,4 @@ export function siblingLeads(cards: { id: string; parent: string }[], tails: Map
 /** The context key a graph canvas gives its cards their pill names under. */
 export const COMPACT_TAILS = Symbol('compact-tails');
 /** A card's pill name and its parent box, by card id; undefined outside a graph canvas. */
-export type CompactTails = { tail: (id: string) => string | undefined; parent: (id: string) => string | undefined; lead: (id: string) => number };
+export type CompactTails = { tail: (id: string) => string | undefined; parent: (id: string) => string | undefined; lead: (id: string) => number; zoom: () => number };

@@ -9,7 +9,7 @@
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import FitControls from '$lib/lineage/fit-controls.svelte';
 	import CountEdge from '$lib/lineage/count-edge.svelte';
-	import { LABEL_MIN_ZOOM, READABLE_ZOOM, compactLevel } from '$lib/lineage/fit';
+	import { LABEL_MIN_ZOOM, READABLE_ZOOM, cardStage, compactLevel } from '$lib/lineage/fit';
 
 	// Every graph in the UI is drawn here, so they share one canvas: the same background, fit controls
 	// and readable fit (a large graph opens on its cards at a zoom where they read, never as dots), and
@@ -121,12 +121,13 @@
 		}
 		press = null;
 	}
-	// Semantic zoom: zoomed out past the point where the cards' lines would no longer read, each card
-	// shows its compact form instead (CompactFace: a one-line pill, its state's ring and its name), by
-	// one class on the canvas; `data-compact` picks the name's fit for the level of zoom, and
-	// `--sb-title-unzoom` keeps the pill's size on screen. Cards keep their size, so edges don't move.
-	// Card controls grow with `--sb-unzoom` so they keep their size.
+	// Semantic zoom in stages (`cardStage`): zoomed out past the point where the cards' status lines would
+	// no longer read, node cards show their name alone, enlarged; further out every card shows its compact
+	// form (CompactFace: a one-line pill, its state's dot and its name), then the dot alone. One class
+	// and `data-stage` on the canvas pick the stage, and `--sb-title-unzoom` keeps the pill's size on
+	// screen. Cards keep their size, so edges don't move. Card controls grow with `--sb-unzoom`.
 	const level = $derived(compactLevel(settledZoom));
+	const stage = $derived(cardStage(settledZoom));
 	// Each card's pill name: the part of its title none of its siblings ends with. Worked out from the
 	// cards' titles and boxes alone, so moving or selecting cards doesn't change it.
 	const cardKey = $derived(nodes.map((n) => `${n.id}\t${n.parentId ?? ''}\t${compactTitleOf(n.data as Record<string, unknown>) ?? ''}`).join('\n'));
@@ -135,13 +136,13 @@
 	const parents = $derived(new Map(titled.map((c) => [c.id, c.parent])));
 	// The prefix each pill name shares with a sibling's, dropped first when it doesn't fit.
 	const leads = $derived(siblingLeads(titled, tails));
-	setContext<CompactTails>(COMPACT_TAILS, { tail: (id) => tails.get(id), parent: (id) => parents.get(id), lead: (id) => leads.get(id) ?? 0 });
+	setContext<CompactTails>(COMPACT_TAILS, { tail: (id) => tails.get(id), parent: (id) => parents.get(id), lead: (id) => leads.get(id) ?? 0, zoom: () => settledZoom });
 	const compact = $derived(level > 0);
 	const titleUnzoom = $derived(compact ? 1 / Math.max(settledZoom, LABEL_MIN_ZOOM) : 1);
 	const controlScale = $derived(unzoom(settledZoom));
 </script>
 
-<div class="graph-canvas sb-flow" class:framed class:compact class:moving class:unfitted={!fitted && nodes.length > 0} data-compact={level || undefined} style:--sb-title-unzoom={titleUnzoom} style:--sb-unzoom={controlScale} bind:this={element} onpointerdowncapture={onpointerdown} onpointermovecapture={onpointermove} onclickcapture={onclick}>
+<div class="graph-canvas sb-flow" class:framed class:compact class:moving class:unfitted={!fitted && nodes.length > 0} data-compact={level || undefined} data-stage={stage} style:--sb-inv={1 / settledZoom} style:--sb-title-unzoom={titleUnzoom} style:--sb-unzoom={controlScale} bind:this={element} onpointerdowncapture={onpointerdown} onpointermovecapture={onpointermove} onclickcapture={onclick}>
 	<SvelteFlow bind:nodes bind:edges edgeTypes={allEdgeTypes} fitView={fitOnInit || undefined} elevateEdgesOnSelect={false} minZoom={0.1} proOptions={{ hideAttribution: true }} {...flow}>
 		<FlowController bind:fitView={fit} bind:fitted bind:viewport bind:setViewport {fitFloor} {readable} />
 		<!-- The dot grid lives in the viewport, so it moves and scales with the graph's layer. -->

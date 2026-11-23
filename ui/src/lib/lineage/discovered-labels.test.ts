@@ -33,11 +33,12 @@ describe('discovered node labels', () => {
 		const lead = 'hierarchy_'.length;
 		expect(pillText('hierarchy_supplier', 12, 15 * 6, measure, lead)).toBe('hierar…supplier');
 		expect(pillText('hierarchy_supplier', 12, 9 * 6, measure, lead)).toBe('…supplier');
-		// A rest too long for the room loses its middle, keeping both its ends.
-		expect(pillText('hierarchy_supplier_regional', 12, 12 * 6, measure, lead)).toMatch(/^…sup.*….*nal$/);
-		// With no shared prefix the middle goes, as before.
-		expect(pillText('transformer_predictions', 12, 15 * 6, measure)).toMatch(/^tran.*….*ions$/);
+		// A rest too long for the room then loses its end.
+		expect(pillText('hierarchy_supplier_regional', 12, 12 * 6, measure, lead)).toBe('…supplier_r…');
+		// With no shared prefix the end goes, never the middle.
+		expect(pillText('transformer_predictions', 12, 15 * 6, measure)).toBe('transformer_pr…');
 	});
+
 
 	it('break long names only after `_ . [ / :`', () => {
 		expect(breakable('forecast_eu[gbm.chain/d1:x]')).toEqual(['forecast_', 'eu[', 'gbm.', 'chain/', 'd1:', 'x]']);
