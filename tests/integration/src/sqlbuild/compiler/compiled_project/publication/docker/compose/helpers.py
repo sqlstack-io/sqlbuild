@@ -318,6 +318,47 @@ WATCHDOG_SCAN_SECONDS: float = 30
 # WEBHOOK_REQUEST_SECONDS, retrying the same event on the next poll.
 WEBHOOK_POLL_SECONDS: float = 5
 WEBHOOK_REQUEST_SECONDS: float = 10
+# `sqb location serve` reports its health, which refreshes last_seen_at, this often.
+LOCATION_REPORT_SECONDS: float = 30
+
+
+def location_check_in_deadline_seconds() -> float:
+    """The longest a running location can take to check in again.
+
+    The next report is due within one report interval. A report that fails or overruns its tick
+    is skipped, so one further interval is allowed as slack.
+    """
+    return 2 * LOCATION_REPORT_SECONDS
+
+
+def wait_for_location_check_in(stack: ComposeStack, *, since: str) -> str:
+    """Wait until the location has reported after `since`, a control-store timestamp.
+
+    An outage is reported once per last_seen_at. If the location has not checked in since the
+    server restarted, stopping it repeats an outage the watchdog may already have reported
+    while the server was down, and no fresh `location_broken` event is sent.
+    """
+    timeout: float = location_check_in_deadline_seconds()
+    deadline: float = time.monotonic() + timeout
+    sql: str = (
+        "SELECT MAX(last_seen_at) AS last_seen_at FROM sqb_location_instances "
+        f"WHERE location_id='{stack.location_id}'"
+    )
+    while True:
+        fresh: list[dict[str, Any]] = stack.query(
+            f"{sql} HAVING MAX(last_seen_at)>'{since}'::timestamptz"
+        )
+        if fresh:
+            return fresh[0]["last_seen_at"]
+        if time.monotonic() >= deadline:
+            latest: list[dict[str, Any]] = stack.query(sql)
+            raise AssertionError(
+                f"Location {stack.location_id} did not check in within {timeout:.0f}s after "
+                f"the server restarted at {since}; its latest check-in is "
+                f"{latest[0]['last_seen_at'] if latest else 'missing'} "
+                f"(logs in {stack.directory})"
+            )
+        time.sleep(0.5)
 
 
 def location_outage_deadline_seconds() -> float:
@@ -333,6 +374,19 @@ def location_outage_deadline_seconds() -> float:
         + 2 * WATCHDOG_SCAN_SECONDS
         + 2 * (WEBHOOK_POLL_SECONDS + WEBHOOK_REQUEST_SECONDS)
     )
+
+
+def stop_location_after_check_in(
+    stack: ComposeStack, events: list[dict[str, Any]], *, since: str
+) -> tuple[set[str], datetime]:
+    """Stop the location once it has checked in after `since`, so the stop starts a fresh outage.
+
+    Returns the IDs of the platform events received before the stop, and when it was stopped.
+    """
+    wait_for_location_check_in(stack, since=since)
+    prior_events: set[str] = {event["event_id"] for event in events}
+    stack.compose("stop", "--timeout", "1", "location")
+    return prior_events, datetime.now(UTC)
 
 
 def wait_for_location_outage(

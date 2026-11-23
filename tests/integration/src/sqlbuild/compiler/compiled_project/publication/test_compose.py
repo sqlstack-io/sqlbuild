@@ -19,6 +19,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.docker.compose.helpers import (
     ComposeStack,
     platform_receiver,
+    stop_location_after_check_in,
     wait_for_location_outage,
 )
 
@@ -175,6 +176,7 @@ def test_given_packaged_services_when_redeployed_and_restarted_then_pinned_runs_
                 time.sleep(0.5)
             assert stack.query("SELECT count(*) AS count FROM sqb_runs")[0]["count"] == before
             stack.compose("up", "-d", "--wait", "server")
+            server_restarted_at: str = stack.query("SELECT now() AS now")[0]["now"]
             stack.wait(
                 f"SELECT r.run_id,r.status,t.scheduled_for FROM sqb_runs r JOIN sqb_ticks t USING(tick_id) WHERE t.scheduled_for='{due}' AND r.status='success'"
             )
@@ -185,9 +187,9 @@ def test_given_packaged_services_when_redeployed_and_restarted_then_pinned_runs_
                 == []
             )
 
-            prior_events: set[str] = {event["event_id"] for event in events}
-            stack.compose("stop", "--timeout", "1", "location")
-            stopped_at: datetime = datetime.now(UTC)
+            prior_events, stopped_at = stop_location_after_check_in(
+                stack, events, since=server_restarted_at
+            )
             broken: dict[str, Any] = wait_for_location_outage(
                 events,
                 prior_events,
