@@ -1049,14 +1049,29 @@ pub struct DiscoveredSetReadback {
     pub last_good_at: Option<DateTime<Utc>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub digest: Option<String>,
-    /// The tags of the result the set serves: its newest, or its last good one after a failure.
-    #[schema(value_type = Object)]
-    pub tags: std::collections::BTreeMap<String, serde_json::Value>,
+    /// The tags of the result the set serves (its newest, or its last good one), each as text.
+    pub tags: std::collections::BTreeMap<String, String>,
     pub items: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check_every_seconds: Option<u64>,
+    /// The `for_each` assets that read the set.
+    pub assets: Vec<String>,
+    /// The node each served item became under each of `assets`, or each asset's placeholder.
+    pub nodes: Vec<DiscoveredNodeReadback>,
+}
+
+/// The node one item of a discovered set became under one `for_each` asset.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct DiscoveredNodeReadback {
+    /// The node key, `asset:<asset>[<item>]`.
+    pub key: String,
+    pub asset: String,
+    /// The item's ID, or `*` for the placeholder of a set that never succeeded.
+    pub step: String,
+    /// The item's arguments; one that is not a string reads as its JSON text.
+    pub args: std::collections::BTreeMap<String, String>,
 }
 
 /// The discovered sets of a target's current snapshot; empty when it saved none.

@@ -2281,6 +2281,18 @@ export interface components {
             /** @enum {string} */
             status: "unavailable";
         };
+        /** @description The node one item of a discovered set became under one `for_each` asset. */
+        DiscoveredNodeReadback: {
+            /** @description The item's arguments; one that is not a string reads as its JSON text. */
+            args: {
+                [key: string]: string;
+            };
+            asset: string;
+            /** @description The node key, `asset:<asset>[<item>]`. */
+            key: string;
+            /** @description The item's ID, or `*` for the placeholder of a set that never succeeded. */
+            step: string;
+        };
         /** @description The discovered sets of a target's current snapshot; empty when it saved none. */
         DiscoveredReadback: {
             /** Format: int64 */
@@ -2293,6 +2305,8 @@ export interface components {
         };
         /** @description One discovered set of the current snapshot, as a deploy reads it back. */
         DiscoveredSetReadback: {
+            /** @description The `for_each` assets that read the set. */
+            assets: string[];
             /** Format: int64 */
             check_every_seconds?: number | null;
             digest?: string | null;
@@ -2304,9 +2318,19 @@ export interface components {
             /** Format: date-time */
             last_good_at?: string | null;
             name: string;
+            /**
+             * @description The node each item of the served result became under each of `assets`, or each asset's
+             *     placeholder node for a set that never succeeded.
+             */
+            nodes: components["schemas"]["DiscoveredNodeReadback"][];
             status: components["schemas"]["DiscoveredSetStatus"];
-            /** @description The tags of the result the set serves: its newest, or its last good one after a failure. */
-            tags: Record<string, never>;
+            /**
+             * @description The tags of the result the set serves: its newest, or its last good one after a failure. A tag
+             *     that is not a string reads as its JSON text.
+             */
+            tags: {
+                [key: string]: string;
+            };
         };
         /**
          * @description How a set's newest attempt went.

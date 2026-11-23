@@ -119,3 +119,4 @@ def test_given_no_items_when_checking_and_publishing_then_the_set_fails_and_the_
     kept: list[dict[str, Any]] = saved.get("result", {"items": []})["items"]
     assert tuple(item["id"] for item in kept) == test_case.expected_kept_items
     assert "fulfilment_plan" in health and "failed" in health, health
+    assert second["documents"]["discovered_assets"] == {"fulfilment_plan": ["fulfil"]}

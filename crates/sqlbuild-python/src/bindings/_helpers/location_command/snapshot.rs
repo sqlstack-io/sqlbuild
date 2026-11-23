@@ -10,12 +10,15 @@ use sqlbuild_analysis::planner_scope::main::node_loads::node_loads;
 use sqlbuild_core::models::DiagnosticSeverity;
 use sqlbuild_discovery::orchestration_files::models::OrchestrationInventory;
 use sqlbuild_discovery::project_validation::main::validate_orchestration_names::validate_orchestration_names;
-use sqlbuild_orchestration::discovered_sets::constants::DISCOVERED_DOCUMENT;
+use sqlbuild_orchestration::discovered_sets::constants::{
+    DISCOVERED_ASSETS_DOCUMENT, DISCOVERED_DOCUMENT,
+};
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::orchestration_reads::main::environment_hash::environment_hash;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_front::command_runtime::main::published_concurrency::published_concurrency;
+use sqlbuild_python_front::discovered_sets::main::for_each_assets::for_each_assets;
 use sqlbuild_python_front::discovered_sets::main::used_discovered_sets::used_discovered_sets;
 use sqlbuild_python_front::discovery::main::project::named_node_rows::named_node_rows;
 use sqlbuild_python_front::discovery::main::project::project_facts::project_facts;
@@ -114,6 +117,10 @@ pub(crate) fn orchestration_snapshot<'py>(
         let document = serde_json::to_value(&sets)
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
         input.documents.insert(DISCOVERED_DOCUMENT.into(), document);
+        input.documents.insert(
+            DISCOVERED_ASSETS_DOCUMENT.into(),
+            json!(for_each_assets(&discovered_inputs)?),
+        );
     }
     let graph = project.lineage_graph(py)?;
     let inventory = if declared {

@@ -56,7 +56,7 @@ CREATE TABLE sqb_snapshot_sources (
 );
 CREATE TABLE sqb_snapshot_documents (
     snapshot_id {uuid} NOT NULL REFERENCES sqb_snapshots(snapshot_id),
-    kind TEXT NOT NULL CHECK (kind IN ('jobs', 'groups', 'triggers', 'roles', 'lineage', 'columns', 'providers', 'connection', 'discovered')),
+    kind TEXT NOT NULL CHECK (kind IN ('jobs', 'groups', 'triggers', 'roles', 'lineage', 'columns', 'providers', 'connection', 'discovered', 'discovered_assets')),
     document_hash TEXT NOT NULL REFERENCES sqb_documents(document_hash),
     PRIMARY KEY (snapshot_id, kind)
 );

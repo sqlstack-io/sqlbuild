@@ -9,8 +9,8 @@ use crate::node_set_dependencies::_helpers::labels::{
     excluding, listed, node_label, node_name, set_label,
 };
 use crate::node_set_dependencies::constants::{
-    DEPENDABLE_PYTHON_KINDS, DEPENDABLE_SQL_KINDS, JOB_SET, LOCATION_SEPARATOR,
-    NODE_SET_CODE, TAG_SET,
+    DEPENDABLE_PYTHON_KINDS, DEPENDABLE_SQL_KINDS, JOB_SET, LOCATION_SEPARATOR, NODE_SET_CODE,
+    TAG_SET,
 };
 use crate::node_set_dependencies::models::{
     DependantNode, GraphNode, NodeSetDependency, ResolvedNode,

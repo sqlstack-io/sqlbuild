@@ -1,5 +1,6 @@
 pub mod checked_set;
 pub mod discover_for_publication;
+pub mod for_each_assets;
 pub mod publish_only_placeholders;
 pub mod published_sets;
 pub mod record_tag_failures;
