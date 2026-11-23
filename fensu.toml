@@ -1682,6 +1682,11 @@ reason = "The interrupter thread polls for the event that starts the interrupt a
 
 [[targets.python.rule_exceptions]]
 rule = "FFT104"
+path = "tests/integration/src/sqlbuild/compiler/compiled_project/publication/docker/compose/helpers.py"
+reason = "The Compose outage helpers poll a real server, location and webhook receiver until a fresh check-in or delivery arrives or a deadline passes, and describe what arrived on failure; the tests using them remain branch-free."
+
+[[targets.python.rule_exceptions]]
+rule = "FFT104"
 path = "tests/unit/src/sqlbuild/python_nodes/helpers.py"
 reason = "node_module_files rewrites an inline node module into one kind-named file per declaration by walking its syntax tree, which needs branches by node kind; the tests that call it remain branch-free."
 

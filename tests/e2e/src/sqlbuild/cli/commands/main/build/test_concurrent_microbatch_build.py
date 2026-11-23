@@ -321,11 +321,12 @@ def test_given_later_batches_succeed_when_one_batch_fails_then_next_run_preserve
         command=("--no-color", "build"), project_dir=project_dir
     )
     assert failed.returncode != 0
-    failed_run_completion_starts: set[str] = {
-        row[1]
-        for row in query_duckdb(db_path=db_path, sql=completion_events_sql)
-        if row[0] not in initial_completion_ids
-    }
+    completion_starts: dict[str, str] = dict(
+        query_duckdb(db_path=db_path, sql=completion_events_sql)
+    )
+    failed_run_completion_starts: set[str] = set(
+        map(completion_starts.__getitem__, completion_starts.keys() - initial_completion_ids)
+    )
     # The failing 02:00 batch records no completion. Its 03:00 sibling is handed to a worker
     # before the coordinator runs 04:00 itself, and sibling failures are only examined after
     # 04:00 finishes, so both always complete. Whether 05:00 and 06:00 also start before the
