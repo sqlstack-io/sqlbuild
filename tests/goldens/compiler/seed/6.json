@@ -263,21 +263,9 @@
    "  )",
    ""
   ],
-  "audits/generic/fulfillment_summary_0/not_null__id.sql": [
-   "SELECT id",
-   "FROM __ref(\"fulfillment_summary_0\")",
-   "WHERE id IS NULL",
-   ""
-  ],
   "audits/generic/sales_summary_0/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"sales_summary_0\")",
-   "WHERE id IS NULL",
-   ""
-  ],
-  "audits/generic/sales_summary_1/not_null__id.sql": [
-   "SELECT id",
-   "FROM __ref(\"sales_summary_1\")",
    "WHERE id IS NULL",
    ""
   ],
@@ -300,15 +288,33 @@
    "WHERE id IS NULL",
    ""
   ],
+  "audits/generic/stg_fulfillment_1/not_null__id.sql": [
+   "SELECT id",
+   "FROM __ref(\"stg_fulfillment_1\")",
+   "WHERE id IS NULL",
+   ""
+  ],
   "audits/generic/stg_fulfillment_2/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"stg_fulfillment_2\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/stg_inventory_1/not_null__id.sql": [
+  "audits/generic/stg_inventory_0/not_null__id.sql": [
    "SELECT id",
-   "FROM __ref(\"stg_inventory_1\")",
+   "FROM __ref(\"stg_inventory_0\")",
+   "WHERE id IS NULL",
+   ""
+  ],
+  "audits/generic/stg_inventory_2/not_null__id.sql": [
+   "SELECT id",
+   "FROM __ref(\"stg_inventory_2\")",
+   "WHERE id IS NULL",
+   ""
+  ],
+  "audits/generic/stg_sales_0/not_null__id.sql": [
+   "SELECT id",
+   "FROM __ref(\"stg_sales_0\")",
    "WHERE id IS NULL",
    ""
   ],
@@ -445,8 +451,7 @@
    "  t.status,",
    "  t.created_at,",
    "  3 AS priority,",
-   "  'Ελληνικά orders' AS threshold_0_label,",
-   "  '東京 warehouse' AS site_label",
+   "  'Ελληνικά orders' AS threshold_0_label",
    "FROM __source(\"raw_events_0\") t",
    ""
   ],
@@ -455,7 +460,8 @@
    "  t.id,",
    "  t.amount,",
    "  t.status,",
-   "  t.created_at",
+   "  t.created_at,",
+   "  '東京 warehouse' AS site_label",
    "FROM __source(\"raw_events_0\") t",
    ""
   ],
@@ -493,8 +499,7 @@
    "  t.id,",
    "  t.amount,",
    "  t.status,",
-   "  t.created_at,",
-   "  '東京 warehouse' AS site_label",
+   "  t.created_at",
    "FROM __source(\"raw_events_0\") t",
    ""
   ],
@@ -513,8 +518,7 @@
    "  t.amount,",
    "  t.status,",
    "  t.created_at,",
-   "  ROUND(ROUND((t.amount * 2), 2), 2) AS adjust_0_amount,",
-   "  '東京 warehouse' AS site_label",
+   "  ROUND(ROUND((t.amount * 2), 2), 2) AS adjust_0_amount",
    "FROM __source(\"raw_events_0\") t",
    ""
   ],
@@ -1591,8 +1595,8 @@
           "channel": "café ☕ counter"
          },
          "relative_path": "models/features/_sqlbuild/_hooks/python/notify.py",
-         "definition_hash": "55440ff19f0c4f231ad57d453227a3c9d584b81234ee4b3338a39ccdf59814a8",
-         "version_hash": "03b4f786f8ab2736e5be2e4de5016bd16ea44d84beca000ec2a53a397e503eb6"
+         "definition_hash": "4669f6863eaccfebdb6aa5286a58eb944d8b0142ea2bc8e6678cce4efb35bf7e",
+         "version_hash": "80b0b3a25244f0def68efcbecd29182bfa91d76b9272c4d2147d08ae88260fa2"
         }
        ]
       }
@@ -1951,18 +1955,7 @@
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
-     "post-hook": [
-      {
-       "sql": "SELECT 'main.fulfillment_summary_0' AS refreshed_relation, 'Ελληνικά orders' AS refresh_label",
-       "transaction": true,
-       "index": 0
-      },
-      {
-       "sql": "SELECT 'main.fulfillment_summary_0' AS refreshed",
-       "transaction": true,
-       "index": 1
-      }
-     ],
+     "post-hook": [],
      "pre-hook": [],
      "quoting": {},
      "column_types": {},
@@ -1986,41 +1979,8 @@
      "marts"
     ],
     "description": "Summary of fulfillment activity 0",
-    "columns": {
-     "id": {
-      "name": "id",
-      "description": "",
-      "meta": {},
-      "data_type": null,
-      "constraints": [],
-      "quote": null,
-      "tags": []
-     }
-    },
-    "meta": {
-     "sqlbuild": {
-      "lifecycle_hooks": {
-       "post_hooks": [
-        {
-         "type": "sql",
-         "statement": "SELECT 'main.fulfillment_summary_0' AS refreshed_relation, 'Ελληνικά orders' AS refresh_label",
-         "name": "record_refresh",
-         "relative_path": "hooks/sql/record_refresh.sql",
-         "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
-         "kwargs": {
-          "relation": "@@CTX:destination.qualified",
-          "label": "Ελληνικά orders"
-         },
-         "description": "Record a refresh for one relation"
-        },
-        {
-         "type": "sql",
-         "statement": "SELECT 'main.fulfillment_summary_0' AS refreshed"
-        }
-       ]
-      }
-     }
-    },
+    "columns": {},
+    "meta": {},
     "group": null,
     "docs": {
      "show": true,
@@ -2177,7 +2137,17 @@
      "staging"
     ],
     "description": "Staged fulfillment events 1 (東京 warehouse)",
-    "columns": {},
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
     "meta": {},
     "group": null,
     "docs": {
@@ -2555,7 +2525,17 @@
      "staging"
     ],
     "description": "Staged inventory events 0 (Ελληνικά orders)",
-    "columns": {},
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
     "meta": {},
     "group": null,
     "docs": {
@@ -2629,17 +2609,7 @@
      "staging"
     ],
     "description": "Staged inventory events 1",
-    "columns": {
-     "id": {
-      "name": "id",
-      "description": "",
-      "meta": {},
-      "data_type": null,
-      "constraints": [],
-      "quote": null,
-      "tags": []
-     }
-    },
+    "columns": {},
     "meta": {},
     "group": null,
     "docs": {
@@ -2713,7 +2683,17 @@
      "staging"
     ],
     "description": "Staged inventory events 2",
-    "columns": {},
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
     "meta": {},
     "group": null,
     "docs": {
@@ -2930,7 +2910,7 @@
      "persist_docs": {},
      "post-hook": [
       {
-       "sql": "SELECT 'main.sales_summary_0' AS refreshed_relation, '東京 warehouse' AS refresh_label",
+       "sql": "SELECT 'main.sales_summary_0' AS refreshed_relation, 'naïve résumé' AS refresh_label",
        "transaction": true,
        "index": 0
       },
@@ -2977,13 +2957,13 @@
        "post_hooks": [
         {
          "type": "sql",
-         "statement": "SELECT 'main.sales_summary_0' AS refreshed_relation, '東京 warehouse' AS refresh_label",
+         "statement": "SELECT 'main.sales_summary_0' AS refreshed_relation, 'naïve résumé' AS refresh_label",
          "name": "record_refresh",
          "relative_path": "hooks/sql/record_refresh.sql",
          "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
          "kwargs": {
           "relation": "@@CTX:destination.qualified",
-          "label": "東京 warehouse"
+          "label": "naïve résumé"
          },
          "description": "Record a refresh for one relation"
         },
@@ -3042,7 +3022,18 @@
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
-     "post-hook": [],
+     "post-hook": [
+      {
+       "sql": "SELECT 'main.sales_summary_1' AS refreshed_relation, 'café ☕ counter' AS refresh_label",
+       "transaction": true,
+       "index": 0
+      },
+      {
+       "sql": "SELECT 'main.sales_summary_1' AS refreshed",
+       "transaction": true,
+       "index": 1
+      }
+     ],
      "pre-hook": [],
      "quoting": {},
      "column_types": {},
@@ -3063,18 +3054,31 @@
     },
     "tags": [],
     "description": "Summary of sales activity 1 (café ☕ counter)",
-    "columns": {
-     "id": {
-      "name": "id",
-      "description": "",
-      "meta": {},
-      "data_type": null,
-      "constraints": [],
-      "quote": null,
-      "tags": []
+    "columns": {},
+    "meta": {
+     "sqlbuild": {
+      "lifecycle_hooks": {
+       "post_hooks": [
+        {
+         "type": "sql",
+         "statement": "SELECT 'main.sales_summary_1' AS refreshed_relation, 'café ☕ counter' AS refresh_label",
+         "name": "record_refresh",
+         "relative_path": "hooks/sql/record_refresh.sql",
+         "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
+         "kwargs": {
+          "relation": "@@CTX:destination.qualified",
+          "label": "café ☕ counter"
+         },
+         "description": "Record a refresh for one relation"
+        },
+        {
+         "type": "sql",
+         "statement": "SELECT 'main.sales_summary_1' AS refreshed"
+        }
+       ]
+      }
      }
     },
-    "meta": {},
     "group": null,
     "docs": {
      "show": true,
@@ -3148,7 +3152,17 @@
      "staging"
     ],
     "description": "Staged sales events 0",
-    "columns": {},
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
     "meta": {},
     "group": null,
     "docs": {

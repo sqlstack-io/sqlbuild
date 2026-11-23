@@ -2,163 +2,3566 @@
  "commands": [
   {
    "label": "compile",
-   "exit_code": 1,
-   "diagnostics": [
-    {
-     "phase": "compile",
-     "severity": "error",
-     "code": "P001",
-     "message": "Model file models/sales/marts/sales_summary_1.sql references unknown model 'missing_model'"
-    }
-   ]
+   "exit_code": 0,
+   "diagnostics": []
   },
   {
    "label": "compile-store-warm",
-   "exit_code": 1,
-   "diagnostics": [
-    {
-     "phase": "compile",
-     "severity": "error",
-     "code": "P001",
-     "message": "Model file models/sales/marts/sales_summary_1.sql references unknown model 'missing_model'"
-    }
-   ]
+   "exit_code": 0,
+   "diagnostics": []
   },
   {
    "label": "plan",
-   "exit_code": 1,
-   "diagnostics": [
-    "Project discovery  START",
-    "Project assembly  START",
-    "Declaration parsing  START",
-    "Declaration parsing  OK  (<elapsed>)",
-    "Python discovery  START",
-    "Python discovery  OK  (<elapsed>)",
-    "Project assembly  OK  (<elapsed>)",
-    "Project discovery  OK  (<elapsed>)",
-    "Compiling project...",
-    "error[P001]: Model file models/sales/marts/sales_summary_1.sql references unknown model 'missing_model'",
-    "",
-    ""
-   ]
+   "exit_code": 0,
+   "diagnostics": []
   },
   {
    "label": "compile-select",
-   "exit_code": 1,
-   "diagnostics": [
-    {
-     "phase": "compile",
-     "severity": "error",
-     "code": "P001",
-     "message": "Model file models/sales/marts/sales_summary_1.sql references unknown model 'missing_model'"
-    }
-   ]
+   "exit_code": 0,
+   "diagnostics": []
   },
   {
    "label": "compile-no-analysis",
-   "exit_code": 1,
-   "diagnostics": [
-    {
-     "phase": "compile",
-     "severity": "error",
-     "code": "P001",
-     "message": "Model file models/sales/marts/sales_summary_1.sql references unknown model 'missing_model'"
-    }
-   ]
+   "exit_code": 0,
+   "diagnostics": []
   },
   {
    "label": "compile-rich-lineage",
-   "exit_code": 1,
-   "diagnostics": [
-    {
-     "phase": "compile",
-     "severity": "error",
-     "code": "P001",
-     "message": "Model file models/sales/marts/sales_summary_1.sql references unknown model 'missing_model'"
-    }
-   ]
+   "exit_code": 0,
+   "diagnostics": []
   },
   {
    "label": "lineage-rich-upstream",
-   "exit_code": 1,
-   "diagnostics": [
-    "Project discovery  START",
-    "Project assembly  START",
-    "Declaration parsing  START",
-    "Declaration parsing  OK  (<elapsed>)",
-    "Python discovery  START",
-    "Python discovery  OK  (<elapsed>)",
-    "Project assembly  OK  (<elapsed>)",
-    "Project discovery  OK  (<elapsed>)",
-    "error[P001]: Model file models/sales/marts/sales_summary_1.sql references unknown model 'missing_model'",
-    "",
-    ""
-   ],
-   "stdout": [
-    ""
-   ]
+   "exit_code": 0,
+   "diagnostics": [],
+   "stdout": {
+    "target": {
+     "resource_type": "model",
+     "resource_name": "cte_facts_stg_sales_2",
+     "column_name": "amount"
+    },
+    "direction": "upstream",
+    "metadata": {
+     "mode": "rich",
+     "max_depth": null,
+     "analyzed_models": 2,
+     "truncated": false
+    },
+    "trace": [
+     {
+      "source": {
+       "resource_type": "model",
+       "resource_name": "stg_sales_2",
+       "column_name": "amount"
+      },
+      "target": {
+       "resource_type": "model",
+       "resource_name": "cte_facts_stg_sales_2",
+       "column_name": "amount"
+      },
+      "transform": "direct",
+      "confidence": "high"
+     },
+     {
+      "source": {
+       "resource_type": "source",
+       "resource_name": "raw_events_0",
+       "column_name": "amount"
+      },
+      "target": {
+       "resource_type": "model",
+       "resource_name": "stg_sales_2",
+       "column_name": "amount"
+      },
+      "transform": "direct",
+      "confidence": "high"
+     }
+    ]
+   }
   },
   {
    "label": "lineage-rich-downstream",
-   "exit_code": 1,
-   "diagnostics": [
-    "Project discovery  START",
-    "Project assembly  START",
-    "Declaration parsing  START",
-    "Declaration parsing  OK  (<elapsed>)",
-    "Python discovery  START",
-    "Python discovery  OK  (<elapsed>)",
-    "Project assembly  OK  (<elapsed>)",
-    "Project discovery  OK  (<elapsed>)",
-    "error[P001]: Model file models/sales/marts/sales_summary_1.sql references unknown model 'missing_model'",
-    "",
-    ""
-   ],
-   "stdout": [
-    ""
-   ]
+   "exit_code": 0,
+   "diagnostics": [],
+   "stdout": {
+    "target": {
+     "resource_type": "model",
+     "resource_name": "stg_sales_2",
+     "column_name": "amount"
+    },
+    "direction": "downstream",
+    "metadata": {
+     "mode": "rich",
+     "max_depth": null,
+     "analyzed_models": 9,
+     "truncated": false
+    },
+    "trace": [
+     {
+      "source": {
+       "resource_type": "model",
+       "resource_name": "stg_sales_2",
+       "column_name": "amount"
+      },
+      "target": {
+       "resource_type": "model",
+       "resource_name": "checked_stg_sales_2",
+       "column_name": "amount"
+      },
+      "transform": "direct",
+      "confidence": "high"
+     },
+     {
+      "source": {
+       "resource_type": "model",
+       "resource_name": "stg_sales_2",
+       "column_name": "amount"
+      },
+      "target": {
+       "resource_type": "model",
+       "resource_name": "cte_facts_stg_sales_2",
+       "column_name": "amount"
+      },
+      "transform": "direct",
+      "confidence": "high"
+     },
+     {
+      "source": {
+       "resource_type": "model",
+       "resource_name": "stg_sales_2",
+       "column_name": "amount"
+      },
+      "target": {
+       "resource_type": "model",
+       "resource_name": "every_stg_sales_2",
+       "column_name": "amount"
+      },
+      "transform": "star",
+      "confidence": "medium"
+     },
+     {
+      "source": {
+       "resource_type": "model",
+       "resource_name": "stg_sales_2",
+       "column_name": "amount"
+      },
+      "target": {
+       "resource_type": "model",
+       "resource_name": "typed_stg_sales_2",
+       "column_name": "doubled_amount"
+      },
+      "transform": "expression",
+      "confidence": "high"
+     },
+     {
+      "source": {
+       "resource_type": "model",
+       "resource_name": "stg_sales_2",
+       "column_name": "amount"
+      },
+      "target": {
+       "resource_type": "model",
+       "resource_name": "check_history_stg_sales_2",
+       "column_name": "amount"
+      },
+      "transform": "direct",
+      "confidence": "high"
+     }
+    ]
+   }
   },
   {
    "label": "lineage-fast-upstream",
-   "exit_code": 1,
-   "diagnostics": [
-    "Project discovery  START",
-    "Project assembly  START",
-    "Declaration parsing  START",
-    "Declaration parsing  OK  (<elapsed>)",
-    "Python discovery  START",
-    "Python discovery  OK  (<elapsed>)",
-    "Project assembly  OK  (<elapsed>)",
-    "Project discovery  OK  (<elapsed>)",
-    "error[P001]: Model file models/sales/marts/sales_summary_1.sql references unknown model 'missing_model'",
-    "",
-    ""
-   ],
-   "stdout": [
-    ""
-   ]
+   "exit_code": 0,
+   "diagnostics": [],
+   "stdout": {
+    "target": {
+     "resource_type": "model",
+     "resource_name": "cte_facts_stg_sales_2",
+     "column_name": "amount"
+    },
+    "direction": "upstream",
+    "metadata": {
+     "mode": "fast",
+     "max_depth": null,
+     "analyzed_models": 2,
+     "truncated": false
+    },
+    "trace": [
+     {
+      "source": {
+       "resource_type": "model",
+       "resource_name": "stg_sales_2",
+       "column_name": "amount"
+      },
+      "target": {
+       "resource_type": "model",
+       "resource_name": "cte_facts_stg_sales_2",
+       "column_name": "amount"
+      },
+      "transform": "cast",
+      "confidence": "high"
+     },
+     {
+      "source": {
+       "resource_type": "source",
+       "resource_name": "raw_events_0",
+       "column_name": "amount"
+      },
+      "target": {
+       "resource_type": "model",
+       "resource_name": "stg_sales_2",
+       "column_name": "amount"
+      },
+      "transform": "direct",
+      "confidence": "high"
+     }
+    ]
+   }
   },
   {
    "label": "lineage-relations",
-   "exit_code": 1,
-   "diagnostics": [
-    "Project discovery  START",
-    "Project assembly  START",
-    "Declaration parsing  START",
-    "Declaration parsing  OK  (<elapsed>)",
-    "Python discovery  START",
-    "Python discovery  OK  (<elapsed>)",
-    "Project assembly  OK  (<elapsed>)",
-    "Project discovery  OK  (<elapsed>)",
-    "error[P001]: Model file models/sales/marts/sales_summary_1.sql references unknown model 'missing_model'",
-    "",
-    ""
-   ],
-   "stdout": [
-    ""
-   ]
+   "exit_code": 0,
+   "diagnostics": [],
+   "stdout": {
+    "nodes": [
+     {
+      "id": "model:check_history_stg_sales_2",
+      "name": "check_history_stg_sales_2",
+      "resource_type": "model",
+      "relative_path": "models/features/check_history_stg_sales_2.sql",
+      "qualified_name": "analytics.check_history_stg_sales_2"
+     },
+     {
+      "id": "model:checked_stg_sales_2",
+      "name": "checked_stg_sales_2",
+      "resource_type": "model",
+      "relative_path": "models/analysis/checked_stg_sales_2.sql",
+      "qualified_name": "analytics.checked_stg_sales_2"
+     },
+     {
+      "id": "model:combined_stg_sales_2",
+      "name": "combined_stg_sales_2",
+      "resource_type": "model",
+      "relative_path": "models/analysis/combined_stg_sales_2.sql",
+      "qualified_name": "analytics.combined_stg_sales_2"
+     },
+     {
+      "id": "model:cte_facts_stg_sales_2",
+      "name": "cte_facts_stg_sales_2",
+      "resource_type": "model",
+      "relative_path": "models/analysis/cte_facts_stg_sales_2.sql",
+      "qualified_name": "analytics.cte_facts_stg_sales_2"
+     },
+     {
+      "id": "model:every_stg_sales_2",
+      "name": "every_stg_sales_2",
+      "resource_type": "model",
+      "relative_path": "models/analysis/every_stg_sales_2.sql",
+      "qualified_name": "analytics.every_stg_sales_2"
+     },
+     {
+      "id": "model:passed_stg_sales_2",
+      "name": "passed_stg_sales_2",
+      "resource_type": "model",
+      "relative_path": "models/analysis/passed_stg_sales_2.sql",
+      "qualified_name": "analytics.passed_stg_sales_2"
+     },
+     {
+      "id": "model:sales_summary_1",
+      "name": "sales_summary_1",
+      "resource_type": "model",
+      "relative_path": "models/sales/marts/sales_summary_1.sql",
+      "qualified_name": "analytics.sales_summary_1"
+     },
+     {
+      "id": "model:stg_sales_2",
+      "name": "stg_sales_2",
+      "resource_type": "model",
+      "relative_path": "models/sales/staging/stg_sales_2.sql",
+      "qualified_name": "analytics.stg_sales_2"
+     },
+     {
+      "id": "model:typed_stg_sales_2",
+      "name": "typed_stg_sales_2",
+      "resource_type": "model",
+      "relative_path": "models/analysis/typed_stg_sales_2.sql",
+      "qualified_name": "analytics.typed_stg_sales_2"
+     },
+     {
+      "id": "source:raw_events_0",
+      "name": "raw_events_0",
+      "resource_type": "source",
+      "relative_path": "sources/raw.yml"
+     }
+    ],
+    "edges": [
+     {
+      "from": "model:stg_sales_2",
+      "to": "model:check_history_stg_sales_2"
+     },
+     {
+      "from": "model:stg_sales_2",
+      "to": "model:checked_stg_sales_2"
+     },
+     {
+      "from": "model:stg_sales_2",
+      "to": "model:combined_stg_sales_2"
+     },
+     {
+      "from": "model:stg_sales_2",
+      "to": "model:cte_facts_stg_sales_2"
+     },
+     {
+      "from": "model:stg_sales_2",
+      "to": "model:every_stg_sales_2"
+     },
+     {
+      "from": "model:stg_sales_2",
+      "to": "model:passed_stg_sales_2"
+     },
+     {
+      "from": "model:stg_sales_2",
+      "to": "model:sales_summary_1"
+     },
+     {
+      "from": "source:raw_events_0",
+      "to": "model:stg_sales_2"
+     },
+     {
+      "from": "model:stg_sales_2",
+      "to": "model:typed_stg_sales_2"
+     }
+    ],
+    "focus": [
+     "model:stg_sales_2"
+    ],
+    "direction": "both"
+   }
   }
  ],
- "compiled": {},
- "manifest": null
+ "compiled": {
+  "audits/generic/audited_stg_sales_0/id_present__id.sql": [
+   "SELECT id",
+   "FROM __ref(\"audited_stg_sales_0\")",
+   "WHERE id IS NULL",
+   ""
+  ],
+  "audits/generic/checked_stg_sales_2/accepted_values__status.sql": [
+   "SELECT status",
+   "FROM __ref(\"checked_stg_sales_2\")",
+   "WHERE status IS NOT NULL",
+   "  AND status NOT IN ('placed', 'expédié', '取消', 'returned ✓')",
+   ""
+  ],
+  "audits/generic/checked_stg_sales_2/expression_is_true.sql": [
+   "SELECT *",
+   "FROM __ref(\"checked_stg_sales_2\")",
+   "WHERE NOT (amount >= -1000)",
+   ""
+  ],
+  "audits/generic/checked_stg_sales_2/relationships__id.sql": [
+   "SELECT id",
+   "FROM __ref(\"checked_stg_sales_2\")",
+   "WHERE id IS NOT NULL",
+   "  AND id NOT IN (",
+   "    SELECT id",
+   "    FROM __ref(\"stg_sales_2\")",
+   "    WHERE id IS NOT NULL",
+   "  )",
+   ""
+  ],
+  "audits/generic/sales_summary_0/not_null__id.sql": [
+   "SELECT id",
+   "FROM __ref(\"sales_summary_0\")",
+   "WHERE id IS NULL",
+   ""
+  ],
+  "audits/generic/sales_summary_1/not_null__id.sql": [
+   "SELECT id",
+   "FROM __ref(\"sales_summary_1\")",
+   "WHERE id IS NULL",
+   ""
+  ],
+  "audits/generic/stated_stg_sales_1/accepted_values__status.sql": [
+   "SELECT status",
+   "FROM __ref(\"stated_stg_sales_1\")",
+   "WHERE status IS NOT NULL",
+   "  AND status NOT IN ('placed', 'expédié', '取消', 'returned ✓')",
+   ""
+  ],
+  "audits/generic/stg_sales_1/not_null__id.sql": [
+   "SELECT id",
+   "FROM __ref(\"stg_sales_1\")",
+   "WHERE id IS NULL",
+   ""
+  ],
+  "audits/generic/stg_sales_2/not_null__id.sql": [
+   "SELECT id",
+   "FROM __ref(\"stg_sales_2\")",
+   "WHERE id IS NULL",
+   ""
+  ],
+  "functions/python/is_large.sql": [
+   "REGISTER PYTHON FUNCTION is_large(DOUBLE) RETURNS BOOLEAN",
+   ""
+  ],
+  "functions/sql/is_placed.sql": [
+   "CREATE OR REPLACE MACRO analytics.is_placed(event_status) AS (",
+   "event_status = 'placed'",
+   ")",
+   ""
+  ],
+  "functions/sql/table_fn__events_above.sql": [
+   "CREATE OR REPLACE MACRO analytics.table_fn__events_above(p_minimum) AS TABLE",
+   "SELECT id, amount",
+   "FROM __ref(\"stg_sales_1\")",
+   "WHERE amount > p_minimum",
+   ""
+  ],
+  "models/analysis/chain_1_stg_sales_1.sql": [
+   "SELECT id, label, amount",
+   "FROM __ref(\"contracted_stg_sales_1\")",
+   ""
+  ],
+  "models/analysis/chain_2_stg_sales_1.sql": [
+   "SELECT id, UPPER(label) AS label, amount",
+   "FROM __ref(\"chain_1_stg_sales_1\")",
+   ""
+  ],
+  "models/analysis/chain_3_stg_sales_1.sql": [
+   "SELECT id, label, amount",
+   "FROM __ref(\"chain_2_stg_sales_1\")",
+   ""
+  ],
+  "models/analysis/checked_stg_sales_2.sql": [
+   "SELECT id, amount, status",
+   "FROM __ref(\"stg_sales_2\")",
+   ""
+  ],
+  "models/analysis/combined_stg_sales_2.sql": [
+   "WITH recent AS (",
+   "  SELECT id, created_at FROM __ref(\"stg_sales_2\") WHERE amount > 0",
+   "),",
+   "older AS (",
+   "  SELECT id, created_at FROM __ref(\"stg_sales_2\")",
+   ")",
+   "SELECT id, created_at FROM recent",
+   "UNION ALL",
+   "SELECT id, created_at FROM older",
+   ""
+  ],
+  "models/analysis/contracted_stg_sales_1.sql": [
+   "SELECT CAST(id AS INTEGER) AS id, CAST(status AS VARCHAR(40)) AS label,",
+   "  amount",
+   "FROM __source(\"raw_events_0\")",
+   ""
+  ],
+  "models/analysis/cte_facts_stg_sales_2.sql": [
+   "WITH base AS (",
+   "  SELECT id, CAST(amount AS DECIMAL(12, 2)) AS amount, 'event' AS kind,",
+   "    COALESCE(status, 'unknown') AS status",
+   "  FROM __ref(\"stg_sales_2\")",
+   "  WHERE id IS NOT NULL",
+   ")",
+   "SELECT id + 0 AS id, amount, UPPER(kind) AS kind, UPPER(status) AS status",
+   "FROM base",
+   ""
+  ],
+  "models/analysis/every_open_event.sql": [
+   "SELECT *",
+   "FROM __source(\"open_events\")",
+   ""
+  ],
+  "models/analysis/every_raw_events_0.sql": [
+   "SELECT *",
+   "FROM __source(\"raw_events_0\")",
+   ""
+  ],
+  "models/analysis/every_stg_sales_2.sql": [
+   "SELECT *",
+   "FROM __ref(\"stg_sales_2\")",
+   ""
+  ],
+  "models/analysis/passed_stg_sales_2.sql": [
+   "WITH passthrough AS (",
+   "  SELECT id, created_at FROM __ref(\"stg_sales_2\")",
+   ")",
+   "SELECT id, created_at",
+   "FROM passthrough",
+   ""
+  ],
+  "models/analysis/pivot_input_stg_sales_1.sql": [
+   "SELECT CAST(id AS INTEGER) AS id, CAST(status AS VARCHAR) AS status, amount",
+   "FROM __ref(\"stg_sales_1\")",
+   ""
+  ],
+  "models/analysis/pivoted_stg_sales_1.sql": [
+   "PIVOT __ref(\"pivot_input_stg_sales_1\")",
+   "ON status",
+   "USING MAX(amount)",
+   "GROUP BY id",
+   ""
+  ],
+  "models/analysis/typed_stg_sales_2.sql": [
+   "SELECT id, amount * 2 AS doubled_amount, CAST(status AS VARCHAR) AS status_text,",
+   "  created_at, NULL AS missing_note",
+   "FROM __ref(\"stg_sales_2\")",
+   ""
+  ],
+  "models/features/audited_stg_sales_0.sql": [
+   "SELECT id, amount",
+   "FROM __ref(\"stg_sales_0\")",
+   ""
+  ],
+  "models/features/check_history_stg_sales_2.sql": [
+   "SELECT id, status, amount",
+   "FROM __ref(\"stg_sales_2\")",
+   ""
+  ],
+  "models/features/copied_stg_sales_0.sql": [
+   "SELECT id, status",
+   "FROM __ref(\"stg_sales_0\")",
+   ""
+  ],
+  "models/features/flagged_stg_sales_0.sql": [
+   "SELECT id, __udf(\"is_placed\")(status) AS is_placed,",
+   "  __udf(\"is_large\")(amount) AS is_large",
+   "FROM __ref(\"stg_sales_0\")",
+   ""
+  ],
+  "models/features/merge_stg_sales_1.sql": [
+   "SELECT id, amount, status, created_at",
+   "FROM __ref(\"stg_sales_1\")",
+   ""
+  ],
+  "models/features/spaced_stg_sales_1.sql": [
+   "-- Généré pour Zürich – depot",
+   "SELECT",
+   "\tid,",
+   "\t'café ☕ counter' AS label, -- étiquette ✓",
+   "\tamount",
+   "FROM __ref(\"stg_sales_1\")",
+   ""
+  ],
+  "models/features/taxed_stg_sales_0.sql": [
+   "SELECT id, ROUND(amount * 1.2, 2) AS taxed, ROUND(amount, 1) AS rounded",
+   "FROM __ref(\"stg_sales_0\")",
+   ""
+  ],
+  "models/rendering/bounded_stg_sales_0.sql": [
+   "SELECT id, amount, created_at",
+   "FROM __ref(\"stg_sales_0\")",
+   "WHERE created_at >= __cursor_start()",
+   "  AND created_at < __cursor_end()",
+   ""
+  ],
+  "models/rendering/large_events.sql": [
+   "SELECT id, amount",
+   "FROM __table_fn(\"table_fn__events_above\")(4)",
+   ""
+  ],
+  "models/rendering/stated_stg_sales_1.sql": [
+   "SELECT CAST(id AS INTEGER) AS id, status,",
+   "  CASE WHEN amount >= 8 THEN 'HIGH'",
+   "    ELSE 'LOW' END AS tier",
+   "FROM __ref(\"stg_sales_1\")",
+   ""
+  ],
+  "models/sales/marts/sales_summary_0.sql": [
+   "SELECT",
+   "  t.id,",
+   "  t.amount,",
+   "  t.status,",
+   "  t.created_at,",
+   "  t.amount * 0.1 AS threshold_1_amount,",
+   "  (t.amount + LENGTH('east')) AS adjust_0_amount,",
+   "  ROUND(ROUND((t.amount * 2), 2), 2) AS adjust_1_amount,",
+   "  '東京 warehouse' AS site_label",
+   "FROM __ref(\"stg_sales_1\") t",
+   ""
+  ],
+  "models/sales/marts/sales_summary_1.sql": [
+   "SELECT",
+   "  t.id,",
+   "  t.amount,",
+   "  t.status,",
+   "  t.created_at,",
+   "  3 AS priority,",
+   "  t.amount + 371 AS threshold_0_amount,",
+   "  j2.label AS lookup_label_2,",
+   "  '東京 warehouse' AS site_label",
+   "FROM __ref(\"stg_sales_1\") t",
+   "LEFT JOIN __ref(\"stg_sales_2\") j1 ON t.id = j1.id",
+   "LEFT JOIN __seed(\"lookup_0\") j2 ON t.id = j2.id",
+   ""
+  ],
+  "models/sales/marts/sales_summary_2.sql": [
+   "SELECT",
+   "  t.id,",
+   "  t.amount,",
+   "  t.status,",
+   "  t.created_at,",
+   "  t.amount + 371 AS threshold_0_amount,",
+   "  ROUND(ROUND((t.amount * 2), 2), 2) AS adjust_1_amount,",
+   "  j1.label AS lookup_label_1,",
+   "  '東京 warehouse' AS site_label",
+   "FROM __ref(\"stg_sales_1\") t",
+   "LEFT JOIN __seed(\"lookup_0\") j1 ON t.id = j1.id",
+   ""
+  ],
+  "models/sales/staging/stg_sales_0.sql": [
+   "SELECT",
+   "  t.id,",
+   "  t.amount,",
+   "  t.status,",
+   "  t.created_at,",
+   "  '東京 warehouse' AS site_label",
+   "FROM __source(\"raw_events_0\") t",
+   ""
+  ],
+  "models/sales/staging/stg_sales_1.sql": [
+   "SELECT",
+   "  t.id,",
+   "  t.amount,",
+   "  t.status,",
+   "  t.created_at,",
+   "  3 AS priority",
+   "FROM __source(\"raw_events_0\") t",
+   "WHERE t.status <> 'placed'",
+   ""
+  ],
+  "models/sales/staging/stg_sales_2.sql": [
+   "SELECT",
+   "  t.id,",
+   "  t.amount,",
+   "  t.status,",
+   "  t.created_at,",
+   "  3 AS priority,",
+   "  t.amount + 371 AS threshold_0_amount,",
+   "  (t.amount + LENGTH('east')) AS adjust_0_amount,",
+   "  ROUND(ROUND((t.amount * 2), 2), 2) AS adjust_1_amount",
+   "FROM __source(\"raw_events_0\") t",
+   ""
+  ],
+  "tests/macro taxes_amounts/taxes_amounts.sql": [
+   "WITH input_values AS (SELECT 10 AS amount),",
+   "__actual__macro_taxes_amounts AS (SELECT ROUND(amount * 1.2, 2) AS taxed",
+   "  FROM input_values),",
+   "__expected__macro_taxes_amounts AS (SELECT 12.0 AS taxed)",
+   "SELECT 0 AS step_index, 'macro taxes_amounts' AS model_name, (SELECT COUNT(*) FROM __actual__macro_taxes_amounts) AS actual_count, (SELECT COUNT(*) FROM __expected__macro_taxes_amounts) AS expected_count, (SELECT COUNT(*) FROM (SELECT * FROM __actual__macro_taxes_amounts EXCEPT SELECT * FROM __expected__macro_taxes_amounts) AS __sqlbuild_mismatch) AS unexpected_count, (SELECT COUNT(*) FROM (SELECT * FROM __expected__macro_taxes_amounts EXCEPT SELECT * FROM __actual__macro_taxes_amounts) AS __sqlbuild_missing) AS missing_count",
+   ""
+  ],
+  "tests/stg_sales_2/test_stg_sales_2.sql": [
+   "WITH __source__raw_events_0 AS (SELECT 1 AS id, CAST(10 AS DOUBLE) AS amount, 'placed' AS status,",
+   "    TIMESTAMP '2026-01-01 00:00:00' AS created_at),",
+   "__ref__stg_sales_2 AS (SELECT",
+   "  t.id,",
+   "  t.amount,",
+   "  t.status,",
+   "  t.created_at,",
+   "  3 AS priority,",
+   "  t.amount + 371 AS threshold_0_amount,",
+   "  (t.amount + LENGTH('east')) AS adjust_0_amount,",
+   "  ROUND(ROUND((t.amount * 2), 2), 2) AS adjust_1_amount",
+   "FROM __source__raw_events_0 t),",
+   "__actual__stg_sales_2 AS (SELECT * FROM __ref__stg_sales_2),",
+   "__expected__stg_sales_2 AS (SELECT 1 AS id, 'placed' AS status)",
+   "SELECT 0 AS step_index, 'stg_sales_2' AS model_name, (SELECT COUNT(*) FROM __actual__stg_sales_2) AS actual_count, (SELECT COUNT(*) FROM __expected__stg_sales_2) AS expected_count, (SELECT COUNT(*) FROM (SELECT id, status FROM __actual__stg_sales_2 EXCEPT SELECT id, status FROM __expected__stg_sales_2) AS __sqlbuild_mismatch) AS unexpected_count, (SELECT COUNT(*) FROM (SELECT id, status FROM __expected__stg_sales_2 EXCEPT SELECT id, status FROM __actual__stg_sales_2) AS __sqlbuild_missing) AS missing_count",
+   ""
+  ],
+  "tests/udf detects_placed_events/detects_placed_events.sql": [
+   "WITH input_values AS (SELECT 'placed' AS event_status),",
+   "__actual__udf_detects_placed_events AS (SELECT event_status, analytics.is_placed(event_status) AS is_placed",
+   "  FROM input_values),",
+   "__expected__udf_detects_placed_events AS (SELECT 'placed' AS event_status, TRUE AS is_placed)",
+   "SELECT 0 AS step_index, 'udf detects_placed_events' AS model_name, (SELECT COUNT(*) FROM __actual__udf_detects_placed_events) AS actual_count, (SELECT COUNT(*) FROM __expected__udf_detects_placed_events) AS expected_count, (SELECT COUNT(*) FROM (SELECT * FROM __actual__udf_detects_placed_events EXCEPT SELECT * FROM __expected__udf_detects_placed_events) AS __sqlbuild_mismatch) AS unexpected_count, (SELECT COUNT(*) FROM (SELECT * FROM __expected__udf_detects_placed_events EXCEPT SELECT * FROM __actual__udf_detects_placed_events) AS __sqlbuild_missing) AS missing_count",
+   ""
+  ]
+ },
+ "manifest": {
+  "nodes": {
+   "model.generated_2.chain_1_stg_sales_1": {
+    "database": null,
+    "schema": "analytics",
+    "name": "chain_1_stg_sales_1",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/analysis/chain_1_stg_sales_1.sql",
+    "original_file_path": "models/analysis/chain_1_stg_sales_1.sql",
+    "unique_id": "model.generated_2.chain_1_stg_sales_1",
+    "fqn": [
+     "generated_2",
+     "models",
+     "analysis",
+     "chain_1_stg_sales_1"
+    ],
+    "alias": "chain_1_stg_sales_1",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Level 1 below the contracted copy of stg_sales_1",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.chain_1_stg_sales_1",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.contracted_stg_sales_1"
+     ]
+    }
+   },
+   "model.generated_2.chain_2_stg_sales_1": {
+    "database": null,
+    "schema": "analytics",
+    "name": "chain_2_stg_sales_1",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/analysis/chain_2_stg_sales_1.sql",
+    "original_file_path": "models/analysis/chain_2_stg_sales_1.sql",
+    "unique_id": "model.generated_2.chain_2_stg_sales_1",
+    "fqn": [
+     "generated_2",
+     "models",
+     "analysis",
+     "chain_2_stg_sales_1"
+    ],
+    "alias": "chain_2_stg_sales_1",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Level 2 below the contracted copy of stg_sales_1",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.chain_2_stg_sales_1",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.chain_1_stg_sales_1"
+     ]
+    }
+   },
+   "model.generated_2.chain_3_stg_sales_1": {
+    "database": null,
+    "schema": "analytics",
+    "name": "chain_3_stg_sales_1",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/analysis/chain_3_stg_sales_1.sql",
+    "original_file_path": "models/analysis/chain_3_stg_sales_1.sql",
+    "unique_id": "model.generated_2.chain_3_stg_sales_1",
+    "fqn": [
+     "generated_2",
+     "models",
+     "analysis",
+     "chain_3_stg_sales_1"
+    ],
+    "alias": "chain_3_stg_sales_1",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Level 3 below the contracted copy of stg_sales_1",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.chain_3_stg_sales_1",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.chain_2_stg_sales_1"
+     ]
+    }
+   },
+   "model.generated_2.checked_stg_sales_2": {
+    "database": null,
+    "schema": "analytics",
+    "name": "checked_stg_sales_2",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/analysis/checked_stg_sales_2.sql",
+    "original_file_path": "models/analysis/checked_stg_sales_2.sql",
+    "unique_id": "model.generated_2.checked_stg_sales_2",
+    "fqn": [
+     "generated_2",
+     "models",
+     "analysis",
+     "checked_stg_sales_2"
+    ],
+    "alias": "checked_stg_sales_2",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": [
+      "id"
+     ],
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Metadata-checked copy of stg_sales_2",
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "status": {
+      "name": "status",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.checked_stg_sales_2",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_2"
+     ]
+    }
+   },
+   "model.generated_2.combined_stg_sales_2": {
+    "database": null,
+    "schema": "analytics",
+    "name": "combined_stg_sales_2",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/analysis/combined_stg_sales_2.sql",
+    "original_file_path": "models/analysis/combined_stg_sales_2.sql",
+    "unique_id": "model.generated_2.combined_stg_sales_2",
+    "fqn": [
+     "generated_2",
+     "models",
+     "analysis",
+     "combined_stg_sales_2"
+    ],
+    "alias": "combined_stg_sales_2",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Recent and older rows of stg_sales_2 and stg_sales_2",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.combined_stg_sales_2",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_2"
+     ]
+    }
+   },
+   "model.generated_2.contracted_stg_sales_1": {
+    "database": null,
+    "schema": "analytics",
+    "name": "contracted_stg_sales_1",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/analysis/contracted_stg_sales_1.sql",
+    "original_file_path": "models/analysis/contracted_stg_sales_1.sql",
+    "unique_id": "model.generated_2.contracted_stg_sales_1",
+    "fqn": [
+     "generated_2",
+     "models",
+     "analysis",
+     "contracted_stg_sales_1"
+    ],
+    "alias": "contracted_stg_sales_1",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Contracted copy of raw_events_0",
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": "INTEGER",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "label": {
+      "name": "label",
+      "description": "",
+      "meta": {},
+      "data_type": "VARCHAR(40)",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "amount": {
+      "name": "amount",
+      "description": "",
+      "meta": {},
+      "data_type": "DOUBLE",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.contracted_stg_sales_1",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "source.generated_2.raw_events_0"
+     ]
+    }
+   },
+   "model.generated_2.cte_facts_stg_sales_2": {
+    "database": null,
+    "schema": "analytics",
+    "name": "cte_facts_stg_sales_2",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/analysis/cte_facts_stg_sales_2.sql",
+    "original_file_path": "models/analysis/cte_facts_stg_sales_2.sql",
+    "unique_id": "model.generated_2.cte_facts_stg_sales_2",
+    "fqn": [
+     "generated_2",
+     "models",
+     "analysis",
+     "cte_facts_stg_sales_2"
+    ],
+    "alias": "cte_facts_stg_sales_2",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Contracted CTE reads of stg_sales_2",
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "Recovered id",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "amount": {
+      "name": "amount",
+      "description": "Recovered amount",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "kind": {
+      "name": "kind",
+      "description": "Recovered kind",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "status": {
+      "name": "status",
+      "description": "Recovered status",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.cte_facts_stg_sales_2",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_2"
+     ]
+    }
+   },
+   "model.generated_2.every_open_event": {
+    "database": null,
+    "schema": "analytics",
+    "name": "every_open_event",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/analysis/every_open_event.sql",
+    "original_file_path": "models/analysis/every_open_event.sql",
+    "unique_id": "model.generated_2.every_open_event",
+    "fqn": [
+     "generated_2",
+     "models",
+     "analysis",
+     "every_open_event"
+    ],
+    "alias": "every_open_event",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Every column of an open source",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.every_open_event",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "source.generated_2.open_events"
+     ]
+    }
+   },
+   "model.generated_2.every_raw_events_0": {
+    "database": null,
+    "schema": "analytics",
+    "name": "every_raw_events_0",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/analysis/every_raw_events_0.sql",
+    "original_file_path": "models/analysis/every_raw_events_0.sql",
+    "unique_id": "model.generated_2.every_raw_events_0",
+    "fqn": [
+     "generated_2",
+     "models",
+     "analysis",
+     "every_raw_events_0"
+    ],
+    "alias": "every_raw_events_0",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Every column of raw_events_0",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.every_raw_events_0",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "source.generated_2.raw_events_0"
+     ]
+    }
+   },
+   "model.generated_2.every_stg_sales_2": {
+    "database": null,
+    "schema": "analytics",
+    "name": "every_stg_sales_2",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/analysis/every_stg_sales_2.sql",
+    "original_file_path": "models/analysis/every_stg_sales_2.sql",
+    "unique_id": "model.generated_2.every_stg_sales_2",
+    "fqn": [
+     "generated_2",
+     "models",
+     "analysis",
+     "every_stg_sales_2"
+    ],
+    "alias": "every_stg_sales_2",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Every column of stg_sales_2",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.every_stg_sales_2",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_2"
+     ]
+    }
+   },
+   "model.generated_2.passed_stg_sales_2": {
+    "database": null,
+    "schema": "analytics",
+    "name": "passed_stg_sales_2",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/analysis/passed_stg_sales_2.sql",
+    "original_file_path": "models/analysis/passed_stg_sales_2.sql",
+    "unique_id": "model.generated_2.passed_stg_sales_2",
+    "fqn": [
+     "generated_2",
+     "models",
+     "analysis",
+     "passed_stg_sales_2"
+    ],
+    "alias": "passed_stg_sales_2",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Columns of stg_sales_2 passed through a CTE",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.passed_stg_sales_2",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_2"
+     ]
+    }
+   },
+   "model.generated_2.pivot_input_stg_sales_1": {
+    "database": null,
+    "schema": "analytics",
+    "name": "pivot_input_stg_sales_1",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/analysis/pivot_input_stg_sales_1.sql",
+    "original_file_path": "models/analysis/pivot_input_stg_sales_1.sql",
+    "unique_id": "model.generated_2.pivot_input_stg_sales_1",
+    "fqn": [
+     "generated_2",
+     "models",
+     "analysis",
+     "pivot_input_stg_sales_1"
+    ],
+    "alias": "pivot_input_stg_sales_1",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Contracted pivot input from stg_sales_1",
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": "INTEGER",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "status": {
+      "name": "status",
+      "description": "",
+      "meta": {},
+      "data_type": "VARCHAR",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "amount": {
+      "name": "amount",
+      "description": "",
+      "meta": {},
+      "data_type": "DOUBLE",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.pivot_input_stg_sales_1",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_1"
+     ]
+    }
+   },
+   "model.generated_2.pivoted_stg_sales_1": {
+    "database": null,
+    "schema": "analytics",
+    "name": "pivoted_stg_sales_1",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/analysis/pivoted_stg_sales_1.sql",
+    "original_file_path": "models/analysis/pivoted_stg_sales_1.sql",
+    "unique_id": "model.generated_2.pivoted_stg_sales_1",
+    "fqn": [
+     "generated_2",
+     "models",
+     "analysis",
+     "pivoted_stg_sales_1"
+    ],
+    "alias": "pivoted_stg_sales_1",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Amounts of stg_sales_1 pivoted by status",
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": "INTEGER",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
+    "meta": {
+     "sqlbuild": {
+      "dynamic_columns": [
+       {
+        "name": "status_amounts",
+        "pivot_column": "status",
+        "value_column": "amount",
+        "aggregate": "MAX",
+        "type": "DOUBLE",
+        "name_pattern": null
+       }
+      ]
+     }
+    },
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.pivoted_stg_sales_1",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.pivot_input_stg_sales_1"
+     ]
+    }
+   },
+   "model.generated_2.typed_stg_sales_2": {
+    "database": null,
+    "schema": "analytics",
+    "name": "typed_stg_sales_2",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/analysis/typed_stg_sales_2.sql",
+    "original_file_path": "models/analysis/typed_stg_sales_2.sql",
+    "unique_id": "model.generated_2.typed_stg_sales_2",
+    "fqn": [
+     "generated_2",
+     "models",
+     "analysis",
+     "typed_stg_sales_2"
+    ],
+    "alias": "typed_stg_sales_2",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Typed and untyped outputs of stg_sales_2",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.typed_stg_sales_2",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_2"
+     ]
+    }
+   },
+   "model.generated_2.audited_stg_sales_0": {
+    "database": null,
+    "schema": "analytics",
+    "name": "audited_stg_sales_0",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/features/audited_stg_sales_0.sql",
+    "original_file_path": "models/features/audited_stg_sales_0.sql",
+    "unique_id": "model.generated_2.audited_stg_sales_0",
+    "fqn": [
+     "generated_2",
+     "models",
+     "features",
+     "audited_stg_sales_0"
+    ],
+    "alias": "audited_stg_sales_0",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Factory-audited copy of stg_sales_0",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.audited_stg_sales_0",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_0"
+     ]
+    }
+   },
+   "model.generated_2.check_history_stg_sales_2": {
+    "database": null,
+    "schema": "analytics",
+    "name": "check_history_stg_sales_2",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/features/check_history_stg_sales_2.sql",
+    "original_file_path": "models/features/check_history_stg_sales_2.sql",
+    "unique_id": "model.generated_2.check_history_stg_sales_2",
+    "fqn": [
+     "generated_2",
+     "models",
+     "features",
+     "check_history_stg_sales_2"
+    ],
+    "alias": "check_history_stg_sales_2",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "snapshot",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": [
+      "id"
+     ],
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Check history of stg_sales_2",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.check_history_stg_sales_2",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_2"
+     ]
+    }
+   },
+   "model.generated_2.copied_stg_sales_0": {
+    "database": null,
+    "schema": "analytics",
+    "name": "copied_stg_sales_0",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/features/copied_stg_sales_0.sql",
+    "original_file_path": "models/features/copied_stg_sales_0.sql",
+    "unique_id": "model.generated_2.copied_stg_sales_0",
+    "fqn": [
+     "generated_2",
+     "models",
+     "features",
+     "copied_stg_sales_0"
+    ],
+    "alias": "copied_stg_sales_0",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "copy_table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Custom copy of stg_sales_0",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.copied_stg_sales_0",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_0"
+     ]
+    }
+   },
+   "model.generated_2.flagged_stg_sales_0": {
+    "database": null,
+    "schema": "analytics",
+    "name": "flagged_stg_sales_0",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/features/flagged_stg_sales_0.sql",
+    "original_file_path": "models/features/flagged_stg_sales_0.sql",
+    "unique_id": "model.generated_2.flagged_stg_sales_0",
+    "fqn": [
+     "generated_2",
+     "models",
+     "features",
+     "flagged_stg_sales_0"
+    ],
+    "alias": "flagged_stg_sales_0",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Function-flagged copy of stg_sales_0",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.flagged_stg_sales_0",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.is_placed",
+      "model.generated_2.is_large",
+      "model.generated_2.stg_sales_0"
+     ]
+    }
+   },
+   "model.generated_2.merge_stg_sales_1": {
+    "database": null,
+    "schema": "analytics",
+    "name": "merge_stg_sales_1",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/features/merge_stg_sales_1.sql",
+    "original_file_path": "models/features/merge_stg_sales_1.sql",
+    "unique_id": "model.generated_2.merge_stg_sales_1",
+    "fqn": [
+     "generated_2",
+     "models",
+     "features",
+     "merge_stg_sales_1"
+    ],
+    "alias": "merge_stg_sales_1",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "incremental",
+     "incremental_strategy": "merge",
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": [
+      "id"
+     ],
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Incremental merge copy of stg_sales_1",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.merge_stg_sales_1",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_1"
+     ]
+    }
+   },
+   "model.generated_2.spaced_stg_sales_1": {
+    "database": null,
+    "schema": "analytics",
+    "name": "spaced_stg_sales_1",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/features/spaced_stg_sales_1.sql",
+    "original_file_path": "models/features/spaced_stg_sales_1.sql",
+    "unique_id": "model.generated_2.spaced_stg_sales_1",
+    "fqn": [
+     "generated_2",
+     "models",
+     "features",
+     "spaced_stg_sales_1"
+    ],
+    "alias": "spaced_stg_sales_1",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [
+      "línea",
+      "東京"
+     ],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [
+     "línea",
+     "東京"
+    ],
+    "description": "Copy of stg_sales_1 with Ελληνικά orders",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.spaced_stg_sales_1",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_1"
+     ]
+    }
+   },
+   "model.generated_2.taxed_stg_sales_0": {
+    "database": null,
+    "schema": "analytics",
+    "name": "taxed_stg_sales_0",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/features/taxed_stg_sales_0.sql",
+    "original_file_path": "models/features/taxed_stg_sales_0.sql",
+    "unique_id": "model.generated_2.taxed_stg_sales_0",
+    "fqn": [
+     "generated_2",
+     "models",
+     "features",
+     "taxed_stg_sales_0"
+    ],
+    "alias": "taxed_stg_sales_0",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Taxed copy of stg_sales_0",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.taxed_stg_sales_0",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_0"
+     ]
+    }
+   },
+   "model.generated_2.bounded_stg_sales_0": {
+    "database": null,
+    "schema": "analytics",
+    "name": "bounded_stg_sales_0",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/rendering/bounded_stg_sales_0.sql",
+    "original_file_path": "models/rendering/bounded_stg_sales_0.sql",
+    "unique_id": "model.generated_2.bounded_stg_sales_0",
+    "fqn": [
+     "generated_2",
+     "models",
+     "rendering",
+     "bounded_stg_sales_0"
+    ],
+    "alias": "bounded_stg_sales_0",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "incremental",
+     "incremental_strategy": "delete_insert",
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": [
+      "id"
+     ],
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Cursor-bounded copy of stg_sales_0",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.bounded_stg_sales_0",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_0"
+     ]
+    }
+   },
+   "model.generated_2.large_events": {
+    "database": null,
+    "schema": "analytics",
+    "name": "large_events",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/rendering/large_events.sql",
+    "original_file_path": "models/rendering/large_events.sql",
+    "unique_id": "model.generated_2.large_events",
+    "fqn": [
+     "generated_2",
+     "models",
+     "rendering",
+     "large_events"
+    ],
+    "alias": "large_events",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Events above a threshold from a table function",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.large_events",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.table_fn__events_above"
+     ]
+    }
+   },
+   "model.generated_2.stated_stg_sales_1": {
+    "database": null,
+    "schema": "analytics",
+    "name": "stated_stg_sales_1",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/rendering/stated_stg_sales_1.sql",
+    "original_file_path": "models/rendering/stated_stg_sales_1.sql",
+    "unique_id": "model.generated_2.stated_stg_sales_1",
+    "fqn": [
+     "generated_2",
+     "models",
+     "rendering",
+     "stated_stg_sales_1"
+    ],
+    "alias": "stated_stg_sales_1",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Enum-typed copy of stg_sales_1",
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": "INTEGER",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "status": {
+      "name": "status",
+      "description": "",
+      "meta": {},
+      "data_type": "VARCHAR",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "tier": {
+      "name": "tier",
+      "description": "",
+      "meta": {},
+      "data_type": "VARCHAR",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.stated_stg_sales_1",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_1"
+     ]
+    }
+   },
+   "model.generated_2.sales_summary_0": {
+    "database": null,
+    "schema": "analytics",
+    "name": "sales_summary_0",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/sales/marts/sales_summary_0.sql",
+    "original_file_path": "models/sales/marts/sales_summary_0.sql",
+    "unique_id": "model.generated_2.sales_summary_0",
+    "fqn": [
+     "generated_2",
+     "models",
+     "sales",
+     "marts",
+     "sales_summary_0"
+    ],
+    "alias": "sales_summary_0",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [
+      "sales",
+      "marts"
+     ],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [
+      {
+       "sql": "SELECT 'analytics.sales_summary_0' AS refreshed_relation, '東京 warehouse' AS refresh_label",
+       "transaction": true,
+       "index": 0
+      },
+      {
+       "sql": "SELECT 'analytics.sales_summary_0' AS refreshed",
+       "transaction": true,
+       "index": 1
+      }
+     ],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [
+     "sales",
+     "marts"
+    ],
+    "description": "Summary of sales activity 0",
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
+    "meta": {
+     "sqlbuild": {
+      "lifecycle_hooks": {
+       "post_hooks": [
+        {
+         "type": "sql",
+         "statement": "SELECT 'analytics.sales_summary_0' AS refreshed_relation, '東京 warehouse' AS refresh_label",
+         "name": "record_refresh",
+         "relative_path": "models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
+         "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
+         "kwargs": {
+          "relation": "@@CTX:destination.qualified",
+          "label": "東京 warehouse"
+         },
+         "description": "Record a refresh for one relation"
+        },
+        {
+         "type": "sql",
+         "statement": "SELECT 'analytics.sales_summary_0' AS refreshed"
+        }
+       ]
+      }
+     }
+    },
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.sales_summary_0",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_1"
+     ]
+    }
+   },
+   "model.generated_2.sales_summary_1": {
+    "database": null,
+    "schema": "analytics",
+    "name": "sales_summary_1",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/sales/marts/sales_summary_1.sql",
+    "original_file_path": "models/sales/marts/sales_summary_1.sql",
+    "unique_id": "model.generated_2.sales_summary_1",
+    "fqn": [
+     "generated_2",
+     "models",
+     "sales",
+     "marts",
+     "sales_summary_1"
+    ],
+    "alias": "sales_summary_1",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [
+      "sales",
+      "marts"
+     ],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [
+      {
+       "sql": "SELECT 'analytics.sales_summary_1' AS refreshed_relation, 'Zürich – depot' AS refresh_label",
+       "transaction": true,
+       "index": 0
+      },
+      {
+       "sql": "SELECT 'analytics.sales_summary_1' AS refreshed",
+       "transaction": true,
+       "index": 1
+      }
+     ],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [
+     "sales",
+     "marts"
+    ],
+    "description": "Summary of sales activity 1",
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
+    "meta": {
+     "sqlbuild": {
+      "lifecycle_hooks": {
+       "post_hooks": [
+        {
+         "type": "sql",
+         "statement": "SELECT 'analytics.sales_summary_1' AS refreshed_relation, 'Zürich – depot' AS refresh_label",
+         "name": "record_refresh",
+         "relative_path": "models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
+         "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
+         "kwargs": {
+          "relation": "@@CTX:destination.qualified",
+          "label": "Zürich – depot"
+         },
+         "description": "Record a refresh for one relation"
+        },
+        {
+         "type": "sql",
+         "statement": "SELECT 'analytics.sales_summary_1' AS refreshed"
+        }
+       ]
+      }
+     }
+    },
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.sales_summary_1",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_1",
+      "model.generated_2.stg_sales_2",
+      "seed.generated_2.lookup_0"
+     ]
+    }
+   },
+   "model.generated_2.sales_summary_2": {
+    "database": null,
+    "schema": "analytics",
+    "name": "sales_summary_2",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/sales/marts/sales_summary_2.sql",
+    "original_file_path": "models/sales/marts/sales_summary_2.sql",
+    "unique_id": "model.generated_2.sales_summary_2",
+    "fqn": [
+     "generated_2",
+     "models",
+     "sales",
+     "marts",
+     "sales_summary_2"
+    ],
+    "alias": "sales_summary_2",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [
+      "sales",
+      "marts"
+     ],
+     "meta": {},
+     "group": null,
+     "materialized": "table",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [
+      {
+       "sql": "SELECT 'analytics.sales_summary_2' AS refreshed_relation, 'café ☕ counter' AS refresh_label",
+       "transaction": true,
+       "index": 0
+      },
+      {
+       "sql": "SELECT 'analytics.sales_summary_2' AS refreshed",
+       "transaction": true,
+       "index": 1
+      }
+     ],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [
+     "sales",
+     "marts"
+    ],
+    "description": "Summary of sales activity 2",
+    "columns": {},
+    "meta": {
+     "sqlbuild": {
+      "lifecycle_hooks": {
+       "post_hooks": [
+        {
+         "type": "sql",
+         "statement": "SELECT 'analytics.sales_summary_2' AS refreshed_relation, 'café ☕ counter' AS refresh_label",
+         "name": "record_refresh",
+         "relative_path": "models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
+         "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
+         "kwargs": {
+          "relation": "@@CTX:destination.qualified",
+          "label": "café ☕ counter"
+         },
+         "description": "Record a refresh for one relation"
+        },
+        {
+         "type": "sql",
+         "statement": "SELECT 'analytics.sales_summary_2' AS refreshed"
+        }
+       ]
+      }
+     }
+    },
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.sales_summary_2",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_2.stg_sales_1",
+      "seed.generated_2.lookup_0"
+     ]
+    }
+   },
+   "model.generated_2.stg_sales_0": {
+    "database": null,
+    "schema": "analytics",
+    "name": "stg_sales_0",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/sales/staging/stg_sales_0.sql",
+    "original_file_path": "models/sales/staging/stg_sales_0.sql",
+    "unique_id": "model.generated_2.stg_sales_0",
+    "fqn": [
+     "generated_2",
+     "models",
+     "sales",
+     "staging",
+     "stg_sales_0"
+    ],
+    "alias": "stg_sales_0",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [
+      "staging"
+     ],
+     "meta": {},
+     "group": null,
+     "materialized": "view",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [
+     "staging"
+    ],
+    "description": "Staged sales events 0 (東京 warehouse)",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.stg_sales_0",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "source.generated_2.raw_events_0"
+     ]
+    }
+   },
+   "model.generated_2.stg_sales_1": {
+    "database": null,
+    "schema": "analytics",
+    "name": "stg_sales_1",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/sales/staging/stg_sales_1.sql",
+    "original_file_path": "models/sales/staging/stg_sales_1.sql",
+    "unique_id": "model.generated_2.stg_sales_1",
+    "fqn": [
+     "generated_2",
+     "models",
+     "sales",
+     "staging",
+     "stg_sales_1"
+    ],
+    "alias": "stg_sales_1",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [
+      "staging"
+     ],
+     "meta": {},
+     "group": null,
+     "materialized": "view",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [
+     "staging"
+    ],
+    "description": "Staged sales events 1",
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.stg_sales_1",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "source.generated_2.raw_events_0"
+     ]
+    }
+   },
+   "model.generated_2.stg_sales_2": {
+    "database": null,
+    "schema": "analytics",
+    "name": "stg_sales_2",
+    "resource_type": "model",
+    "package_name": "generated_2",
+    "path": "models/sales/staging/stg_sales_2.sql",
+    "original_file_path": "models/sales/staging/stg_sales_2.sql",
+    "unique_id": "model.generated_2.stg_sales_2",
+    "fqn": [
+     "generated_2",
+     "models",
+     "sales",
+     "staging",
+     "stg_sales_2"
+    ],
+    "alias": "stg_sales_2",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [
+      "staging"
+     ],
+     "meta": {},
+     "group": null,
+     "materialized": "view",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [
+     "staging"
+    ],
+    "description": "Staged sales events 2",
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.stg_sales_2",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "source.generated_2.raw_events_0"
+     ]
+    }
+   },
+   "seed.generated_2.lookup_0": {
+    "database": null,
+    "schema": "analytics",
+    "name": "lookup_0",
+    "resource_type": "seed",
+    "package_name": "generated_2",
+    "path": "seeds/lookup_0.csv",
+    "original_file_path": "seeds/lookup_0.csv",
+    "unique_id": "seed.generated_2.lookup_0",
+    "fqn": [
+     "generated_2",
+     "seeds",
+     "lookup_0"
+    ],
+    "alias": "lookup_0",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "seed",
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     },
+     "delimiter": ",",
+     "quote_columns": null
+    },
+    "tags": [],
+    "description": "Generated lookup 0.",
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": "INTEGER",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "label": {
+      "name": "label",
+      "description": "",
+      "meta": {},
+      "data_type": "VARCHAR",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.lookup_0",
+    "root_path": null,
+    "depends_on": {
+     "macros": []
+    }
+   }
+  },
+  "sources": {
+   "source.generated_2.open_events": {
+    "database": null,
+    "schema": "",
+    "name": "open_events",
+    "resource_type": "source",
+    "package_name": "generated_2",
+    "path": "sources/open.yml",
+    "original_file_path": "sources/open.yml",
+    "unique_id": "source.generated_2.open_events",
+    "fqn": [
+     "generated_2",
+     "open_events"
+    ],
+    "source_name": "open_events",
+    "source_description": "",
+    "loader": "",
+    "identifier": "open_events",
+    "quoting": {},
+    "loaded_at_field": null,
+    "freshness": null,
+    "external": null,
+    "description": "Events whose columns are only known to the warehouse.",
+    "columns": {},
+    "meta": {},
+    "source_meta": {},
+    "tags": [],
+    "config": {},
+    "patch_path": null,
+    "unrendered_config": {},
+    "relation_name": null
+   },
+   "source.generated_2.raw_events_0": {
+    "database": null,
+    "schema": "",
+    "name": "raw_events_0",
+    "resource_type": "source",
+    "package_name": "generated_2",
+    "path": "sources/raw.yml",
+    "original_file_path": "sources/raw.yml",
+    "unique_id": "source.generated_2.raw_events_0",
+    "fqn": [
+     "generated_2",
+     "raw_events_0"
+    ],
+    "source_name": "raw_events_0",
+    "source_description": "",
+    "loader": "",
+    "identifier": "raw_events_0",
+    "quoting": {},
+    "loaded_at_field": null,
+    "freshness": null,
+    "external": null,
+    "description": "Generated event feed 0.",
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": "INTEGER",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "amount": {
+      "name": "amount",
+      "description": "",
+      "meta": {},
+      "data_type": "DOUBLE",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "status": {
+      "name": "status",
+      "description": "",
+      "meta": {},
+      "data_type": "VARCHAR",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     },
+     "created_at": {
+      "name": "created_at",
+      "description": "",
+      "meta": {},
+      "data_type": "TIMESTAMP",
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
+    "meta": {},
+    "source_meta": {},
+    "tags": [],
+    "config": {},
+    "patch_path": null,
+    "unrendered_config": {},
+    "relation_name": null
+   }
+  },
+  "macros": {
+   "macro.generated_2.round_amount": {
+    "name": "round_amount",
+    "resource_type": "macro",
+    "package_name": "generated_2",
+    "path": "macros/python/rounding.py",
+    "original_file_path": "macros/python/rounding.py",
+    "unique_id": "macro.generated_2.round_amount",
+    "macro_sql": "def round_amount(expression: str, places: int = 2) -> str:\n    \"\"\"Round an amount.\"\"\"\n    return f\"ROUND({expression}, {places})\"\n",
+    "depends_on": {
+     "macros": []
+    },
+    "description": "",
+    "meta": {
+     "sqlbuild_visibility": "global",
+     "sqlbuild_scope_path": null
+    },
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "arguments": [],
+    "supported_languages": null
+   },
+   "macro.generated_2.taxed": {
+    "name": "taxed",
+    "resource_type": "macro",
+    "package_name": "generated_2",
+    "path": "macros/python/tax.py",
+    "original_file_path": "macros/python/tax.py",
+    "unique_id": "macro.generated_2.taxed",
+    "macro_sql": "from macros.python.rounding import round_amount\n\n\ndef taxed(expression: str) -> str:\n    \"\"\"Add tax to an amount, rounded.\"\"\"\n    return round_amount(f\"{expression} * 1.2\")\n",
+    "depends_on": {
+     "macros": [
+      "macro.generated_2.round_amount"
+     ]
+    },
+    "description": "",
+    "meta": {
+     "sqlbuild_visibility": "global",
+     "sqlbuild_scope_path": null
+    },
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "arguments": [],
+    "supported_languages": null
+   },
+   "macro.generated_2.adjust_0": {
+    "name": "adjust_0",
+    "resource_type": "macro",
+    "package_name": "generated_2",
+    "path": "models/sales/_sqlbuild/macros/python/adjust_0.py",
+    "original_file_path": "models/sales/_sqlbuild/macros/python/adjust_0.py",
+    "unique_id": "macro.generated_2.adjust_0",
+    "macro_sql": "import os\n\n\ndef adjust_0(expression: str) -> str:\n    \"\"\"Tag an amount with the deployment region.\"\"\"\n    region = os.environ.get(\"SQB_DIFFERENTIAL_REGION\", \"east\")\n    return f\"({expression} + LENGTH('{region}'))\"\n",
+    "depends_on": {
+     "macros": []
+    },
+    "description": "",
+    "meta": {
+     "sqlbuild_visibility": "inherited",
+     "sqlbuild_scope_path": "models/sales"
+    },
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "arguments": [],
+    "supported_languages": null
+   },
+   "macro.generated_2.adjust_1": {
+    "name": "adjust_1",
+    "resource_type": "macro",
+    "package_name": "generated_2",
+    "path": "models/sales/_sqlbuild/macros/python/adjust_1.py",
+    "original_file_path": "models/sales/_sqlbuild/macros/python/adjust_1.py",
+    "unique_id": "macro.generated_2.adjust_1",
+    "macro_sql": "def adjust_1_round(expression: str) -> str:\n    \"\"\"Round an amount to two places.\"\"\"\n    return f\"ROUND({expression}, 2)\"\n\n\ndef adjust_1(expression: str) -> str:\n    \"\"\"Double and round an amount.\"\"\"\n    return adjust_1_round(f\"({expression} * 2)\")\n",
+    "depends_on": {
+     "macros": [
+      "macro.generated_2.adjust_1_round"
+     ]
+    },
+    "description": "",
+    "meta": {
+     "sqlbuild_visibility": "inherited",
+     "sqlbuild_scope_path": "models/sales"
+    },
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "arguments": [],
+    "supported_languages": null
+   },
+   "macro.generated_2.adjust_1_round": {
+    "name": "adjust_1_round",
+    "resource_type": "macro",
+    "package_name": "generated_2",
+    "path": "models/sales/_sqlbuild/macros/python/adjust_1.py",
+    "original_file_path": "models/sales/_sqlbuild/macros/python/adjust_1.py",
+    "unique_id": "macro.generated_2.adjust_1_round",
+    "macro_sql": "def adjust_1_round(expression: str) -> str:\n    \"\"\"Round an amount to two places.\"\"\"\n    return f\"ROUND({expression}, 2)\"\n\n\ndef adjust_1(expression: str) -> str:\n    \"\"\"Double and round an amount.\"\"\"\n    return adjust_1_round(f\"({expression} * 2)\")\n",
+    "depends_on": {
+     "macros": []
+    },
+    "description": "",
+    "meta": {
+     "sqlbuild_visibility": "inherited",
+     "sqlbuild_scope_path": "models/sales"
+    },
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "arguments": [],
+    "supported_languages": null
+   },
+   "macro.generated_2__sqlbuild_hooks.record_refresh": {
+    "name": "record_refresh",
+    "resource_type": "macro",
+    "package_name": "generated_2__sqlbuild_hooks",
+    "path": "models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
+    "original_file_path": "models/sales/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
+    "unique_id": "macro.generated_2__sqlbuild_hooks.record_refresh",
+    "macro_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
+    "depends_on": {
+     "macros": []
+    },
+    "description": "Record a refresh for one relation",
+    "meta": {
+     "sqlbuild_resource_type": "sql_hook",
+     "sqlbuild_hook_name": "record_refresh"
+    },
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "arguments": [],
+    "supported_languages": null
+   }
+  },
+  "exposures": {},
+  "metrics": {},
+  "groups": {},
+  "selectors": {},
+  "disabled": {},
+  "parent_map": {
+   "model.generated_2.chain_1_stg_sales_1": [
+    "model.generated_2.contracted_stg_sales_1"
+   ],
+   "model.generated_2.chain_2_stg_sales_1": [
+    "model.generated_2.chain_1_stg_sales_1"
+   ],
+   "model.generated_2.chain_3_stg_sales_1": [
+    "model.generated_2.chain_2_stg_sales_1"
+   ],
+   "model.generated_2.checked_stg_sales_2": [
+    "model.generated_2.stg_sales_2"
+   ],
+   "model.generated_2.combined_stg_sales_2": [
+    "model.generated_2.stg_sales_2"
+   ],
+   "model.generated_2.contracted_stg_sales_1": [
+    "source.generated_2.raw_events_0"
+   ],
+   "model.generated_2.cte_facts_stg_sales_2": [
+    "model.generated_2.stg_sales_2"
+   ],
+   "model.generated_2.every_open_event": [
+    "source.generated_2.open_events"
+   ],
+   "model.generated_2.every_raw_events_0": [
+    "source.generated_2.raw_events_0"
+   ],
+   "model.generated_2.every_stg_sales_2": [
+    "model.generated_2.stg_sales_2"
+   ],
+   "model.generated_2.passed_stg_sales_2": [
+    "model.generated_2.stg_sales_2"
+   ],
+   "model.generated_2.pivot_input_stg_sales_1": [
+    "model.generated_2.stg_sales_1"
+   ],
+   "model.generated_2.pivoted_stg_sales_1": [
+    "model.generated_2.pivot_input_stg_sales_1"
+   ],
+   "model.generated_2.typed_stg_sales_2": [
+    "model.generated_2.stg_sales_2"
+   ],
+   "model.generated_2.audited_stg_sales_0": [
+    "model.generated_2.stg_sales_0"
+   ],
+   "model.generated_2.check_history_stg_sales_2": [
+    "model.generated_2.stg_sales_2"
+   ],
+   "model.generated_2.copied_stg_sales_0": [
+    "model.generated_2.stg_sales_0"
+   ],
+   "model.generated_2.flagged_stg_sales_0": [
+    "model.generated_2.is_placed",
+    "model.generated_2.is_large",
+    "model.generated_2.stg_sales_0"
+   ],
+   "model.generated_2.merge_stg_sales_1": [
+    "model.generated_2.stg_sales_1"
+   ],
+   "model.generated_2.spaced_stg_sales_1": [
+    "model.generated_2.stg_sales_1"
+   ],
+   "model.generated_2.taxed_stg_sales_0": [
+    "model.generated_2.stg_sales_0"
+   ],
+   "model.generated_2.bounded_stg_sales_0": [
+    "model.generated_2.stg_sales_0"
+   ],
+   "model.generated_2.large_events": [
+    "model.generated_2.table_fn__events_above"
+   ],
+   "model.generated_2.stated_stg_sales_1": [
+    "model.generated_2.stg_sales_1"
+   ],
+   "model.generated_2.sales_summary_0": [
+    "model.generated_2.stg_sales_1"
+   ],
+   "model.generated_2.sales_summary_1": [
+    "model.generated_2.stg_sales_1",
+    "model.generated_2.stg_sales_2",
+    "seed.generated_2.lookup_0"
+   ],
+   "model.generated_2.sales_summary_2": [
+    "model.generated_2.stg_sales_1",
+    "seed.generated_2.lookup_0"
+   ],
+   "model.generated_2.stg_sales_0": [
+    "source.generated_2.raw_events_0"
+   ],
+   "model.generated_2.stg_sales_1": [
+    "source.generated_2.raw_events_0"
+   ],
+   "model.generated_2.stg_sales_2": [
+    "source.generated_2.raw_events_0"
+   ],
+   "source.generated_2.open_events": [],
+   "source.generated_2.raw_events_0": [],
+   "seed.generated_2.lookup_0": [],
+   "model.generated_2.is_placed": [],
+   "model.generated_2.table_fn__events_above": [
+    "model.generated_2.stg_sales_1"
+   ],
+   "model.generated_2.is_large": []
+  },
+  "group_map": {},
+  "docs": {},
+  "saved_queries": {},
+  "semantic_models": {},
+  "unit_tests": {}
+ }
 }

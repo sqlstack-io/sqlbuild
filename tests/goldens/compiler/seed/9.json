@@ -76,9 +76,9 @@
    "  AND status NOT IN ('placed', 'expédié', '取消', 'returned ✓')",
    ""
   ],
-  "audits/generic/stg_support_1/not_null__id.sql": [
+  "audits/generic/stg_billing_0/not_null__id.sql": [
    "SELECT id",
-   "FROM __ref(\"stg_support_1\")",
+   "FROM __ref(\"stg_billing_0\")",
    "WHERE id IS NULL",
    ""
   ],
@@ -193,8 +193,7 @@
    "  t.status,",
    "  t.created_at,",
    "  t.amount * 2.4700 AS threshold_0_amount,",
-   "  (t.amount + 0 + 1) AS adjust_0_amount,",
-   "  'Zürich – depot' AS site_label",
+   "  (t.amount + 0 + 1) AS adjust_0_amount",
    "FROM __source(\"raw_events_0\") t",
    ""
   ],
@@ -295,7 +294,8 @@
    "  t.amount,",
    "  t.status,",
    "  t.created_at,",
-   "  t.amount * 2.4700 AS threshold_0_amount",
+   "  t.amount * 2.4700 AS threshold_0_amount,",
+   "  'Zürich – depot' AS site_label",
    "FROM __source(\"raw_events_0\") t",
    ""
   ],
@@ -305,7 +305,8 @@
    "  t.amount,",
    "  t.status,",
    "  t.created_at,",
-   "  (t.amount + 0 + 1) AS adjust_0_amount",
+   "  (t.amount + 0 + 1) AS adjust_0_amount,",
+   "  'Zürich – depot' AS site_label",
    "FROM __source(\"raw_events_0\") t",
    ""
   ],
@@ -316,7 +317,8 @@
    "  t.amount,",
    "  t.status,",
    "  t.created_at,",
-   "  (t.amount + 0 + 1) AS adjust_0_amount",
+   "  (t.amount + 0 + 1) AS adjust_0_amount,",
+   "  'Zürich – depot' AS site_label",
    "FROM __source__raw_events_0 t),",
    "__ref__labelled_stg_support_1 AS (SELECT id, LOWER(TRIM(status)) AS status,",
    "  ci_checks.tidy_status(status) AS tidied",
@@ -336,7 +338,8 @@
    "  t.amount,",
    "  t.status,",
    "  t.created_at,",
-   "  t.amount * 2.4700 AS threshold_0_amount",
+   "  t.amount * 2.4700 AS threshold_0_amount,",
+   "  'Zürich – depot' AS site_label",
    "FROM __source__raw_events_0 t),",
    "__actual__stg_support_0 AS (SELECT * FROM __ref__stg_support_0),",
    "__expected__stg_support_0 AS (SELECT 1 AS id, 'placed' AS status)",
@@ -352,7 +355,8 @@
    "  t.amount,",
    "  t.status,",
    "  t.created_at,",
-   "  t.amount * 2.4700 AS threshold_0_amount",
+   "  t.amount * 2.4700 AS threshold_0_amount,",
+   "  'Zürich – depot' AS site_label",
    "FROM __source__raw_events_0 t),",
    "__actual__stg_support_0 AS (SELECT * FROM __ref__stg_support_0),",
    "__expected__stg_support_0 AS (SELECT 1 AS id)",
@@ -368,7 +372,8 @@
    "  t.amount,",
    "  t.status,",
    "  t.created_at,",
-   "  t.amount * 2.4700 AS threshold_0_amount",
+   "  t.amount * 2.4700 AS threshold_0_amount,",
+   "  'Zürich – depot' AS site_label",
    "FROM __source__raw_events_0 t),",
    "__actual__stg_support_0 AS (SELECT * FROM __ref__stg_support_0),",
    "__expected__stg_support_0 AS (SELECT 1 AS id)",
@@ -1157,18 +1162,7 @@
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
-     "post-hook": [
-      {
-       "sql": "SELECT 'ci_checks.billing_summary_0' AS refreshed_relation, 'Ελληνικά orders' AS refresh_label",
-       "transaction": true,
-       "index": 0
-      },
-      {
-       "sql": "SELECT 'ci_checks.billing_summary_0' AS refreshed",
-       "transaction": true,
-       "index": 1
-      }
-     ],
+     "post-hook": [],
      "pre-hook": [],
      "quoting": {},
      "column_types": {},
@@ -1200,30 +1194,7 @@
       "tags": []
      }
     },
-    "meta": {
-     "sqlbuild": {
-      "lifecycle_hooks": {
-       "post_hooks": [
-        {
-         "type": "sql",
-         "statement": "SELECT 'ci_checks.billing_summary_0' AS refreshed_relation, 'Ελληνικά orders' AS refresh_label",
-         "name": "record_refresh",
-         "relative_path": "hooks/sql/record_refresh.sql",
-         "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
-         "kwargs": {
-          "relation": "@@CTX:destination.qualified",
-          "label": "Ελληνικά orders"
-         },
-         "description": "Record a refresh for one relation"
-        },
-        {
-         "type": "sql",
-         "statement": "SELECT 'ci_checks.billing_summary_0' AS refreshed"
-        }
-       ]
-      }
-     }
-    },
+    "meta": {},
     "group": null,
     "docs": {
      "show": true,
@@ -1296,7 +1267,17 @@
      "staging"
     ],
     "description": "Staged billing events 0",
-    "columns": {},
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
     "meta": {},
     "group": null,
     "docs": {
@@ -2451,7 +2432,7 @@
          "type": "sql",
          "statement": "SELECT 'ci_checks.support_summary_0' AS refreshed_relation, 'café ☕ counter' AS refresh_label",
          "name": "record_refresh",
-         "relative_path": "hooks/sql/record_refresh.sql",
+         "relative_path": "models/support/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
          "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
          "kwargs": {
           "relation": "@@CTX:destination.qualified",
@@ -2613,17 +2594,7 @@
      "staging"
     ],
     "description": "Staged support events 1",
-    "columns": {
-     "id": {
-      "name": "id",
-      "description": "",
-      "meta": {},
-      "data_type": null,
-      "constraints": [],
-      "quote": null,
-      "tags": []
-     }
-    },
+    "columns": {},
     "meta": {},
     "group": null,
     "docs": {
@@ -3072,8 +3043,8 @@
     "name": "record_refresh",
     "resource_type": "macro",
     "package_name": "generated_9__sqlbuild_hooks",
-    "path": "hooks/sql/record_refresh.sql",
-    "original_file_path": "hooks/sql/record_refresh.sql",
+    "path": "models/support/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
+    "original_file_path": "models/support/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
     "unique_id": "macro.generated_9__sqlbuild_hooks.record_refresh",
     "macro_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
     "depends_on": {
