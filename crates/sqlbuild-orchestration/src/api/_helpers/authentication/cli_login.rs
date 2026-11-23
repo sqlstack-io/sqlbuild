@@ -18,7 +18,8 @@ use crate::credentials::main::cli_login::{
     approve_login::approve_login, claim_login::claim_login, start_login::start_login,
 };
 use crate::credentials::models::{
-    AuditContext, AuthenticatedPerson, AuthenticationAttempt, ClaimedLogin, StartedLogin,
+    AuditContext, AuthenticatedPerson, AuthenticationAttempt, ClaimedLogin, ServiceKeyIdentity,
+    StartedLogin,
 };
 use crate::store::models::ControlStore;
 
@@ -80,14 +81,16 @@ pub(crate) async fn start(
     responses((status = 204), (status = 401, body = AuthenticationDenial)))]
 pub(crate) async fn approve(
     State(store): State<ControlStore>,
-    (Extension(context), Extension(person)): (
+    (Extension(context), Extension(person), service_account): (
         Extension<AuditContext>,
         Extension<AuthenticatedPerson>,
+        Option<Extension<ServiceKeyIdentity>>,
     ),
     headers: HeaderMap,
     Json(request): Json<CliLoginApprovalRequest>,
 ) -> Result<Response, ApiError> {
-    if !session_header(&headers)
+    if service_account.is_none()
+        && !session_header(&headers)
         && approve_login(
             &store,
             &context,

@@ -28,6 +28,7 @@ use crate::bindings::_helpers::command_runtime::runtime_errors::raised;
 use crate::bindings::_helpers::compile_driver::plan_pipeline::{
     SecretCheck, planned_project, selectors,
 };
+use crate::bindings::_helpers::compile_driver::plan_result::PlanUse;
 use crate::bindings::_helpers::compile_driver::rules_at_load::RulesAtLoadScope;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::plan_command::changed::changed_json;
@@ -178,16 +179,14 @@ fn resolve_invocation<'py>(
     let discovered: Bound<'py, PyAny> = match project {
         PlanProject::Held { discovered, .. } => discovered.clone(),
         PlanProject::Compiled => timed(DISCOVERING, || {
-            let mut options: Vec<(&str, Bound<'py, PyAny>)> = vec![
+            let options: [(&str, Bound<'py, PyAny>); 3] = [
                 ("project_dir", project_dir.clone()),
                 ("extract_output_column_locations", flag(py, false)),
-            ];
-            if state.is_some() {
-                options.push((
+                (
                     "secret_policy",
                     PyString::new(py, SecretPolicy::Defer.name()).into_any(),
-                ));
-            }
+                ),
+            ];
             discover_project_inputs(py, Some(keywords(py, &options)?))
         })?,
     };
@@ -375,6 +374,7 @@ fn compile_pipeline<'py>(
                 PlanProject::Compiled => None,
             },
             preview.as_ref(),
+            PlanUse::Show,
         ),
         SecretCheck::Report,
     )
@@ -550,7 +550,7 @@ pub(crate) fn run_plan_command(request: &Bound<'_, PyAny>) -> PyResult<i32> {
     Ok(plan(request, (PlanProject::Compiled, None))?.0)
 }
 
-/// A location's preview from the synced `state`, without rules, which ran at load; vars or a dbt manifest recompile, deferring secrets.
+/// A location's preview from the synced `state`, without rules, which ran at load; vars or a dbt manifest recompile.
 pub(crate) fn location_plan<'py>(
     request: &Bound<'py, PyAny>,
     (held, state): (PlanProject<'_, 'py>, &Arc<WarehouseState>),

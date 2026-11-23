@@ -6,9 +6,13 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use sqlbuild_cache::project_snapshot::models::{PathStamp, SnapshotRules};
-use sqlbuild_orchestration::credentials::models::CredentialScope;
+use sqlbuild_orchestration::credentials::models::{
+    CredentialScope, IssuedToken, NewServiceAccount, ServiceAccountSummary,
+};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
-use sqlbuild_orchestration::platform::models::{LocationWorkRequest, WarehouseReadFailure};
+use sqlbuild_orchestration::platform::models::{
+    LocationWorkRecord, LocationWorkRequest, WarehouseReadFailure,
+};
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
 use sqlbuild_orchestration::sensors::models::SensorEventChoice;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_PAGE_RECORDS;
@@ -26,9 +30,7 @@ pub(crate) enum ControlAdmin {
     CreateLocation(String),
     CreatePrincipal(String),
     BootstrapUser(String),
-    IssueToken(CredentialScope, DateTime<Utc>),
-    RevokeToken(Uuid),
-    RotateToken(Uuid),
+    Token(TokenAdmin),
     SetPassword(Uuid, String),
     GrantAdmin(Uuid),
     RequestJobRun(JobRunRequest),
@@ -46,6 +48,116 @@ pub(crate) enum ControlAdmin {
         change: TriggerChange,
         reason: String,
     },
+    ServiceAccount(ServiceAccountAdmin),
+}
+
+/// The location token commands.
+#[derive(Debug)]
+pub(crate) enum TokenAdmin {
+    Issue(CredentialScope, DateTime<Utc>),
+    Revoke(Uuid),
+    Rotate(Uuid),
+}
+
+/// The service account commands, which name accounts rather than numbering them.
+pub(crate) enum ServiceAccountAdmin {
+    /// A new account, with the key read from `--key-from-env` when one is imported.
+    Create {
+        request: NewServiceAccount,
+        key: Option<String>,
+    },
+    Rotate {
+        name: String,
+        overlap_minutes: i64,
+    },
+    SetDisabled {
+        name: String,
+        disabled: bool,
+    },
+    List,
+}
+
+/// What an admin command did or read; it may hold a secret, so it has no `Debug`.
+pub(crate) enum AdminDone {
+    Bootstrapped {
+        id: Uuid,
+        name: String,
+    },
+    LocationCreated {
+        id: Uuid,
+        name: String,
+    },
+    PrincipalCreated {
+        id: Uuid,
+        name: String,
+    },
+    PasswordSet {
+        id: Uuid,
+        name: String,
+    },
+    AdminGranted {
+        id: Uuid,
+        name: String,
+    },
+    TokenIssued {
+        token: IssuedToken,
+        location: String,
+    },
+    TokenRotated {
+        replaced: Uuid,
+        token: IssuedToken,
+    },
+    TokenRevoked {
+        id: Uuid,
+        revoked: bool,
+    },
+    RunQueued {
+        run_id: Uuid,
+        job: String,
+        target: String,
+        applied: bool,
+    },
+    RerunQueued {
+        run_id: Uuid,
+        source: Uuid,
+        applied: bool,
+    },
+    CheckRequested {
+        request_id: Uuid,
+        location: String,
+        target: String,
+        applied: bool,
+    },
+    WorkRead {
+        request_id: Uuid,
+        record: Option<Box<LocationWorkRecord>>,
+        now: DateTime<Utc>,
+    },
+    CancelRequested {
+        event_id: Uuid,
+        run_id: Uuid,
+        applied: bool,
+    },
+    TriggerChanged {
+        event_id: Uuid,
+        trigger_id: Uuid,
+        change: TriggerChange,
+        applied: bool,
+    },
+    /// `key` is absent when the operator imported their own.
+    AccountCreated {
+        account: ServiceAccountSummary,
+        key: Option<String>,
+    },
+    KeyRotated {
+        account: ServiceAccountSummary,
+        key: String,
+    },
+    AccountSwitched {
+        account: ServiceAccountSummary,
+        disabled: bool,
+    },
+    AccountsListed(Vec<ServiceAccountSummary>),
 }
 
 /// Parsing can finish an invocation before package discovery or any Python handoff.
@@ -58,12 +170,21 @@ pub(crate) enum NativeParse {
     },
 }
 
-/// One turn of named work: the files it wrote, whether metadata should sync, and whether it claimed work.
+/// One turn of named work: its files, whether to sync, whether it claimed, and any republish owed.
 #[derive(Debug, Default)]
 pub(crate) struct LocationWorkTurn {
     pub(crate) files: Vec<std::path::PathBuf>,
     pub(crate) sync: bool,
     pub(crate) claimed: bool,
+    pub(crate) republish: Option<PendingRepublish>,
+}
+
+/// A claimed republish: its result is reported after the next compile, before its lease ends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PendingRepublish {
+    pub(crate) request_id: uuid::Uuid,
+    pub(crate) claim_id: uuid::Uuid,
+    pub(crate) deadline: tokio::time::Instant,
 }
 
 /// What `sqb skills` installs.
@@ -173,6 +294,8 @@ pub(crate) struct DevControlState {
     /// `None` until `sqb dev` reports its foreground connection; outside `sqb dev`, always connected.
     pub(crate) warehouse: Option<bool>,
     pub(crate) recompiles: u64,
+    /// How many of those recompiles also call every discover function again, as `r` and the republish API do.
+    pub(crate) rediscovers: u64,
 }
 
 /// Retained source observations survive compilation; warehouse exclusions never replace them.
@@ -180,6 +303,8 @@ pub(crate) struct DevControlState {
 pub(crate) struct LocationWatch {
     pub(crate) rules: SnapshotRules,
     pub(crate) local_files: Vec<PathBuf>,
+    /// `sqb dev`'s run output folder where it lies inside the project, left out with everything beneath it.
+    pub(crate) output_folders: Vec<PathBuf>,
     pub(crate) observed: (Vec<PathStamp>, Option<String>),
     pub(crate) attempted: Option<(Vec<PathStamp>, Option<String>)>,
     pub(crate) changed_at: tokio::time::Instant,
@@ -188,6 +313,18 @@ pub(crate) struct LocationWatch {
     pub(crate) commit_checked_at: tokio::time::Instant,
     /// Whether a generation has published, so the next publication's connection check is not the startup check.
     pub(crate) checked: bool,
+    /// A claimed republish, owed the result of the next compile to finish.
+    pub(crate) republish: Option<PendingRepublish>,
+}
+
+/// What one compile published, for the watcher and any republish it owes.
+#[derive(Debug)]
+pub(crate) struct LoadedGeneration {
+    pub(crate) refresh_at: Option<tokio::time::Instant>,
+    pub(crate) state_locations:
+        Vec<sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation>,
+    pub(crate) secrets: crate::native_commands::types::GenerationSecrets,
+    pub(crate) snapshot_id: uuid::Uuid,
 }
 
 /// A bounded supervisor request; dropping the reply cancels and reaps an active compiler.
@@ -203,6 +340,12 @@ pub(crate) struct LocationCompileRequest {
 pub(crate) struct LocationLoad {
     pub(crate) published: Option<PublishedGeneration>,
     pub(crate) rules: Option<sqlbuild_orchestration::platform::models::LocationRuleFailure>,
+    /// The discovered sets the compile used; empty in a project without discover functions.
+    pub(crate) discovered: sqlbuild_orchestration::discovered_sets::types::DiscoveredSets,
+    /// Each discover function's file, relative to the project.
+    pub(crate) discover_files: std::collections::BTreeMap<String, String>,
+    /// Why nothing was published, redacted; null after a publication or a rules failure.
+    pub(crate) error: Option<String>,
 }
 
 /// A `{"plan": {"argv", "copy"}}` request for the runtime interpreter, answered with its reply.
@@ -654,4 +797,53 @@ pub(crate) struct SensorTrialArguments {
     pub(crate) target: String,
     pub(crate) choice: SensorEventChoice,
     pub(crate) source: EventSource,
+}
+
+/// Never prints an imported key, so a debug log can't leak it.
+impl std::fmt::Debug for ServiceAccountAdmin {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Create { request, key } => formatter
+                .debug_struct("Create")
+                .field("request", request)
+                .field("key", &key.as_ref().map(|_| "[redacted]"))
+                .finish(),
+            Self::Rotate {
+                name,
+                overlap_minutes,
+            } => formatter
+                .debug_struct("Rotate")
+                .field("name", name)
+                .field("overlap_minutes", overlap_minutes)
+                .finish(),
+            Self::SetDisabled { name, disabled } => formatter
+                .debug_struct("SetDisabled")
+                .field("name", name)
+                .field("disabled", disabled)
+                .finish(),
+            Self::List => formatter.write_str("List"),
+        }
+    }
+}
+
+/// Who a republish is requested as; the key never appears in diagnostics.
+pub(crate) enum RepublishCaller {
+    Key { server: String, key: String },
+    Session { server: String, ca: Option<PathBuf> },
+}
+
+impl std::fmt::Debug for RepublishCaller {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Key { server, .. } => formatter
+                .debug_struct("Key")
+                .field("server", server)
+                .finish_non_exhaustive(),
+            Self::Session { server, ca } => formatter
+                .debug_struct("Session")
+                .field("server", server)
+                .field("ca", ca)
+                .finish(),
+        }
+    }
 }

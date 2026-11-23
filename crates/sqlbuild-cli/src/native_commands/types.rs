@@ -1,6 +1,6 @@
 //! Private interpreter protocol shapes owned by the location supervisor.
 
-use crate::native_commands::models::{LocationMetadataSync, LocationWatch};
+use crate::native_commands::models::{LoadedGeneration, LocationMetadataSync, LocationWatch};
 use sqlbuild_orchestration::platform::models::{LocationRuleFailure, MissingProviderSecrets};
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
 
@@ -18,15 +18,14 @@ pub(crate) type NextGeneration = (
     Option<Vec<sqlbuild_cache::project_snapshot::models::PathStamp>>,
 );
 
-/// A published generation's refresh deadline, state locations and providers missing secrets, or the rule findings that failed it.
-pub(crate) type LoadOutcome = Result<
-    (
-        Option<tokio::time::Instant>,
-        Vec<WarehouseStateLocation>,
-        Vec<MissingProviderSecrets>,
-    ),
-    Option<LocationRuleFailure>,
->;
+/// The providers a generation shows missing secrets, and the node keys that need each.
+pub(crate) type GenerationSecrets = (
+    Vec<MissingProviderSecrets>,
+    std::collections::BTreeMap<String, Vec<String>>,
+);
+
+/// A compile's publication; or any rule findings and the error.
+pub(crate) type LoadOutcome = Result<LoadedGeneration, (Option<LocationRuleFailure>, String)>;
 
 /// A plan document and the model diffs it left out, by model, which the server stores apart.
 pub(crate) type LocationPlan = (
@@ -44,4 +43,10 @@ pub(crate) type PlanSelection<'a> = (
 pub(crate) type PlanSettings<'a> = (
     &'a std::collections::BTreeMap<String, serde_json::Value>,
     &'a std::collections::BTreeSet<String>,
+);
+
+/// The republish trigger and the location's credential and session, for discovery's checks and health.
+pub(crate) type DiscoveryControls<'a> = (
+    &'a tokio::sync::watch::Sender<crate::native_commands::models::DevControlState>,
+    (&'a str, uuid::Uuid),
 );

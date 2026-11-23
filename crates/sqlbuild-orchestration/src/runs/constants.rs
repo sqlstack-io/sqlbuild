@@ -3,6 +3,8 @@
 pub(crate) const NODE_PENDING: &str = "pending";
 pub(crate) const NODE_RUNNING: &str = "running";
 pub(crate) const NODE_FAILED: &str = "failed";
+/// The node states a rerun from failure, an automatic retry and a group treat as unfinished, as a SQL list.
+pub(crate) const UNFINISHED_NODE_STATUSES: &str = "'failed','skipped','cancelled','not_run'";
 
 pub(crate) const HEARTBEAT_TIMEOUT_SECONDS: i64 = 45;
 pub(crate) const MONITOR_BATCH_SIZE: usize = 100;
@@ -52,6 +54,8 @@ pub(crate) const VARS_SETTING: &str = "vars";
 pub(crate) const SUPERSEDED_CHILD: &str = "EXISTS(SELECT 1 FROM sqb_runs s WHERE s.parent_run_id=r.parent_run_id AND s.rerun_of_run_id=r.run_id)";
 /// The group run event recorded when a failed member is queued to run again.
 pub(crate) const MEMBER_RETRYING_EVENT: &str = "run_member_retrying";
+/// The scheduler's launch fact, which names the container a worker started in, if any.
+pub(crate) const RUN_LAUNCHED_EVENT: &str = "run_launched";
 /// The group run event recorded when a retried member succeeds.
 pub(crate) const MEMBER_RECOVERED_EVENT: &str = "run_member_recovered";
 
@@ -61,3 +65,12 @@ pub(crate) const PUBLICATIONS_PER_TARGET: usize = 2;
 /// Selected keys per page of a selection evaluation, and the most a request may ask for.
 pub(crate) const SELECTION_PAGE_DEFAULT: u32 = 1_000;
 pub(crate) const SELECTION_PAGE_MAX: u32 = 10_000;
+
+/// A followed run's repeated output reads are audited at most once per person, run and kind in this window, on each server.
+pub(crate) const REPEATED_READ_AUDIT: std::time::Duration = std::time::Duration::from_secs(600);
+
+/// The code a node fails with when its provider is missing secrets.
+pub(crate) const MISSING_SECRET_ERROR_CODE: &str = "D012";
+/// How a worker's message for such a node starts, and the phrase after its variables.
+pub(crate) const MISSING_SECRET_PREFIX: &str = "provider ";
+pub(crate) const MISSING_SECRET_PHRASE: &str = " not set (missing from ";

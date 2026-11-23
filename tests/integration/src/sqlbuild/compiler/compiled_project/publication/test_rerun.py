@@ -101,6 +101,7 @@ def test_given_a_partial_group_when_retrying_from_failure_then_successful_nodes_
             "--from-failure",
             "--reason",
             "Retry failed and skipped nodes after fixing warehouse input.",
+            "--json",
         ]
         for expected_applied in [True, False]:
             requested: subprocess.CompletedProcess[str] = subprocess.run(

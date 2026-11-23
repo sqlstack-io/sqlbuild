@@ -7,7 +7,7 @@ use chrono::Utc;
 use serde_json::json;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 
-use crate::person_login::constants::{LOGIN_SECONDS, POLL_SECONDS, SECRET_BYTES};
+use crate::person_login::constants::{KEYS_ONLY_MODE, LOGIN_SECONDS, POLL_SECONDS, SECRET_BYTES};
 use crate::person_login::main::open_browser::open_browser;
 use crate::person_login::models::{LoginFlow, PersonClient, PersonCredential};
 
@@ -30,6 +30,11 @@ pub(crate) async fn login(
         .send()
         .await
         .map_err(|_| std::io::Error::other("could not start browser sign-in"))?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND && keys_only(client).await {
+        return Err(std::io::Error::other(
+            "this server has no sign-in for people: scripts call it with a service account key",
+        ));
+    }
     if !response.status().is_success() {
         return Err(std::io::Error::other(
             "server rejected CLI sign-in; check its authentication configuration or wait before retrying",
@@ -88,4 +93,18 @@ pub(crate) async fn login(
     Err(std::io::Error::other(
         "CLI sign-in expired; start sqb login again",
     ))
+}
+
+/// Whether the server answers that only service account keys call it.
+async fn keys_only(client: &PersonClient) -> bool {
+    let Ok(response) = client
+        .client
+        .get(format!("{}/api/auth/login-mode", client.origin))
+        .send()
+        .await
+    else {
+        return false;
+    };
+    let answer: serde_json::Value = response.json().await.unwrap_or_default();
+    answer["login_mode"] == KEYS_ONLY_MODE
 }

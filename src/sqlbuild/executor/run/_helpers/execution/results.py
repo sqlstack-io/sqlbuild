@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 
 from sqlbuild._native import (
@@ -15,6 +16,7 @@ from sqlbuild._native import (
     format_waiting_on_empty_inputs,
 )
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
+from sqlbuild.diagnostics.main.log_debug_event import log_debug_event
 from sqlbuild.executor.auditing.models import AuditExecutionResult
 from sqlbuild.executor.run.constants import (
     RUN_AUDIT_FAILED_CODE,
@@ -30,9 +32,16 @@ from sqlbuild.executor.run.constants import (
     RUN_TYPE_ENFORCEMENT_FAILED_CODE,
     RUN_UNKNOWN_FAILED_CODE,
 )
-from sqlbuild.executor.run.models import HookExecutionResult, ModelExecutionResult
+from sqlbuild.executor.run.models import (
+    HookExecutionResult,
+    ModelExecutionResult,
+    ModelMaterializationContext,
+    TableTargets,
+)
 from sqlbuild.executor.run.types import ExecutionPhase
 from sqlbuild.executor.scheduling.types import ExecutionStatus
+
+_DEBUG_LOGGER: logging.Logger = logging.getLogger("sqlbuild.execution")
 
 
 def build_failed_result(
@@ -56,9 +65,11 @@ def build_failed_result(
     if error_prefix is not None:
         rendered_error = f"{error_prefix}: {rendered_error}"
 
-    statement_recorder.log(f"model {entry.name} failed phase={phase.value} error={rendered_error}")
+    statement_recorder.log(
+        message=f"model {entry.name} failed phase={phase.value} error={rendered_error}"
+    )
     if staging_relation is not None:
-        statement_recorder.log(f"staging relation kept for inspection: {staging_relation}")
+        statement_recorder.log(message=f"staging relation kept for inspection: {staging_relation}")
 
     return ModelExecutionResult(
         model_name=entry.name,
@@ -105,7 +116,7 @@ def build_skipped_result(
     """Build a skipped ModelExecutionResult after a lifecycle skip signal."""
 
     skipped_hook: HookExecutionResult | None = _last_skipped_hook(hook_results)
-    statement_recorder.log(f"model {entry.name} skipped by hook")
+    statement_recorder.log(message=f"model {entry.name} skipped by hook")
     return ModelExecutionResult(
         model_name=entry.name,
         status=ExecutionStatus.SKIPPED,
@@ -206,3 +217,29 @@ def with_waiting_on_empty_inputs_warning(result: ModelExecutionResult) -> ModelE
     if message in result.warning_messages:
         return result
     return replace(result, warning_messages=(*result.warning_messages, message))
+
+
+def rebuilt_table_rows(
+    *, context: ModelMaterializationContext, targets: TableTargets
+) -> int | None:
+    """Exact rows of a freshly rebuilt table with no post-hooks; a failed read gives None."""
+
+    if context.entry.post_hooks:
+        return None
+    try:
+        return context.adapter.rebuilt_table_row_count(
+            connection=context.connection,
+            database=targets.target_database,
+            schema=targets.target_schema,
+            name=targets.target_table,
+        )
+    except Exception as error:
+        log_debug_event(
+            logger=_DEBUG_LOGGER,
+            message="rebuilt table row count unavailable",
+            sqlbuild_subject="model",
+            sqlbuild_name=context.entry.name,
+            sqlbuild_event="row_count_unavailable",
+            sqlbuild_error_type=type(error).__name__,
+        )
+        return None

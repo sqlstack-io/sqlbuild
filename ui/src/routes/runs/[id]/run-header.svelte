@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { planHref } from '$lib/run/command';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { to } from '$lib/paths';
 	import CopyButton from '$lib/components/copy-button.svelte';
@@ -7,18 +6,39 @@
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
 	import { narrowingText, shortRunId } from '$lib/operate/labels';
 	import { app } from '$lib/state/app.svelte';
-	import { runKindLabel, runOriginLabel, runStatusTone } from '$lib/status';
-	import RerunButton from './rerun-button.svelte';
-	import { costSummary, retriedMembers } from './utils';
+	import { runKindLabel, runOriginLabel } from '$lib/status';
+	import RunSummary from './run-summary.svelte';
+	import { retriedMembers } from './utils';
 	import type { RunDetailState } from './state.svelte';
 
 	let { view, runId }: { view: RunDetailState; runId: string } = $props();
 
 	const run = $derived(view.run);
-	const pct = $derived(view.progress.total ? (view.progress.done / view.progress.total) * 100 : 0);
 	const what = $derived(run?.jobKey ?? (view.detail?.selection.join(' ') || 'whole project'));
 	const cancelRequested = $derived(!!view.detail?.cancel && !view.detail.cancel.terminatedAt);
 	const retried = $derived(retriedMembers(view.detail?.children ?? []));
+	/** A group's member that never started: "not started", never "skipped". */
+	const notStarted = $derived(!!run?.parentRunId && run.status === 'skipped' && !run.startedAt);
+	type Fact = { text: string; href?: string; title?: string; live?: boolean };
+	/** The first line's facts, in order; a missing one leaves no separator behind. */
+	const facts = $derived.by((): Fact[] => {
+		if (!run) return [];
+		const out: (Fact | null)[] = [
+			{ text: runKindLabel[run.kind].toLowerCase() },
+			run.triggerId
+				? { text: `${runOriginLabel[run.origin].toLowerCase()}${run.triggerName ? `: ${run.triggerName}` : ''}`, href: `/triggers/${run.triggerId}`, title: 'Open what started this run' }
+				: run.rerunOfRunId
+					? { text: `rerun of ${shortRunId(run.rerunOfRunId)}`, href: `/runs/${run.rerunOfRunId}` }
+					: { text: runOriginLabel[run.origin].toLowerCase() },
+			run.narrowing ? { text: `part: ${narrowingText(run.narrowing)}`, title: `Ran part of ${run.jobKey}` } : null,
+			run.window ? { text: `window ${run.window.start} → ${run.window.end}` } : null,
+			retried ? { text: `${retried} retried`, title: 'Member jobs the group retried inside this run' } : null,
+			{ text: `by ${run.requestedBy.displayName}`, title: run.requestedBy.name },
+			run.startedAt ? { text: formatAgo(run.startedAt, app.now), title: `Started ${formatStamp(run.startedAt)}` } : { text: `queued ${formatAgo(run.queuedAt, app.now)}`, title: formatStamp(run.queuedAt) },
+			run.startedAt ? { text: `${view.active ? 'running for ' : ''}${formatDuration(run.startedAt, run.endedAt, app.now)}`, live: view.active, title: view.active ? 'Running for' : 'Took' } : null
+		];
+		return out.filter((f): f is Fact => !!f);
+	});
 </script>
 
 <div class="head">
@@ -31,64 +51,23 @@
 			<CopyButton value={runId} label="Copy run ID" />
 		</nav>
 		{#if run}
+			<!-- Two lines: what ran and how it ended, then what it did. The rest is under Details. -->
 			<div class="title-row">
 				<h2>
 					{#if run.jobKey}<a href={to(`/jobs/${run.jobKey}`)}>{run.jobKey}</a>{:else}<span class="adhoc">ad hoc: <code>{what}</code></span>{/if}
 				</h2>
-				<RunStatusPill status={run.status} size="md" ignored={run.ignoredAuditFailures} />
-				{#if retried}<span class="chip" title="Member jobs the group retried inside this run" data-testid="run-retried">· {retried} retried</span>{/if}
-				<!-- The kind is a fact about this run; the origin opens what started it, when that has a page. -->
-				<span class="chip" title="{runKindLabel[run.kind]} run">{runKindLabel[run.kind].toLowerCase()}</span>
-				{#if run.narrowing}
-					<span class="chip part" title="Ran part of {run.jobKey}: sqb build {narrowingText(run.narrowing)}" data-testid="run-narrowing">part · <code>{narrowingText(run.narrowing)}</code></span>
-				{/if}
-				{#if run.window}
-					<span class="chip part" title="Processed only this cursor range, both ends included" data-testid="run-window">window · <code>{run.window.start} → {run.window.end}</code></span>
-				{/if}
-				{#if run.triggerId}
-					<a class="chip link" href={to(`/triggers/${run.triggerId}`)} title="Open the {runOriginLabel[run.origin].toLowerCase()} that started this run">{runOriginLabel[run.origin].toLowerCase()}{#if run.triggerName}: {run.triggerName}{/if}</a>
-				{:else if run.rerunOfRunId}
-					<a class="chip link" href={to(`/runs/${run.rerunOfRunId}`)} title="Open the run this one repeats">rerun of {shortRunId(run.rerunOfRunId)}</a>
-				{:else}
-					<span class="chip">{runOriginLabel[run.origin].toLowerCase()}</span>
-				{/if}
+				<RunStatusPill status={run.status} size="md" ignored={run.ignoredAuditFailures} notStarted={notStarted} />
+				<span class="meta">
+					{#each facts as f, i (i)}
+						{#if i}<span class="sep">{' · '}</span>{/if}
+						{#if f.href}<a href={to(f.href)} title={f.title}>{f.text}</a>{:else}<span class:live={f.live} title={f.title}>{f.text}</span>{/if}
+					{/each}
+				</span>
 			</div>
-			<div class="meta">
-				{#if run.startedAt}
-					<span title={formatStamp(run.startedAt)}>Started {formatStamp(run.startedAt)} <span class="faint">({formatAgo(run.startedAt, app.now)})</span></span>
-					<span>·</span>
-					<span class:live={view.active}>{view.active ? 'running for ' : 'took '}{formatDuration(run.startedAt, run.endedAt, app.now)}</span>
-					{#if view.cost && view.cost.status !== 'none'}
-						{@const summary = costSummary(view.cost)}
-						<span>·</span>
-						<Button variant="link" size="inline" onclick={() => (view.tab = 'cost')} title="Estimated query cost{summary.note ? `. ${summary.note}` : ''}" data-testid="run-cost-chip">{summary.text.startsWith('Cost') ? summary.text.toLowerCase() : `est. ${summary.text}`}</Button>
-					{/if}
-				{:else}
-					<span title={formatStamp(run.queuedAt)}>Queued {formatAgo(run.queuedAt, app.now)}</span>
-				{/if}
-				<span>·</span>
-				<span title="{run.requestedBy.displayName} ({run.requestedBy.name})">by {run.requestedBy.displayName}</span>
-				{#if view.progress.total}
-					<span class="progress" title="{view.progress.done} of {view.progress.total} nodes finished">
-						<span class="bar"><i style:width="{pct}%" style:background={runStatusTone[run.status]}></i></span>
-						{view.progress.done}/{view.progress.total} nodes
-					</span>
-				{/if}
-				{#if view.detail?.provenance}
-					{@const p = view.detail.provenance}
-					<span>·</span>
-					<a href={to(`/changes`)} title="Project version {p.snapshotGeneration}{p.gitRevision ? `, commit ${p.gitRevision}` : ''}{p.gitDirty ? ' with uncommitted changes' : ''}">version {p.snapshotGeneration}</a>
-				{/if}
-				<Button variant="link" size="inline" class="ml-2.5" onclick={() => view.toggleDetails()} aria-expanded={view.showDetails} title="Version, command, image, worker and other technical details">{view.showDetails ? 'Hide details' : 'Details'}</Button>
-				{#if run.jobKey}
-					<!-- The plan the run made is printed in its log (Show printed output); the plan page plans the same build on today's state, in full. -->
-					<a class="plan-link" href={to(planHref(run.narrowing?.select ?? [], 'build', { job: run.jobKey, exclude: run.narrowing?.exclude ?? [] }))} title="Plan this build of {run.jobKey} on the current state, section by section; the run's own plan is in its printed output" data-testid="run-plan-link">Plan it now</a>
-				{/if}
+			<div class="summary-row">
+				<RunSummary {view} />
+				<Button variant="link" size="inline" class="details-toggle" onclick={() => view.toggleDetails()} aria-expanded={view.showDetails} title="Command, version, nodes, cost, related runs and technical details">Details {view.showDetails ? '▴' : '▾'}</Button>
 			</div>
-			{#if view.detail?.provenance?.command}
-				{@const command = view.detail.provenance.command}
-				<div class="command"><span class="faint">$</span> <code>{command}</code> <CopyButton value={command} label="Copy command" /></div>
-			{/if}
 		{:else if view.detailRes.error}
 			<p class="err">Couldn't load this run: {view.detailRes.error}</p>
 		{:else if view.detailRes.data === null}
@@ -110,32 +89,18 @@
 					</Button>
 				</span>
 			{/if}
-			<RerunButton {view} />
 		</div>
 	{/if}
 </div>
 {#if view.actionError}<div class="action-error" role="alert">{view.actionError}</div>{/if}
 
 <style>
-	.command {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		margin-top: 6px;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.command code {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
 	.head {
 		display: flex;
 		align-items: flex-start;
 		gap: 16px;
-		padding: 12px 24px 12px;
-		border-bottom: 1px solid var(--border);
+		padding: 16px 24px 14px;
+		border-bottom: 1px solid var(--border-subtle);
 	}
 	.left {
 		min-width: 0;
@@ -177,59 +142,34 @@
 	.adhoc {
 		font-size: 15px;
 	}
-	.chip {
-		padding: 0 8px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		color: var(--muted-foreground);
-		font-size: 12px;
-		line-height: 20px;
-	}
-	.chip.part {
-		max-width: 420px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.chip.part code {
-		font-size: 11.5px;
-	}
-	.chip.link:hover {
-		color: var(--foreground);
-		background: var(--sb-hover);
-	}
 	.meta {
-		display: flex;
+		display: inline-flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 6px;
-		margin-top: 6px;
+		gap: 0;
+		white-space: pre-wrap;
 		color: var(--muted-foreground);
+		font-size: 12.5px;
+	}
+	.meta a:hover {
+		color: var(--primary);
+	}
+	.sep {
+		color: var(--sb-text-faint);
+	}
+	.summary-row {
+		display: flex;
+		align-items: baseline;
+		gap: 14px;
+		margin-top: 8px;
+	}
+	.summary-row :global(.details-toggle) {
+		margin-left: auto;
 		font-size: 12.5px;
 	}
 	.live {
 		color: var(--sb-running);
 		font-variant-numeric: tabular-nums;
-	}
-	.progress {
-		display: inline-flex;
-		align-items: center;
-		gap: 8px;
-		margin-left: 10px;
-		font-variant-numeric: tabular-nums;
-	}
-	.bar {
-		display: block;
-		overflow: hidden;
-		width: 140px;
-		height: 6px;
-		border-radius: 3px;
-		background: var(--sb-hover);
-	}
-	.bar i {
-		display: block;
-		height: 100%;
-		transition: width 0.4s ease;
 	}
 	.actions {
 		display: flex;
@@ -250,13 +190,5 @@
 		margin-top: 6px;
 		color: var(--muted-foreground);
 		font-size: 12.5px;
-	}
-	.plan-link {
-		margin-left: 10px;
-		color: var(--primary);
-		font-size: 12.5px;
-	}
-	.plan-link:hover {
-		text-decoration: underline;
 	}
 </style>

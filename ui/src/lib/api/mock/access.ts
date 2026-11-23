@@ -121,6 +121,7 @@ const PLAIN: Record<Capability, string> = {
 	'sensor.reset_cursor': 'reset where a sensor is up to',
 	'run.adhoc': 'run sqb commands on any selection of nodes',
 	'connection.test': 'test warehouse connections',
+	'location.republish': 'republish locations',
 	'plan.preview': 'preview build plans',
 	'location.manage': 'manage locations',
 	'user.manage': 'manage people',

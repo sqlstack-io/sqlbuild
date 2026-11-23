@@ -1,5 +1,6 @@
 //! Coalesce source edits and retain the last good publication across isolated compiler failures.
 
+use sqlbuild_orchestration::platform::models::LocationWorkScope;
 use std::future::Future;
 use std::path::Path;
 use std::time::Duration;
@@ -24,6 +25,7 @@ use crate::native_commands::_helpers::location::execution::{
 use crate::native_commands::_helpers::location::execution::{
     dev_controls, location_clock, location_heartbeats, next_turn,
 };
+use crate::native_commands::_helpers::location::republish::start_republish;
 use crate::native_commands::_helpers::location::shutdown::shutdown_signal;
 use crate::native_commands::_helpers::location::work::next_work_check;
 use crate::native_commands::constants::LOCATION_WORK_IDLE_POLL;
@@ -47,17 +49,25 @@ pub(super) async fn run_location(
     let poll = LocationWorkPoll {
         session_id,
         target: options.target.clone(),
+        scope: LocationWorkScope::All,
     };
     let (requests, receiver) = mpsc::channel(1);
-    let controls = dev_controls(&options);
+    let (republisher, controls) = dev_controls(&options);
     let serving = async {
         tokio::select! {
-            result = watch_location(&options, script, (bearer, &client, &poll), (requests, controls)) => result,
+            result = watch_location(&options, script, (bearer, &client, &poll), (requests, controls, &republisher)) => result,
             result = location_heartbeats(&options, bearer, session_id) => result,
         }
     };
-    let (serving, compiler) =
-        tokio::join!(serving, run_location_compiler(&options, script, receiver));
+    let (serving, compiler) = tokio::join!(
+        serving,
+        run_location_compiler(
+            &options,
+            script,
+            receiver,
+            (&republisher, (bearer, session_id))
+        )
+    );
     serving.and(compiler)
 }
 
@@ -65,9 +75,10 @@ async fn watch_location(
     options: &LocationServe,
     script: &Path,
     (bearer, client, poll): (&str, &LocationWorkClient, &LocationWorkPoll),
-    (requests, mut controls): (
+    (requests, mut controls, republisher): (
         mpsc::Sender<LocationRuntimeRequest>,
         watch::Receiver<DevControlState>,
+        &watch::Sender<DevControlState>,
     ),
 ) -> Result<(), ControlError> {
     let mut watch = location_watch(&options.project_dir);
@@ -111,7 +122,7 @@ async fn watch_location(
             let connected: bool = controls.borrow().warehouse == Some(true);
             let Some(idle) = poll_location(
                 (options, script, (&requests, connected)),
-                (client, poll, published_generation),
+                (client, poll, (published_generation, republisher)),
                 (watch, work_at, metadata),
                 stopped.as_mut(),
             )
@@ -143,7 +154,7 @@ async fn watch_location(
             Err(_) => None,
         };
         let Some(settled) = finish_compile(
-            (options, script, (bearer, poll.session_id)),
+            (options, script, ((bearer, poll.session_id), client)),
             (load, generation),
             (watch, metadata, deferred_sync),
             (&mut controls, stopped.as_mut()),
@@ -163,16 +174,28 @@ async fn poll_location(
         &Path,
         (&mpsc::Sender<LocationRuntimeRequest>, bool),
     ),
-    (client, poll, generation): (&LocationWorkClient, &LocationWorkPoll, Option<i64>),
+    (client, poll, (generation, republisher)): (
+        &LocationWorkClient,
+        &LocationWorkPoll,
+        (Option<i64>, &watch::Sender<DevControlState>),
+    ),
     (mut watch, mut work_at, mut metadata): (LocationWatch, Instant, Option<LocationMetadataSync>),
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<(LocationWatch, Instant, Option<LocationMetadataSync>)>, ControlError> {
     tokio::pin!(stopped);
-    if generation.is_some() && watch.attempted.as_ref() == Some(&watch.observed) {
+    let current: bool = watch.attempted.as_ref() == Some(&watch.observed);
+    if current {
         if Instant::now() >= work_at {
+            let poll = LocationWorkPoll {
+                scope: match generation {
+                    Some(_) => LocationWorkScope::All,
+                    None => LocationWorkScope::RepublishOnly,
+                },
+                ..poll.clone()
+            };
             let Some(turn) = run_location_work(
                 (options, script, (runtime, connected)),
-                (client, poll, &watch),
+                (client, &poll, &watch),
                 generation,
                 stopped.as_mut(),
             )
@@ -181,6 +204,7 @@ async fn poll_location(
                 return Ok(None);
             };
             work_at = next_work_check(&turn, Instant::now());
+            watch = start_republish(republisher, turn.republish, watch);
             watch = exclude_location_databases(&options.project_dir, turn.files, watch);
             if turn.sync
                 && let Some(state) = metadata.as_mut()
@@ -188,7 +212,9 @@ async fn poll_location(
                 state.request_sync();
             }
         }
-        if let Some(state) = metadata.take() {
+        if generation.is_some()
+            && let Some(state) = metadata.take()
+        {
             let syncing = !state.idle;
             metadata = sync_location_metadata(
                 state,

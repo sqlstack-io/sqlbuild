@@ -81,6 +81,16 @@ fn given_location_health_reports_when_checking_health_then_down_falling_back_or_
             expected_exit: 0,
         },
         LocationHealthTestCase {
+            description: "a discover function failed and its set serves the last good items",
+            reports: &[
+                r#"{"kind":"connection","generation":2,"healthy":true}"#,
+                r#"{"kind":"discovery","generation":2,"sets":[{"name":"orders_plan","status":"failed","items":2}]}"#,
+            ],
+            other_target_connections: 0,
+            expected_state: "discovery_failed",
+            expected_exit: 0,
+        },
+        LocationHealthTestCase {
             description: "the warehouse connection check failed",
             reports: &[r#"{"kind":"connection","generation":2,"healthy":false}"#],
             other_target_connections: 0,

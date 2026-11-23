@@ -27,7 +27,12 @@ import type {
 	RunEventPage,
 	RunListQuery,
 	RunNodeError,
+	RunOutputFollow,
 	RunOutputLine,
+	NodeOutputIndex,
+	NodeOutputPage,
+	NodeOutputSearch,
+	CheckSample,
 	RunRowPage,
 	RunRowQuery,
 	RunStatement,
@@ -40,7 +45,7 @@ import type {
 	NodeStates,
 	Snapshot,
 	RunTabCounts,
-	Scope,
+	RepublishResult, Scope,
 	SnapshotChange,
 	SelectionEvaluation,
 	SelectionRequest,
@@ -127,6 +132,16 @@ export interface ApiClient extends PlatformApi {
 	/** One statement's SQL, fetched when its row is expanded. `view.sql` */
 	getStatementSql(scope: Scope, runId: string, statementId: string): Promise<StatementSql>;
 	listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]>;
+	/** The run's output from the output store since line `after` (the newest when null), with its `ctx.log` lines; null when the server keeps no output store. `view.evidence` */
+	followRunOutput?(scope: Scope, runId: string, after: number | null): Promise<RunOutputFollow | null>;
+	/** A node's output in the output store: how much there is and its error and warning lines, read by range. `view.evidence` */
+	getNodeOutputIndex?(scope: Scope, runId: string, nodeKey: string): Promise<NodeOutputIndex | null>;
+	getNodeOutputPage?(scope: Scope, runId: string, nodeKey: string, at: { from: number; rows: number; direction: 'forward' | 'backward'; collapse: boolean; stream?: 'all' | 'stdout' | 'stderr'; around?: number }): Promise<NodeOutputPage>;
+	searchNodeOutput?(scope: Scope, runId: string, nodeKey: string, query: string, from: number, direction: 'forward' | 'backward', signal?: AbortSignal): Promise<NodeOutputSearch>;
+	/** Where the server streams a node's whole output as a file. */
+	nodeOutputDownloadUrl?(scope: Scope, runId: string, nodeKey: string): string;
+	/** A failing check's sample rows, by the check's statement. */
+	getCheckSample?(scope: Scope, runId: string, statementId: string): Promise<CheckSample | null>;
 	/** One failed node's error text, fetched when its row is expanded. `view.evidence` on the node */
 	getRunNodeError(scope: Scope, runId: string, nodeKey: string): Promise<RunNodeError>;
 	/** Queued runs in claim order, with why each one waits. */
@@ -187,6 +202,9 @@ export interface ApiClient extends PlatformApi {
 	getWarehouseSync(scope: Scope): Promise<WarehouseSync | null>;
 	/** Asks the location to read SQLBuild's state back from the warehouse now. `connection.test` */
 	requestWarehouseSync(scope: Scope): Promise<void>;
+
+	/** Asks the location to compile and publish again, and waits for the result. `location.republish` */
+	republish(scope: Scope): Promise<RepublishResult>;
 
 	/** Live "changed" signals (SSE in the server client); consumers refetch or apply their payload. */
 	changes: ChangeSubscription;

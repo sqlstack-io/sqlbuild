@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::platform::models::MissingProviderSetting;
+
 /// One step of publishing a location generation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -27,11 +29,15 @@ pub struct SourcePosition {
     pub column: u32,
 }
 
-/// A provider whose unset secrets stop the runs that use it: the variables it reads, never their values.
+/// A provider whose unset secrets stop the runs that use it: where each is declared and what needs it, never a value.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnsetProviderSecrets {
     pub provider: String,
-    pub variables: Vec<String>,
+    /// The provider's file, relative to the project directory.
+    pub path: String,
+    pub settings: Vec<MissingProviderSetting>,
+    /// The node keys that use the provider, then those that read them.
+    pub needed_by: Vec<String>,
 }
 
 /// What happened in the location child.
@@ -71,7 +77,11 @@ pub enum DevEvent {
     /// The providers the latest provider-secrets health shows missing secrets the target doesn't allow to miss; empty once none is.
     MissingSecrets {
         providers: Vec<UnsetProviderSecrets>,
+        /// The env file the location loads, relative to the project; `None` when it loads none.
+        env_file: Option<String>,
     },
+    /// The discovered sets a publication used, summarised for the ready card.
+    Discovered { summary: String },
 }
 
 /// What `sqb dev` asks its location child to do, one JSON line each on the child's stdin.

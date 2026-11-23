@@ -90,7 +90,8 @@ under `[sinks.lifecycle]`, not per named sink. `"0s"` drops anything still queue
 final quarter of the budget is reserved for run and invocation outcomes: when it begins, other
 queued events are dropped and counted so the outcomes still arrive. The setting does not change the one-second timeout for each sink call. A sink call still running when
 the budget ends gets up to that one second to return before providers are torn down; teardown
-always runs on the command's own thread.
+always runs on the command's own thread. A cancel that leaves a step running skips teardown,
+as described under [Providers](../python-nodes/providers.md#lifecycle).
 
 ```toml
 [sinks.lifecycle]

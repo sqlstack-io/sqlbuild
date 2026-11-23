@@ -17,7 +17,7 @@ use crate::dev_session::models::{DevProject, LocationPipes};
 use crate::dev_stop::main::stop_switch::stop_switch;
 use crate::dev_stop::models::DevEnd;
 use crate::native_commands::_helpers::command::decision::{
-    control_address, control_database, control_database_variable, flag, text,
+    control_database, control_database_variable, flag, text,
 };
 use crate::native_commands::_helpers::command::init::run_init;
 use crate::native_commands::_helpers::command::package::installed_package;
@@ -35,16 +35,19 @@ use crate::native_commands::_helpers::command::terminal::{
 };
 use crate::native_commands::_helpers::command::terminal::{live_screen, screen_colour};
 use crate::native_commands::_helpers::location::dev_cancel::DevRuns;
+use crate::native_commands::_helpers::location::dev_exposure::{
+    allowed_hosts, connect_address, exposure, listens_beyond_loopback,
+};
 use crate::native_commands::_helpers::location::dev_supervision::{
     DevRoles, supervise_development_roles,
 };
 use crate::native_commands::_helpers::location::dynamic_resume::resume_expired_holds;
 use crate::native_commands::_helpers::location::env_reload::env_file_summary;
 use crate::native_commands::_helpers::location::provider_secrets::report_provider_secrets;
+use crate::native_commands::_helpers::location::republish::settle_republish;
 use crate::native_commands::_helpers::location::sync_report::{
     metadata_health, read_timeout_seconds, rows_text, scan_line,
 };
-use crate::native_commands::constants::PLAN_NOT_PRODUCED;
 use crate::native_commands::constants::{
     ADMIN_COMMAND, CHANGED_PATHS_SHOWN, COLUMNS_VARIABLE, FALLBACK_COLUMNS, FALLBACK_ROWS,
     METADATA_OVERLAP_SECONDS, METADATA_POLL_SECONDS, METADATA_READER_CLOSE_SECONDS,
@@ -52,15 +55,19 @@ use crate::native_commands::constants::{
     METADATA_SYNC_CHECK_SECONDS, SAFETY_SYNC_ENV, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS,
     UNKNOWN_COMMAND,
 };
+use crate::native_commands::constants::{DEVELOPMENT_OUTPUT_FOLDER, PLAN_NOT_PRODUCED};
+use crate::native_commands::constants::{OPENING_STORE, STORE_READY};
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_control::run_control;
 use crate::native_commands::main::_run_cost::run_cost;
+use crate::native_commands::models::AdminDone;
 use crate::native_commands::models::{
     CommandOutput, DevControlState, InstalledPackage, LocationCompileRequest, LocationCompiler,
     LocationMetadataPage, LocationMetadataSync, LocationServe, LocationWatch, LostStdout,
     MetadataReply, NativeCommand, NativeInvocation, ProjectLocation, ScanToken,
 };
+use crate::native_commands::models::{LoadedGeneration, PendingRepublish};
 use crate::native_commands::models::{
     LocationLoad, LocationRuntimeRequest, ReadFailure, SyncProgress,
 };
@@ -111,6 +118,8 @@ use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll, RetentionPolicies,
     WarehouseSyncFailure,
 };
+use sqlbuild_orchestration::run_output::main::open_output_store::open_output_store;
+use sqlbuild_orchestration::run_output::models::{OutputSettings, OutputStore};
 use sqlbuild_orchestration::runs::types::RunHandoff;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
@@ -135,7 +144,6 @@ use sqlbuild_orchestration::webhooks::models::{Webhook, WebhookSource};
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
 use std::io;
-use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, SystemTime};
@@ -154,8 +162,10 @@ pub(crate) async fn run_development_roles(
     listener: tokio::net::TcpListener,
     (scheduler, (messages, actions, keys)): (bool, DevScreenParts),
 ) -> Result<DevEnd, ControlError> {
-    let address = listener.local_addr()?;
+    let listening = listener.local_addr()?;
+    let address = connect_address(listening);
     let url = format!("http://{address}");
+    let opened_to: Option<String> = exposure(listening, &scope);
     let location_id = scope.location_id;
     let target = scope.target.clone();
     let workers = open_development_workers(
@@ -171,6 +181,7 @@ pub(crate) async fn run_development_roles(
         detail: String::new(),
     }));
     let api_ready = messages.clone();
+    let output: OutputStore = open_output_store(&OutputSettings::default(), &store)?;
     roles.spawn(
         Some("UI server"),
         serve_api(
@@ -185,6 +196,7 @@ pub(crate) async fn run_development_roles(
                 ServerFacts {
                     version: env!("CARGO_PKG_VERSION").into(),
                     scheduler,
+                    output: Some(output.clone()),
                     ..ServerFacts::default()
                 },
             ),
@@ -194,6 +206,9 @@ pub(crate) async fn run_development_roles(
                         step: DevStep::Api,
                         detail: address.to_string(),
                     }));
+                    if let Some(opened_to) = opened_to {
+                        drop(api_ready.send(ScreenMessage::Exposed(opened_to)));
+                    }
                 },
                 development_stopped(shutdown.clone()),
             ),
@@ -203,7 +218,7 @@ pub(crate) async fn run_development_roles(
     let (location, pipes) = development_location_role(
         (&project, &executable),
         (location_id, &target),
-        (&url, &store),
+        (&url, &store, output.local_folder()),
         shutdown.clone(),
     )?;
     roles.spawn(Some("code location"), location);
@@ -267,11 +282,11 @@ async fn development_stopped(mut shutdown: watch::Receiver<bool>) {
     }
 }
 
-/// Hand off only the local file exclusion, never control-store connection credentials.
+/// Hand off only the local file and output folder exclusions, never control-store connection credentials.
 fn development_location_role(
     (project, executable): (&Path, &Path),
     (location_id, target): (Uuid, &str),
-    (url, store): (&str, &ControlStore),
+    (url, store, output): (&str, &ControlStore, Option<&Path>),
     shutdown: watch::Receiver<bool>,
 ) -> Result<
     (
@@ -301,6 +316,7 @@ fn development_location_role(
         .env_remove(SECURITY_AUDIT_WEBHOOK_VARIABLE)
         .env_remove(RUN_TOKEN_VARIABLE)
         .env_remove("SQLBUILD_DEVELOPMENT_CONTROL_FILE")
+        .env_remove(DEVELOPMENT_OUTPUT_FOLDER)
         .env(DEV_EVENTS_VARIABLE, DEV_EVENTS_ON)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -313,6 +329,9 @@ fn development_location_role(
             "SQLBUILD_DEVELOPMENT_CONTROL_FILE",
             std::env::current_dir()?.join(path),
         );
+    }
+    if let Some(folder) = output {
+        command.env(DEVELOPMENT_OUTPUT_FOLDER, folder);
     }
     let mut child = command.spawn()?;
     let group: Option<u32> = child.id();
@@ -391,10 +410,13 @@ pub(crate) async fn compile_generation(
                     "Location compiler failed; generation {generation} may already be published: {error}\n"
                 ),
             )]));
-            dev_failure(dev_events, generation, error);
+            dev_failure(dev_events, generation, error.clone());
             LocationLoad {
                 published: None,
                 rules: None,
+                discovered: Default::default(),
+                discover_files: Default::default(),
+                error: Some(error),
             }
         }
     };
@@ -403,12 +425,17 @@ pub(crate) async fn compile_generation(
         refresh_at: refresh,
         state_locations: locations,
         missing_secrets,
+        secrets_needed_by,
     }) = load.published
     else {
-        if let Some(rules) = &load.rules {
-            dev_failure(dev_events, generation, rule_failure_text(rules));
+        let rules_text: Option<String> = load.rules.as_ref().map(rule_failure_text);
+        if let Some(text) = &rules_text {
+            dev_failure(dev_events, generation, text.clone());
         }
-        return Ok(Some(Err(load.rules)));
+        let error: String = rules_text.or(load.error).unwrap_or_else(|| {
+            "the compile failed; the location's output has the error".to_owned()
+        });
+        return Ok(Some(Err((load.rules, error))));
     };
     let refresh_at = refresh
         .map(|deadline| Instant::now() + (deadline - Utc::now()).to_std().unwrap_or_default());
@@ -431,7 +458,12 @@ pub(crate) async fn compile_generation(
             record.snapshot_id
         )));
     }
-    Ok(Some(Ok((refresh_at, locations, missing_secrets))))
+    Ok(Some(Ok(LoadedGeneration {
+        refresh_at,
+        state_locations: locations,
+        secrets: (missing_secrets, secrets_needed_by),
+        snapshot_id: record.snapshot_id,
+    })))
 }
 
 /// Under `sqb dev`, tell the screen a generation failed; the last good generation keeps serving.
@@ -463,15 +495,15 @@ fn rule_failure_text(rules: &LocationRuleFailure) -> String {
     )
 }
 
-/// The child is retained by its owning task while this exchange can be cancelled.
-pub(crate) async fn exchange_location_generation(
+/// Send `request` as a JSON line and read the runtime's reply, a `what`; `sqb dev` events pass on.
+pub(crate) async fn exchange_reply<T: serde::de::DeserializeOwned>(
     compiler: &mut LocationCompiler,
-    generation: i64,
-) -> Result<LocationLoad, ControlError> {
-    compiler
-        .stdin
-        .write_all(format!("{generation}\n").as_bytes())
-        .await?;
+    request: &impl serde::Serialize,
+    what: &str,
+) -> Result<T, ControlError> {
+    let mut line: Vec<u8> = serde_json::to_vec(request).map_err(std::io::Error::other)?;
+    line.push(b'\n');
+    compiler.stdin.write_all(&line).await?;
     compiler.stdin.flush().await?;
     let mut line = String::new();
     loop {
@@ -482,13 +514,12 @@ pub(crate) async fn exchange_location_generation(
             ));
         }
         if parse_dev_event(&line).is_none() {
-            break;
+            return serde_json::from_str(&line).map_err(|_| {
+                ControlError::Invalid(format!("location interpreter returned an invalid {what}"))
+            });
         }
         drop(write_output(&[(Stream::Stdout, &line)]));
     }
-    serde_json::from_str(&line).map_err(|_| {
-        ControlError::Invalid("location interpreter returned an invalid publication record".into())
-    })
 }
 
 /// The caller retains and reaps the child while a cancellable bounded exchange owns its pipes.
@@ -1175,7 +1206,7 @@ pub(crate) fn start_platform_roles(
 pub(crate) async fn run_control_action(
     namespace: &Namespace,
     command: &str,
-) -> Result<Option<serde_json::Value>, ControlError> {
+) -> Result<Option<AdminDone>, ControlError> {
     if command == ADMIN_COMMAND {
         return run_admin(namespace).await.map(Some);
     }
@@ -1184,7 +1215,7 @@ pub(crate) async fn run_control_action(
         .map(|()| None)
 }
 
-/// Open and migrate the privileged store, reporting progress without contaminating JSON stdout.
+/// Open and migrate the server's store, reporting progress on stderr.
 pub(crate) async fn open_control_store(
     namespace: &Namespace,
     server: Option<&ServerSection>,
@@ -1193,14 +1224,17 @@ pub(crate) async fn open_control_store(
         namespace,
         &control_database_variable(namespace, server.unwrap_or(&ServerSection::default())),
     )?;
+    drop(write_output(&[(Stream::Stderr, OPENING_STORE)]));
+    let store = open_migrated_store(&url).await?;
+    drop(write_output(&[(Stream::Stderr, STORE_READY)]));
+    Ok(store)
+}
+
+/// The store at `url`, created or migrated to this build's schema.
+pub(crate) async fn open_migrated_store(url: &str) -> Result<ControlStore, ControlError> {
     set_release_version(env!("CARGO_PKG_VERSION"));
-    drop(write_output(&[(
-        Stream::Stderr,
-        "Opening control store...\n",
-    )]));
-    let store = open_store(&url).await?;
+    let store = open_store(url).await?;
     migrate_store(&store).await?;
-    drop(write_output(&[(Stream::Stderr, "Control store ready\n")]));
     Ok(store)
 }
 
@@ -1547,11 +1581,18 @@ pub(crate) async fn next_turn(
 }
 
 /// `sqb dev`'s control lines from stdin; outside `sqb dev`, a fixed connected state. `sqb dev` holds stdin open while it lives, so its end, even after `sqb dev` was killed, stops the location as SIGTERM does.
-pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevControlState> {
+pub(crate) fn dev_controls(
+    options: &LocationServe,
+) -> (
+    watch::Sender<DevControlState>,
+    watch::Receiver<DevControlState>,
+) {
     let (sender, receiver) = watch::channel(DevControlState {
         warehouse: (!options.dev_events).then_some(true),
         recompiles: 0,
+        rediscovers: 0,
     });
+    let republisher: watch::Sender<DevControlState> = sender.clone();
     if options.dev_events {
         tokio::task::spawn_blocking(move || {
             for line in std::io::stdin().lines().map_while(Result::ok) {
@@ -1559,9 +1600,7 @@ pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevContro
                     Some(DevControl::Warehouse { connected }) => {
                         sender.send_modify(|state| state.warehouse = Some(connected));
                     }
-                    Some(DevControl::Recompile) => {
-                        sender.send_modify(|state| state.recompiles += 1);
-                    }
+                    Some(DevControl::Recompile) => request_republish(&sender, true),
                     None => {}
                 }
             }
@@ -1572,7 +1611,15 @@ pub(crate) fn dev_controls(options: &LocationServe) -> watch::Receiver<DevContro
             );
         });
     }
-    receiver
+    (republisher, receiver)
+}
+
+/// Publish a new generation even when no input changed; `rediscover` calls every discover function again.
+pub(crate) fn request_republish(controls: &watch::Sender<DevControlState>, rediscover: bool) {
+    controls.send_modify(|state| {
+        state.recompiles += 1;
+        state.rediscovers += u64::from(rediscover);
+    });
 }
 
 /// Tell `sqb dev` which inputs changed since the last compile: the first few paths and how many more.
@@ -1703,18 +1750,6 @@ pub(crate) async fn apply_dev_controls(
     Ok(settled.map(|settled| (control.recompiles, settled)))
 }
 
-/// The loopback address `sqb dev` listens on.
-pub(crate) fn loopback_address(namespace: &Namespace) -> Result<SocketAddr, ControlError> {
-    let address = control_address(namespace, false, &ServerSection::default())?
-        .ok_or_else(|| ControlError::Invalid("development address is required".into()))?;
-    if !address.ip().is_loopback() {
-        return Err(ControlError::Invalid(
-            "sqb dev only listens on loopback".into(),
-        ));
-    }
-    Ok(address)
-}
-
 /// Open the development store, with its checklist row and the location it names on the screen.
 pub(crate) async fn announced_store(
     namespace: &Namespace,
@@ -1802,6 +1837,8 @@ pub(crate) async fn development_store(
         target: target.into(),
         triggers: flag(namespace, "development_triggers"),
         principal_id: development_person(&store, &context).await?,
+        allowed_hosts: allowed_hosts(namespace)?,
+        listens_beyond_loopback: listens_beyond_loopback(namespace),
     };
     if !scope.triggers {
         pause_development_triggers(&store, (location_id, target)).await?;
@@ -1811,7 +1848,11 @@ pub(crate) async fn development_store(
 
 /// After a compile: a publication waits for the `sqb dev` warehouse verdict and settles; a failure keeps the last good snapshot.
 pub(crate) async fn finish_compile(
-    (options, script, session): (&LocationServe, &Path, (&str, Uuid)),
+    (options, script, (session, client)): (
+        &LocationServe,
+        &Path,
+        ((&str, Uuid), &LocationWorkClient),
+    ),
     (load, generation): (LoadOutcome, i64),
     (mut watch, metadata, deferred): Settled,
     (controls, stopped): (
@@ -1820,9 +1861,22 @@ pub(crate) async fn finish_compile(
     ),
 ) -> Result<Option<Settled>, ControlError> {
     tokio::pin!(stopped);
-    let (refresh_at, locations, missing_secrets) = match load {
+    let owed: Option<PendingRepublish> = watch.republish.take();
+    let compiled = (&load, generation);
+    if let Some(result) =
+        settle_republish((client, session.1), owed, compiled, stopped.as_mut()).await
+    {
+        result?;
+        return Ok(None);
+    }
+    let LoadedGeneration {
+        refresh_at,
+        state_locations: locations,
+        secrets: missing_secrets,
+        ..
+    } = match load {
         Ok(published) => published,
-        Err(rules) => {
+        Err((rules, _)) => {
             watch.retry_at = Some(Instant::now() + Duration::from_secs(30));
             tokio::select! {
                 result = &mut stopped => { result?; return Ok(None); },
@@ -1896,25 +1950,6 @@ pub(crate) async fn compile_next_generation(
     )
     .await?;
     Ok(load.map(|load| (Some((load, generation)), metadata, compiled_inputs)))
-}
-
-/// Ask the runtime interpreter for one plan preview; its reply is one JSON line.
-pub(crate) async fn exchange_location_plan(
-    compiler: &mut LocationCompiler,
-    request: &serde_json::Value,
-) -> Result<serde_json::Value, ControlError> {
-    let mut line: Vec<u8> = serde_json::to_vec(request).map_err(std::io::Error::other)?;
-    line.push(b'\n');
-    compiler.stdin.write_all(&line).await?;
-    compiler.stdin.flush().await?;
-    let mut reply = String::new();
-    if compiler.stdout.read_line(&mut reply).await? == 0 {
-        return Err(ControlError::Invalid(
-            "location interpreter exited before replying".into(),
-        ));
-    }
-    serde_json::from_str(&reply)
-        .map_err(|_| ControlError::Invalid("location interpreter returned an invalid plan".into()))
 }
 
 /// The safety sync interval from the flag, then the environment, then the project; `None` when unset.

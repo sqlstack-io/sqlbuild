@@ -1,3 +1,4 @@
+pub(crate) mod admin_actions;
 pub(crate) mod argv_host;
 pub(crate) mod decision;
 pub(crate) mod init;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { groupRunNodes, mergePlanPage, parseRunCursor, queueEntriesOf, planResultOf, runDetailOf, runRowPage, runRowPageOver, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
+import { groupRunNodes, mergePlanPage, nodeKindOf, parseRunCursor, queueEntriesOf, planResultOf, runDetailOf, runRowPage, runRowPageOver, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
 
 type RunRecord = components['schemas']['RunRecord'];
 type W = components['schemas'];
@@ -51,17 +51,17 @@ describe('run mapping', () => {
 		expect([part.narrowing, whole.narrowing]).toEqual([{ select: [], exclude: ['customers'] }, null]);
 	});
 
-	it('counts cancelled nodes as failed and counts each run’s direct children', () => {
+	it('counts cancelled nodes as failed, not-run nodes among the skipped as well as on their own, and each run’s direct children', () => {
 		const runs = toRuns(
 			[
-				wire('group', { kind: 'group', node_counts_json: { success: 3, cancelled: 2, failed: 1, pending: 4 } }),
+				wire('group', { kind: 'group', node_counts_json: { success: 3, cancelled: 2, failed: 1, pending: 4, skipped: 1, not_run: 2 } }),
 				wire('child-1', { parent_run_id: 'group', root_run_id: 'group' }),
 				wire('child-2', { parent_run_id: 'group', root_run_id: 'group' }),
 				wire('grandchild', { parent_run_id: 'child-1', root_run_id: 'group' })
 			],
 			LOCATION
 		);
-		expect(runs[0].nodeCounts).toEqual({ success: 3, warn: 0, failed: 3, skipped: 0, running: 0, pending: 4 });
+		expect(runs[0].nodeCounts).toEqual({ success: 3, warn: 0, failed: 3, skipped: 3, notRun: 2, running: 0, pending: 4 });
 		expect(runs.map((r) => r.childRunCount)).toEqual([2, 1, 0, 0]);
 	});
 });
@@ -94,7 +94,7 @@ describe('runs list', () => {
 		expect(rows.find((r) => r.run.id === 'r1')?.cancelRequestedAt).toBe('2026-11-06T10:05:00Z');
 		expect(rows.find((r) => r.run.id === 'r2')?.cancelRequestedAt).toBeNull();
 		expect(rows.find((r) => r.run.id === 'r4')?.rerunFromFailureCount).toBe(5);
-		expect(rows.find((r) => r.run.id === 'r7')?.rerunFromFailureCount).toBe(2);
+		expect(rows.find((r) => r.run.id === 'r7')?.rerunFromFailureCount).toBe(4);
 	});
 
 	it('counts active and queued runs under the filter, ignoring the tab', () => {
@@ -197,7 +197,7 @@ describe('runs past the newest window', () => {
 });
 
 describe('run detail', () => {
-	it('links parent, children and reruns, and reruns from failed and skipped nodes but not cancelled ones', () => {
+	it('links parent, children and reruns, and reruns from failed, cancelled, skipped and unreached nodes', () => {
 		const wires = [
 			wire('parent', { kind: 'group' }),
 			wire('run', { parent_run_id: 'parent', root_run_id: 'parent', status: 'failed' }),
@@ -207,14 +207,14 @@ describe('run detail', () => {
 		];
 		const runs = toRuns(wires, LOCATION);
 		const run = runs[1];
-		const nodes = (['success', 'failed', 'skipped', 'cancelled', 'bogus'] as const).map((status, i) =>
+		const nodes = (['success', 'failed', 'skipped', 'cancelled', 'bogus', 'not_run'] as const).map((status, i) =>
 			toRunNode({ node_key: `model.n${i}`, status, skipped_because_of: status === 'skipped' ? 'model.n1' : null } as components['schemas']['RunNodeRecord'], run)
 		);
 		const detail = runDetailOf(run, wires[1], runs, nodes);
 		expect(detail.parent?.id).toBe('parent');
 		expect(detail.children.map((r) => r.id)).toEqual(['child-early', 'child-late']);
 		expect(detail.reruns.map((r) => r.id)).toEqual(['retry']);
-		expect(detail.rerunFromFailureNodes).toEqual(['model.n1', 'model.n2']);
+		expect(detail.rerunFromFailureNodes).toEqual(['model.n1', 'model.n2', 'model.n3', 'model.n4', 'model.n5']);
 		expect(nodes[4].status).toBe('not_run');
 		expect(nodes[2].skippedBecauseOf).toEqual({ nodeKey: 'model.n1', runId: 'run', jobKey: 'orders_daily' });
 	});
@@ -264,6 +264,23 @@ describe('run Recall reads', () => {
 		expect([toRunEvent(event('resource_attempt_failed', table), 'r1')?.nodeKey, toRunStatements([{ invocation_id: inv, statement_id: 's10', sql_available: true, ...view }], 'r1')[0].nodeKey]).toEqual(['model:orders', 'model:customers']);
 		// A hash alone names no node; the scheduler's node events carry none yet.
 		expect(toRunEvent(event('resource_attempt_started', { resource_id: '3b7370f99e385665996e8f73523b4fd5' }), 'r1')?.nodeKey).toBeNull();
+	});
+
+	it('names a check result, its outcome and the rows it found; other events carry no check', () => {
+		const check = (outcome: string, extra: Partial<W['RunEventRecord']> = {}) => toRunEvent(event('audit_completed', { outcome, ...extra }), 'r1')?.check;
+		expect([
+			check('warn', { check_name: 'unique(order_id)', check_rows: 14, check_binding_key: 'b-1', check_result_id: 'r-1' }),
+			check('error', { check_name: 'not_null(id)', check_rows: 2 }),
+			check('pass', { check_name: 'row_count' }),
+			check('insufficient', { check_name: 'freshness' }),
+			toRunEvent(event('resource_attempt_started'), 'r1')?.check
+		]).toEqual([
+			{ name: 'unique(order_id)', outcome: 'warned', rows: 14, bindingKey: 'b-1', resultId: 'r-1' },
+			{ name: 'not_null(id)', outcome: 'failed', rows: 2, bindingKey: null, resultId: null },
+			{ name: 'row_count', outcome: 'passed', rows: null, bindingKey: null, resultId: null },
+			{ name: 'freshness', outcome: 'skipped', rows: null, bindingKey: null, resultId: null },
+			null
+		]);
 	});
 
 	it('orders statements as sent and tells running from finished by the end time', () => {
@@ -410,5 +427,18 @@ describe('mergePlanPage', () => {
 		const page = { total: 1, section_total: 1, rows: [{ name: 'orders', reason: 'query_changed' }], runs: [], warnings: [warning], cursor_window_starts: { orders: '2026-11-01' } };
 		const once = mergePlanPage(mergePlanPage(withCopy, 'query_changed', page as never), 'warnings', { ...page, rows: [warning], warnings: [], cursor_window_starts: {} } as never);
 		expect({ warnings: once.warnings, starts: once.synced_copy?.cursor_window_starts }).toEqual({ warnings: [warning], starts: { orders: '2026-11-01' } });
+	});
+});
+
+describe('run node kinds', () => {
+	it('read a model’s kind from its materialization and any other node’s from its key', () => {
+		expect([nodeKindOf('model:orders', 'incremental'), nodeKindOf('model:orders', 'view'), nodeKindOf('model:orders', null), nodeKindOf('seed:countries', null), nodeKindOf('loader:raw_events', null), nodeKindOf('check:orders_valid', null)]).toEqual([
+			'incremental',
+			'view',
+			null,
+			'seed',
+			'loader',
+			null
+		]);
 	});
 });

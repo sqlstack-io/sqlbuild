@@ -1,3 +1,4 @@
+import { shortName } from '$lib/build-area/labels';
 import type { components } from '$control/schema.d.ts';
 import type { Location, LocationHealth, PlatformEvent, Snapshot, WarehouseSync } from './types';
 import type { ConnectionDetails, ConnectionTest, LocationDetail, MissingProviderSecrets, PoolCapWarning, LocationInstance, LocationSummary, WarehouseConnection, WarehouseTableSync } from './types/platform';
@@ -11,7 +12,7 @@ function latestOf<K extends Wire['LocationHealth']['kind']>(observations: Wire['
 	return observations.find((o) => o.report.health.kind === kind) as (Wire['LocationHealthObservation'] & { report: { health: Extract<Wire['LocationHealth'], { kind: K }> } }) | undefined;
 }
 
-/** Health from the newest observations: down without a recent check-in, then load failures, then missing provider secrets, then connection failures. */
+/** Health from the newest observations: down without a recent check-in, then load failures, then missing provider secrets, then failed discover functions, then connection failures. */
 export function healthOf(observations: Wire['LocationHealthObservation'][], now: number): { health: LocationHealth; liveInstances: number; lastSeenAt: string | null } {
 	// The server's own pool-cap warning is not a location check-in.
 	const reported = observations.filter((o) => o.report.health.kind !== 'pool_capped');
@@ -20,13 +21,16 @@ export function healthOf(observations: Wire['LocationHealthObservation'][], now:
 	const failed = latestOf(observations, 'compile_failed');
 	const connection = latestOf(observations, 'connection');
 	const secrets = latestOf(observations, 'provider_secrets');
+	const discovery = latestOf(observations, 'discovery');
 	const health: LocationHealth = !live.size
 		? 'broken'
 		: failed && (!connection || failed.report.health.generation >= connection.report.health.generation)
 			? 'falling_back'
 			: secrets && secrets.report.health.missing > 0
 				? 'missing_secrets'
-				: connection && !connection.report.health.healthy
+				: discovery && discovery.report.health.sets.some((set) => set.status === 'failed')
+					? 'discovery_failed'
+					: connection && !connection.report.health.healthy
 					? 'degraded'
 					: 'healthy';
 	return { health, liveInstances: live.size, lastSeenAt };
@@ -39,6 +43,12 @@ export function missingSecretsOf(observations: Wire['LocationHealthObservation']
 	return [...providers.filter((p) => !p.allowed), ...providers.filter((p) => p.allowed)];
 }
 
+/** How many nodes the missing-secrets problem names before "and N more". */
+const SECRET_NODES_SHOWN = 3;
+
+/** "a", "a and b", "a, b and c". */
+const andList = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`);
+
 /**
  * The Overview's problem for a location whose providers miss secrets its target doesn't allow, or null.
  * Its members are the unset variables, so a newly missing one makes it worse.
@@ -48,7 +58,13 @@ export function missingSecretsEventOf(locationKey: string, observations: Wire['L
 	const problems = missingSecretsOf(observations).filter((p) => !p.allowed);
 	if (!latest || !problems.length) return null;
 	const variables = problems.flatMap((p) => p.settings.map((s) => s.variable));
-	const nodes = new Set(problems.flatMap((p) => p.nodes)).size;
+	const nodes = [...new Set(problems.flatMap((p) => p.nodes))].map(shortName);
+	const it = problems.length === 1 ? 'it' : 'them';
+	const stopped = !nodes.length
+		? `runs that use ${it}`
+		: nodes.length <= SECRET_NODES_SHOWN
+			? `runs of ${andList(nodes)}`
+			: `runs of ${nodes.slice(0, SECRET_NODES_SHOWN).join(', ')} and ${nodes.length - SECRET_NODES_SHOWN} more`;
 	const providers = problems.map((p) => p.provider).join(', ');
 	return {
 		id: `secrets:${locationKey}`,
@@ -59,7 +75,7 @@ export function missingSecretsEventOf(locationKey: string, observations: Wire['L
 		active: true,
 		locationId: locationKey,
 		subject: null,
-		message: `${providers} ${problems.length === 1 ? 'is' : 'are'} missing ${variables.join(', ')} in the location's environment, so runs of ${nodes === 1 ? 'the node that uses' : `the ${nodes} nodes that use`} ${problems.length === 1 ? 'it' : 'them'} stop before the warehouse.`
+		message: `${providers} ${problems.length === 1 ? 'is' : 'are'} missing ${variables.join(', ')} in the location's environment, so ${stopped} stop before the warehouse.`
 	};
 }
 

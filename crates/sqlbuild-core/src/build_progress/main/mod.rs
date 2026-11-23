@@ -1,5 +1,7 @@
 pub mod batch_progress_message;
 pub mod format_build_footer;
+pub mod heartbeat_interval;
+pub mod heartbeat_message;
 pub mod progress_name_width;
 pub mod query_diagnostic_message;
 pub mod render_build_spinner_line;

@@ -1,5 +1,8 @@
 //! Worker resource reports bind to the authenticated run and claim, never a caller-supplied actor.
 
+use crate::api::models::ServerFacts;
+use crate::run_output::main::publish_output_batch::publish_output_batch;
+use crate::run_output::models::{OutputBatch, OutputBatchReceipt};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::{Extension, Json};
@@ -91,6 +94,34 @@ pub(crate) async fn output(
     Ok(Json(
         publish_run_output(&store, (run_id, claim_id), &chunks).await?,
     ))
+}
+
+#[utoipa::path(post, path = "/api/runs/{run_id}/output/batches", params(("run_id" = Uuid, Path)),
+    request_body = OutputBatch,
+    responses((status = 200, body = OutputBatchReceipt), (status = 400, body = crate::api::models::ApiErrorBody),
+        (status = 401, description = "Invalid credential"), (status = 403, description = "Run not authorized"),
+        (status = 503, body = crate::api::models::ApiErrorBody, description = "The server keeps no run output")),
+    security(("bearer" = [])))]
+pub(crate) async fn output_batch(
+    (State(store), Extension(facts)): (State<ControlStore>, Extension<ServerFacts>),
+    Extension(identity): Extension<TokenIdentity>,
+    Path(run_id): Path<Uuid>,
+    Json(batch): Json<OutputBatch>,
+) -> Result<Json<OutputBatchReceipt>, ApiError> {
+    let claim_id = require_worker(&identity, run_id)?;
+    let output = facts.output.ok_or_else(no_output_store)?;
+    Ok(Json(
+        publish_output_batch(&store, &output, (run_id, claim_id), batch).await?,
+    ))
+}
+
+/// A server started without an output store refuses output, saying why.
+pub(crate) fn no_output_store() -> ApiError {
+    ApiError {
+        status: StatusCode::SERVICE_UNAVAILABLE,
+        message: "this server keeps no run output store".into(),
+        decision_id: None,
+    }
 }
 
 #[utoipa::path(post, path = "/api/runs/{run_id}/recall", params(("run_id" = Uuid, Path)),

@@ -64,6 +64,14 @@ impl<'a> Candidates<'a> {
     }
 }
 
+/// The name a node's author wrote: `asset` for a discovered item's node `asset[item]`.
+fn authored_name(name: &str) -> &str {
+    match name.split_once('[') {
+        Some((asset, item)) if item.ends_with(']') => asset,
+        _ => name,
+    }
+}
+
 /// Reject the first identity that is not canonical lowercase snake_case.
 pub(crate) fn validate_identities(facts: &ProjectFacts) -> Result<(), ValidationFailure> {
     for candidate in candidates(facts) {
@@ -133,7 +141,7 @@ fn candidates(facts: &ProjectFacts) -> Vec<Candidate<'_>> {
     candidates.push_named(&facts.materializations, "materialization");
     for kind in [NodeKind::Loader, NodeKind::Asset, NodeKind::Check] {
         for node in facts.nodes.iter().filter(|node| node.kind == kind) {
-            candidates.push(&node.name, kind.label(), &node.path);
+            candidates.push(authored_name(&node.name), kind.label(), &node.path);
         }
     }
     candidates.push_named(&facts.hook_functions, "Python hook");

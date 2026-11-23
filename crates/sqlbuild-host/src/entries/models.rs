@@ -185,6 +185,9 @@ pub enum UserCodeHost {
     RunCommandOutputSinks,
     GetLifecycleEventSinkDefinition,
     InvokeRecallSink,
+    ReadDiscoverDefinition,
+    DiscoveredResultJson,
+    ItemDependencyRefs,
 }
 
 impl UserCodeHost {
@@ -348,6 +351,7 @@ pub enum ExecutorHost {
     ExecutionDeadlinesSuspended,
     AuditEvidenceScope,
     CancelRunningStatements,
+    StatementActivity,
     EventDispatcher,
     OperationLifecycle,
     StatementLifecycle,

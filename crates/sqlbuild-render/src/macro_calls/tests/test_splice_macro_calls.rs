@@ -47,8 +47,8 @@ fn given_call_sites_and_outputs_when_splicing_then_sql_and_spans_match_python() 
             .iter()
             .map(|output| (*output).to_owned())
             .collect();
-        let actual =
-            splice_macro_calls(test_case.sql, test_case.sites, &outputs).map(|(sql, spans)| {
+        let actual = splice_macro_calls(test_case.sql, test_case.sites, &outputs, None).map(
+            |(sql, spans)| {
                 (
                     sql,
                     spans
@@ -63,7 +63,8 @@ fn given_call_sites_and_outputs_when_splicing_then_sql_and_spans_match_python() 
                         })
                         .collect::<Vec<_>>(),
                 )
-            });
+            },
+        );
         assert_eq!(
             actual,
             test_case

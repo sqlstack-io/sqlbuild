@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import traceback
+
+from sqlbuild._native import redact_diagnostic_text
 from sqlbuild.compiler.python_nodes.types import (
     PythonNodeFanInAction,
     PythonNodeKind,
@@ -9,6 +12,13 @@ from sqlbuild.compiler.python_nodes.types import (
     SkipMode,
 )
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
+from sqlbuild.executor.python_nodes.constants import (
+    ERROR_DETAIL_CHARS,
+    ERROR_SUMMARY_CHARS,
+    ERROR_SUMMARY_CUT,
+    TRACEBACK_ELIDED,
+    TRACEBACK_HEADER,
+)
 from sqlbuild.executor.python_nodes.models import (
     PythonCheckResult,
     PythonNodeExecutionResult,
@@ -83,7 +93,33 @@ def build_python_node_failure_result(
         kind=kind,
         status=PythonNodeStatus.FAILED,
         error_message=str(error),
+        error_detail=traceback_tail(error=error),
     )
+
+
+def traceback_tail(*, error: BaseException) -> str:
+    """Return the error's redacted traceback, cut to its exception and last frames if too long."""
+
+    text: str = redact_diagnostic_text("".join(traceback.format_exception(error)))
+    if len(text) <= ERROR_DETAIL_CHARS:
+        return text
+    raised: str = redact_diagnostic_text("".join(traceback.format_exception_only(error)))
+    frames: list[str] = text.removesuffix(raised).splitlines(keepends=True)
+    if len(raised) > ERROR_SUMMARY_CHARS:
+        raised = raised[: ERROR_SUMMARY_CHARS - len(ERROR_SUMMARY_CUT)] + ERROR_SUMMARY_CUT
+    elided: str = TRACEBACK_ELIDED.format(count=len(frames))
+    room: int = ERROR_DETAIL_CHARS - len(TRACEBACK_HEADER) - len(elided) - len(raised)
+    kept: list[str] = []
+    for line in reversed(frames):
+        if len(line) > room:
+            break
+        kept.append(line)
+        room -= len(line)
+    kept.reverse()
+    if len(kept) == len(frames):
+        return "".join(kept) + raised
+    elided = TRACEBACK_ELIDED.format(count=len(frames) - len(kept))
+    return TRACEBACK_HEADER + elided + "".join(kept) + raised
 
 
 def evaluate_python_node_fan_in(

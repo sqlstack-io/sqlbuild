@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import functools
 import time
 from collections.abc import Callable
 from typing import Any
@@ -88,6 +89,9 @@ def execute_build_source_node(
             result_store=result_store,
             schema_prepared=schema_prepared,
             project_relations=runtime.project_relations,
+            on_rows_written=_rows_written_for(
+                key=f"source:{source_entry.name}", callbacks=callbacks
+            ),
         ),
         statement_recorder=StatementRecorder(),
         loader_ref_entries=loader_ref_entries,
@@ -108,3 +112,12 @@ def execute_build_source_node(
             result_store=result_store,
         )
     return timed_result
+
+
+def _rows_written_for(*, key: str, callbacks: BuildCallbacks) -> Callable[[int], None] | None:
+    """Report one loader's rows so far under its node key."""
+
+    on_rows_written: Callable[[str, int], None] | None = callbacks.on_rows_written
+    if on_rows_written is None:
+        return None
+    return functools.partial(on_rows_written, key)

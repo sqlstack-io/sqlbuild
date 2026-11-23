@@ -81,7 +81,11 @@ def test_given_postgres_replicas_when_grant_admin_runs_then_only_the_granted_per
     )
     with PostgresContainer(POSTGRES_IMAGE, driver=None) as postgres:
         url: str = postgres.get_connection_url()
-        extra: dict[str, str] = {"SQLBUILD_CONTROL_DATABASE_URL": url}
+        state: Path = tmp_path / "state"
+        extra: dict[str, str] = {
+            "SQLBUILD_CONTROL_DATABASE_URL": url,
+            "XDG_STATE_HOME": str(state),
+        }
         people: list[dict[str, Any]] = []
         for command, name in [
             ("create-user", fixture["first_person"]),
@@ -105,6 +109,11 @@ def test_given_postgres_replicas_when_grant_admin_runs_then_only_the_granted_per
             serve(installation, extra_environment=extra) as first,
             serve((Path(binary), replica), extra_environment=extra) as second,
         ):
+            for started_in in (tmp_path, replica):
+                assert (
+                    f"Run output store: file://{state}/sqlbuild/output\n"
+                    in (started_in / "server.log").read_text()
+                )
             previous: tuple[str, str] = login(first, people[0]["name"], fixture["password"])
             other: tuple[str, str] = login(second, people[1]["name"], fixture["password"])
             for endpoint in [first, second]:

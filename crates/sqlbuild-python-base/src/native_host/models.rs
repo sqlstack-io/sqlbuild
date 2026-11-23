@@ -5,6 +5,7 @@ use crate::native_host::_helpers::interrupt::INTERRUPTED;
 use crate::native_host::_helpers::interrupt::SIGINT;
 use crate::native_host::_helpers::interrupt::restore_signal_handler;
 use crate::native_host::types::Syntax;
+use crate::native_host::types::WakeupSocket;
 use pyo3::exceptions::PyAttributeError;
 use pyo3::exceptions::PyKeyboardInterrupt;
 use pyo3::prelude::Bound;
@@ -266,4 +267,41 @@ impl Dialect {
     fn __getattr__<'py>(&self, py: Python<'py>, name: &str) -> PyResult<Bound<'py, PyAny>> {
         self.attribute(py, name)
     }
+}
+
+/// One command's watch for Ctrl+C.
+#[derive(Debug)]
+pub(crate) struct InterruptWatch {
+    /// The end of the socket pair Python's wakeup descriptor feeds.
+    pub(crate) receiver: WakeupSocket,
+    /// The end Python's wakeup descriptor writes to.
+    pub(crate) sender: WakeupSocket,
+    /// The sync bytes the watcher has read, and the signal it gives when it reads one.
+    pub(crate) syncs: std::sync::Mutex<u64>,
+    pub(crate) synced: std::sync::Condvar,
+    /// The terminal's descriptor and the settings it had when the command started.
+    pub(crate) terminal: Option<(i32, Py<PyAny>)>,
+    /// Whether SIGTERM is stopping the command, which then ends as a termination.
+    pub(crate) terminated: fn() -> bool,
+    pub(crate) pressed: std::sync::atomic::AtomicBool,
+    pub(crate) announced: std::sync::atomic::AtomicBool,
+}
+
+/// The Ctrl+C presses so far.
+#[derive(Debug)]
+pub(crate) struct InterruptPresses {
+    pub(crate) count: usize,
+    pub(crate) last: std::time::Instant,
+    /// The adapter connects in progress at the first press.
+    pub(crate) connecting: Vec<Py<PyAny>>,
+    /// Whether discovered steps had threads at the first press, so their pool ends the command.
+    pub(crate) stepping: bool,
+}
+
+/// A watch while its command runs.
+#[derive(Debug)]
+pub(crate) struct InterruptSession {
+    pub(crate) watch: std::sync::Arc<InterruptWatch>,
+    pub(crate) watcher: std::thread::JoinHandle<PyResult<()>>,
+    pub(crate) previous_wakeup: Py<PyAny>,
 }

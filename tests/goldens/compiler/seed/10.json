@@ -37,7 +37,7 @@
    "stdout": {
     "target": {
      "resource_type": "model",
-     "resource_name": "cte_facts_stg_sales_0",
+     "resource_name": "cte_facts_stg_inventory_1",
      "column_name": "amount"
     },
     "direction": "upstream",
@@ -51,12 +51,12 @@
      {
       "source": {
        "resource_type": "model",
-       "resource_name": "stg_sales_0",
+       "resource_name": "stg_inventory_1",
        "column_name": "amount"
       },
       "target": {
        "resource_type": "model",
-       "resource_name": "cte_facts_stg_sales_0",
+       "resource_name": "cte_facts_stg_inventory_1",
        "column_name": "amount"
       },
       "transform": "direct",
@@ -65,12 +65,12 @@
      {
       "source": {
        "resource_type": "source",
-       "resource_name": "raw_events_1",
+       "resource_name": "raw_events_0",
        "column_name": "amount"
       },
       "target": {
        "resource_type": "model",
-       "resource_name": "stg_sales_0",
+       "resource_name": "stg_inventory_1",
        "column_name": "amount"
       },
       "transform": "direct",
@@ -86,26 +86,26 @@
    "stdout": {
     "target": {
      "resource_type": "model",
-     "resource_name": "stg_sales_0",
+     "resource_name": "stg_inventory_1",
      "column_name": "amount"
     },
     "direction": "downstream",
     "metadata": {
      "mode": "rich",
      "max_depth": null,
-     "analyzed_models": 7,
+     "analyzed_models": 6,
      "truncated": false
     },
     "trace": [
      {
       "source": {
        "resource_type": "model",
-       "resource_name": "stg_sales_0",
+       "resource_name": "stg_inventory_1",
        "column_name": "amount"
       },
       "target": {
        "resource_type": "model",
-       "resource_name": "cte_facts_stg_sales_0",
+       "resource_name": "cte_facts_stg_inventory_1",
        "column_name": "amount"
       },
       "transform": "direct",
@@ -114,12 +114,12 @@
      {
       "source": {
        "resource_type": "model",
-       "resource_name": "stg_sales_0",
+       "resource_name": "stg_inventory_1",
        "column_name": "amount"
       },
       "target": {
        "resource_type": "model",
-       "resource_name": "merge_stg_sales_0",
+       "resource_name": "guarded_stg_inventory_1",
        "column_name": "amount"
       },
       "transform": "direct",
@@ -128,26 +128,12 @@
      {
       "source": {
        "resource_type": "model",
-       "resource_name": "stg_sales_0",
+       "resource_name": "stg_inventory_1",
        "column_name": "amount"
       },
       "target": {
        "resource_type": "model",
-       "resource_name": "spaced_stg_sales_0",
-       "column_name": "amount"
-      },
-      "transform": "direct",
-      "confidence": "high"
-     },
-     {
-      "source": {
-       "resource_type": "model",
-       "resource_name": "stg_sales_0",
-       "column_name": "amount"
-      },
-      "target": {
-       "resource_type": "model",
-       "resource_name": "taxed_stg_sales_0",
+       "resource_name": "taxed_stg_inventory_1",
        "column_name": "taxed"
       },
       "transform": "expression",
@@ -156,12 +142,12 @@
      {
       "source": {
        "resource_type": "model",
-       "resource_name": "stg_sales_0",
+       "resource_name": "stg_inventory_1",
        "column_name": "amount"
       },
       "target": {
        "resource_type": "model",
-       "resource_name": "taxed_stg_sales_0",
+       "resource_name": "taxed_stg_inventory_1",
        "column_name": "rounded"
       },
       "transform": "expression",
@@ -170,12 +156,40 @@
      {
       "source": {
        "resource_type": "model",
-       "resource_name": "stg_sales_0",
+       "resource_name": "stg_inventory_1",
        "column_name": "amount"
       },
       "target": {
        "resource_type": "model",
-       "resource_name": "sales_summary_0",
+       "resource_name": "inventory_summary_0",
+       "column_name": "amount"
+      },
+      "transform": "direct",
+      "confidence": "high"
+     },
+     {
+      "source": {
+       "resource_type": "model",
+       "resource_name": "stg_inventory_1",
+       "column_name": "amount"
+      },
+      "target": {
+       "resource_type": "model",
+       "resource_name": "inventory_summary_0",
+       "column_name": "adjust_1_amount"
+      },
+      "transform": "expression",
+      "confidence": "high"
+     },
+     {
+      "source": {
+       "resource_type": "model",
+       "resource_name": "stg_inventory_1",
+       "column_name": "amount"
+      },
+      "target": {
+       "resource_type": "model",
+       "resource_name": "inventory_summary_1",
        "column_name": "amount"
       },
       "transform": "direct",
@@ -191,7 +205,7 @@
    "stdout": {
     "target": {
      "resource_type": "model",
-     "resource_name": "cte_facts_stg_sales_0",
+     "resource_name": "cte_facts_stg_inventory_1",
      "column_name": "amount"
     },
     "direction": "upstream",
@@ -205,12 +219,12 @@
      {
       "source": {
        "resource_type": "model",
-       "resource_name": "stg_sales_0",
+       "resource_name": "stg_inventory_1",
        "column_name": "amount"
       },
       "target": {
        "resource_type": "model",
-       "resource_name": "cte_facts_stg_sales_0",
+       "resource_name": "cte_facts_stg_inventory_1",
        "column_name": "amount"
       },
       "transform": "cast",
@@ -219,12 +233,12 @@
      {
       "source": {
        "resource_type": "source",
-       "resource_name": "raw_events_1",
+       "resource_name": "raw_events_0",
        "column_name": "amount"
       },
       "target": {
        "resource_type": "model",
-       "resource_name": "stg_sales_0",
+       "resource_name": "stg_inventory_1",
        "column_name": "amount"
       },
       "transform": "direct",
@@ -240,133 +254,116 @@
    "stdout": {
     "nodes": [
      {
-      "id": "model:copied_stg_sales_0",
-      "name": "copied_stg_sales_0",
+      "id": "model:cte_facts_stg_inventory_1",
+      "name": "cte_facts_stg_inventory_1",
       "resource_type": "model",
-      "relative_path": "models/features/copied_stg_sales_0.sql",
-      "qualified_name": "main.copied_stg_sales_0"
+      "relative_path": "models/analysis/cte_facts_stg_inventory_1.sql",
+      "qualified_name": "analytics.cte_facts_stg_inventory_1"
      },
      {
-      "id": "model:cte_facts_stg_sales_0",
-      "name": "cte_facts_stg_sales_0",
+      "id": "model:guarded_stg_inventory_1",
+      "name": "guarded_stg_inventory_1",
       "resource_type": "model",
-      "relative_path": "models/analysis/cte_facts_stg_sales_0.sql",
-      "qualified_name": "main.cte_facts_stg_sales_0"
+      "relative_path": "models/features/guarded_stg_inventory_1.sql",
+      "qualified_name": "analytics.guarded_stg_inventory_1"
      },
      {
-      "id": "model:merge_stg_sales_0",
-      "name": "merge_stg_sales_0",
+      "id": "model:inventory_summary_0",
+      "name": "inventory_summary_0",
       "resource_type": "model",
-      "relative_path": "models/features/merge_stg_sales_0.sql",
-      "qualified_name": "main.merge_stg_sales_0"
+      "relative_path": "models/inventory/marts/inventory_summary_0.sql",
+      "qualified_name": "analytics.inventory_summary_0"
      },
      {
-      "id": "model:sales_summary_0",
-      "name": "sales_summary_0",
+      "id": "model:inventory_summary_1",
+      "name": "inventory_summary_1",
       "resource_type": "model",
-      "relative_path": "models/sales/marts/sales_summary_0.sql",
-      "qualified_name": "main.sales_summary_0"
+      "relative_path": "models/inventory/marts/inventory_summary_1.sql",
+      "qualified_name": "analytics.inventory_summary_1"
      },
      {
-      "id": "model:spaced_stg_sales_0",
-      "name": "spaced_stg_sales_0",
+      "id": "model:stg_inventory_1",
+      "name": "stg_inventory_1",
       "resource_type": "model",
-      "relative_path": "models/features/spaced_stg_sales_0.sql",
-      "qualified_name": "main.spaced_stg_sales_0"
+      "relative_path": "models/inventory/staging/stg_inventory_1.sql",
+      "qualified_name": "analytics.stg_inventory_1"
      },
      {
-      "id": "model:stg_sales_0",
-      "name": "stg_sales_0",
+      "id": "model:taxed_stg_inventory_1",
+      "name": "taxed_stg_inventory_1",
       "resource_type": "model",
-      "relative_path": "models/sales/staging/stg_sales_0.sql",
-      "qualified_name": "main.stg_sales_0"
+      "relative_path": "models/features/taxed_stg_inventory_1.sql",
+      "qualified_name": "analytics.taxed_stg_inventory_1"
      },
      {
-      "id": "model:taxed_stg_sales_0",
-      "name": "taxed_stg_sales_0",
-      "resource_type": "model",
-      "relative_path": "models/features/taxed_stg_sales_0.sql",
-      "qualified_name": "main.taxed_stg_sales_0"
-     },
-     {
-      "id": "source:raw_events_1",
-      "name": "raw_events_1",
+      "id": "source:raw_events_0",
+      "name": "raw_events_0",
       "resource_type": "source",
       "relative_path": "sources/raw.yml"
      }
     ],
     "edges": [
      {
-      "from": "model:stg_sales_0",
-      "to": "model:copied_stg_sales_0"
+      "from": "model:stg_inventory_1",
+      "to": "model:cte_facts_stg_inventory_1"
      },
      {
-      "from": "model:stg_sales_0",
-      "to": "model:cte_facts_stg_sales_0"
+      "from": "model:stg_inventory_1",
+      "to": "model:guarded_stg_inventory_1"
      },
      {
-      "from": "model:stg_sales_0",
-      "to": "model:merge_stg_sales_0"
+      "from": "model:stg_inventory_1",
+      "to": "model:inventory_summary_0"
      },
      {
-      "from": "model:stg_sales_0",
-      "to": "model:sales_summary_0"
+      "from": "model:stg_inventory_1",
+      "to": "model:inventory_summary_1"
      },
      {
-      "from": "model:stg_sales_0",
-      "to": "model:spaced_stg_sales_0"
+      "from": "source:raw_events_0",
+      "to": "model:stg_inventory_1"
      },
      {
-      "from": "source:raw_events_1",
-      "to": "model:stg_sales_0"
-     },
-     {
-      "from": "model:stg_sales_0",
-      "to": "model:taxed_stg_sales_0"
+      "from": "model:stg_inventory_1",
+      "to": "model:taxed_stg_inventory_1"
      }
     ],
     "focus": [
-     "model:stg_sales_0"
+     "model:stg_inventory_1"
     ],
     "direction": "both"
    }
   }
  ],
  "compiled": {
-  "audits/generic/audited_stg_fulfillment_1/id_present__id.sql": [
+  "audits/generic/audited_stg_sales_0/id_present__id.sql": [
    "SELECT id",
-   "FROM __ref(\"audited_stg_fulfillment_1\")",
+   "FROM __ref(\"audited_stg_sales_0\")",
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/checked_stg_fulfillment_0/accepted_values__status.sql": [
+  "audits/generic/checked_stg_sales_0/accepted_values__status.sql": [
    "SELECT status",
-   "FROM __ref(\"checked_stg_fulfillment_0\")",
+   "FROM __ref(\"checked_stg_sales_0\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'expédié', '取消', 'returned ✓')",
    ""
   ],
-  "audits/generic/checked_stg_fulfillment_0/expression_is_true.sql": [
+  "audits/generic/checked_stg_sales_0/expression_is_true.sql": [
    "SELECT *",
-   "FROM __ref(\"checked_stg_fulfillment_0\")",
+   "FROM __ref(\"checked_stg_sales_0\")",
    "WHERE NOT (amount >= -1000)",
    ""
   ],
-  "audits/generic/checked_stg_fulfillment_0/relationships__id.sql": [
+  "audits/generic/checked_stg_sales_0/relationships__id.sql": [
    "SELECT id",
-   "FROM __ref(\"checked_stg_fulfillment_0\")",
+   "FROM __ref(\"checked_stg_sales_0\")",
    "WHERE id IS NOT NULL",
    "  AND id NOT IN (",
    "    SELECT id",
-   "    FROM __ref(\"stg_fulfillment_0\")",
+   "    FROM __ref(\"stg_sales_0\")",
    "    WHERE id IS NOT NULL",
    "  )",
-   ""
-  ],
-  "audits/generic/fulfillment_summary_1/not_null__id.sql": [
-   "SELECT id",
-   "FROM __ref(\"fulfillment_summary_1\")",
-   "WHERE id IS NULL",
    ""
   ],
   "audits/generic/guarded_stg_inventory_1/amount_at_least__amount.sql": [
@@ -375,16 +372,40 @@
    "WHERE amount < 0",
    ""
   ],
-  "audits/generic/stated_stg_fulfillment_1/accepted_values__status.sql": [
+  "audits/generic/inventory_summary_0/not_null__id.sql": [
+   "SELECT id",
+   "FROM __ref(\"inventory_summary_0\")",
+   "WHERE id IS NULL",
+   ""
+  ],
+  "audits/generic/sales_summary_0/not_null__id.sql": [
+   "SELECT id",
+   "FROM __ref(\"sales_summary_0\")",
+   "WHERE id IS NULL",
+   ""
+  ],
+  "audits/generic/stated_stg_sales_0/accepted_values__status.sql": [
    "SELECT status",
-   "FROM __ref(\"stated_stg_fulfillment_1\")",
+   "FROM __ref(\"stated_stg_sales_0\")",
    "WHERE status IS NOT NULL",
    "  AND status NOT IN ('placed', 'expédié', '取消', 'returned ✓')",
+   ""
+  ],
+  "audits/generic/stg_fulfillment_0/not_null__id.sql": [
+   "SELECT id",
+   "FROM __ref(\"stg_fulfillment_0\")",
+   "WHERE id IS NULL",
    ""
   ],
   "audits/generic/stg_fulfillment_1/not_null__id.sql": [
    "SELECT id",
    "FROM __ref(\"stg_fulfillment_1\")",
+   "WHERE id IS NULL",
+   ""
+  ],
+  "audits/generic/stg_inventory_0/not_null__id.sql": [
+   "SELECT id",
+   "FROM __ref(\"stg_inventory_0\")",
    "WHERE id IS NULL",
    ""
   ],
@@ -394,16 +415,10 @@
    "WHERE id IS NULL",
    ""
   ],
-  "audits/generic/stg_sales_0/not_null__id.sql": [
-   "SELECT id",
-   "FROM __ref(\"stg_sales_0\")",
-   "WHERE id IS NULL",
-   ""
-  ],
-  "audits/singular/fulfillment_summary_1_matches.sql": [
+  "audits/singular/inventory_summary_0_matches.sql": [
    "SELECT a.id",
-   "FROM __ref(\"fulfillment_summary_1\") a",
-   "LEFT JOIN __ref(\"fulfillment_summary_0\") b ON a.id = b.id",
+   "FROM __ref(\"inventory_summary_0\") a",
+   "LEFT JOIN __ref(\"inventory_summary_1\") b ON a.id = b.id",
    "WHERE b.id IS NULL",
    ""
   ],
@@ -412,68 +427,68 @@
    ""
   ],
   "functions/sql/is_placed.sql": [
-   "CREATE OR REPLACE MACRO main.is_placed(event_status) AS (",
+   "CREATE OR REPLACE MACRO analytics.is_placed(event_status) AS (",
    "event_status = 'placed'",
    ")",
    ""
   ],
   "functions/sql/table_fn__events_above.sql": [
-   "CREATE OR REPLACE MACRO main.table_fn__events_above(p_minimum) AS TABLE",
+   "CREATE OR REPLACE MACRO analytics.table_fn__events_above(p_minimum) AS TABLE",
    "SELECT id, amount",
-   "FROM __ref(\"stg_inventory_0\")",
+   "FROM __ref(\"stg_fulfillment_1\")",
    "WHERE amount > p_minimum",
    ""
   ],
-  "models/analysis/chain_1_stg_sales_0.sql": [
+  "models/analysis/chain_1_stg_inventory_0.sql": [
    "SELECT id, label, amount",
-   "FROM __ref(\"contracted_stg_sales_0\")",
+   "FROM __ref(\"contracted_stg_inventory_0\")",
    ""
   ],
-  "models/analysis/chain_2_stg_sales_0.sql": [
+  "models/analysis/chain_2_stg_inventory_0.sql": [
    "SELECT id, UPPER(label) AS label, amount",
-   "FROM __ref(\"chain_1_stg_sales_0\")",
+   "FROM __ref(\"chain_1_stg_inventory_0\")",
    ""
   ],
-  "models/analysis/chain_3_stg_sales_0.sql": [
+  "models/analysis/chain_3_stg_inventory_0.sql": [
    "SELECT id, label, amount",
-   "FROM __ref(\"chain_2_stg_sales_0\")",
+   "FROM __ref(\"chain_2_stg_inventory_0\")",
    ""
   ],
-  "models/analysis/checked_stg_fulfillment_0.sql": [
+  "models/analysis/checked_stg_sales_0.sql": [
    "SELECT id, amount, status",
-   "FROM __ref(\"stg_fulfillment_0\")",
+   "FROM __ref(\"stg_sales_0\")",
    ""
   ],
-  "models/analysis/contracted_stg_sales_0.sql": [
-   "SELECT CAST(id AS INTEGER) AS id, CAST(status AS VARCHAR(34)) AS label,",
+  "models/analysis/contracted_stg_inventory_0.sql": [
+   "SELECT CAST(id AS INTEGER) AS id, CAST(status AS VARCHAR(22)) AS label,",
    "  amount",
-   "FROM __source(\"raw_events_1\")",
+   "FROM __source(\"raw_events_0\")",
    ""
   ],
-  "models/analysis/cte_facts_stg_sales_0.sql": [
+  "models/analysis/cte_facts_stg_inventory_1.sql": [
    "WITH base AS (",
    "  SELECT id, CAST(amount AS DECIMAL(12, 2)) AS amount, 'event' AS kind,",
    "    COALESCE(status, 'unknown') AS status",
-   "  FROM __ref(\"stg_sales_0\")",
+   "  FROM __ref(\"stg_inventory_1\")",
    "  WHERE id IS NOT NULL",
    ")",
    "SELECT id + 0 AS id, amount, UPPER(kind) AS kind, UPPER(status) AS status",
    "FROM base",
    ""
   ],
-  "models/analysis/regional_stg_inventory_0.sql": [
-   "SELECT id, amount, 'north' AS region",
-   "FROM __ref(\"stg_inventory_0\")",
+  "models/analysis/regional_stg_fulfillment_1.sql": [
+   "SELECT id, amount, 'south' AS region",
+   "FROM __ref(\"stg_fulfillment_1\")",
    ""
   ],
-  "models/features/audited_stg_fulfillment_1.sql": [
+  "models/features/audited_stg_sales_0.sql": [
    "SELECT id, amount",
-   "FROM __ref(\"stg_fulfillment_1\")",
+   "FROM __ref(\"stg_sales_0\")",
    ""
   ],
-  "models/features/check_history_stg_fulfillment_1.sql": [
+  "models/features/check_history_stg_inventory_0.sql": [
    "SELECT id, status, amount",
-   "FROM __ref(\"stg_fulfillment_1\")",
+   "FROM __ref(\"stg_inventory_0\")",
    ""
   ],
   "models/features/copied_stg_sales_0.sql": [
@@ -481,10 +496,10 @@
    "FROM __ref(\"stg_sales_0\")",
    ""
   ],
-  "models/features/flagged_stg_inventory_1.sql": [
+  "models/features/flagged_stg_sales_0.sql": [
    "SELECT id, __udf(\"is_placed\")(status) AS is_placed,",
    "  __udf(\"is_large\")(amount) AS is_large",
-   "FROM __ref(\"stg_inventory_1\")",
+   "FROM __ref(\"stg_sales_0\")",
    ""
   ],
   "models/features/guarded_stg_inventory_1.sql": [
@@ -492,9 +507,9 @@
    "FROM __ref(\"stg_inventory_1\")",
    ""
   ],
-  "models/features/merge_stg_sales_0.sql": [
+  "models/features/merge_stg_fulfillment_1.sql": [
    "SELECT id, amount, status, created_at",
-   "FROM __ref(\"stg_sales_0\")",
+   "FROM __ref(\"stg_fulfillment_1\")",
    ""
   ],
   "models/features/product_labels.sql": [
@@ -502,18 +517,18 @@
    "FROM __source(\"loaded_products\")",
    ""
   ],
-  "models/features/spaced_stg_sales_0.sql": [
-   "-- Généré pour 東京 warehouse",
+  "models/features/spaced_stg_fulfillment_1.sql": [
+   "-- Généré pour naïve résumé",
    "SELECT",
    "\tid,",
-   "\t'naïve résumé' AS label, -- étiquette ✓",
+   "\t'東京 warehouse' AS label, -- étiquette ✓",
    "\tamount",
-   "FROM __ref(\"stg_sales_0\")",
+   "FROM __ref(\"stg_fulfillment_1\")",
    ""
   ],
-  "models/features/taxed_stg_sales_0.sql": [
+  "models/features/taxed_stg_inventory_1.sql": [
    "SELECT id, ROUND(amount * 1.2, 2) AS taxed, ROUND(amount, 1) AS rounded",
-   "FROM __ref(\"stg_sales_0\")",
+   "FROM __ref(\"stg_inventory_1\")",
    ""
   ],
   "models/fulfillment/marts/fulfillment_summary_0.sql": [
@@ -522,7 +537,8 @@
    "  t.amount,",
    "  t.status,",
    "  t.created_at,",
-   "  (t.amount * (1 - 12345.678)) AS adjust_0_amount",
+   "  (t.amount * (1 - 0.1)) AS adjust_0_amount,",
+   "  'naïve résumé' AS site_label",
    "FROM __ref(\"stg_fulfillment_1\") t",
    ""
   ],
@@ -541,8 +557,9 @@
    "  t.amount,",
    "  t.status,",
    "  t.created_at,",
-   "  (t.amount * (1 - 12345.678)) AS adjust_0_amount,",
-   "  ROUND(ROUND((t.amount * 2), 2), 2) AS adjust_1_amount",
+   "  (t.amount * (1 - 0.1)) AS adjust_0_amount,",
+   "  ROUND(ROUND((t.amount * 2), 2), 2) AS adjust_1_amount,",
+   "  'naïve résumé' AS site_label",
    "FROM __source(\"raw_events_2\") t",
    ""
   ],
@@ -553,7 +570,7 @@
    "  t.status,",
    "  t.created_at,",
    "  3 AS priority,",
-   "  (t.amount * (1 - 12345.678)) AS adjust_0_amount,",
+   "  (t.amount * (1 - 0.1)) AS adjust_0_amount,",
    "  ROUND(ROUND((t.amount * 2), 2), 2) AS adjust_1_amount",
    "FROM __source(\"raw_events_0\") t",
    ""
@@ -574,7 +591,8 @@
    "  t.id,",
    "  t.amount,",
    "  t.status,",
-   "  t.created_at",
+   "  t.created_at,",
+   "  'naïve résumé' AS site_label",
    "FROM __ref(\"stg_inventory_1\") t",
    ""
   ],
@@ -584,7 +602,8 @@
    "  t.amount,",
    "  t.status,",
    "  t.created_at,",
-   "  (t.amount + 2 + 1) AS adjust_2_amount",
+   "  (t.amount + 2 + 1) AS adjust_2_amount,",
+   "  'naïve résumé' AS site_label",
    "FROM __source(\"raw_events_0\") t",
    ""
   ],
@@ -593,8 +612,7 @@
    "  t.id,",
    "  t.amount,",
    "  t.status,",
-   "  t.created_at,",
-   "  'naïve résumé' AS site_label",
+   "  t.created_at",
    "FROM __source(\"raw_events_0\") t",
    ""
   ],
@@ -603,21 +621,21 @@
    "FROM __table_fn(\"table_fn__events_above\")(1.5)",
    ""
   ],
-  "models/rendering/latest_raw_events_2.sql": [
+  "models/rendering/latest_raw_events_0.sql": [
    "SELECT id, amount",
-   "FROM (SELECT id, amount FROM __source(\"raw_events_2\") ORDER BY id DESC LIMIT 2) AS latest",
+   "FROM (SELECT id, amount FROM __source(\"raw_events_0\") ORDER BY id DESC LIMIT 2) AS latest",
    ""
   ],
-  "models/rendering/stated_stg_fulfillment_1.sql": [
+  "models/rendering/stated_stg_sales_0.sql": [
    "SELECT CAST(id AS INTEGER) AS id, status,",
-   "  CASE WHEN amount >= 3 THEN 'HIGH'",
+   "  CASE WHEN amount >= 4 THEN 'HIGH'",
    "    ELSE 'LOW' END AS tier",
-   "FROM __ref(\"stg_fulfillment_1\")",
+   "FROM __ref(\"stg_sales_0\")",
    ""
   ],
   "models/rendering/unioned_event_ids.sql": [
    "SELECT id",
-   "FROM (SELECT id FROM __ref(\"stg_fulfillment_0\") UNION ALL SELECT id FROM __ref(\"stg_fulfillment_1\")) AS unioned",
+   "FROM (SELECT id FROM __ref(\"stg_fulfillment_1\") UNION ALL SELECT id FROM __ref(\"stg_inventory_0\")) AS unioned",
    ""
   ],
   "models/sales/marts/sales_summary_0.sql": [
@@ -626,8 +644,7 @@
    "  t.amount,",
    "  t.status,",
    "  t.created_at,",
-   "  3 AS priority,",
-   "  'naïve résumé' AS site_label",
+   "  3 AS priority",
    "FROM __ref(\"stg_sales_0\") t",
    "WHERE t.status <> 'returned ✓'",
    ""
@@ -650,35 +667,33 @@
    "SELECT 0 AS step_index, 'macro taxes_amounts' AS model_name, (SELECT COUNT(*) FROM __actual__macro_taxes_amounts) AS actual_count, (SELECT COUNT(*) FROM __expected__macro_taxes_amounts) AS expected_count, (SELECT COUNT(*) FROM (SELECT * FROM __actual__macro_taxes_amounts EXCEPT SELECT * FROM __expected__macro_taxes_amounts) AS __sqlbuild_mismatch) AS unexpected_count, (SELECT COUNT(*) FROM (SELECT * FROM __expected__macro_taxes_amounts EXCEPT SELECT * FROM __actual__macro_taxes_amounts) AS __sqlbuild_missing) AS missing_count",
    ""
   ],
-  "tests/regional_stg_inventory_0/test_regional_stg_inventory_0.sql": [
-   "WITH __ref__stg_inventory_0 AS (SELECT 1 AS id, CAST(4 AS DOUBLE) AS amount, 'placed' AS status,",
+  "tests/regional_stg_fulfillment_1/test_regional_stg_fulfillment_1.sql": [
+   "WITH __ref__stg_fulfillment_1 AS (SELECT 1 AS id, CAST(4 AS DOUBLE) AS amount, 'placed' AS status,",
    "    TIMESTAMP '2026-01-01 00:00:00' AS created_at),",
-   "__ref__regional_stg_inventory_0 AS (SELECT id, amount, 'west' AS region",
-   "FROM __ref__stg_inventory_0),",
-   "__actual__regional_stg_inventory_0 AS (SELECT * FROM __ref__regional_stg_inventory_0),",
-   "__expected__regional_stg_inventory_0 AS (SELECT 1 AS id, CAST(4 AS DOUBLE) AS amount, 'west' AS region)",
-   "SELECT 0 AS step_index, 'regional_stg_inventory_0' AS model_name, (SELECT COUNT(*) FROM __actual__regional_stg_inventory_0) AS actual_count, (SELECT COUNT(*) FROM __expected__regional_stg_inventory_0) AS expected_count, (SELECT COUNT(*) FROM (SELECT id, amount, region FROM __actual__regional_stg_inventory_0 EXCEPT SELECT id, amount, region FROM __expected__regional_stg_inventory_0) AS __sqlbuild_mismatch) AS unexpected_count, (SELECT COUNT(*) FROM (SELECT id, amount, region FROM __expected__regional_stg_inventory_0 EXCEPT SELECT id, amount, region FROM __actual__regional_stg_inventory_0) AS __sqlbuild_missing) AS missing_count",
+   "__ref__regional_stg_fulfillment_1 AS (SELECT id, amount, 'west' AS region",
+   "FROM __ref__stg_fulfillment_1),",
+   "__actual__regional_stg_fulfillment_1 AS (SELECT * FROM __ref__regional_stg_fulfillment_1),",
+   "__expected__regional_stg_fulfillment_1 AS (SELECT 1 AS id, CAST(4 AS DOUBLE) AS amount, 'west' AS region)",
+   "SELECT 0 AS step_index, 'regional_stg_fulfillment_1' AS model_name, (SELECT COUNT(*) FROM __actual__regional_stg_fulfillment_1) AS actual_count, (SELECT COUNT(*) FROM __expected__regional_stg_fulfillment_1) AS expected_count, (SELECT COUNT(*) FROM (SELECT id, amount, region FROM __actual__regional_stg_fulfillment_1 EXCEPT SELECT id, amount, region FROM __expected__regional_stg_fulfillment_1) AS __sqlbuild_mismatch) AS unexpected_count, (SELECT COUNT(*) FROM (SELECT id, amount, region FROM __expected__regional_stg_fulfillment_1 EXCEPT SELECT id, amount, region FROM __actual__regional_stg_fulfillment_1) AS __sqlbuild_missing) AS missing_count",
    ""
   ],
-  "tests/stg_fulfillment_0/test_stg_fulfillment_0.sql": [
-   "WITH __source__raw_events_2 AS (SELECT 1 AS id, CAST(10 AS DOUBLE) AS amount, 'placed' AS status,",
+  "tests/stg_inventory_1/test_stg_inventory_1.sql": [
+   "WITH __source__raw_events_0 AS (SELECT 1 AS id, CAST(10 AS DOUBLE) AS amount, 'placed' AS status,",
    "    TIMESTAMP '2026-01-01 00:00:00' AS created_at),",
-   "__ref__stg_fulfillment_0 AS (SELECT",
+   "__ref__stg_inventory_1 AS (SELECT",
    "  t.id,",
    "  t.amount,",
    "  t.status,",
-   "  t.created_at,",
-   "  (t.amount * (1 - 12345.678)) AS adjust_0_amount,",
-   "  ROUND(ROUND((t.amount * 2), 2), 2) AS adjust_1_amount",
-   "FROM __source__raw_events_2 t),",
-   "__actual__stg_fulfillment_0 AS (SELECT * FROM __ref__stg_fulfillment_0),",
-   "__expected__stg_fulfillment_0 AS (SELECT 1 AS id, 'placed' AS status)",
-   "SELECT 0 AS step_index, 'stg_fulfillment_0' AS model_name, (SELECT COUNT(*) FROM __actual__stg_fulfillment_0) AS actual_count, (SELECT COUNT(*) FROM __expected__stg_fulfillment_0) AS expected_count, (SELECT COUNT(*) FROM (SELECT id, status FROM __actual__stg_fulfillment_0 EXCEPT SELECT id, status FROM __expected__stg_fulfillment_0) AS __sqlbuild_mismatch) AS unexpected_count, (SELECT COUNT(*) FROM (SELECT id, status FROM __expected__stg_fulfillment_0 EXCEPT SELECT id, status FROM __actual__stg_fulfillment_0) AS __sqlbuild_missing) AS missing_count",
+   "  t.created_at",
+   "FROM __source__raw_events_0 t),",
+   "__actual__stg_inventory_1 AS (SELECT * FROM __ref__stg_inventory_1),",
+   "__expected__stg_inventory_1 AS (SELECT 1 AS id, 'placed' AS status)",
+   "SELECT 0 AS step_index, 'stg_inventory_1' AS model_name, (SELECT COUNT(*) FROM __actual__stg_inventory_1) AS actual_count, (SELECT COUNT(*) FROM __expected__stg_inventory_1) AS expected_count, (SELECT COUNT(*) FROM (SELECT id, status FROM __actual__stg_inventory_1 EXCEPT SELECT id, status FROM __expected__stg_inventory_1) AS __sqlbuild_mismatch) AS unexpected_count, (SELECT COUNT(*) FROM (SELECT id, status FROM __expected__stg_inventory_1 EXCEPT SELECT id, status FROM __actual__stg_inventory_1) AS __sqlbuild_missing) AS missing_count",
    ""
   ],
   "tests/udf detects_placed_events/detects_placed_events.sql": [
    "WITH input_values AS (SELECT 'placed' AS event_status),",
-   "__actual__udf_detects_placed_events AS (SELECT event_status, main.is_placed(event_status) AS is_placed",
+   "__actual__udf_detects_placed_events AS (SELECT event_status, analytics.is_placed(event_status) AS is_placed",
    "  FROM input_values),",
    "__expected__udf_detects_placed_events AS (SELECT 'placed' AS event_status, TRUE AS is_placed)",
    "SELECT 0 AS step_index, 'udf detects_placed_events' AS model_name, (SELECT COUNT(*) FROM __actual__udf_detects_placed_events) AS actual_count, (SELECT COUNT(*) FROM __expected__udf_detects_placed_events) AS expected_count, (SELECT COUNT(*) FROM (SELECT * FROM __actual__udf_detects_placed_events EXCEPT SELECT * FROM __expected__udf_detects_placed_events) AS __sqlbuild_mismatch) AS unexpected_count, (SELECT COUNT(*) FROM (SELECT * FROM __expected__udf_detects_placed_events EXCEPT SELECT * FROM __actual__udf_detects_placed_events) AS __sqlbuild_missing) AS missing_count",
@@ -687,31 +702,31 @@
  },
  "manifest": {
   "nodes": {
-   "model.generated_10.chain_1_stg_sales_0": {
+   "model.generated_10.chain_1_stg_inventory_0": {
     "database": null,
-    "schema": "main",
-    "name": "chain_1_stg_sales_0",
+    "schema": "analytics",
+    "name": "chain_1_stg_inventory_0",
     "resource_type": "model",
     "package_name": "generated_10",
-    "path": "models/analysis/chain_1_stg_sales_0.sql",
-    "original_file_path": "models/analysis/chain_1_stg_sales_0.sql",
-    "unique_id": "model.generated_10.chain_1_stg_sales_0",
+    "path": "models/analysis/chain_1_stg_inventory_0.sql",
+    "original_file_path": "models/analysis/chain_1_stg_inventory_0.sql",
+    "unique_id": "model.generated_10.chain_1_stg_inventory_0",
     "fqn": [
      "generated_10",
      "models",
      "analysis",
-     "chain_1_stg_sales_0"
+     "chain_1_stg_inventory_0"
     ],
-    "alias": "chain_1_stg_sales_0",
+    "alias": "chain_1_stg_inventory_0",
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -735,7 +750,7 @@
      }
     },
     "tags": [],
-    "description": "Level 1 below the contracted copy of stg_sales_0",
+    "description": "Level 1 below the contracted copy of stg_inventory_0",
     "columns": {},
     "meta": {},
     "group": null,
@@ -748,39 +763,39 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.chain_1_stg_sales_0",
+    "relation_name": "analytics.chain_1_stg_inventory_0",
     "depends_on": {
      "macros": [],
      "nodes": [
-      "model.generated_10.contracted_stg_sales_0"
+      "model.generated_10.contracted_stg_inventory_0"
      ]
     }
    },
-   "model.generated_10.chain_2_stg_sales_0": {
+   "model.generated_10.chain_2_stg_inventory_0": {
     "database": null,
-    "schema": "main",
-    "name": "chain_2_stg_sales_0",
+    "schema": "analytics",
+    "name": "chain_2_stg_inventory_0",
     "resource_type": "model",
     "package_name": "generated_10",
-    "path": "models/analysis/chain_2_stg_sales_0.sql",
-    "original_file_path": "models/analysis/chain_2_stg_sales_0.sql",
-    "unique_id": "model.generated_10.chain_2_stg_sales_0",
+    "path": "models/analysis/chain_2_stg_inventory_0.sql",
+    "original_file_path": "models/analysis/chain_2_stg_inventory_0.sql",
+    "unique_id": "model.generated_10.chain_2_stg_inventory_0",
     "fqn": [
      "generated_10",
      "models",
      "analysis",
-     "chain_2_stg_sales_0"
+     "chain_2_stg_inventory_0"
     ],
-    "alias": "chain_2_stg_sales_0",
+    "alias": "chain_2_stg_inventory_0",
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -804,7 +819,7 @@
      }
     },
     "tags": [],
-    "description": "Level 2 below the contracted copy of stg_sales_0",
+    "description": "Level 2 below the contracted copy of stg_inventory_0",
     "columns": {},
     "meta": {},
     "group": null,
@@ -817,39 +832,39 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.chain_2_stg_sales_0",
+    "relation_name": "analytics.chain_2_stg_inventory_0",
     "depends_on": {
      "macros": [],
      "nodes": [
-      "model.generated_10.chain_1_stg_sales_0"
+      "model.generated_10.chain_1_stg_inventory_0"
      ]
     }
    },
-   "model.generated_10.chain_3_stg_sales_0": {
+   "model.generated_10.chain_3_stg_inventory_0": {
     "database": null,
-    "schema": "main",
-    "name": "chain_3_stg_sales_0",
+    "schema": "analytics",
+    "name": "chain_3_stg_inventory_0",
     "resource_type": "model",
     "package_name": "generated_10",
-    "path": "models/analysis/chain_3_stg_sales_0.sql",
-    "original_file_path": "models/analysis/chain_3_stg_sales_0.sql",
-    "unique_id": "model.generated_10.chain_3_stg_sales_0",
+    "path": "models/analysis/chain_3_stg_inventory_0.sql",
+    "original_file_path": "models/analysis/chain_3_stg_inventory_0.sql",
+    "unique_id": "model.generated_10.chain_3_stg_inventory_0",
     "fqn": [
      "generated_10",
      "models",
      "analysis",
-     "chain_3_stg_sales_0"
+     "chain_3_stg_inventory_0"
     ],
-    "alias": "chain_3_stg_sales_0",
+    "alias": "chain_3_stg_inventory_0",
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -873,7 +888,7 @@
      }
     },
     "tags": [],
-    "description": "Level 3 below the contracted copy of stg_sales_0",
+    "description": "Level 3 below the contracted copy of stg_inventory_0",
     "columns": {},
     "meta": {},
     "group": null,
@@ -886,34 +901,34 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.chain_3_stg_sales_0",
+    "relation_name": "analytics.chain_3_stg_inventory_0",
     "depends_on": {
      "macros": [],
      "nodes": [
-      "model.generated_10.chain_2_stg_sales_0"
+      "model.generated_10.chain_2_stg_inventory_0"
      ]
     }
    },
-   "model.generated_10.checked_stg_fulfillment_0": {
+   "model.generated_10.checked_stg_sales_0": {
     "database": null,
-    "schema": "main",
-    "name": "checked_stg_fulfillment_0",
+    "schema": "analytics",
+    "name": "checked_stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_10",
-    "path": "models/analysis/checked_stg_fulfillment_0.sql",
-    "original_file_path": "models/analysis/checked_stg_fulfillment_0.sql",
-    "unique_id": "model.generated_10.checked_stg_fulfillment_0",
+    "path": "models/analysis/checked_stg_sales_0.sql",
+    "original_file_path": "models/analysis/checked_stg_sales_0.sql",
+    "unique_id": "model.generated_10.checked_stg_sales_0",
     "fqn": [
      "generated_10",
      "models",
      "analysis",
-     "checked_stg_fulfillment_0"
+     "checked_stg_sales_0"
     ],
-    "alias": "checked_stg_fulfillment_0",
+    "alias": "checked_stg_sales_0",
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
@@ -944,7 +959,7 @@
      }
     },
     "tags": [],
-    "description": "Metadata-checked copy of stg_fulfillment_0",
+    "description": "Metadata-checked copy of stg_sales_0",
     "columns": {
      "id": {
       "name": "id",
@@ -976,34 +991,34 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.checked_stg_fulfillment_0",
+    "relation_name": "analytics.checked_stg_sales_0",
     "depends_on": {
      "macros": [],
      "nodes": [
-      "model.generated_10.stg_fulfillment_0"
+      "model.generated_10.stg_sales_0"
      ]
     }
    },
-   "model.generated_10.contracted_stg_sales_0": {
+   "model.generated_10.contracted_stg_inventory_0": {
     "database": null,
-    "schema": "main",
-    "name": "contracted_stg_sales_0",
+    "schema": "analytics",
+    "name": "contracted_stg_inventory_0",
     "resource_type": "model",
     "package_name": "generated_10",
-    "path": "models/analysis/contracted_stg_sales_0.sql",
-    "original_file_path": "models/analysis/contracted_stg_sales_0.sql",
-    "unique_id": "model.generated_10.contracted_stg_sales_0",
+    "path": "models/analysis/contracted_stg_inventory_0.sql",
+    "original_file_path": "models/analysis/contracted_stg_inventory_0.sql",
+    "unique_id": "model.generated_10.contracted_stg_inventory_0",
     "fqn": [
      "generated_10",
      "models",
      "analysis",
-     "contracted_stg_sales_0"
+     "contracted_stg_inventory_0"
     ],
-    "alias": "contracted_stg_sales_0",
+    "alias": "contracted_stg_inventory_0",
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
@@ -1032,7 +1047,7 @@
      }
     },
     "tags": [],
-    "description": "Contracted copy of raw_events_1",
+    "description": "Contracted copy of raw_events_0",
     "columns": {
      "id": {
       "name": "id",
@@ -1047,7 +1062,7 @@
       "name": "label",
       "description": "",
       "meta": {},
-      "data_type": "VARCHAR(34)",
+      "data_type": "VARCHAR(22)",
       "constraints": [],
       "quote": null,
       "tags": []
@@ -1073,39 +1088,39 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.contracted_stg_sales_0",
+    "relation_name": "analytics.contracted_stg_inventory_0",
     "depends_on": {
      "macros": [],
      "nodes": [
-      "source.generated_10.raw_events_1"
+      "source.generated_10.raw_events_0"
      ]
     }
    },
-   "model.generated_10.cte_facts_stg_sales_0": {
+   "model.generated_10.cte_facts_stg_inventory_1": {
     "database": null,
-    "schema": "main",
-    "name": "cte_facts_stg_sales_0",
+    "schema": "analytics",
+    "name": "cte_facts_stg_inventory_1",
     "resource_type": "model",
     "package_name": "generated_10",
-    "path": "models/analysis/cte_facts_stg_sales_0.sql",
-    "original_file_path": "models/analysis/cte_facts_stg_sales_0.sql",
-    "unique_id": "model.generated_10.cte_facts_stg_sales_0",
+    "path": "models/analysis/cte_facts_stg_inventory_1.sql",
+    "original_file_path": "models/analysis/cte_facts_stg_inventory_1.sql",
+    "unique_id": "model.generated_10.cte_facts_stg_inventory_1",
     "fqn": [
      "generated_10",
      "models",
      "analysis",
-     "cte_facts_stg_sales_0"
+     "cte_facts_stg_inventory_1"
     ],
-    "alias": "cte_facts_stg_sales_0",
+    "alias": "cte_facts_stg_inventory_1",
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -1129,7 +1144,7 @@
      }
     },
     "tags": [],
-    "description": "Contracted CTE reads of stg_sales_0",
+    "description": "Contracted CTE reads of stg_inventory_1",
     "columns": {
      "id": {
       "name": "id",
@@ -1179,39 +1194,39 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.cte_facts_stg_sales_0",
+    "relation_name": "analytics.cte_facts_stg_inventory_1",
     "depends_on": {
      "macros": [],
      "nodes": [
-      "model.generated_10.stg_sales_0"
+      "model.generated_10.stg_inventory_1"
      ]
     }
    },
-   "model.generated_10.regional_stg_inventory_0": {
+   "model.generated_10.regional_stg_fulfillment_1": {
     "database": null,
-    "schema": "main",
-    "name": "regional_stg_inventory_0",
+    "schema": "analytics",
+    "name": "regional_stg_fulfillment_1",
     "resource_type": "model",
     "package_name": "generated_10",
-    "path": "models/analysis/regional_stg_inventory_0.sql",
-    "original_file_path": "models/analysis/regional_stg_inventory_0.sql",
-    "unique_id": "model.generated_10.regional_stg_inventory_0",
+    "path": "models/analysis/regional_stg_fulfillment_1.sql",
+    "original_file_path": "models/analysis/regional_stg_fulfillment_1.sql",
+    "unique_id": "model.generated_10.regional_stg_fulfillment_1",
     "fqn": [
      "generated_10",
      "models",
      "analysis",
-     "regional_stg_inventory_0"
+     "regional_stg_fulfillment_1"
     ],
-    "alias": "regional_stg_inventory_0",
+    "alias": "regional_stg_fulfillment_1",
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -1235,7 +1250,7 @@
      }
     },
     "tags": [],
-    "description": "Regional copy of stg_inventory_0",
+    "description": "Regional copy of stg_fulfillment_1",
     "columns": {},
     "meta": {},
     "group": null,
@@ -1248,76 +1263,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.regional_stg_inventory_0",
-    "depends_on": {
-     "macros": [],
-     "nodes": [
-      "model.generated_10.stg_inventory_0"
-     ]
-    }
-   },
-   "model.generated_10.audited_stg_fulfillment_1": {
-    "database": null,
-    "schema": "main",
-    "name": "audited_stg_fulfillment_1",
-    "resource_type": "model",
-    "package_name": "generated_10",
-    "path": "models/features/audited_stg_fulfillment_1.sql",
-    "original_file_path": "models/features/audited_stg_fulfillment_1.sql",
-    "unique_id": "model.generated_10.audited_stg_fulfillment_1",
-    "fqn": [
-     "generated_10",
-     "models",
-     "features",
-     "audited_stg_fulfillment_1"
-    ],
-    "alias": "audited_stg_fulfillment_1",
-    "config": {
-     "enabled": true,
-     "alias": null,
-     "schema": "main",
-     "database": null,
-     "tags": [],
-     "meta": {},
-     "group": null,
-     "materialized": "table",
-     "incremental_strategy": null,
-     "merge_exclude_columns": null,
-     "persist_docs": {},
-     "post-hook": [],
-     "pre-hook": [],
-     "quoting": {},
-     "column_types": {},
-     "full_refresh": null,
-     "unique_key": null,
-     "on_schema_change": "ignore",
-     "on_configuration_change": "apply",
-     "grants": {},
-     "packages": [],
-     "docs": {
-      "show": true,
-      "node_color": null
-     },
-     "contract": {
-      "enforced": false,
-      "alias_types": true
-     }
-    },
-    "tags": [],
-    "description": "Factory-audited copy of stg_fulfillment_1",
-    "columns": {},
-    "meta": {},
-    "group": null,
-    "docs": {
-     "show": true,
-     "node_color": null
-    },
-    "patch_path": null,
-    "build_path": null,
-    "unrendered_config": {},
-    "config_call_dict": {},
-    "unrendered_config_call_dict": {},
-    "relation_name": "main.audited_stg_fulfillment_1",
+    "relation_name": "analytics.regional_stg_fulfillment_1",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -1325,26 +1271,95 @@
      ]
     }
    },
-   "model.generated_10.check_history_stg_fulfillment_1": {
+   "model.generated_10.audited_stg_sales_0": {
     "database": null,
-    "schema": "main",
-    "name": "check_history_stg_fulfillment_1",
+    "schema": "analytics",
+    "name": "audited_stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_10",
-    "path": "models/features/check_history_stg_fulfillment_1.sql",
-    "original_file_path": "models/features/check_history_stg_fulfillment_1.sql",
-    "unique_id": "model.generated_10.check_history_stg_fulfillment_1",
+    "path": "models/features/audited_stg_sales_0.sql",
+    "original_file_path": "models/features/audited_stg_sales_0.sql",
+    "unique_id": "model.generated_10.audited_stg_sales_0",
     "fqn": [
      "generated_10",
      "models",
      "features",
-     "check_history_stg_fulfillment_1"
+     "audited_stg_sales_0"
     ],
-    "alias": "check_history_stg_fulfillment_1",
+    "alias": "audited_stg_sales_0",
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
+     "database": null,
+     "tags": [],
+     "meta": {},
+     "group": null,
+     "materialized": "view",
+     "incremental_strategy": null,
+     "merge_exclude_columns": null,
+     "persist_docs": {},
+     "post-hook": [],
+     "pre-hook": [],
+     "quoting": {},
+     "column_types": {},
+     "full_refresh": null,
+     "unique_key": null,
+     "on_schema_change": "ignore",
+     "on_configuration_change": "apply",
+     "grants": {},
+     "packages": [],
+     "docs": {
+      "show": true,
+      "node_color": null
+     },
+     "contract": {
+      "enforced": false,
+      "alias_types": true
+     }
+    },
+    "tags": [],
+    "description": "Factory-audited copy of stg_sales_0",
+    "columns": {},
+    "meta": {},
+    "group": null,
+    "docs": {
+     "show": true,
+     "node_color": null
+    },
+    "patch_path": null,
+    "build_path": null,
+    "unrendered_config": {},
+    "config_call_dict": {},
+    "unrendered_config_call_dict": {},
+    "relation_name": "analytics.audited_stg_sales_0",
+    "depends_on": {
+     "macros": [],
+     "nodes": [
+      "model.generated_10.stg_sales_0"
+     ]
+    }
+   },
+   "model.generated_10.check_history_stg_inventory_0": {
+    "database": null,
+    "schema": "analytics",
+    "name": "check_history_stg_inventory_0",
+    "resource_type": "model",
+    "package_name": "generated_10",
+    "path": "models/features/check_history_stg_inventory_0.sql",
+    "original_file_path": "models/features/check_history_stg_inventory_0.sql",
+    "unique_id": "model.generated_10.check_history_stg_inventory_0",
+    "fqn": [
+     "generated_10",
+     "models",
+     "features",
+     "check_history_stg_inventory_0"
+    ],
+    "alias": "check_history_stg_inventory_0",
+    "config": {
+     "enabled": true,
+     "alias": null,
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
@@ -1375,7 +1390,7 @@
      }
     },
     "tags": [],
-    "description": "Check history of stg_fulfillment_1",
+    "description": "Check history of stg_inventory_0",
     "columns": {},
     "meta": {},
     "group": null,
@@ -1388,17 +1403,17 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.check_history_stg_fulfillment_1",
+    "relation_name": "analytics.check_history_stg_inventory_0",
     "depends_on": {
      "macros": [],
      "nodes": [
-      "model.generated_10.stg_fulfillment_1"
+      "model.generated_10.stg_inventory_0"
      ]
     }
    },
    "model.generated_10.copied_stg_sales_0": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "copied_stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -1415,7 +1430,7 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
@@ -1457,7 +1472,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.copied_stg_sales_0",
+    "relation_name": "analytics.copied_stg_sales_0",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -1465,31 +1480,31 @@
      ]
     }
    },
-   "model.generated_10.flagged_stg_inventory_1": {
+   "model.generated_10.flagged_stg_sales_0": {
     "database": null,
-    "schema": "main",
-    "name": "flagged_stg_inventory_1",
+    "schema": "analytics",
+    "name": "flagged_stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_10",
-    "path": "models/features/flagged_stg_inventory_1.sql",
-    "original_file_path": "models/features/flagged_stg_inventory_1.sql",
-    "unique_id": "model.generated_10.flagged_stg_inventory_1",
+    "path": "models/features/flagged_stg_sales_0.sql",
+    "original_file_path": "models/features/flagged_stg_sales_0.sql",
+    "unique_id": "model.generated_10.flagged_stg_sales_0",
     "fqn": [
      "generated_10",
      "models",
      "features",
-     "flagged_stg_inventory_1"
+     "flagged_stg_sales_0"
     ],
-    "alias": "flagged_stg_inventory_1",
+    "alias": "flagged_stg_sales_0",
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -1513,7 +1528,7 @@
      }
     },
     "tags": [],
-    "description": "Function-flagged copy of stg_inventory_1",
+    "description": "Function-flagged copy of stg_sales_0",
     "columns": {},
     "meta": {},
     "group": null,
@@ -1526,19 +1541,19 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.flagged_stg_inventory_1",
+    "relation_name": "analytics.flagged_stg_sales_0",
     "depends_on": {
      "macros": [],
      "nodes": [
       "model.generated_10.is_placed",
       "model.generated_10.is_large",
-      "model.generated_10.stg_inventory_1"
+      "model.generated_10.stg_sales_0"
      ]
     }
    },
    "model.generated_10.guarded_stg_inventory_1": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "guarded_stg_inventory_1",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -1555,12 +1570,12 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -1607,7 +1622,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.guarded_stg_inventory_1",
+    "relation_name": "analytics.guarded_stg_inventory_1",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -1615,26 +1630,26 @@
      ]
     }
    },
-   "model.generated_10.merge_stg_sales_0": {
+   "model.generated_10.merge_stg_fulfillment_1": {
     "database": null,
-    "schema": "main",
-    "name": "merge_stg_sales_0",
+    "schema": "analytics",
+    "name": "merge_stg_fulfillment_1",
     "resource_type": "model",
     "package_name": "generated_10",
-    "path": "models/features/merge_stg_sales_0.sql",
-    "original_file_path": "models/features/merge_stg_sales_0.sql",
-    "unique_id": "model.generated_10.merge_stg_sales_0",
+    "path": "models/features/merge_stg_fulfillment_1.sql",
+    "original_file_path": "models/features/merge_stg_fulfillment_1.sql",
+    "unique_id": "model.generated_10.merge_stg_fulfillment_1",
     "fqn": [
      "generated_10",
      "models",
      "features",
-     "merge_stg_sales_0"
+     "merge_stg_fulfillment_1"
     ],
-    "alias": "merge_stg_sales_0",
+    "alias": "merge_stg_fulfillment_1",
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
@@ -1665,7 +1680,7 @@
      }
     },
     "tags": [],
-    "description": "Incremental merge copy of stg_sales_0",
+    "description": "Incremental merge copy of stg_fulfillment_1",
     "columns": {},
     "meta": {},
     "group": null,
@@ -1678,17 +1693,17 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.merge_stg_sales_0",
+    "relation_name": "analytics.merge_stg_fulfillment_1",
     "depends_on": {
      "macros": [],
      "nodes": [
-      "model.generated_10.stg_sales_0"
+      "model.generated_10.stg_fulfillment_1"
      ]
     }
    },
    "model.generated_10.product_labels": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "product_labels",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -1705,7 +1720,7 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
@@ -1747,7 +1762,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.product_labels",
+    "relation_name": "analytics.product_labels",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -1755,26 +1770,26 @@
      ]
     }
    },
-   "model.generated_10.spaced_stg_sales_0": {
+   "model.generated_10.spaced_stg_fulfillment_1": {
     "database": null,
-    "schema": "main",
-    "name": "spaced_stg_sales_0",
+    "schema": "analytics",
+    "name": "spaced_stg_fulfillment_1",
     "resource_type": "model",
     "package_name": "generated_10",
-    "path": "models/features/spaced_stg_sales_0.sql",
-    "original_file_path": "models/features/spaced_stg_sales_0.sql",
-    "unique_id": "model.generated_10.spaced_stg_sales_0",
+    "path": "models/features/spaced_stg_fulfillment_1.sql",
+    "original_file_path": "models/features/spaced_stg_fulfillment_1.sql",
+    "unique_id": "model.generated_10.spaced_stg_fulfillment_1",
     "fqn": [
      "generated_10",
      "models",
      "features",
-     "spaced_stg_sales_0"
+     "spaced_stg_fulfillment_1"
     ],
-    "alias": "spaced_stg_sales_0",
+    "alias": "spaced_stg_fulfillment_1",
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [
       "línea",
@@ -1782,7 +1797,7 @@
      ],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -1809,7 +1824,7 @@
      "línea",
      "東京"
     ],
-    "description": "Copy of stg_sales_0 with café ☕ counter",
+    "description": "Copy of stg_fulfillment_1 with 東京 warehouse",
     "columns": {},
     "meta": {},
     "group": null,
@@ -1822,39 +1837,39 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.spaced_stg_sales_0",
+    "relation_name": "analytics.spaced_stg_fulfillment_1",
     "depends_on": {
      "macros": [],
      "nodes": [
-      "model.generated_10.stg_sales_0"
+      "model.generated_10.stg_fulfillment_1"
      ]
     }
    },
-   "model.generated_10.taxed_stg_sales_0": {
+   "model.generated_10.taxed_stg_inventory_1": {
     "database": null,
-    "schema": "main",
-    "name": "taxed_stg_sales_0",
+    "schema": "analytics",
+    "name": "taxed_stg_inventory_1",
     "resource_type": "model",
     "package_name": "generated_10",
-    "path": "models/features/taxed_stg_sales_0.sql",
-    "original_file_path": "models/features/taxed_stg_sales_0.sql",
-    "unique_id": "model.generated_10.taxed_stg_sales_0",
+    "path": "models/features/taxed_stg_inventory_1.sql",
+    "original_file_path": "models/features/taxed_stg_inventory_1.sql",
+    "unique_id": "model.generated_10.taxed_stg_inventory_1",
     "fqn": [
      "generated_10",
      "models",
      "features",
-     "taxed_stg_sales_0"
+     "taxed_stg_inventory_1"
     ],
-    "alias": "taxed_stg_sales_0",
+    "alias": "taxed_stg_inventory_1",
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -1878,7 +1893,7 @@
      }
     },
     "tags": [],
-    "description": "Taxed copy of stg_sales_0",
+    "description": "Taxed copy of stg_inventory_1",
     "columns": {},
     "meta": {},
     "group": null,
@@ -1891,17 +1906,17 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.taxed_stg_sales_0",
+    "relation_name": "analytics.taxed_stg_inventory_1",
     "depends_on": {
      "macros": [],
      "nodes": [
-      "model.generated_10.stg_sales_0"
+      "model.generated_10.stg_inventory_1"
      ]
     }
    },
    "model.generated_10.fulfillment_summary_0": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "fulfillment_summary_0",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -1919,7 +1934,7 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [
       "fulfillment",
@@ -1927,7 +1942,7 @@
      ],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -1967,7 +1982,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.fulfillment_summary_0",
+    "relation_name": "analytics.fulfillment_summary_0",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -1977,7 +1992,7 @@
    },
    "model.generated_10.fulfillment_summary_1": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "fulfillment_summary_1",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -1995,7 +2010,7 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [
       "fulfillment",
@@ -2003,7 +2018,7 @@
      ],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -2031,17 +2046,7 @@
      "marts"
     ],
     "description": "Summary of fulfillment activity 1",
-    "columns": {
-     "id": {
-      "name": "id",
-      "description": "",
-      "meta": {},
-      "data_type": null,
-      "constraints": [],
-      "quote": null,
-      "tags": []
-     }
-    },
+    "columns": {},
     "meta": {},
     "group": null,
     "docs": {
@@ -2053,7 +2058,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.fulfillment_summary_1",
+    "relation_name": "analytics.fulfillment_summary_1",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -2063,7 +2068,7 @@
    },
    "model.generated_10.stg_fulfillment_0": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "stg_fulfillment_0",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -2081,7 +2086,7 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [
       "staging"
@@ -2115,7 +2120,17 @@
      "staging"
     ],
     "description": "Staged fulfillment events 0",
-    "columns": {},
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
     "meta": {},
     "group": null,
     "docs": {
@@ -2127,7 +2142,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.stg_fulfillment_0",
+    "relation_name": "analytics.stg_fulfillment_0",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -2137,7 +2152,7 @@
    },
    "model.generated_10.stg_fulfillment_1": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "stg_fulfillment_1",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -2155,7 +2170,7 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [
       "staging"
@@ -2211,7 +2226,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.stg_fulfillment_1",
+    "relation_name": "analytics.stg_fulfillment_1",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -2221,7 +2236,7 @@
    },
    "model.generated_10.inventory_summary_0": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "inventory_summary_0",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -2239,12 +2254,9 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
-     "tags": [
-      "inventory",
-      "marts"
-     ],
+     "tags": [],
      "meta": {},
      "group": null,
      "materialized": "view",
@@ -2253,12 +2265,12 @@
      "persist_docs": {},
      "post-hook": [
       {
-       "sql": "SELECT 'main.inventory_summary_0' AS refreshed_relation, 'café ☕ counter' AS refresh_label",
+       "sql": "SELECT 'analytics.inventory_summary_0' AS refreshed_relation, 'naïve résumé' AS refresh_label",
        "transaction": true,
        "index": 0
       },
       {
-       "sql": "SELECT 'main.inventory_summary_0' AS refreshed",
+       "sql": "SELECT 'analytics.inventory_summary_0' AS refreshed",
        "transaction": true,
        "index": 1
       }
@@ -2281,31 +2293,38 @@
       "alias_types": true
      }
     },
-    "tags": [
-     "inventory",
-     "marts"
-    ],
+    "tags": [],
     "description": "Summary of inventory activity 0 (東京 warehouse)",
-    "columns": {},
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
     "meta": {
      "sqlbuild": {
       "lifecycle_hooks": {
        "post_hooks": [
         {
          "type": "sql",
-         "statement": "SELECT 'main.inventory_summary_0' AS refreshed_relation, 'café ☕ counter' AS refresh_label",
+         "statement": "SELECT 'analytics.inventory_summary_0' AS refreshed_relation, 'naïve résumé' AS refresh_label",
          "name": "record_refresh",
          "relative_path": "hooks/sql/record_refresh.sql",
          "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
          "kwargs": {
           "relation": "@@CTX:destination.qualified",
-          "label": "café ☕ counter"
+          "label": "naïve résumé"
          },
          "description": "Record a refresh for one relation"
         },
         {
          "type": "sql",
-         "statement": "SELECT 'main.inventory_summary_0' AS refreshed"
+         "statement": "SELECT 'analytics.inventory_summary_0' AS refreshed"
         }
        ]
       }
@@ -2321,7 +2340,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.inventory_summary_0",
+    "relation_name": "analytics.inventory_summary_0",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -2331,7 +2350,7 @@
    },
    "model.generated_10.inventory_summary_1": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "inventory_summary_1",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -2349,30 +2368,16 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
-     "tags": [
-      "inventory",
-      "marts"
-     ],
+     "tags": [],
      "meta": {},
      "group": null,
      "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
-     "post-hook": [
-      {
-       "sql": "SELECT 'main.inventory_summary_1' AS refreshed_relation, 'Ελληνικά orders' AS refresh_label",
-       "transaction": true,
-       "index": 0
-      },
-      {
-       "sql": "SELECT 'main.inventory_summary_1' AS refreshed",
-       "transaction": true,
-       "index": 1
-      }
-     ],
+     "post-hook": [],
      "pre-hook": [],
      "quoting": {},
      "column_types": {},
@@ -2391,36 +2396,10 @@
       "alias_types": true
      }
     },
-    "tags": [
-     "inventory",
-     "marts"
-    ],
+    "tags": [],
     "description": "Summary of inventory activity 1",
     "columns": {},
-    "meta": {
-     "sqlbuild": {
-      "lifecycle_hooks": {
-       "post_hooks": [
-        {
-         "type": "sql",
-         "statement": "SELECT 'main.inventory_summary_1' AS refreshed_relation, 'Ελληνικά orders' AS refresh_label",
-         "name": "record_refresh",
-         "relative_path": "hooks/sql/record_refresh.sql",
-         "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
-         "kwargs": {
-          "relation": "@@CTX:destination.qualified",
-          "label": "Ελληνικά orders"
-         },
-         "description": "Record a refresh for one relation"
-        },
-        {
-         "type": "sql",
-         "statement": "SELECT 'main.inventory_summary_1' AS refreshed"
-        }
-       ]
-      }
-     }
-    },
+    "meta": {},
     "group": null,
     "docs": {
      "show": true,
@@ -2431,7 +2410,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.inventory_summary_1",
+    "relation_name": "analytics.inventory_summary_1",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -2441,7 +2420,7 @@
    },
    "model.generated_10.stg_inventory_0": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "stg_inventory_0",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -2459,7 +2438,7 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [
       "staging"
@@ -2493,7 +2472,17 @@
      "staging"
     ],
     "description": "Staged inventory events 0 (café ☕ counter)",
-    "columns": {},
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
     "meta": {},
     "group": null,
     "docs": {
@@ -2505,7 +2494,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.stg_inventory_0",
+    "relation_name": "analytics.stg_inventory_0",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -2515,7 +2504,7 @@
    },
    "model.generated_10.stg_inventory_1": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "stg_inventory_1",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -2533,7 +2522,7 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [
       "staging"
@@ -2589,7 +2578,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.stg_inventory_1",
+    "relation_name": "analytics.stg_inventory_1",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -2599,7 +2588,7 @@
    },
    "model.generated_10.large_events": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "large_events",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -2616,12 +2605,12 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -2658,7 +2647,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.large_events",
+    "relation_name": "analytics.large_events",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -2666,31 +2655,31 @@
      ]
     }
    },
-   "model.generated_10.latest_raw_events_2": {
+   "model.generated_10.latest_raw_events_0": {
     "database": null,
-    "schema": "main",
-    "name": "latest_raw_events_2",
+    "schema": "analytics",
+    "name": "latest_raw_events_0",
     "resource_type": "model",
     "package_name": "generated_10",
-    "path": "models/rendering/latest_raw_events_2.sql",
-    "original_file_path": "models/rendering/latest_raw_events_2.sql",
-    "unique_id": "model.generated_10.latest_raw_events_2",
+    "path": "models/rendering/latest_raw_events_0.sql",
+    "original_file_path": "models/rendering/latest_raw_events_0.sql",
+    "unique_id": "model.generated_10.latest_raw_events_0",
     "fqn": [
      "generated_10",
      "models",
      "rendering",
-     "latest_raw_events_2"
+     "latest_raw_events_0"
     ],
-    "alias": "latest_raw_events_2",
+    "alias": "latest_raw_events_0",
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -2714,7 +2703,7 @@
      }
     },
     "tags": [],
-    "description": "Newest rows of raw_events_2",
+    "description": "Newest rows of raw_events_0",
     "columns": {},
     "meta": {},
     "group": null,
@@ -2727,39 +2716,39 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.latest_raw_events_2",
+    "relation_name": "analytics.latest_raw_events_0",
     "depends_on": {
      "macros": [],
      "nodes": [
-      "source.generated_10.raw_events_2"
+      "source.generated_10.raw_events_0"
      ]
     }
    },
-   "model.generated_10.stated_stg_fulfillment_1": {
+   "model.generated_10.stated_stg_sales_0": {
     "database": null,
-    "schema": "main",
-    "name": "stated_stg_fulfillment_1",
+    "schema": "analytics",
+    "name": "stated_stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_10",
-    "path": "models/rendering/stated_stg_fulfillment_1.sql",
-    "original_file_path": "models/rendering/stated_stg_fulfillment_1.sql",
-    "unique_id": "model.generated_10.stated_stg_fulfillment_1",
+    "path": "models/rendering/stated_stg_sales_0.sql",
+    "original_file_path": "models/rendering/stated_stg_sales_0.sql",
+    "unique_id": "model.generated_10.stated_stg_sales_0",
     "fqn": [
      "generated_10",
      "models",
      "rendering",
-     "stated_stg_fulfillment_1"
+     "stated_stg_sales_0"
     ],
-    "alias": "stated_stg_fulfillment_1",
+    "alias": "stated_stg_sales_0",
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -2783,7 +2772,7 @@
      }
     },
     "tags": [],
-    "description": "Enum-typed copy of stg_fulfillment_1",
+    "description": "Enum-typed copy of stg_sales_0",
     "columns": {
      "id": {
       "name": "id",
@@ -2824,17 +2813,17 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.stated_stg_fulfillment_1",
+    "relation_name": "analytics.stated_stg_sales_0",
     "depends_on": {
      "macros": [],
      "nodes": [
-      "model.generated_10.stg_fulfillment_1"
+      "model.generated_10.stg_sales_0"
      ]
     }
    },
    "model.generated_10.unioned_event_ids": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "unioned_event_ids",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -2851,12 +2840,12 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [],
      "meta": {},
      "group": null,
-     "materialized": "table",
+     "materialized": "view",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
@@ -2893,18 +2882,18 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.unioned_event_ids",
+    "relation_name": "analytics.unioned_event_ids",
     "depends_on": {
      "macros": [],
      "nodes": [
-      "model.generated_10.stg_fulfillment_0",
-      "model.generated_10.stg_fulfillment_1"
+      "model.generated_10.stg_fulfillment_1",
+      "model.generated_10.stg_inventory_0"
      ]
     }
    },
    "model.generated_10.sales_summary_0": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "sales_summary_0",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -2922,7 +2911,7 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [
       "sales",
@@ -2930,18 +2919,18 @@
      ],
      "meta": {},
      "group": null,
-     "materialized": "view",
+     "materialized": "table",
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
      "post-hook": [
       {
-       "sql": "SELECT 'main.sales_summary_0' AS refreshed_relation, 'Zürich – depot' AS refresh_label",
+       "sql": "SELECT 'analytics.sales_summary_0' AS refreshed_relation, 'Zürich – depot' AS refresh_label",
        "transaction": true,
        "index": 0
       },
       {
-       "sql": "SELECT 'main.sales_summary_0' AS refreshed",
+       "sql": "SELECT 'analytics.sales_summary_0' AS refreshed",
        "transaction": true,
        "index": 1
       }
@@ -2969,14 +2958,24 @@
      "marts"
     ],
     "description": "Summary of sales activity 0",
-    "columns": {},
+    "columns": {
+     "id": {
+      "name": "id",
+      "description": "",
+      "meta": {},
+      "data_type": null,
+      "constraints": [],
+      "quote": null,
+      "tags": []
+     }
+    },
     "meta": {
      "sqlbuild": {
       "lifecycle_hooks": {
        "post_hooks": [
         {
          "type": "sql",
-         "statement": "SELECT 'main.sales_summary_0' AS refreshed_relation, 'Zürich – depot' AS refresh_label",
+         "statement": "SELECT 'analytics.sales_summary_0' AS refreshed_relation, 'Zürich – depot' AS refresh_label",
          "name": "record_refresh",
          "relative_path": "hooks/sql/record_refresh.sql",
          "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
@@ -2988,7 +2987,7 @@
         },
         {
          "type": "sql",
-         "statement": "SELECT 'main.sales_summary_0' AS refreshed"
+         "statement": "SELECT 'analytics.sales_summary_0' AS refreshed"
         }
        ]
       }
@@ -3004,7 +3003,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.sales_summary_0",
+    "relation_name": "analytics.sales_summary_0",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -3014,7 +3013,7 @@
    },
    "model.generated_10.stg_sales_0": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "stg_sales_0",
     "resource_type": "model",
     "package_name": "generated_10",
@@ -3032,7 +3031,7 @@
     "config": {
      "enabled": true,
      "alias": null,
-     "schema": "main",
+     "schema": "analytics",
      "database": null,
      "tags": [
       "staging"
@@ -3066,17 +3065,7 @@
      "staging"
     ],
     "description": "Staged sales events 0",
-    "columns": {
-     "id": {
-      "name": "id",
-      "description": "",
-      "meta": {},
-      "data_type": null,
-      "constraints": [],
-      "quote": null,
-      "tags": []
-     }
-    },
+    "columns": {},
     "meta": {},
     "group": null,
     "docs": {
@@ -3088,7 +3077,7 @@
     "unrendered_config": {},
     "config_call_dict": {},
     "unrendered_config_call_dict": {},
-    "relation_name": "main.stg_sales_0",
+    "relation_name": "analytics.stg_sales_0",
     "depends_on": {
      "macros": [],
      "nodes": [
@@ -3100,7 +3089,7 @@
   "sources": {
    "source.generated_10.loaded_products": {
     "database": null,
-    "schema": "main",
+    "schema": "analytics",
     "name": "loaded_products",
     "resource_type": "source",
     "package_name": "generated_10",
@@ -3467,7 +3456,7 @@
     "path": "models/analysis/_sqlbuild/_macros/python/regions.py",
     "original_file_path": "models/analysis/_sqlbuild/_macros/python/regions.py",
     "unique_id": "macro.generated_10.analysis_region",
-    "macro_sql": "def analysis_region() -> str:\n    \"\"\"Return the region rows are assigned to.\"\"\"\n    return \"'north'\"\n",
+    "macro_sql": "def analysis_region() -> str:\n    \"\"\"Return the region rows are assigned to.\"\"\"\n    return \"'south'\"\n",
     "depends_on": {
      "macros": []
     },
@@ -3611,55 +3600,55 @@
   "selectors": {},
   "disabled": {},
   "parent_map": {
-   "model.generated_10.chain_1_stg_sales_0": [
-    "model.generated_10.contracted_stg_sales_0"
+   "model.generated_10.chain_1_stg_inventory_0": [
+    "model.generated_10.contracted_stg_inventory_0"
    ],
-   "model.generated_10.chain_2_stg_sales_0": [
-    "model.generated_10.chain_1_stg_sales_0"
+   "model.generated_10.chain_2_stg_inventory_0": [
+    "model.generated_10.chain_1_stg_inventory_0"
    ],
-   "model.generated_10.chain_3_stg_sales_0": [
-    "model.generated_10.chain_2_stg_sales_0"
+   "model.generated_10.chain_3_stg_inventory_0": [
+    "model.generated_10.chain_2_stg_inventory_0"
    ],
-   "model.generated_10.checked_stg_fulfillment_0": [
-    "model.generated_10.stg_fulfillment_0"
-   ],
-   "model.generated_10.contracted_stg_sales_0": [
-    "source.generated_10.raw_events_1"
-   ],
-   "model.generated_10.cte_facts_stg_sales_0": [
+   "model.generated_10.checked_stg_sales_0": [
     "model.generated_10.stg_sales_0"
    ],
-   "model.generated_10.regional_stg_inventory_0": [
+   "model.generated_10.contracted_stg_inventory_0": [
+    "source.generated_10.raw_events_0"
+   ],
+   "model.generated_10.cte_facts_stg_inventory_1": [
+    "model.generated_10.stg_inventory_1"
+   ],
+   "model.generated_10.regional_stg_fulfillment_1": [
+    "model.generated_10.stg_fulfillment_1"
+   ],
+   "model.generated_10.audited_stg_sales_0": [
+    "model.generated_10.stg_sales_0"
+   ],
+   "model.generated_10.check_history_stg_inventory_0": [
     "model.generated_10.stg_inventory_0"
-   ],
-   "model.generated_10.audited_stg_fulfillment_1": [
-    "model.generated_10.stg_fulfillment_1"
-   ],
-   "model.generated_10.check_history_stg_fulfillment_1": [
-    "model.generated_10.stg_fulfillment_1"
    ],
    "model.generated_10.copied_stg_sales_0": [
     "model.generated_10.stg_sales_0"
    ],
-   "model.generated_10.flagged_stg_inventory_1": [
+   "model.generated_10.flagged_stg_sales_0": [
     "model.generated_10.is_placed",
     "model.generated_10.is_large",
-    "model.generated_10.stg_inventory_1"
+    "model.generated_10.stg_sales_0"
    ],
    "model.generated_10.guarded_stg_inventory_1": [
     "model.generated_10.stg_inventory_1"
    ],
-   "model.generated_10.merge_stg_sales_0": [
-    "model.generated_10.stg_sales_0"
+   "model.generated_10.merge_stg_fulfillment_1": [
+    "model.generated_10.stg_fulfillment_1"
    ],
    "model.generated_10.product_labels": [
     "source.generated_10.loaded_products"
    ],
-   "model.generated_10.spaced_stg_sales_0": [
-    "model.generated_10.stg_sales_0"
+   "model.generated_10.spaced_stg_fulfillment_1": [
+    "model.generated_10.stg_fulfillment_1"
    ],
-   "model.generated_10.taxed_stg_sales_0": [
-    "model.generated_10.stg_sales_0"
+   "model.generated_10.taxed_stg_inventory_1": [
+    "model.generated_10.stg_inventory_1"
    ],
    "model.generated_10.fulfillment_summary_0": [
     "model.generated_10.stg_fulfillment_1"
@@ -3688,15 +3677,15 @@
    "model.generated_10.large_events": [
     "model.generated_10.table_fn__events_above"
    ],
-   "model.generated_10.latest_raw_events_2": [
-    "source.generated_10.raw_events_2"
+   "model.generated_10.latest_raw_events_0": [
+    "source.generated_10.raw_events_0"
    ],
-   "model.generated_10.stated_stg_fulfillment_1": [
-    "model.generated_10.stg_fulfillment_1"
+   "model.generated_10.stated_stg_sales_0": [
+    "model.generated_10.stg_sales_0"
    ],
    "model.generated_10.unioned_event_ids": [
-    "model.generated_10.stg_fulfillment_0",
-    "model.generated_10.stg_fulfillment_1"
+    "model.generated_10.stg_fulfillment_1",
+    "model.generated_10.stg_inventory_0"
    ],
    "model.generated_10.sales_summary_0": [
     "model.generated_10.stg_sales_0"
@@ -3710,7 +3699,7 @@
    "source.generated_10.raw_events_2": [],
    "model.generated_10.is_placed": [],
    "model.generated_10.table_fn__events_above": [
-    "model.generated_10.stg_inventory_0"
+    "model.generated_10.stg_fulfillment_1"
    ],
    "model.generated_10.is_large": []
   },

@@ -101,6 +101,14 @@ class LifeCycleEventKind(StrEnum):
     LOG = "log"
 
 
+class LogLevel(StrEnum):
+    """The level of a line a node logs with `ctx.log`."""
+
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+
+
 class FrameworkType(StrEnum):
     STRING = "string"
     INTEGER = "integer"

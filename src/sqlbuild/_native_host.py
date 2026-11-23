@@ -306,6 +306,18 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "sqlbuild.runtime.event_exporting.main._invoke_recall_sink",
         "invoke_recall_sink",
     ),
+    "read_discover_definition": (
+        "sqlbuild.python_nodes.main.read_discover_definition",
+        "read_discover_definition",
+    ),
+    "discovered_result_json": (
+        "sqlbuild.python_nodes.main.discovered_result_json",
+        "discovered_result_json",
+    ),
+    "item_dependency_refs": (
+        "sqlbuild.python_nodes._helpers.discovered_results",
+        "item_dependency_refs",
+    ),
     "run_command_output_sinks": (
         "sqlbuild.runtime.event_exporting.main._run_command_output_sinks",
         "run_command_output_sinks",
@@ -595,8 +607,12 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "audit_evidence_scope",
     ),
     "cancel_running_statements": (
-        "sqlbuild.runtime.execution_limits.main._cancel_running_statements",
+        "sqlbuild.runtime.execution_limits.main.cancel_running_statements",
         "cancel_running_statements",
+    ),
+    "statement_activity": (
+        "sqlbuild.runtime.execution_limits.main.statement_activity",
+        "statement_activity",
     ),
     "EventDispatcher": (
         "sqlbuild.runtime.observability.classes.event_dispatcher",

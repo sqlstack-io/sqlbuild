@@ -7,3 +7,4 @@ pub mod providers_document;
 pub mod python_declarations;
 pub mod register_snapshot;
 pub mod resource_nodes;
+pub mod saved_discovered_sets;

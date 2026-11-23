@@ -36,6 +36,8 @@ pub(crate) const DDL_PASSWORD_PATTERN: &str = concat!(
     r#"\b(identified\s+(?:with\s+\w+\s+)?by)(\s+)("[^"\r\n]{0,512}"|'[^'\r\n]{0,512}'|[^\s,;]{1,512})"#,
 );
 pub(crate) const DDL_REPLACEMENT: &str = "${1}${2}${4}${5}[REDACTED]";
+/// Stands in for a whole text that can't be stored as it reads.
+pub(crate) const WITHHELD_TEXT: &str = "[REDACTED]";
 pub(crate) const PAIR_REPLACEMENT: &str = "${1}${2}[REDACTED]";
 pub(crate) const BEARER_REPLACEMENT: &str = "Bearer [REDACTED]";
 pub(crate) const URI_REPLACEMENT: &str = "${1}[REDACTED]${3}${4}";

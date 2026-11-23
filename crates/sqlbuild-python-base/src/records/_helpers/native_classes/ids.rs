@@ -207,6 +207,7 @@ native_id_names! {
         RecordId::DiscoveredCommandOutputSink => "DiscoveredCommandOutputSink",
         RecordId::DiscoveredCommandOutputSinkDeclaration => "DiscoveredCommandOutputSinkDeclaration",
         RecordId::DiscoveredConstantFile => "DiscoveredConstantFile",
+        RecordId::DiscoveredDiscoverFunction => "DiscoveredDiscoverFunction",
         RecordId::DiscoveredEnumFile => "DiscoveredEnumFile",
         RecordId::DiscoveredEventExporter => "DiscoveredEventExporter",
         RecordId::DiscoveredEventExporterDeclaration => "DiscoveredEventExporterDeclaration",

@@ -1,6 +1,8 @@
 //! Python's raw and quoted SQL argument patterns and argument value rendering.
 
 use crate::audits::models::ArgumentValue;
+use sqlbuild_sqltext::sql_scan::main::bounded_expansions::bounded_expansions;
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 /// One `@name` or `@'name'` occurrence, in byte offsets.
 pub(crate) struct ParameterMatch<'sql> {
@@ -123,10 +125,12 @@ pub(crate) enum RenderStop {
 pub(crate) fn render_parameterized_sql(
     sql: &str,
     arguments: &[(String, ArgumentValue)],
+    syntax: Option<&LexicalSyntax>,
 ) -> Result<String, RenderStop> {
     let matches = parameter_matches(sql);
     let mut rendered: String = String::with_capacity(sql.len());
     let mut previous_end: usize = 0;
+    let mut texts: Vec<String> = Vec::with_capacity(matches.len());
     for item in &matches {
         let Some((_, value)) = arguments
             .iter()
@@ -134,11 +138,22 @@ pub(crate) fn render_parameterized_sql(
         else {
             return Err(RenderStop::MissingArgument(item.name.to_owned()));
         };
-        rendered.push_str(&sql[previous_end..item.start]);
         let Some(text) = render_value(value, item.quoted) else {
             return Err(RenderStop::UnsupportedValue(item.name.to_owned()));
         };
-        rendered.push_str(&text);
+        texts.push(text);
+    }
+    let sites: Vec<(usize, usize, &str)> = matches
+        .iter()
+        .zip(&texts)
+        .map(|(item, text)| (item.start, item.end, text.as_str()))
+        .collect();
+    for bounded in bounded_expansions(sql, &sites, syntax) {
+        texts[bounded.index] = bounded.text;
+    }
+    for (item, text) in matches.iter().zip(&texts) {
+        rendered.push_str(&sql[previous_end..item.start]);
+        rendered.push_str(text);
         previous_end = item.end;
     }
     rendered.push_str(&sql[previous_end..]);

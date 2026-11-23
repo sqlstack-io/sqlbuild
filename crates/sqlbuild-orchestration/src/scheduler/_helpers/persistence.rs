@@ -73,6 +73,7 @@ pub(crate) async fn persist_ticks(
                 job_settings: Default::default(),
                 retry: None,
                 member_attempt: None,
+                chain_run_id: None,
             };
             transaction = queue_run(transaction, &request).await?;
         }

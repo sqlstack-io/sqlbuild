@@ -1,5 +1,7 @@
 //! Public constants of native host.
 
+use std::time::Duration;
+
 /// The calendar's evaluation window is supplied by the host, not a provider.
 pub const CALENDAR_WINDOW_PARAMETER: &str = "window";
 
@@ -29,3 +31,29 @@ pub const HISTORY_STREAM_PAGES: usize = 50;
 pub const ALIAS_PREFIX_TARGET: &str = "alias";
 
 pub const ALL_PREFIX_TARGET: &str = "all";
+
+/// SIGINT's number, as the wakeup descriptor carries it.
+pub(crate) const INTERRUPT_BYTE: u8 = 2;
+/// What stops the watcher; no signal has this number.
+pub(crate) const STOP_BYTE: u8 = 0;
+/// Asks the watcher to confirm it has read every byte written before it; no signal has this number.
+pub(crate) const SYNC_BYTE: u8 = 255;
+/// How long a command's end waits for that confirmation before it trusts what the watcher has seen.
+pub(crate) const SYNC_WAIT: Duration = Duration::from_millis(200);
+/// The most bytes one read of the wakeup descriptor takes.
+pub(crate) const RECEIVE_BYTES: usize = 64;
+/// 128 plus SIGINT, as shells report Ctrl+C.
+pub(crate) const INTERRUPTED_CODE: i64 = 130;
+/// 128 plus SIGTERM, which a command reports itself.
+pub(crate) const TERMINATED_CODE: i64 = 143;
+pub(crate) const INTERRUPTED_LINE: &str = "error: interrupted (Ctrl+C)";
+/// How long an interrupted command may take to unwind before an exit that cuts nothing short.
+pub(crate) const GRACE: Duration = Duration::from_millis(600);
+pub(crate) const POLL: Duration = Duration::from_millis(50);
+/// How long a forced exit waits for statements to cancel, and for output to flush.
+pub(crate) const FORCED_EXIT_WAIT: Duration = Duration::from_secs(1);
+pub(crate) const ADAPTER_BASE_MODULE: &str = "sqlbuild.adapter.contract.classes.base_adapter";
+pub(crate) const ADAPTER_BASE_CLASS: &str = "BaseAdapter";
+pub(crate) const CONNECT_METHOD: &str = "connect";
+/// `ABANDONABLE_THREAD_PREFIX` of the discovered item pool, which names its threads with it.
+pub(crate) const STEP_THREAD_PREFIX: &str = "sqlbuild-item";

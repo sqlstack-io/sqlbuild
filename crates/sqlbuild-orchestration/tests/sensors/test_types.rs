@@ -49,8 +49,8 @@ pub(crate) struct CheckEventTestCase {
     pub(crate) backend: Backend,
     /// The `check_event` kinds the sensor watches.
     pub(crate) kinds: &'static [&'static str],
-    /// The watched run's kind: `job`, or `adhoc` as a worker's `sqb test` or `sqb audit` run is.
-    pub(crate) run_kind: &'static str,
+    /// The command of an ad-hoc watched run; empty watches a job's run.
+    pub(crate) adhoc_command: &'static [crate::runs::models::RunCommand],
     /// The checks whose outcome starts a run, each once.
     pub(crate) expected_checks: &'static [&'static str],
 }
@@ -118,4 +118,17 @@ pub(crate) struct SkipInFlightTestCase {
     pub(crate) before_skip: &'static [crate::declarations::models::TriggerChange],
     pub(crate) after_skip: &'static [crate::declarations::models::TriggerChange],
     pub(crate) expected_next_event: &'static str,
+}
+
+/// A started tick, then one that ends as `tick`, with some phases stored as an earlier release wrote them.
+pub(crate) struct UnreadableTickTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) tick: fn() -> crate::sensors::models::SensorEvaluationOutcome,
+    /// Which phases no longer decode; `$2` is the first tick and `$3` the second.
+    pub(crate) unreadable: &'static str,
+    /// Newest first: each tick's outcome, and whether it says it can't be read.
+    pub(crate) expected_ticks: [(&'static str, bool); 2],
+    /// `None` when not failing, else the reason shown on the page and in the trigger list.
+    pub(crate) expected_failing: Option<Option<&'static str>>,
 }

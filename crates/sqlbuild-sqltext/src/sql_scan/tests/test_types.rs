@@ -64,3 +64,19 @@ pub(crate) struct PrefixCheckTestCase {
     pub(crate) declared: &'static [&'static str],
     pub(crate) expected_unsupported: &'static [&'static str],
 }
+
+pub(crate) struct BoundaryTestCase {
+    pub(crate) description: &'static str,
+    /// `{}` marks each site.
+    pub(crate) template: &'static str,
+    pub(crate) values: &'static [&'static str],
+    pub(crate) dialect: &'static str,
+    pub(crate) expected_sql: &'static str,
+}
+
+pub(crate) struct GeneratedBoundaryTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) syntax: LexicalSyntax,
+    /// Splices that gained or lost code, or changed although they read right.
+    pub(crate) expected_failures: &'static [&'static str],
+}

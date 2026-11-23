@@ -4,8 +4,11 @@ use std::collections::BTreeMap;
 
 use uuid::Uuid;
 
+use crate::discovered_sets::constants::DISCOVERED_DOCUMENT;
+use crate::discovered_sets::types::DiscoveredSets;
 use crate::runs::_helpers::groups::selection::skipped_nodes;
 use crate::runs::models::{ExecutionMetadata, RunClaim, RunExecution};
+use crate::snapshots::main::reads::read_snapshot_documents::read_snapshot_documents;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -46,7 +49,19 @@ pub async fn run_execution(
         })
         .collect::<Result<_, ControlError>>()?;
     let (transaction, skipped_nodes) = skipped_nodes(transaction, &metadata.request_json).await?;
+    let (transaction, mut documents) = read_snapshot_documents(
+        transaction,
+        metadata.request_json.snapshot_id,
+        Some(&[DISCOVERED_DOCUMENT]),
+    )
+    .await?;
     commit(transaction).await?;
+    let discovered: DiscoveredSets = documents
+        .remove(DISCOVERED_DOCUMENT)
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(|error| ControlError::Invalid(error.to_string()))?
+        .unwrap_or_default();
     Ok(Some(RunExecution {
         claim: RunClaim {
             claim_id,
@@ -56,5 +71,6 @@ pub async fn run_execution(
         sqb_version: metadata.sqb_version,
         node_hashes,
         skipped_nodes,
+        discovered,
     }))
 }

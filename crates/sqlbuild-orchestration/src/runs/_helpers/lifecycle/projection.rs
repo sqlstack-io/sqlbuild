@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use serde_json::json;
 
+use crate::run_output::constants::NODE_LOG_MESSAGE_BYTES;
 use crate::runs::_helpers::lifecycle::checks::check_execution_history;
 use crate::runs::_helpers::lifecycle::nodes::project_node;
 use crate::runs::models::{ChangingRun, RunChange, RunChangeRequest, RunOutcome};
@@ -63,6 +64,47 @@ pub(crate) async fn project_run_state(
         RunChange::NodeStarted { .. } | RunChange::NodeFinished { .. } => {
             return project_node(transaction, request, &state.node_counts_json).await;
         }
+        RunChange::NodeLog {
+            node_key,
+            level,
+            message,
+        } => {
+            if message.len() > NODE_LOG_MESSAGE_BYTES {
+                return Err(ControlError::Invalid(
+                    "a ctx.log message is longer than its limit".into(),
+                ));
+            }
+            (transaction, _) = query(
+                transaction,
+                "INSERT INTO sqb_run_node_logs (run_id, event_id, node_key, level, message, logged_at) \
+                 VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (run_id, event_id) DO NOTHING",
+                vec![
+                    Parameter::Id(request.run_id),
+                    Parameter::Id(request.event_id),
+                    Parameter::Text(node_key.clone()),
+                    Parameter::Text(level.as_str().into()),
+                    Parameter::Text(message.clone()),
+                    Parameter::Time(now),
+                ],
+            )
+            .await?;
+        }
+        RunChange::NodeProgress {
+            node_key,
+            rows_so_far,
+        } => {
+            (transaction, _) = query(
+                transaction,
+                "UPDATE sqb_run_nodes SET rows_so_far=$1 WHERE run_id=$2 AND node_key=$3 \
+                 AND kind='node' AND status='running'",
+                vec![
+                    Parameter::Integer(*rows_so_far),
+                    Parameter::Id(request.run_id),
+                    Parameter::Text(node_key.clone()),
+                ],
+            )
+            .await?;
+        }
         RunChange::AuditFailuresIgnored { count } => {
             (transaction, _) = query(
                 transaction,
@@ -116,7 +158,7 @@ pub(crate) async fn project_run_state(
                 "UPDATE sqb_run_nodes SET status=CASE WHEN status='running' THEN $1 ELSE $2 END, ended_at=$3 \
                  WHERE run_id=$4 AND kind='node' AND status IN ('pending','running')",
                 vec![Parameter::Text(if cancelled { "cancelled" } else { "failed" }.into()),
-                    Parameter::Text(if cancelled { "cancelled" } else { "skipped" }.into()), Parameter::Time(now), Parameter::Id(request.run_id)]).await?;
+                    Parameter::Text(if cancelled { "cancelled" } else { "not_run" }.into()), Parameter::Time(now), Parameter::Id(request.run_id)]).await?;
             let counts;
             (transaction, counts) = query(transaction,
                 "SELECT status, COUNT(*) AS count FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' GROUP BY status",

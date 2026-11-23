@@ -98,6 +98,7 @@ def test_given_a_published_location_when_an_owner_requests_work_then_results_ret
             request_id,
             "--reason",
             "Check orders connectivity",
+            "--json",
         ]
         log: Path = tmp_path / "location.log"
         publications: Path = tmp_path / "publications.jsonl"
@@ -125,13 +126,21 @@ def test_given_a_published_location_when_an_owner_requests_work_then_results_ret
                 "healthy": test_case.expected_connection,
             }
             read: subprocess.CompletedProcess[str] = subprocess.run(
-                [executable, "admin", "location-work", request_id],
+                [executable, "admin", "location-work", request_id, "--json"],
                 env=owner_environment,
                 capture_output=True,
                 text=True,
                 check=True,
             )
             assert json.loads(read.stdout) == result
+            plain: subprocess.CompletedProcess[str] = subprocess.run(
+                [executable, "admin", "location-work", request_id],
+                env=owner_environment,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            assert ["state", "completed"] in [line.split() for line in plain.stdout.splitlines()]
             process.terminate()
             _ = process.wait(timeout=5)
         stale_id: str = str(uuid4())

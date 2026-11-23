@@ -34,6 +34,7 @@ use sqlbuild_render::macro_calls::main::macro_call_names::macro_call_names;
 use sqlbuild_sqltext::compiler::models::DeclarationReferenceStop;
 use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_references;
 use sqlbuild_sqltext::sql_references::models::{ReferenceExtraction, SqlReference};
+use sqlbuild_sqltext::sql_scan::main::bounded_expansions::bounded_expansions;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::input_loops::_helpers::model::model_loop::LoopContext;
@@ -229,26 +230,46 @@ impl<'py> TestScope<'_, 'py> {
         let declared: Vec<String> = values.iter().map(|(name, _)| name.clone()).collect();
         let owner: String = format!("SQL test '{test_name}' case '{case_name}' in '{file_path}'");
         let scan = parameter_references(sql, &declared, &owner);
-        let characters: Vec<char> = sql.chars().collect();
+        let offsets: Vec<usize> = sql
+            .char_indices()
+            .map(|(offset, _)| offset)
+            .chain([sql.len()])
+            .collect();
         let mut expanded: String = String::with_capacity(sql.len());
         let mut cursor: usize = 0;
         let mut used: HashSet<&str> = HashSet::new();
+        let mut texts: Vec<String> = Vec::with_capacity(scan.references.len());
         for reference in &scan.references {
-            expanded.extend(&characters[cursor..reference.start]);
             let value: &Py<PyAny> = values
                 .iter()
                 .find(|(name, _)| *name == reference.name)
                 .map(|(_, value)| value)
                 .ok_or_else(|| self.error(&reference.name))?;
-            expanded.push_str(&self.rendered_parameter(
-                (test_name, case_name),
-                &reference.name,
-                value,
-            )?);
+            texts.push(self.rendered_parameter((test_name, case_name), &reference.name, value)?);
             used.insert(&reference.name);
-            cursor = reference.end;
         }
-        expanded.extend(&characters[cursor..]);
+        let sites: Vec<(usize, usize, &str)> = scan
+            .references
+            .iter()
+            .zip(&texts)
+            .map(|(reference, text)| {
+                (
+                    offsets[reference.start],
+                    offsets[reference.end],
+                    text.as_str(),
+                )
+            })
+            .collect();
+        let bounded = bounded_expansions(sql, &sites, Some(&self.model_loop.syntax));
+        for expansion in bounded {
+            texts[expansion.index] = expansion.text;
+        }
+        for (reference, text) in scan.references.iter().zip(&texts) {
+            expanded.push_str(&sql[cursor..offsets[reference.start]]);
+            expanded.push_str(text);
+            cursor = offsets[reference.end];
+        }
+        expanded.push_str(&sql[cursor..]);
         if let Some(message) = scan.error {
             return Err(self.error(&message));
         }

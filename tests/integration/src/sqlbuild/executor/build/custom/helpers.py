@@ -355,14 +355,14 @@ def build_partition_tracking_fn() -> Callable[[MaterializationContext], Material
     def materialize(ctx: MaterializationContext) -> MaterializationResult:
         tracking_table: str = str(ctx.config["tracking_table"])
         ctx.logger.debug("checking partition state table=%s", tracking_table)
-        ctx.log("checking partition state")
+        ctx.log.info("checking partition state")
         ctx.execute_sql(
             f"CREATE TABLE IF NOT EXISTS {tracking_table} (partition_value VARCHAR, run_id VARCHAR)"
         )
 
         full_sql: str = ctx.sql.replace("@@@partition_start", "'2024-01-01'")
         full_sql = full_sql.replace("@@@partition_end", "'2024-01-04'")
-        ctx.log("building initial partition range")
+        ctx.log.info("building initial partition range")
         ctx.adapter.create_table_as(
             connection=ctx.connection,
             destination=ctx.destination,

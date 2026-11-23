@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from sqlbuild.compiler.auditing.types import ThresholdOperator
-from sqlbuild.python_nodes.models import RetryPolicy
+from sqlbuild.python_nodes.models import DiscoverDefinition, Item, RetryPolicy
 
 
 @dataclass(frozen=True)
@@ -58,3 +58,30 @@ class JitteredRetryDelayTestCase:
     retry_index: int
     seed: int
     expected_upper_bound: float
+
+
+@dataclass(frozen=True)
+class DiscoveredResultTestCase:
+    description: str
+    items: tuple[Item, ...]
+    expected_items: list[dict[str, object]]
+
+
+@dataclass(frozen=True)
+class DiscoveredArgsErrorTestCase:
+    description: str
+    args: dict[str, object]
+    expected_error_fragment: str
+
+
+@dataclass(frozen=True)
+class DiscoverAuthoringErrorTestCase:
+    description: str
+    expected_error_fragment: str
+
+
+@dataclass(frozen=True)
+class DiscoverDefinitionTestCase:
+    description: str
+    expected_definition: DiscoverDefinition
+    expected_for_each: str

@@ -120,6 +120,15 @@ pub(crate) struct LocationHealthTestCase {
     pub(crate) expected_observations: usize,
 }
 
+pub(crate) struct RepublishTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) publishes: bool,
+    pub(crate) outcome: fn(uuid::Uuid) -> crate::platform::models::LocationWorkOutcome,
+    pub(crate) expected_state: crate::platform::models::RepublishState,
+    pub(crate) expected_error: Option<&'static str>,
+}
+
 pub(crate) struct LocationWorkTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
@@ -352,6 +361,51 @@ pub(crate) struct OlderNodeFinished {
     skipped_because_of: Option<String>,
 }
 
+/// The run report shape a server had before run nodes recorded rows, progress and `not_run`.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+pub(crate) struct PreviousRunReport {
+    event_id: uuid::Uuid,
+    run_id: uuid::Uuid,
+    claim_id: Option<uuid::Uuid>,
+    change: PreviousRunChange,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[allow(dead_code)]
+pub(crate) enum PreviousRunChange {
+    NodeStarted {
+        node_key: String,
+    },
+    NodeFinished {
+        node_key: String,
+        outcome: PreviousNodeOutcome,
+        rows_affected: Option<i64>,
+        error_code: Option<String>,
+        skipped_because_of: Option<String>,
+        error_message: Option<String>,
+    },
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+pub(crate) enum PreviousNodeOutcome {
+    Success,
+    Warn,
+    Failed,
+    Skipped,
+    Cancelled,
+}
+
+pub(crate) struct PreviousServerTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) change: crate::runs::models::RunChange,
+    pub(crate) expected_upgrade_refusal: bool,
+}
+
 pub(crate) struct PlanTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
@@ -530,4 +584,124 @@ pub(crate) struct NoPasswordPeopleTestCase {
     pub(crate) description: &'static str,
     pub(crate) login: fn(uuid::Uuid) -> crate::api::models::HumanLogin,
     pub(crate) expected_status: reqwest::StatusCode,
+}
+
+pub(crate) struct ServiceAccountLifecycleTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    /// `sqbk_` and the random characters after it.
+    pub(crate) expected_key_length: usize,
+    /// Keys that work while a rotation's overlap lasts: the new one and the replaced one.
+    pub(crate) expected_overlap_keys: usize,
+}
+
+pub(crate) struct ServiceAccountPermissionTestCase {
+    pub(crate) description: &'static str,
+    /// The built-in role of the person who asks.
+    pub(crate) role: crate::credentials::models::BuiltinRole,
+    pub(crate) expected_list: reqwest::StatusCode,
+    pub(crate) expected_create: reqwest::StatusCode,
+}
+
+pub(crate) struct ImportedKeyTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) key: &'static str,
+    /// Part of the refusal.
+    pub(crate) expected_error: &'static str,
+}
+
+pub(crate) struct ImportedKeyAcceptedTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) key: &'static str,
+    pub(crate) expected_origin: &'static str,
+    pub(crate) expected_status: reqwest::StatusCode,
+}
+
+pub(crate) struct PersonImportTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) expected_error: &'static str,
+}
+
+/// Adds a request's credentials, or none.
+pub(crate) type Authorize = fn(reqwest::RequestBuilder, &str) -> reqwest::RequestBuilder;
+
+pub(crate) struct ProxyKeyTestCase {
+    pub(crate) description: &'static str,
+    /// The proxy's only trusted peer; the test client is `127.0.0.1`.
+    pub(crate) trusted_peer: &'static str,
+    pub(crate) authorize: Authorize,
+    pub(crate) expected_status: reqwest::StatusCode,
+    /// Whom the request authenticated as; empty when it was refused.
+    pub(crate) expected_name: &'static str,
+}
+
+pub(crate) struct ProxyBindingTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) expected_status: reqwest::StatusCode,
+}
+
+pub(crate) struct KeyOnlyTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) authorize: Authorize,
+    pub(crate) expected_status: reqwest::StatusCode,
+    pub(crate) expected_cache_control: &'static str,
+}
+
+pub(crate) struct KeyedRoleTestCase {
+    pub(crate) description: &'static str,
+    /// The role of the service account whose key makes the change.
+    pub(crate) role: crate::credentials::models::BuiltinRole,
+    /// The route, with `{target}`, `{key}`, `{person}` and `{sole_admin}` filled in.
+    pub(crate) path: &'static str,
+    pub(crate) body: &'static str,
+    pub(crate) expected_status: reqwest::StatusCode,
+    pub(crate) expected_denials: usize,
+}
+
+pub(crate) struct ServiceAccountRoleTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) from: crate::credentials::models::BuiltinRole,
+    pub(crate) to: &'static str,
+    pub(crate) expected_roles: &'static [&'static str],
+}
+
+pub(crate) struct LoginModeTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) login: fn() -> crate::api::models::HumanLogin,
+    pub(crate) expected_status: reqwest::StatusCode,
+    pub(crate) expected_mode: &'static str,
+}
+
+/// One request to a development listener, with `{port}` standing for the listener's port.
+pub(crate) struct DevelopmentHostTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) bind: &'static str,
+    pub(crate) allowed: &'static [&'static str],
+    pub(crate) host: &'static str,
+    pub(crate) origin: Option<&'static str>,
+    pub(crate) expected_status: reqwest::StatusCode,
+}
+
+/// A development listener beyond loopback without the opt-in.
+pub(crate) struct DevelopmentListenerTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) bind: &'static str,
+    pub(crate) expected_refusal: &'static str,
+}
+
+pub(crate) fn republish_published(
+    snapshot_id: uuid::Uuid,
+) -> crate::platform::models::LocationWorkOutcome {
+    crate::platform::models::LocationWorkOutcome::Published {
+        snapshot_id,
+        generation: 2,
+    }
+}
+
+pub(crate) fn republish_failed(_: uuid::Uuid) -> crate::platform::models::LocationWorkOutcome {
+    crate::platform::models::LocationWorkOutcome::PublishFailed {
+        generation: 2,
+        error: "orders does not parse".into(),
+    }
 }

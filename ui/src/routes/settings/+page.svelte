@@ -24,7 +24,8 @@
 		oidc: 'Single sign-on (OIDC)',
 		trusted_proxy: 'Trusted proxy',
 		password: 'Password',
-		disabled: 'Off (local only)'
+		disabled: 'Off (local only)',
+		keys: 'Service account keys only'
 	};
 </script>
 

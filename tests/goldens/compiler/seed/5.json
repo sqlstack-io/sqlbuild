@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro name collision for 'adjust_0': macros/python/adjust_0.py and macros/python/duplicate_adjust_0.py"
+     "message": "Model file models/fulfillment/staging/stg_fulfillment_2.sql references unknown model 'missing_model'"
     }
    ]
   },
@@ -20,7 +20,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P001",
-     "message": "Macro name collision for 'adjust_0': macros/python/adjust_0.py and macros/python/duplicate_adjust_0.py"
+     "message": "Model file models/fulfillment/staging/stg_fulfillment_2.sql references unknown model 'missing_model'"
     }
    ]
   },
@@ -37,7 +37,7 @@
     "Project assembly  OK  (<elapsed>)",
     "Project discovery  OK  (<elapsed>)",
     "Compiling project...",
-    "error[P001]: Macro name collision for 'adjust_0': macros/python/adjust_0.py and macros/python/duplicate_adjust_0.py",
+    "error[P001]: Model file models/fulfillment/staging/stg_fulfillment_2.sql references unknown model 'missing_model'",
     "",
     ""
    ]

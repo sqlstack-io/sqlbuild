@@ -12,7 +12,7 @@ use sqlbuild_core::git_revisions::main::head_commit::head_commit;
 use sqlbuild_rules::project_tree::main::project_real_path::project_real_path;
 use tokio::time::Instant;
 
-use crate::native_commands::constants::LOCATION_COMMIT_CHECK_SECONDS;
+use crate::native_commands::constants::{DEVELOPMENT_OUTPUT_FOLDER, LOCATION_COMMIT_CHECK_SECONDS};
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::{LocationWatch, ProjectLocation};
 use crate::replay::main::output_file_identities::output_file_identities;
@@ -25,18 +25,22 @@ pub(crate) fn location_watch(root: &Path) -> LocationWatch {
         .map(|path| path.to_string_lossy().into_owned())
         .collect();
     let local_files = location_database_files(root, files);
+    let output: Option<PathBuf> = std::env::var_os(DEVELOPMENT_OUTPUT_FOLDER).map(PathBuf::from);
+    let output_folders: Vec<PathBuf> = location_output_folders(root, output.as_deref());
     LocationWatch {
         observed: (
-            location_files(root, &rules, &local_files),
+            location_files(root, &rules, (&local_files, &output_folders)),
             head_commit(root),
         ),
         rules,
         local_files,
+        output_folders,
         attempted: None,
         changed_at: tokio::time::Instant::now(),
         retry_at: None,
         commit_checked_at: tokio::time::Instant::now(),
         checked: false,
+        republish: None,
     }
 }
 
@@ -54,7 +58,11 @@ pub(crate) fn observe_location_inputs(
         watch.observed.1.clone()
     };
     let current = (
-        location_files(root, &watch.rules, &watch.local_files),
+        location_files(
+            root,
+            &watch.rules,
+            (&watch.local_files, &watch.output_folders),
+        ),
         commit,
     );
     if watch.observed != current {
@@ -95,7 +103,7 @@ fn location_rules() -> SnapshotRules {
 pub(crate) fn location_files(
     root: &Path,
     rules: &SnapshotRules,
-    local_files: &[PathBuf],
+    (local_files, output_folders): (&[PathBuf], &[PathBuf]),
 ) -> Vec<PathStamp> {
     let mut stamps = snapshot_project_files(root, rules);
     stamps.retain(|stamp| {
@@ -105,6 +113,10 @@ pub(crate) fn location_files(
             .any(|suffix| stamp.relative_path.ends_with(suffix))
     });
     stamps = exclude_location_files(stamps, root, local_files);
+    stamps.retain(|stamp| {
+        let path: PathBuf = root.join(&stamp.relative_path);
+        !output_folders.iter().any(|folder| path.starts_with(folder))
+    });
     #[cfg(windows)]
     {
         let output: Vec<same_file::Handle> =
@@ -169,6 +181,27 @@ pub(crate) fn location_database_files(root: &Path, files: Vec<String>) -> Vec<Pa
         }
     }
     paths
+}
+
+/// `folder` inside `root`, as authored and as resolved, both spelled from `root`; none when it is `root` or above it, so the watch stays on.
+pub(crate) fn location_output_folders(root: &Path, folder: Option<&Path>) -> Vec<PathBuf> {
+    let Some(folder) = folder else {
+        return Vec::new();
+    };
+    let authored: PathBuf = pathlib_path(&root.join(folder));
+    let resolved: PathBuf = resolved_path(&authored, root);
+    let real_root: PathBuf = project_real_path(root);
+    if real_root.starts_with(&resolved) {
+        return Vec::new();
+    }
+    [
+        authored.strip_prefix(root),
+        resolved.strip_prefix(&real_root),
+    ]
+    .into_iter()
+    .flatten()
+    .map(|inside| root.join(inside))
+    .collect()
 }
 
 /// `Path(text)`: repeated separators, `.` parts and trailing separators dropped.

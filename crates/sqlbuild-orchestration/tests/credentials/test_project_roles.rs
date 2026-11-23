@@ -16,10 +16,14 @@ use crate::credentials::tests::role_helpers::{
     member_listings, member_trigger_change, member_trigger_changes, orders_grant,
     publish_customers_trigger, publish_support_role, role_changes, role_fixture,
 };
-use crate::credentials::tests::test_types::{ProjectRoleTestCase, RolesFileTestCase};
+use crate::credentials::tests::test_types::{
+    ProjectRoleTestCase, RolesFileTestCase, UnreadableJobToggleTestCase,
+};
 use crate::declarations::models::TriggerChange;
-use crate::runs::tests::helpers::snapshot;
+use crate::runs::tests::helpers::{rows, snapshot};
+use crate::scheduler::tests::contracts::helpers::store_old_job_definitions;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
+use crate::store::constants::UNREADABLE_PUBLICATION;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::{begin::begin, commit::commit, query::query};
@@ -27,6 +31,8 @@ use crate::store::models::{Parameter, TransactionMode};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
+const ALL_NODES: &[&str] = &["customers", "inventory", "orders", "products"];
+const TOGGLE_DENIED: &str = "missing trigger.toggle permission for this target";
 const ADHOC_DENIED: &str = "missing run.adhoc permission for this target";
 
 #[test]
@@ -317,6 +323,130 @@ fn given_grant_outside_a_triggers_job_when_the_member_overrides_it_then_both_tri
             close_test_store(fixture).await;
         });
     }
+}
+
+#[test]
+fn given_a_schedule_whose_job_cannot_be_read_when_a_member_toggles_it_then_pause_and_resume_need_the_whole_target()
+ {
+    let test_cases = [
+        UnreadableJobToggleTestCase {
+            description: "SQLite pauses and resumes an unreadable job's schedule with the whole target",
+            backend: Backend::Sqlite,
+            nodes: ALL_NODES,
+            earlier_forms: &["project"],
+            expected_outcomes: [Ok(true), Ok(true), Err(UNREADABLE_PUBLICATION)],
+            expected_statuses: ["paused", "running", "running"],
+        },
+        UnreadableJobToggleTestCase {
+            description: "SQLite refuses an unreadable job's schedule with only that job's nodes",
+            backend: Backend::Sqlite,
+            nodes: &["customers"],
+            earlier_forms: &["project"],
+            expected_outcomes: [
+                Err(TOGGLE_DENIED),
+                Err(TOGGLE_DENIED),
+                Err(UNREADABLE_PUBLICATION),
+            ],
+            expected_statuses: ["running", "running", "running"],
+        },
+        UnreadableJobToggleTestCase {
+            description: "SQLite still toggles a readable job's schedule with only that job's nodes",
+            backend: Backend::Sqlite,
+            nodes: &["customers"],
+            earlier_forms: &[],
+            expected_outcomes: [Ok(true), Ok(true), Ok(true)],
+            expected_statuses: ["paused", "running", "running"],
+        },
+        UnreadableJobToggleTestCase {
+            description: "SQLite still refuses a readable job's schedule without that job's nodes",
+            backend: Backend::Sqlite,
+            nodes: &["orders"],
+            earlier_forms: &[],
+            expected_outcomes: [Err(TOGGLE_DENIED), Err(TOGGLE_DENIED), Err(TOGGLE_DENIED)],
+            expected_statuses: ["running", "running", "running"],
+        },
+        UnreadableJobToggleTestCase {
+            description: "PostgreSQL pauses and resumes an unreadable job's schedule with the whole target",
+            backend: Backend::Postgres,
+            nodes: ALL_NODES,
+            earlier_forms: &["project"],
+            expected_outcomes: [Ok(true), Ok(true), Err(UNREADABLE_PUBLICATION)],
+            expected_statuses: ["paused", "running", "running"],
+        },
+        UnreadableJobToggleTestCase {
+            description: "PostgreSQL refuses an unreadable job's schedule with only that job's nodes",
+            backend: Backend::Postgres,
+            nodes: &["customers"],
+            earlier_forms: &["project"],
+            expected_outcomes: [
+                Err(TOGGLE_DENIED),
+                Err(TOGGLE_DENIED),
+                Err(UNREADABLE_PUBLICATION),
+            ],
+            expected_statuses: ["running", "running", "running"],
+        },
+        UnreadableJobToggleTestCase {
+            description: "PostgreSQL still toggles a readable job's schedule with only that job's nodes",
+            backend: Backend::Postgres,
+            nodes: &["customers"],
+            earlier_forms: &[],
+            expected_outcomes: [Ok(true), Ok(true), Ok(true)],
+            expected_statuses: ["paused", "running", "running"],
+        },
+        UnreadableJobToggleTestCase {
+            description: "PostgreSQL still refuses a readable job's schedule without that job's nodes",
+            backend: Backend::Postgres,
+            nodes: &["orders"],
+            earlier_forms: &[],
+            expected_outcomes: [Err(TOGGLE_DENIED), Err(TOGGLE_DENIED), Err(TOGGLE_DENIED)],
+            expected_statuses: ["running", "running", "running"],
+        },
+    ];
+    let mut completed = 0;
+    for test_case in test_cases {
+        run(async {
+            let fixture = open_test_store(test_case.backend)
+                .await
+                .expect("required backend");
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let roles = role_fixture(store).await;
+            let grants = json!([orders_grant(
+                json!(["view", "trigger.toggle"]),
+                test_case.nodes
+            )]);
+            publish_customers_trigger(store, roles.location_id, (2, grants)).await;
+            for form in test_case.earlier_forms {
+                store_old_job_definitions(store, form).await;
+            }
+            let mut outcomes: Vec<Result<bool, String>> = Vec::new();
+            let mut statuses: Vec<String> = Vec::new();
+            for change in [
+                TriggerChange::Pause,
+                TriggerChange::Enable,
+                TriggerChange::ResetDefault,
+            ] {
+                outcomes.push(member_trigger_change(store, &roles, change).await);
+                let state = rows(store, "SELECT status FROM sqb_trigger_state", vec![]).await;
+                statuses.push(state[0]["status"].as_str().expect("status").to_owned());
+            }
+            assert_eq!(
+                (outcomes, statuses),
+                (
+                    test_case
+                        .expected_outcomes
+                        .map(|expected| expected.map_err(str::to_owned))
+                        .to_vec(),
+                    test_case.expected_statuses.map(str::to_owned).to_vec(),
+                ),
+                "{}",
+                test_case.description
+            );
+            completed += 1;
+            close_test_store(fixture).await;
+        });
+    }
+    assert_eq!(completed, 8, "both backends run");
 }
 
 #[test]

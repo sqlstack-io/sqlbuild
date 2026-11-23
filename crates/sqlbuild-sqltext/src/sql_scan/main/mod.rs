@@ -1,8 +1,10 @@
+pub mod bounded_expansions;
 pub mod comment_end;
 pub mod dialect_lexical_syntax;
 pub mod dialect_matching_paren;
 pub mod dialect_non_code_end;
 pub mod dialect_non_code_ranges;
+pub mod expansion_followed_by;
 pub mod follows_table_wrapper;
 pub mod lexical_syntax_key;
 pub mod matching_paren;

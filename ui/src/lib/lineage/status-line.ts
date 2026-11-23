@@ -10,8 +10,10 @@ const GAP = 6;
 const DOT = 7;
 /** A drift chip's icon, gap, padding and border around its word. */
 const CHIP = 10 + 3 + 2 * 5 + 2;
-/** The '·' and its margin before the time when it follows the status word. */
-const SEP = 10;
+/** The '·' and its margin before the time when it follows the status word, as drawn. */
+const SEP = 12;
+/** What the checks badge draws beyond its measured text: tabular figures, and a ✕ or ✓ from a fallback font. */
+const CHECKS_EXTRA = 3;
 
 export type StatusParts = { label?: string; when?: string; drift?: string; checks?: string };
 export type StatusFit = { label: boolean; driftWord: boolean };
@@ -23,7 +25,7 @@ export function fitStatus(parts: StatusParts, measure: Measure = measureText, ro
 			parts.label !== undefined ? DOT + (label ? GAP + measure(parts.label, 11, 500) : 0) : null,
 			parts.when ? measure(parts.when, 11, 400) + (parts.label !== undefined ? SEP : 0) : null,
 			parts.drift ? CHIP + (driftWord ? measure(parts.drift, 10.5, 600) : -3) : null,
-			parts.checks ? measure(parts.checks, 11, 400) : null
+			parts.checks ? measure(parts.checks, 11, 400) + CHECKS_EXTRA : null
 		].filter((w): w is number => w !== null);
 		return items.reduce((a, b) => a + b, 0) + GAP * Math.max(0, items.length - 1);
 	};

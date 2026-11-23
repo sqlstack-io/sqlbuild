@@ -32,9 +32,11 @@ use crate::store::models::{ControlStore, TransactionMode};
 
 /// Session-authenticated person routes, plus routes acting on the caller's own session.
 pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
-    person_routes()
-        .route_layer(middleware::from_fn_with_state(store.clone(), authenticate))
-        .merge(session_routes(store))
+    super::service_keys::keyed(
+        store,
+        person_routes().route_layer(middleware::from_fn_with_state(store.clone(), authenticate)),
+    )
+    .merge(session_routes(store))
 }
 
 /// Routes that act on the caller's own session.
@@ -73,6 +75,27 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
         .route(
             "/api/admin/server",
             get(crate::api::_helpers::resources::administrators::server),
+        )
+        .route(
+            "/api/admin/service-accounts",
+            get(crate::api::_helpers::resources::service_accounts::list)
+                .post(crate::api::_helpers::resources::service_accounts::create),
+        )
+        .route(
+            "/api/admin/service-accounts/{principal_id}/keys",
+            post(crate::api::_helpers::resources::service_accounts::rotate),
+        )
+        .route(
+            "/api/admin/service-accounts/{principal_id}/keys/{key_id}/revoke",
+            post(crate::api::_helpers::resources::service_accounts::revoke),
+        )
+        .route(
+            "/api/admin/service-accounts/{principal_id}/disabled",
+            post(crate::api::_helpers::resources::service_accounts::disable),
+        )
+        .route(
+            "/api/admin/service-accounts/{principal_id}/role",
+            post(crate::api::_helpers::resources::service_accounts::role),
         )
         .route(
             "/api/admin/locations/{location_id}/targets/{target}/roles",
@@ -114,6 +137,18 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
         .route(
             "/api/control/locations/{location_id}/targets/{target}/warehouse-syncs",
             post(crate::api::_helpers::resources::person_location_work::request_sync),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/republish",
+            post(crate::api::_helpers::resources::person_republish::request),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/republish/{request_id}",
+            get(crate::api::_helpers::resources::person_republish::read),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/discovered",
+            get(crate::api::_helpers::resources::person_republish::discovered),
         )
         .route(
             "/api/control/locations/{location_id}/targets/{target}/connection-tests/{request_id}",
@@ -272,6 +307,22 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
         .route(
             "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output",
             get(crate::api::_helpers::resources::person_reads::run_output),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/index",
+            get(crate::api::_helpers::resources::person_reads::run_output_index),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/lines",
+            get(crate::api::_helpers::resources::person_reads::run_output_lines),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/search",
+            get(crate::api::_helpers::resources::person_reads::run_output_search),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output/download",
+            get(crate::api::_helpers::resources::person_reads::run_output_download),
         )
         .route(
             "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes/{node_key}/error",

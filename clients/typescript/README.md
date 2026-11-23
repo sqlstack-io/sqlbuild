@@ -42,7 +42,7 @@ separate authentication contract, not an inferred privilege of this client.
 ## Authenticate through a trusted proxy
 
 Create a person with `sqb admin create-principal orders-reader`, then put the
-returned `principal_id` in the `[trusted_proxy]` section of the server's
+ID it prints (`principal_id` with `--json`) in the `[trusted_proxy]` section of the server's
 `server.toml`. Subjects are exact ASCII upstream identities, not inferred local
 usernames or email addresses:
 

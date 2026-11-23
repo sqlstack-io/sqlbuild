@@ -121,6 +121,39 @@ class FactoryDefinition:
 
 
 @dataclass(frozen=True)
+class DiscoverDefinition:
+    """Metadata attached to a function that discovers a set of items at publish."""
+
+    name: str
+    check_every: str | None = None
+
+
+@dataclass(frozen=True)
+class Item:
+    """One discovered item: its ID, the items or nodes it waits on, and its nodes' arguments."""
+
+    id: str
+    depends_on: tuple[str | SqlResourceRef | NodeSetRef, ...] = ()
+    args: Mapping[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Discovered:
+    """What a discover function returns: its items, and optional set-wide tags and parallelism."""
+
+    items: tuple[Item, ...]
+    tags: Mapping[str, object] | None = None
+    max_parallel: int | None = None
+
+
+@dataclass(frozen=True)
+class DiscoveredItemRef:
+    """A discovered item's dependency on another item of its set, by node name."""
+
+    name: str
+
+
+@dataclass(frozen=True)
 class AuditFactoryDefinition:
     """Metadata attached to an audit-case factory function."""
 
@@ -149,6 +182,7 @@ class AssetDefinition:
     columns: tuple[SourceColumnEntry, ...] = ()
     column_lineage: dict[str, tuple[ColumnLineageRef, ...]] | None = None
     retry: RetryPolicy | None = None
+    for_each: str | None = None
 
 
 @dataclass(frozen=True)

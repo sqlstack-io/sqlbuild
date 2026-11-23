@@ -5,10 +5,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from sqlbuild.compiler.python_nodes.types import PythonNodeKind
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.node_results.constants import RESULT_DEPENDENCY_ATTRIBUTES
 from sqlbuild.executor.node_results.models import NodeResultEnvelope
 from sqlbuild.executor.python_nodes.constants import MISSING_DEFAULT
+from sqlbuild.python_nodes.models import DiscoveredItemRef
 
 
 class DependencyResultReader:
@@ -56,8 +58,10 @@ class DependencyResultReader:
         return identity
 
     def result_node_identity(self, node_function: Callable[..., object]) -> tuple[str, str] | None:
-        """Return the `(kind, name)` of a decorated asset or loader, else None."""
+        """Return the `(kind, name)` of a decorated asset or loader, or a discovered item's node."""
 
+        if isinstance(node_function, DiscoveredItemRef):
+            return PythonNodeKind.ASSET.value, node_function.name
         for attribute, kind in RESULT_DEPENDENCY_ATTRIBUTES:
             definition: object = getattr(node_function, attribute, None)
             if definition is None:

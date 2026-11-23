@@ -305,22 +305,26 @@ impl<'py> HookRun<'_, '_, 'py> {
         let owner: String = format!("{} {label}", scope.file_path);
         let definition_label: String =
             format!("SQL hook '{name}' in {}", definition_path.str()?.to_str()?);
-        let rendered: String = render_parameterized_sql(&body, &argument_pairs(&kwargs)?, true)
-            .map_err(|stop| {
-                let message: String = match stop {
-                    ParameterRenderStop::UnusedArguments(names) => format!(
-                        "{owner} passes unknown argument(s) to {definition_label}: {}",
-                        names.join(", ")
-                    ),
-                    ParameterRenderStop::MissingArgument(argument) => {
-                        format!("{owner} is missing argument '{argument}' for {definition_label}")
-                    }
-                    ParameterRenderStop::UnsupportedValue(argument) => format!(
-                        "{owner} {definition_label} argument '{argument}' uses an unsupported value"
-                    ),
-                };
-                compile_error(self.context.classes, &message, None)
-            })?;
+        let rendered: String = render_parameterized_sql(
+            &body,
+            &argument_pairs(&kwargs)?,
+            (true, Some(self.context.syntax)),
+        )
+        .map_err(|stop| {
+            let message: String = match stop {
+                ParameterRenderStop::UnusedArguments(names) => format!(
+                    "{owner} passes unknown argument(s) to {definition_label}: {}",
+                    names.join(", ")
+                ),
+                ParameterRenderStop::MissingArgument(argument) => {
+                    format!("{owner} is missing argument '{argument}' for {definition_label}")
+                }
+                ParameterRenderStop::UnsupportedValue(argument) => format!(
+                    "{owner} {definition_label} argument '{argument}' uses an unsupported value"
+                ),
+            };
+            compile_error(self.context.classes, &message, None)
+        })?;
         let start: usize = self.references.borrow().len();
         let hook_path: String = native_field(&definition, FILE_PATH_ATTRIBUTE)?
             .str()?

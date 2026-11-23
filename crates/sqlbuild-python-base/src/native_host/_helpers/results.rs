@@ -13,7 +13,7 @@ use sqlbuild_host::models::{
     AuditOutcome, AuditRunScope, AuditSeverity, BuildExecutionResult, BuildExecutionTimings,
     BuildStatus, CancellationOutcome, ExecutionPhase, ExecutionResourceKind, ExecutionStatus,
     FunctionExecutionResult, HookExecutionResult, HookPhase, ItemKind, ItemTimeoutReport,
-    LifeCycleEvent, LifeCycleEventKind, LoadExecutionResult, MeasuredValue,
+    LifeCycleEvent, LifeCycleEventKind, LoadExecutionResult, LogLevel, MeasuredValue,
     MicrobatchAccountingInterval, MicrobatchLimitAction, ModelExecutionResult,
     ScenarioAssertionExpectationExecutionResult, ScenarioExpectedExpectationExecutionResult,
     ScenarioLocalRunStatus, ScenarioRunResult, SeedExecutionResult, SkipMode,
@@ -101,6 +101,7 @@ enums!(
     AttachedAuditTargetKind,
     AuditEvaluationMode,
     LifeCycleEventKind,
+    LogLevel,
     AuditAttachmentKind,
     AuditSeverity,
     AuditOutcome,
@@ -135,7 +136,11 @@ record!(BuildExecutionTimings {
     schema_preparation_seconds,
     execution_seconds,
 });
-record!(LifeCycleEvent { kind, content });
+record!(LifeCycleEvent {
+    kind,
+    content,
+    level
+});
 record!(HookExecutionResult {
     phase,
     index,
@@ -157,7 +162,8 @@ record!(MicrobatchAccountingInterval {
 });
 record!(ModelExecutionResult<V> {
     model_name, status, failed_phase, staging_relation, promoted_relation, duration_ms,
-    batch_count, batch_size, rows_affected, cursor_range_start, cursor_range_end, cursor_type,
+    batch_count, batch_size, rows_affected, table_rows, cursor_range_start, cursor_range_end,
+    cursor_type,
     cursor_grain, empty_cursor_inputs, waiting_on_empty_inputs, future_cursor_safety,
     maximum_start_safety, audit_results, warning_messages, lifecycle_events, hook_results,
     skip_mode, skip_reason, error_code, error_help, error_message, failed_sql,
@@ -352,6 +358,7 @@ impl<'py> ReadResult<'py> for LoadExecutionResult<Bound<'py, PyAny>> {
             resource_kind: ReadResult::read(&field(value, "resource_kind")?)?,
             staging_relation: ReadResult::read(&field(value, "staging_relation")?)?,
             rows_loaded: ReadResult::read(&field(value, "rows_loaded")?)?,
+            rows_affected: ReadResult::read(&field(value, "rows_affected")?)?,
             duration_ms: ReadResult::read(&field(value, "duration_ms")?)?,
             lifecycle_events: ReadResult::read(&field(value, "lifecycle_events")?)?,
             skip_mode: ReadResult::read(&field(value, "skip_mode")?)?,

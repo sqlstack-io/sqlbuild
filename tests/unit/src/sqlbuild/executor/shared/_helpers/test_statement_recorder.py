@@ -37,7 +37,7 @@ def test_given_recorded_events_when_snapshotting_then_returns_expected_tuple(
     recorder: StatementRecorder = StatementRecorder()
 
     recorder.record(test_case.statements[0])
-    recorder.log(test_case.log_message)
+    recorder.log(message=test_case.log_message)
     recorder.record_many(test_case.statements[1:])
     result: tuple[LifeCycleEvent, ...] = recorder.snapshot()
 

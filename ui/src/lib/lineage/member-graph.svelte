@@ -28,7 +28,9 @@
 		catalog = [],
 		links = new Map(),
 		selection = $bindable(null),
-		details
+		details,
+		initialExpanded = [],
+		fitWhole = false
 	}: {
 		members: JobGroupMember[];
 		info: ReadonlyMap<string, MemberInfo>;
@@ -37,11 +39,16 @@
 		selection?: MemberSelection | null;
 		/** The page's details panel, toggled from the toolbar as on Lineage. */
 		details?: { open: boolean; toggle: () => void };
+		/** Members open in place when the graph first shows, such as a run's failed member. */
+		initialExpanded?: readonly string[];
+		/** Open on the whole graph, even when its cards turn compact (a run's graph). */
+		fitWhole?: boolean;
 	} = $props();
 
 	const nodeTypes = { member: MemberNode, memberBox: MemberBoxNode, asset: AssetNode, folder: FolderNode, folderBox: JobBoxNode };
 	const edgeTypes = { count: CountEdge };
-	let expanded = $state<ReadonlySet<string>>(new Set());
+	// svelte-ignore state_referenced_locally
+	let expanded = $state<ReadonlySet<string>>(new Set(initialExpanded));
 	let openFolders = $state<ReadonlyMap<string, ReadonlySet<string>>>(new Map());
 	/** Selects a member and opens or closes it, from its card or its box's header. */
 	function toggle(jobKey: string) {
@@ -279,6 +286,9 @@
 		bind:viewport
 		bind:setViewport
 		bind:element={panel}
+		readable={!fitWhole}
+		{...fitWhole ? { fitFloor: 0.1 } : {}}
+		{...fitWhole ? { fitViewOptions: { padding: 0.06, maxZoom: 1, minZoom: 0.1 } } : {}}
 		{nodeTypes}
 		{edgeTypes}
 		nodesDraggable={false}

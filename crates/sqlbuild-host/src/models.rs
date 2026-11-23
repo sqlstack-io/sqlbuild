@@ -429,6 +429,28 @@ pub struct BuildExecutionTimings {
 pub struct LifeCycleEvent {
     pub kind: LifeCycleEventKind,
     pub content: String,
+    /// The level of a `ctx.log` line; SQL events have none.
+    pub level: Option<LogLevel>,
+}
+
+/// The level of a line a node logs with `ctx.log`. Mirrors `sqlbuild.adapter.contract.types.LogLevel`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LogLevel {
+    Info,
+    Warning,
+    Error,
+}
+
+impl ResultEnum for LogLevel {
+    const ALL: &'static [Self] = &[Self::Info, Self::Warning, Self::Error];
+
+    fn value(self) -> &'static str {
+        match self {
+            Self::Info => "info",
+            Self::Warning => "warning",
+            Self::Error => "error",
+        }
+    }
 }
 
 /// One pre- or post-hook of a model. Mirrors `sqlbuild.executor.run.models.HookExecutionResult`.
@@ -508,6 +530,7 @@ pub struct ModelExecutionResult<V> {
     pub batch_count: Option<i64>,
     pub batch_size: Option<String>,
     pub rows_affected: Option<i64>,
+    pub table_rows: Option<i64>,
     pub cursor_range_start: Option<String>,
     pub cursor_range_end: Option<String>,
     pub cursor_type: Option<String>,
@@ -587,6 +610,7 @@ pub struct LoadExecutionResult<V> {
     pub resource_kind: ExecutionResourceKind,
     pub staging_relation: Option<String>,
     pub rows_loaded: i64,
+    pub rows_affected: Option<i64>,
     pub duration_ms: Option<i64>,
     pub lifecycle_events: Vec<LifeCycleEvent>,
     pub skip_mode: Option<SkipMode>,

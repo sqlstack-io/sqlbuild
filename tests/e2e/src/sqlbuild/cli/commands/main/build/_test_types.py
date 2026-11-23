@@ -1771,3 +1771,12 @@ class AdapterDefaultResultsFallbackE2ETestCase:
     kept_loader: str
     reading_task: str
     expected_payload_keys: tuple[str, str]
+
+
+@dataclass(frozen=True)
+class DiscoveredNodesE2ETestCase:
+    description: str
+    command: tuple[str, ...]
+    expected_exit_code: int
+    expected_output_patterns: tuple[str, ...]
+    expected_runs: tuple[str, ...]

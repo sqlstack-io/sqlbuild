@@ -98,6 +98,20 @@ impl WorkerClient {
         .await?)
     }
 
+    /// Send one batch of run output; a retried batch is stored once.
+    pub async fn publish_output_batch(
+        &self,
+        batch: &crate::run_output::models::OutputBatch,
+    ) -> Result<crate::run_output::models::OutputBatchReceipt, ClientError> {
+        client_response(
+            self.connection
+                .client
+                .post(format!("{}output/batches", self.run_url))
+                .json(batch),
+        )
+        .await
+    }
+
     /// Run independently from warehouse execution; cancellation is a cooperative request.
     pub async fn heartbeat(&self) -> Result<bool, WorkerError> {
         let result: HeartbeatResponse = client_response(

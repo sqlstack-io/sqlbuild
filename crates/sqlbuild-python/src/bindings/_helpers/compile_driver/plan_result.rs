@@ -33,15 +33,26 @@ use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::connection_failure::connection_failure;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
+use sqlbuild_python_base::records::main::construct::new_plain_error::new_plain_error;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
-use sqlbuild_python_base::records::types::RecordId;
+use sqlbuild_python_base::records::types::{ErrorId, RecordId};
 use sqlbuild_python_compile::compile_driver::main::stages::monotonic::monotonic;
+use sqlbuild_python_front::discovered_sets::main::publish_only_placeholders::publish_only_placeholders;
 use sqlbuild_python_project::graph::main::python_nodes::run_selection_from_inputs::run_selection_from_inputs;
 
 const SINGLE_CONNECTION: i64 = 1;
 
 /// The deferred relation locations and the warehouse relations behind them, when deferring.
 type Deferral<'py> = (Bound<'py, PyAny>, Bound<'py, PyAny>);
+
+/// What the caller does with the plan it asks for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PlanUse {
+    /// Show it, placeholders included.
+    Show,
+    /// Run it, which refuses a selected placeholder.
+    Run,
+}
 
 /// The planning inputs: the discovered project, the adapter and its open connection.
 pub(crate) struct PlanningInputs<'a, 'py> {
@@ -50,6 +61,7 @@ pub(crate) struct PlanningInputs<'a, 'py> {
     /// The live planning connection, `None` when the plan reads a synced state.
     pub(crate) connection: &'a Bound<'py, PyAny>,
     pub(crate) reads: &'a Bound<'py, PlannerReads>,
+    pub(crate) plan_use: PlanUse,
     /// Python nodes' `(database, schema)` under the active target.
     pub(crate) node_results_location: Option<(Option<String>, Option<String>)>,
 }
@@ -103,6 +115,21 @@ fn without_loaders<'py>(
     ))
 }
 
+/// Refuse to run a `for_each` asset that compiled as its placeholder because no discovery ran.
+fn refuse_placeholders(discovered: &Bound<'_, PyAny>, selected: &Bound<'_, PyAny>) -> PyResult<()> {
+    let assets: Vec<String> = publish_only_placeholders(discovered, selected)?;
+    match assets.first() {
+        None => Ok(()),
+        Some(asset) => Err(new_plain_error(
+            discovered.py(),
+            ErrorId::PlannerInput,
+            &format!(
+                "{asset} is discovered at publish; run it from a location or `sqb dev`, or pass --discover"
+            ),
+        )),
+    }
+}
+
 /// Plan the compiled project over an open connection and attach Python node plans.
 pub(crate) fn pipeline_result<'py>(
     inputs: &PlanningInputs<'_, 'py>,
@@ -138,6 +165,9 @@ pub(crate) fn pipeline_result<'py>(
             ),
             (options, discovered, project),
         )?;
+        if inputs.plan_use == PlanUse::Run {
+            refuse_placeholders(discovered, &selected_python_node_names)?;
+        }
         python_read_source_names = python_read_source_names_for(
             py,
             Some(keywords(

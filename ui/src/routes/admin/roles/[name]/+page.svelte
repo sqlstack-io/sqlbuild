@@ -1,4 +1,5 @@
 <script lang="ts">
+	import BotIcon from '@lucide/svelte/icons/bot';
 	import PageBody from '$lib/components/page-body.svelte';
 	import DataTable from '$lib/components/list/data-table.svelte';
 	import type { TableColumn } from '$lib/components/list/table-columns';
@@ -15,7 +16,7 @@
 	import RoleSourceBadge from '$lib/components/admin/role-source-badge.svelte';
 	import SourceChip from '$lib/components/admin/source-chip.svelte';
 	import { CAPABILITIES, type Capability } from '$lib/api';
-	import { builtInLabel, personHref, roleHref, roleSummary, scopeWords } from '$lib/platform/access';
+	import { builtInLabel, principalHref, roleHref, roleSummary, scopeWords } from '$lib/platform/access';
 	import { PERMISSIONS } from '$lib/platform/permission-catalog';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
@@ -171,7 +172,12 @@
 							<ul class="holders">
 								{#each r.assignments as a (a.id)}
 									<li class:stale={a.stale}>
-										<a href={to(personHref(a.principal))}>{a.principal.displayName}</a>
+										{#if a.principal.kind === 'service'}
+											<a class="holder" href={to(principalHref(a.principal))} title="Service account"><BotIcon size={13} strokeWidth={1.75} />{a.principal.displayName}</a>
+											<span class="kind">service account</span>
+										{:else}
+											<a href={to(principalHref(a.principal))}>{a.principal.displayName}</a>
+										{/if}
 										<span class="muted">{scopeWords(a.scope.locationId, locations)}</span>
 										<SourceChip assignment={a} />
 									</li>
@@ -310,5 +316,14 @@
 	code {
 		font-family: var(--font-mono);
 		font-size: 12px;
+	}
+	.holder {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+	}
+	.kind {
+		color: var(--muted-foreground);
+		font-size: 11.5px;
 	}
 </style>

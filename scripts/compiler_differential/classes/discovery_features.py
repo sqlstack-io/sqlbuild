@@ -90,6 +90,7 @@ class DiscoveryFeatureWriter:
             "python_hook": self._python_hook,
             "managed_source_loader": self._managed_source_loader,
             "asset_and_check": self._asset_and_check,
+            "discovered_set": self._discovered_set,
             "audit_factory": self._audit_factory,
             "provider": self._provider,
             "lifecycle_sink": self._lifecycle_sink,
@@ -179,7 +180,7 @@ class DiscoveryFeatureWriter:
             "@hook\n"
             'def note_refresh(ctx, channel="#builds"):\n'
             '    """Log one refresh."""\n'
-            '    ctx.log(f"{channel}: {ctx.model_name} refreshed during {ctx.phase}")\n'
+            '    ctx.log.info(f"{channel}: {ctx.model_name} refreshed during {ctx.phase}")\n'
         )
         _ = self._model(
             name=f"hooked_{base.name}",
@@ -232,6 +233,25 @@ class DiscoveryFeatureWriter:
             f"def export_{base.name}_ready(ctx):\n"
             '    """Check that the export ran."""\n'
             "    return ctx.pass_()\n"
+        )
+
+    def _discovered_set(self) -> None:
+        self._features.add("discovered_set")
+        self._files["python/assets/steps.py"] = (
+            "from sqlbuild.assets import asset\n"
+            "from sqlbuild.discovery import Discovered, Item, discover\n\n\n"
+            '@discover(check_every="60s")\n'
+            "def step_plan():\n"
+            '    """List the steps of an external plan; only a location calls this."""\n'
+            "    return Discovered(\n"
+            '        items=(Item(id="load", args={"step": "load"}), '
+            'Item(id="fit", depends_on=("load",), args={"step": "fit"})),\n'
+            '        tags={"release": "r1"},\n'
+            "    )\n\n\n"
+            '@asset(for_each=step_plan, tags=("steps",))\n'
+            "def run_step(ctx, step):\n"
+            '    """Run one discovered step."""\n'
+            '    return ctx.result(metadata={"step": step}, materialized=True)\n'
         )
 
     def _audit_factory(self) -> None:

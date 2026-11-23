@@ -15,19 +15,23 @@ pub(crate) async fn project_node(
     request: &RunChangeRequest,
     counts: &BTreeMap<String, i64>,
 ) -> Result<ControlTransaction, ControlError> {
-    let (node, status, rows, error, skipped) = match &request.change {
-        RunChange::NodeStarted { node_key } => (node_key, NODE_RUNNING, None, None, None),
+    let (node, status, (rows, table_rows, no_change), error, skipped) = match &request.change {
+        RunChange::NodeStarted { node_key } => {
+            (node_key, NODE_RUNNING, (None, None, None), None, None)
+        }
         RunChange::NodeFinished {
             node_key,
             outcome,
             rows_affected,
+            table_rows,
+            no_change_reason,
             error_code,
             skipped_because_of,
             ..
         } => (
             node_key,
             outcome.as_str(),
-            *rows_affected,
+            (*rows_affected, *table_rows, no_change_reason.clone()),
             error_code.clone(),
             skipped_because_of.clone(),
         ),
@@ -68,10 +72,12 @@ pub(crate) async fn project_node(
     *counts.entry(status.into()).or_default() += 1;
     let (transaction, _) = query(transaction,
         "UPDATE sqb_run_nodes SET status=$1, started_at=CASE WHEN $1='running' THEN $2 ELSE started_at END, \
-         ended_at=$3, rows_affected=$4, error_code=$5, skipped_because_of=$6 WHERE run_id=$7 AND node_key=$8 AND kind='node'",
+         ended_at=$3, rows_affected=$4, error_code=$5, skipped_because_of=$6, table_rows=$9, no_change_reason=$10 \
+         WHERE run_id=$7 AND node_key=$8 AND kind='node'",
         vec![Parameter::Text(status.into()), Parameter::Time(now), Parameter::OptionalTime((status != NODE_RUNNING).then_some(now)),
-            rows.map_or(Parameter::Null(sqlbuild_recall::schema::models::ColumnType::Integer), Parameter::Integer),
-            Parameter::OptionalText(error), Parameter::OptionalText(skipped), Parameter::Id(request.run_id), Parameter::Text(node.clone())]).await?;
+            optional_integer(rows),
+            Parameter::OptionalText(error), Parameter::OptionalText(skipped), Parameter::Id(request.run_id), Parameter::Text(node.clone()),
+            optional_integer(table_rows), Parameter::OptionalText(no_change)]).await?;
     let (transaction, _) = query(
         transaction,
         "UPDATE sqb_runs SET node_counts_json=$1 WHERE run_id=$2",
@@ -82,4 +88,12 @@ pub(crate) async fn project_node(
     )
     .await?;
     Ok(transaction)
+}
+
+/// `value` as an integer parameter, or an integer-typed NULL.
+fn optional_integer(value: Option<i64>) -> Parameter {
+    value.map_or(
+        Parameter::Null(sqlbuild_recall::schema::models::ColumnType::Integer),
+        Parameter::Integer,
+    )
 }

@@ -17,6 +17,7 @@ from sqlbuild.executor.python_nodes._helpers.results import (
     evaluate_python_node_fan_in,
     normalize_python_check_return,
     normalize_python_node_return,
+    traceback_tail,
 )
 from sqlbuild.executor.python_nodes.models import (
     CheckContext,
@@ -34,10 +35,14 @@ from tests.unit.src.sqlbuild.executor.python_nodes._helpers._test_types import (
     PythonNodeFailureResultTestCase,
     PythonNodeFanInPolicyTestCase,
     PythonNodeReturnNormalizationTestCase,
+    TracebackRedactionTestCase,
+    TracebackTailTestCase,
 )
 from tests.unit.src.sqlbuild.executor.python_nodes._helpers.helpers import (
     PythonNodeContextTestAdapter,
     build_check_context,
+    nested_key_error,
+    raised_value_error,
 )
 
 
@@ -335,3 +340,109 @@ def test_given_upstream_python_node_results_when_evaluating_fan_in_then_returns_
 
     assert decision.action == test_case.expected_action
     assert decision.reason == test_case.expected_reason
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        TracebackTailTestCase(
+            description="a short traceback is kept whole",
+            depth=1,
+            expected_start="Traceback (most recent call last):\n  File ",
+            expected_end="KeyError: 'customer_segment'\n",
+            expected_elided=False,
+        ),
+        TracebackTailTestCase(
+            description="a long traceback keeps its header, then its end with the exception",
+            depth=80,
+            expected_start="Traceback (most recent call last):\n  ... ",
+            expected_end="KeyError: 'customer_segment'\n",
+            expected_elided=True,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_python_failure_when_its_traceback_is_kept_then_its_end_fits_the_run_error(
+    test_case: TracebackTailTestCase,
+) -> None:
+    error: BaseException = nested_key_error(depth=test_case.depth)
+    result: PythonNodeExecutionResult = build_python_node_failure_result(
+        node_name="score_orders", kind=PythonNodeKind.ASSET, error=error
+    )
+    detail: str = result.error_detail or ""
+    assert (
+        detail.startswith(test_case.expected_start),
+        detail.endswith(test_case.expected_end),
+        "earlier lines" in detail,
+        len(detail) <= 1_900,
+        detail == traceback_tail(error=error),
+        result.error_message,
+    ) == (True, True, test_case.expected_elided, True, True, "'customer_segment'"), (
+        test_case.description,
+        detail,
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        TracebackRedactionTestCase(
+            description="a secret whose key is on a line the cut drops",
+            message="password=" + "\n" * 2_000 + "example-value",
+            expected_kept="ValueError: password=",
+            expected_absent="example-value",
+        ),
+        TracebackRedactionTestCase(
+            description="a secret whose key is cut from one long line",
+            message="refused "
+            + "x" * 100
+            + " password="
+            + "y" * 400
+            + "example-value"
+            + " z" * 900,
+            expected_kept="ValueError: refused",
+            expected_absent="example-value",
+        ),
+        TracebackRedactionTestCase(
+            description="a match only without NUL withholds the whole text",
+            message="pass\0word=example-value",
+            expected_kept="[REDACTED]",
+            expected_absent="example-value",
+        ),
+        TracebackRedactionTestCase(
+            description="a match only as it is withholds the whole text",
+            message="x\0Bearer example-value",
+            expected_kept="[REDACTED]",
+            expected_absent="example-value",
+        ),
+        TracebackRedactionTestCase(
+            description="a match in a long text with NUL withholds it before the cut",
+            message="x\0Bearer example-value" + "\n  refused row" * 400,
+            expected_kept="[REDACTED]",
+            expected_absent="example-value",
+        ),
+        TracebackRedactionTestCase(
+            description="a long text with NUL and no match keeps the exception without it",
+            message="order \0rows refused" + "\n  refused row" * 400,
+            expected_kept="ValueError: order rows refused",
+            expected_absent="\0",
+        ),
+        TracebackRedactionTestCase(
+            description="a message of many lines keeps the line naming the exception",
+            message="order rows refused" + "\n  refused row" * 400,
+            expected_kept="ValueError: order rows refused",
+            expected_absent="password",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_long_error_when_its_traceback_is_cut_then_it_is_redacted_first_and_keeps_the_exception(
+    test_case: TracebackRedactionTestCase,
+) -> None:
+    detail: str = traceback_tail(error=raised_value_error(message=test_case.message))
+
+    assert (
+        test_case.expected_kept in detail,
+        test_case.expected_absent not in detail,
+        len(detail) <= 1_900,
+    ) == (True, True, True), (test_case.description, detail)

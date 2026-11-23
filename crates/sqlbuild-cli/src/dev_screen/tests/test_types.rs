@@ -23,6 +23,10 @@ pub(super) struct ScreenTestCase {
 pub(super) struct MissingSecretsTestCase {
     pub(super) description: &'static str,
     pub(super) size: Option<(usize, usize)>,
+    /// The env file the location loads.
+    pub(super) env_file: Option<&'static str>,
+    /// The nodes that need each provider.
+    pub(super) needed_by: &'static [&'static str],
     /// Each health read's providers and the variables they miss, in order.
     pub(super) reports: Vec<Vec<(&'static str, Vec<&'static str>)>>,
     /// The last rows the terminal shows.
@@ -118,4 +122,17 @@ pub(super) struct KeyTestCase {
     pub(super) description: &'static str,
     pub(super) keys: &'static str,
     pub(super) expected_actions: Vec<ScreenAction>,
+}
+
+/// An opened session at one size: what it keeps in the scrollback.
+pub(super) struct DiscoveredRowTestCase {
+    pub(super) description: &'static str,
+    pub(super) summary: &'static str,
+    pub(super) expected_lines: Vec<&'static str>,
+}
+
+pub(super) struct ExposureTestCase {
+    pub(super) description: &'static str,
+    pub(super) size: Option<(usize, usize)>,
+    pub(super) expected_lines: Vec<&'static str>,
 }

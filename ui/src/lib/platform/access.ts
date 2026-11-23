@@ -88,6 +88,12 @@ export function personHref(principal: { name: string }): string {
 	return `/admin/people/${encodeURIComponent(principal.name)}`;
 }
 
+/** Where a principal's page is: a service account's panel on People, or a person's own page. */
+export function principalHref(principal: { kind: string; name: string }): string {
+	if (principal.kind === 'service') return `/admin/people?tab=service-accounts&open=${encodeURIComponent(principal.name)}`;
+	return personHref(principal);
+}
+
 export function roleHref(name: string): string {
 	return `/admin/roles/${encodeURIComponent(name)}`;
 }

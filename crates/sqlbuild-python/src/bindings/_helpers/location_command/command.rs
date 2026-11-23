@@ -21,6 +21,7 @@ use sqlbuild_orchestration::dev_events::models::{DevPhase, DevStepState};
 use sqlbuild_orchestration::platform::models::LocationRuleFailure;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
+use sqlbuild_python_compile::provider_check::main::key_secret_blocks::key_secret_blocks;
 
 use crate::bindings::_helpers::location_command::constants::EXECUTE_ACTION;
 use crate::bindings::_helpers::location_command::constants::PUBLISH_ACTION;
@@ -35,15 +36,20 @@ use crate::bindings::_helpers::location_command::worker::execute_worker;
 use crate::bindings::_helpers::query_command::project::ProjectAdapter;
 use crate::bindings::_helpers::query_command::project::ProjectInputs;
 use crate::bindings::_helpers::query_command::project::project_adapter;
+use sqlbuild_orchestration::discovered_sets::models::DiscoveryPublishRequest;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::native_host::main::write_console::write_console;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field;
 use sqlbuild_python_base::records::types::RecordId;
 use sqlbuild_python_compile::compile_driver::main::setup::compiled_phase::compiled_phase;
+use sqlbuild_python_front::discovered_sets::main::discover_for_publication::discover_for_publication;
+use sqlbuild_python_front::discovered_sets::main::set_discovery_source::set_discovery_source;
+use sqlbuild_python_front::discovered_sets::models::DiscoverySource;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 use sqlbuild_python_output::recall::models::InvocationRecall;
 use sqlbuild_python_project::compiled_views::models::NativeProjectView;
+use sqlbuild_python_project::project_snapshot::main::saved_discovered_sets::saved_discovered_sets;
 use sqlbuild_python_project::project_snapshot::models::NativeOrchestrationSnapshot;
 use sqlbuild_python_project::project_snapshot::types::NodeKeys;
 
@@ -297,6 +303,17 @@ pub(super) fn publish_location<'py>(
         .get("providers")
         .map(|providers| missing_provider_secrets(providers, &allowed))
         .unwrap_or_default();
+    let mut secrets_needed_by: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    if missing_secrets.iter().any(|provider| !provider.allowed) {
+        let published: BTreeSet<String> = snapshot.input.nodes.keys().cloned().collect();
+        let project_view: Bound<'py, PyAny> = field(&compiled, "project")?;
+        for block in key_secret_blocks((&project.discovered, &project_view), &published)? {
+            secrets_needed_by.insert(
+                block.provider,
+                block.users.into_iter().chain(block.readers).collect(),
+            );
+        }
+    }
     status(py, "Publishing location snapshot...")?;
     steps(py, &[(DevPhase::Publish, DevStepState::Started)], None)?;
     let record = snapshot.publication(
@@ -320,6 +337,7 @@ pub(super) fn publish_location<'py>(
             refresh_at,
             state_locations: locations.into_iter().collect(),
             missing_secrets,
+            secrets_needed_by,
         },
         (project.discovered, compiled),
     )))
@@ -358,6 +376,12 @@ pub(crate) fn run_location<'py>(
             arguments.value("run_id")?.extract::<String>()?,
             arguments.value("claim_id")?.extract::<String>()?,
         );
+        let server_url: String = arguments.value("server_url")?.extract()?;
+        set_discovery_source(DiscoverySource::Saved(saved_discovered_sets(
+            py,
+            (&server_url, &bearer),
+            (&identity.0, &identity.1),
+        )?));
         let ((snapshot, blocked, compiled), project) = compile_location(py, &arguments, &input)?;
         return execute_worker(
             py,
@@ -375,6 +399,18 @@ pub(crate) fn run_location<'py>(
         return run_runtime(py, options.unwrap_or_else(|| PyDict::new(py)));
     }
     let publication = (|| {
+        discover_for_publication(
+            &arguments,
+            DiscoveryPublishRequest {
+                generation: arguments
+                    .value("generation")?
+                    .extract::<Option<i64>>()?
+                    .unwrap_or(1),
+                rediscover: None,
+                previous: Default::default(),
+                seed: true,
+            },
+        )?;
         let (PublishedGeneration { record, .. }, _) =
             publish_location(py, &arguments)?.map_err(|failure| {
                 PyValueError::new_err(format!(

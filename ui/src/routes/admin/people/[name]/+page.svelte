@@ -10,7 +10,6 @@
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import RefreshButton from '$lib/components/refresh-button.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
-	import GatedButton from '$lib/components/platform/gated-button.svelte';
 	import NoAccess from '$lib/components/platform/no-access.svelte';
 	import Panel from '$lib/components/platform/panel.svelte';
 	import KeyValues from '$lib/components/platform/key-values.svelte';
@@ -18,14 +17,13 @@
 	import AssignmentList from '$lib/components/admin/assignment-list.svelte';
 	import AuditMini from '$lib/components/admin/audit-mini.svelte';
 	import EffectiveAccessGrid from '$lib/components/admin/effective-access-grid.svelte';
-	import type { Account } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import type { CheckInput } from '$lib/platform/access';
-	import { accountSourceLabel, errorMessage } from '$lib/platform/labels';
+	import { accountSourceLabel } from '$lib/platform/labels';
 	import { createAccessDirectory } from '$lib/state/access-directory.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
-	import { toggleAccount } from '../api';
+	import AccountMenu from '../account-menu.svelte';
 
 	const name = $derived(page.params.name ?? '');
 	const d = createAccessDirectory();
@@ -51,19 +49,6 @@
 		access.refresh();
 	}
 
-	let busy = $state(false);
-	let error = $state<string | null>(null);
-	async function toggle(a: Account) {
-		busy = true;
-		error = null;
-		try {
-			if (await toggleAccount(a)) changed();
-		} catch (e) {
-			error = errorMessage(e);
-		} finally {
-			busy = false;
-		}
-	}
 </script>
 
 <AppTopbar title="People" subject="{name} · People">
@@ -85,12 +70,11 @@
 					{#if account.name === app.user?.name}
 						<span class="muted">You</span>
 					{:else}
-						<GatedButton requires="user.manage" size="sm" variant={account.disabled ? 'outline' : 'destructive'} {busy} onclick={() => toggle(account)}>{account.disabled ? 'Enable' : 'Disable'}</GatedButton>
+						<AccountMenu {account} onchange={changed} />
 					{/if}
 				</div>
 			{/if}
 		</div>
-		{#if error}<p class="err px-6 pt-3">{error}</p>{/if}
 
 		{#if d.accounts.data && !account}
 			<p class="muted px-6 py-4">No person named <code>{name}</code>.<HelpTip text="People appear after their first sign-in" /></p>

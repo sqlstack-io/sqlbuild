@@ -7,7 +7,9 @@ const GROUPS: Omit<NodeGroup, 'nodes'>[] = [
 	{ key: 'failed', label: 'Failed', tone: 'var(--sb-error)', statuses: ['failed'] },
 	{ key: 'skipped', label: 'Skipped', tone: 'var(--sb-warning)', statuses: ['skipped'] },
 	{ key: 'succeeded', label: 'Succeeded', tone: 'var(--sb-success)', statuses: ['success', 'warn'] },
-	{ key: 'not_run', label: 'Not run', tone: 'var(--sb-text-faint)', statuses: ['cancelled', 'not_run'] }
+	{ key: 'not_run', label: 'Not run', tone: 'var(--sb-text-faint)', statuses: ['cancelled', 'not_run'] },
+	// Overlaps Succeeded: the summary line's "N warnings" filter.
+	{ key: 'warned', label: 'With warnings', tone: 'var(--sb-warning)', statuses: ['warn'] }
 ];
 
 /**

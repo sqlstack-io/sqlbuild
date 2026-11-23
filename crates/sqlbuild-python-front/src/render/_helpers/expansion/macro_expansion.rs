@@ -144,7 +144,7 @@ pub(crate) fn expanded<'py>(
         .iter()
         .map(|site| (site.start, site.end))
         .collect();
-    let (rendered, spans) = splice_calls(text.text, &bounds, &outputs)
+    let (rendered, spans) = splice_calls(text.text, &bounds, &outputs, this.syntax.as_ref())
         .ok_or_else(|| PyValueError::new_err("macro call sites do not fit the SQL"))?;
     let facts = this.facts.borrow();
     Ok(ExpansionOutput {

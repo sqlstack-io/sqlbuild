@@ -24,8 +24,8 @@ _STOP_NOTICE: str = "Interrupted; cleaning up running scenarios..."
         SignalledScenarioTestCase(
             description="Ctrl+C cancels the running statement",
             sent_signal=signal.SIGINT,
-            expected_exit_code=-signal.SIGINT,
-            expected_last_line="KeyboardInterrupt",
+            expected_exit_code=130,
+            expected_last_line="error: interrupted (Ctrl+C)",
         ),
         SignalledScenarioTestCase(
             description="SIGTERM cancels the running statement the same way",

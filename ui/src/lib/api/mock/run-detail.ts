@@ -3,6 +3,7 @@
 // facts. Pure: the same record and clock always give the same detail.
 
 import type {
+	RunEventCheck,
 	CancelProgress,
 	LaunchVerb,
 	NodeCounts,
@@ -19,6 +20,25 @@ import type {
 	SkippedBecauseOf
 } from '../types';
 import { ancestors, snapshotNode, sortTopologically } from './operate-graph';
+import { NODE_SPECS } from './build-fixtures';
+import { BIG_NODE, OUTPUT_SOURCES, V2_NODE, V2_TRACEBACK, bigAvailable } from './big-output';
+
+/** The prototype runs (CHI-1591), run by a local worker process and printing sqb's own lines. */
+const PROTO = /^run-p(f31|r02|s07|g40)/;
+/** Rows a prototype node writes per second while it builds, for its progress. */
+const protoRate = (key: string) => 37 + (hash(key) % 400);
+/**
+ * Honest progress (CHI-1591): only loaders and microbatch models know their rows while they run; a
+ * warehouse statement reports none until it finishes, so other nodes show elapsed time only.
+ */
+const reportsRowsWhileRunning = (key: string) => snapshotNode(key)?.kind === 'loader' || !!NODE_SPECS[key]?.microbatch;
+/** Rows a finished node reports: added rows for incrementals and loaders, the table's count from metadata after a rebuild, none for views and tasks. */
+const finishedRows = (key: string, ms: number): number | null => {
+	const kind = snapshotNode(key)?.kind;
+	if (kind === 'view' || kind === 'asset') return null;
+	if (kind === 'incremental' || kind === 'loader') return Math.round((ms / 1000) * protoRate(key));
+	return 800 + (hash(`${key}/rows`) % 60_000);
+};
 
 /** `crashed`: the worker stopped before building anything, as when its plan is refused; `crashError` says why. */
 export type RunEnd = 'complete' | 'cancelled' | 'presumed_failed' | 'never_started' | 'crashed';
@@ -155,20 +175,23 @@ export function computeNodes(record: RunRecord, siblings: RunRecord[], now: numb
 			const status: RunNodeStatus = fails ? 'failed' : script.warn.includes(key) ? 'warn' : 'success';
 			if (fails) failed.set(key, { nodeKey: key, runId: run.id, jobKey: run.jobKey, at: e });
 			const message = fails ? (script.errors[key] ?? 'Statement failed in the warehouse') : null;
+		const python = fails && key === V2_NODE;
 			return {
 				...base(key, status),
 				startedAt: iso(s),
 				endedAt: iso(e),
-				rowsAffected: fails || snapshotNode(key)?.kind === 'view' ? null : 120 + (hash(key + run.id) % 48000),
-				errorCode: fails ? 'E2103' : null,
+				rowsAffected: (fails && !CHECK_FAILS.has(key)) || snapshotNode(key)?.kind === 'view' ? null : PROTO.test(run.id) ? finishedRows(key, e - s) : 120 + (hash(key + run.id) % 48000),
+				// As sqb reports them: R006 for a failed check, no code for a Python exception, the warehouse's own otherwise.
+				errorCode: fails ? (CHECK_FAILS.has(key) ? 'R006' : python ? null : 'E2103') : null,
 				errorMessage: message,
-				...(fails ? failureDetail(key, run, message ?? '') : {})
+				...(fails ? (CHECK_FAILS.has(key) ? checkFailureDetail(key) : python ? pythonFailureDetail() : failureDetail(key, run, message ?? '')) : {})
 			};
 		};
 		if (terminal && script.end === 'complete') return finish();
 		if (e <= clock) return finish();
 		if (s <= clock) {
-			if (!terminal) return { ...base(key, 'running'), startedAt: iso(s) };
+			// A prototype run reports rows so far while a node builds, for the timeline bar and the drawer.
+			if (!terminal) return { ...base(key, 'running'), startedAt: iso(s), rowsAffected: PROTO.test(run.id) && reportsRowsWhileRunning(key) ? Math.round(((clock - s) / 1000) * protoRate(key)) : null };
 			if (script.end === 'presumed_failed')
 				return {
 					...base(key, 'failed'),
@@ -183,6 +206,62 @@ export function computeNodes(record: RunRecord, siblings: RunRecord[], now: numb
 		if (!terminal) return base(key, 'pending');
 		return base(key, script.end === 'cancelled' ? 'cancelled' : 'not_run');
 	});
+}
+
+// ---- several checks on one node (CHI-1591) ----
+
+/** Checks that fail or warn on a node that warns or fails by a check: severity and the rows they found. */
+const CHECK_PROFILE: Record<string, Record<string, readonly ['warn' | 'error', number]>> = {
+	stg_inventory: { 'not_null(product_id)': ['warn', 3] },
+	fct_shipments: { 'not_null(shipment_id)': ['warn', 4] },
+	fct_payment_daily: { 'not_null(payment_id)': ['warn', 2] },
+	fct_order_lines: { 'not_null(payment_id)': ['warn', 2], 'unique(order_id)': ['warn', 6] },
+	fct_refunds: { 'unique(order_id)': ['error', 14], 'not_null(payment_id)': ['warn', 2], 'accepted_values(status)': ['warn', 5], 'not_null(reason)': ['warn', 9] }
+};
+/** Nodes that built but failed on an error-severity check. */
+const CHECK_FAILS = new Set(['fct_refunds']);
+
+export const auditStatementId = (run: Run, nodeKey: string, i: number) => `${statementIdOf(run, nodeKey)}-audit-${i}`;
+
+/** A node's checks, as `name(column)`, in declaration order. */
+export function auditsOf(key: string): string[] {
+	return (NODE_SPECS[key]?.columns ?? []).flatMap((c) => (c.audits ?? []).map((a) => `${a}(${c.name})`));
+}
+
+/** A check's query as it ran, compiled. */
+export function auditSql(nodeKey: string, statementId: string, target: string): string {
+	const i = Number(statementId.split('-audit-')[1] ?? 0);
+	const audit = auditsOf(nodeKey)[i] ?? 'not_null(id)';
+	const [, name, col] = audit.match(/^(\w+)\((\w+)\)$/) ?? [];
+	const rel = `${target === 'dev' ? 'dev_demo' : 'analytics'}.${nodeKey}`;
+	if (name === 'unique') return `select ${col}, count(*) as n\nfrom ${rel}\nwhere ${col} is not null\ngroup by ${col}\nhaving count(*) > 1`;
+	if (name === 'accepted_values') return `select ${col}, count(*) as n\nfrom ${rel}\nwhere ${col} not in ('paid', 'pending', 'refunded', 'void')\ngroup by ${col}`;
+	return `select *\nfrom ${rel}\nwhere ${col} is null`;
+}
+
+/** The failing rows a check found, as a small sample (the server keeps the first 100). */
+export function auditSample(nodeKey: string, statementId: string, count: number): { columns: string[]; rows: (string | number | null)[][]; total: number } {
+	const i = Number(statementId.split('-audit-')[1] ?? 0);
+	const audit = auditsOf(nodeKey)[i] ?? 'not_null(id)';
+	const [, name, col] = audit.match(/^(\w+)\((\w+)\)$/) ?? [];
+	const n = Math.min(count, 8);
+	const id = (j: number) => 10_400 + ((hash(`${statementId}${j}`) % 9_000) | 0);
+	if (name === 'unique') return { columns: [col, 'n'], rows: Array.from({ length: n }, (_, j) => [id(j), 2 + (j % 2)]), total: count };
+	if (name === 'accepted_values') return { columns: [col, 'n'], rows: ['paid ', 'PAID', 'refund', 'unknown', 'n/a'].slice(0, n).map((v, j) => [v, 1 + j]), total: count };
+	return { columns: ['order_id', col, 'created_at'], rows: Array.from({ length: n }, (_, j) => [id(j), null, `2026-11-${String(10 + j).padStart(2, '0')} 0${j}:14:0${j}`]), total: count };
+}
+
+/** A Python node's exception: where it was raised in the node's own code, and the whole traceback. */
+function pythonFailureDetail(): Pick<RunNode, 'errorLocation' | 'errorDetail'> {
+	return { errorLocation: { file: 'models/ml/score_customers_v2.py', line: 26 }, errorDetail: V2_TRACEBACK.join('\n') };
+}
+
+function checkFailureDetail(key: string): Pick<RunNode, 'errorLocation' | 'errorDetail'> {
+	const file = (snapshotNode(key)?.path ?? `models/${key}.sql`).replace(/\.sql$/, '.yml');
+	return {
+		errorLocation: { file, line: 12 },
+		errorDetail: ['check unique(order_id) failed: 14 duplicate rows (severity error)', `  --> ${file}:12`, '', 'The table was built, then its error-severity check failed, so the node failed and its downstream was skipped.'].join('\n')
+	};
 }
 
 /** Mock failure location and full text: the model file, and a line inside its main statement. */
@@ -216,12 +295,15 @@ export function queryIdOf(statementId: string): string {
 }
 
 export function countNodes(nodes: RunNode[]): NodeCounts {
-	const c: NodeCounts = { success: 0, warn: 0, failed: 0, skipped: 0, running: 0, pending: 0 };
+	const c: NodeCounts = { success: 0, warn: 0, failed: 0, skipped: 0, running: 0, pending: 0, notRun: 0 };
 	for (const n of nodes) {
 		if (n.status === 'success') c.success++;
 		else if (n.status === 'warn') c.warn++;
 		else if (n.status === 'failed') c.failed++;
-		else if (n.status === 'skipped' || n.status === 'cancelled' || n.status === 'not_run') c.skipped++;
+		else if (n.status === 'skipped' || n.status === 'cancelled' || n.status === 'not_run') {
+			c.skipped++;
+			if (n.status !== 'skipped') c.notRun!++;
+		}
 		else if (n.status === 'running') c.running++;
 		else c.pending++;
 	}
@@ -259,6 +341,7 @@ export function statusReason(status: RunStatus, nodes: RunNode[]): string | null
 // ---- Recall events, statements and output ----
 
 const LEVEL: Record<RunEvent['type'], RunEventLevel> = {
+	node_log: 'info',
 	invocation_started: 'info',
 	invocation_completed: 'info',
 	invocation_failed: 'error',
@@ -360,7 +443,8 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 		drafts.push({ producer: 'scheduler', type, occurredAt: typeof at === 'number' ? iso(at) : at, invocationId: null, nodeKey: null, statementId: null, attempt: null, message });
 	const ev = (type: Draft['type'], at: number, nodeKey: string | null, message: string, statementId: string | null = null) =>
 		drafts.push({ type, occurredAt: iso(at), invocationId: inv, nodeKey, statementId, attempt: nodeKey ? 1 : null, message });
-	const out = (stream: RunOutputLine['stream'], at: number, text: string, error = false) => inv && output.push({ invocationId: inv, stream, at: iso(at), text, error });
+	const out = (stream: RunOutputLine['stream'], at: number, text: string, error = false, nodeKey: string | null = null, omitted?: number) =>
+		inv && output.push({ invocationId: inv, stream, at: iso(at), text, error, ...(nodeKey ? { nodeKey } : {}), ...(omitted ? { omitted } : {}) });
 
 	const queued = Date.parse(run.queuedAt);
 	fact('requested', queued - 200, `Requested by ${run.requestedBy.displayName}${run.triggerName ? ` via ${run.triggerName}` : ''}`);
@@ -368,11 +452,13 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 	if (run.launchedAt) {
 		const launched = Date.parse(run.launchedAt);
 		fact('claimed', launched - 300, script.nodes.length ? `Claimed ${script.nodes.length} write-set nodes${Object.keys(script.pools).length ? ` and slots in pool ${Object.keys(script.pools).join(', ')}` : ''}` : 'Claimed');
-		fact('launched', launched, script.nodes.length ? `Container started from image ${script.imageId.slice(0, 19)}` : `Started ${run.childRunCount} child runs in order`);
+		fact('launched', launched, PROTO.test(run.id) ? (script.nodes.length ? 'Worker started (local process)' : `Started ${run.childRunCount} member job runs in order`) : script.nodes.length ? `Container started from image ${script.imageId.slice(0, 19)}` : `Started ${run.childRunCount} child runs in order`);
 	}
 	if (script.cancel) fact('cancel_requested', script.cancel.requestedAt, `Cancel requested by ${script.cancel.requestedBy.displayName}`);
 
-	if (inv && run.startedAt) {
+	if (inv && run.startedAt && PROTO.test(run.id)) {
+		protoExecution(record, nodes, now ?? Date.now(), { ev, out, statements, inv });
+	} else if (inv && run.startedAt) {
 		const start = Date.parse(run.startedAt);
 		ev('invocation_started', start, null, commandOf(record));
 		out('stdout', start, `$ ${commandOf(record)}`);
@@ -462,14 +548,233 @@ export function execution(record: RunRecord, nodes: RunNode[], now?: number): Ru
 			producer: d.producer ?? 'sqb',
 			type: d.type,
 			occurredAt: d.occurredAt,
-			level: LEVEL[d.type],
+			level:
+				d.type === 'audit_completed' && /\(severity error\)$/.test(d.message)
+					? 'error'
+					: (d.type === 'audit_completed' && /\(severity warn\)$/.test(d.message)) || (d.type === 'node_log' && d.message.startsWith('[warning] '))
+						? 'warn'
+						: LEVEL[d.type],
 			invocationId: d.invocationId,
 			nodeKey: d.nodeKey,
 			statementId: d.statementId,
 			attempt: d.attempt,
-			message: d.message
+			message: d.message,
+			...(d.type === 'audit_completed' ? { check: mockCheck(d.message) } : {})
 		}));
 	return { events, statements, output: output.sort((a, b) => a.at.localeCompare(b.at)) };
+}
+
+type Emit = {
+	ev: (type: RunEvent['type'], at: number, nodeKey: string | null, message: string, statementId?: string | null) => void;
+	out: (stream: RunOutputLine['stream'], at: number, text: string, error?: boolean, nodeKey?: string | null, omitted?: number) => void;
+	statements: RunStatement[];
+	inv: string;
+};
+
+/** What a prototype Python node prints while it runs: its own stdout, and a warning with a traceback on stderr. */
+function pythonOutput(key: string, s: number, e: number | null, now: number, out: Emit['out']) {
+	const until = e ?? now;
+	const at = (ms: number) => s + ms;
+	const line = (ms: number, stream: RunOutputLine['stream'], text: string) => at(ms) < until && out(stream, at(ms), text, false, key);
+	if (key === 'raw_events') {
+		line(400, 'stdout', 'Fetching events since 2026-11-20T09:00:00Z');
+		for (let page = 1, t = 6_000; t < (e ?? now) - s; page++, t += 9_000) {
+			line(t, 'stdout', `Page ${page}: ${(11_000 + (hash(`${key}${page}`) % 2_000)).toLocaleString('en-GB')} events`);
+			if (page === 3)
+				line(
+					t + 2_500,
+					'stderr',
+					[
+						'WARNING shop.events: page 4 failed, retrying in 5s',
+						'Traceback (most recent call last):',
+						'  File "/app/models/ingest/raw_events.py", line 18, in raw_events',
+						'    rows = fetch_page(since=ctx.current_cursor_value, page=page)',
+						'  File "/app/shop/events_api.py", line 41, in fetch_page',
+						'    resp.raise_for_status()',
+						'requests.exceptions.HTTPError: 503 Server Error: Service Unavailable for url: https://events.example.com/v1/events?page=4'
+					].join('\n')
+				);
+		}
+	}
+	const src = OUTPUT_SOURCES[key];
+	if (src) {
+		// The live view is capped (CHI-1597): a marker for what came before, then the latest lines; the rest is in the viewer.
+		const n = { nodeKey: key, startedAt: new Date(s).toISOString(), status: e == null ? 'running' : 'success' } as RunNode;
+		const big = bigAvailable(n, until);
+		if (!big) return;
+		// Capped only past about 1,000 lines: then the last 40, and the rest in the viewer.
+		const LIVE = big.available > 1_000 ? 40 : big.available;
+		const first = Math.max(1, big.available - LIVE + 1);
+		if (first > 1) out('stdout', until - 1_000, `${(first - 1).toLocaleString('en-GB')} earlier lines`, false, key, first - 1);
+		for (let i = first; i <= big.available; i++) {
+			const l = src.line(i);
+			out(l.stream, until - 1_000 + (i - first) * 20, l.text, false, key);
+		}
+		return;
+	}
+	if (key === 'score_customers') {
+		line(500, 'stdout', 'Loaded 4,812 customers');
+		line(
+			1_400,
+			'stderr',
+			[
+				'/app/models/ml/score_customers.py:11: FutureWarning: DataFrame.fillna with \'method\' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.',
+				'  features = features.fillna(method="ffill")'
+			].join('\n')
+		);
+		if (e != null) line(e - s - 300, 'stdout', 'Scored 4,812 customers');
+	}
+}
+
+/** The heartbeat's backoff: 30 s, then 1 min, 2 min, and every 5 min after that. */
+function heartbeatTimes(start: number, until: number): number[] {
+	const gaps = [30_000, 60_000, 120_000];
+	const out: number[] = [];
+	for (let t = start, i = 0; ; i++) {
+		t += gaps[i] ?? 300_000;
+		if (t >= until) return out;
+		out.push(t);
+	}
+}
+
+/**
+ * A prototype run's events and what sqb printed. Each check is its own event (the page folds them into
+ * their node's line); sqb prints a progress line for a building node every 30 seconds, and every line
+ * it prints for a node carries that node.
+ */
+function protoExecution(record: RunRecord, nodes: RunNode[], now: number, { ev, out, statements, inv }: Emit) {
+	const { run, script } = record;
+	const start = Date.parse(run.startedAt!);
+	const secs = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+	const rows = (n: number) => n.toLocaleString('en-GB');
+	ev('invocation_started', start, null, commandOf(record));
+	// sqb prints its progress on stdout, and warnings and errors on stderr.
+	out('stdout', start + 120, `sqb ${commandOf(record).replace(/^sqb /, '')}`);
+	out('stdout', start + 450, `✓ Project compiled  ${script.nodes.length} models  0.4s`);
+	out('stdout', start + 900, '✓ Warehouse connected  snowflake  0.1s');
+	out('stdout', start + 1100, `Building ${script.nodes.length} nodes, 4 at a time`);
+	const audits = auditsOf;
+	for (const n of nodes) {
+		const k = snapshotNode(n.nodeKey)?.kind ?? 'table';
+		const key = n.nodeKey;
+		if (n.status === 'skipped' && n.endedAt) {
+			const why = n.skippedBecauseOf;
+			// Every skip names its cause, chain included: the skipped parent it waited on, and the failure behind it.
+			const via = why ? nodes.find((p) => p.status === 'skipped' && p.skippedBecauseOf?.nodeKey === why.nodeKey && (snapshotNode(key)?.upstream ?? []).includes(p.nodeKey)) : undefined;
+			const across = why && why.runId !== run.id ? ` in ${why.jobKey ?? why.runId}` : '';
+			const cause = !why ? 'an upstream node did not run' : via ? `${via.nodeKey} was skipped (after ${why.nodeKey} failed${across})` : `${why.nodeKey} failed${across}`;
+			ev('resource_attempt_skipped', Date.parse(n.endedAt), key, `Skipped: ${cause}`);
+			out('stdout', Date.parse(n.endedAt), `  – ${key}  skipped: ${cause}`, false, key);
+			continue;
+		}
+		if (!n.startedAt) continue;
+		const s = Date.parse(n.startedAt);
+		const e = n.endedAt ? Date.parse(n.endedAt) : null;
+		ev('resource_attempt_started', s, key, `Started ${k} ${key}`);
+		out('stdout', s, `  ▸ ${key}  ${k}`, false, key);
+		pythonOutput(key, s, e, now, out);
+		if (key === BIG_NODE) {
+			// Its ctx.log lines: few and deliberate, kept as events (CHI-1597).
+			ev('node_log', s + 1_500, key, 'Running notebook churn_features.ipynb (48 cells)');
+			if ((e ?? now) - s > 3_000) ev('node_log', s + ((e ?? now) - s) / 2, key, '[warning] cell 18 retried after worker loss');
+			if (e != null) ev('node_log', e - 200, key, 'Notebook finished: 48 cells, 211,604 rows written');
+		}
+		const kind = STATEMENT_KIND[k];
+		if (kind) {
+			// The node's warehouse statement, with its query ID, for the Statements tab, the cost and the drawer.
+			const statementId = statementIdOf(run, key);
+			const stEnd = e != null ? e - 120 : null;
+			// A node failed by a check built fine: its build query completed.
+			const failed = n.status === 'failed' && !CHECK_FAILS.has(key);
+			statements.push({
+				id: statementId,
+				runId: run.id,
+				invocationId: inv,
+				sequence: statements.length + 1,
+				nodeKey: key,
+				kind,
+				status: n.status === 'running' ? 'running' : failed ? 'failed' : 'completed',
+				startedAt: iso(s + 60),
+				endedAt: stEnd == null ? null : iso(stEnd),
+				rowsAffected: n.status === 'running' ? null : n.rowsAffected,
+				rowsSoFar: n.status === 'running' && reportsRowsWhileRunning(key) ? n.rowsAffected : null,
+				queryId: queryIdOf(statementId),
+				sqlRecorded: true,
+				error: failed ? (n.errorDetail ?? n.errorMessage) : null
+			});
+			ev('statement_submitted', s + 40, key, `${kind} submitted`, statementId);
+			ev('statement_started', s + 60, key, `${kind} running`, statementId);
+			if (stEnd != null) {
+				if (failed) ev('statement_failed', stEnd, key, n.errorMessage ?? 'Statement failed', statementId);
+				else ev('statement_completed', stEnd, key, n.rowsAffected != null ? `${rows(n.rowsAffected)} rows` : 'Completed', statementId);
+			}
+		}
+		if (e == null) continue;
+		const took = secs(e - s);
+		const checkFailed = CHECK_FAILS.has(key) && n.status === 'failed';
+		if (n.status === 'failed' && !checkFailed) {
+			ev('resource_attempt_failed', e, key, `${n.errorCode}: ${n.errorMessage}`);
+			out('stderr', e, `  ✗ ${key}  ${k}  ${took}  ${n.errorMessage}`, true, key);
+			continue;
+		}
+		const added = k === 'incremental' && n.rowsAffected != null ? `  +${rows(n.rowsAffected)} rows` : n.rowsAffected != null ? `  ${rows(n.rowsAffected)} rows` : '';
+		if (!checkFailed) ev('resource_attempt_completed', e, key, `${n.status === 'warn' ? 'Completed with warnings' : 'Completed'} in ${took}${added ? ` ·${added.replace(/^ +/, ' ')}` : ''}`);
+		out('stdout', e, `  ✓ ${key}  ${k}  ${took}${added}`, false, key);
+		// Each check is its own query: an event with its statement, so its SQL, query ID and failing rows can be read.
+		const profile = n.status === 'warn' || checkFailed ? (CHECK_PROFILE[key] ?? null) : null;
+		audits(key).forEach((audit, i) => {
+			const problem = profile ? profile[audit] : n.status === 'warn' && i === 0 ? (['warn', 2 + (hash(key) % 5)] as const) : undefined;
+			const at = e + 40 + i * 120;
+			const statementId = auditStatementId(run, key, i);
+			statements.push({
+				id: statementId,
+				runId: run.id,
+				invocationId: inv,
+				sequence: statements.length + 1,
+				nodeKey: key,
+				kind: 'audit',
+				status: 'completed',
+				startedAt: iso(at - 90 - (hash(statementId) % 300)),
+				endedAt: iso(at),
+				rowsAffected: problem ? problem[1] : 0,
+				rowsSoFar: null,
+				queryId: queryIdOf(statementId),
+				sqlRecorded: true,
+				error: null
+			});
+			const noun = audit.startsWith('unique') ? 'duplicate rows' : 'failing rows';
+			ev('audit_completed', at, key, problem ? `${audit}: ${problem[1]} ${noun} (severity ${problem[0]})` : `${audit} passed`, statementId);
+			if (problem) out('stderr', at, `    ${problem[0] === 'error' ? '✗' : '!'} ${key}  check ${audit}: ${problem[1]} ${noun} (${problem[0]})`, problem[0] === 'error', key);
+		});
+		if (checkFailed) {
+			const at = e + 60 + audits(key).length * 120;
+			ev('resource_attempt_failed', at, key, `check_failed: ${n.errorMessage}`);
+			out('stderr', at, `  ✗ ${key}  ${k}  ${took}  ${n.errorMessage}`, true, key);
+		}
+	}
+	// One combined heartbeat line for whatever is still running, backing off: 30 s, 1 min, 2 min, then every 5 min.
+	const firstStart = Math.min(...nodes.map((n) => (n.startedAt ? Date.parse(n.startedAt) : Infinity)));
+	if (Number.isFinite(firstStart)) {
+		const until = run.endedAt ? Date.parse(run.endedAt) : now;
+		for (const t of heartbeatTimes(firstStart, until)) {
+			const busy = nodes.filter((n) => n.startedAt && Date.parse(n.startedAt) <= t && (!n.endedAt || Date.parse(n.endedAt) > t));
+			if (!busy.length) continue;
+			const span = (ms: number) => (ms >= 60_000 ? `${Math.floor(ms / 60_000)}m${String(Math.floor((ms % 60_000) / 1000)).padStart(2, '0')}s` : `${Math.floor(ms / 1000)}s`);
+			const parts = busy.map((n) => {
+				const ms = t - Date.parse(n.startedAt!);
+				return `${n.nodeKey} ${span(ms)}${reportsRowsWhileRunning(n.nodeKey) ? ` (${rows(Math.round((ms / 1000) * protoRate(n.nodeKey)))} rows)` : ''}`;
+			});
+			out('stdout', t, `… still running (${busy.length})  ${parts.join(' · ')}`);
+		}
+	}
+	if (run.endedAt) {
+		const end = Date.parse(run.endedAt) - 400;
+		const c = countNodes(nodes);
+		const summary = `${c.success + c.warn} built · ${c.failed} failed · ${c.skipped} skipped`;
+		const ok = c.failed === 0;
+		ev(ok ? 'invocation_completed' : 'invocation_failed', end, null, `${summary} · ${secs(end - start)}`);
+		out(ok ? 'stdout' : 'stderr', end, `${ok ? '✓ Completed' : '✗ Completed with errors'}  ${summary}  ${secs(end - start)}`);
+	}
 }
 
 export function liveness(record: RunRecord, now: number): RunLiveness | null {
@@ -492,4 +797,11 @@ export function liveness(record: RunRecord, now: number): RunLiveness | null {
 	if (run.status === 'unresponsive') return { ...base, state: 'unresponsive', lastHeartbeatAt: iso(heartbeat), exitCode: null };
 	if (isTerminal(run.status)) return { ...base, state: 'exited', lastHeartbeatAt: iso(heartbeat), exitCode };
 	return { ...base, state: 'healthy', lastHeartbeatAt: iso(heartbeat), exitCode: null };
+}
+
+/** The check an `audit_completed` message of this mock describes, as the server reports it. */
+function mockCheck(message: string): RunEventCheck {
+	const m = message.match(/^(.*?): ([\d,]+) .*? \(severity (\w+)\)$/);
+	if (m) return { name: m[1], outcome: m[3] === 'error' ? 'failed' : 'warned', rows: Number(m[2].replace(/,/g, '')), bindingKey: null, resultId: null };
+	return { name: message.replace(/ passed$/, ''), outcome: 'passed', rows: null, bindingKey: null, resultId: null };
 }

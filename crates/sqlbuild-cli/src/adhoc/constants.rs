@@ -98,7 +98,7 @@ pub(crate) const INTEGER_CONVERTERS: [&str; 2] = ["int", POSITIVE_INTEGER_CONVER
 pub(crate) const POSITIVE_INTEGER_CONVERTER: &str = "_positive_integer";
 
 /// Refused destinations: the flag people typed and why an ad-hoc run cannot honour it.
-pub(crate) const REFUSED_DESTS: [(&str, &str, &str); 23] = [
+pub(crate) const REFUSED_DESTS: [(&str, &str, &str); 24] = [
     (
         "select_file",
         "--select-file",
@@ -126,6 +126,11 @@ pub(crate) const REFUSED_DESTS: [(&str, &str, &str); 23] = [
         "workers always verify the published SQL",
     ),
     ("no_cache", "--no-cache", "workers manage their own cache"),
+    (
+        "discover",
+        "--discover",
+        "workers run the discovered sets the snapshot saved",
+    ),
     (
         "target",
         "--target",

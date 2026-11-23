@@ -1,14 +1,22 @@
 //! Python's default compilation Ctrl+C handler, retained across unraisable callbacks.
 
 use std::cell::Cell;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 use pyo3::exceptions::PyKeyboardInterrupt;
 use pyo3::prelude::{Py, PyAny, PyAnyMethods, PyModule, PyResult, Python};
+
+use crate::native_host::models::InterruptWatch;
 
 thread_local! {
     pub(crate) static INTERRUPTED: Cell<bool> = const { Cell::new(false) };
 }
 pub(crate) const SIGINT: i64 = 2;
+/// Whether Ctrl+C reached the `sqb` process's watch, which sees it before any handler runs.
+pub(crate) static WATCHED_INTERRUPT: AtomicBool = AtomicBool::new(false);
+/// The watch of the running command, which a command's end asks to catch up.
+pub(crate) static ACTIVE_WATCH: Mutex<Option<Arc<InterruptWatch>>> = Mutex::new(None);
 
 /// Whether the default handler observed Ctrl+C during the current command.
 pub(crate) fn interrupted() -> bool {
@@ -38,4 +46,9 @@ pub(crate) fn restore_signal_handler(
         module.call_method1("signal", (signal, previous.bind(py)))?;
     }
     Ok(())
+}
+
+/// Whether the default handler or the process's watch observed Ctrl+C during the current command.
+pub(crate) fn interrupt_observed() -> bool {
+    interrupted() || WATCHED_INTERRUPT.load(Ordering::SeqCst)
 }

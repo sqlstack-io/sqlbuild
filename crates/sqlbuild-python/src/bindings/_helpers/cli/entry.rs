@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::time::{Instant, SystemTime};
 
-use pyo3::exceptions::{PyKeyboardInterrupt, PySystemExit};
+use pyo3::exceptions::{PyException, PyKeyboardInterrupt, PySystemExit};
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
@@ -15,6 +15,8 @@ use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_cli::dispatch::main::failure_report::failure_report;
 use sqlbuild_cli::dispatch::main::invocation_policy::invocation_policy;
 use sqlbuild_cli::dispatch::models::{CommandFacts, CommandFailure, InvocationPolicy};
+use sqlbuild_python_front::discovered_sets::main::set_discovery_source::set_discovery_source;
+use sqlbuild_python_front::discovered_sets::models::{DiscoverySource, LiveDiscovery, Rediscover};
 
 use sqlbuild_host::entries::models::{ExecutorHost, FacadeHost};
 use sqlbuild_orchestration::runs::models::RunOutcome;
@@ -398,8 +400,11 @@ fn exit<'py>(py: Python<'py>, code: i64) -> PyResult<Bound<'py, PyAny>> {
     code.into_bound_py_any(py)
 }
 
-/// The kind of expected failure `error` is, or `None` when it propagates.
+/// The kind of expected failure `error` is, or `None` when it propagates. Every expected failure is an `Exception`, so Ctrl+C and SIGTERM propagate without loading the staying-Python failure classes.
 fn failure_kind(py: Python<'_>, error: &Bound<'_, PyAny>) -> PyResult<Option<CommandFailure>> {
+    if !error.is_instance_of::<PyException>() {
+        return Ok(None);
+    }
     if error.is_instance(&error_class(py, ErrorId::CliUser)?)?
         || error.is_instance(&error_class(py, ErrorId::Rules)?)?
     {
@@ -655,7 +660,7 @@ fn observed_dispatch<'py>(
             &invocation.recall,
         ) {
             Ok(_) if terminated() => Err(CommandTerminated::new_err(TERMINATED_MESSAGE)),
-            Ok(_) if interrupted() => Err(PyKeyboardInterrupt::new_err(())),
+            _ if !terminated() && interrupted(py) => Err(PyKeyboardInterrupt::new_err(())),
             dispatched => dispatched,
         };
         match dispatched {
@@ -840,6 +845,23 @@ fn parsed_invocation<'py>(
         .map(|value| value.extract::<Option<String>>())
         .transpose()?
         .flatten();
+    if namespace
+        .get_item("discover")?
+        .is_some_and(|discover| discover.is_truthy().unwrap_or(false))
+    {
+        let target: Option<String> = namespace
+            .get_item("target")?
+            .map(|value| value.extract::<Option<String>>())
+            .transpose()?
+            .flatten();
+        set_discovery_source(DiscoverySource::Live(LiveDiscovery {
+            target,
+            previous: Default::default(),
+            rediscover: Rediscover::All,
+            keep_last_good: false,
+            seed: None,
+        }));
+    }
     if command.as_deref() == Some("location") && location_command.as_deref() == Some("runtime") {
         return within(&redirect_stdout_to_stderr(py)?, |_| {
             execute_parsed_invocation(args, handlers, identity, use_color)

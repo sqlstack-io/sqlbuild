@@ -188,6 +188,14 @@ pub struct StatementText {
     pub phase: String,
 }
 
+/// A node still running when a heartbeat line is written, with the rows it has written where known.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RunningNodeText {
+    pub name: String,
+    pub elapsed_seconds: u64,
+    pub rows_so_far: Option<i64>,
+}
+
 /// One completed microbatch of a model.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BatchProgressText {

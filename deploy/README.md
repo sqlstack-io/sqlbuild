@@ -53,20 +53,23 @@ direct-store administration path, not an HTTP or person-role grant:
 docker compose run --rm --no-deps server admin create-location orders
 ```
 
+It prints `Registered location orders (<location_id>)`.
+
 The server reads `/etc/sqlbuild/server.toml`, which `compose.yml` writes from its `server` config.
 Its `[[launchers.docker]]` entry starts workers for the location named `orders`, so create the
 location before the server starts. Edit that config and recreate the server to change launchers,
 retention or sign-in; see `sqb server` in the documentation for every setting.
 
-Replace `.env`'s placeholder `SQLBUILD_LOCATION_ID` with the returned `location_id`. Issue a
+Replace `.env`'s placeholder `SQLBUILD_LOCATION_ID` with that ID. Issue a
 bounded credential, using a future RFC 3339 expiry you choose:
 
 ```sh
-docker compose run --rm --no-deps server admin issue-location-token "$SQLBUILD_LOCATION_ID" --expires-at "$EXPIRY"
+SQLBUILD_LOCATION_TOKEN="$(docker compose run --rm --no-deps -T server admin issue-location-token "$SQLBUILD_LOCATION_ID" --expires-at "$EXPIRY")"
 ```
 
 Shell variables above must be set explicitly; Compose's `.env` file is not sourced by the shell.
-Store the one-time `bearer` in `.env` as `SQLBUILD_LOCATION_TOKEN`, restrict the file to its owner
+The command prints the one-time bearer alone on stdout and what it did on stderr; `-T` keeps the
+two apart. Store it in `.env` as `SQLBUILD_LOCATION_TOKEN`, restrict the file to its owner
 (`chmod 600 .env`), and start the stack:
 
 ```sh
@@ -78,7 +81,10 @@ The location watches and compiles its baked project, publishes a successful snap
 its warehouse connection. The example schedule runs every minute. The server resolves the
 running container's actual Docker image ID at publication; no `--image-id` or Docker socket is
 needed in the location. Workers recompile in that pinned image and verify environment and node
-hashes before writing. The warehouse persists in its named volume.
+hashes before writing. The warehouse persists in its named volume, and so does run output: the
+`output` volume is mounted at `/home/sqlbuild/.local/state/sqlbuild/output`, the server's default output
+folder with PostgreSQL in this image, so recreating the server keeps it. `docker compose down
+--volumes` deletes both.
 
 Check the location the way a container health check would; it exits 1 when the location is down
 or its last load failed:
@@ -219,6 +225,7 @@ Network=sqlbuild.network
 PublishPort=127.0.0.1:8000:8000
 Volume=/etc/sqlbuild/server.toml:/etc/sqlbuild/server.toml:ro
 Volume=/run/podman/podman.sock:/var/run/docker.sock
+Volume=sqlbuild-output:/home/sqlbuild/.local/state/sqlbuild/output
 GroupAdd=993
 SecurityLabelDisable=true
 Secret=sqlbuild-control-database-url,type=env,target=SQLBUILD_CONTROL_DATABASE_URL
@@ -235,7 +242,7 @@ WantedBy=multi-user.target
 ```
 
 `/etc/containers/systemd/orders-location.container`, with the `location_id` that
-`create-location` returned:
+`create-location` printed:
 
 ```ini
 [Unit]
@@ -279,12 +286,14 @@ sudo podman healthcheck run orders-location
   so a server restart leaves it running; it checks in again when the server is back.
 - The server resolves launcher locations when it starts. To add a location, create it, add its
   launcher and container unit, then restart the server: `sudo systemctl restart sqlbuild-server`.
+- The `sqlbuild-output` volume keeps run output when the server's container is recreated. Podman
+  creates it on first use, owned by the image's user (10001).
 - `SecurityLabelDisable=true` lets the server use the socket on SELinux hosts.
 
 ## Credentials, identity, and platform events
 
-Rotate a location credential with `docker compose run --rm --no-deps server admin rotate-token
-TOKEN_UUID`, store its one-time replacement bearer, and recreate the location. The scope and
+Rotate a location credential with `docker compose run --rm --no-deps -T server admin rotate-token
+TOKEN_UUID`, store the one-time replacement bearer it prints on stdout, and recreate the location. The scope and
 expiry stay unchanged, and the old credential is revoked atomically. Service-account principal
 tokens are separate from location/run tokens. Person identities do not become machine bearers.
 
@@ -302,8 +311,8 @@ person and role checks. `POST /api/auth/logout` revokes the session across repli
 resets and `grant-admin` revoke all of that person's browser sessions.
 
 The local control-store owner initializes the first installation administrator with
-`sqb admin create-user NAME`, then provisions its password separately with
-`sqb admin set-password PRINCIPAL_ID`. `create-user` works only while no person exists; once
+`sqb admin create-user NAME`, which prints the new person's ID, then provisions its password
+separately with `sqb admin set-password PRINCIPAL_ID`. `create-user` works only while no person exists; once
 anyone exists, use `grant-admin` instead. `create-principal` creates a role-free identity, not
 another administrator. With password, OIDC or trusted-proxy authentication, installation administrators
 use `POST /api/admin/people/{principal_id}` with a JSON action of `grant`, `revoke`, `disable`,

@@ -200,6 +200,7 @@ pub enum RecordId {
     DiscoveredCommandOutputSink,
     DiscoveredCommandOutputSinkDeclaration,
     DiscoveredConstantFile,
+    DiscoveredDiscoverFunction,
     DiscoveredEnumFile,
     DiscoveredEventExporter,
     DiscoveredEventExporterDeclaration,

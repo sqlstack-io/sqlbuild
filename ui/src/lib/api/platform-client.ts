@@ -4,10 +4,14 @@ import type {
 	AccessOverview,
 	AccessQuery,
 	Account,
+	BuiltInRole,
 	AuditEntry,
 	AuditQuery,
 	ConnectionTest,
 	IssuedToken,
+	KeyRotation,
+	NewServiceAccount,
+	ServiceAccount,
 	LocationDetail,
 	LocationSummary,
 	LocationToken,
@@ -75,6 +79,18 @@ export interface PlatformApi {
 	enableAccount(name: string): Promise<Account>;
 	/** Adds a person who signs in with a password, only under password sign-in. `user.manage`, and `role.assign` to give a role. */
 	createPasswordAccount(request: NewPasswordAccount): Promise<Account>;
+	/** Service accounts with their working keys' prefixes. `user.manage` or `role.assign` */
+	listServiceAccounts(): Promise<ServiceAccount[]>;
+	/** Adds a service account and issues its first key, returned only this once. `user.manage` and `role.assign` */
+	createServiceAccount(request: NewServiceAccount): Promise<IssuedToken<ServiceAccount>>;
+	/** Issues a new key, returned only this once; the old key works on for the overlap, if any. `user.manage` */
+	rotateServiceAccountKey(name: string, rotation: KeyRotation): Promise<IssuedToken<ServiceAccount>>;
+	/** Stops one of the account's keys now, such as an old key before its overlap ends. `user.manage` */
+	revokeServiceAccountKey(name: string, keyId: string): Promise<ServiceAccount>;
+	/** Disabling stops every key of the account at once; enabling lets the same keys work again. `user.manage` */
+	setServiceAccountDisabled(name: string, disabled: boolean): Promise<ServiceAccount>;
+	/** Gives the service account a built-in role everywhere. `role.assign` */
+	setServiceAccountRole(name: string, role: BuiltInRole): Promise<ServiceAccount>;
 
 	// ---- roles ----
 	/** Roles available in a location: built-in, server config and the location's project roles. `role.assign` */

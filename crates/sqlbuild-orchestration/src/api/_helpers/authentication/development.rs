@@ -1,4 +1,4 @@
-//! Development person requests: `local_request` already confined them to a loopback host and origin.
+//! Development person requests: `local_request` already confined them to an accepted host and origin.
 
 use std::net::SocketAddr;
 

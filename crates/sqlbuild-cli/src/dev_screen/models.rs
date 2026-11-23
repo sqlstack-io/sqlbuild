@@ -49,6 +49,8 @@ pub(crate) enum ScreenMessage {
     Child(DevEvent),
     /// The development location's ID, known once the control store is open; plain output prints it with `ready`.
     Location(String),
+    /// The session is open beyond this machine: who gets in without signing in.
+    Exposed(String),
     /// The dev target's triggers, such as `41 paused`, read after the first publication.
     Triggers(String),
     /// The foreground warehouse connection's outcome.
@@ -136,11 +138,15 @@ pub(crate) struct DevScreen {
     pub(crate) header: DevHeader,
     pub(crate) header_printed: bool,
     pub(crate) ui_url: String,
+    /// Who gets in without signing in; empty for a loopback-only session.
+    pub(crate) exposure: String,
     pub(crate) location: String,
     /// The env file row of the ready box.
     pub(crate) env_file: Option<String>,
     /// Providers the latest health read shows missing secrets; drawn as a warning row until a read shows none.
     pub(crate) missing_secrets: Vec<UnsetProviderSecrets>,
+    /// The env file that health read looked in.
+    pub(crate) secrets_env_file: Option<String>,
     pub(crate) triggers: String,
     pub(crate) steps: Vec<StepRow>,
     pub(crate) ready: bool,
@@ -154,6 +160,8 @@ pub(crate) struct DevScreen {
     pub(crate) serving: Option<String>,
     /// The last compile's summary, such as `412 python nodes, 2280 models`.
     pub(crate) compile_detail: String,
+    /// The last publication's discovered sets, such as `orders_plan 27 items`.
+    pub(crate) discovered: Option<String>,
     /// The project directory, which error positions link into.
     pub(crate) project_root: String,
     pub(crate) prompt: Option<Prompt>,

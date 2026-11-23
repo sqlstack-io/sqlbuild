@@ -29,8 +29,11 @@ pub(crate) async fn sync_location_metadata(
 ) -> Result<Option<LocationMetadataSync>, ControlError> {
     if Instant::now() < state.next_at
         || state.locations.is_empty()
-        || location_files(&options.project_dir, &watch.rules, &watch.local_files)
-            != watch.observed.0
+        || location_files(
+            &options.project_dir,
+            &watch.rules,
+            (&watch.local_files, &watch.output_folders),
+        ) != watch.observed.0
     {
         return Ok(Some(state));
     }
@@ -88,8 +91,11 @@ pub(crate) async fn sync_location_metadata(
                     .await;
             }
         };
-        if location_files(&options.project_dir, &watch.rules, &watch.local_files)
-            != watch.observed.0
+        if location_files(
+            &options.project_dir,
+            &watch.rules,
+            (&watch.local_files, &watch.output_folders),
+        ) != watch.observed.0
         {
             return Ok(Some(state));
         }

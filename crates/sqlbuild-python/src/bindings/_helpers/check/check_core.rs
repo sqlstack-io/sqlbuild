@@ -118,10 +118,10 @@ pub(crate) fn record_python_run_state_results<'py>(
     source_map: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<()> {
     let py: Python<'py> = discovered_inputs.py();
-    let record = |function: Bound<'py, PyAny>, result: Bound<'py, PyAny>| -> PyResult<()> {
+    let record = |result: Bound<'py, PyAny>| -> PyResult<()> {
         call_with(
             &native_field(run_state, "record_result")?,
-            &[("node_function", function), ("result", result)],
+            &[("result", result)],
         )?;
         Ok(())
     };
@@ -130,17 +130,9 @@ pub(crate) fn record_python_run_state_results<'py>(
         let result: Bound<'py, PyAny> = result?;
         result_by_name.set_item(native_field(&result, "node_name")?, result)?;
     }
-    let node_by_name: Bound<'py, PyDict> = PyDict::new(py);
     for node in native_field(discovered_inputs, "asset_functions")?.try_iter()? {
-        let node: Bound<'py, PyAny> = node?;
-        node_by_name.set_item(
-            native_field(&node, "name")?,
-            native_field(&node, "function")?,
-        )?;
-    }
-    for (name, function) in node_by_name.iter() {
-        if let Some(result) = result_by_name.get_item(name)? {
-            record(function, result)?;
+        if let Some(result) = result_by_name.get_item(native_field(&node?, "name")?)? {
+            record(result)?;
         }
     }
     let by_loader: Bound<'py, PyDict> = match (source_map, load_results) {
@@ -158,10 +150,7 @@ pub(crate) fn record_python_run_state_results<'py>(
         let Some(result) = by_loader.get_item(&name)? else {
             continue;
         };
-        record(
-            native_field(&loader, "function")?,
-            load_result_as_python_result(&name, &result)?,
-        )?;
+        record(load_result_as_python_result(&name, &result)?)?;
     }
     Ok(())
 }

@@ -1,5 +1,7 @@
 //! Snapshot retention keeps recent publications per location and target, collected in small batches.
 
+use crate::discovered_sets::constants::DISCOVERED_DOCUMENT;
+
 pub(crate) const DEFAULT_SNAPSHOT_RETENTION_COUNT: u16 = 10;
 pub(crate) const SNAPSHOT_RETENTION_BATCH: usize = 10;
 pub(crate) const CONTENT_HASH_CHUNK: usize = 500;
@@ -11,7 +13,7 @@ pub(crate) const PUBLISH_TIMEOUT_SECONDS: u64 = 300;
 /// The target's non-secret connection settings, a `ConnectionDetails`.
 pub const CONNECTION_DOCUMENT: &str = "connection";
 /// Snapshot document kinds: per-snapshot metadata that never changes a node hash or node change.
-pub(crate) const SNAPSHOT_DOCUMENT_KINDS: [&str; 8] = [
+pub(crate) const SNAPSHOT_DOCUMENT_KINDS: [&str; 9] = [
     "jobs",
     "groups",
     "triggers",
@@ -20,6 +22,7 @@ pub(crate) const SNAPSHOT_DOCUMENT_KINDS: [&str; 8] = [
     COLUMNS_DOCUMENT,
     "providers",
     CONNECTION_DOCUMENT,
+    DISCOVERED_DOCUMENT,
 ];
 /// Connection keys that may name the signed-in user, in preference order.
 pub(crate) const USER_KEYS: [&str; 3] = ["user", "username", "login"];

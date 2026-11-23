@@ -71,6 +71,8 @@ pub(crate) fn validate_authority(
             RunChange::CancelRequested { .. }
                 | RunChange::Started
                 | RunChange::NodeStarted { .. }
+                | RunChange::NodeProgress { .. }
+                | RunChange::NodeLog { .. }
                 | RunChange::NodeFinished { .. }
                 | RunChange::CheckStarted { .. }
                 | RunChange::CheckFinished { .. }
@@ -83,6 +85,8 @@ pub(crate) fn validate_authority(
                     request.change,
                     RunChange::Started
                         | RunChange::NodeStarted { .. }
+                        | RunChange::NodeProgress { .. }
+                        | RunChange::NodeLog { .. }
                         | RunChange::NodeFinished { .. }
                         | RunChange::CheckStarted { .. }
                         | RunChange::CheckFinished { .. }
@@ -135,6 +139,8 @@ pub(crate) fn validate_change(
             state.worker_instance.is_some() && matches!(state.status, Queued | Launched)
         }
         RunChange::NodeStarted { .. }
+        | RunChange::NodeProgress { .. }
+        | RunChange::NodeLog { .. }
         | RunChange::NodeFinished { .. }
         | RunChange::CheckStarted { .. }
         | RunChange::CheckFinished { .. }
@@ -168,7 +174,7 @@ pub(crate) fn validate_change(
                 .unwrap_or_default()
         };
         let good = count("success") + count("warn");
-        let bad = count("failed") + count("skipped") + count("cancelled");
+        let bad = count("failed") + count("skipped") + count("cancelled") + count("not_run");
         let expected = if bad > 0 && good > 0 {
             RunOutcome::Partial
         } else if bad > 0 {

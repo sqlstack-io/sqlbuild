@@ -13,6 +13,7 @@ use crate::api::_helpers::authentication::password_sessions;
 use crate::api::_helpers::authentication::password_transport::{self, deny, guard, single_header};
 use crate::api::_helpers::authentication::proxy_settings::{ProxySettings, canonical_username};
 use crate::api::_helpers::authentication::proxy_warnings::warn_plain_http_origin;
+use crate::api::_helpers::authentication::service_keys;
 use crate::api::constants::HTTP_SCHEME;
 use crate::api::errors::ApiError;
 use crate::api::models::{
@@ -20,7 +21,7 @@ use crate::api::models::{
 };
 use crate::authorization::main::people::resolve_proxy_person::resolve_proxy_person;
 use crate::authorization::models::ProxyPerson;
-use crate::credentials::models::{AuditContext, AuthenticatedPerson};
+use crate::credentials::models::{AuditContext, AuthenticatedPerson, ServiceKeyIdentity};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
@@ -34,10 +35,11 @@ pub(crate) fn router(
         warn_plain_http_origin(&origin.0);
     }
     let mut routes = Router::new()
-        .merge(
+        .merge(service_keys::keyed(
+            store,
             password_sessions::person_routes()
                 .route_layer(middleware::from_fn_with_state(store.clone(), authenticate)),
-        )
+        ))
         .merge(password_sessions::session_routes(store))
         .merge(super::cli_login::router(BrowserLoginMethod::Proxy))
         .layer(middleware::from_fn(guard))
@@ -74,6 +76,9 @@ async fn authenticate(
     mut request: Request,
     next: Next,
 ) -> Result<Response, ApiError> {
+    if request.extensions().get::<ServiceKeyIdentity>().is_some() {
+        return Ok(next.run(request).await);
+    }
     if password_transport::session_header(request.headers()) {
         return password_transport::authenticate(State(store), request, next).await;
     }

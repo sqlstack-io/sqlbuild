@@ -3,8 +3,11 @@
 use std::path::Path;
 
 use pyo3::prelude::{PyErr, Python};
+use sqlbuild_core::process_environment::main::location_secret_fix::location_secret_fix;
+use sqlbuild_core::process_environment::main::shell_secret_fix::shell_secret_fix;
 use sqlbuild_python_base::records::main::construct::new_annotated_error::new_annotated_error;
 use sqlbuild_python_base::records::types::ErrorId;
+use sqlbuild_python_front::discovery::main::sources::env_file_display::env_file_display;
 use sqlbuild_python_front::discovery::main::sources::secret_places::secret_places;
 
 use crate::provider_check::_helpers::text::{rows, sink_lines};
@@ -32,10 +35,14 @@ pub fn secret_block_error(py: Python<'_>, blocks: &[SecretBlock], project_dir: &
             .into_iter()
             .map(|line| format!("  {line}")),
     );
-    let help: &str = if std::env::var_os(RUN_TOKEN_VARIABLE).is_some() {
-        "set each variable in the location's environment (or its env file) and restart the location; the next run then works"
+    let env_file: Option<String> = env_file_display(project_dir);
+    let help: String = if std::env::var_os(RUN_TOKEN_VARIABLE).is_some() {
+        location_secret_fix("each variable", env_file.as_deref())
     } else {
-        "set each variable in this shell or the project's env file, or narrow the selection"
+        format!(
+            "{}, or narrow the selection",
+            shell_secret_fix("each variable", env_file.as_deref())
+        )
     };
     new_annotated_error(
         py,
@@ -45,6 +52,6 @@ pub fn secret_block_error(py: Python<'_>, blocks: &[SecretBlock], project_dir: &
             secret_places(project_dir),
             lines.join("\n")
         ),
-        &[("help", help.to_owned())],
+        &[("help", help)],
     )
 }

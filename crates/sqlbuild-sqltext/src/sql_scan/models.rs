@@ -94,3 +94,13 @@ impl LexicalSyntax {
             .any(|value| value.as_bytes() == [quote])
     }
 }
+
+/// An expansion that must change so that it neither opens nor extends a comment where it lands.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BoundedExpansion {
+    /// Its position among the expansions given.
+    pub index: usize,
+    pub text: String,
+    /// The bytes, and characters, now ahead of the original text.
+    pub lead: usize,
+}

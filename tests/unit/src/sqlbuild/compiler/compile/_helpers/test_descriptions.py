@@ -24,6 +24,8 @@ DESCRIPTION_EXEMPT_INPUTS: dict[str, str] = {
     "test_files": "SQL unit tests are named by their subject and expected behaviour",
     "audit_files": "audits are assertions named by what they check",
     "audit_factories": "generate audits, which are assertions",
+    "discover_functions": "list a set's items, not graph resources",
+    "for_each_assets": "templates of asset nodes; each item's node is checked as an asset",
     "materialization_files": "materialization strategies, not graph resources",
     "event_exporters": "runtime event outputs, not graph resources",
     "command_output_sinks": "runtime command outputs, not graph resources",

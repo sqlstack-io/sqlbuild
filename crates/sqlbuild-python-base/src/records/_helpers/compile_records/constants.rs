@@ -975,6 +975,20 @@ const R_DISCOVERED_ASSET_FUNCTION: RecordSpec = RecordSpec {
             compared: false,
             shown: false,
         },
+        FieldSpec::new("for_each", FieldDefault::None),
+        FieldSpec::new("discovered", FieldDefault::None),
+    ],
+};
+const R_DISCOVERED_DISCOVER_FUNCTION: RecordSpec = RecordSpec {
+    name: "DiscoveredDiscoverFunction",
+    doc: "A discovered project function that discovers a set of items at publish.",
+    fields: &[
+        FieldSpec::required("file_path"),
+        FieldSpec::required("relative_path"),
+        FieldSpec::required("name"),
+        FieldSpec::required("function"),
+        FieldSpec::new("check_every_seconds", FieldDefault::None),
+        FieldSpec::new("provider_usages", FieldDefault::EmptyTuple),
     ],
 };
 const R_DISCOVERED_CHECK_FUNCTION: RecordSpec = RecordSpec {
@@ -1117,6 +1131,8 @@ const R_DISCOVERED_PYTHON_NODE_FUNCTIONS: RecordSpec = RecordSpec {
         FieldSpec::new("assets", FieldDefault::EmptyTuple),
         FieldSpec::new("checks", FieldDefault::EmptyTuple),
         FieldSpec::new("audit_factories", FieldDefault::EmptyTuple),
+        FieldSpec::new("discover_functions", FieldDefault::EmptyTuple),
+        FieldSpec::new("for_each_assets", FieldDefault::EmptyTuple),
     ],
 };
 const R_DISCOVERED_PROJECT_INPUTS: RecordSpec = RecordSpec {
@@ -1144,6 +1160,8 @@ const R_DISCOVERED_PROJECT_INPUTS: RecordSpec = RecordSpec {
         FieldSpec::new("loader_functions", FieldDefault::EmptyTuple),
         FieldSpec::new("asset_functions", FieldDefault::EmptyTuple),
         FieldSpec::new("check_functions", FieldDefault::EmptyTuple),
+        FieldSpec::new("discover_functions", FieldDefault::EmptyTuple),
+        FieldSpec::new("for_each_assets", FieldDefault::EmptyTuple),
         FieldSpec::new("audit_factories", FieldDefault::EmptyTuple),
         FieldSpec::new("hook_functions", FieldDefault::EmptyTuple),
         FieldSpec::new("event_exporters", FieldDefault::EmptyTuple),
@@ -1685,6 +1703,7 @@ pub(crate) const COMPILE_VALUE_RECORDS: &[RecordSpec] = &[
     R_DISCOVERED_PROVIDER_USAGE,
     R_DISCOVERED_LOADER_FUNCTION,
     R_DISCOVERED_ASSET_FUNCTION,
+    R_DISCOVERED_DISCOVER_FUNCTION,
     R_DISCOVERED_CHECK_FUNCTION,
     R_DISCOVERED_HOOK_FUNCTION,
     R_DISCOVERED_AUDIT_FACTORY,

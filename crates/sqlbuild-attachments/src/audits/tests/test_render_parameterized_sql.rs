@@ -78,7 +78,7 @@ fn given_unreferenced_arguments_when_rejecting_unused_then_their_sorted_names_st
             })
             .collect();
         assert_eq!(
-            render_parameterized_sql(test_case.sql, &arguments, true),
+            render_parameterized_sql(test_case.sql, &arguments, (true, None)),
             test_case.expected_sql.map(str::to_owned),
             "{}",
             test_case.description

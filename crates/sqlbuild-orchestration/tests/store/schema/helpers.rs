@@ -4,6 +4,10 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+use crate::authorization::main::service_accounts::create_service_account::create_service_account;
+use crate::credentials::models::{
+    AuditContext, BuiltinRole, NewServiceAccount, ServiceAccountAuthority,
+};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -11,8 +15,9 @@ use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::open_store::open_store;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::schema::test_types::StoreDialect;
-use crate::store::tests::store_helpers::run;
+use crate::store::tests::store_helpers::{close_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::store::types::Row;
 use crate::store_migrations::constants::{POSTGRES_BASELINE_CHECKSUMS, SQLITE_BASELINE_CHECKSUMS};
@@ -257,9 +262,10 @@ pub(crate) async fn schema_shape(store: &ControlStore, dialect: &StoreDialect) -
     shape
 }
 
-/// Every row of `tables`, in primary-key order.
+/// Every row of `tables`, in primary-key order, on new connections: PostgreSQL refuses a `SELECT *` prepared before a column was added.
 pub(crate) async fn table_rows(store: &ControlStore, tables: &[&str]) -> Vec<Vec<Row>> {
-    let mut transaction = begin(store, TransactionMode::Read)
+    let reader: ControlStore = second_store(store).await;
+    let mut transaction = begin(&reader, TransactionMode::Read)
         .await
         .expect("begin read");
     let mut all: Vec<Vec<Row>> = Vec::new();
@@ -275,6 +281,7 @@ pub(crate) async fn table_rows(store: &ControlStore, tables: &[&str]) -> Vec<Vec
         all.push(rows);
     }
     commit(transaction).await.expect("finish read");
+    close_store(reader).await;
     all
 }
 
@@ -307,6 +314,29 @@ pub(crate) async fn query_items(store: &ControlStore, sql: &str) -> Vec<String> 
         .unwrap_or_else(|error| panic!("{sql}: {error}"));
     commit(transaction).await.expect("finish read");
     rows.iter().map(|row| text(row, "item")).collect()
+}
+
+/// The key of a service account the store's owner adds, which needs the service account tables.
+pub(crate) async fn service_account_key(store: &ControlStore) -> String {
+    let context = AuditContext {
+        actor: "local-control-store-owner".into(),
+        granting_role: "control-store-owner".into(),
+        request_id: uuid::Uuid::now_v7(),
+        ip_address: None,
+    };
+    let request = NewServiceAccount {
+        name: "orders-deploy".into(),
+        description: None,
+        role: BuiltinRole::Developer,
+    };
+    create_service_account(
+        store,
+        (&context, ServiceAccountAuthority::Owner),
+        (&request, None),
+    )
+    .await
+    .expect("a service account")
+    .key
 }
 
 /// The store's recorded schema version.

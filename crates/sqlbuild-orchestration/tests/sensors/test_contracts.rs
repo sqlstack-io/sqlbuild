@@ -38,5 +38,7 @@ mod test_sources;
 mod test_transitions;
 #[path = "test_types.rs"]
 mod test_types;
+#[path = "test_unreadable_ticks.rs"]
+mod test_unreadable_ticks;
 #[path = "test_upgrade.rs"]
 mod test_upgrade;

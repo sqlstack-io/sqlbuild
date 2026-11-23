@@ -26,6 +26,7 @@ export const CAPABILITIES = [
 	'sensor.reset_cursor',
 	'run.adhoc',
 	'connection.test',
+	'location.republish',
 	'plan.preview',
 	'location.manage',
 	'user.manage',
@@ -34,7 +35,10 @@ export const CAPABILITIES = [
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
-export type PrincipalKind = 'user' | 'scheduler' | 'sensor' | 'system';
+/** Where a republish got to: the new version once published, or why nothing was. */
+export type RepublishResult = { state: 'pending' | 'published' | 'failed' | 'expired'; generation: number | null; error: string | null };
+
+export type PrincipalKind = 'user' | 'service' | 'scheduler' | 'sensor' | 'system';
 export type Principal = {
 	kind: PrincipalKind;
 	/** Stable handle, e.g. a user name or `scheduler`. */
@@ -48,7 +52,7 @@ export type CurrentUser = Principal & {
 	role?: BuiltInRole;
 };
 
-export type AuthMode = 'oidc' | 'trusted_proxy' | 'password' | 'disabled';
+export type AuthMode = 'oidc' | 'trusted_proxy' | 'password' | 'disabled' | 'keys';
 
 // ---- locations, targets and snapshots ----
 
@@ -85,7 +89,7 @@ export type LocationTarget = {
 	connectionSummary: string | null;
 };
 
-export type LocationHealth = 'healthy' | 'degraded' | 'missing_secrets' | 'falling_back' | 'broken';
+export type LocationHealth = 'healthy' | 'degraded' | 'missing_secrets' | 'discovery_failed' | 'falling_back' | 'broken';
 /** A project deployed against exactly one target. Staging and dev are separate locations. */
 export type Location = {
 	/** Opaque server-generated UUID; the name is a mutable label. */

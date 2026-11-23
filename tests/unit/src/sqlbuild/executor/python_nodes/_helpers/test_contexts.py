@@ -77,7 +77,7 @@ def test_given_task_context_when_using_helpers_then_records_and_qualifies_names(
     with caplog.at_level(logging.INFO, logger=test_case.expected_logger_name):
         execute_result: object = context.execute_sql("CREATE TABLE scratch_orders AS SELECT 1")
         query_result: object = context.query("SELECT * FROM scratch_orders")
-        context.log("loading scratch orders")
+        context.log.info("loading scratch orders")
     qualified_name: str = context.qualify_name(
         name=test_case.raw_name,
         database=test_case.database,

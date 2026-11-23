@@ -14,3 +14,10 @@ pub trait Syntax<'py> {
     /// One syntax attribute, such as `render_qualified_name`; anything reaching the warehouse is refused.
     fn syntax(&self, name: &str) -> PyResult<Bound<'py, PyAny>>;
 }
+
+/// One end of the socket pair Python's wakeup descriptor writes to.
+#[cfg(unix)]
+pub(crate) type WakeupSocket = std::os::unix::net::UnixStream;
+/// One end of the socket pair Python's wakeup descriptor writes to.
+#[cfg(windows)]
+pub(crate) type WakeupSocket = std::net::TcpStream;

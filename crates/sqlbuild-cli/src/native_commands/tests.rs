@@ -1,3 +1,5 @@
+#[path = "tests/test_admin_output.rs"]
+mod admin_output;
 #[path = "tests/test_argv_host.rs"]
 mod argv_host;
 #[path = "tests/test_changed_build.rs"]
@@ -8,6 +10,8 @@ mod decision;
 mod helpers;
 #[path = "tests/test_init.rs"]
 mod init;
+#[path = "tests/test_location_discovery.rs"]
+mod location_discovery;
 #[path = "tests/test_location_metadata.rs"]
 mod location_metadata;
 #[path = "tests/test_location_plan.rs"]

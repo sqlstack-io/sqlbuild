@@ -92,14 +92,17 @@ pub(crate) async fn assign_role_in(
         )
         .await;
     }
-    assign_scoped_role(transaction, context, request).await
+    let (transaction, applied) = write_scoped_role(transaction, context, request).await?;
+    commit(transaction).await?;
+    Ok(applied)
 }
 
-async fn assign_scoped_role(
+/// Writes and audits one assignment or revocation of a role that isn't admin, leaving the commit to the caller.
+pub(crate) async fn write_scoped_role(
     transaction: ControlTransaction,
     context: &AuditContext,
     request: &RoleAssignmentRequest,
-) -> Result<bool, ControlError> {
+) -> Result<(ControlTransaction, bool), ControlError> {
     let role = serde_json::to_value(&request.role)
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let key = serde_json::to_string(&(
@@ -139,6 +142,5 @@ async fn assign_scoped_role(
         .await?;
         transaction.changes.insert(Change::Credentials);
     }
-    commit(transaction).await?;
-    Ok(applied)
+    Ok((transaction, applied))
 }

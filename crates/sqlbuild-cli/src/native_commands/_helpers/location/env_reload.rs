@@ -37,9 +37,7 @@ pub(crate) fn reload_env_file(options: &LocationServe) -> bool {
     match load_env_file(&options.project_dir, Some(&options.target)) {
         Ok(Some(load)) => {
             let changed: bool = changes_values(&load.overlay);
-            if changed {
-                install_environment_overlay(load.overlay);
-            }
+            install_environment_overlay(load.overlay);
             changed
         }
         Ok(None) => false,

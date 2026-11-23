@@ -151,13 +151,15 @@
      "name": "dev",
      "parser": {
       "prog": "sqb dev",
-      "description": "Run the local control API, scheduler and reloadable code location. Authentication is disabled only on loopback; triggers start paused. The web UI is served at the same address.",
+      "description": "Run the local control API, scheduler and reloadable code location. There is no sign-in, so it listens on loopback and takes only local names unless --host or --allow-host opens it up; triggers start paused. The web UI is served at the same address.",
       "groups": [{"title": "positional arguments"}, {"title": "options"}],
       "actions": [
        {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
        {"kind": "store", "options": ["--project-dir", "--sqb-project-dir"], "dest": "project_dir", "default": {"suppress": true}, "help": "SQLBuild project directory", "group": 1},
        {"kind": "store", "options": ["--target"], "dest": "target", "help": "target to compile and run (default: configured target)", "group": 1},
-       {"kind": "store", "options": ["--port"], "dest": "control_port", "default": 8000, "type": "int", "help": "loopback TCP port, or 0 to choose a free port (default: 8000)", "group": 1},
+       {"kind": "store", "options": ["--port"], "dest": "control_port", "default": 8000, "type": "int", "help": "TCP port, or 0 to choose a free port (default: 8000)", "group": 1},
+       {"kind": "store", "options": ["--host"], "dest": "control_host", "metavar": "ADDRESS", "help": "IP address to listen on (default: 127.0.0.1); beyond loopback, anyone who can reach it has full access without signing in, with your credentials", "group": 1},
+       {"kind": "append", "options": ["--allow-host"], "dest": "development_allow_host", "default": [], "metavar": "NAME", "help": "also accept this name or IP address, optionally with :port, in Host and Origin (repeatable); anyone who can reach it has full access without signing in, with your credentials", "group": 1},
        {"kind": "store", "options": ["--control-store-url"], "dest": "development_store_url", "help": "control store URL or path (default: .sqlbuild/control.sqlite3 in the project)", "group": 1},
        {"kind": "store_true", "options": ["--no-scheduler"], "dest": "control_no_scheduler", "nargs": 0, "const": true, "default": false, "help": "serve and reload without executing scheduled work", "group": 1},
        {"kind": "store_true", "options": ["--triggers"], "dest": "development_triggers", "nargs": 0, "const": true, "default": false, "help": "preserve trigger defaults and operator overrides instead of pausing on startup", "group": 1},
@@ -169,7 +171,7 @@
      "name": "location",
      "parser": {
       "prog": "sqb location",
-      "description": "Compile and publish a project from its own Python environment. Uses SQLBUILD_LOCATION_TOKEN for scoped HTTP access, never the control database. Results are JSON; progress goes to stderr.",
+      "description": "Compile and publish a project from its own Python environment. Uses SQLBUILD_LOCATION_TOKEN for scoped HTTP access, never the control database; republish instead uses SQLBUILD_API_KEY, over HTTP or HTTPS, or your sqb login session, over HTTPS. Results are JSON; progress goes to stderr.",
       "groups": [
        {
         "title": "positional arguments"
@@ -193,8 +195,8 @@
         "options": [],
         "dest": "location_command",
         "required": true,
-        "choices": ["publish", "serve", "health", "runtime", "execute"],
-        "help": "publish one snapshot, watch and reload, check health (exits 1 when the location is down or its last load failed), or run the supervisor's stdio compiler",
+        "choices": ["publish", "serve", "health", "republish", "runtime", "execute"],
+        "help": "publish one snapshot, watch and reload, check health (exits 1 when the location is down or its last load failed), ask a served location to republish, or run the supervisor's stdio compiler",
         "group": 0
        },
        {
@@ -245,6 +247,38 @@
        },
        {
         "kind": "store",
+        "options": ["--reason"],
+        "dest": "location_reason",
+        "help": "for republish, why, as the audit log and the location record it",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": ["--wait"],
+        "dest": "location_wait",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "for republish, wait for the new snapshot or the publish error",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--timeout"],
+        "dest": "location_timeout",
+        "type": "int",
+        "help": "for republish --wait, seconds to wait (default: 600)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--ca-cert"],
+        "dest": "login_ca",
+        "help": "for republish with a sqb login session, an additional trusted PEM CA certificate",
+        "group": 1
+       },
+       {
+        "kind": "store",
         "options": ["--run-id"],
         "dest": "location_run_id",
         "help": "frozen run UUID for execute; requires SQLBUILD_RUN_TOKEN",
@@ -272,7 +306,7 @@
      "name": "admin",
      "parser": {
       "prog": "sqb admin",
-      "description": "Privileged local administration using direct control database access. Results are JSON; issued bearer credentials appear only once on stdout.",
+      "description": "Privileged local administration using direct control database access. Each command says what it did in one line on stderr; stdout holds only an issued secret, shown once, or the rows of a read, or only the JSON result with --json.",
       "groups": [
        {
         "title": "positional arguments"
@@ -348,7 +382,9 @@
              "required": true,
              "help": "location label; identity is assigned by the control store",
              "group": 0
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -387,7 +423,9 @@
              "required": true,
              "help": "principal label; creation grants no permissions",
              "group": 0
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -399,7 +437,9 @@
            "groups": [{"title": "positional arguments"}, {"title": "options"}],
            "actions": [
             {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
-            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "PRINCIPAL_ID", "required": true, "help": "active person UUID; password is read from the terminal or standard input, never an argument", "group": 0}
+            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "PRINCIPAL_ID", "required": true, "help": "active person UUID; password is read from the terminal or standard input, never an argument", "group": 0},
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -411,7 +451,9 @@
            "groups": [{"title": "positional arguments"}, {"title": "options"}],
            "actions": [
             {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
-            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "NAME", "required": true, "help": "first administrator's person name", "group": 0}
+            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "NAME", "required": true, "help": "first administrator's person name", "group": 0},
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -423,7 +465,9 @@
            "groups": [{"title": "positional arguments"}, {"title": "options"}],
            "actions": [
             {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
-            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "PRINCIPAL_ID", "required": true, "help": "existing person UUID to enable and grant installation admin", "group": 0}
+            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "PRINCIPAL_ID", "required": true, "help": "existing person UUID to enable and grant installation admin", "group": 0},
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -472,7 +516,9 @@
              "required": true,
              "help": "future expiry as an RFC3339 timestamp with timezone",
              "group": 1
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -511,7 +557,9 @@
              "required": true,
              "help": "credential UUID, never its bearer secret",
              "group": 0
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -519,11 +567,13 @@
           "name": "rotate-token",
           "parser": {
            "prog": "sqb admin rotate-token",
-           "description": "Replace a live credential atomically through direct control-store ownership, retaining its exact scope and expiry. Returns the new bearer once as JSON; the old credential immediately stops working.",
+           "description": "Replace a live credential atomically through direct control-store ownership, retaining its exact scope and expiry. Prints the new bearer once, alone on stdout; the old credential immediately stops working.",
            "groups": [{"title": "positional arguments"}, {"title": "options"}],
            "actions": [
             {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
-            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "TOKEN_ID", "required": true, "help": "live credential UUID, never its bearer secret", "group": 0}
+            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "TOKEN_ID", "required": true, "help": "live credential UUID, never its bearer secret", "group": 0},
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -574,7 +624,7 @@
              "nargs": 0,
              "const": true,
              "default": false,
-             "help": "retry exactly the failed and skipped nodes, excluding successful nodes",
+             "help": "retry exactly the failed, cancelled, skipped and unreached nodes, excluding successful nodes",
              "group": 1
             },
             {
@@ -592,7 +642,9 @@
              "required": true,
              "help": "nonblank reason recorded with the security audit",
              "group": 1
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -727,7 +779,9 @@
              "required": true,
              "help": "nonblank reason recorded with the security audit",
              "group": 1
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -782,7 +836,9 @@
              "required": true,
              "help": "nonblank reason recorded with the security audit",
              "group": 1
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -813,7 +869,9 @@
              "required": true,
              "help": "location work request UUID",
              "group": 0
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -873,7 +931,9 @@
              "required": true,
              "help": "nonblank reason recorded with the cancellation fact and security audit",
              "group": 1
-            }
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          },
@@ -968,7 +1028,255 @@
              "dest": "admin_sensor_event",
              "help": "the sensor event ID to mark delivered without calling the function; required only for skip-event",
              "group": 1
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
+           ]
+          }
+         },
+         {
+          "name": "create-service-account",
+          "parser": {
+           "prog": "sqb admin create-service-account",
+           "description": "Add a service account with a built-in role everywhere and print its API key once, alone on stdout; store it now, it isn't shown again. Only the key's hash is kept.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
             }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "NAME",
+             "required": true,
+             "help": "new service account name: 2 to 63 lowercase letters, digits, - or _, starting with a letter",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--role"
+             ],
+             "dest": "admin_role",
+             "choices": [
+              "viewer",
+              "operator",
+              "developer",
+              "admin"
+             ],
+             "required": true,
+             "help": "built-in role everywhere",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--description"
+             ],
+             "dest": "admin_description",
+             "help": "what uses it, shown in the Service accounts tab",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--key-from-env"
+             ],
+             "dest": "admin_key_env",
+             "metavar": "VAR",
+             "help": "import the key held in environment variable VAR instead of generating one, for setups that recreate a control store and must keep the same key: sqbk_ and at least 32 more characters, generated randomly (for example sqbk_ and 40 random letters and digits), since the key is only as strong as you make it; the result then omits the key",
+             "group": 1
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
+           ]
+          }
+         },
+         {
+          "name": "rotate-service-account",
+          "parser": {
+           "prog": "sqb admin rotate-service-account",
+           "description": "Issue a service account a new API key, printed once, alone on stdout; the replaced key stops now unless --overlap-minutes keeps it working a little longer.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "NAME",
+             "required": true,
+             "help": "service account name",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--overlap-minutes"
+             ],
+             "dest": "admin_overlap_minutes",
+             "type": "int",
+             "help": "minutes the replaced key keeps working, 0 to 1440 (default: 0)",
+             "group": 1
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
+           ]
+          }
+         },
+         {
+          "name": "disable-service-account",
+          "parser": {
+           "prog": "sqb admin disable-service-account",
+           "description": "Refuse every key of a service account at once.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "NAME",
+             "required": true,
+             "help": "service account name",
+             "group": 0
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
+           ]
+          }
+         },
+         {
+          "name": "enable-service-account",
+          "parser": {
+           "prog": "sqb admin enable-service-account",
+           "description": "Accept a disabled service account's keys again.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "NAME",
+             "required": true,
+             "help": "service account name",
+             "group": 0
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
+           ]
+          }
+         },
+         {
+          "name": "list-service-accounts",
+          "parser": {
+           "prog": "sqb admin list-service-accounts",
+           "description": "List service accounts with their roles and the prefixes of their working keys, never the keys.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {"kind": "store_true", "options": ["--json"], "dest": "json", "nargs": 0, "const": true, "default": false, "help": "print only the JSON result, on stdout", "group": 1},
+            {"kind": "store_true", "options": ["--verbose", "-v"], "dest": "verbose", "nargs": 0, "const": true, "default": false, "help": "also say when the control store opens and is ready", "group": 1}
            ]
           }
          }
@@ -997,7 +1305,7 @@
          {
           "dest": "issue-location-token",
           "metavar": "issue-location-token",
-          "help": "issue a bounded location credential, returned once as JSON"
+          "help": "issue a bounded location credential, printed once on stdout"
          },
          {
           "dest": "revoke-token",
@@ -1017,7 +1325,7 @@
          {
           "dest": "rerun-run",
           "metavar": "rerun-run",
-          "help": "retry a terminal run or exactly its failed and skipped nodes"
+          "help": "retry a terminal run or exactly its unfinished nodes"
          },
          {
           "dest": "cancel-run",
@@ -1038,6 +1346,31 @@
           "dest": "change-trigger",
           "metavar": "change-trigger",
           "help": "change trigger status or cursor with an atomic audit and retry identity"
+         },
+         {
+          "dest": "create-service-account",
+          "metavar": "create-service-account",
+          "help": "add a service account with a role; its API key is printed once"
+         },
+         {
+          "dest": "rotate-service-account",
+          "metavar": "rotate-service-account",
+          "help": "issue a service account a new API key, printed once"
+         },
+         {
+          "dest": "disable-service-account",
+          "metavar": "disable-service-account",
+          "help": "refuse every key of a service account at once"
+         },
+         {
+          "dest": "enable-service-account",
+          "metavar": "enable-service-account",
+          "help": "accept a disabled service account's keys again"
+         },
+         {
+          "dest": "list-service-accounts",
+          "metavar": "list-service-accounts",
+          "help": "list service accounts and their key prefixes"
          }
         ]
        }
@@ -1395,6 +1728,18 @@
         "const": true,
         "default": false,
         "help": "Bypass the compile analysis cache for this invocation",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--discover"
+        ],
+        "dest": "discover",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Run the project's @discover functions with the target's providers for this command instead of compiling each for_each asset as its placeholder; nothing is saved",
         "group": 1
        },
        {
@@ -1855,6 +2200,18 @@
         "group": 1
        },
        {
+        "kind": "store_true",
+        "options": [
+         "--discover"
+        ],
+        "dest": "discover",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Run the project's @discover functions with the target's providers for this command instead of compiling each for_each asset as its placeholder; nothing is saved",
+        "group": 1
+       },
+       {
         "kind": "store",
         "options": [
          "--defer-to"
@@ -2312,6 +2669,18 @@
         "const": true,
         "default": false,
         "help": "Bypass the compile analysis cache for this invocation",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--discover"
+        ],
+        "dest": "discover",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "Run the project's @discover functions with the target's providers for this command instead of compiling each for_each asset as its placeholder; nothing is saved",
         "group": 1
        },
        {

@@ -131,6 +131,8 @@ fn given_a_wide_group_when_only_the_last_node_has_not_started_then_all_chunks_mu
                         node_key: key.clone(),
                         outcome: NodeOutcome::Success,
                         rows_affected: None,
+                        table_rows: None,
+                        no_change_reason: None,
                         error_code: None,
                         skipped_because_of: None,
                         error_message: None,

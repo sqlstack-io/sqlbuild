@@ -11,7 +11,7 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::main::execution::{change_run::change_run, claim_next_run::claim_next_run};
 use crate::runs::models::{NodeOutcome, RunAuthority, RunChange, RunChangeRequest};
 use crate::runs::tests::helpers::{queue, request, snapshot, snapshot_node};
-use crate::runs::tests::test_types::{NodeEventResourcesTestCase, NodeOfTestCase};
+use crate::runs::tests::test_types::{CheckFields, NodeEventResourcesTestCase, NodeOfTestCase};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publication::publish_snapshot::publish_snapshot;
 use crate::store::main::{begin::begin, commit::commit, query::query};
@@ -42,6 +42,12 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
                 ("run_check_finished", "check", "payments_positive"),
                 ("run_node_finished", "model", "payments"),
             ],
+            expected_check: (
+                Some("payments_positive".into()),
+                Some("b-payments-positive".into()),
+                Some("r-1".into()),
+                Some(14),
+            ),
         },
         NodeEventResourcesTestCase {
             description: "PostgreSQL node and check events",
@@ -52,6 +58,12 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
                 ("run_check_finished", "check", "payments_positive"),
                 ("run_node_finished", "model", "payments"),
             ],
+            expected_check: (
+                Some("payments_positive".into()),
+                Some("b-payments-positive".into()),
+                Some("r-1".into()),
+                Some(14),
+            ),
         },
     ];
     for test_case in test_cases {
@@ -102,20 +114,23 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
             let node_started = report(RunChange::NodeStarted {
                 node_key: "model:payments".into(),
             });
+            let check_finished = report(RunChange::CheckFinished {
+                node_key: "check:payments_positive".into(),
+                outcome: NodeOutcome::Success,
+            });
             for request in [
                 report(RunChange::Started),
                 node_started.clone(),
                 report(RunChange::CheckStarted {
                     node_key: "check:payments_positive".into(),
                 }),
-                report(RunChange::CheckFinished {
-                    node_key: "check:payments_positive".into(),
-                    outcome: NodeOutcome::Success,
-                }),
+                check_finished.clone(),
                 report(RunChange::NodeFinished {
                     node_key: "model:payments".into(),
                     outcome: NodeOutcome::Success,
                     rows_affected: Some(3),
+                    table_rows: None,
+                    no_change_reason: None,
                     error_code: None,
                     skipped_because_of: None,
                     error_message: None,
@@ -214,6 +229,54 @@ fn given_node_and_check_reports_when_stored_and_read_then_each_event_names_its_n
             assert_eq!(
                 read, stored,
                 "{}: the old event is named from its payload",
+                test_case.description
+            );
+
+            // A check's result, as the worker records it: its name, identity and rows come from its payload.
+            let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+            let (transaction, _) = query(
+                transaction,
+                "UPDATE recall_events SET event_type='audit_completed', outcome='warn', payload=$1 WHERE event_id=$2",
+                vec![
+                    Parameter::Json(json!({
+                        "audit_name": "payments_positive",
+                        "binding_key": "b-payments-positive",
+                        "result_id": "r-1",
+                        "outcome": "warn",
+                        "violation_count": 14,
+                        "executed_sql": "SELECT 1",
+                    })),
+                    Parameter::Text(check_finished.event_id.to_string()),
+                ],
+            )
+            .await
+            .expect("store a check result");
+            commit(transaction).await.expect("commit");
+            let events = read_person_run_events(
+                store,
+                (&context, admin),
+                ((location, "development", claim.request.run_id), (0, 1000)),
+                DefaultRole::None,
+            )
+            .await
+            .expect("run events")
+            .expect("run");
+            let checks: Vec<CheckFields> = events
+                .iter()
+                .filter(|event| event.event_type == "audit_completed")
+                .map(|event| {
+                    (
+                        event.check_name.clone(),
+                        event.check_binding_key.clone(),
+                        event.check_result_id.clone(),
+                        event.check_rows,
+                    )
+                })
+                .collect();
+            assert_eq!(
+                checks,
+                vec![test_case.expected_check.clone()],
+                "{}: a check result names its check and the rows it found, never its SQL",
                 test_case.description
             );
             close_test_store(fixture).await;

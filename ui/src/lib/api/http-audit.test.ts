@@ -62,6 +62,7 @@ describe('toAuditEntry', () => {
 		const work = (work: Record<string, unknown>) => allowed('location.work_requested', { request_id: 'q-1', reason: 'plan', work });
 		expect(work({ kind: 'plan', command: ['build', '--select', 'orders'], selection: ['model:orders'], settings: {}, fresh: false })).toBe('Plan sqb build --select orders');
 		expect(work({ kind: 'sync_warehouse' })).toBe('Sync the warehouse copy');
+		expect(allowed('location.work_requested', { reason: 'deploy 0.58.0', work: { kind: 'republish', requested_by: 'orders-deploy' } })).toBe('Republish requested by orders-deploy: deploy 0.58.0');
 		expect(allowed('error.read', { run_id: 'd36ac8b2-314c-46aa', found: true })).toBe('Run d36ac8b2');
 		expect(allowed('output.read', { run_id: 'd36ac8b2-314c-46aa', found: false })).toBe('Run d36ac8b2, not found');
 	});

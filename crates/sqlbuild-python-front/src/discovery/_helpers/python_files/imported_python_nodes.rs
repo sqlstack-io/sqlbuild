@@ -15,6 +15,7 @@ use crate::discovery::_helpers::python_files::imported_modules::{
     module_functions, shim, tuple_of,
 };
 use crate::discovery::_helpers::python_files::python_hook_files::discover_python_hook_files;
+use sqlbuild_orchestration::discovered_sets::main::parse_check_every::parse_check_every;
 use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
@@ -26,6 +27,9 @@ const AUDIT_CASE: UserCodeHost = UserCodeHost::AuditCase;
 const READ_FACTORY: UserCodeHost = UserCodeHost::ReadFactoryDefinition;
 const READ_AUDIT_FACTORY: UserCodeHost = UserCodeHost::ReadAuditFactoryDefinition;
 const READ_HOOK: UserCodeHost = UserCodeHost::ReadHookDefinition;
+/// The item field a node's identity leaves out: a failure message does not change what the node runs.
+const DISCOVERED_ERROR_KEY: &str = "error";
+const READ_DISCOVER: UserCodeHost = UserCodeHost::ReadDiscoverDefinition;
 const NOT_A_NODE: &str = "that is not a SQLBuild asset, loader, or check";
 
 /// One Python-node kind: its reader, record class, bucket and copied definition fields.
@@ -70,6 +74,7 @@ const NODE_KINDS: [NodeKind; 3] = [
             "columns",
             "column_lineage",
             "retry",
+            "for_each",
         ],
     },
     NodeKind {
@@ -88,11 +93,17 @@ const NODE_KINDS: [NodeKind; 3] = [
     },
 ];
 
-/// Discovered loaders, assets, checks and audit factories, in discovery order.
+/// Discovered Python nodes, discover functions, `for_each` assets and audit factories, in order.
 pub(crate) struct Buckets<'py> {
-    pub(crate) nodes: [Vec<Bound<'py, PyAny>>; 3],
+    /// Loaders, assets, checks, discover functions and `for_each` assets.
+    pub(crate) nodes: [Vec<Bound<'py, PyAny>>; 5],
     pub(crate) audit_factories: Vec<(String, String, Bound<'py, PyAny>)>,
 }
+
+/// The `Buckets::nodes` slot of `@discover` functions.
+pub(crate) const DISCOVER_BUCKET: usize = 3;
+/// The `Buckets::nodes` slot of assets that run once per discovered item.
+pub(crate) const FOR_EACH_BUCKET: usize = 4;
 
 /// The module and the file it was imported from.
 struct ImportedModule<'py> {
@@ -109,6 +120,11 @@ impl<'py> Buckets<'py> {
         providers: &Bound<'py, PyDict>,
     ) -> PyResult<bool> {
         let py: Python<'py> = project.py();
+        if let Some(read) = definition(function, READ_DISCOVER)? {
+            let record = discover_function(project, (file_path, function), (&read, providers))?;
+            self.nodes[DISCOVER_BUCKET].push(record);
+            return Ok(true);
+        }
         for kind in &NODE_KINDS {
             let Some(read) = definition(function, kind.reader)? else {
                 continue;
@@ -130,8 +146,14 @@ impl<'py> Buckets<'py> {
                 }
             };
             let identity: Bound<'py, PyAny> = node_identity(py, kind.identity, &get)?;
+            let for_each: bool = !get("for_each")?.is_none();
             pairs.push(("identity", identity));
-            self.nodes[kind.bucket].push(discovered(py, kind.record, &pairs)?);
+            let record: Bound<'py, PyAny> = discovered(py, kind.record, &pairs)?;
+            if !for_each {
+                self.nodes[kind.bucket].push(record);
+            } else {
+                self.nodes[FOR_EACH_BUCKET].push(record);
+            }
             return Ok(true);
         }
         Ok(false)
@@ -262,6 +284,41 @@ impl<'py> Buckets<'py> {
         }
         Ok(())
     }
+}
+
+/// The record of one `@discover` function, its `check_every` read as seconds.
+fn discover_function<'py>(
+    project: &ProjectDir<'py>,
+    (file_path, function): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (read, providers): (&Bound<'py, PyAny>, &Bound<'py, PyDict>),
+) -> PyResult<Bound<'py, PyAny>> {
+    let py: Python<'py> = project.py();
+    let name: Bound<'py, PyAny> = native_field(read, "name")?;
+    let check_every: Option<String> = native_field(read, "check_every")?.extract()?;
+    let seconds: Option<u64> = check_every
+        .map(|text| {
+            parse_check_every(&text).map_err(|problem| {
+                let location = project.relative_to(file_path).unwrap_or_default();
+                discovery_error(
+                    py,
+                    NODE_ERROR,
+                    format!("Discover function '{name}' in {location}: {problem}"),
+                )
+            })
+        })
+        .transpose()?;
+    discovered(
+        py,
+        RecordId::DiscoveredDiscoverFunction,
+        &[
+            ("file_path", file_path.clone()),
+            ("relative_path", project.relative(file_path)?),
+            ("name", name.clone()),
+            ("function", function.clone()),
+            ("check_every_seconds", seconds.into_bound_py_any(py)?),
+            ("provider_usages", provider_usages(function, providers)?),
+        ],
+    )
 }
 
 /// The Python-node kinds an audit factory is also decorated as.
@@ -468,6 +525,16 @@ fn decorator_config<'py>(
         "ASSET" => {
             config.set_item("columns", get("columns")?)?;
             config.set_item("column_lineage", get("column_lineage")?)?;
+            let discovered: Bound<'py, PyAny> = get("discovered")?;
+            if let Ok(discovered) = discovered.cast::<PyDict>() {
+                let identifying: Bound<'py, PyDict> = PyDict::new(py);
+                for (key, value) in discovered.iter() {
+                    if key.extract::<String>()? != DISCOVERED_ERROR_KEY {
+                        identifying.set_item(key, value)?;
+                    }
+                }
+                config.set_item("discovered", identifying)?;
+            }
         }
         "CHECK" => {
             config.set_item("severity", get("severity")?.getattr("value")?)?;

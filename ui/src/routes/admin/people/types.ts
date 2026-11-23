@@ -16,3 +16,12 @@ export type RoleChoice =
 
 /** What changing a row's role does: give the new role everywhere, then take back the assignments it replaces. */
 export type RoleChange = { give: BuiltinRole | null; revoke: string[] };
+
+/** The People page's tabs; `service-accounts` is `?tab=service-accounts`. */
+export type PeopleTab = "people" | "service-accounts";
+
+/** When a rotation stops the old key: now, or after this many minutes. */
+export type OverlapChoice = "now" | "15" | "60" | "1440";
+
+/** How a service account row reads: working, part-way through a rotation, disabled, or not used yet. */
+export type ServiceState = "active" | "rotating" | "disabled" | "unused";

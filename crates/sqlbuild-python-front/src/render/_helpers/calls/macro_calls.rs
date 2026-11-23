@@ -60,7 +60,7 @@ pub(crate) fn splice_macro_calls(
     outputs: Vec<String>,
 ) -> PyResult<(String, Vec<SpanTuple>)> {
     let spliced = py
-        .compiler_detach(|| Ok(splice_calls(sql, &sites, &outputs)))
+        .compiler_detach(|| Ok(splice_calls(sql, &sites, &outputs, None)))
         .map_err(compiler_error)?;
     let (rendered, spans) =
         spliced.ok_or_else(|| PyValueError::new_err("macro call sites do not fit the SQL"))?;

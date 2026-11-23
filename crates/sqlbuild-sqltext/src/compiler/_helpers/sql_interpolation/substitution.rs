@@ -3,6 +3,7 @@
 use crate::compiler::models::CharSpan;
 use crate::compiler::models::{InterpolatedSql, InterpolationFailure, InterpolationRead};
 use crate::compiler::types::InterpolationHost;
+use crate::sql_scan::main::bounded_expansions::bounded_expansions;
 use crate::sql_scan::main::dialect_non_code_end::dialect_non_code_end;
 use crate::sql_scan::main::non_code_end::non_code_end;
 use crate::sql_scan::models::{QuotePolicy, Unclosed};
@@ -51,6 +52,7 @@ pub(crate) fn interpolate<H: InterpolationHost>(
     }
     match run.scan(sql) {
         Ok(()) => {
+            run.bound_values(sql);
             let spans = character_spans(sql, &run.output, &run.spans);
             let changed = run.output != sql;
             Ok(InterpolatedSql {
@@ -104,6 +106,39 @@ impl<H: InterpolationHost> Interpolation<'_, H> {
             index += character.len_utf8();
         }
         Ok(())
+    }
+
+    /// Keep the substituted values from opening or extending a comment, moving each span with them.
+    fn bound_values(&mut self, sql: &str) {
+        let values: Vec<(usize, usize, &str)> = self
+            .spans
+            .iter()
+            .map(|span| {
+                let value: &str = &self.output[span.output_start..span.output_end];
+                (span.source_start, span.source_end, value)
+            })
+            .collect();
+        let bounded = bounded_expansions(sql, &values, self.host.lexical_syntax());
+        if bounded.is_empty() {
+            return;
+        }
+        let mut texts: Vec<String> = values
+            .iter()
+            .map(|(_, _, value)| (*value).to_owned())
+            .collect();
+        for value in bounded {
+            texts[value.index] = value.text;
+        }
+        self.output.clear();
+        let mut copied: usize = 0;
+        for (span, text) in self.spans.iter_mut().zip(texts) {
+            self.output.push_str(&sql[copied..span.source_start]);
+            span.output_start = self.output.len();
+            self.output.push_str(&text);
+            span.output_end = self.output.len();
+            copied = span.source_end;
+        }
+        self.output.push_str(&sql[copied..]);
     }
 
     /// Python's `_interpolate_sql_segment`: every token inside one quoted literal.

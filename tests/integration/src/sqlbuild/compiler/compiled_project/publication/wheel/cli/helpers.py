@@ -27,7 +27,7 @@ def administer(
     """Password input remains on stdin and is never included in process arguments or logs."""
     binary, root = installation
     return subprocess.run(
-        [str(binary), "admin", *arguments],
+        [str(binary), "admin", *arguments, "--json"],
         cwd=root,
         env=environment(extra_environment),
         input=password,

@@ -20,11 +20,11 @@ pub async fn read_person_run_statement_sql(
         store,
         credentials,
         (run, default_role, Action::ViewSql),
-        (
+        ((
             "sql.read",
             async |transaction, scope| statement_sql_in(transaction, scope, statement_id).await,
             |sql: &Option<RunStatementSql>| json!({"statement_id": statement_id, "found": sql.is_some()}),
-        ),
+        ), None),
     )
     .await?
     .flatten())

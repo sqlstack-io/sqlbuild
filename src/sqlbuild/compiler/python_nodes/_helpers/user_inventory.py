@@ -14,6 +14,7 @@ from sqlbuild.python_nodes.main.read_loader_definition import read_loader_defini
 from sqlbuild.python_nodes.models import (
     AssetDefinition,
     CheckDefinition,
+    DiscoveredItemRef,
     LoaderDefinition,
 )
 
@@ -44,7 +45,10 @@ def python_node_identity(
 
 
 def python_node_dependency_key(dependency: object) -> object | tuple[str, str]:
-    """The node name a decorated dependency declares, or the dependency itself."""
+    """The node name a decorated dependency or discovered item names, or the dependency itself."""
+
+    if isinstance(dependency, DiscoveredItemRef):
+        return ("name", dependency.name)
 
     loader_definition: LoaderDefinition | None = (
         read_loader_definition(dependency) if callable(dependency) else None

@@ -84,7 +84,7 @@ function withMissingKeyItem(overview: Overview | null, scope: Scope): Overview |
 		active: true,
 		locationId: scope.locationId,
 		subject: null,
-		message: "orders_api is missing ORDERS_API_KEY in the location's environment, so runs of the node that uses it stop before the warehouse."
+		message: "orders_api is missing ORDERS_API_KEY in the location's environment, so runs of raw_orders stop before the warehouse."
 	};
 	return { ...overview, attention: [{ kind: 'platform_event', event }, ...overview.attention] };
 }

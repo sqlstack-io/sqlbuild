@@ -25,8 +25,8 @@ use crate::api::tests::helpers::{start_api, stop_api};
 use crate::api::tests::output_helpers::{chunk, output_contract};
 use crate::api::tests::recall_helpers::recall_contract;
 use crate::api::tests::test_types::{
-    ApiContractTestCase, OlderNodeReport, OlderServerReportTestCase, TestApi,
-    WorkerDeadlineTestCase, WorkerRedirectTestCase,
+    ApiContractTestCase, OlderNodeReport, OlderServerReportTestCase, PreviousRunReport,
+    PreviousServerTestCase, TestApi, WorkerDeadlineTestCase, WorkerRedirectTestCase,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::tests::helpers::{queue, request, snapshot};
@@ -197,6 +197,8 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
                         node_key: "orders".into(),
                         outcome: NodeOutcome::Success,
                         rows_affected: Some(7),
+                        table_rows: None,
+                        no_change_reason: None,
                         error_code: None,
                         skipped_because_of: None,
                         error_message: None,
@@ -443,6 +445,8 @@ fn given_an_older_server_when_a_worker_reports_error_text_then_the_refusal_asks_
                         node_key: "model:orders".into(),
                         outcome: NodeOutcome::Failed,
                         rows_affected: None,
+                        table_rows: None,
+                        no_change_reason: None,
                         error_code: Some("R002".into()),
                         skipped_because_of: None,
                         error_message: test_case.error_message.map(str::to_owned),
@@ -560,4 +564,96 @@ fn given_a_slow_recall_server_when_the_delivery_deadline_expires_then_the_native
             let _ = task.await;
         });
     }
+}
+
+#[test]
+fn given_a_server_older_than_node_results_when_a_worker_reports_them_then_the_refusal_asks_for_a_server_upgrade()
+ {
+    let finished = |outcome, table_rows| RunChange::NodeFinished {
+        node_key: "model:orders".into(),
+        outcome,
+        rows_affected: None,
+        table_rows,
+        no_change_reason: None,
+        error_code: None,
+        skipped_because_of: None,
+        error_message: None,
+    };
+    let test_cases = [
+        PreviousServerTestCase {
+            description: "a report without the new facts keeps working",
+            change: finished(NodeOutcome::Success, None),
+            expected_upgrade_refusal: false,
+        },
+        PreviousServerTestCase {
+            description: "a rebuilt table's row count names the upgrade order",
+            change: finished(NodeOutcome::Success, Some(500)),
+            expected_upgrade_refusal: true,
+        },
+        PreviousServerTestCase {
+            description: "a node the run never reached names the upgrade order",
+            change: finished(NodeOutcome::NotRun, None),
+            expected_upgrade_refusal: true,
+        },
+        PreviousServerTestCase {
+            description: "rows written so far name the upgrade order",
+            change: RunChange::NodeProgress {
+                node_key: "model:orders".into(),
+                rows_so_far: 120,
+            },
+            expected_upgrade_refusal: true,
+        },
+    ];
+    run(async {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("isolated older server");
+        let url = format!("http://{}", listener.local_addr().expect("address"));
+        let application = Router::new().route(
+            "/api/runs/{run_id}/events",
+            axum::routing::post(|axum::Json(_): axum::Json<PreviousRunReport>| async {
+                axum::Json(serde_json::json!({"applied": true}))
+            }),
+        );
+        let (shutdown, signal) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(async move {
+            axum::serve(listener, application)
+                .with_graceful_shutdown(async {
+                    let _ = signal.await;
+                })
+                .await
+                .map_err(ControlError::from)
+        });
+        let api = TestApi {
+            url,
+            shutdown,
+            task,
+        };
+        let client = connect_worker(
+            &api.url,
+            "synthetic-worker-bearer",
+            (Uuid::now_v7(), Uuid::now_v7()),
+        )
+        .expect("worker client");
+        for test_case in test_cases {
+            let reported = client.report(Uuid::now_v7(), test_case.change).await;
+            let message = reported.as_ref().err().map(ToString::to_string);
+            assert_eq!(
+                (
+                    reported.is_ok(),
+                    matches!(reported, Err(WorkerError::OlderServer)),
+                    message
+                        .is_some_and(|text| text.contains("upgrade the server before its workers")),
+                ),
+                (
+                    !test_case.expected_upgrade_refusal,
+                    test_case.expected_upgrade_refusal,
+                    test_case.expected_upgrade_refusal
+                ),
+                "{}",
+                test_case.description
+            );
+        }
+        stop_api(api).await;
+    });
 }

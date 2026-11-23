@@ -28,6 +28,24 @@ describe('people', () => {
 		]);
 	});
 
+	it('marks the service accounts among role holders, so their pages link to their panel', () => {
+		const assignments = toRoleAssignments(
+			{
+				assignments: [
+					{ assignment_id: 'a-1', principal_id: 'p-sam', name: 'sam', role_key: 'viewer', location_id: null, target: null },
+					{ assignment_id: 'a-2', principal_id: 'p-deploy', name: 'orders-deploy', role_key: 'developer', location_id: null, target: null }
+				],
+				group_roles: []
+			},
+			[person('sam', [], true)],
+			new Set(['orders-deploy'])
+		);
+		expect(assignments.map((a) => [a.principal.name, a.principal.kind])).toEqual([
+			['sam', 'user'],
+			['orders-deploy', 'service']
+		]);
+	});
+
 	it('reports a sign-in source only when the server knows one', () => {
 		expect([toAccount(person('sam', [], true)).source, toAccount(person('ada', ['g'])).source, toAccount(person('vic', [])).source]).toEqual([
 			'password',

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import replace
 from typing import Any
 
@@ -28,32 +29,37 @@ class DirectNodeResultStore(NodeResultStore):
         database: str | None,
         schema: str | None,
         previous_locations: tuple[tuple[str | None, str | None], ...] = (),
+        write_lock: AbstractContextManager[Any] | None = None,
     ) -> None:
         self.adapter: BaseAdapter = adapter
         self.connection: Any = connection
         self.previous_locations: tuple[tuple[str | None, str | None], ...] = previous_locations
+        self._write_lock: AbstractContextManager[Any] = (
+            nullcontext() if write_lock is None else write_lock
+        )
         super().__init__(database=database, schema=schema)
 
     def write(self, record: NodeResultRecord) -> None:
         if self.schema is None:
             return
-        self.adapter.ensure_schema(
-            connection=self.connection,
-            database=self.database,
-            schema=self.schema,
-            statement_recorder=StatementRecorder(),
-        )
-        write_node_result_record(
-            connection=self.connection,
-            execute=self.adapter.execute,
-            database=self.database,
-            schema=self.schema,
-            record=record,
-            render_qualified_name=self.adapter.render_qualified_name,
-            render_framework_type=self.adapter.render_framework_type,
-            render_create_table_sql=self.adapter.render_create_node_result_table_sql,
-            render_create_index_sqls=self.adapter.render_create_node_result_index_sqls,
-        )
+        with self._write_lock:
+            self.adapter.ensure_schema(
+                connection=self.connection,
+                database=self.database,
+                schema=self.schema,
+                statement_recorder=StatementRecorder(),
+            )
+            write_node_result_record(
+                connection=self.connection,
+                execute=self.adapter.execute,
+                database=self.database,
+                schema=self.schema,
+                record=record,
+                render_qualified_name=self.adapter.render_qualified_name,
+                render_framework_type=self.adapter.render_framework_type,
+                render_create_table_sql=self.adapter.render_create_node_result_table_sql,
+                render_create_index_sqls=self.adapter.render_create_node_result_index_sqls,
+            )
         self._cache_record(record=record)
 
     def _read_persisted(self, *, query: NodeResultQuery) -> tuple[NodeResultEnvelope, ...]:

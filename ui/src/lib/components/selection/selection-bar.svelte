@@ -31,7 +31,9 @@
 		names,
 		total,
 		build = true,
+		copy: offerCopy = true,
 		leading,
+		trailing,
 		view
 	}: {
 		selection: SelectionState;
@@ -41,7 +43,11 @@
 		total: number;
 		/** Offer Build these. */
 		build?: boolean;
+		/** Offer Copy as `sqb build -s …`; off where the next page shows the command anyway. */
+		copy?: boolean;
 		leading?: Snippet;
+		/** After the count, on the same row, such as the run page's quick picks and Plan these. */
+		trailing?: Snippet;
 		view?: Snippet;
 	} = $props();
 
@@ -116,10 +122,11 @@
 			{:else if selection.evaluation}<b>{selection.evaluation.count.toLocaleString('en')}</b> {noun(selection.evaluation.count, 'node')}
 			{:else}—{/if}
 		</span>
-		<Button variant="outline" size="bar" disabled={blocked} onclick={copy} title={command}>{#if copied}<CheckIcon />Copied{:else}<CopyIcon />Copy as <code>sqb build -s …</code>{/if}</Button>
+		{#if offerCopy}<Button variant="outline" size="bar" disabled={blocked} onclick={copy} title={command}>{#if copied}<CheckIcon />Copied{:else}<CopyIcon />Copy as <code>sqb build -s …</code>{/if}</Button>{/if}
 		{#if build && canBuild}
 			<GatedButton requires="run.adhoc" variant="default" disabled={blocked} reason={problem ? 'Fix the selection first' : 'Select nodes first'} hint="Open the plan for {command}" onclick={buildThese}><HammerIcon />Build these</GatedButton>
 		{/if}
+		{@render trailing?.()}
 	</div>
 	{#if showExcept || view}
 		<div class="sb-row second">

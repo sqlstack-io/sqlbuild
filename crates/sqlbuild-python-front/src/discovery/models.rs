@@ -7,7 +7,8 @@ use crate::discovery::_helpers::records::model_file_record::Locations;
 use crate::discovery::_helpers::records::model_file_record::ModelFileFields;
 use crate::discovery::_helpers::records::model_file_record::ModelFilePaths;
 use crate::discovery::_helpers::sources::provider_secrets::{
-    INVOCATION_ALLOWS_MISSING_SECRETS, INVOCATION_TARGET, TARGET_ALLOWED_MISSING_SECRETS,
+    INVOCATION_ALLOWS_MISSING_SECRETS, INVOCATION_TAKES_ALLOW_FLAG, INVOCATION_TARGET,
+    TARGET_ALLOWED_MISSING_SECRETS,
 };
 use crate::discovery::main::records::projected_text::projected_text;
 use pyo3::FromPyObject;
@@ -334,17 +335,18 @@ pub struct NodeRow {
     pub(crate) depends_on: Vec<DependencyRow>,
 }
 
-/// `--allow-missing-secrets` and `--target` for one invocation, restored when the invocation ends.
+/// `--allow-missing-secrets`, whether the command takes it, and `--target` for one invocation, restored when the invocation ends.
 #[derive(Debug)]
 pub struct MissingSecretsScope {
-    pub(crate) previous: (bool, Option<String>),
+    pub(crate) previous: (bool, bool, Option<String>),
 }
 
 impl MissingSecretsScope {
-    pub fn enter(allowed: bool, target: Option<String>) -> Self {
+    pub fn enter((allowed, takes_flag): (bool, bool), target: Option<String>) -> Self {
         Self {
             previous: (
                 INVOCATION_ALLOWS_MISSING_SECRETS.replace(allowed),
+                INVOCATION_TAKES_ALLOW_FLAG.replace(takes_flag),
                 INVOCATION_TARGET.replace(target),
             ),
         }
@@ -354,7 +356,8 @@ impl MissingSecretsScope {
 impl Drop for MissingSecretsScope {
     fn drop(&mut self) {
         INVOCATION_ALLOWS_MISSING_SECRETS.set(self.previous.0);
-        INVOCATION_TARGET.replace(self.previous.1.take());
+        INVOCATION_TAKES_ALLOW_FLAG.set(self.previous.1);
+        INVOCATION_TARGET.replace(self.previous.2.take());
     }
 }
 

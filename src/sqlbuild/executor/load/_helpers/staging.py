@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from sqlbuild._native import ContractPolicy, SourceEntry, fit_auxiliary_relation_name
@@ -29,8 +30,9 @@ def write_loader_rows_to_staging(
     connection: Any,
     staging: str,
     statement_recorder: StatementRecorder,
+    on_rows_written: Callable[[int], None] | None = None,
 ) -> int:
-    """Write framework-managed loader rows into one staging table."""
+    """Write framework-managed loader rows into one staging table, reporting the rows so far."""
 
     default_load_batch_size: int = 10000
     batch_size: int = source_entry.load_batch_size or default_load_batch_size
@@ -99,6 +101,8 @@ def write_loader_rows_to_staging(
             )
             staging_created = True
         rows_loaded += len(batch)
+        if on_rows_written is not None:
+            on_rows_written(rows_loaded)
     if not staging_created:
         sql = build_rows_sql(
             adapter=adapter,

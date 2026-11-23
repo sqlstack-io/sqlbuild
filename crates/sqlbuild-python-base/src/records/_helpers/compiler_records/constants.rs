@@ -510,6 +510,7 @@ const R_DISCOVERED_PYTHON_ASSET_METADATA: RecordSpec = RecordSpec {
         FieldSpec::new("columns", FieldDefault::EmptyTuple),
         FieldSpec::new("column_lineage", FieldDefault::None),
         FieldSpec::new("retry", FieldDefault::None),
+        FieldSpec::new("discovered", FieldDefault::None),
     ],
 };
 const R_DISCOVERED_PYTHON_CHECK_METADATA: RecordSpec = RecordSpec {

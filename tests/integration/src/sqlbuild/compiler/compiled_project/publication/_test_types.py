@@ -148,6 +148,15 @@ class WorkerExecutionTestCase:
 
 
 @dataclass(frozen=True)
+class NodeResultsTestCase(WorkerExecutionTestCase):
+    description: str
+    # Each run node as (key, status, rows affected, table rows, rows so far, skipped because of).
+    expected_node_results: list[tuple[str, str, int | None, int | None, int | None, str | None]] = (
+        field(default_factory=list)
+    )
+
+
+@dataclass(frozen=True)
 class ClaimedLoadTestCase(WorkerExecutionTestCase):
     description: str
     expected_write_set: frozenset[str] = frozenset()
@@ -166,6 +175,28 @@ class UnclaimedLoadTestCase:
 class CheckExecutionTestCase(WorkerExecutionTestCase):
     description: str
     expected_check_outcome: str = "success"
+
+
+@dataclass(frozen=True)
+class RunOutputTestCase(WorkerExecutionTestCase):
+    description: str
+    expected_lines: int = 0
+    expected_error_lines: list[int] = field(default_factory=list)
+    expected_logs: list[tuple[str, str, str]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class NulLogTestCase(WorkerExecutionTestCase):
+    description: str
+    backend: Literal["sqlite", "postgres"] = "sqlite"
+    expected_logs: list[tuple[str, str]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class NulFailureTestCase(WorkerExecutionTestCase):
+    description: str
+    backend: Literal["sqlite", "postgres"] = "sqlite"
+    expected_error_end: str = ""
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -305,6 +336,21 @@ class DevelopmentTestCase:
 
 
 @dataclass(frozen=True)
+class DevelopmentExposureTestCase:
+    description: str
+    arguments: tuple[str, ...]
+    expected_status: int
+    expected_lines: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DevelopmentAllowHostRefusalTestCase:
+    description: str
+    value: str
+    expected_exit_code: int
+
+
+@dataclass(frozen=True)
 class DevelopmentDiscoveryTestCase:
     description: str
     expected_imports: int
@@ -425,7 +471,9 @@ class DevelopmentMissingSecretsTestCase:
     description: str
     first_env_file: str
     second_env_file: str
-    # What the warning row shows while the secrets are missing.
+    # The target's env file, relative to the project.
+    env_file_name: str
+    # What the printed warning says while the secrets are missing.
     expected_warning: tuple[str, ...]
 
 
@@ -561,7 +609,7 @@ class ChangedJobTestCase(WorkerExecutionTestCase):
     raw_tables_sql: tuple[str, ...]
     new_order_sql: str
     execute: Callable[[Path, str], list[tuple[Any, ...]]]
-    expected_runs: tuple[tuple[str, frozenset[str], dict[str, int]], ...]
+    expected_runs: tuple[tuple[str, frozenset[str], dict[str, int], frozenset[str]], ...]
 
 
 @dataclass(frozen=True)
@@ -794,3 +842,179 @@ class CheckSensorsTestCase:
     # The run event's failed checks and failed nodes.
     expected_failed_checks: list[str]
     expected_failed_nodes: list[str]
+
+
+@dataclass(frozen=True)
+class PythonFailureTestCase(WorkerExecutionTestCase):
+    description: str
+    expected_error_start: str = ""
+    expected_error_end: str = ""
+    expected_error_below: int = 0
+
+
+@dataclass(frozen=True)
+class SecretAdviceTestCase:
+    description: str
+    command: tuple[str, ...]
+    # The target's env file, relative to the project.
+    env_file_name: str
+    expected_help: str
+    expected_flag_suggested: bool
+    expected_failure: bool = True
+
+
+@dataclass(frozen=True)
+class DevelopmentRepublishTestCase:
+    description: str
+    release: str
+    expected_exit_code: int
+    expected_items: int
+
+
+@dataclass(frozen=True)
+class SessionRepublishTestCase:
+    description: str
+    reason: str
+    expected_exit_code: int
+    expected_state: str
+
+
+@dataclass(frozen=True)
+class NodeStatusTestCase:
+    description: str
+    first_depends_on: str
+    job_select: str
+    job_settings: str
+    files: dict[str, str]
+    expected_statuses_during_second: dict[str, str]
+    expected_rerun_selection: frozenset[str]
+
+
+@dataclass(frozen=True)
+class HungCheckTestCase:
+    description: str
+    check_every: str
+    check_starts_within_seconds: float
+    expected_message: str
+
+
+@dataclass(frozen=True)
+class EmptyDiscoveryTestCase:
+    description: str
+    first_items: tuple[str, ...]
+    expected_nodes: frozenset[str]
+    expected_kept_items: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ParallelItemsTestCase:
+    description: str
+    first_depends_on: str
+    job_select: str
+    expected_status: str
+    expected_statuses: dict[str, str]
+
+
+@dataclass(frozen=True)
+class ItemLogsTestCase:
+    description: str
+    depends_on: str
+    job_select: str
+    job_settings: str
+    max_parallel: int
+    outcomes: dict[str, str]
+    files: dict[str, str]
+    expected_statuses: dict[str, str]
+
+
+@dataclass(frozen=True)
+class RunningItemsTestCase:
+    description: str
+    depends_on: str
+    job_select: str
+    job_settings: str
+    max_parallel: int
+    files: dict[str, str]
+    expected_running: int
+    expected_pending: int
+
+
+@dataclass(frozen=True)
+class WaitingCheckTestCase:
+    description: str
+    check_seconds: int
+    expected_finished: bool
+    expected_restarts: int
+
+
+@dataclass(frozen=True)
+class CancelledChainTestCase:
+    description: str
+    max_parallel: int
+    expected_first_run: list[str]
+    expected_second_run: list[str]
+    expected_statuses: dict[str, str]
+    expected_torn_down: bool
+
+
+@dataclass(frozen=True)
+class InterruptedStepsTestCase:
+    description: str
+    expected_status: str
+    expected_statuses: dict[str, str]
+    expected_notice: str
+
+
+@dataclass(frozen=True)
+class WaitingRepublishTestCase:
+    description: str
+    check_seconds: int
+    release: str
+    expected_exit_code: int
+    expected_check_finished: bool
+
+
+@dataclass(frozen=True)
+class KeyedRepublishTestCase:
+    description: str
+    role: str
+    sign_in_arguments: tuple[str, ...]
+    expected_exit_code: int
+    expected_stderr: str
+    expected_generation: int
+    expected_release: str
+
+
+@dataclass(frozen=True)
+class CancelledWriteTestCase:
+    description: str
+    job_select: str
+    job_settings: str
+    files: dict[str, str]
+    expected_statuses: dict[str, str]
+    expected_rerun: list[str]
+
+
+@dataclass(frozen=True)
+class UnknownDependencyTestCase:
+    description: str
+    first: str
+    then: str
+    removed: tuple[str, ...]
+    missing: str
+    expected_nodes: frozenset[str]
+
+
+@dataclass(frozen=True)
+class UnknownDependencyDiscoverTestCase:
+    description: str
+    dependency: str
+    expected_error: str
+
+
+@dataclass(frozen=True)
+class UnknownTagTestCase:
+    description: str
+    dependency: str
+    expected_error: str
+    expected_status: int

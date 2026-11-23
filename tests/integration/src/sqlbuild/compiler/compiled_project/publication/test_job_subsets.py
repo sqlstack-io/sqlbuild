@@ -60,6 +60,7 @@ def test_given_a_published_job_when_an_operator_excludes_a_model_then_only_the_r
             "development",
             "--reason",
             "Rebuild the job without customers",
+            "--json",
         ]
         refused: subprocess.CompletedProcess[str] = subprocess.run(
             [*request_run, "--run-id", str(uuid4()), "--select", "products"],

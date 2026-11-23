@@ -179,6 +179,7 @@
 					"docs/concepts/python-nodes/assets",
 					"docs/concepts/python-nodes/checks",
 					"docs/concepts/python-nodes/factories",
+					"docs/concepts/python-nodes/discovered-nodes",
 					"docs/concepts/python-nodes/providers",
 					"docs/concepts/python-nodes/sql-references"
 				]
