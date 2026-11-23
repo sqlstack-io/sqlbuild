@@ -125,7 +125,7 @@ def test_given_a_check_that_never_returns_when_the_location_is_stopped_then_it_e
                 assert process.poll() is None, log.read_text()
                 assert time.monotonic() < deadline, log.read_text()
                 time.sleep(0.2)
-            stop_location(process, int(pidfile.read_text()), log)
+            stop_location(process, int(pidfile.read_text()), log, expected_exit_code=0)
     assert test_case.expected_message in log.read_text()
 
 

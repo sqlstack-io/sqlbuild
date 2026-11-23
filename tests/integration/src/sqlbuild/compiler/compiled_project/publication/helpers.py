@@ -162,10 +162,16 @@ def location_process(
                 _ = process.wait(timeout=5)
 
 
-def stop_location(process: subprocess.Popen[bytes], interpreter_pid: int, log: Path) -> None:
-    """Exercise graceful `sqb dev` shutdown on SIGTERM and prove its interpreter was reaped."""
+def stop_location(
+    process: subprocess.Popen[bytes],
+    interpreter_pid: int,
+    log: Path,
+    *,
+    expected_exit_code: int = 128 + signal.SIGTERM,
+) -> None:
+    """Stop `sqb dev` (143) or `sqb location serve` (0) with SIGTERM; its interpreter is reaped."""
     process.send_signal(signal.SIGTERM)
-    assert process.wait(timeout=15) == 128 + signal.SIGTERM, log.read_text()
+    assert process.wait(timeout=15) == expected_exit_code, log.read_text()
     with pytest.raises(ProcessLookupError):
         os.kill(interpreter_pid, 0)
 
