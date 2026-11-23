@@ -8,12 +8,18 @@ from pathlib import PurePosixPath
 
 _NODE_DECORATORS: frozenset[str] = frozenset({"loader", "asset", "check", "factory"})
 _KIND_FILES: dict[str, str] = {"loader": "loader.py", "asset": "asset.py"}
-_FACTORY_FILES: dict[str, str] = {"loader": "loaders.py", "asset": "assets.py", "check": "checks.py"}
+_FACTORY_FILES: dict[str, str] = {
+    "loader": "loaders.py",
+    "asset": "assets.py",
+    "check": "checks.py",
+}
 _CHECKS_FILE: str = "checks.py"
 _MIXED_FACTORY_FILE: str = "factory.py"
 _UNSEEN_FACTORY_FILE: str = "assets.py"
 _INIT_FILE: str = "__init__.py"
-_ROOT_PARENTS: re.Pattern[str] = re.compile(r"(Path\(__file__\)(?:\.resolve\(\))?\.parents\[)(\d+)(\])")
+_ROOT_PARENTS: re.Pattern[str] = re.compile(
+    r"(Path\(__file__\)(?:\.resolve\(\))?\.parents\[)(\d+)(\])"
+)
 _MIN_ROOT_PARENTS: int = 2
 
 
@@ -30,7 +36,10 @@ def node_module_files(module_path: str, source: str) -> dict[str, str]:
 
     tree: ast.Module = ast.parse(source)
     nodes: list[tuple[ast.FunctionDef | ast.AsyncFunctionDef, str]] = [
-        (item, kind) for item in tree.body if (kind := _declared_kind(item)) is not None
+        (item, kind)
+        for item in tree.body
+        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and (kind := _declared_kind(item)) is not None
     ]
     if not nodes:
         return {module_path: source}
@@ -55,19 +64,24 @@ def node_module_files(module_path: str, source: str) -> dict[str, str]:
         for piece, members in pieces.items()
     }
     files[str(package / _INIT_FILE)] = "".join(
-        f"from .{'.'.join(PurePosixPath(placed[item.name]).relative_to(package).with_suffix('').parts)}"
-        f" import {item.name}\n"
+        f"from .{_relative_module(placed[item.name], package)} import {item.name}\n"
         for item, _ in nodes
     )
     return files
 
 
-def _declared_kind(item: ast.stmt) -> str | None:
+def _relative_module(path: str, package: PurePosixPath) -> str:
+    return ".".join(PurePosixPath(path).relative_to(package).with_suffix("").parts)
+
+
+def _declared_kind(item: ast.AST) -> str | None:
     if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
         return None
     for decorator in item.decorator_list:
         target: ast.expr = decorator.func if isinstance(decorator, ast.Call) else decorator
-        name: str | None = target.id if isinstance(target, ast.Name) else getattr(target, "attr", None)
+        name: str | None = (
+            target.id if isinstance(target, ast.Name) else getattr(target, "attr", None)
+        )
         if name in _NODE_DECORATORS:
             return name
     return None
@@ -117,15 +131,20 @@ def _piece_source(*, preamble: str, imports: str, body: str, depth: int) -> str:
     head: str = "\n".join(part for part in (preamble, imports.rstrip("\n")) if part)
     text: str = (f"{head}\n\n\n" if head else "") + body + "\n"
     return _ROOT_PARENTS.sub(
-        lambda match: match.group(1)
-        + (str(depth) if int(match.group(2)) >= _MIN_ROOT_PARENTS else match.group(2))
-        + match.group(3),
+        lambda match: (
+            match.group(1)
+            + (str(depth) if int(match.group(2)) >= _MIN_ROOT_PARENTS else match.group(2))
+            + match.group(3)
+        ),
         text,
     )
 
 
 def _segment(lines: list[str], item: ast.stmt) -> str:
     start: int = item.lineno
-    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and item.decorator_list:
+    if (
+        isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        and item.decorator_list
+    ):
         start = min(decorator.lineno for decorator in item.decorator_list)
     return "\n".join(lines[start - 1 : item.end_lineno])
