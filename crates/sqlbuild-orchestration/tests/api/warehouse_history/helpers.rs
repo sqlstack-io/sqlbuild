@@ -282,3 +282,102 @@ pub(crate) fn cost_page<'a>(
 ) -> BoxFuture<'a, Result<WarehouseSyncResponse, ControlError>> {
     Box::pin(ingest_resource_costs(store, scope, page))
 }
+
+/// Builds of the `daily` job 2 hours and 9 days ago, and one from the command line 3 hours ago.
+pub(crate) fn cost_selection_observations(daily: Uuid, old_daily: Uuid) -> Value {
+    let row =
+        |id: &str, hours: i64, run: Option<Uuid>, (kind, name): (&str, &str), credits: &str| {
+            json!({"observation_id": id, "hours_ago": hours, "run_id": id.split('/').next(),
+            "orchestration_run_id": run.map(|run| run.to_string()), "resource_type": kind,
+            "resource_name": name, "estimated_credits": credits,
+            "estimated_usd": format!("{:.4}", credits.parse::<f64>().expect("credits") * 3.0)})
+        };
+    let mut data = fixture("resource_cost_history.json");
+    data["observations"] = json!([
+        row(
+            "build-a/total",
+            2,
+            Some(daily),
+            ("_total", "build-a"),
+            "0.15"
+        ),
+        row(
+            "build-a/orders",
+            2,
+            Some(daily),
+            ("model", "orders"),
+            "0.10"
+        ),
+        row(
+            "build-a/customers",
+            2,
+            Some(daily),
+            ("model", "customers"),
+            "0.05"
+        ),
+        row("build-b/total", 3, None, ("_total", "build-b"), "0.04"),
+        row("build-b/orders", 3, None, ("model", "orders"), "0.04"),
+        row(
+            "build-c/total",
+            216,
+            Some(old_daily),
+            ("_total", "build-c"),
+            "0.20"
+        ),
+        row(
+            "build-c/orders",
+            216,
+            Some(old_daily),
+            ("model", "orders"),
+            "0.20"
+        ),
+    ]);
+    data
+}
+
+/// `(job, node, folder, credits, previous)` of each fact, amounts rounded to hundredths.
+pub(crate) fn cost_facts(read: &Value) -> Vec<(Value, Value, Value, f64, f64)> {
+    let round = |value: &Value| (value.as_f64().expect("amount") * 100.0).round() / 100.0;
+    read["facts"]
+        .as_array()
+        .expect("facts")
+        .iter()
+        .map(|fact| {
+            (
+                fact["job"].clone(),
+                fact["node_key"].clone(),
+                fact["folder"].clone(),
+                round(&fact["credits"]),
+                round(&fact["previous_credits"]),
+            )
+        })
+        .collect()
+}
+
+/// Each series' total, rounded to hundredths.
+pub(crate) fn series_totals(series: &Value) -> Vec<f64> {
+    series
+        .as_array()
+        .expect("series")
+        .iter()
+        .map(|values| {
+            let values = values.get("credits").unwrap_or(values);
+            (values
+                .as_array()
+                .expect("days")
+                .iter()
+                .filter_map(Value::as_f64)
+                .sum::<f64>()
+                * 100.0)
+                .round()
+                / 100.0
+        })
+        .collect()
+}
+
+/// `text` percent-encoded for a query value.
+pub(crate) fn percent_encoded(text: &str) -> String {
+    let mut url = reqwest::Url::parse("http://query.invalid/").expect("url");
+    url.query_pairs_mut().append_pair("v", text);
+    url.query().expect("query")["v=".len()..].to_owned()
+}

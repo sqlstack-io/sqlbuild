@@ -66,6 +66,8 @@ mod test_column_lineage;
 mod test_compression;
 #[path = "test_contract.rs"]
 mod test_contract;
+#[path = "test_cost_selection.rs"]
+mod test_cost_selection;
 #[path = "test_custom_roles.rs"]
 mod test_custom_roles;
 #[path = "test_denials.rs"]

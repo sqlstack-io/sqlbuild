@@ -3,6 +3,8 @@ pub mod read_node_check_counts;
 pub mod read_person_check;
 pub mod read_person_check_evidence;
 pub mod read_person_check_sql;
+pub mod read_person_cost_selection;
+pub mod read_person_cost_series;
 pub mod read_person_cost_summary;
 pub mod read_person_maintenance;
 pub mod read_person_microbatch_coverage;

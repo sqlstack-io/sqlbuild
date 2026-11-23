@@ -1191,3 +1191,14 @@ pub struct VocabularyEntry {
     pub value: String,
     pub count: u64,
 }
+
+/// The nodes a selection picks in the current publication, as a person may view them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ViewedSelection {
+    /// The publication evaluated; None before the first one.
+    pub snapshot_id: Option<Uuid>,
+    /// Every picked key; None for an empty selection, which is every node.
+    pub keys: Option<std::collections::BTreeSet<String>>,
+    /// Why `sqb` refuses the selection; then no key is picked.
+    pub error: Option<SelectionProblem>,
+}

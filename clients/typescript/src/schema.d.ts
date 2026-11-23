@@ -569,6 +569,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/cost/selection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readCostSelection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/cost/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readCostSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/discovered": {
         parameters: {
             query?: never;
@@ -2201,6 +2233,34 @@ export interface components {
             /** @description Where signing out goes when a trusted proxy owns the sign-in; absent means no sign-out link. */
             logout_url?: string | null;
         };
+        /** @description One job's estimated query cost on one node: in the period, and in the period before it. */
+        CostFactRecord: {
+            /** Format: int64 */
+            bytes_scanned: number;
+            /** Format: double */
+            credits: number;
+            /** @description The node's folder as `costFolder` names it; empty at the top of `sql/models`. */
+            folder: string;
+            /** @description None for builds no server run started. */
+            job?: string | null;
+            /** @description `<kind>:<name>`, like catalog node keys. */
+            node_key: string;
+            /** Format: double */
+            previous_credits: number;
+            /** Format: double */
+            previous_usd?: number | null;
+            /** Format: int64 */
+            queries: number;
+            /**
+             * Format: int64
+             * @description Builds in the period, counted once each.
+             */
+            runs: number;
+            /** Format: double */
+            seconds: number;
+            /** Format: double */
+            usd?: number | null;
+        };
         /** @description Estimated query cost of one group, such as a job, a warehouse size or a node. */
         CostGroup: {
             /** Format: double */
@@ -2219,6 +2279,67 @@ export interface components {
              * @description None when any of the group's observations had no configured credit price.
              */
             usd?: number | null;
+        };
+        /** @description The price the dollars of a cost read use, and where it came from. */
+        CostPrice: {
+            /** @description `configured`: the project's `[cost] usd_per_credit`. */
+            source: string;
+            /** Format: double */
+            usd_per_credit: number;
+        };
+        /** @description A selection's estimated query cost over a period, job by node, with daily series. */
+        CostSelectionRecord: {
+            /** Format: int64 */
+            bytes_scanned: number;
+            /** Format: double */
+            credits: number;
+            /** @description The period's days, `YYYY-MM-DD` in UTC, oldest first; every series follows them. */
+            dates: string[];
+            /** Format: int32 */
+            days: number;
+            error?: null | components["schemas"]["SelectionProblem"];
+            facts: components["schemas"]["CostFactRecord"][];
+            folder_daily: components["schemas"]["CostSeriesRecord"][];
+            /**
+             * Format: int64
+             * @description Of those, builds whose cost is still pending or partial.
+             */
+            incomplete_runs: number;
+            job_daily: components["schemas"]["CostSeriesRecord"][];
+            /** Format: double */
+            previous_credits: number;
+            /** Format: double */
+            previous_usd?: number | null;
+            price?: null | components["schemas"]["CostPrice"];
+            /** Format: int64 */
+            queries: number;
+            /**
+             * Format: int64
+             * @description Builds in the period that spent cost on a selected node.
+             */
+            runs: number;
+            /** Format: double */
+            seconds: number;
+            /** Format: date-time */
+            since: string;
+            /**
+             * Format: uuid
+             * @description The publication the selection was evaluated against; None before the first one.
+             */
+            snapshot_id?: string | null;
+            /** Format: double */
+            usd?: number | null;
+        };
+        /** @description Daily series for a batch of groups, in their order. */
+        CostSeriesBatch: {
+            dates: string[];
+            series: number[][];
+        };
+        /** @description Credits per day of the period, oldest first, for one group. */
+        CostSeriesRecord: {
+            credits: number[];
+            /** @description The job, or top-level folder; None for builds no server run started. */
+            key?: string | null;
         };
         /** @description A target's estimated query cost over a window, from the latest observation of each run. */
         CostSummaryRecord: {
@@ -2318,16 +2439,10 @@ export interface components {
             /** Format: date-time */
             last_good_at?: string | null;
             name: string;
-            /**
-             * @description The node each item of the served result became under each of `assets`, or each asset's
-             *     placeholder node for a set that never succeeded.
-             */
+            /** @description The node each served item became under each of `assets`, or each asset's placeholder. */
             nodes: components["schemas"]["DiscoveredNodeReadback"][];
             status: components["schemas"]["DiscoveredSetStatus"];
-            /**
-             * @description The tags of the result the set serves: its newest, or its last good one after a failure. A tag
-             *     that is not a string reads as its JSON text.
-             */
+            /** @description The tags of the result the set serves (its newest, or its last good one), each as text. */
             tags: {
                 [key: string]: string;
             };
@@ -6778,6 +6893,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CostSummaryRecord"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readCostSelection: {
+        parameters: {
+            query?: {
+                /** @description Builds that started in the last this many whole UTC days, today included; defaults to 7, capped at 90 */
+                days?: number;
+                /** @description Space-separated selectors, as `sqb build -s` takes them; empty selects every node */
+                select?: string;
+                /** @description Space-separated selectors, as `--exclude` takes them */
+                exclude?: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The selection's cost job by node, against the period before, with daily series by job and top-level folder */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostSelectionRecord"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readCostSeries: {
+        parameters: {
+            query: {
+                /** @description As `readCostSelection` */
+                days?: number;
+                /** @description As `readCostSelection` */
+                select?: string;
+                /** @description As `readCostSelection` */
+                exclude?: string;
+                /** @description A JSON array of at most 200 `CostSeriesGroup`s */
+                groups: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Each group's credits per day, in the groups' order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostSeriesBatch"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Session rejected */

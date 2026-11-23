@@ -10,9 +10,10 @@ use crate::api::_helpers::authentication::password_sessions;
 use crate::api::_helpers::authentication::{cli_login, oidc};
 use crate::api::_helpers::resources::{
     administrators, audit, changed_builds, changes, location_health, location_work,
-    person_bootstrap, person_checks, person_location_work, person_maintenance, person_node_sql,
-    person_operations, person_plans, person_reads, person_republish, person_selection, run_reads,
-    runs, service_accounts, snapshots, trigger_reads, warehouse_metadata,
+    person_bootstrap, person_checks, person_cost, person_location_work, person_maintenance,
+    person_node_sql, person_operations, person_plans, person_reads, person_republish,
+    person_selection, run_reads, runs, service_accounts, snapshots, trigger_reads,
+    warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
@@ -51,6 +52,8 @@ use crate::api::_helpers::resources::{
     person_reads::run_ignored_audits,
     person_reads::run_cost,
     person_reads::cost_summary,
+    person_cost::cost_selection,
+    person_cost::cost_series,
     person_reads::node_costs,
     person_reads::run_statement_sql,
     person_reads::run_output,
@@ -177,6 +180,29 @@ pub(crate) struct ReadQuery {
 pub(crate) struct CostQuery {
     pub(crate) days: Option<u32>,
     pub(crate) limit: Option<u32>,
+}
+
+/// A selection's cost read: its window in days and the selection, as `sqb build` takes it.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CostSelectionQuery {
+    pub(crate) days: Option<u32>,
+    #[serde(default)]
+    pub(crate) select: String,
+    #[serde(default)]
+    pub(crate) exclude: String,
+}
+
+/// A batch of daily cost series: the selection's read and the groups, as JSON.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CostSeriesQuery {
+    pub(crate) days: Option<u32>,
+    #[serde(default)]
+    pub(crate) select: String,
+    #[serde(default)]
+    pub(crate) exclude: String,
+    pub(crate) groups: String,
 }
 
 #[derive(Debug, Deserialize)]

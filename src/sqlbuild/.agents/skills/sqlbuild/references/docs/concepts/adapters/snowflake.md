@@ -273,10 +273,17 @@ Under [`sqb server`](../../cli/server.md), the UI labels the same figures "estim
 | --- | --- |
 | Run | The run's total, then each model and each warehouse, most expensive first |
 | Model, Runs tab | The model's cost and query time in each build over the last 30 days |
-| Overview | The last 7 or 30 days by job, folder and warehouse size |
+| Cost | A selection's cost over 7 or 30 days, by job and folder down to each model, against the period before, with a trend per day |
+| Overview | The last 7 days' total, linking to the Cost page |
 
 Figures are in dollars when `usd_per_credit` is set, and in credits with the default rate. A run
 whose cost isn't final shows "Cost pending" or "Partial", never $0.
+
+The Cost page takes a selection as `sqb build --select` does, and the server resolves it against
+the current deploy. The same reads are in the control API: `readCostSelection` returns each job's
+cost on each selected model for the period and the one before, with daily series by job and
+top-level folder, and `readCostSeries` returns daily series for up to 200 groups by job, folder
+and model.
 
 The estimate is read from `INFORMATION_SCHEMA.QUERY_HISTORY` when the run finishes. If it can't be
 read within 30 seconds, the build is unaffected and its cost is recorded as `pending`;

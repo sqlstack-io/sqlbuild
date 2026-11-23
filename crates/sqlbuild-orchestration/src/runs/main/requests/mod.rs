@@ -6,3 +6,4 @@ pub mod read_selection_vocabulary;
 pub mod request_job_run;
 pub mod request_person_run;
 pub mod request_rerun;
+pub mod select_viewed_nodes;

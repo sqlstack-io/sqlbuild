@@ -285,6 +285,14 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_reads::cost_summary),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/cost/selection",
+            get(crate::api::_helpers::resources::person_cost::cost_selection),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/cost/series",
+            get(crate::api::_helpers::resources::person_cost::cost_series),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/cost",
             get(crate::api::_helpers::resources::person_reads::node_costs),
         )

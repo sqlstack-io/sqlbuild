@@ -234,3 +234,91 @@ pub struct NodeCostRecord {
     pub seconds: f64,
     pub query_count: i64,
 }
+
+/// The price the dollars of a cost read use, and where it came from.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CostPrice {
+    pub usd_per_credit: f64,
+    /// `configured`: the project's `[cost] usd_per_credit`.
+    pub source: String,
+}
+
+/// One job's estimated query cost on one node: in the period, and in the period before it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CostFactRecord {
+    /// None for builds no server run started.
+    pub job: Option<String>,
+    /// `<kind>:<name>`, like catalog node keys.
+    pub node_key: String,
+    /// The node's folder as `costFolder` names it; empty at the top of `sql/models`.
+    pub folder: String,
+    pub credits: f64,
+    pub previous_credits: f64,
+    pub usd: Option<f64>,
+    pub previous_usd: Option<f64>,
+    pub seconds: f64,
+    /// Builds in the period, counted once each.
+    pub runs: i64,
+    pub queries: i64,
+    pub bytes_scanned: i64,
+}
+
+/// Credits per day of the period, oldest first, for one group.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CostSeriesRecord {
+    /// The job, or top-level folder; None for builds no server run started.
+    pub key: Option<String>,
+    pub credits: Vec<f64>,
+}
+
+/// A selection's estimated query cost over a period, job by node, with daily series.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CostSelectionRecord {
+    /// The publication the selection was evaluated against; None before the first one.
+    pub snapshot_id: Option<Uuid>,
+    pub since: DateTime<Utc>,
+    pub days: u32,
+    /// The period's days, `YYYY-MM-DD` in UTC, oldest first; every series follows them.
+    pub dates: Vec<String>,
+    /// Why `sqb` refuses the selection; facts and series are then empty.
+    pub error: Option<crate::runs::models::SelectionProblem>,
+    /// None when any observation had no configured credit price.
+    pub price: Option<CostPrice>,
+    pub credits: f64,
+    pub previous_credits: f64,
+    pub usd: Option<f64>,
+    pub previous_usd: Option<f64>,
+    /// Builds in the period that spent cost on a selected node.
+    pub runs: i64,
+    /// Of those, builds whose cost is still pending or partial.
+    pub incomplete_runs: i64,
+    pub queries: i64,
+    pub seconds: f64,
+    pub bytes_scanned: i64,
+    pub facts: Vec<CostFactRecord>,
+    pub job_daily: Vec<CostSeriesRecord>,
+    pub folder_daily: Vec<CostSeriesRecord>,
+}
+
+/// One group a batch of daily series asks for: the cost of selected nodes matching every field given.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CostSeriesGroup {
+    #[serde(default)]
+    pub job: Option<String>,
+    /// Builds no server run started.
+    #[serde(default)]
+    pub manual: bool,
+    /// The folder or one under it.
+    #[serde(default)]
+    pub folder: Option<String>,
+    #[serde(default)]
+    pub node_key: Option<String>,
+}
+
+/// Daily series for a batch of groups, in their order.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CostSeriesBatch {
+    pub dates: Vec<String>,
+    pub series: Vec<Vec<f64>>,
+}
