@@ -1,5 +1,6 @@
 import CheckCircleIcon from '@lucide/svelte/icons/circle-check';
 import ClockIcon from '@lucide/svelte/icons/clock-3';
+import CircleDollarSignIcon from '@lucide/svelte/icons/circle-dollar-sign';
 import DatabaseIcon from '@lucide/svelte/icons/database';
 import GitBranchIcon from '@lucide/svelte/icons/git-branch';
 import GitCompareIcon from '@lucide/svelte/icons/git-compare';
@@ -40,7 +41,9 @@ export const NAV: readonly NavGroup[] = [
 		items: [
 			{ label: 'Runs', href: '/runs', icon: ListIcon, loads: 'listRunRows', badge: { value: (c) => c.activeRuns, tone: 'live' }, wholeTarget: true },
 			{ label: 'Jobs', href: '/jobs', icon: PlayIcon, loads: 'listJobs', wholeTarget: true },
-			{ label: 'Triggers', href: '/triggers', icon: ClockIcon, loads: 'listTriggers', badge: { value: (c) => c.pausedTriggers, tone: 'muted' }, wholeTarget: true }
+			{ label: 'Triggers', href: '/triggers', icon: ClockIcon, loads: 'listTriggers', badge: { value: (c) => c.pausedTriggers, tone: 'muted' }, wholeTarget: true },
+			// Mockup (CHI-1650): the real entry also hides when the connection's adapter reports no cost.
+			{ label: 'Cost', href: '/cost', icon: CircleDollarSignIcon, loads: 'getCostSummary', wholeTarget: true }
 		]
 	},
 	{

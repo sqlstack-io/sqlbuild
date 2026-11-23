@@ -33,6 +33,9 @@
 	import { cappedFolders, quietDeployLine, recentDeployRows } from '$lib/build-area/overview-panels';
 	import { pagesBeyondTarget } from '$lib/nav';
 	import OverviewCost from './overview-cost.svelte';
+	import OverviewCostCard from './overview-cost-card.svelte';
+	import { page } from '$app/state';
+	import { MockApiClient } from '$lib/api/mock/mock-client';
 
 	const catalog = useCatalogNodes();
 	/** Each top-level folder as a selection, for the folder rows' links to the catalog. */
@@ -163,6 +166,8 @@
 	const latest = $derived(data?.latestRun ?? null);
 	const latestText = $derived(latest ? `Last run ${runStatusLabel[latest.status].toLowerCase()} ${formatAgo(latest.endedAt, app.now)}` : 'No runs yet');
 	const m = $derived(data?.metrics);
+	// Mockup (CHI-1650): `?mock&variant=a|b|c|d` shows the Cost card that links to the Cost page.
+	const costVariant = $derived(app.client instanceof MockApiClient ? page.url.searchParams.get('variant') : null);
 	const finished = $derived(m ? m.runs24h.success + m.runs24h.warn + m.runs24h.partial + m.runs24h.failed : 0);
 	const successRate = $derived(m && finished ? Math.round(((m.runs24h.success + m.runs24h.warn) / finished) * 100) : null);
 	const costChange = $derived(m?.cost && m.cost.baseline ? Math.round(((m.cost.last24h - m.cost.baseline) / m.cost.baseline) * 100) : null);
@@ -309,7 +314,7 @@
 				<p class="ack-error standalone">{acknowledgeError}</p>
 			{/if}
 
-			<section class="metric-strip" style:--metrics={3 + (m?.stale ? 1 : 0) + (m?.cost ? 1 : 0)}>
+			<section class="metric-strip" style:--metrics={3 + (m?.stale ? 1 : 0) + (m?.cost || costVariant ? 1 : 0)}>
 				{#if m}
 					<div class="metric">
 						<span class="metric-label">Models</span>
@@ -333,7 +338,9 @@
 							<span>{m.stale.changed} changed · {m.stale.behind} behind{#if m.stale.sources !== null} · {plural(m.stale.sources, 'source')} late{/if}</span>
 						</div>
 					{/if}
-					{#if m.cost}
+					{#if costVariant}
+						<OverviewCostCard variant={costVariant} />
+					{:else if m.cost}
 						<div class="metric">
 							<span class="metric-label">Cost · 24h</span>
 							<div><strong>{formatCredits(m.cost.last24h)}</strong></div>
@@ -409,7 +416,7 @@
 				</section>
 			{/if}
 
-			<OverviewCost />
+			{#if !costVariant}<OverviewCost />{/if}
 		</div>
 	{/if}
 </PageBody>
