@@ -183,7 +183,7 @@ def break_dbt_interop_fact_orders_model(project_dir: Path) -> None:
     """Make the dbt fact_orders model fail at run time so the dbt build errors."""
 
     fact_orders_path: Path = (
-        project_dir.parent / "dbt_project" / "sql" / "models" / "marts" / "fact_orders.sql"
+        project_dir.parent / "dbt_project" / "models" / "marts" / "fact_orders.sql"
     )
     fact_orders_path.write_text(
         "{{ config(tags=['finance']) }}\n"

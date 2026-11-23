@@ -198,6 +198,7 @@ def test_given_factory_generated_nodes_when_running_commands_then_lifecycle_succ
         project_name="factory_nodes_project",
         repo_files={
             "sqlbuild_project.toml": (
+                'extra_paths = ["prepare_marker.txt", "loader_marker.txt", "asset_marker.txt"]\n'
                 'name = "factory_nodes_project"\n'
                 'adapter = "duckdb"\n\n'
                 "[connection]\n"
@@ -487,6 +488,7 @@ def test_given_asset_selector_when_running_run_then_asset_executes(
         project_name="python_asset_run_project",
         repo_files={
             "sqlbuild_project.toml": (
+                'extra_paths = ["asset_marker.txt"]\n'
                 'name = "python_asset_run_project"\n'
                 'adapter = "duckdb"\n\n'
                 "[connection]\n"

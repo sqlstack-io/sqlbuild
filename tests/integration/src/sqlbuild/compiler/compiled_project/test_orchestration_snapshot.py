@@ -157,9 +157,9 @@ _PRICE_MODELS: dict[str, str] = {
                     ).read_text()
                 )[source]
                 for path, source in (
-                    ("python/nodes/notify/orders.py", "side_effect"),
-                    ("python/nodes/assets/orders.py", "asset"),
-                    ("python/nodes/checks/orders.py", "initial"),
+                    ("python/nodes/notify/notify_support/asset.py", "side_effect"),
+                    ("python/nodes/assets/order_export/asset.py", "asset"),
+                    ("python/nodes/checks/orders/checks.py", "initial"),
                 )
             },
             frozenset({"model", "asset", "check"}),

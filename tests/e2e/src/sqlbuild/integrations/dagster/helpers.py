@@ -61,7 +61,8 @@ def prepare_python_nodes_integration_project(root: Path) -> Path:
         "MODEL (description 'Test model orders.', materialized view);\n\nSELECT 1 AS order_id\n",
         encoding="utf-8",
     )
-    (factories_dir / "generated_nodes.py").write_text(
+    (factories_dir / "generated_nodes").mkdir()
+    (factories_dir / "generated_nodes" / "factory.py").write_text(
         "\n".join(
             (
                 "from sqlbuild.assets import asset",

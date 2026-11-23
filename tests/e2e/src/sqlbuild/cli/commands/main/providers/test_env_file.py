@@ -115,7 +115,7 @@ BUILD: tuple[str, ...] = (
         ),
         EnvFileE2ETestCase(
             description="the selected target's env_file replaces the project default",
-            project_toml='\n[targets.uat]\nenv_file = "config/uat.env"\n',
+            project_toml='extra_paths = ["config/"]\n\n[targets.uat]\nenv_file = "config/uat.env"\n',
             files={
                 ".env": (ENV_FILE, PRIVATE),
                 "config/uat.env": (

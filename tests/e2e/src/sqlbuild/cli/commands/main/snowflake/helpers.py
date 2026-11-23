@@ -415,7 +415,7 @@ def build_snowflake_dbt_profiles_yml(*, schema_name: str, config: dict[str, obje
 def write_snowflake_dbt_scenario_date_trunc_model(*, sqlbuild_project_dir: Path) -> None:
     """Write a Snowflake-flavored DATE_TRUNC dbt model and a scenario targeting it."""
 
-    dbt_models_dir: Path = sqlbuild_project_dir.parent / "dbt_project" / "sql" / "models"
+    dbt_models_dir: Path = sqlbuild_project_dir.parent / "dbt_project" / "models"
     dbt_models_dir.joinpath("event_rollup.sql").write_text(
         "select\n"
         "  customer_id,\n"

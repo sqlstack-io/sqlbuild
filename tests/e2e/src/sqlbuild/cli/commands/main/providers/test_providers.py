@@ -664,7 +664,7 @@ def test_given_provider_project_when_running_compile_or_plan_then_provider_setup
             description="alias-imported provider annotation gets CLI diagnostic",
             command=("--no-color", "build", "--no-tests", "--no-audits", "--select", "alias_task"),
             expected_error_fragment=(
-                "Import project providers using the project-root providers package path"
+                "Import project providers using the project path of the providers package"
             ),
         )
     ],
@@ -1459,7 +1459,7 @@ def test_given_alias_imported_provider_annotation_on_hook_when_building_then_cli
 
                 from sqlbuild.hooks import hook
 
-                provider_path = Path(__file__).parents[2] / "python" / "providers" / "marker.py"
+                provider_path = Path(__file__).parents[3] / "python" / "providers" / "marker.py"
                 spec = importlib.util.spec_from_file_location("alias_marker", provider_path)
                 alias_marker = importlib.util.module_from_spec(spec)
                 sys.modules["alias_marker"] = alias_marker

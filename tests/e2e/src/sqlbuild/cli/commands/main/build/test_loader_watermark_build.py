@@ -44,6 +44,7 @@ def test_given_managed_loader_watermark_when_reloaded_then_incremental_consumes_
         repo_files={
             "sqlbuild_project.toml": dedent(
                 """
+                extra_paths = ["maximum.txt"]
                 name = "loader_watermark_build"
                 adapter = "duckdb"
 

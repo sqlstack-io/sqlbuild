@@ -106,7 +106,7 @@ def prepare_dbt_profile_workspace(*, tmp_path: Path, profiles_yml: str) -> Path:
 def write_dbt_profile_orders_model(*, workspace: Path, order_id: int) -> None:
     """Write the mutable dbt model used by adapter dbt-profile E2Es."""
 
-    (workspace / "dbt_project" / "sql" / "models" / "dbt_orders.sql").write_text(
+    (workspace / "dbt_project" / "models" / "dbt_orders.sql").write_text(
         f"select {order_id} as order_id\n",
         encoding="utf-8",
     )

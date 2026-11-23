@@ -442,7 +442,7 @@ def prepare_postgres_dbt_seed_change_workspace(
 def append_postgres_dbt_seed_change_order(*, project_dir: Path, order_id: int, amount: int) -> None:
     """Append one row to the Postgres seed-change raw_orders seed."""
 
-    seed_path: Path = project_dir.parent / "dbt_project" / "sql" / "seeds" / "raw_orders.csv"
+    seed_path: Path = project_dir.parent / "dbt_project" / "seeds" / "raw_orders.csv"
     seed_path.write_text(
         seed_path.read_text(encoding="utf-8") + f"{order_id},{amount}\n",
         encoding="utf-8",
