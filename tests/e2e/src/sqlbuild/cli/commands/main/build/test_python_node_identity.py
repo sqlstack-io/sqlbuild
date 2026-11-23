@@ -20,8 +20,10 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
 )
 from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
-_LOADERS_PATH: str = "python/nodes/loaders/orders.py"
-_ASSETS_PATH: str = "python/nodes/assets/exports.py"
+_LOADERS_MODULE: str = "python/nodes/loaders/orders.py"
+_ASSETS_MODULE: str = "python/nodes/assets/exports.py"
+_LOADERS_PATH: str = "python/nodes/loaders/orders/staged_orders/loader.py"
+_ASSETS_PATH: str = "python/nodes/assets/exports/export_orders/asset.py"
 _ORIGINAL_COLUMNS: str = 'LoaderColumnSpec(name="order_id", type="INTEGER")'
 _ORIGINAL_RETRY: str = "RetryPolicy(max_attempts=2, retry_on=RuntimeError)"
 
@@ -69,8 +71,10 @@ def test_given_built_python_nodes_when_editing_decorator_inputs_then_identity_tr
                 """
             ).strip()
             + "\n",
-            _LOADERS_PATH: dedent(
-                f"""
+            **node_module_files(
+                _LOADERS_MODULE,
+                dedent(
+                    f"""
                 from sqlbuild.loaders import LoaderColumnSpec, loader
 
                 STAGED_ORDER_COLUMNS = [{_ORIGINAL_COLUMNS}]
@@ -89,7 +93,8 @@ def test_given_built_python_nodes_when_editing_decorator_inputs_then_identity_tr
                     rows = ctx.query(f"SELECT order_id FROM {{staged}}")
                     return [{{"order_id": row[0]}} for row in rows]
                 """
-            ).lstrip(),
+                ).lstrip(),
+            ),
             "sql/sources/raw.yml": dedent(
                 """
                 sources:
@@ -102,8 +107,10 @@ def test_given_built_python_nodes_when_editing_decorator_inputs_then_identity_tr
                         type: INTEGER
                 """
             ).lstrip(),
-            _ASSETS_PATH: dedent(
-                f"""
+            **node_module_files(
+                _ASSETS_MODULE,
+                dedent(
+                    f"""
                 from sqlbuild.assets import asset
                 from sqlbuild.retries import RetryPolicy
 
@@ -115,7 +122,8 @@ def test_given_built_python_nodes_when_editing_decorator_inputs_then_identity_tr
                     '''Test asset export_orders.'''
                     return None
                 """
-            ).lstrip(),
+                ).lstrip(),
+            ),
         },
     )
     first_build: subprocess.CompletedProcess[str] = run_sqb(
@@ -209,7 +217,7 @@ def test_given_helper_package_with_relative_imports_when_editing_helper_then_tas
                 def orders(ctx):
                     '''Test task orders.'''
                     return ctx.result(
-                        payload={"status": python.helpers.clean.normalize_status(" Shipped ")}
+                        payload={"status": python.nodes.helpers.clean.normalize_status(" Shipped ")}
                     )
                 """
                 ).lstrip(),
