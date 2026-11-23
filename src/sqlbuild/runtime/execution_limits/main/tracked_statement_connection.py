@@ -18,10 +18,7 @@ from sqlbuild.runtime.execution_limits.classes.item_deadline import ItemDeadline
 
 @contextmanager
 def tracked_statement_connection(*, adapter: Any, connection: Any) -> Generator[None]:
-    """Record a statement on `connection` for deadlines and, unless bookkeeping, for cancels.
-
-    A bookkeeping statement still counts as run, so Ctrl+C sees this process has used the warehouse.
-    """
+    """Record a statement on `connection` for deadlines and, unless bookkeeping, for cancels."""
 
     bookkeeping: bool = current_bookkeeping_context.get()
     if bookkeeping:
