@@ -107,8 +107,10 @@ pub(crate) struct OutputLargeTestCase {
 }
 
 /// What a pass leaves: runs pruned, objects, chunk rows, marks and the run's output row.
+#[cfg(unix)]
 pub(crate) type RetentionState = (usize, usize, usize, usize, usize);
 
+#[cfg(unix)]
 pub(crate) struct OutputRetentionFailureTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

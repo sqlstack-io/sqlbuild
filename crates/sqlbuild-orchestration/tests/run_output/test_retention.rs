@@ -5,12 +5,12 @@ use chrono::TimeDelta;
 use crate::run_output::main::prune_run_output::prune_run_output;
 use crate::run_output::main::publish_output_batch::publish_output_batch;
 use crate::run_output::models::OutputStream;
-use crate::run_output::tests::helpers::{
-    batch, claimed_run, object_count, output_store, segment, set_chunks_writable,
-};
-use crate::run_output::tests::test_types::{
-    OutputRetentionFailureTestCase, OutputRetentionTestCase, RetentionState,
-};
+#[cfg(unix)]
+use crate::run_output::tests::helpers::set_chunks_writable;
+use crate::run_output::tests::helpers::{batch, claimed_run, object_count, output_store, segment};
+use crate::run_output::tests::test_types::OutputRetentionTestCase;
+#[cfg(unix)]
+use crate::run_output::tests::test_types::{OutputRetentionFailureTestCase, RetentionState};
 use crate::runs::tests::helpers::rows;
 use crate::store::main::query::query;
 use crate::store::main::write::write;
@@ -140,6 +140,8 @@ fn given_finished_runs_when_retention_runs_then_only_output_past_its_days_is_rem
     }
 }
 
+/// Read-only folders are how this test makes deletion fail, and they are a unix permission.
+#[cfg(unix)]
 #[test]
 fn given_objects_that_cannot_be_deleted_when_retention_runs_then_the_index_points_at_nothing_and_the_next_pass_finishes()
  {

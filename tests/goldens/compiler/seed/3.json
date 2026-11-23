@@ -1071,8 +1071,8 @@
           "channel": "東京 warehouse"
          },
          "relative_path": "models/features/_sqlbuild/_hooks/python/notify.py",
-         "definition_hash": "55440ff19f0c4f231ad57d453227a3c9d584b81234ee4b3338a39ccdf59814a8",
-         "version_hash": "03b4f786f8ab2736e5be2e4de5016bd16ea44d84beca000ec2a53a397e503eb6"
+         "definition_hash": "4669f6863eaccfebdb6aa5286a58eb944d8b0142ea2bc8e6678cce4efb35bf7e",
+         "version_hash": "80b0b3a25244f0def68efcbecd29182bfa91d76b9272c4d2147d08ae88260fa2"
         }
        ]
       }

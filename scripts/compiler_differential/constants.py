@@ -264,6 +264,7 @@ GENERATOR_FEATURE_BLOCKS: tuple[str, ...] = (
     "line_endings",
     *GENERATOR_RENDER_BLOCKS,
     *GENERATOR_ANALYSIS_BLOCKS,
+    "discovered_set",
 )
 GENERATOR_FEATURE_STRIDE: int = 4
 GENERATOR_OPTIONAL_FEATURE_SHARE: float = 0.2

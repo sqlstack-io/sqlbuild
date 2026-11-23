@@ -2000,18 +2000,7 @@
      "incremental_strategy": null,
      "merge_exclude_columns": null,
      "persist_docs": {},
-     "post-hook": [
-      {
-       "sql": "SELECT 'ci_checks.support_summary_0' AS refreshed_relation, 'naïve résumé' AS refresh_label",
-       "transaction": true,
-       "index": 0
-      },
-      {
-       "sql": "SELECT 'ci_checks.support_summary_0' AS refreshed",
-       "transaction": true,
-       "index": 1
-      }
-     ],
+     "post-hook": [],
      "pre-hook": [],
      "quoting": {},
      "column_types": {},
@@ -2046,30 +2035,7 @@
       "tags": []
      }
     },
-    "meta": {
-     "sqlbuild": {
-      "lifecycle_hooks": {
-       "post_hooks": [
-        {
-         "type": "sql",
-         "statement": "SELECT 'ci_checks.support_summary_0' AS refreshed_relation, 'naïve résumé' AS refresh_label",
-         "name": "record_refresh",
-         "relative_path": "models/support/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
-         "definition_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
-         "kwargs": {
-          "relation": "@@CTX:destination.qualified",
-          "label": "naïve résumé"
-         },
-         "description": "Record a refresh for one relation"
-        },
-        {
-         "type": "sql",
-         "statement": "SELECT 'ci_checks.support_summary_0' AS refreshed"
-        }
-       ]
-      }
-     }
-    },
+    "meta": {},
     "group": null,
     "docs": {
      "show": true,
@@ -2993,30 +2959,6 @@
     "meta": {
      "sqlbuild_visibility": "local",
      "sqlbuild_scope_path": "models/support/marts"
-    },
-    "docs": {
-     "show": true,
-     "node_color": null
-    },
-    "patch_path": null,
-    "arguments": [],
-    "supported_languages": null
-   },
-   "macro.generated_4__sqlbuild_hooks.record_refresh": {
-    "name": "record_refresh",
-    "resource_type": "macro",
-    "package_name": "generated_4__sqlbuild_hooks",
-    "path": "models/support/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
-    "original_file_path": "models/support/marts/_sqlbuild/_hooks/sql/record_refresh.sql",
-    "unique_id": "macro.generated_4__sqlbuild_hooks.record_refresh",
-    "macro_sql": "SELECT @'relation' AS refreshed_relation, @'label' AS refresh_label",
-    "depends_on": {
-     "macros": []
-    },
-    "description": "Record a refresh for one relation",
-    "meta": {
-     "sqlbuild_resource_type": "sql_hook",
-     "sqlbuild_hook_name": "record_refresh"
     },
     "docs": {
      "show": true,
