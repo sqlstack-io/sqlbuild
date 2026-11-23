@@ -274,6 +274,11 @@ impl Dialect {
 pub(crate) struct InterruptWatch {
     /// The end of the socket pair Python's wakeup descriptor feeds.
     pub(crate) receiver: WakeupSocket,
+    /// The end Python's wakeup descriptor writes to.
+    pub(crate) sender: WakeupSocket,
+    /// The sync bytes the watcher has read, and the signal it gives when it reads one.
+    pub(crate) syncs: std::sync::Mutex<u64>,
+    pub(crate) synced: std::sync::Condvar,
     /// The terminal's descriptor and the settings it had when the command started.
     pub(crate) terminal: Option<(i32, Py<PyAny>)>,
     /// Whether SIGTERM is stopping the command, which then ends as a termination.
@@ -298,7 +303,5 @@ pub(crate) struct InterruptPresses {
 pub(crate) struct InterruptSession {
     pub(crate) watch: std::sync::Arc<InterruptWatch>,
     pub(crate) watcher: std::thread::JoinHandle<PyResult<()>>,
-    /// The wakeup descriptor's socket.
-    pub(crate) sender: WakeupSocket,
     pub(crate) previous_wakeup: Py<PyAny>,
 }

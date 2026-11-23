@@ -36,6 +36,10 @@ pub const ALL_PREFIX_TARGET: &str = "all";
 pub(crate) const INTERRUPT_BYTE: u8 = 2;
 /// What stops the watcher; no signal has this number.
 pub(crate) const STOP_BYTE: u8 = 0;
+/// Asks the watcher to confirm it has read every byte written before it; no signal has this number.
+pub(crate) const SYNC_BYTE: u8 = 255;
+/// How long a command's end waits for that confirmation before it trusts what the watcher has seen.
+pub(crate) const SYNC_WAIT: Duration = Duration::from_millis(200);
 /// The most bytes one read of the wakeup descriptor takes.
 pub(crate) const RECEIVE_BYTES: usize = 64;
 /// 128 plus SIGINT, as shells report Ctrl+C.
