@@ -103,9 +103,37 @@ export function findCopy(file: string, source: string, labelFile = false): CopyS
 	// Key-value rows, table columns and filter options: `label: '…'` and `value: '…'` literals.
 	for (const m of source.matchAll(/\blabel:\s*(['"`])((?:(?!\1)[^\\\n])*)\1/g)) add(m.index, 'label', m[2]);
 	for (const m of source.matchAll(/\{\s*label:[^{}]*?\bvalue:\s*(['"`])((?:(?!\1)[^\\\n])*)\1/g)) add(m.index + m[0].lastIndexOf('value:'), 'value', m[2]);
-	// Empty states and messages written as text.
-	for (const m of source.matchAll(/class="(?:[^"]*\s)?(?:empty|msg)(?:\s[^"]*)?"[^>]*>([^<{]*[a-z][^<{]*)</gi)) add(m.index, 'empty', m[1]);
+	// Empty states and messages, read as all the text of their element, nested elements included.
+	for (const m of source.matchAll(/<([a-z]+)\b[^>]*\bclass="(?:[^"]*\s)?(?:empty|msg)(?:\s[^"]*)?"[^>]*>/gi)) {
+		for (const text of blockTexts(source, m[1], m.index + m[0].length)) if (/[a-z]/i.test(text)) add(m.index, 'empty', text);
+	}
 	return sites;
+}
+
+/** The texts of the element whose content starts at `start`, one per `{#if}` branch, without buttons, help tips or code. */
+function blockTexts(source: string, tag: string, start: number): string[] {
+	const open = new RegExp(`<${tag}\\b|</${tag}>`, 'gi');
+	open.lastIndex = start;
+	let depth = 1;
+	let end = source.length;
+	for (let m = open.exec(source); m; m = open.exec(source)) {
+		depth += m[0].startsWith('</') ? -1 : 1;
+		if (!depth) {
+			end = m.index;
+			break;
+		}
+	}
+	let text = source.slice(start, end).replace(/<(Button|button|HelpTip|code)\b[\s\S]*?<\/\1>/g, ' ');
+	// Template expressions, innermost first, become one token; block tags split the branches.
+	for (let before = ''; before !== text; ) {
+		before = text;
+		text = text.replace(/\{([#:/@]?)[^{}]*\}/g, (_, block: string) => (block ? '\u0000' : '#'));
+	}
+	return text
+		.replace(/<[^>]*>/g, ' ')
+		.split('\u0000')
+		.map((part) => part.replace(/\s+/g, ' ').trim())
+		.filter(Boolean);
 }
 
 /** The findings in one file, with `copy-allow` markers honoured; a bare marker is itself a finding. */

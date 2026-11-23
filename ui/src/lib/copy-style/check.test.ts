@@ -48,6 +48,15 @@ describe('copy sites and exceptions', () => {
 		expect(findCopy('labels.ts', labels, true).map((s) => s.text)).toEqual(['Fails if any rows break the rule']);
 	});
 
+	it('reads an empty state with nested elements as one text, without its buttons and help', () => {
+		const block =
+			'<div class="empty">\n<BotIcon />\n<div class="empty-title">No service accounts yet</div>\n<p>A service account lets a script call SQLBuild.</p>\n{#if canAdd}<Button>Add service account</Button>{/if}\n<HelpTip><code>sqb admin</code></HelpTip>\n</div>';
+		expect(findCopy('a.svelte', block).map((s) => [s.kind, s.text])).toEqual([['empty', 'No service accounts yet A service account lets a script call SQLBuild.']]);
+		const branches = '<p class="empty">{#if failed}Couldn\'t load: {error}{:else}No runs in {`${days} days`}.{/if}</p>';
+		expect(findCopy('a.svelte', branches).map((s) => s.text)).toEqual(["Couldn't load: #", 'No runs in #.']);
+		expect(findings('a.svelte', block).findings.map((f) => f.rule)).toContain('empty state over 8 words');
+	});
+
 	it('honours copy-allow with a reason, and reports a bare one', () => {
 		const ok = '<!-- copy-allow: consequence warning -->\n<Panel title="A" note="This will replace every row in the table">';
 		expect(findings('a.svelte', ok)).toEqual({ findings: [], allowed: 1 });

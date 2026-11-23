@@ -180,7 +180,7 @@
 	{#if job.error}
 		<div class="msg err">Couldn't load this job: {job.error}</div>
 	{:else if job.data === null}
-		<div class="msg">There's no job or group named <code>{name}</code> in the version deployed to {app.location?.name}.</div>
+		<div class="msg">No job or group <code>{name}</code> in {app.location?.name}.</div>
 	{/if}
 	{#if actionError}<div class="msg err">{actionError}</div>{/if}
 
