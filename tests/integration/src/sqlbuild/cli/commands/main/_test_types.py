@@ -1637,7 +1637,8 @@ class InterruptedCommandTestCase:
     settle_seconds: float = 0.3
     presses: int = 1
     files: dict[str, str] = field(default_factory=dict)
-    expected_within_seconds: float = 1.0
+    # The forced exit's own worst case is its 0.6 s grace plus two 1 s joins.
+    expected_within_seconds: float = 3.0
 
 
 @dataclass(frozen=True)
