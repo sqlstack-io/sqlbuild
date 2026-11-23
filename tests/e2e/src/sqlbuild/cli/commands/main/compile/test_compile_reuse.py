@@ -636,7 +636,7 @@ def test_given_deprecated_setting_alias_when_compile_is_reused_then_the_warning_
     "test_case",
     [
         CompileReuseRedirectTestCase(
-            description="json_report_redirected_into_project_root",
+            description="json_report_redirected_into_a_gitignored_project_file",
             report_name="compile-report.json",
             expected_hit_counts=(0, 1),
         )
@@ -648,6 +648,8 @@ def test_given_stdout_redirected_into_project_when_rerun_then_it_reuses_the_comp
 ) -> None:
     project_dir: Path = compile_reuse_project
     report_path: Path = project_dir / test_case.report_name
+    # A file outside the project layout is allowed only when the project ignores it.
+    _ = (project_dir / ".gitignore").write_text(f"{test_case.report_name}\n", encoding="utf-8")
 
     first: subprocess.CompletedProcess[str] = run_reuse_compile_into_file(
         project_dir=project_dir, report_path=report_path
