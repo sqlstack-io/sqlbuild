@@ -31,6 +31,9 @@ use crate::warehouse_history::_helpers::audit_repeats::{audit_due, record_audit}
 /// Events whose node may be named only in their payload: older node and check events, and audit results.
 const NODE_EVENTS: &str = "'run_node_started','run_node_finished','run_check_started','run_check_finished','audit_completed'";
 
+/// A finished phase of a worker's command, such as `compiled` or `planned`.
+const INVOCATION_PHASE_EVENT: &str = "invocation_phase";
+
 /// An `invocation_started` event's command, target, selection size and version columns.
 const START_FIELDS: [(&str, &str); 4] = [
     ("started_command", "payload->>'command'"),
@@ -265,6 +268,10 @@ pub(crate) async fn run_events_in(
                  CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN payload->>'binding_key' END AS check_binding_key, \
                  CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN payload->>'result_id' END AS check_result_id, \
                  CASE WHEN event_type='{AUDIT_COMPLETED_EVENT}' THEN CAST(payload->>'violation_count' AS BIGINT) END AS check_rows, \
+                 CASE WHEN event_type='{INVOCATION_PHASE_EVENT}' THEN payload->>'phase' END AS phase, \
+                 CASE WHEN event_type='{INVOCATION_PHASE_EVENT}' THEN CAST(payload->>'count' AS BIGINT) END AS phase_count, \
+                 CASE WHEN event_type='{INVOCATION_PHASE_EVENT}' THEN payload->>'name' END AS phase_name, \
+                 CASE WHEN event_type='{INVOCATION_PHASE_EVENT}' THEN payload->>'detail' END AS phase_detail, \
                  {}, {} FROM events WHERE {filter} AND storage_id>${next} ORDER BY storage_id LIMIT ${}", node_columns(), start_columns(), next + 1)
             },
             vec![

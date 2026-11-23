@@ -19,6 +19,33 @@ const event = (id: string, at: string, extra: Partial<RunEvent> = {}): RunEvent 
 });
 
 describe('run log', () => {
+	it("reads a worker's preparation as steps with durations that open to their sub-steps", () => {
+		const phase = (id: string, at: string, p: Partial<NonNullable<RunEvent['phase']>> & { phase: string }) =>
+			event(id, at, { type: 'invocation_phase', nodeKey: null, phase: { durationMs: null, count: null, name: null, detail: null, ...p } });
+		const entries = logEntries(
+			[
+				phase('d', '2026-11-23T10:00:05Z', { phase: 'discovered', durationMs: 5000 }),
+				phase('c', '2026-11-23T10:00:09Z', { phase: 'compiled', durationMs: 4100, count: 2281, detail: '12 python nodes, 2269 models' }),
+				phase('s', '2026-11-23T10:00:09Z', { phase: 'discovered_set', name: 'fulfilment_plan', count: 3, detail: 'release 2026.11 · discovered 2026-11-23 08:00 UTC' }),
+				phase('k', '2026-11-23T10:00:10Z', { phase: 'connected', durationMs: 300, count: 9, name: 'snowflake' }),
+				phase('p', '2026-11-23T10:00:12Z', { phase: 'planned', durationMs: 1500, count: 93, detail: 'source freshness 1.12 s' })
+			],
+			[]
+		);
+		expect(entries.map((e) => [e.text, e.tag?.text, e.tag?.repeats])).toEqual([
+			['Discovered project · 5.0 s', 'preparing', false],
+			['Compiled project · 2,281 nodes · 4.1 s', 'preparing', false],
+			['Used discovered set fulfilment_plan · 3 items', 'preparing', false],
+			['Connected to snowflake · 0.30 s', 'preparing', false],
+			['Planned · 93 selected · 1.5 s', 'planned', true]
+		]);
+		expect(entries[2].details).toEqual([
+			['Detail', 'release 2026.11'],
+			['Detail', 'discovered 2026-11-23 08:00 UTC']
+		]);
+		expect(entries[3].details).toEqual([['Connections', '9']]);
+	});
+
 	it('says when the worker became ready and how long it took, with the command behind the row', () => {
 		const entries = logEntries(
 			[

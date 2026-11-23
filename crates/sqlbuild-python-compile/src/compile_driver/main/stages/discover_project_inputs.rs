@@ -12,7 +12,11 @@ use sqlbuild_python_base::boundary::main::within::within;
 use sqlbuild_python_base::boundary::models::KeywordArguments;
 use sqlbuild_python_base::compile_driver::constants::PROJECT_DISCOVERIES;
 use sqlbuild_python_base::compile_driver::main::count_stage::count_stage;
+use sqlbuild_python_base::invocation_phases::constants::DISCOVERED_PHASE;
+use sqlbuild_python_base::invocation_phases::main::phase_since::phase_since;
+use sqlbuild_python_base::native_host::main::publish_invocation_phase::publish_invocation_phase;
 use sqlbuild_python_front::discovery::models::SecretPolicy;
+use std::time::Instant;
 
 /// Load all raw project inputs from disk before semantic resolution.
 #[pyfunction]
@@ -47,11 +51,14 @@ pub fn discover_project_inputs<'py>(
             || arguments.flag("extract_output_column_locations")?,
         secret_policy,
     };
-    within(&lifecycle(py, "project_discovery")?, |_| {
+    let started: Instant = Instant::now();
+    let discovered: Bound<'py, PyAny> = within(&lifecycle(py, "project_discovery")?, |_| {
         let assembled: Bound<'py, PyAny> =
             within(&lifecycle(py, "discovery_project_assembly")?, |_| {
                 assembled_inputs(py, &request)
             })?;
         produced(FrontierStage::DiscoveredProjectInputs, assembled)
-    })
+    })?;
+    publish_invocation_phase(py, &phase_since(DISCOVERED_PHASE, started))?;
+    Ok(discovered)
 }

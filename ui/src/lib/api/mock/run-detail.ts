@@ -343,6 +343,7 @@ export function statusReason(status: RunStatus, nodes: RunNode[]): string | null
 const LEVEL: Record<RunEvent['type'], RunEventLevel> = {
 	node_log: 'info',
 	invocation_started: 'info',
+	invocation_phase: 'info',
 	invocation_completed: 'info',
 	invocation_failed: 'error',
 	resource_attempt_started: 'debug',

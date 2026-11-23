@@ -358,6 +358,7 @@ pub enum ExecutorHost {
     ObservabilityValidationError,
     CreateLifecycleEvent,
     CurrentExecutionIdentity,
+    CurrentEventDispatcher,
     DiagnosticLogToJson,
     DispatcherScope,
     InvocationExternalContextScope,

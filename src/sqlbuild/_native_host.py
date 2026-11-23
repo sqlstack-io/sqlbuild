@@ -638,6 +638,10 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "sqlbuild.runtime.observability.main.current_execution_identity",
         "current_execution_identity",
     ),
+    "current_event_dispatcher": (
+        "sqlbuild.runtime.observability.main.current_event_dispatcher",
+        "current_event_dispatcher",
+    ),
     "diagnostic_log_to_json": (
         "sqlbuild.runtime.observability.main.diagnostic_log_to_json",
         "diagnostic_log_to_json",

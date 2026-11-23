@@ -493,6 +493,15 @@ pub struct RunEventRecord {
     pub check_result_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check_rows: Option<i64>,
+    /// For a phase of a worker's command, such as `compiled` or `planned`: what it counted, what it is about and its sub-steps.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase_count: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase_detail: Option<String>,
 }
 
 /// One error-severity audit failure a run or one of its current members let through; never its SQL or evidence.

@@ -193,6 +193,13 @@ class NulLogTestCase(WorkerExecutionTestCase):
 
 
 @dataclass(frozen=True)
+class PhaseEventsTestCase(WorkerExecutionTestCase):
+    description: str
+    backend: Literal["sqlite", "postgres"] = "sqlite"
+    expected_phases: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class NulFailureTestCase(WorkerExecutionTestCase):
     description: str
     backend: Literal["sqlite", "postgres"] = "sqlite"

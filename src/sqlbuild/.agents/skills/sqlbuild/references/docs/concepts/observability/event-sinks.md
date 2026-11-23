@@ -49,6 +49,25 @@ Using `invocation_id` as a partition key keeps one invocation on one Kafka parti
 `event_id` in the payload as the deduplication identity. Confirm the destination topic is not
 compacted when complete lifecycle history must remain replayable.
 
+### Invocation phases
+
+Before a command runs its first node, it publishes one `invocation_phase` event (kind
+`invocation`) as each step of its preparation finishes. The payload's `phase` names the step,
+`duration_ms` says how long it took, and `count`, `name` and `detail` add what the step reports:
+
+| `phase`          | When                                                    | Also carries                                                                  |
+| ---------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `discovered`     | the project's declarations and Python were read         | `duration_ms`                                                                 |
+| `compiled`       | the project compiled                                    | `duration_ms`                                                                 |
+| `matched`        | a worker's compile matched its run's published snapshot | `duration_ms`                                                                 |
+| `discovered_set` | a worker read a saved discovered set its run uses       | `name` (the set), `count` (items), `detail` (tags and when it was discovered) |
+| `connected`      | warehouse connections opened                            | `duration_ms`, `name` (adapter), `count` (connections)                        |
+| `inspected`      | the warehouse state the plan needs was read             | `duration_ms`                                                                 |
+| `planned`        | the plan was generated                                  | `duration_ms`, `count` (nodes selected), `detail` (sub-steps)                 |
+
+A run's page shows these steps in its events, and a "Preparing" bar before the first node on its
+timeline. A consumer that doesn't know a `phase` can ignore the event.
+
 ## Command-output event sink
 
 ```python
@@ -105,9 +124,9 @@ durability. SQLBuild core does not provide a Kafka or ClickHouse implementation.
 
 ## Delivery behavior
 
-- `sqb compile` sends lifecycle sinks only its invocation events (`invocation_started` and its
-  outcome), never its phase `operation` events, so a sink never lengthens a compile with phase
-  deliveries. Other commands send every subscribed kind.
+- `sqb compile` sends lifecycle sinks only its invocation start and outcome, never its
+  `invocation_phase` steps or phase `operation` events, so a sink never lengthens a compile with
+  phase deliveries. Other commands send every subscribed kind.
 - Each sink receives events on its own long-lived delivery thread.
 - An invocation's `invocation_started` arrives before its other events, and `invocation_completed`
   or `invocation_failed` after every other queued event. Events between them are prioritized:

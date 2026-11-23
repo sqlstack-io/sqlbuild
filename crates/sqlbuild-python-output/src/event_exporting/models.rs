@@ -217,7 +217,7 @@ impl EventExporterDispatcher {
     pub(crate) fn enqueue(&self, py: Python<'_>, event: &Bound<'_, PyAny>) -> PyResult<()> {
         let event_type: String = native_field(event, "event_type")?.extract()?;
         let policy: ExportPolicy = export_policy(py, &event_type)?;
-        if self.withheld_kinds.contains(&policy.kind) {
+        if self.withheld_kinds.contains(&policy.kind) || self.withheld_kinds.contains(&event_type) {
             return Ok(());
         }
         let invocation_id: Option<String> = match native_field(event, "invocation_id") {

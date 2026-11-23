@@ -9,6 +9,9 @@ use crate::compile_driver::main::stages::monotonic::monotonic;
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_python_base::boundary::main::keywords::keywords;
+use sqlbuild_python_base::invocation_phases::constants::COMPILED_PHASE;
+use sqlbuild_python_base::invocation_phases::models::InvocationPhase;
+use sqlbuild_python_base::native_host::main::publish_invocation_phase::publish_invocation_phase;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::construct::new_record_with::new_record_with;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
@@ -85,6 +88,14 @@ pub fn compiled_phase<'py>(
     }
     let project: Bound<'py, PyAny> = compiled?;
     reject_compile_errors(&project, &options, on_progress)?;
+    publish_invocation_phase(
+        py,
+        &InvocationPhase {
+            phase: COMPILED_PHASE,
+            duration_ms: Some(compile_seconds * 1000.0),
+            ..InvocationPhase::default()
+        },
+    )?;
     progress(
         on_progress,
         &format!("Compiled project. ({compile_seconds:.2}s)"),

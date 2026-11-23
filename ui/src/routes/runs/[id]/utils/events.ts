@@ -1,6 +1,6 @@
 // Plain one-line summaries of run events; the raw type stays available as a tooltip.
 
-import type { RunEvent, RunEventLevel, RunNode, RunOutputLine } from '$lib/api';
+import type { RunEvent, RunEventLevel, RunEventPhase, RunNode, RunOutputLine } from '$lib/api';
 import { eventTone } from '$lib/operate/labels';
 import { fullStamp } from './stamps';
 import { CHECK_FAILED_CODE } from './failures';
@@ -25,6 +25,33 @@ export function eventCategory(e: RunEvent): EventCategory {
 export function phaseSeconds(ms: number): string {
 	return `${(ms / 1000).toFixed(ms < 1000 ? 2 : 1)} s`;
 }
+
+const PHASE_TEXT: Record<string, (p: RunEventPhase) => string> = {
+	discovered: () => 'Discovered project',
+	compiled: (p) => (p.count === null ? 'Compiled project' : `Compiled project · ${plural(p.count, 'node', 'nodes')}`),
+	matched: () => 'Matched published snapshot',
+	discovered_set: (p) => `Used discovered set ${p.name ?? ''}${p.count === null ? '' : ` · ${plural(p.count, 'item', 'items')}`}`,
+	connected: (p) => `Connected to ${p.name ?? 'the warehouse'}`,
+	inspected: () => 'Inspected warehouse',
+	planned: (p) => (p.count === null ? 'Planned' : `Planned · ${p.count.toLocaleString('en-GB')} selected`)
+};
+
+/** A finished preparation step in one line, such as `Compiled project · 2,281 nodes · 4.1 s`. */
+export function phaseSummary(p: RunEventPhase): string {
+	const text = PHASE_TEXT[p.phase]?.(p) ?? `Finished ${p.phase.replace(/_/g, ' ')}`;
+	return p.durationMs === null ? text : `${text} · ${phaseSeconds(p.durationMs)}`;
+}
+
+/** What a finished step opens to: its sub-steps and facts, one per row. */
+function phaseDetails(p: RunEventPhase): [string, string][] {
+	const rows: [string, string][] = [];
+	if (p.phase === 'matched' && p.name) rows.push(['Snapshot', p.name]);
+	if (p.phase === 'connected' && p.count !== null) rows.push(['Connections', String(p.count)]);
+	for (const step of p.detail?.split(' · ') ?? []) rows.push(['Detail', step]);
+	return rows;
+}
+
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
 
 /** A row's one-line summary; `loadMs` is how long the worker took to become ready, for its ready event. */
 export function eventSummary(e: RunEvent, loadMs?: number): string {
@@ -51,6 +78,8 @@ export function eventSummary(e: RunEvent, loadMs?: number): string {
 		case 'invocation_started':
 			// The worker has loaded and its command starts: how long that took since the worker started.
 			return loadMs === undefined ? 'Worker ready' : `Worker ready · ${phaseSeconds(loadMs)}`;
+		case 'invocation_phase':
+			return e.phase ? phaseSummary(e.phase) : 'Prepared';
 		case 'invocation_completed':
 			return `sqb finished: ${e.message}`;
 		case 'invocation_failed':
@@ -119,6 +148,7 @@ const RUN_KINDS: Partial<Record<RunEvent['type'], string>> = {
 	claimed: 'queued',
 	launched: 'started',
 	invocation_started: 'ready',
+	invocation_phase: 'preparing',
 	invocation_completed: 'finished',
 	invocation_failed: 'failed',
 	terminated: 'finished',
@@ -130,7 +160,7 @@ const RUN_KINDS: Partial<Record<RunEvent['type'], string>> = {
 
 /** The tag an event's row carries: plain words, never the event type. */
 function eventTag(e: RunEvent): LogEntry['tag'] {
-	const kind = e.nodeKey ? undefined : RUN_KINDS[e.type];
+	const kind = e.nodeKey ? undefined : e.phase?.phase === 'planned' ? 'planned' : RUN_KINDS[e.type];
 	if (kind) return { text: kind, tone: kind === 'failed' ? TAG_TONE.err : TAG_TONE.quiet };
 	if (e.type === 'resource_attempt_completed') return { text: 'built', tone: TAG_TONE.ok };
 	if (e.type === 'resource_attempt_failed' || e.type === 'statement_failed' || e.type === 'invocation_failed') return { text: 'failed', tone: TAG_TONE.err };
@@ -178,7 +208,7 @@ function entryOf(e: RunEvent, loads?: ReadonlyMap<string, number>): LogEntry {
 		queries: [],
 		pinned: false,
 		tag: tag && { ...tag, repeats: repeats(tag, text, e.nodeKey) },
-		details: e.message && e.message !== text ? [[e.type === 'invocation_started' ? 'Command' : 'Message', e.message]] : undefined
+		details: e.phase ? phaseDetails(e.phase) : e.message && e.message !== text ? [[e.type === 'invocation_started' ? 'Command' : 'Message', e.message]] : undefined
 	};
 }
 

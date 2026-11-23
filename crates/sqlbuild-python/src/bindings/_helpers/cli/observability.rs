@@ -40,9 +40,9 @@ use sqlbuild_python_output::result_output::models::TerminalEventIndex;
 const OBSERVABILITY_LOGGER: &str = "sqlbuild.cli.observability";
 const DEBUG_COMMAND: &str = "debug";
 const LINEAGE_COMMAND: &str = "lineage";
-/// Compile's phase operations stay out of project lifecycle sinks; its invocation events do not.
+/// Compile's phase operations and steps stay out of project lifecycle sinks; its start and outcome do not.
 const COMPILE_COMMAND: &str = "compile";
-const COMPILE_WITHHELD_KINDS: &[&str] = &["operation"];
+const COMPILE_WITHHELD_KINDS: &[&str] = &["operation", "invocation_phase"];
 const INVOCATION_COMPLETED: &str = "invocation_completed";
 const INVOCATION_FAILED: &str = "invocation_failed";
 /// What an incomplete-export notice says is the only thing affected.

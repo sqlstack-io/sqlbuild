@@ -253,6 +253,8 @@ export const RECALL_EVENT_TYPES = [
 	// A Python node's `ctx.log` line: few, deliberate, kept as events.
 	'node_log',
 	'invocation_started',
+	// A finished step of the worker's command: discovered, compiled, matched, connected, inspected, planned, or a saved discovered set.
+	'invocation_phase',
 	'invocation_completed',
 	'invocation_failed',
 	'resource_attempt_started',
@@ -298,6 +300,17 @@ export type RunEvent = {
 	message: string;
 	/** For `audit_completed`: which check ran, how it came out and how many rows it found. */
 	check?: RunEventCheck | null;
+	/** For `invocation_phase`: which step finished, how long it took, what it counted, what it is about and its sub-steps. */
+	phase?: RunEventPhase | null;
+};
+
+/** One finished step of a worker's command before its nodes run. */
+export type RunEventPhase = {
+	phase: string;
+	durationMs: number | null;
+	count: number | null;
+	name: string | null;
+	detail: string | null;
 };
 
 /** A check's result in a run: its name as declared, its outcome, the rows it found, and its identity for its evidence. */

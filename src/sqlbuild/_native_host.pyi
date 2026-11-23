@@ -574,6 +574,9 @@ from sqlbuild.runtime.observability.main.create_lifecycle_event import (
 from sqlbuild.runtime.observability.main.current_execution_identity import (
     current_execution_identity as current_execution_identity,
 )
+from sqlbuild.runtime.observability.main.current_event_dispatcher import (
+    current_event_dispatcher as current_event_dispatcher,
+)
 from sqlbuild.runtime.observability.main.diagnostic_log_to_json import (
     diagnostic_log_to_json as diagnostic_log_to_json,
 )

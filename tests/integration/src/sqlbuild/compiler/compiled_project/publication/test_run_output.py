@@ -10,6 +10,7 @@ import pytest
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     NulFailureTestCase,
     NulLogTestCase,
+    PhaseEventsTestCase,
     PythonFailureTestCase,
     RunOutputTestCase,
 )
@@ -336,3 +337,65 @@ def test_given_a_nul_in_an_exception_when_its_traceback_is_reported_then_the_fai
             finishes,
             worker.log.read_text()[-4000:],
         )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        PhaseEventsTestCase(
+            "SQLite",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(17,)],
+            backend="sqlite",
+            expected_phases=(
+                "discovered",
+                "compiled",
+                "matched",
+                "connected",
+                "inspected",
+                "planned",
+                "connected",
+            ),
+        ),
+        PhaseEventsTestCase(
+            "PostgreSQL",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(17,)],
+            backend="postgres",
+            expected_phases=(
+                "discovered",
+                "compiled",
+                "matched",
+                "connected",
+                "inspected",
+                "planned",
+                "connected",
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_worker_run_when_it_prepares_then_each_phase_is_a_run_event_with_its_duration(
+    test_case: PhaseEventsTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with (
+        control_database(test_case.backend) as url,
+        scheduled_worker(tmp_path, monkeypatch, test_case, database_url=url) as worker,
+    ):
+        run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
+        database: str = url or f"sqlite://{worker.control_store}"
+        phases: list[tuple[str, bool]] = [
+            (str(phase), duration is not None)
+            for phase, duration in control_query(
+                database,
+                "SELECT payload->>'phase', duration_ms FROM recall_events "
+                "WHERE event_type='invocation_phase' ORDER BY occurred_at, storage_id",
+            )
+        ]
+
+    assert run["status"] == test_case.expected_status, worker.log.read_text()[-4000:]
+    assert phases == [(phase, True) for phase in test_case.expected_phases], phases

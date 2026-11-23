@@ -468,7 +468,8 @@ export function toRunEvent(wire: Wire['RunEventRecord'], runId: string): RunEven
 		statementId: wire.statement_id ?? null,
 		attempt: null,
 		message,
-		check: type === 'audit_completed' ? checkOf(wire) : null
+		check: type === 'audit_completed' ? checkOf(wire) : null,
+		phase: wire.phase ? { phase: wire.phase, durationMs: wire.duration_ms ?? null, count: wire.phase_count ?? null, name: wire.phase_name ?? null, detail: wire.phase_detail ?? null } : null
 	};
 }
 

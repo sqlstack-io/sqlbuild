@@ -4011,6 +4011,12 @@ export interface components {
             message?: string | null;
             occurred_at: string;
             outcome?: string | null;
+            /** @description For a phase of a worker's command, such as `compiled` or `planned`: what it counted, what it is about and its sub-steps. */
+            phase?: string | null;
+            /** Format: int64 */
+            phase_count?: number | null;
+            phase_detail?: string | null;
+            phase_name?: string | null;
             producer?: string | null;
             resource_attempt_id?: string | null;
             resource_id?: string | null;
