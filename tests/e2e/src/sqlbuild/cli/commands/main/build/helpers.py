@@ -1515,7 +1515,7 @@ ROUND_TRIP_FIXTURE: Path = Path("benchmarks/duckshop/edge_cases/loaders/round_tr
 _TWO_GATE_LOADER: str = (
     "from sqlbuild.loaders import loader\n\n"
     "from python.nodes.tasks.ranking import rank_orders\n"
-    "from python.nodes.tasks.scoring import score_orders\n\n\n"
+    "from python.nodes.tasks.scoring.asset import score_orders\n\n\n"
     "@loader(depends_on=[score_orders, rank_orders])\n"
     "def partner_scores(ctx):\n"
     '    """Load the scores the partner returned."""\n'
@@ -1534,10 +1534,10 @@ def round_trip_project_files(*, project_settings: str, task_body: str) -> dict[s
             [*project.rglob("*.py"), *project.rglob("*.sql"), *project.rglob("*.yml")]
         )
     }
-    assert SCORING_TASK in files["python/nodes/tasks/scoring.py"]
-    files["python/nodes/tasks/scoring.py"] = files["python/nodes/tasks/scoring.py"].replace(
-        SCORING_TASK, task_body
-    )
+    assert SCORING_TASK in files["python/nodes/tasks/scoring/asset.py"]
+    files["python/nodes/tasks/scoring/asset.py"] = files[
+        "python/nodes/tasks/scoring/asset.py"
+    ].replace(SCORING_TASK, task_body)
     return {
         "sqlbuild_project.toml": (
             'name = "partner_scoring"\n'
@@ -1571,7 +1571,7 @@ def round_trip_variant(variant: str, files: dict[str, str]) -> dict[str, str]:
 def scoring_task_files(body: str) -> dict[str, str]:
     """The round trip's score task with `body`, keyed by where it goes in the project."""
 
-    path: str = "python/nodes/tasks/scoring.py"
+    path: str = "python/nodes/tasks/scoring/asset.py"
     return {
         path: round_trip_project_files(project_settings=ALLOW_ROUND_TRIPS, task_body=body)[path]
     }

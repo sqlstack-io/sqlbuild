@@ -3,17 +3,16 @@
 use std::collections::BTreeMap;
 
 use crate::node_files::constants::{
-    CHECKS_FILE, DIRECT_FILES, KIND_PLURALS, MIXED_FACTORY_FILE, SINGLE_KIND_FACTORY_FILES,
-    SINGLE_NODE_FILES,
+    CHECKS_FILE, KIND_FILES, MIXED_FACTORY_FILE, SINGLE_NODE_FILES,
 };
-use crate::node_files::models::NodeModule;
+use crate::node_files::models::{KindFiles, NodeModule};
 
 /// The first file-name problem of one module, if any.
 pub(crate) fn module_problem(module: &NodeModule) -> Option<String> {
     let path: &str = &module.relative_path;
     let file: &str = path.rsplit('/').next().unwrap_or(path);
     for (name, kind) in &module.direct {
-        let expected: &str = lookup(&DIRECT_FILES, kind);
+        let expected: &str = files(kind).direct;
         if file != expected {
             return Some(format!(
                 "@{kind} '{name}' is declared in {path}; an @{kind} is declared in {expected}"
@@ -23,15 +22,12 @@ pub(crate) fn module_problem(module: &NodeModule) -> Option<String> {
     for (name, kinds) in &module.factories {
         let (expected, made): (&str, String) = match kinds.as_slice() {
             [] => continue,
-            [kind] => (
-                lookup(&SINGLE_KIND_FACTORY_FILES, kind),
-                format!("only {}", lookup(&KIND_PLURALS, kind)),
-            ),
+            [kind] => (files(kind).factory, format!("only {}", files(kind).plural)),
             _ => (
                 MIXED_FACTORY_FILE,
                 kinds
                     .iter()
-                    .map(|kind| lookup(&KIND_PLURALS, kind))
+                    .map(|kind| files(kind).plural)
                     .collect::<Vec<&str>>()
                     .join(" and "),
             ),
@@ -87,9 +83,10 @@ pub(crate) fn unit_folder_problem(modules: &[NodeModule]) -> Option<String> {
         })
 }
 
-fn lookup<'a>(table: &[(&str, &'a str)], kind: &str) -> &'a str {
-    table
-        .iter()
-        .find(|(name, _)| *name == kind)
-        .map_or("", |(_, value)| *value)
+/// The files of `kind`; every kind discovery reports is in the table.
+fn files(kind: &str) -> KindFiles {
+    KIND_FILES
+        .into_iter()
+        .find(|files| files.kind == kind)
+        .unwrap_or(KIND_FILES[0])
 }

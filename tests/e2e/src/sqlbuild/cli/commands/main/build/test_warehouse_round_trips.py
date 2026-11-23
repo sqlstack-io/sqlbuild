@@ -236,8 +236,8 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
             extra_files=round_trip_variant(
                 "transitive_gate",
                 {
-                    "python/nodes/tasks/packaging.py": "packaging.py",
-                    "python/nodes/loaders/partner.py": "partner.py",
+                    "python/nodes/tasks/packaging/asset.py": "packaging.py",
+                    "python/nodes/loaders/partner/loader.py": "partner.py",
                 },
             ),
             expected_output_fragments=(
@@ -253,10 +253,10 @@ def test_given_a_round_trip_that_cannot_complete_when_building_then_its_readers_
             extra_files=round_trip_variant(
                 "ingress_gate",
                 {
-                    "python/nodes/tasks/rates.py": "rates_task.py",
-                    "python/nodes/loaders/rates.py": "rates_loader.py",
+                    "python/nodes/tasks/rates/asset.py": "rates_task.py",
+                    "python/nodes/loaders/rates/loader.py": "rates_loader.py",
                     "sql/sources/rates.yml": "rates.yml",
-                    "python/nodes/loaders/partner.py": "partner.py",
+                    "python/nodes/loaders/partner/loader.py": "partner.py",
                 },
             ),
             expected_output_fragments=(
@@ -291,6 +291,7 @@ def test_given_a_built_round_trip_when_rebuilding_then_the_decision_follows_the_
         test_case.orders_sql, encoding="utf-8"
     )
     for relative, text in test_case.extra_files.items():
+        (project_dir / relative).parent.mkdir(parents=True, exist_ok=True)
         (project_dir / relative).write_text(text, encoding="utf-8")
 
     result: subprocess.CompletedProcess[str] = run_sqb(

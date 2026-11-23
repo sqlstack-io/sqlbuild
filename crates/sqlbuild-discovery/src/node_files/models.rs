@@ -10,3 +10,14 @@ pub struct NodeModule {
     /// Each factory's name and the kinds of the nodes it returned, without repeats.
     pub factories: Vec<(String, Vec<&'static str>)>,
 }
+
+/// The files one kind of node is declared in, and its plural as messages name it.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct KindFiles {
+    pub(crate) kind: &'static str,
+    /// The file of one direct declaration.
+    pub(crate) direct: &'static str,
+    /// The file of a factory that makes only this kind.
+    pub(crate) factory: &'static str,
+    pub(crate) plural: &'static str,
+}

@@ -24,7 +24,6 @@ from tests.e2e.src.sqlbuild.cli.commands.main.test.helpers import (
     write_project_files,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
-from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 _FILES: dict[str, str] = build_since_project_files()
 _STAGING: str = "sql/models/stg_orders.sql"
@@ -548,12 +547,9 @@ def test_given_changes_since_ref_when_testing_then_runs_only_affected_tests(
         SinceSelectionE2ETestCase(
             description="a Python node change is listed",
             edits={
-                **node_module_files(
-                    "python/nodes/tasks/report.py",
-                    _INDIRECT["python/nodes/tasks/report.py"].replace(
-                        "payload={}", 'payload={"orders": 1}'
-                    ),
-                )
+                "python/nodes/tasks/report/asset.py": _INDIRECT[
+                    "python/nodes/tasks/report/asset.py"
+                ].replace("payload={}", 'payload={"orders": 1}')
             },
             command=_TEST_COMMAND,
             expected_exit_code=0,

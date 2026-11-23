@@ -386,18 +386,20 @@ fn function_parent_components(
 }
 
 fn direct_parent_components(path: &str, root: &str) -> Option<Vec<String>> {
+    let path: Vec<&str> = parts_below(path, root)?;
+    let start: usize = usize::from(path.first() == Some(&sqlbuild_core::constants::SQL_DIRECTORY));
+    Some(owned_parts(&path[start..path.len() - 1]))
+}
+
+/// `path`'s folders and file when it lies below `root`, otherwise `None`.
+fn parts_below<'a>(path: &'a str, root: &str) -> Option<Vec<&'a str>> {
     let path: Vec<&str> = path.split('/').collect();
     let root: Vec<&str> = root.split('/').collect();
-    if path.len() <= root.len() || path.get(..root.len()) != Some(root.as_slice()) {
-        return None;
-    }
-    let start: usize = usize::from(path.first() == Some(&sqlbuild_core::constants::SQL_DIRECTORY));
-    Some(
-        path[start..path.len() - 1]
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect(),
-    )
+    (path.len() > root.len() && path.get(..root.len()) == Some(root.as_slice())).then_some(path)
+}
+
+fn owned_parts(parts: &[&str]) -> Vec<String> {
+    parts.iter().map(|value| (*value).to_owned()).collect()
 }
 
 fn direct_expected_parent(parents: &[Vec<String>]) -> Option<String> {
@@ -497,17 +499,9 @@ fn same_resource_kind(left: &ResourceKind, right: &ResourceKind) -> bool {
 }
 
 fn relative_parent(resource: &ScopeResource) -> Option<Vec<String>> {
-    let path: Vec<&str> = resource.path.split('/').collect();
-    let root: Vec<&str> = resource.ownership_root.split('/').collect();
-    if path.len() <= root.len() || path.get(..root.len()) != Some(root.as_slice()) {
-        return None;
-    }
-    Some(
-        path[root.len()..path.len() - 1]
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect(),
-    )
+    let path: Vec<&str> = parts_below(&resource.path, &resource.ownership_root)?;
+    let depth: usize = resource.ownership_root.split('/').count();
+    Some(owned_parts(&path[depth..path.len() - 1]))
 }
 
 fn common_components(values: &[Vec<String>]) -> Vec<String> {

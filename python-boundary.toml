@@ -668,7 +668,7 @@ rule = 3
 note = "Public facade: re-exports only."
 
 [[stays]]
-path = "sinks.py"
+path = "event_sinks.py"
 rule = 3
 note = "Public facade: re-exports only."
 

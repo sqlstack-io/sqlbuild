@@ -20,7 +20,6 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     prepare_inline_project,
     run_sqb,
 )
-from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
 
 
 @pytest.mark.parametrize(
@@ -37,9 +36,7 @@ from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
             description="a cycle through a task, models, a source and its loader fails compile",
             project_settings=ALLOW_ROUND_TRIPS,
             edited_files={
-                **node_module_files(
-                    "python/nodes/tasks/scoring.py", round_trip_refusal("cycle_task.py")
-                )
+                "python/nodes/tasks/scoring/asset.py": round_trip_refusal("cycle_task.py"),
             },
             expected_exit_code=1,
             expected_output_fragments=(
@@ -76,12 +73,9 @@ from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
             description="a task depending on a terminal loader instead of its source fails compile",
             project_settings="",
             edited_files={
-                **node_module_files(
-                    "python/nodes/tasks/scoring.py", round_trip_refusal("unread_task.py")
-                ),
-                **node_module_files(
-                    "python/nodes/tasks/reporting.py",
-                    round_trip_refusal("terminal_loader_reader.py"),
+                "python/nodes/tasks/scoring/asset.py": round_trip_refusal("unread_task.py"),
+                "python/nodes/tasks/reporting/asset.py": round_trip_refusal(
+                    "terminal_loader_reader.py"
                 ),
             },
             expected_exit_code=1,
