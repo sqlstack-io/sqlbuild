@@ -19,13 +19,13 @@ from sqlbuild._native import (
     EventExportSeverity,
     EventExportSummary,
 )
+from sqlbuild.event_sinks import CommandOutputRecord, CommandOutputStream
 from sqlbuild.observability import LifecycleEvent
 from sqlbuild.runtime.event_exporting.exceptions import EventExporterInputError
 from sqlbuild.runtime.event_exporting.main._invoke_lifecycle_event_sink import (
     invoke_lifecycle_event_sink,
 )
 from sqlbuild.runtime.output_capture.models import BoundCommandOutputSink
-from sqlbuild.sinks import CommandOutputRecord, CommandOutputStream
 from tests.unit.src.sqlbuild.runtime.event_exporting.classes._test_types import (
     EventExporterDispatcherTestCase,
     HealthIntervalTestCase,

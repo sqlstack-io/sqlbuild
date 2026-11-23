@@ -201,11 +201,11 @@ class ComposeStack:
         images: list[str] = []
         for version, sql in cases.items():
             project: Path = self.directory / version
-            (project / "models").mkdir(parents=True)
+            (project / "sql" / "models").mkdir(parents=True)
             (project / "orchestration/jobs").mkdir(parents=True)
             for relative in ("sqlbuild_project.toml", "orchestration/jobs/refresh_orders_job.toml"):
                 shutil.copyfile(Path("deploy/project") / relative, project / relative)
-            (project / "models/orders.sql").write_text(
+            (project / "sql/models/orders.sql").write_text(
                 "MODEL (description 'Example orders.', materialized table);\n" + sql + "\n"
             )
             # Only source enters this build context; credentials stay in the parent process.
