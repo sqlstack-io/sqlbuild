@@ -1015,6 +1015,8 @@ class UnknownDependencyDiscoverTestCase:
 @dataclass(frozen=True)
 class UnknownTagTestCase:
     description: str
-    dependency: str
+    backend: str
+    first: str
+    edits: dict[str, str]
+    expected_nodes: frozenset[str]
     expected_error: str
-    expected_status: int

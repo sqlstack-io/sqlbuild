@@ -5,7 +5,6 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
-from urllib.error import HTTPError
 
 import pytest
 
@@ -15,12 +14,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     UnknownTagTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
-    current_snapshot,
+    control_database,
     location_health_reports,
     location_process,
     snapshot_api,
     wait_for_generation,
-    wait_for_log,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 from tests.unit.src.sqlbuild.python_nodes.helpers import node_module_files
@@ -60,6 +58,11 @@ def support(ctx: AssetContext) -> None:
 '''
 _KEPT: frozenset[str] = frozenset({"asset:fulfil[pack]", "asset:support[triage]"})
 _PLACEHOLDER: frozenset[str] = frozenset({"asset:fulfil[*]", "asset:support[triage]"})
+_TAGGED_ORDERS: str = "MODEL (description 'Orders.', tags [finance]);\nSELECT 1 AS order_id\n"
+_RETAGGED_ORDERS: str = "MODEL (description 'Orders.', tags [finance]);\nSELECT 2 AS order_id\n"
+_UNTAGGED_ORDERS: str = "MODEL (description 'Orders.');\nSELECT 2 AS order_id\n"
+_UNKNOWN_RETURNS: str = "item 'pack' depends on tag 'returns', which no node carries"
+_UNKNOWN_FINANCE: str = "item 'pack' depends on tag 'finance', which no node carries"
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")
@@ -237,15 +240,61 @@ def test_given_an_item_naming_what_the_project_lacks_when_compiling_with_discove
     "test_case",
     [
         UnknownTagTestCase(
-            description="an unknown tag still fails the whole publish",
-            dependency='tag("returns")',
-            expected_error="asset 'fulfil[pack]' depends on tag 'returns', which no node carries",
-            expected_status=404,
-        )
+            description="an unknown tag on first discovery fails only its set, which compiles as its placeholder on SQLite",
+            backend="sqlite",
+            first='tag("returns")',
+            edits={"sql/models/orders.sql": _RETAGGED_ORDERS},
+            expected_nodes=_PLACEHOLDER,
+            expected_error=_UNKNOWN_RETURNS,
+        ),
+        UnknownTagTestCase(
+            description="an item that newly names an unknown tag keeps its set's last good items on SQLite",
+            backend="sqlite",
+            first='model("orders")',
+            edits=node_module_files(
+                "python/nodes/plan/nodes.py", _PLAN.format(dependency='tag("returns")')
+            ),
+            expected_nodes=_KEPT,
+            expected_error=_UNKNOWN_RETURNS,
+        ),
+        UnknownTagTestCase(
+            description="last good items naming a tag the project dropped compile as the placeholder on SQLite",
+            backend="sqlite",
+            first='tag("finance")',
+            edits={"sql/models/orders.sql": _UNTAGGED_ORDERS},
+            expected_nodes=_PLACEHOLDER,
+            expected_error=_UNKNOWN_FINANCE,
+        ),
+        UnknownTagTestCase(
+            description="an unknown tag on first discovery fails only its set, which compiles as its placeholder on PostgreSQL",
+            backend="postgres",
+            first='tag("returns")',
+            edits={"sql/models/orders.sql": _RETAGGED_ORDERS},
+            expected_nodes=_PLACEHOLDER,
+            expected_error=_UNKNOWN_RETURNS,
+        ),
+        UnknownTagTestCase(
+            description="an item that newly names an unknown tag keeps its set's last good items on PostgreSQL",
+            backend="postgres",
+            first='model("orders")',
+            edits=node_module_files(
+                "python/nodes/plan/nodes.py", _PLAN.format(dependency='tag("returns")')
+            ),
+            expected_nodes=_KEPT,
+            expected_error=_UNKNOWN_RETURNS,
+        ),
+        UnknownTagTestCase(
+            description="last good items naming a tag the project dropped compile as the placeholder on PostgreSQL",
+            backend="postgres",
+            first='tag("finance")',
+            edits={"sql/models/orders.sql": _UNTAGGED_ORDERS},
+            expected_nodes=_PLACEHOLDER,
+            expected_error=_UNKNOWN_FINANCE,
+        ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_an_item_naming_a_tag_no_node_carries_when_publishing_then_nothing_publishes(
+def test_given_an_item_naming_a_tag_no_node_carries_when_publishing_then_only_its_set_fails(
     test_case: UnknownTagTestCase, tmp_path: Path
 ) -> None:
     project: Path = tmp_path / "project"
@@ -255,9 +304,9 @@ def test_given_an_item_naming_a_tag_no_node_carries_when_publishing_then_nothing
             "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
             'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
             '[targets.development]\nschema = "main"\n',
-            "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
+            "sql/models/orders.sql": _TAGGED_ORDERS,
             **node_module_files(
-                "python/nodes/plan/nodes.py", _PLAN.format(dependency=test_case.dependency)
+                "python/nodes/plan/nodes.py", _PLAN.format(dependency=test_case.first)
             ),
             "python/nodes/support/nodes/asset.py": _GOOD.replace(
                 'after = (model("orders"), source("raw_orders"), seed("regions"), job("orders_job"))',
@@ -266,7 +315,10 @@ def test_given_an_item_naming_a_tag_no_node_carries_when_publishing_then_nothing
         },
     )
     log: Path = tmp_path / "location.log"
-    with snapshot_api(tmp_path / "control") as api:
+    with (
+        control_database(test_case.backend) as database_url,
+        snapshot_api(tmp_path / "control", database_url=database_url) as api,
+    ):
         arguments: list[str] = [
             str(Path(sys.executable).with_name("sqb")),
             "--project-dir",
@@ -284,8 +336,16 @@ def test_given_an_item_naming_a_tag_no_node_carries_when_publishing_then_nothing
         with location_process(
             arguments, log, tmp_path / "location.stdout", env=environment
         ) as process:
-            wait_for_log(process, log, test_case.expected_error, timeout=60)
-            with pytest.raises(HTTPError) as unpublished:
-                _ = current_snapshot(api, "development")
+            _ = wait_for_generation(api, "development", 1, process, log)
+            for path, text in test_case.edits.items():
+                (project / path).write_text(text)
+            published: dict[str, Any] = wait_for_generation(api, "development", 2, process, log)
+            health: str = str(location_health_reports(api))
 
-    assert unpublished.value.code == test_case.expected_status
+    assets: set[str] = set(filter(lambda key: key.startswith("asset:"), published["nodes"]))
+    assert assets == test_case.expected_nodes, log.read_text()
+    saved: dict[str, Any] = published["documents"]["discovered"]
+    assert saved["support_plan"]["status"] == "ok"
+    assert saved["fulfilment_plan"]["status"] == "failed"
+    assert test_case.expected_error in saved["fulfilment_plan"]["error"]
+    assert "fulfilment_plan" in health and "failed" in health, health

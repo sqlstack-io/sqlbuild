@@ -114,7 +114,7 @@ Only a location, including `sqb dev`, calls discover functions. Every other comp
 
 - **A set fails on its own.** It keeps its last good items, the location's health shows **Discovery failed** with the set and its error, and everything else publishes normally. A location that restarts reads the last good items from the server's current snapshot.
 - **Last good items that name a model, source, seed or job the project no longer has** aren't kept. That covers a publish that reuses a set after the model it names was renamed or removed: the set fails with an error naming the item and the missing node, and compiles as its placeholder until it's discovered again.
-- **An item that depends on a `tag()` no node carries** still fails the whole publish, not only its set: tags are known only once the project compiles. The location keeps its current snapshot and reports the error.
+- **An item that depends on a `tag()` no node carries** fails only its own set, with an error naming the item and the tag. Tags are known only once the project compiles, so the location compiles once more with that set's last good items, and everything else publishes. When those items name the missing tag too, the set compiles as its placeholder.
 - **A set that never succeeded** compiles as its **placeholder node**, `<asset>[*]`. Its `job()` and `tag()` dependants stay valid. A run that reaches it fails that node with `never discovered: <error>`, and its downstream nodes are skipped.
 
 ## Outside a location

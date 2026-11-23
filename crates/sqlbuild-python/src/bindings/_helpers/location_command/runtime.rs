@@ -39,6 +39,7 @@ use sqlbuild_python_base::native_host::main::redirect_stdout_to_stderr::redirect
 use sqlbuild_python_front::discovered_sets::main::checked_set::checked_set;
 use sqlbuild_python_front::discovered_sets::main::discover_for_publication::discover_for_publication;
 use sqlbuild_python_front::discovered_sets::main::published_sets::published_sets;
+use sqlbuild_python_front::discovered_sets::main::with_set_retries::with_set_retries;
 use sqlbuild_python_output::recall::main::write_stderr::write_stderr;
 
 pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResult<i32> {
@@ -79,25 +80,26 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     held = None;
                     discover_for_publication(&arguments, publication)?;
                     let mut error_text: Option<String> = None;
-                    let (published, rules) = match publish_location(py, &arguments) {
-                        Ok(Ok((published, project))) => {
-                            held = Some(project);
-                            (Some(published), None)
-                        }
-                        Ok(Err(rules)) => (None, Some(rules)),
-                        Err(error) => {
-                            write_stderr(
-                                py,
-                                &format!("Location compilation/publication failed: {error}\n"),
-                            )?;
-                            let (message, code, help) = error_text_fields(py, &error)?;
-                            let message = message.unwrap_or_else(|| error.to_string());
-                            let failed = generation_failed(generation, message, (code, help));
-                            py.detach(|| emit_dev_event(&failed))?;
-                            error_text = Some(redact_error_text(&error.to_string()));
-                            (None, None)
-                        }
-                    };
+                    let (published, rules) =
+                        match with_set_retries(|| publish_location(py, &arguments)) {
+                            Ok(Ok((published, project))) => {
+                                held = Some(project);
+                                (Some(published), None)
+                            }
+                            Ok(Err(rules)) => (None, Some(rules)),
+                            Err(error) => {
+                                write_stderr(
+                                    py,
+                                    &format!("Location compilation/publication failed: {error}\n"),
+                                )?;
+                                let (message, code, help) = error_text_fields(py, &error)?;
+                                let message = message.unwrap_or_else(|| error.to_string());
+                                let failed = generation_failed(generation, message, (code, help));
+                                py.detach(|| emit_dev_event(&failed))?;
+                                error_text = Some(redact_error_text(&error.to_string()));
+                                (None, None)
+                            }
+                        };
                     let (discovered, discover_files) =
                         published_sets(held.as_ref().map(|(discovered, _)| discovered))?;
                     serde_json::to_string(&serde_json::json!({
