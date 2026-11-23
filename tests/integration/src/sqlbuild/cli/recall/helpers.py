@@ -512,13 +512,13 @@ RECALL_SINK_IMPORTS: str = (
 EVENT_LOG_SINK: str = (
     "@lifecycle_event_sink\n"
     "def event_log(event: LifecycleEvent) -> None:\n"
-    "    with (Path(__file__).parents[1] / 'events.log').open('a') as log:\n"
+    "    with (Path(__file__).parents[2] / '.events.log').open('a') as log:\n"
     "        log.write(event.event_type + '\\n')\n"
 )
 OUTPUT_LOG_SINK: str = (
     "@command_output_event_sink\n"
     "def output_log(record: CommandOutputRecord) -> None:\n"
-    "    with (Path(__file__).parents[1] / 'output.log').open('a') as log:\n"
+    "    with (Path(__file__).parents[2] / '.output.log').open('a') as log:\n"
     "        log.write(record.message)\n"
 )
 SLOW_LIFECYCLE_SINK: str = (
@@ -576,7 +576,7 @@ def logged_event_types(project_dir: Path, dropped_prefix: str) -> tuple[list[str
     """The sorted event types `event_log` wrote, then those not starting with `dropped_prefix`."""
 
     logged: list[str] = sorted(
-        (project_dir / "events.log").read_text(encoding="utf-8").splitlines()
+        (project_dir / ".events.log").read_text(encoding="utf-8").splitlines()
     )
     dropped: operator.methodcaller = operator.methodcaller("startswith", dropped_prefix)
     return logged, list(itertools.filterfalse(dropped, logged))

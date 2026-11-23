@@ -74,6 +74,12 @@ def test_given_selectors_when_building_then_the_effective_selection_is_recorded(
     test_case: RecordedSelectionTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = write_project(tmp_path / "orders_shop")
+    project_file: Path = project_dir / "sqlbuild_project.toml"
+    # A selector file at the top level is outside the project layout unless the project lists it.
+    _ = project_file.write_text(
+        'extra_paths = ["nightly.txt"]\n' + project_file.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
     _ = (project_dir / "nightly.txt").write_text(test_case.selector_file, encoding="utf-8")
 
     built: subprocess.CompletedProcess[bytes] = run(project_dir, "build", *test_case.args)
@@ -352,9 +358,7 @@ def test_given_cost_attribution_when_a_build_ends_then_the_invocation_records_ho
         toml.read_text(encoding="utf-8").replace('"duckdb"', '"duckdb_costed"', 1),
         encoding="utf-8",
     )
-    adapter: Path = (
-        project_dir / "python" / "adapters" / "warehouse" / "duckdb_costed.py"
-    )
+    adapter: Path = project_dir / "python" / "adapters" / "warehouse" / "duckdb_costed.py"
     adapter.parent.mkdir(parents=True)
     _ = adapter.write_text(COSTED_ADAPTER.format(collected=test_case.collected), encoding="utf-8")
 
