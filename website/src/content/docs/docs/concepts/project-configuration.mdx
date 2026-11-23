@@ -928,8 +928,11 @@ These entries are always allowed:
 
 - the two configuration files and `README.md`;
 - hidden entries such as `.gitignore`, `.env` and the `.agents/` and `.claude/` skill folders;
-- `__pycache__/`, and the `target/` and `logs/` folders SQLBuild writes;
-- local database files beside the project, such as `warehouse.duckdb`;
+- `__pycache__/` at any level, and the `target/` and `logs/` folders SQLBuild writes at the top
+  level;
+- local database files at the top level, ending in `.duckdb`, `.db`, `.sqlite` or `.sqlite3`, and
+  the write-ahead log, shared-memory and journal files beside them (ending in `.wal`, `-wal`,
+  `-shm` or `-journal`), such as `warehouse.duckdb` and `warehouse.duckdb.wal`;
 - anything the project's `.gitignore` files ignore, read from the project directory up to the
   repository root, with the repository's `.git/info/exclude`.
 

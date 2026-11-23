@@ -1318,7 +1318,7 @@ def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
     single_hosts: CustomHostObserver = observe_hosts(monkeypatch=monkeypatch, cores=1)
     single: dict[str, Any] = compile_payload()
     rules_bulk_cache_path(project_dir=tmp_path, file_name="custom-rules.json").parent.parent.rename(
-        tmp_path / "single-rules-cache"
+        tmp_path / "target" / "single-rules-cache"
     )
     split_hosts: CustomHostObserver = observe_hosts(monkeypatch=monkeypatch, cores=test_case.hosts)
     split: dict[str, Any] = compile_payload()
@@ -1334,7 +1334,7 @@ def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
     assert len(split["diagnostics"]) == test_case.model_count - test_case.model_count // 3
     assert warm["diagnostics"] == single["diagnostics"]
     assert warm["compile_timings"]["rule_cache_hits"] >= test_case.model_count
-    assert (tmp_path / "single-rules-cache" / "bulk" / "custom-rules.json").read_bytes() == (
+    assert (tmp_path / "target" / "single-rules-cache" / "bulk" / "custom-rules.json").read_bytes() == (
         rules_bulk_cache_path(project_dir=tmp_path, file_name="custom-rules.json").read_bytes()
     )
 
@@ -3097,7 +3097,7 @@ def required_prefix(*, model: Model, ctx: RuleContext) -> list[Finding]:
         ),
         EmptyRuleSelectionTestCase(
             "ignore paths naming a folder or a glob that matches nothing compile",
-            '[[rules.rule_ignores]]\nrules = ["SQLCLEAN"]\npaths = ["models", "sql/models/legacy/**"]\n'
+            '[[rules.rule_ignores]]\nrules = ["SQLCLEAN"]\npaths = ["sql/models", "sql/models/legacy/**"]\n'
             'reason = "Legacy."\n',
             0,
             (),
@@ -3591,7 +3591,7 @@ def test_given_python_rule_cache_when_inputs_change_then_only_changed_files_reru
         )
         observed.append((timings["rule_cache_hits"], timings["rule_cache_misses"]))
         cached.append(
-            rules_bulk_cache_path(project_dir=tmp_path, file_name="python.nodes.json").is_file()
+            rules_bulk_cache_path(project_dir=tmp_path, file_name="python.json").is_file()
         )
 
     assert tuple(observed) == test_case.expected_hits_and_misses

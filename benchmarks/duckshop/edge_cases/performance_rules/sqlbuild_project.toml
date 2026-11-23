@@ -1,3 +1,4 @@
+extra_paths = ["expected_findings.json"]
 name = "orders"
 adapter = "snowflake"
 
