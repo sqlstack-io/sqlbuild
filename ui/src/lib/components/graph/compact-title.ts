@@ -82,7 +82,12 @@ function measureIn(family: () => string, fallback: number): Measure {
 }
 
 /** The cards' own font, Inter, as the status line measures it. */
-export const measureText: Measure = measureIn(() => '"Inter Variable", sans-serif', 0.64);
+/** The cards' font: Inter, or the mock font switcher's choice (`--card-font`, `?cards=new&font=`). */
+function cardFamily(): string {
+	if (typeof document === 'undefined') return '"Inter Variable", sans-serif';
+	return document.documentElement.style.getPropertyValue('--card-font').trim() || '"Inter Variable", sans-serif';
+}
+export const measureText: Measure = measureIn(cardFamily, 0.64);
 
 /** The pills' name font: whatever the page sets `--font-node-compact` to. */
 function compactFamily(): string {

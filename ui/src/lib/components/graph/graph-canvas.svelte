@@ -12,6 +12,7 @@
 	import CountEdge from '$lib/lineage/count-edge.svelte';
 	import { LABEL_MIN_ZOOM, READABLE_ZOOM, compactLevel, newCardStage, newCompactLevel } from '$lib/lineage/fit';
 	import { cardsMode } from './cards-mode.svelte';
+	import CardFontSwitcher from './card-font-switcher.svelte';
 
 	// Every graph in the UI is drawn here, so they share one canvas: the same background, fit controls
 	// and readable fit (a large graph opens on its cards at a zoom where they read, never as dots), and
@@ -159,6 +160,7 @@
 		{#if controls === 'fit'}<FitControls onfit={() => fit?.()} {showLock} />{:else if controls === 'full'}<Controls {showLock} />{/if}
 		{@render children?.()}
 	</SvelteFlow>
+	{#if cardsNew}<CardFontSwitcher />{/if}
 </div>
 
 <style>

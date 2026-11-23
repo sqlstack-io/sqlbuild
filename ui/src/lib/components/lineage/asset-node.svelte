@@ -114,6 +114,7 @@
 		const room = CARD_WIDTH - 2 - 20 - 8 - 14 * Math.min(1 / zoom, 1.8);
 		const lead = labelRule.on || /\[[^\]]+\]$/.test(label) ? (tails?.lead?.(id) ?? 0) : 0;
 		void fonts.ready;
+		void fonts.version;
 		const measure = (t: string, px: number) => measureText(t, px, 600);
 		return newPillText(label, font, room, measure, lead);
 	});
@@ -130,6 +131,7 @@
 	// shorten when its parts don't fit; the time never does.
 	const fit = $derived(
 		(void fonts.ready,
+		void fonts.version,
 		fitStatus({
 			label: f.status ? statusLabel[d.status] : undefined,
 			when: f.lastBuilt && when ? when : undefined,
@@ -195,7 +197,7 @@
 		border-radius: 2px;
 		background: var(--card);
 		color: var(--foreground);
-		font-family: var(--font-sans);
+		font-family: var(--card-font, var(--font-sans));
 		transition:
 			opacity 0.15s,
 			border-color 0.15s;
