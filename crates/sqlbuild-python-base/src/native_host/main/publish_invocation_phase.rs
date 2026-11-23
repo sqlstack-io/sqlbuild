@@ -9,11 +9,15 @@ use crate::invocation_phases::constants::INVOCATION_PHASE_EVENT;
 use crate::invocation_phases::models::InvocationPhase;
 use crate::native_host::main::host_entry::host_entry;
 
-/// Publish `phase` to the current event dispatcher; without one, nothing is published.
+/// Publish `phase` to the current event dispatcher; without one, or outside an invocation, nothing is published.
 pub fn publish_invocation_phase(py: Python<'_>, phase: &InvocationPhase<'_>) -> PyResult<()> {
     let dispatcher: Bound<'_, PyAny> =
         host_entry(py, ExecutorHost::CurrentEventDispatcher)?.call0()?;
-    if dispatcher.is_none() {
+    if dispatcher.is_none()
+        || host_entry(py, ExecutorHost::CurrentExecutionIdentity)?
+            .call0()?
+            .is_none()
+    {
         return Ok(());
     }
     let payload: Bound<'_, PyDict> = PyDict::new(py);
