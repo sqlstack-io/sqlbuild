@@ -22,6 +22,7 @@ use sqlbuild_python_base::boundary::main::call_with::call_with;
 use sqlbuild_python_base::native_host::main::host_entry::host_entry;
 use sqlbuild_python_base::records::main::construct::new_record::new_record;
 use sqlbuild_python_base::records::main::fields::field::field as native_field;
+use sqlbuild_python_base::records::main::fields::field_text::field_text;
 use sqlbuild_python_base::records::types::ErrorId;
 use sqlbuild_python_base::records::types::RecordId;
 const NODE_ERROR: ErrorId = ErrorId::PythonNodeDiscovery;
@@ -113,10 +114,10 @@ pub(crate) const DISCOVER_BUCKET: usize = 3;
 pub(crate) const FOR_EACH_BUCKET: usize = 4;
 
 /// What `append_node` found in one function.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Appended {
-    /// A loader, asset or check, by decorator name.
-    Node(&'static str),
+    /// A loader, asset or check: its decorator name and node name.
+    Node(&'static str, String),
     /// A `@discover` function, which is not a node.
     Discover,
     /// No node definition.
@@ -172,7 +173,7 @@ impl<'py> Buckets<'py> {
             } else {
                 self.nodes[FOR_EACH_BUCKET].push(record);
             }
-            return Ok(Appended::Node(kind.name));
+            return Ok(Appended::Node(kind.name, field_text(&read, "name")?));
         }
         Ok(Appended::Nothing)
     }
@@ -267,7 +268,7 @@ impl<'py> Buckets<'py> {
                     &generated,
                     providers,
                 )? {
-                    Appended::Node(kind) => {
+                    Appended::Node(kind, _) => {
                         if !kinds.contains(&kind) {
                             kinds.push(kind);
                         }
@@ -313,11 +314,10 @@ impl<'py> Buckets<'py> {
             for function in module_functions(&imported_module.module)? {
                 let appended: Appended =
                     self.append_node((project, &imported_module.file_path), &function, providers)?;
-                if appended == Appended::Nothing {
+                if matches!(appended, Appended::Nothing) {
                     continue;
                 }
-                if let Appended::Node(kind) = appended {
-                    let name: String = function.getattr("__name__")?.extract()?;
+                if let Appended::Node(kind, name) = appended {
                     module_record.direct.push((name, kind));
                 }
                 direct.insert(function.as_ptr() as usize, function);

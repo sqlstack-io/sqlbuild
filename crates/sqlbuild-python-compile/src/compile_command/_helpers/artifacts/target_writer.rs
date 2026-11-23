@@ -108,7 +108,7 @@ fn is_below(path: &str, root: &str) -> bool {
 /// `relative_path` under `sql/models/`, unless it already starts there.
 fn model_output_path<'py>(relative_path: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = relative_path.py();
-    let text: String = relative_path.call_method0("as_posix")?.extract()?;
+    let text: String = path_posix_text(relative_path)?;
     if is_below(&text, MODELS_DIR) {
         return path_class(py)?.call1((text,));
     }
@@ -139,7 +139,7 @@ fn function_output_path<'py>(
     language: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = relative_path.py();
-    let text: String = relative_path.call_method0("as_posix")?.extract()?;
+    let text: String = path_posix_text(relative_path)?;
     let language_dir: Bound<'py, PyAny> = native_field(language, "value")?;
     let language_name: String = language_dir.extract()?;
     let path: Bound<'py, PyAny> = if is_below(&text, &format!("{FUNCTIONS_DIR}/{language_name}")) {
