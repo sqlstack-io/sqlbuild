@@ -38,11 +38,11 @@ from sqlbuild.rules import Finding, Project, RuleContext, rule
 @rule(
     code="XSQBRARCH002",
     message="The project must contain a final model directory",
-    remediation="Add models/final and place final outputs beneath it.",
+    remediation="Add sql/models/final and place final outputs beneath it.",
 )
 def final_directory(*, ctx: RuleContext, project: Project) -> list[Finding]:
     del project
-    paths = ctx.project.tree.glob("models/final/**")
+    paths = ctx.project.tree.glob("sql/models/final/**")
     return [] if paths else [ctx.finding(subject="models")]
 ```
 

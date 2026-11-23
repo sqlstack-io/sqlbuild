@@ -195,7 +195,7 @@ target/run/scenarios/daily_revenue_minimal/
   fixtures/
     ref__stg_orders.sql
     ref__stg_payments.sql
-  models/
+  sql/models/
     marts/daily_revenue.sql
   expectations/
     expected__daily_revenue.sql

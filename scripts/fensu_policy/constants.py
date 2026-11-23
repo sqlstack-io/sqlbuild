@@ -239,7 +239,7 @@ DIAGNOSTIC_CONSTRUCTION_OWNER_PATHS: frozenset[str] = frozenset(
 )
 
 EVENT_EXPORTER_RUNTIME_PREFIX: str = "src/sqlbuild/runtime/event_exporting/"
-EVENT_EXPORTER_PUBLIC_PATH: str = "src/sqlbuild/sinks.py"
+EVENT_EXPORTER_PUBLIC_PATH: str = "src/sqlbuild/event_sinks.py"
 EVENT_EXPORTER_DIRECTORY_NAME: str = "sinks"
 EVENT_EXPORTER_MODULE_PARTS: tuple[str, ...] = ("sqlbuild", "runtime", "event_exporting")
 CORE_EVENT_EXPORTER_CLASS_NAMES: frozenset[str] = frozenset(

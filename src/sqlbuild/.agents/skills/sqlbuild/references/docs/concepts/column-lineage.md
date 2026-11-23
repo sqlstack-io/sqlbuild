@@ -116,7 +116,7 @@ sqb lineage fact_orders
 ```
 
 ```
-Lineage  model  fact_orders  models/marts/fact_orders.sql  upstream
+Lineage  model  fact_orders  sql/models/marts/fact_orders.sql  upstream
 
 ├── model  stg_orders  models/staging/stg_orders.sql
 │   └── source  raw__orders  sources/raw.yml
@@ -133,7 +133,7 @@ sqb lineage daily_revenue --direction both
 ```
 
 ```
-Lineage  model  daily_revenue  models/marts/daily_revenue.sql  both
+Lineage  model  daily_revenue  sql/models/marts/daily_revenue.sql  both
 
 upstream
 ├── model  stg_orders  models/staging/stg_orders.sql

@@ -37,34 +37,35 @@ that dialect.
 
 ## Create a SQL macro
 
-Put each SQL macro in its own `.sql` file under `macros/sql/`. The file name is the macro name.
-Python macros live next to it in `macros/python/`:
+Put each SQL macro in its own `.sql` file under `sql/macros/sql/`. The file name is the macro name.
+Python macros live next to it in `sql/macros/python/`:
 
 ```text
 my_project/
-├── macros/
-│   ├── python/
-│   │   └── labels.py
-│   └── sql/
-│       ├── cents_to_dollars.sql
-│       ├── clean_orders.sql
-│       └── audit_columns.sql
-├── models/
+├── sql/
+│   ├── macros/
+│   │   ├── python/
+│   │   │   └── labels.py
+│   │   └── sql/
+│   │       ├── cents_to_dollars.sql
+│   │       ├── clean_orders.sql
+│   │       └── audit_columns.sql
+│   └── models/
 └── sqlbuild_project.toml
 ```
 
-A file directly under a `macros/` folder fails with `D013`, which names the subfolder to move it
-to. Folder scopes use the same layout, such as `models/marts/_sqlbuild/_macros/sql/`.
+A file directly under a `sql/macros/` folder fails with `D013`, which names the subfolder to move it
+to. Folder scopes use the same layout, such as `sql/models/marts/_sqlbuild/_macros/sql/`.
 
 Rules that bound declaration folders, such as `SQBRDECLARATION304` (files per folder) and
-`SQBRDECLARATION306` (shared filename prefixes), count `python/` and `sql/` as separate folders. To
-split a full `sql/` folder, move files into subfolders such as `macros/sql/text/`: a SQL macro is
+`SQBRDECLARATION306` (shared filename prefixes), count `python/nodes/` and `sql/` as separate folders. To
+split a full `sql/` folder, move files into subfolders such as `sql/macros/sql/text/`: a SQL macro is
 named by its file, so it keeps its name and its callers stay unchanged.
 
 A SQL macro file starts with a `MACRO` header, then the body:
 
 ```sql
--- macros/sql/cents_to_dollars.sql
+-- sql/macros/sql/cents_to_dollars.sql
 MACRO (
   description "Cents to dollars",
   arguments (amount_cents BIGINT, places INT CONST DEFAULT 2),
@@ -114,7 +115,7 @@ scope, so a model can pass its own private constant; the macro receives only the
 A CTE-list macro inserts its CTEs, with its own names, into the caller's `WITH` list at the call:
 
 ```sql
--- macros/sql/clean_orders.sql
+-- sql/macros/sql/clean_orders.sql
 MACRO (
   description "Deduplicated, non-deleted orders",
   arguments (src RELATION (order_id BIGINT, updated_at TIMESTAMP, is_deleted BOOLEAN)),
@@ -166,7 +167,7 @@ even one named like a macro CTE. Later CTEs may read the prefixed ones too.
 A column-list macro inserts its columns into the caller's select list. Every column needs a name:
 
 ```sql
--- macros/sql/audit_columns.sql
+-- sql/macros/sql/audit_columns.sql
 MACRO (
   description "Standard audit columns",
   arguments (src RELATION (created_at TIMESTAMP, updated_at TIMESTAMP)),
@@ -232,7 +233,7 @@ Write every parameter as `@name` in the body, as [generic audits](../audits.md) 
 identifier is always plain SQL, a column, CTE or table, never the parameter:
 
 ```sql
--- macros/sql/is_status.sql
+-- sql/macros/sql/is_status.sql
 MACRO (
   description "Whether the status column matches",
   arguments (status VARCHAR),
@@ -260,7 +261,7 @@ either one typed column or a `COLUMNS` group of columns the caller chooses, so o
 any grain:
 
 ```sql
--- macros/sql/weekly_rates.sql
+-- sql/macros/sql/weekly_rates.sql
 MACRO (
   description "Weekly refund rate per grain",
   arguments (weekly RELATION (keys COLUMNS, order_count BIGINT, refund_count BIGINT)),
@@ -291,7 +292,7 @@ fully typed.
 A SQL macro may call other SQL macros, and pass its own parameters on as `@name`:
 
 ```sql
--- macros/sql/net_amount.sql
+-- sql/macros/sql/net_amount.sql
 MACRO (
   description "Net amount in dollars",
   arguments (gross_cents BIGINT, refund_cents BIGINT),

@@ -21,7 +21,7 @@ Online: https://sqlbuild.com/docs/concepts/python-nodes/discovered-nodes/
 A discover function asks an external system which items exist, and an asset with `for_each` runs once per item. The location calls the function when it publishes and saves its result in the snapshot, so every run executes exactly the nodes it published.
 
 ```python
-# python/fulfilment/nodes.py
+# python/nodes/fulfilment/nodes.py
 from sqlbuild.assets import AssetContext, asset
 from sqlbuild.discovery import Discovered, Item, discover
 from sqlbuild.refs import model
@@ -50,7 +50,7 @@ With steps `pick`, `pack` and `ship`, where each waits on the one before, the gr
 
 ## Declaring a discovered set
 
-- **`@discover`** marks a project function under `python/` that returns `Discovered`. Providers are injected by parameter name, as for any Python node. Pass `name=` to name the set something other than the function, and `check_every=` to have the location check it for changes (see [When discovery runs](#when-discovery-runs)).
+- **`@discover`** marks a project function under `python/nodes/` that returns `Discovered`. Providers are injected by parameter name, as for any Python node. Pass `name=` to name the set something other than the function, and `check_every=` to have the location check it for changes (see [When discovery runs](#when-discovery-runs)).
 - **`Discovered`** is the only return form: `items`, plus optional set-wide `tags` and `max_parallel`.
 - **`Item`** has an `id`, a `depends_on` and `args`.
   - `id` is unique in the set, at most 200 characters, and uses only letters, digits and `_ . : -`.

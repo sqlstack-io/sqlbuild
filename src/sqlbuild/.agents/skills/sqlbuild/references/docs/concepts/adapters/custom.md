@@ -6,14 +6,14 @@
 
 Online: https://sqlbuild.com/docs/concepts/adapters/custom/
 
-You can write your own adapter for any database engine by placing Python files under `adapters/` in your project directory.
+You can write your own adapter for any database engine by placing Python files under `python/adapters/` in your project directory.
 
 ## Extending a built-in adapter
 
 The most common case is extending an existing adapter with custom behavior. Subclass the built-in adapter, set a new `adapter_name`, and override what you need:
 
 ```python
-# adapters/duckdb_plus.py
+# python/adapters/duckdb_plus.py
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 
 class DuckDbPlusAdapter(DuckDbAdapter):
@@ -41,7 +41,7 @@ warehouse as the connection's `warehouse` key.
 For a database engine with no built-in support, subclass `BaseAdapter`. It provides ANSI SQL defaults for most methods - you only need to implement `connect`, `execute`, `close`, and any methods where your engine differs from standard SQL:
 
 ```python
-# adapters/my_database.py
+# python/adapters/my_database.py
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 
 class MyDatabaseAdapter(BaseAdapter):
@@ -66,7 +66,7 @@ A few `StrictAdapter` methods are optional and have a documented default. `creat
 
 ## Discovery rules
 
-- SQLBuild discovers all `.py` files under `adapters/` recursively (excluding `__init__.py` and files starting with `_`)
+- SQLBuild discovers all `.py` files under `python/adapters/` recursively (excluding `__init__.py` and files starting with `_`)
 - Each file is scanned for classes that define a string `adapter_name` and subclass `StrictAdapter` (or any of its subclasses like `BaseAdapter` or a built-in adapter)
 - Adapter names must be unique across all adapter files - duplicates raise an error
 - Custom adapter names cannot shadow built-in names (`duckdb`, `motherduck`, `snowflake`, `bigquery`, `databricks`, `postgres`, `sqlite`, `sqlserver`, `clickhouse`)

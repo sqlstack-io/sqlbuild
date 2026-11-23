@@ -15,7 +15,7 @@ Factories are an advanced feature. Most projects author nodes directly; reach fo
 A `@factory` function takes **no arguments** and returns one or more decorated node functions:
 
 ```python
-# python/factories/exports.py
+# python/nodes/factories/exports.py
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -39,16 +39,16 @@ A factory may return a single node or a list, tuple, or set of nodes. Every retu
 
 ## Where factories live
 
-Factories live anywhere under `python/`, like every other Python node. The decorators on the returned functions decide each node's kind, so a factory may emit a single kind or a mix, and it can sit next to hand-written nodes in the same file. The playgrounds keep factories in `python/factories/`.
+Factories live anywhere under `python/nodes/`, like every other Python node. The decorators on the returned functions decide each node's kind, so a factory may emit a single kind or a mix, and it can sit next to hand-written nodes in the same file. The playgrounds keep factories in `python/nodes/factories/`.
 
-Factory modules are normal Python: constants, classes, and undecorated helpers are allowed, and shared helpers can live in their own modules, for example `python/factories/_helpers.py` imported as `from python.factories._helpers import TABLES`.
+Factory modules are normal Python: constants, classes, and undecorated helpers are allowed, and shared helpers can live in their own modules, for example `python/nodes/factories/_helpers.py` imported as `from python.nodes.factories._helpers import TABLES`.
 
 ## Mixed-kind factories
 
 A single factory can generate a whole related pipeline at once - a loader, the asset that reads it, and a check on the result:
 
 ```python
-# python/factories/orders.py
+# python/nodes/factories/orders.py
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 from sqlbuild.assets import asset

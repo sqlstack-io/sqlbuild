@@ -4959,7 +4959,7 @@ _STORE_PROJECT_EXTRA_FILES: dict[str, str] = {
         'def label_value() -> str:\n    """Return the label literal."""\n    return "\'first\'"\n'
     ),
     "sql/macros/python/labels.py": (
-        "from macros.python._label_values import label_value\n\n\n"
+        "from sql.macros.python._label_values import label_value\n\n\n"
         'def label() -> str:\n    """Return the label from a helper module."""\n'
         "    return label_value()\n"
     ),

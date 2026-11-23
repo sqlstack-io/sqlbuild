@@ -46,7 +46,7 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
                 SHARED,
                 (
                     "sql/macros/a.py",
-                    "from macros.b import b, c\n_Y = [[c], b]\n\n\ndef a():\n    return 1\n",
+                    "from sql.macros.b import b, c\n_Y = [[c], b]\n\n\ndef a():\n    return 1\n",
                 ),
             ],
             expected_exports: &[("b", 0, &[], 1, &[]), ("c", 0, &[], 5, &[])],
@@ -63,7 +63,7 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
                 SHARED,
                 (
                     "sql/macros/a.py",
-                    "from macros.b import b, c\nif x:\n    pass\nelif c:\n    pass\nelse:\n    \
+                    "from sql.macros.b import b, c\nif x:\n    pass\nelif c:\n    pass\nelse:\n    \
                      b\n\n\ndef a():\n    return 1\n",
                 ),
             ],
@@ -81,7 +81,7 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
                 SHARED,
                 (
                     "sql/macros/a.py",
-                    "from macros.b import b, c\n\n\ndef a():\n    return f(b, [c])\n",
+                    "from sql.macros.b import b, c\n\n\ndef a():\n    return f(b, [c])\n",
                 ),
             ],
             expected_exports: &[("b", 0, &[], 1, &[]), ("c", 0, &[], 5, &[])],
@@ -110,11 +110,11 @@ fn given_macro_modules_when_inventoried_then_python_analysis_agrees() {
             sources: &[
                 (
                     "sql/macros/a.py",
-                    "from macros.b import b\n\n\ndef a():\n    return b()\n",
+                    "from sql.macros.b import b\n\n\ndef a():\n    return b()\n",
                 ),
                 (
                     "sql/macros/b.py",
-                    "from macros.a import a\n\n\ndef b():\n    return a()\n",
+                    "from sql.macros.a import a\n\n\ndef b():\n    return a()\n",
                 ),
             ],
             expected_exports: &[],

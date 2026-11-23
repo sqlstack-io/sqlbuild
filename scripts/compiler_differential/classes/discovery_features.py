@@ -391,7 +391,7 @@ class DiscoveryFeatureWriter:
             '    return f"ROUND({expression}, {places})"\n'
         )
         self._files["sql/macros/python/tax.py"] = (
-            "from macros.python.rounding import round_amount\n\n\n"
+            "from sql.macros.python.rounding import round_amount\n\n\n"
             "def taxed(expression: str) -> str:\n"
             '    """Add tax to an amount, rounded."""\n'
             '    return round_amount(f"{expression} * 1.2")\n'

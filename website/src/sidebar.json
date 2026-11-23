@@ -117,7 +117,7 @@
 			"docs/concepts/observability/recall",
 			"docs/concepts/observability/recall-clickhouse",
 			"docs/concepts/observability",
-			"docs/concepts/observability/sinks"
+			"docs/concepts/observability/event-sinks"
 		]
 	},
 	{

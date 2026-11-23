@@ -30,9 +30,9 @@ _MOVED: str = "models.finance._sqlbuild._macros.python.cents"
             description="direct, aliased and grouped imports of a carried macro module",
             files={
                 **cents_check(
-                    "from models.staging._sqlbuild._macros.python.cents import to_cents\n"
-                    "import models.staging._sqlbuild._macros.python.cents as cents_module\n"
-                    "from models.staging._sqlbuild._macros.python.cents import (\n    to_cents as cents,\n)",
+                    "from sql.models.staging._sqlbuild._macros.python.cents import to_cents\n"
+                    "import sql.models.staging._sqlbuild._macros.python.cents as cents_module\n"
+                    "from sql.models.staging._sqlbuild._macros.python.cents import (\n    to_cents as cents,\n)",
                     body='    assert to_cents("1") == cents_module.to_cents("1") == cents("1")\n',
                 ),
             },
@@ -48,7 +48,7 @@ _MOVED: str = "models.finance._sqlbuild._macros.python.cents"
             description="a relative import from a macro module that stays",
             files={
                 **cents_check(
-                    "from models.staging._sqlbuild._macros.python import cents as cents_module",
+                    "from sql.models.staging._sqlbuild._macros.python import cents as cents_module",
                     body='    assert cents_module.to_cents("1")\n',
                 ),
                 "sql/models/staging/_sqlbuild/_macros/python/totals.py": (
@@ -62,9 +62,9 @@ _MOVED: str = "models.finance._sqlbuild._macros.python.cents"
                 ),
             },
             expected_fragments={
-                CENTS_CHECK: ("from macros.python import cents as cents_module",),
+                CENTS_CHECK: ("from sql.macros.python import cents as cents_module",),
                 "sql/models/staging/_sqlbuild/_macros/python/totals.py": (
-                    "from macros.python.cents import to_cents\n",
+                    "from sql.macros.python.cents import to_cents\n",
                 ),
             },
         ),
@@ -114,8 +114,8 @@ def test_given_python_imports_of_a_moved_macro_when_moving_then_imports_follow_a
         PythonImportRefusalE2ETestCase(
             description="a star import from the macro module's package",
             files=cents_check(
-                "from models.staging._sqlbuild._macros.python.cents import *\n"
-                "from models.staging._sqlbuild._macros.python import *"
+                "from sql.models.staging._sqlbuild._macros.python.cents import *\n"
+                "from sql.models.staging._sqlbuild._macros.python import *"
             ),
             expected_location=f"{CENTS_CHECK}:5:1",
             expected_reason=(
@@ -125,7 +125,7 @@ def test_given_python_imports_of_a_moved_macro_when_moving_then_imports_follow_a
         PythonImportRefusalE2ETestCase(
             description="an import without an alias",
             files=cents_check(
-                "import models.staging._sqlbuild._macros.python.cents",
+                "import sql.models.staging._sqlbuild._macros.python.cents",
                 body='    assert models.staging._sqlbuild._macros.python.cents.to_cents("1")\n',
             ),
             expected_location=f"{CENTS_CHECK}:4:8",
@@ -133,7 +133,7 @@ def test_given_python_imports_of_a_moved_macro_when_moving_then_imports_follow_a
         ),
         PythonImportRefusalE2ETestCase(
             description="a project Python file that is not UTF-8",
-            files=cents_check("from models.staging._sqlbuild._macros.python.cents import to_cents"),
+            files=cents_check("from sql.models.staging._sqlbuild._macros.python.cents import to_cents"),
             binary_files={"rules/legacy.py": b"LABEL = '\xe9'\n"},
             expected_location="rules/legacy.py",
             expected_reason="this Python file cannot be read as UTF-8",

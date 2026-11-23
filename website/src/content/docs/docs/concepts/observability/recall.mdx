@@ -300,7 +300,7 @@ runs, point it at ClickHouse; see
 ## Filtering what Recall stores
 
 By default Recall stores every lifecycle event and every output byte. To decide yourself, write a
-[sink](/docs/concepts/observability/sinks) with a parameter annotated `RecallWriter`: it replaces
+[sink](/docs/concepts/observability/event-sinks) with a parameter annotated `RecallWriter`: it replaces
 Recall's default for its stream, and Recall stores only what it publishes.
 
 ```python

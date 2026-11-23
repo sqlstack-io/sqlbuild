@@ -107,7 +107,7 @@ _SCOPE: str = "sqlbuild.compiler.scopes.types:ScopeKind"
                 ],
                 "enum_files": [{"declarations": [{"members": [{"name": "LOW", "value": 1}]}]}],
                 "macro_files": [
-                    {"contents": "from macros.python.rounding import round_amount\n"},
+                    {"contents": "from sql.macros.python.rounding import round_amount\n"},
                 ],
                 "test_files": [
                     {

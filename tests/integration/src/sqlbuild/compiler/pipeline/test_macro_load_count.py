@@ -80,7 +80,7 @@ def test_given_side_effect_macro_when_compiling_manifest_then_imports_macros_onc
                 "sqlbuild_project.toml": _PROJECT_TOML,
                 "sql/models/_macros/python/shared.py": "def shared() -> str:\n    return 'order_id'\n",
                 "sql/models/_macros/python/orders.py": (
-                    "from models._macros.python.shared import shared\n\n"
+                    "from sql.models._macros.python.shared import shared\n\n"
                     "def _helper() -> str:\n    return shared()\n\n"
                     "def order_column() -> str:\n    return _helper()\n"
                 ),

@@ -321,7 +321,7 @@ runs, point it at ClickHouse; see
 ## Filtering what Recall stores
 
 By default Recall stores every lifecycle event and every output byte. To decide yourself, write a
-[sink](sinks.md) with a parameter annotated `RecallWriter`: it replaces
+[sink](event-sinks.md) with a parameter annotated `RecallWriter`: it replaces
 Recall's default for its stream, and Recall stores only what it publishes.
 
 ```python

@@ -503,7 +503,7 @@ This setting does not make unsupported adapter features portable. In particular,
 Per-directory model defaults. Useful for applying different config to different parts of your project. Each path default accepts any `MODEL()` header field; an unknown key fails compilation with `D001`:
 
 ```toml
-[path_defaults."models/staging"]
+[path_defaults."sql/models/staging"]
 materialized = "view"
 tags = ["staging"]
 
@@ -513,7 +513,7 @@ tags = ["marts"]
 replay_on_change = "full"
 ```
 
-Path matching uses the path below `models/`. A model at `models/staging/stg_orders.sql` matches the
+Path matching uses the path below `sql/models/`. A model at `sql/models/staging/stg_orders.sql` matches the
 `staging` path default. A key matches its folder and every folder below it. In a key, `*` matches one
 folder name and `**` matches any number of folders, so `"**"` matches every model.
 
@@ -528,8 +528,8 @@ a model gets nothing from a broader key when a more specific key also matches it
    `*` segments, then fewer `**` segments. Two equally specific matches fail compilation.
 
 A broad `"**"` default therefore applies only to models that no other key matches. With the
-configuration below, `models/orders.sql` gets the `"**"` description, but
-`models/staging/stg_customers.sql` uses only the `staging` entry. It has no description and fails
+configuration below, `sql/models/orders.sql` gets the `"**"` description, but
+`sql/models/staging/stg_customers.sql` uses only the `staging` entry. It has no description and fails
 with `P010`:
 
 ```toml
@@ -878,35 +878,79 @@ auto_update = false
 
 See [skills CLI reference](/docs/cli/skills) for usage details.
 
-## Project Python
+## Project layout
 
-Project-owned Python lives in a small set of roots. Anything that runs as part of the pipeline graph
-goes in `python/`: loaders, assets, checks, factories, and the helper modules they import.
-Modules under `python/` are normal Python: constants, classes, undecorated helper functions, and
-helper-only modules such as `python/_helpers.py` are allowed, while decorators determine which
-functions become graph nodes. See [Python nodes](/docs/concepts/python-nodes/overview#the-python-folder).
+A project keeps everything the warehouse runs under `sql/` and everything SQLBuild imports as Python
+under `python/`:
 
-Code that extends SQLBuild itself keeps its own root:
+```text
+<project>/
+├── sql/                  everything the warehouse runs
+│   ├── models/
+│   ├── seeds/
+│   ├── sources/
+│   ├── schemas/
+│   ├── macros/
+│   ├── functions/        SQL UDFs in functions/sql/, Python UDFs in functions/python/
+│   ├── enums/
+│   ├── constants/
+│   ├── audits/
+│   └── hooks/
+├── python/               everything SQLBuild imports as Python, as the `python` package
+│   ├── nodes/            loaders, assets, checks and factories
+│   ├── providers/        runtime providers
+│   ├── event_sinks/      lifecycle event and command output event sinks
+│   ├── materializations/ custom materializations
+│   ├── adapters/         custom adapters (or a single python/adapter.py)
+│   └── __init__.py       optional
+├── orchestration/        jobs, job groups, sensors and calendars
+├── rules/                custom project rules
+├── tests/                SQL tests, scenarios and Python tests
+├── README.md             optional
+├── sqlbuild_project.toml
+└── sqlbuild_local.toml
+```
 
-| Location | Holds |
-|----------|-------|
-| `rules/` | Custom project rules |
-| `materializations/` | Custom materializations |
-| `adapters/`, `adapter.py` | Custom adapters |
-| `providers/` | Runtime providers |
-| `sinks/` | Lifecycle event and command output sinks |
-| `hooks/python/` | Python model lifecycle hooks |
-| `functions/python/` | Python UDFs |
-| `macros/python/`, `enums/`, `constants/` and scoped `_macros/python/`, `_enums/`, `_constants/` | Python macros and declarations |
-| `orchestration/` | Jobs and job groups as TOML in `jobs/` and `job_groups/`; calendars and sensors as Python in `calendars/` and `sensors/`. See [Orchestration](/docs/concepts/orchestration) |
+Scoped declarations (`_sqlbuild/` folders beside models) live inside the resource tree they belong to.
+Python modules are imported by their path below the project directory, such as
+`python.nodes.orders.export.asset` or `python.providers.warehouse_client.provider`; see
+[Python nodes](/docs/concepts/python-nodes/overview#the-pythonnodes-folder) for how node files are named.
 
-Compilation rejects Python anywhere else with `D016`, so indirectly importable modules cannot create
-an unofficial project structure.
+Compilation rejects any other entry at the top level, or inside `sql/` or `python/`, with `D018`:
+
+```text
+error[D018]: 'migrations/' is not part of a SQLBuild project
+  = help: move it under one of: sql/, python/, orchestration/, rules/, tests/,
+          or list it in extra_paths in sqlbuild_project.toml if it belongs here on purpose
+```
+
+These entries are always allowed:
+
+- the two configuration files and `README.md`;
+- hidden entries such as `.gitignore`, `.env` and the `.agents/` and `.claude/` skill folders;
+- `__pycache__/`, and the `target/` and `logs/` folders SQLBuild writes;
+- local database files beside the project, such as `warehouse.duckdb`;
+- anything the project's `.gitignore` files ignore, read from the project directory up to the
+  repository root, with the repository's `.git/info/exclude`.
+
+List anything else the project keeps on purpose in `extra_paths`, relative to the project directory:
+
+```toml
+extra_paths = ["docs/", "sql/notes/"]
+```
+
+Each entry names an entry at the top level, or directly inside `sql/` or `python/`, and must stay
+inside the project.
+
+Python is supported only under `python/`, `rules/`, `orchestration/`, `sql/hooks/python/`,
+`sql/functions/python/`, `sql/macros/`, `sql/enums/`, `sql/constants/` and the scoped `_macros/`,
+`_enums/` and `_constants/` folders. Compilation rejects Python anywhere else, such as a `.py` file in
+`sql/models/`, with `D016`.
 
 The project's `tests/` directory holds SQL tests and scenarios, and pytest tests of project Python
-under `tests/python/`, `tests/providers/` and `tests/orchestration/`, which `sqb test` runs; see
-[Python tests](/docs/cli/test#python-tests). Orchestrator code such as Dagster or Rivers definitions
-lives outside the SQLBuild project directory and points at it; see
+under `tests/python/nodes/`, `tests/python/providers/` and `tests/orchestration/`, which `sqb test`
+runs; see [Python tests](/docs/cli/test#python-tests). Orchestrator code such as Dagster or Rivers
+definitions lives outside the SQLBuild project directory and points at it; see
 [Dagster](/docs/integrations/dagster) and [Rivers](/docs/integrations/rivers).
 
 ## sqlbuild_local.toml

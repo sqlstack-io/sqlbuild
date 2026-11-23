@@ -123,7 +123,7 @@ sqb diff prod --select customer_status_snapshot
 sqb diff prod:dev --full --select customer_status_snapshot
 
 # Schema-only diff of all marts
-sqb diff prod:dev --schema-only --select path:models/marts
+sqb diff prod:dev --schema-only --select path:sql/models/marts
 
 # Bounded diff of last 14 days
 sqb diff prod:dev --bounded 14d --select hourly_order_activity

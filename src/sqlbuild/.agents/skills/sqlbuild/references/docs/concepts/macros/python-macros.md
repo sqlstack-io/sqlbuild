@@ -25,13 +25,13 @@ compiler can see inside it. See [Macros](../macros.md) for how the two kinds com
 
 ## Create a Python macro
 
-Put project-wide Python macros in Python files under `macros/python/`. Folder-scoped macros use the
-same layout, such as `models/marts/_sqlbuild/_macros/python/`.
+Put project-wide Python macros in Python files under `sql/macros/python/`. Folder-scoped macros use the
+same layout, such as `sql/models/marts/_sqlbuild/_macros/python/`.
 
 Every public function defined by a macro file becomes callable from SQL:
 
 ```python
-# macros/python/currency.py
+# sql/macros/python/currency.py
 def cents_to_dollars(expression: str) -> str:
     """Convert a cents expression to dollars."""
     return f"ROUND(CAST({expression} AS DOUBLE) / 100, 2)"
@@ -109,7 +109,7 @@ Python nodes use. It has `kind` and `name` attributes, and formatting it into SQ
 relation with the adapter's quoting:
 
 ```python
-# models/marts/_sqlbuild/_macros/python/unions.py
+# sql/models/marts/_sqlbuild/_macros/python/unions.py
 from sqlbuild.refs import SqlResourceRef
 
 def union_all(relations: list[SqlResourceRef]) -> str:
@@ -129,7 +129,7 @@ it arrived as a quoted string argument such as `@py.wrap('__ref("stg_orders")')`
 ```
 error[P006]: model:order_summary depends on model:stg_orders through macro orders_base()
   model: order_summary
-  --> models/marts/_sqlbuild/_macros/python/orders.py
+  --> sql/models/marts/_sqlbuild/_macros/python/orders.py
   = help: write the reference in the model, or pass it in: @py.orders_base(__ref("stg_orders"))
   = help: the current value is [references] enforce_explicit = true (from sqlbuild_project.toml or its default); while migrating a project, to allow macro-generated references, set this in sqlbuild_project.toml:
             [references]
@@ -147,7 +147,7 @@ Only public functions owned by the file are exported as macros. Prefix helpers, 
 and type aliases with `_`:
 
 ```python
-# macros/python/orders.py
+# sql/macros/python/orders.py
 _DEFAULT_STATUS = "completed"
 
 def _status_filter(status: str) -> str:
@@ -199,7 +199,7 @@ See [where a test-only macro lives](../macros.md#macros-used-only-by-tests).
 Macros work inside inline and named SQL hooks:
 
 ```python
-# macros/python/permissions.py
+# sql/macros/python/permissions.py
 def grant_target(target: str) -> str:
     return f"GRANT SELECT ON {target} TO analyst_role"
 ```

@@ -2273,7 +2273,7 @@ def build_since_indirect_files() -> dict[str, str]:
             'def whole_cents(expression: str) -> str:\n    return f"({expression} * 1)"\n'
         ),
         "sql/models/_macros/python/money.py": (
-            "from models._macros.python.currency import whole_cents\n"
+            "from sql.models._macros.python.currency import whole_cents\n"
             "from python.nodes._rates import DIVISOR\n\n\n"
             "def cents_to_dollars(expression: str) -> str:\n"
             '    return f"CAST({whole_cents(expression)} AS DOUBLE) / {DIVISOR}"\n'
@@ -2282,7 +2282,7 @@ def build_since_indirect_files() -> dict[str, str]:
             'def with_tax(expression: str) -> str:\n    return f"({expression} + 0)"\n'
         ),
         "sql/macros/python/pricing.py": (
-            "from macros.python.taxes import with_tax\n\n\n"
+            "from sql.macros.python.taxes import with_tax\n\n\n"
             "def gross(expression: str) -> str:\n    return with_tax(expression)\n"
         ),
         "sql/macros/python/fixture_values.py": "def suffix() -> str:\n    return \"''\"\n",

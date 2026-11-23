@@ -349,13 +349,13 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
             expected_code="P001",
             files={
                 "sql/macros/python/first.py": (
-                    "from macros.python.second import second_value\n\n\n"
+                    "from sql.macros.python.second import second_value\n\n\n"
                     "def first_value() -> str:\n"
                     '    """First value."""\n'
                     "    return second_value()\n"
                 ),
                 "sql/macros/python/second.py": (
-                    "from macros.python.first import first_value\n\n\n"
+                    "from sql.macros.python.first import first_value\n\n\n"
                     "def second_value() -> str:\n"
                     '    """Second value."""\n'
                     "    return first_value()\n"

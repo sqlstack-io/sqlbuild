@@ -220,7 +220,7 @@ A cursor-based model must read at least one input that can bound its window, eit
 
 ```
 error[P011]: incremental model 'daily_revenue' reads no inputs, so builds after the first cannot work out their cursor window
-  --> models/finance/daily_revenue.sql:5:3
+  --> sql/models/finance/daily_revenue.sql:5:3
     |
   5 |   cursor revenue_date,
     |   ^^^^^^^^^^^^^^^^^^^

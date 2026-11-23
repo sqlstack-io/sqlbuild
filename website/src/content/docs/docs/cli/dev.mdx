@@ -105,8 +105,8 @@ nodes that need the provider (the first five, then a count) and the fix, never a
 
 ```text
 ⚠ warn   1 provider has missing secrets                          missing secret
-  at     providers/region.py:9   region_token  ← REGION_TOKEN
-         providers/region.py:10  region_code   ← REGION_CODE
+  at     python/providers/region.py:9   region_token  ← REGION_TOKEN
+         python/providers/region.py:10  region_code   ← REGION_CODE
   why    runs that use it stop at the provider check, before the warehouse; 2
          nodes need it (raw_regions, stg_regions)
   fix    set them in .env and press r, or set them in the environment you

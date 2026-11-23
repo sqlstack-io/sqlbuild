@@ -329,8 +329,8 @@ def test_given_target_aware_python_composition_when_switching_target_then_depend
             "sqlbuild_local.toml": 'target = "dev"\n',
             "sql/models/orders.sql": "MODEL(description 'Test model orders.');\nSELECT @py.choose() AS value\n",
             "sql/macros/python/choose.py": (
-                "from macros.python.dev import dev_macro\n"
-                "from macros.python.prod import prod_macro\n\n"
+                "from sql.macros.python.dev import dev_macro\n"
+                "from sql.macros.python.prod import prod_macro\n\n"
                 "def choose(ctx):\n    return dev_macro() "
                 'if ctx.target_name == "dev" else prod_macro()\n'
             ),
@@ -388,7 +388,7 @@ def test_given_broken_declaration_category_when_loading_then_other_categories_re
             files={
                 "sql/macros/python/shared.py": "def shared():\n    return 'shared'\n",
                 "sql/macros/python/consumer.py": (
-                    "from macros.python.shared import shared\n\ndef consumer():\n    return shared()\n"
+                    "from sql.macros.python.shared import shared\n\ndef consumer():\n    return shared()\n"
                 ),
                 "sql/macros/python/broken.py": "def broken(:\n    return 'broken'\n",
             },
@@ -402,7 +402,7 @@ def test_given_broken_declaration_category_when_loading_then_other_categories_re
             files={
                 "sql/models/sales/_macros/python/shared.py": ("def shared():\n    return 'shared'\n"),
                 "sql/models/finance/macros/python/consumer.py": (
-                    "from models.sales._macros.python.shared import shared\n\n"
+                    "from sql.models.sales._macros.python.shared import shared\n\n"
                     "def consumer():\n    return shared()\n"
                 ),
                 "sql/macros/python/broken.py": "def broken(:\n    return 'broken'\n",
@@ -427,10 +427,10 @@ def test_given_broken_declaration_category_when_loading_then_other_categories_re
             files={
                 "sql/macros/python/valid.py": "def valid():\n    return 'valid'\n",
                 "sql/macros/python/first.py": (
-                    "from macros.python.second import second\n\ndef first():\n    return second()\n"
+                    "from sql.macros.python.second import second\n\ndef first():\n    return second()\n"
                 ),
                 "sql/macros/python/second.py": (
-                    "from macros.python.first import first\n\ndef second():\n    return first()\n"
+                    "from sql.macros.python.first import first\n\ndef second():\n    return first()\n"
                 ),
             },
             expected_names=frozenset({"valid"}),

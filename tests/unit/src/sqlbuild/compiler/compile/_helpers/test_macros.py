@@ -74,7 +74,7 @@ def order_columns() -> str:
             macro_files={
                 "sql/macros/python/shared.py": "def shared(value: str) -> str:\n    return value.upper()\n",
                 "sql/macros/python/absolute.py": (
-                    "from macros.python.shared import shared as render_shared\n\n"
+                    "from sql.macros.python.shared import shared as render_shared\n\n"
                     "def absolute_macro() -> str:\n    return render_shared('absolute')\n"
                 ),
                 "sql/macros/python/relative.py": (
@@ -126,7 +126,7 @@ def test_given_macro_modules_when_loading_then_exports_only_owned_public_functio
                     "def unused() -> str:\n    return 'unused'\n"
                 ),
                 "sql/macros/python/orders.py": (
-                    "from macros.python.shared import used as render_used, unused\n\n"
+                    "from sql.macros.python.shared import used as render_used, unused\n\n"
                     "def _render(value: str) -> str:\n    return render_used(value)\n\n"
                     "def orders() -> str:\n    return _render('orders')\n"
                 ),
@@ -187,7 +187,7 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
     consumer_source: str = (
         "from pathlib import Path\n"
         "Path(__file__).parents[3].joinpath('executed').touch()\n"
-        "from models.sales._macros.python.shared import shared\n\n"
+        "from sql.models.sales._macros.python.shared import shared\n\n"
         "def consumer() -> str:\n    return shared()\n"
     )
     shared_path: Path = tmp_path / "sql/models/sales/_macros/python/shared.py"
@@ -252,7 +252,7 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
                 "sql/macros/python/consumer.py": (
                     "from pathlib import Path\n"
                     "Path(__file__).parent.parent.joinpath('executed').touch()\n"
-                    "from macros.python.missing import missing\n\n"
+                    "from sql.macros.python.missing import missing\n\n"
                     "def consumer() -> str:\n    return missing()\n"
                 )
             },
@@ -264,11 +264,11 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
                 "sql/macros/python/first.py": (
                     "from pathlib import Path\n"
                     "Path(__file__).parent.parent.joinpath('executed').touch()\n"
-                    "from macros.python.second import second\n\n"
+                    "from sql.macros.python.second import second\n\n"
                     "def first() -> str:\n    return second()\n"
                 ),
                 "sql/macros/python/second.py": (
-                    "from macros.python.first import first\n\ndef second() -> str:\n    return first()\n"
+                    "from sql.macros.python.first import first\n\ndef second() -> str:\n    return first()\n"
                 ),
             },
             expected_error_fragment="Macro import cycle",
@@ -317,7 +317,7 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
             macro_files={
                 "sql/macros/python/shared.py": "def shared() -> str:\n    return 'shared'\n",
                 "sql/macros/python/helpers.py": (
-                    "from macros.python.shared import shared\n\n"
+                    "from sql.macros.python.shared import shared\n\n"
                     "def _helper() -> str:\n    return shared()\n\n"
                     "_alias = _helper\n\n"
                     "def outer() -> str:\n    return _alias()\n"
@@ -332,7 +332,7 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
             macro_files={
                 "sql/macros/python/shared.py": "def shared() -> str:\n    return 'shared'\n",
                 "sql/macros/python/helpers.py": (
-                    "from macros.python.shared import shared\n\n"
+                    "from sql.macros.python.shared import shared\n\n"
                     "def _helper() -> str:\n    return shared()\n\n"
                     "def outer(value=_helper()) -> str:\n    return value\n"
                 ),
@@ -346,7 +346,7 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
             macro_files={
                 "sql/macros/python/shared.py": "def shared() -> str:\n    return 'shared'\n",
                 "sql/macros/python/consumer.py": (
-                    "from macros.python.shared import shared as _helper\n\n"
+                    "from sql.macros.python.shared import shared as _helper\n\n"
                     "def _helper() -> str:\n    return 'local'\n\n"
                     "def outer() -> str:\n    return _helper()\n"
                 ),
@@ -398,7 +398,7 @@ def test_given_inaccessible_scoped_macro_import_when_loading_then_rejects_before
                     "def second() -> str:\n    return 'second'\n"
                 ),
                 "sql/macros/python/consumer.py": (
-                    "from macros.python.shared import first, second\n\n"
+                    "from sql.macros.python.shared import first, second\n\n"
                     "_PAIRS = [[first], second]\n\n"
                     "def consumer() -> str:\n    return 'consumer'\n"
                 ),

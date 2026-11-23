@@ -340,7 +340,7 @@ def test_given_reserved_parent_directories_when_linting_model_then_classificatio
             description="unsupported project module imports fail before lint expansion",
             project_files={
                 "sqlbuild_project.toml": PROJECT_TOML,
-                "sql/macros/python/orders.py": "import macros.python.shared\n",
+                "sql/macros/python/orders.py": "import sql.macros.python.shared\n",
                 "sql/macros/python/shared.py": "def shared_macro() -> str:\n    return 'order_id'\n",
                 "sql/models/demo.sql": f"{HEADER}SELECT 1 AS x\n",
             },

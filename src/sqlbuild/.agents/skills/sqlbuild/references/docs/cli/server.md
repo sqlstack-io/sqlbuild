@@ -344,7 +344,7 @@ receive the URL.
           "node_key": "model:fct_orders",
           "error_code": "E100",
           "message": "Conversion Error: Could not convert string 'n/a' to INT32",
-          "path": "models/marts/fct_orders.sql"
+          "path": "sql/models/marts/fct_orders.sql"
         }
       ],
       "failed_node_count": 1

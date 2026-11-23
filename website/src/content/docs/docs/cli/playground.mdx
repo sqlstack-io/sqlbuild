@@ -30,7 +30,7 @@ A complete DuckDB-backed project with:
 
 - Staging views, fact/dimension tables, and incremental models
 - Sources with inline expression data (no external setup)
-- Python source loaders in `python/loaders/`
+- Python source loaders in `python/nodes/loaders/`
 - Seeds, SQL functions, and a custom materialization
 - Built-in and custom audits
 - SQL unit tests and multi-model tests
@@ -51,7 +51,7 @@ The Dagster `definitions.py` uses `sqlbuild_assets`, `sqlbuild_scenario_checks`,
 
 The `python_nodes` template instead creates a focused Python-nodes project:
 
-- `python/assets/orders_inputs.py`, `python/loaders/orders.py`, `python/assets/orders_export.py`, `python/checks/orders_export.py`
+- `python/nodes/assets/orders_inputs.py`, `python/nodes/loaders/orders.py`, `python/nodes/assets/orders_export.py`, `python/nodes/checks/orders_export.py`
 - A `fact_orders` SQL model over a managed `raw_orders` source
 - Examples of the SQL boundary, `ctx.relation(model(...))`, soft-skip fan-in, and a Python check
 

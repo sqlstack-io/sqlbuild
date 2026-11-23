@@ -17,7 +17,7 @@ Online: https://sqlbuild.com/docs/concepts/sources/
 - Config reference
 - YAML that SQLBuild reads
 
-Sources declare external data that your models depend on. They are defined in YAML files under `sources/` in your project directory.
+Sources declare external data that your models depend on. They are defined in YAML files under `sql/sources/` in your project directory.
 
 ## Table sources
 
@@ -52,7 +52,7 @@ sources:
 Expression sources are resolved at compile time. They're the escape hatch for anything the framework doesn't natively model: external tables, warehouse-specific syntax, function calls, or any other relation type that doesn't fit a standard table reference.
 
 An inline source expression uses macros, constants, and enums available from its source definition
-under `sources/`. Declarations limited to one source folder are not available in sibling folders.
+under `sql/sources/`. Declarations limited to one source folder are not available in sibling folders.
 See [How Visibility Works](declaration-scopes/visibility.md).
 
 ## Source audits

@@ -1,32 +1,24 @@
-<!-- generated-by: sqlbuild skills -->
+---
+title: "Event Sinks"
+description: "Export lifecycle facts and command output through project-owned providers."
+---
 
-# Typed Sinks
-
-> Export lifecycle facts and command output through project-owned providers.
-
-Online: https://sqlbuild.com/docs/concepts/observability/sinks/
-
-## Contents
-
-- Lifecycle sink
-- Command-output sink
-- Configuration
-- Delivery behavior
-
-Project sinks consume one declared record type. Lifecycle and command-output streams remain separate
+Project event sinks live in `python/event_sinks/` and are imported from `sqlbuild.event_sinks`.
+Each consumes one declared record type. Lifecycle and command-output streams remain separate
 even when they share a provider and destination.
 
-## Lifecycle sink
+## Lifecycle event sink
 
 ```python
-# sinks/publish.py
-from providers.destination_client import DestinationClient
+# python/event_sinks/publish.py
+from python.providers.destination_client import DestinationClient
 from sqlbuild.event_sinks import (
     LifecycleEvent,
     LifecycleEventKind,
     lifecycle_event_sink,
     lifecycle_event_to_json,
 )
+
 
 @lifecycle_event_sink(
     event_kinds={
@@ -48,10 +40,11 @@ Using `invocation_id` as a partition key keeps one invocation on one Kafka parti
 `event_id` in the payload as the deduplication identity. Confirm the destination topic is not
 compacted when complete lifecycle history must remain replayable.
 
-## Command-output sink
+## Command-output event sink
 
 ```python
 from sqlbuild.event_sinks import CommandOutputRecord, command_output_event_sink, command_output_to_json
+
 
 @command_output_event_sink(streams={"stdout", "stderr"})
 def publish_output(record: CommandOutputRecord, destination_client: DestinationClient) -> None:
@@ -67,7 +60,7 @@ change, size, or close. A loss record reports bounded-queue drops. This stream i
 transcripts but is not lifecycle evidence.
 
 A sink with a parameter annotated `sqlbuild.recall.RecallWriter` is not an ordinary sink: it
-decides what [Recall](recall.md#filtering-what-recall-stores) stores for
+decides what [Recall](/docs/concepts/observability/recall#filtering-what-recall-stores) stores for
 its stream.
 
 ## Configuration
@@ -75,26 +68,26 @@ its stream.
 Runtime configuration can narrow declaration filters:
 
 ```toml
-[sinks.lifecycle]
+[event_sinks.lifecycle]
 event_kinds = ["run", "resource", "operation", "statement", "audit"]
 min_severity = "info"
 
-[sinks.lifecycle.named.publish_lifecycle]
+[event_sinks.lifecycle.named.publish_lifecycle]
 event_kinds = ["resource", "statement"]
 min_severity = "warning"
 ```
 
 `shutdown_timeout` sets how long a command waits at exit for lifecycle sinks to drain queued
 events. It is a fixed duration from `"0s"` to `"10m"`, defaults to `"2s"`, and is accepted only
-under `[sinks.lifecycle]`, not per named sink. `"0s"` drops anything still queued at exit. The
+under `[event_sinks.lifecycle]`, not per named sink. `"0s"` drops anything still queued at exit. The
 final quarter of the budget is reserved for run and invocation outcomes: when it begins, other
 queued events are dropped and counted so the outcomes still arrive. The setting does not change the one-second timeout for each sink call. A sink call still running when
 the budget ends gets up to that one second to return before providers are torn down; teardown
 always runs on the command's own thread. A cancel that leaves a step running skips teardown,
-as described under [Providers](../python-nodes/providers.md#lifecycle).
+as described under [Providers](/docs/concepts/python-nodes/providers#lifecycle).
 
 ```toml
-[sinks.lifecycle]
+[event_sinks.lifecycle]
 shutdown_timeout = "30s"
 ```
 
@@ -125,7 +118,7 @@ durability. SQLBuild core does not provide a Kafka or ClickHouse implementation.
   their model finishes), not in one burst at the end of the run.
 - When lifecycle events are dropped or fail, the command prints one warning to stderr with the
   counts and affected sinks, for example
-  `Warning: command completed successfully, but lifecycle event export was incomplete: 140 of 248 events dropped, 0 failed (sink 'orders_events'). Check sink health: a sink call slower than 1s drops that sink's events until it returns; events still queued at exit need a longer sinks.lifecycle.shutdown_timeout.`
+  `Warning: command completed successfully, but lifecycle event export was incomplete: 140 of 248 events dropped, 0 failed (sink 'orders_events'). Check sink health: a sink call slower than 1s drops that sink's events until it returns; events still queued at exit need a longer event_sinks.lifecycle.shutdown_timeout.`
   A successful command then ends with
   `sqb audit completed successfully; only its lifecycle event export is affected.` The exit code
   and stdout, including `--json` output, are unchanged.

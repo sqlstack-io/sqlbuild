@@ -197,7 +197,7 @@ def _macro_cases() -> tuple[FailureCase, ...]:
             files={
                 _STAGING_MACROS: _CENTS_MACRO,
                 "sql/models/staging/_sqlbuild/macros/python/wrapping.py": (
-                    "from models.staging._sqlbuild._macros.python.orders import cents\n\n\n"
+                    "from sql.models.staging._sqlbuild._macros.python.orders import cents\n\n\n"
                     'def wrapped(expression: str) -> str:\n    """Wrap cents."""\n'
                     "    return cents(expression)\n"
                 ),
