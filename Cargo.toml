@@ -256,11 +256,10 @@ debug = false
 [profile.release]
 strip = "symbols"
 
-# Released wheels: one codegen unit per crate keeps one copy of generic code that parallel units
-# each instantiate, so the native binaries are about an eighth smaller and build in about 2x time.
+# Released wheels: Cargo's default 16 codegen units per crate. One unit made the binaries about an
+# eighth of the size but doubled build time, and macOS wheel builds took 60-90 minutes.
 [profile.dist]
 inherits = "release"
-codegen-units = 1
 
 # Local iteration: release-level optimisation with incremental builds, so rebuilding after a
 # focused change does not recompile the whole binding crate. CI uses `release`.
