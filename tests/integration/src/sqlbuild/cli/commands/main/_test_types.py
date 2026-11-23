@@ -1628,3 +1628,11 @@ class SinkAbandonedStepTestCase:
 class SinkNormalRunTestCase:
     description: str
     expected_last_line: str
+
+
+@dataclass(frozen=True)
+class MidSubmitCancelTestCase:
+    description: str
+    sent_signal: signal.Signals
+    expected_exit_code: int
+    expected_notice: str

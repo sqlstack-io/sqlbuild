@@ -18,6 +18,7 @@ from tests.unit.src.sqlbuild.executor.python_nodes.classes._test_types import (
     ItemPoolCapTestCase,
     ItemPoolFailureTestCase,
     ItemPoolIgnoredCancelTestCase,
+    ItemPoolMidSubmitTestCase,
     ItemPoolOrderTestCase,
     ItemPoolRecordedInterruptTestCase,
     ItemPoolRepeatedCancelTestCase,
@@ -31,8 +32,10 @@ from tests.unit.src.sqlbuild.executor.python_nodes.classes.helpers import (
     SlowResultAdapter,
     fail_item,
     finishing_probe,
+    held_until,
     ignoring_probe,
     interrupt_after_next_record,
+    interrupt_second_submit,
     interrupted_probe,
     item_graph,
     meet_at,
@@ -485,3 +488,50 @@ def test_given_a_step_writing_its_result_when_a_cancel_round_passes_then_the_wri
         (result.node_name, result.status.value) for result in probe.reported
     )
     assert (reported, probe.cancelled) == (test_case.expected_reported, [])
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ItemPoolMidSubmitTestCase(
+            description="the second step started before the interrupt left submit",
+            start_second_thread=True,
+            expected_cancelled=("pack", "pick"),
+            expected_left_open=2,
+        ),
+        ItemPoolMidSubmitTestCase(
+            description="the second step never started",
+            start_second_thread=False,
+            expected_cancelled=("pick", "pack"),
+            expected_left_open=1,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_interrupt_inside_a_submit_when_cancelling_then_the_step_is_tracked_and_reported(
+    test_case: ItemPoolMidSubmitTestCase, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for run_path in _PATHS:
+        release: threading.Event = threading.Event()
+        started: threading.Event = threading.Event()
+        probe: ItemProbe = ItemProbe(
+            actions={
+                "pack": partial(held_until, release, None),
+                "pick": partial(held_until, release, started),
+            }
+        )
+        adapter: ItemPoolTestAdapter = ItemPoolTestAdapter()
+        graph: PythonNodeGraph = item_graph((("pack", "plan", 2, ()), ("pick", "plan", 2, ())))
+        interrupt_second_submit(
+            monkeypatch, start_thread=test_case.start_second_thread, started=started
+        )
+
+        began: float = time.monotonic()
+        with pytest.raises(KeyboardInterrupt):
+            _ = run_path(graph=graph, adapter=adapter, probe=probe)
+        waited: float = time.monotonic() - began
+        release.set()
+
+        assert (tuple(probe.cancelled), probe.reported) == (test_case.expected_cancelled, [])
+        assert waited < 9
+        assert adapter.connections - adapter.closed == test_case.expected_left_open
