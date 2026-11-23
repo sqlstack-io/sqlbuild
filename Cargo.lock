@@ -1410,9 +1410,9 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
 name = "fensu-facts"
-version = "0.31.1"
+version = "0.31.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ca6517dd7fb6fd5ec99d7c25be8ca860e4d753afb081cc0ab6a065aac40d0a8"
+checksum = "3e9d30452db5ffec654a1dd1683178e14e0789338b57b0ea0a798595b576814e"
 dependencies = [
  "dunce",
  "get-size2",
@@ -1428,9 +1428,9 @@ dependencies = [
 
 [[package]]
 name = "fensu-native"
-version = "0.31.1"
+version = "0.31.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbba81e35d514d8c889ef10287202e6c7920bdf43094ceb925616fded7cd5b92"
+checksum = "b36fc5e154c5967d8126eca79ad1a64f75fe1ca9b38dca903678b55b5988ef4a"
 dependencies = [
  "fensu-facts",
  "globset",
