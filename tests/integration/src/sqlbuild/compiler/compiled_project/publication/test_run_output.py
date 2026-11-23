@@ -350,13 +350,14 @@ def test_given_a_nul_in_an_exception_when_its_traceback_is_reported_then_the_fai
             [(17,)],
             backend="sqlite",
             expected_phases=(
-                "discovered",
-                "compiled",
-                "matched",
-                "connected",
-                "inspected",
-                "planned",
-                "connected",
+                ("discovered", True),
+                ("compiled", True),
+                ("matched", True),
+                ("connected", True),
+                ("inspected", True),
+                ("planned", True),
+                ("connected", True),
+                ("started_execution", False),
             ),
         ),
         PhaseEventsTestCase(
@@ -367,13 +368,14 @@ def test_given_a_nul_in_an_exception_when_its_traceback_is_reported_then_the_fai
             [(17,)],
             backend="postgres",
             expected_phases=(
-                "discovered",
-                "compiled",
-                "matched",
-                "connected",
-                "inspected",
-                "planned",
-                "connected",
+                ("discovered", True),
+                ("compiled", True),
+                ("matched", True),
+                ("connected", True),
+                ("inspected", True),
+                ("planned", True),
+                ("connected", True),
+                ("started_execution", False),
             ),
         ),
     ],
@@ -398,4 +400,4 @@ def test_given_a_worker_run_when_it_prepares_then_each_phase_is_a_run_event_with
         ]
 
     assert run["status"] == test_case.expected_status, worker.log.read_text()[-4000:]
-    assert phases == [(phase, True) for phase in test_case.expected_phases], phases
+    assert phases == list(test_case.expected_phases), phases

@@ -30,7 +30,7 @@ describe('preparing span', () => {
 			start: Date.parse('2026-11-23T10:00:00Z'),
 			end: Date.parse('2026-11-23T10:00:17Z'),
 			live: false,
-			steps: ['Compiled project · 12 nodes · 4.1 s']
+			steps: ['Compiled project · 12 models · 4.1 s']
 		});
 	});
 

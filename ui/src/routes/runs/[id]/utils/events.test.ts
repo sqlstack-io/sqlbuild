@@ -28,17 +28,20 @@ describe('run log', () => {
 				phase('c', '2026-11-23T10:00:09Z', { phase: 'compiled', durationMs: 4100, count: 2281, detail: '12 python nodes, 2269 models' }),
 				phase('s', '2026-11-23T10:00:09Z', { phase: 'discovered_set', name: 'fulfilment_plan', count: 3, detail: 'release 2026.11 · discovered 2026-11-23 08:00 UTC' }),
 				phase('k', '2026-11-23T10:00:10Z', { phase: 'connected', durationMs: 300, count: 9, name: 'snowflake' }),
-				phase('p', '2026-11-23T10:00:12Z', { phase: 'planned', durationMs: 1500, count: 93, detail: 'source freshness 1.12 s' })
+				phase('p', '2026-11-23T10:00:12Z', { phase: 'planned', durationMs: 1500, count: 93, detail: 'source freshness 1.12 s' }),
+				phase('x', '2026-11-23T10:00:13Z', { phase: 'started_execution', count: 8, detail: '9 connections' })
 			],
 			[]
 		);
 		expect(entries.map((e) => [e.text, e.tag?.text, e.tag?.repeats])).toEqual([
 			['Discovered project · 5.0 s', 'preparing', false],
-			['Compiled project · 2,281 nodes · 4.1 s', 'preparing', false],
+			['Compiled project · 2,281 models · 4.1 s', 'preparing', false],
 			['Used discovered set fulfilment_plan · 3 items', 'preparing', false],
 			['Connected to snowflake · 0.30 s', 'preparing', false],
-			['Planned · 93 selected · 1.5 s', 'planned', true]
+			['Planned · 93 selected · 1.5 s', 'planned', true],
+			['Started execution · concurrency 8 · 9 connections', 'started', true]
 		]);
+		expect(entries[5].details).toEqual([]);
 		expect(entries[2].details).toEqual([
 			['Detail', 'release 2026.11'],
 			['Detail', 'discovered 2026-11-23 08:00 UTC']

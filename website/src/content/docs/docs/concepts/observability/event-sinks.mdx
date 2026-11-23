@@ -46,15 +46,16 @@ Before a command runs its first node, it publishes one `invocation_phase` event 
 `invocation`) as each step of its preparation finishes. The payload's `phase` names the step,
 `duration_ms` says how long it took, and `count`, `name` and `detail` add what the step reports:
 
-| `phase`          | When                                                    | Also carries                                                                  |
-| ---------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `discovered`     | the project's declarations and Python were read         | `duration_ms`                                                                 |
-| `compiled`       | the project compiled                                    | `duration_ms`                                                                 |
-| `matched`        | a worker's compile matched its run's published snapshot | `duration_ms`                                                                 |
-| `discovered_set` | a worker read a saved discovered set its run uses       | `name` (the set), `count` (items), `detail` (tags and when it was discovered) |
-| `connected`      | warehouse connections opened                            | `duration_ms`, `name` (adapter), `count` (connections)                        |
-| `inspected`      | the warehouse state the plan needs was read             | `duration_ms`                                                                 |
-| `planned`        | the plan was generated                                  | `duration_ms`, `count` (nodes selected), `detail` (sub-steps)                 |
+| `phase`             | When                                                    | Also carries                                                                  |
+| ------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `discovered`        | the project's declarations and Python were read         | `duration_ms`                                                                 |
+| `compiled`          | the project compiled                                    | `duration_ms`, `count` (models)                                               |
+| `matched`           | a worker's compile matched its run's published snapshot | `duration_ms`                                                                 |
+| `discovered_set`    | a worker read a saved discovered set its run uses       | `name` (the set), `count` (items), `detail` (tags and when it was discovered) |
+| `connected`         | warehouse connections opened                            | `duration_ms`, `name` (adapter), `count` (connections)                        |
+| `inspected`         | the warehouse state the plan needs was read             | `duration_ms`                                                                 |
+| `planned`           | the plan was generated                                  | `duration_ms`, `count` (nodes selected), `detail` (sub-steps)                 |
+| `started_execution` | a build opened its connections and starts its nodes     | `count` (concurrency), `detail` (connections)                                 |
 
 A run's page shows these steps in its events, and a "Preparing" bar before the first node on its
 timeline. A consumer that doesn't know a `phase` can ignore the event.

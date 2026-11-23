@@ -28,12 +28,13 @@ export function phaseSeconds(ms: number): string {
 
 const PHASE_TEXT: Record<string, (p: RunEventPhase) => string> = {
 	discovered: () => 'Discovered project',
-	compiled: (p) => (p.count === null ? 'Compiled project' : `Compiled project · ${plural(p.count, 'node', 'nodes')}`),
+	compiled: (p) => (p.count === null ? 'Compiled project' : `Compiled project · ${plural(p.count, 'model', 'models')}`),
 	matched: () => 'Matched published snapshot',
 	discovered_set: (p) => `Used discovered set ${p.name ?? ''}${p.count === null ? '' : ` · ${plural(p.count, 'item', 'items')}`}`,
 	connected: (p) => `Connected to ${p.name ?? 'the warehouse'}`,
 	inspected: () => 'Inspected warehouse',
-	planned: (p) => (p.count === null ? 'Planned' : `Planned · ${p.count.toLocaleString('en-GB')} selected`)
+	planned: (p) => (p.count === null ? 'Planned' : `Planned · ${p.count.toLocaleString('en-GB')} selected`),
+	started_execution: (p) => ['Started execution', p.count === null ? null : `concurrency ${p.count}`, p.detail].filter(Boolean).join(' · ')
 };
 
 /** A finished preparation step in one line, such as `Compiled project · 2,281 nodes · 4.1 s`. */
@@ -47,6 +48,8 @@ function phaseDetails(p: RunEventPhase): [string, string][] {
 	const rows: [string, string][] = [];
 	if (p.phase === 'matched' && p.name) rows.push(['Snapshot', p.name]);
 	if (p.phase === 'connected' && p.count !== null) rows.push(['Connections', String(p.count)]);
+	// Starting execution says all it has in its line.
+	if (p.phase === 'started_execution') return rows;
 	for (const step of p.detail?.split(' · ') ?? []) rows.push(['Detail', step]);
 	return rows;
 }
@@ -160,7 +163,7 @@ const RUN_KINDS: Partial<Record<RunEvent['type'], string>> = {
 
 /** The tag an event's row carries: plain words, never the event type. */
 function eventTag(e: RunEvent): LogEntry['tag'] {
-	const kind = e.nodeKey ? undefined : e.phase?.phase === 'planned' ? 'planned' : RUN_KINDS[e.type];
+	const kind = e.nodeKey ? undefined : e.phase?.phase === 'planned' ? 'planned' : e.phase?.phase === 'started_execution' ? 'started' : RUN_KINDS[e.type];
 	if (kind) return { text: kind, tone: kind === 'failed' ? TAG_TONE.err : TAG_TONE.quiet };
 	if (e.type === 'resource_attempt_completed') return { text: 'built', tone: TAG_TONE.ok };
 	if (e.type === 'resource_attempt_failed' || e.type === 'statement_failed' || e.type === 'invocation_failed') return { text: 'failed', tone: TAG_TONE.err };
