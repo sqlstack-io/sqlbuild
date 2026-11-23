@@ -271,8 +271,8 @@ impl Dialect {
 /// One command's watch for Ctrl+C.
 #[derive(Debug)]
 pub(crate) struct InterruptWatch {
-    /// The socket Python's wakeup descriptor feeds.
-    pub(crate) receiver: Py<PyAny>,
+    /// The end of the socket pair Python's wakeup descriptor feeds.
+    pub(crate) receiver: WakeupSocket,
     /// The terminal's descriptor and the settings it had when the command started.
     pub(crate) terminal: Option<(i32, Py<PyAny>)>,
     /// Whether SIGTERM is stopping the command, which then ends as a termination.
@@ -298,6 +298,6 @@ pub(crate) struct InterruptSession {
     pub(crate) watch: std::sync::Arc<InterruptWatch>,
     pub(crate) watcher: std::thread::JoinHandle<PyResult<()>>,
     /// The wakeup descriptor's socket.
-    pub(crate) sender: Py<PyAny>,
+    pub(crate) sender: WakeupSocket,
     pub(crate) previous_wakeup: Py<PyAny>,
 }

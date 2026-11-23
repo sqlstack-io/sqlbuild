@@ -6,14 +6,15 @@ use std::time::Instant;
 
 use pyo3::exceptions::{PyKeyboardInterrupt, PyRuntimeError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::PyBytes;
 
 use crate::boundary::main::imported::imported;
 use crate::native_host::_helpers::forced_exit::{announce, force_exit};
 use crate::native_host::_helpers::interrupt::WATCHED_INTERRUPT;
-use crate::native_host::_helpers::signal_watcher::watch_signals;
+use crate::native_host::_helpers::signal_watcher::{
+    send_stop, wakeup_descriptor, wakeup_pair, watch_signals,
+};
 use crate::native_host::_helpers::terminal_settings::terminal_settings;
-use crate::native_host::constants::{GRACE, INTERRUPTED_CODE, POLL, STOP_BYTE, TERMINATED_CODE};
+use crate::native_host::constants::{GRACE, INTERRUPTED_CODE, POLL, TERMINATED_CODE};
 use crate::native_host::models::{InterruptSession, InterruptWatch};
 
 /// Start watching; `None` leaves an ignored or embedder's SIGINT handler alone.
@@ -27,17 +28,15 @@ pub(crate) fn start_watching(
     if !handler.is(&default) {
         return Ok(None);
     }
-    let sockets: Bound<'_, PyAny> = imported(py, "socket", "socketpair")?.call0()?;
-    let (receiver, sender) = (sockets.get_item(0)?, sockets.get_item(1)?);
-    sender.call_method1("setblocking", (false,))?;
+    let (receiver, sender) = wakeup_pair()?;
     let watch: Arc<InterruptWatch> = Arc::new(InterruptWatch {
-        receiver: receiver.unbind(),
+        receiver,
         terminal: terminal_settings(py),
         terminated,
         pressed: AtomicBool::new(false),
         announced: AtomicBool::new(false),
     });
-    let previous = signal.call_method1("set_wakeup_fd", (sender.call_method0("fileno")?,))?;
+    let previous = signal.call_method1("set_wakeup_fd", (wakeup_descriptor(&sender),))?;
     WATCHED_INTERRUPT.store(false, Ordering::SeqCst);
     let watched: Arc<InterruptWatch> = Arc::clone(&watch);
     let watcher = std::thread::Builder::new()
@@ -46,7 +45,7 @@ pub(crate) fn start_watching(
     Ok(Some(InterruptSession {
         watch,
         watcher,
-        sender: sender.unbind(),
+        sender,
         previous_wakeup: previous.unbind(),
     }))
 }
@@ -65,10 +64,7 @@ pub(crate) fn settle(
         drop(ignore());
     }
     signal.call_method1("set_wakeup_fd", (session.previous_wakeup.bind(py),))?;
-    session
-        .sender
-        .bind(py)
-        .call_method1("sendall", (PyBytes::new(py, &[STOP_BYTE]),))?;
+    send_stop(&session.sender)?;
     let watcher = session.watcher;
     match py.detach(|| watcher.join()) {
         Ok(watched) => watched?,
