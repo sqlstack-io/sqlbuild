@@ -97,3 +97,11 @@ class ItemPoolResultWriteTestCase:
     description: str
     write_seconds: float
     expected_reported: frozenset[tuple[str, str]]
+
+
+@dataclass(frozen=True)
+class ItemPoolMidSubmitTestCase:
+    description: str
+    start_second_thread: bool
+    expected_cancelled: tuple[str, ...]
+    expected_left_open: int

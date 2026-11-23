@@ -1618,7 +1618,8 @@ class SinkAbandonedStepTestCase:
     description: str
     parameters: str
     step_body: str
-    started_marker: str
+    started_markers: tuple[str, ...]
+    started_lines: tuple[str, ...]
     sent_signal: signal.Signals
     expected_exit_code: int
 
@@ -1627,3 +1628,11 @@ class SinkAbandonedStepTestCase:
 class SinkNormalRunTestCase:
     description: str
     expected_last_line: str
+
+
+@dataclass(frozen=True)
+class MidSubmitCancelTestCase:
+    description: str
+    sent_signal: signal.Signals
+    expected_exit_code: int
+    expected_notice: str
