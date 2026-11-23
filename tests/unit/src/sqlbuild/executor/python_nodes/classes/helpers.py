@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, ClassVar, cast
 
@@ -490,3 +491,42 @@ def finishing_probe() -> ItemProbe:
 
     probe.after_report = interrupt
     return probe
+
+
+def interrupt_second_submit(
+    monkeypatch: pytest.MonkeyPatch, *, start_thread: bool, started: threading.Event
+) -> None:
+    """Raise an interrupt inside the second `submit`, after its thread starts or before it."""
+
+    adjust: Callable[[ThreadPoolExecutor], None] = ThreadPoolExecutor._adjust_thread_count
+
+    def interrupted(executor: ThreadPoolExecutor) -> None:
+        threads: int = len(executor._threads)
+        outcomes: dict[bool, Callable[[], None]] = {
+            True: lambda: _interrupt_after(adjust, executor, start_thread, started),
+            False: lambda: adjust(executor),
+        }
+        outcomes[threads >= 1]()
+
+    monkeypatch.setattr(ThreadPoolExecutor, "_adjust_thread_count", interrupted)
+
+
+def _interrupt_after(
+    adjust: Callable[[ThreadPoolExecutor], None],
+    executor: ThreadPoolExecutor,
+    start_thread: bool,
+    started: threading.Event,
+) -> None:
+    starts: dict[bool, Callable[[], object]] = {
+        True: lambda: (adjust(executor), started.wait(timeout=WAIT_SECONDS)),
+        False: lambda: None,
+    }
+    _ = starts[start_thread]()
+    raise KeyboardInterrupt("cancelled inside submit")
+
+
+def held_until(release: threading.Event, started: threading.Event | None) -> object:
+    """An item that says it started, if asked, then ignores a cancel until released."""
+
+    _ = started is not None and started.set()
+    return release.wait(timeout=WAIT_SECONDS)

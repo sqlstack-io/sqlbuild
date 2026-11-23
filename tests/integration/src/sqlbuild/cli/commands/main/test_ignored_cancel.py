@@ -12,6 +12,7 @@ import pytest
 from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     HungSetupCancelTestCase,
     IgnoredCancelTestCase,
+    MidSubmitCancelTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
@@ -96,6 +97,24 @@ class GatewayProvider(Provider):
 
     def teardown(self) -> None:
         Path({directory!r}, "torn-down").touch()
+"""
+
+_BOTH_STARTED: tuple[str, ...] = ("fulfil[pack] START", "fulfil[pick] START")
+_SLOW_SUBMIT: str = """\\
+import time
+from concurrent.futures import ThreadPoolExecutor
+
+ADJUST = ThreadPoolExecutor._adjust_thread_count
+
+
+def slow_second_start(self) -> None:
+    \"\"\"Keep the caller inside `submit` for a while once a second thread has started.\"\"\"
+    ADJUST(self)
+    if len(self._threads) > 1:
+        time.sleep(3)
+
+
+ThreadPoolExecutor._adjust_thread_count = slow_second_start
 """
 
 
@@ -214,7 +233,10 @@ def test_given_a_step_in_a_provider_setup_that_never_returns_when_cancelled_then
         )
         try:
             deadline: float = time.monotonic() + 60
-            while not (tmp_path / "setup-started").exists():
+            while not (
+                (tmp_path / "setup-started").exists()
+                and all(line in log.read_text() for line in _BOTH_STARTED)
+            ):
                 assert process.poll() is None, log.read_text()
                 assert time.monotonic() < deadline, log.read_text()
                 time.sleep(0.05)
@@ -226,4 +248,64 @@ def test_given_a_step_in_a_provider_setup_that_never_returns_when_cancelled_then
 
     assert exit_code == test_case.expected_exit_code, log.read_text()
     assert "Stopped waiting for fulfil[pack], fulfil[pick] after 5 seconds" in log.read_text()
+    assert not (tmp_path / "torn-down").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix signals")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        MidSubmitCancelTestCase(
+            description="SIGTERM while the second step is being submitted",
+            sent_signal=signal.SIGTERM,
+            expected_exit_code=143,
+            expected_notice="Stopped waiting for fulfil[pack], fulfil[pick] after 5 seconds",
+        ),
+        MidSubmitCancelTestCase(
+            description="Ctrl+C while the second step is being submitted",
+            sent_signal=signal.SIGINT,
+            expected_exit_code=130,
+            expected_notice="Stopped waiting for fulfil[pack], fulfil[pick] after 5 seconds",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_cancel_inside_a_steps_submit_when_steps_ignore_it_then_both_are_abandoned(
+    test_case: MidSubmitCancelTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": 'name = "fulfilment"\nadapter = "duckdb"\n'
+            'default_target = "development"\n\n[connection]\ndatabase = "warehouse.duckdb"\n\n'
+            '[targets.development]\nschema = "main"\n',
+            "python/steps.py": _STEPS.format(directory=str(tmp_path)),
+            "python/slow_submit.py": _SLOW_SUBMIT,
+            "providers/marker.py": _PROVIDER.format(directory=str(tmp_path)),
+        },
+    )
+    log: Path = tmp_path / "build.log"
+    with log.open("wb") as output:
+        process: subprocess.Popen[bytes] = subprocess.Popen(
+            [str(Path(sys.executable).with_name("sqb")), "--no-color"]
+            + ["--project-dir", str(project), "build", "--discover"],
+            stdout=output,
+            stderr=subprocess.STDOUT,
+            env=os.environ | {"HOME": str(tmp_path)},
+        )
+        try:
+            deadline: float = time.monotonic() + 60
+            while len(list(tmp_path.glob("*.running"))) < 2:
+                assert process.poll() is None, log.read_text()
+                assert time.monotonic() < deadline, log.read_text()
+                time.sleep(0.05)
+            process.send_signal(test_case.sent_signal)
+            exit_code: int = process.wait(timeout=20)
+        finally:
+            process.kill()
+            _ = process.wait(timeout=5)
+
+    assert exit_code == test_case.expected_exit_code, log.read_text()
+    assert test_case.expected_notice in log.read_text()
     assert not (tmp_path / "torn-down").exists()

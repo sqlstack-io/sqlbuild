@@ -9,7 +9,7 @@ from contextvars import copy_context
 from dataclasses import replace
 from threading import Lock
 from time import monotonic
-from typing import Any, cast
+from typing import Any
 
 from sqlbuild._native import CommandTerminated, termination_requested
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
@@ -104,24 +104,43 @@ class DiscoveredItemPool:
                 node.name
             )
             slot: ItemSlot = self._take_slot()
-            self._report_start(node=node, upstream=upstream)
-            future: Future[PythonNodeExecutionResult] = cast(
-                Future[PythonNodeExecutionResult],
-                threads.submit(
-                    copy_context().run,
-                    run_ready_python_node,
-                    node=node,
-                    upstream_results=upstream,
-                    runtime=replace(
-                        self._runtime, connection=slot.connection, result_store=slot.result_store
-                    ),
-                    statement_recorder=StatementRecorder(),
-                    run_state=self._run_state,
-                ),
-            )
+            future: Future[PythonNodeExecutionResult] = Future()
             self._running[future] = RunningItem(node=node, set_name=limited[0], slot=slot)
             started.add(node.name)
             running_by_set[limited[0]] += 1
+            self._report_start(node=node, upstream=upstream)
+            _ = threads.submit(
+                copy_context().run,
+                self._run_into,
+                future=future,
+                node=node,
+                upstream_results=upstream,
+                runtime=replace(
+                    self._runtime, connection=slot.connection, result_store=slot.result_store
+                ),
+                statement_recorder=StatementRecorder(),
+                run_state=self._run_state,
+            )
+
+    @staticmethod
+    def _run_into(
+        *,
+        future: Future[PythonNodeExecutionResult],
+        **arguments: Any,
+    ) -> None:
+        """Run one item into `future`, tracked before it was submitted, unless it was cancelled."""
+
+        if not future.set_running_or_notify_cancel():
+            return
+        try:
+            future.set_result(run_ready_python_node(**arguments))
+        except BaseException as error:
+            future.set_exception(error)
+
+    def _unstarted(self) -> list[RunningItem]:
+        """Take out each item no thread has begun; its cancelled future keeps one from beginning."""
+
+        return [self._running.pop(future) for future in list(self._running) if future.cancel()]
 
     def _report_start(
         self,
@@ -155,6 +174,7 @@ class DiscoveredItemPool:
         """After an error: start nothing more, and settle what is running as it returns."""
 
         try:
+            _ = self._unstarted()
             while self._running:
                 done: set[Future[PythonNodeExecutionResult]]
                 done, _ = wait(self._running, return_when=FIRST_COMPLETED)
@@ -182,6 +202,8 @@ class DiscoveredItemPool:
     def _report_until(self, deadline: float) -> None:
         """Report each item as it ends, those already done at `deadline` too, then the rest."""
 
+        for item in self._unstarted():
+            self._report_cancelled(item)
         while self._running:
             cancel_running_statements()
             done: set[Future[PythonNodeExecutionResult]]
