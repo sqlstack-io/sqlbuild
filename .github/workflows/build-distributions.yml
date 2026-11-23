@@ -201,11 +201,15 @@ jobs:
         uses: PyO3/maturin-action@v1
         if: inputs.prebuilt-run-id == ''
         continue-on-error: true
+        # The extension embeds the UI as sqb does, so the sqb build below reuses the crates this
+        # build compiles instead of compiling sqlbuild-orchestration and sqlbuild-cli again.
+        env:
+          SQLBUILD_UI_REQUIRED: "1"
         with:
           command: build
           # One platform records a cargo build timing report for build time work.
           args: >-
-            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module
+            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module,sqlbuild-cli/ui
             ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
@@ -214,11 +218,13 @@ jobs:
         uses: PyO3/maturin-action@v1
         if: inputs.prebuilt-run-id == '' && steps.extension.outcome == 'failure'
         continue-on-error: ${{ runner.os != 'Linux' }}
+        env:
+          SQLBUILD_UI_REQUIRED: "1"
         with:
           command: build
           # One platform records a cargo build timing report for build time work.
           args: >-
-            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module
+            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module,sqlbuild-cli/ui
             ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
@@ -228,8 +234,9 @@ jobs:
           && steps.extension.outcome == 'failure' && steps.extension-retry.outcome == 'failure'
         shell: bash
         env:
+          SQLBUILD_UI_REQUIRED: "1"
           MATURIN_ARGS: >-
-            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module
+            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module,sqlbuild-cli/ui
           TARGET: ${{ matrix.platform.target }}
         run: scripts/maturin_from_pypi.sh build ${MATURIN_ARGS}
       - id: cli
