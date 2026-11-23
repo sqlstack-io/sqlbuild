@@ -10,6 +10,7 @@ from sqlbuild._native import (
     DiscoveredProjectInputs,
     DiscoveredSqlTestBlock,
     ProjectConfigError,
+    ProjectLayoutError,
     ProjectPythonPathError,
     discover_project_inputs,
 )
@@ -645,65 +646,63 @@ def test_given_supported_project_python_when_discovering_inputs_then_paths_are_a
         DiscoverProjectInputsErrorTestCase(
             description="raises when Python lives in removed tasks root",
             repo_files=base_repo_files() | {"tasks/orders.py": "VALUE = 1\n"},
-            expected_error_fragment="tasks/orders.py",
+            expected_error_fragment="'tasks/' is not part of a SQLBuild project",
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when Python lives in removed assets root",
             repo_files=base_repo_files() | {"assets/orders.py": "VALUE = 1\n"},
-            expected_error_fragment="assets/orders.py",
+            expected_error_fragment="'assets/' is not part of a SQLBuild project",
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when Python lives in removed checks root",
             repo_files=base_repo_files() | {"checks/orders.py": "VALUE = 1\n"},
-            expected_error_fragment="checks/orders.py",
+            expected_error_fragment="'checks/' is not part of a SQLBuild project",
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when Python lives in removed loaders root",
             repo_files=base_repo_files() | {"loaders/orders.py": "VALUE = 1\n"},
-            expected_error_fragment="loaders/orders.py",
+            expected_error_fragment="'loaders/' is not part of a SQLBuild project",
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when Python lives in removed factories root",
             repo_files=base_repo_files() | {"factories/orders.py": "VALUE = 1\n"},
-            expected_error_fragment="factories/orders.py",
+            expected_error_fragment="'factories/' is not part of a SQLBuild project",
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when Python lives in removed libs root",
             repo_files=base_repo_files() | {"libs/cleaning.py": "VALUE = 1\n"},
-            expected_error_fragment="libs/cleaning.py",
+            expected_error_fragment="'libs/' is not part of a SQLBuild project",
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when Python lives in removed dagster root",
             repo_files=base_repo_files() | {"dagster/definitions.py": "VALUE = 1\n"},
-            expected_error_fragment="dagster/definitions.py",
+            expected_error_fragment="'dagster/' is not part of a SQLBuild project",
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when Python lives in removed rivers_pipeline root",
             repo_files=base_repo_files() | {"rivers_pipeline/definitions.py": "VALUE = 1\n"},
-            expected_error_fragment="rivers_pipeline/definitions.py",
+            expected_error_fragment="'rivers_pipeline/' is not part of a SQLBuild project",
         ),
         DiscoverProjectInputsErrorTestCase(
             description="raises when Python lives in removed root definitions root",
             repo_files=base_repo_files() | {"definitions.py": "VALUE = 1\n"},
-            expected_error_fragment="definitions.py",
+            expected_error_fragment="'definitions.py' is not part of a SQLBuild project",
         ),
     ),
     ids=lambda case: case.description,
 )
-def test_given_python_in_removed_root_when_discovering_inputs_then_d016_is_raised(
+def test_given_python_in_removed_root_when_discovering_inputs_then_d018_is_raised(
     test_case: DiscoverProjectInputsErrorTestCase,
     tmp_path: Path,
     write_repo_files: Callable[[Path, dict[str, str]], None],
 ) -> None:
     write_repo_files(tmp_path, test_case.repo_files)
 
-    with pytest.raises(ProjectPythonPathError) as error_info:
+    with pytest.raises(ProjectLayoutError) as error_info:
         discover_project_inputs(project_dir=tmp_path)
 
-    assert error_info.value.code == "D016"
-    assert f"Unsupported project Python path(s): {test_case.expected_error_fragment}" in str(
-        error_info.value
-    )
+    assert error_info.value.code == "D018"
+    assert test_case.expected_error_fragment in str(error_info.value)
 
 
 @pytest.mark.parametrize(
@@ -982,9 +981,9 @@ def test_given_parameterized_test_when_discovering_inputs_then_cases_are_not_dup
         DiscoverProjectInputsErrorTestCase(
             description="raises when Python lives outside a supported project root",
             repo_files=base_repo_files()
-            | {"audit_helpers/measurements.py": "def build_cases(): return []\n"},
+            | {"sql/models/measurements.py": "def build_cases(): return []\n"},
             expected_error_fragment=(
-                "Unsupported project Python path\\(s\\): audit_helpers/measurements.py"
+                "Unsupported project Python path\\(s\\): sql/models/measurements.py"
             ),
         ),
         DiscoverProjectInputsErrorTestCase(
@@ -1251,17 +1250,21 @@ def enriched_events(ctx):
             description="raises when loader dependencies contain a cycle",
             repo_files=base_repo_files()
             | {
-                "python/nodes/loaders/events/loader.py": """
+                "python/nodes/loaders/events/loaders.py": """
+from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 
-def fetch_events(ctx):
-    return []
 
-@loader(depends_on=[fetch_events])
-def enriched_events(ctx):
-    return []
+@factory
+def event_loaders():
+    def fetch_events(ctx):
+        return []
 
-fetch_events = loader(depends_on=[enriched_events])(fetch_events)
+    @loader(depends_on=[fetch_events])
+    def enriched_events(ctx):
+        return []
+
+    return [loader(depends_on=[enriched_events])(fetch_events), enriched_events]
 """,
             },
             expected_error_fragment="Loader dependency cycle detected",
@@ -1526,17 +1529,21 @@ def export_window(ctx):
             description="raises when task and asset dependencies contain a cycle",
             repo_files=base_repo_files()
             | {
-                "python/nodes/tasks/windows/asset.py": """
+                "python/nodes/tasks/windows/assets.py": """
 from sqlbuild.assets import asset
+from sqlbuild.factories import factory
 
-def fetch_window(ctx):
-    return None
 
-@asset(depends_on=fetch_window)
-def enrich_window(ctx):
-    return None
+@factory
+def window_assets():
+    def fetch_window(ctx):
+        return None
 
-fetch_window = asset(depends_on=enrich_window)(fetch_window)
+    @asset(depends_on=fetch_window)
+    def enrich_window(ctx):
+        return None
+
+    return [asset(depends_on=enrich_window)(fetch_window), enrich_window]
 """,
             },
             expected_error_fragment="Python node dependency cycle detected",
