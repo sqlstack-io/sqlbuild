@@ -28,11 +28,11 @@
 	import { attentionViews, type AttentionTone } from '$lib/build-area/attention';
 	import type { AttentionItem, Overview } from '$lib/api';
 	import { CLEARED_REASON, acknowledgementOf, clearedWithdrawalId, judgedRead, snoozeWords, withdrawalsDue, type JudgedRead } from '$lib/build-area/attention-conditions';
-	import { formatCredits } from '$lib/build-area/labels';
 	import { nodeChangeLine, summarizeChange } from '$lib/build-area/changes';
 	import { cappedFolders, quietDeployLine, recentDeployRows } from '$lib/build-area/overview-panels';
 	import { pagesBeyondTarget } from '$lib/nav';
 	import OverviewCost from './overview-cost.svelte';
+	import { CREDIT_PRICE_HINT, formatQueryCost, reportsCost } from '$lib/operate/cost';
 
 	const catalog = useCatalogNodes();
 	/** Each top-level folder as a selection, for the folder rows' links to the catalog. */
@@ -165,7 +165,10 @@
 	const m = $derived(data?.metrics);
 	const finished = $derived(m ? m.runs24h.success + m.runs24h.warn + m.runs24h.partial + m.runs24h.failed : 0);
 	const successRate = $derived(m && finished ? Math.round(((m.runs24h.success + m.runs24h.warn) / finished) * 100) : null);
-	const costChange = $derived(m?.cost && m.cost.baseline ? Math.round(((m.cost.last24h - m.cost.baseline) / m.cost.baseline) * 100) : null);
+	// The last 7 days' query cost, for locations whose adapter reports cost and once any run has some.
+	const showCost = $derived(reportsCost(app.location?.target.adapter) && app.client.supports('getCostSummary'));
+	const costWeek = createResource((client, scope) => (showCost ? client.getCostSummary(scope, 7).catch(() => null) : Promise.resolve(null)), ['runs', 'warehouse_sync', 'snapshot']);
+	const weekCost = $derived(costWeek.data?.runs ? costWeek.data : null);
 	const groups = $derived(data?.groups ?? []);
 	// At most eight folders, most urgent first; the catalog's folder view lists them all.
 	const folders = $derived(cappedFolders(groups));
@@ -309,7 +312,7 @@
 				<p class="ack-error standalone">{acknowledgeError}</p>
 			{/if}
 
-			<section class="metric-strip" style:--metrics={3 + (m?.stale ? 1 : 0) + (m?.cost ? 1 : 0)}>
+			<section class="metric-strip" style:--metrics={3 + (m?.stale ? 1 : 0) + (weekCost ? 1 : 0)}>
 				{#if m}
 					<div class="metric">
 						<span class="metric-label">Models</span>
@@ -333,11 +336,11 @@
 							<span>{m.stale.changed} changed · {m.stale.behind} behind{#if m.stale.sources !== null} · {plural(m.stale.sources, 'source')} late{/if}</span>
 						</div>
 					{/if}
-					{#if m.cost}
-						<div class="metric">
-							<span class="metric-label">Cost · 24h</span>
-							<div><strong>{formatCredits(m.cost.last24h)}</strong></div>
-							<span class:warning-note={(costChange ?? 0) >= 20}>{costChange === null ? '—' : `${costChange >= 0 ? '+' : ''}${costChange}%`} vs {m.cost.baselineDays}-day average</span>
+					{#if weekCost}
+						<div class="metric" data-testid="cost-card">
+							<span class="metric-label">Cost · 7 days{#if weekCost.usd === null}<HelpTip text={CREDIT_PRICE_HINT} label="Why credits" />{/if}</span>
+							<div><strong>{formatQueryCost(weekCost)}</strong></div>
+							<span>{plural(weekCost.runs, 'run')} · <a class="metric-link" href="#cost">Breakdown</a></span>
 						</div>
 					{/if}
 				{/if}
@@ -405,7 +408,7 @@
 						<div><h2>Activity <HelpTip text="Past runs and the next scheduled times" /></h2><span>Past and upcoming</span></div>
 						<a href={to(`/runs?view=timeline`)}>Open full timeline →</a>
 					</div>
-					<RunTimeline scroll={false} stickyTop={0} />
+					<RunTimeline scroll={false} stickyTop={0} foldIdle />
 				</section>
 			{/if}
 

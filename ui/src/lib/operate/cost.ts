@@ -4,8 +4,14 @@ import { topFolder } from '$lib/lineage/catalog-graph';
 /** The resource type of the row carrying a collection's totals. */
 export const TOTAL = '_total';
 
-/** Shown wherever figures read in credits, because the project set no credit price. */
+/** The help tip wherever figures read in credits, because the project set no credit price. */
 export const CREDIT_PRICE_HINT = 'Set usd_per_credit under [cost] in sqlbuild_project.toml to see dollars.';
+
+/** Adapters whose runs report query cost; the Overview shows cost only for these. */
+const COST_ADAPTERS: ReadonlySet<string> = new Set(['snowflake']);
+
+/** Whether a location on `adapter` reports query cost. */
+export const reportsCost = (adapter: string | null | undefined): boolean => !!adapter && COST_ADAPTERS.has(adapter);
 
 /** Node costs summed per top-level folder, most expensive first; nodes no longer deployed count as `other`. */
 export function costByFolder(byNode: CostGroup[], nodes: CatalogNode[]): { key: string; credits: number; usd: number | null; nodes: number }[] {

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import Button from '$lib/components/ui/button/button.svelte';
+	import DisclosureButton from '$lib/components/disclosure-button.svelte';
+	import { plural } from '$lib/format/plural';
 	import Loading from '$lib/components/loading.svelte';
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import { to } from '$lib/paths';
@@ -19,8 +21,11 @@
 		initialWindow = '12h',
 		scroll = true,
 		stickyTop = 0,
+		foldIdle = false,
 		actions
 	}: {
+		/** Fold jobs with nothing in the window under "N idle jobs"; a search still finds them. */
+		foldIdle?: boolean;
 		/** false = no inner scroll; the header sticks to the page's scroll container instead. */
 		scroll?: boolean;
 		stickyTop?: number;
@@ -156,6 +161,14 @@
 			.sort((a, b) => severity(b) - severity(a) || a.localeCompare(b))
 			.map((name) => ({ name }))
 	);
+	// A job is idle when it has no run, scheduled time or tick in the window.
+	const idle = (job: string) => !runsByJob.has(job) && !markersByJob.has(job);
+	let idleOpen = $state(false);
+	const folding = $derived(foldIdle && !q);
+	const idleJobs = $derived(foldIdle ? jobs.filter((j) => idle(j.name)) : []);
+	const shownJobs = $derived(
+		foldIdle ? [...jobs.filter((j) => !idle(j.name)), ...(folding && !idleOpen ? [] : idleJobs)] : jobs
+	);
 
 	// The name column fits the longest job name, within limits; longer names truncate and show in full on hover.
 	// `--tl-gutter` is registered as a length (see the style block), so `ch` resolves once, at the job names'
@@ -221,7 +234,8 @@
 				{#each ticks as t (t.t)}<i class="gridline" style:left="{pct(t.t)}%"></i>{/each}
 				{#if nowPct >= 0 && nowPct <= 100}<i class="now-line" style:left="{nowPct}%"></i>{/if}
 			</div>
-			{#each jobs as job (job.name)}
+			{#each shownJobs as job, i (job.name)}
+				{#if folding && idleOpen && i === shownJobs.length - idleJobs.length}{@render idleFold()}{/if}
 				<div class="row">
 					<a class="gutter job" href={to(`/jobs/${job.name}`)} title="Open {job.name}"><PlayIcon class="job-icon" aria-hidden="true" /><span class="job-name">{job.name}</span></a>
 					<div class="track">
@@ -256,9 +270,16 @@
 					{#if timeline.error}Couldn't load the timeline: {timeline.error}{:else if !timeline.data}<Loading lines={2} />{:else if query}No jobs match “{query}”.{:else}No runs in this window.{/if}
 				</div>
 			{/each}
+			{#if folding && idleJobs.length && !idleOpen}{@render idleFold()}{/if}
 		</div>
 	</div>
 </div>
+
+{#snippet idleFold()}
+	<div class="row fold">
+		<DisclosureButton open={idleOpen} onclick={() => (idleOpen = !idleOpen)} class="h-[28px] px-3.5 text-[12px]">{plural(idleJobs.length, 'idle job')}</DisclosureButton>
+	</div>
+{/snippet}
 
 <svelte:window bind:innerWidth={innerW} />
 
@@ -459,6 +480,11 @@
 	}
 	.row:hover {
 		background: color-mix(in srgb, var(--sb-hover) 55%, transparent);
+	}
+	/* The fold row sits above the overlay's gridlines, so it reads as a divider, not a job. */
+	.row.fold {
+		position: relative;
+		background: var(--card);
 	}
 	.job {
 		display: flex;

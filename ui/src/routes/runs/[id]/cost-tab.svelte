@@ -39,10 +39,8 @@
 	<div class="total">
 		<span class="label">Estimated query cost&nbsp;<HelpTip text="Estimated from the warehouse's query history: each query's share of its warehouse's credits. Idle time and the 60-second minimum are not included. Cost appears after the location syncs this run's query history from a Snowflake warehouse; other warehouses show duration only." /></span>
 		<strong>{summary.text}</strong>
+		{#if counted && cost.usd == null}<HelpTip text={CREDIT_PRICE_HINT} label="Why credits" />{/if}
 		{#if summary.note}<span class="note">{summary.note}</span>{/if}
-		{#if counted && cost.usd == null}
-			<span class="hint">{CREDIT_PRICE_HINT}</span>
-		{/if}
 	</div>
 
 	{#if counted && cost.resources.length}
@@ -99,13 +97,6 @@
 	}
 	.note {
 		color: var(--sb-warn, var(--muted-foreground));
-	}
-	.hint {
-		color: var(--muted-foreground);
-	}
-	.hint {
-		flex-basis: 100%;
-		font-size: 12px;
 	}
 	h4 {
 		margin: 14px 0 6px;

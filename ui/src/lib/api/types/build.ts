@@ -416,8 +416,6 @@ export type OverviewMetrics = {
 	checks: CheckCounts;
 	/** Distinct stale nodes, and how many are changed or behind (a node can be both); null when the server reports no project-wide build state, and `sources` null when source freshness is not checked. */
 	stale: { nodes: number; changed: number; behind: number; sources: number | null } | null;
-	/** Null when the adapter has no cost data. */
-	cost: { last24h: number; baseline: number; baselineDays: number; unit: CostUnit } | null;
 };
 
 /** Build status per group: current, stale (changed or behind) and failed. */

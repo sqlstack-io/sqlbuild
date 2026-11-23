@@ -52,7 +52,7 @@
 </script>
 
 {#if app.client.supports('getCostSummary') && (cost?.runs || summary.error)}
-	<section class="surface-panel cost">
+	<section class="surface-panel cost" id="cost">
 		<div class="panel-heading">
 			<div>
 				<h2>Estimated query cost <HelpTip text="Warehouse time the runs' queries used, not billed warehouse time" /></h2>
@@ -64,9 +64,8 @@
 			<p class="note err">Couldn't load cost: {summary.error}</p>
 		{:else if cost}
 			<div class="total">
-				<strong>{formatQueryCost(cost)}</strong>
+				<strong>{formatQueryCost(cost)}{#if cost.usd === null}<HelpTip text={CREDIT_PRICE_HINT} label="Why credits" />{/if}</strong>
 				<span>{plural(cost.runs, 'run')} in the last {days} days{#if cost.incompleteRuns}&nbsp;· <b title="Cost still pending or partial for these runs">{cost.incompleteRuns} incomplete</b>{/if}</span>
-				{#if cost.usd === null}<span class="hint">{CREDIT_PRICE_HINT}</span>{/if}
 			</div>
 			<div class="columns">
 				{#each columns as c (c.title)}
@@ -98,7 +97,8 @@
 	.total strong { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
 	.total span { color: var(--muted-foreground); font-size: 12px; }
 	.total b { color: var(--sb-warning); font-weight: 500; }
-	.total .hint { flex-basis: 100%; color: var(--sb-text-faint); }
+	.total strong :global(.help-tip) { margin-left: 6px; }
+	.cost { scroll-margin-top: 12px; }
 	.columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; padding: 8px 14px 14px; }
 	.column h3 { margin: 6px 0 4px; color: var(--muted-foreground); font-size: 11px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
 	.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 10px; padding: 6px 0; border-top: 1px solid var(--inner-line); font-size: 12.5px; }
