@@ -12,7 +12,7 @@ use crate::native_host::_helpers::adapter_connects::connects_in_progress;
 use crate::native_host::_helpers::forced_exit::{cancel_statements, force_exit};
 use crate::native_host::_helpers::interrupt::WATCHED_INTERRUPT;
 use crate::native_host::constants::{
-    GRACE, INTERRUPT_BYTE, POLL, RECEIVE_BYTES, STEP_THREAD_PREFIX, STOP_BYTE,
+    GRACE, INTERRUPT_BYTE, POLL, RECEIVE_BYTES, STEP_THREAD_PREFIX, STOP_BYTE, SYNC_BYTE,
 };
 use crate::native_host::main::host_entry::host_entry;
 use crate::native_host::models::{InterruptPresses, InterruptWatch};
@@ -38,6 +38,9 @@ pub(crate) fn watch_signals(py: Python<'_>, watch: &InterruptWatch) -> PyResult<
                 && !(watch.terminated)()
             {
                 WATCHED_INTERRUPT.store(true, Ordering::SeqCst);
+            }
+            if let Ok(bytes) = &received {
+                acknowledge_syncs(watch, bytes);
             }
             received
         })?;
@@ -178,6 +181,24 @@ pub(crate) fn receive(receiver: &WakeupSocket, wait: Option<Duration>) -> std::i
         }
         Err(error) => Err(error),
     }
+}
+
+/// Count the sync bytes just read and wake the command's end waiting on them.
+fn acknowledge_syncs(watch: &InterruptWatch, bytes: &[u8]) {
+    let read: u64 = bytes.iter().filter(|byte| **byte == SYNC_BYTE).count() as u64;
+    if read > 0 {
+        *watch
+            .syncs
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += read;
+        watch.synced.notify_all();
+    }
+}
+
+/// Ask the watcher to confirm it has read everything written before this.
+pub(crate) fn send_sync(sender: &WakeupSocket) -> std::io::Result<()> {
+    let mut writer: &WakeupSocket = sender;
+    writer.write_all(&[SYNC_BYTE])
 }
 
 /// Tell the watcher to stop.
