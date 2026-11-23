@@ -3373,7 +3373,7 @@ _COMPILE_REUSE_EXTRA_PROJECT_FILES: dict[str, str] = {
         '    """Return the rounding scale."""\n    return _SCALE\n'
     ),
     "sql/macros/python/currency.py": (
-        '"""Project-wide currency macros."""\n\nfrom macros.python._rounding import scale\n\n\n'
+        '"""Project-wide currency macros."""\n\nfrom sql.macros.python._rounding import scale\n\n\n'
         "def line_total_cents(price_cents: str, quantity: str) -> str:\n"
         '    """Calculate line total cents from a unit price and quantity."""\n'
         '    return f"ROUND({price_cents} * {quantity}, {scale()})"\n'
@@ -3593,20 +3593,20 @@ def rewrite_macro_without_change(project_dir: Path) -> None:
 def delete_compiled_model(project_dir: Path) -> None:
     """Delete one compiled artifact by hand."""
 
-    (project_dir / "target/compiled/models/marts/regional_orders.sql").unlink()
+    (project_dir / "target/compiled/sql/models/marts/regional_orders.sql").unlink()
 
 
 def edit_compiled_model(project_dir: Path) -> None:
     """Edit one compiled artifact by hand."""
 
-    path: Path = project_dir / "target/compiled/models/marts/regional_orders.sql"
+    path: Path = project_dir / "target/compiled/sql/models/marts/regional_orders.sql"
     path.write_text(path.read_text(encoding="utf-8") + "-- edited by hand\n", encoding="utf-8")
 
 
 def add_stale_compiled_file(project_dir: Path) -> None:
     """Add a compiled artifact that no model produces."""
 
-    write_project_file(project_dir, "target/compiled/models/stale_model.sql", "SELECT 1\n")
+    write_project_file(project_dir, "target/compiled/sql/models/stale_model.sql", "SELECT 1\n")
 
 
 COMPILED_TREE_STAMP_FILE_NAME: str = "compiled-tree.bin"
@@ -3621,7 +3621,7 @@ def compiled_tree_stamp_path(*, project_dir: Path) -> Path:
 def add_stale_compiled_file_beside_models(project_dir: Path) -> None:
     """Add an unmanaged compiled file to a folder that already holds compiled models."""
 
-    write_project_file(project_dir, "target/compiled/models/marts/stale_mart.sql", "SELECT 1\n")
+    write_project_file(project_dir, "target/compiled/sql/models/marts/stale_mart.sql", "SELECT 1\n")
 
 
 def link_compiled_root(project_dir: Path) -> None:
@@ -3815,7 +3815,7 @@ def edit_project_model_during_compile(project_dir: Path) -> None:
 def rewrite_compiled_model_unchanged(project_dir: Path) -> None:
     """Rewrite one compiled artifact with the bytes it already holds."""
 
-    path: Path = project_dir / "target/compiled/models/marts/regional_orders.sql"
+    path: Path = project_dir / "target/compiled/sql/models/marts/regional_orders.sql"
     path.write_bytes(path.read_bytes())
 
 
@@ -4163,7 +4163,7 @@ class RandomEditChain:
 STG_ORDERS_MODEL: str = "sql/models/staging/stg_orders.sql"
 STG_PAYMENTS_MODEL: str = "sql/models/staging/stg_payments.sql"
 FACT_ORDERS_MODEL: str = "sql/models/marts/fact_orders.sql"
-DIM_CUSTOMERS_ARTIFACT: str = "target/compiled/models/marts/dim_customers.sql"
+DIM_CUSTOMERS_ARTIFACT: str = "target/compiled/sql/models/marts/dim_customers.sql"
 _FACT_QUANTITY_TYPE: str = "    quantity (type INTEGER),\n"
 _FACT_ORDER_ID_COLUMN: str = "    order_id (nullable false, audits [not_null]),\n"
 

@@ -1023,12 +1023,12 @@ if __name__ == "__main__":
         CompiledTreeStampTestCase(
             description="stale_file_beside_compiled_models",
             edit=add_stale_compiled_file_beside_models,
-            expected_removed_path="target/compiled/models/marts/stale_mart.sql",
+            expected_removed_path="target/compiled/sql/models/marts/stale_mart.sql",
         ),
         CompiledTreeStampTestCase(
             description="stale_file_in_compiled_models_root",
             edit=add_stale_compiled_file,
-            expected_removed_path="target/compiled/models/stale_model.sql",
+            expected_removed_path="target/compiled/sql/models/stale_model.sql",
         ),
         CompiledTreeStampTestCase(
             description="stale_file_in_linked_compiled_root",
