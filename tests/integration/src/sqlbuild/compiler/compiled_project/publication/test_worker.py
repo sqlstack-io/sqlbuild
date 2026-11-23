@@ -1268,7 +1268,7 @@ def test_given_a_busy_control_store_when_a_build_runs_then_the_scheduler_retries
             "SELECT amount FROM orders",
             "success",
             [(17,)],
-            files={"python/nodes/checks/orders.py": "initial"},
+            files={"python/nodes/checks/orders/checks.py": "initial"},
         ),
         WorkerExecutionTestCase(
             "attached Python check changed after publication",
@@ -1276,8 +1276,8 @@ def test_given_a_busy_control_store_when_a_build_runs_then_the_scheduler_retries
             "SELECT amount FROM orders",
             "failed",
             [],
-            files={"python/nodes/checks/orders.py": "initial"},
-            files_after_publication={"python/nodes/checks/orders.py": "changed"},
+            files={"python/nodes/checks/orders/checks.py": "initial"},
+            files_after_publication={"python/nodes/checks/orders/checks.py": "changed"},
         ),
     ],
     ids=lambda case: case.description,
@@ -1393,7 +1393,7 @@ def test_given_an_attached_check_when_a_worker_executes_then_its_own_outcome_is_
             "success",
             [(59,)],
             files={
-                "python/nodes/checks/orders.py": "failed",
+                "python/nodes/checks/orders/checks.py": "failed",
                 "orchestration/jobs/annual_orders_job.toml": "on_failure_job",
                 "orchestration/jobs/refresh_inventory_job.toml": "on_failure_destination",
                 "orchestration/sensors/failed_orders_sensor.py": "on_failure_sensor",
@@ -1407,7 +1407,7 @@ def test_given_an_attached_check_when_a_worker_executes_then_its_own_outcome_is_
             "success",
             [(59,)],
             files={
-                "python/nodes/checks/orders.py": "failed",
+                "python/nodes/checks/orders/checks.py": "failed",
                 "orchestration/jobs/annual_orders_job.toml": "on_failure_job",
                 "orchestration/jobs/refresh_inventory_job.toml": "on_failure_destination",
                 "orchestration/sensors/failed_orders_sensor.py": "on_check_event_sensor",
@@ -1457,7 +1457,7 @@ def test_given_an_attached_check_failure_when_a_sensor_observes_it_then_its_dest
             "cancelled",
             [(17,)],
             files={
-                "python/nodes/checks/orders.py": "cancelled",
+                "python/nodes/checks/orders/checks.py": "cancelled",
                 "orchestration/jobs/annual_orders_job.toml": "on_failure_job",
                 "orchestration/jobs/refresh_inventory_job.toml": "on_failure_destination",
                 "orchestration/sensors/failed_orders_sensor.py": "on_failure_sensor",
@@ -2228,21 +2228,24 @@ def test_given_a_worker_run_when_its_output_is_captured_then_it_holds_no_json_re
 
 
 NODE_RESULT_FILES: dict[str, str] = {
-    "python/nodes/loaders.py": (
-        "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
-        "from sqlbuild.loaders import loader\n\n\n"
-        "@loader\n"
-        "def raw_gate(ctx):\n"
-        '    """A gate that stays closed."""\n'
-        '    return ctx.skip(reason="gate closed", mode=SkipMode.HARD)\n\n\n'
-        "@loader(depends_on=[raw_gate])\n"
-        "def raw_gated(ctx):\n"
-        '    """Rows behind the gate."""\n'
-        '    return [{"gated_id": 1}]\n\n\n'
-        "@loader\n"
-        "def raw_events(ctx):\n"
-        '    """Three events."""\n'
-        '    return [{"event_id": event_id} for event_id in range(3)]\n'
+    **node_module_files(
+        "python/nodes/loaders/node_results.py",
+        (
+            "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
+            "from sqlbuild.loaders import loader\n\n\n"
+            "@loader\n"
+            "def raw_gate(ctx):\n"
+            '    """A gate that stays closed."""\n'
+            '    return ctx.skip(reason="gate closed", mode=SkipMode.HARD)\n\n\n'
+            "@loader(depends_on=[raw_gate])\n"
+            "def raw_gated(ctx):\n"
+            '    """Rows behind the gate."""\n'
+            '    return [{"gated_id": 1}]\n\n\n'
+            "@loader\n"
+            "def raw_events(ctx):\n"
+            '    """Three events."""\n'
+            '    return [{"event_id": event_id} for event_id in range(3)]\n'
+        ),
     ),
     "sql/sources/raw.yml": (
         "sources:\n"

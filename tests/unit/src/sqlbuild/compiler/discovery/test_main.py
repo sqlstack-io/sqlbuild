@@ -11,7 +11,6 @@ from sqlbuild._native import (
     DiscoveredSqlTestBlock,
     ProjectConfigError,
     ProjectLayoutError,
-    ProjectPythonPathError,
     discover_project_inputs,
 )
 from sqlbuild.observability import EventDispatcher, LifecycleEvent, dispatcher_scope
