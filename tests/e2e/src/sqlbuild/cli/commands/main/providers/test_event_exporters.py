@@ -348,7 +348,7 @@ def test_given_filtered_and_failing_sinks_when_build_fails_then_delivery_and_war
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     output_dir: Path = tmp_path / "filtered"
-    output_dir.mkdir()
+    output_dir.mkdir(parents=True)
     monkeypatch.setenv("FILTERED_EXPORT_DIR", str(output_dir))
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,

@@ -116,7 +116,7 @@ def add_dbt_profile_downstream_model(*, sqlbuild_project_dir: Path) -> None:
     """Add a SQLBuild model downstream of the dbt profile E2E model."""
 
     models_dir: Path = sqlbuild_project_dir / "sql" / "models"
-    models_dir.mkdir(exist_ok=True)
+    models_dir.mkdir(parents=True, exist_ok=True)
     (models_dir / "downstream_orders.sql").write_text(
         "MODEL (description 'Test model downstream_orders.', materialized table);\n\n"
         'SELECT order_id FROM __dbt_ref("analytics", "dbt_orders")\n',

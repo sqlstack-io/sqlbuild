@@ -87,7 +87,7 @@ def test_given_empty_directory_when_running_init_then_scaffolds_project_director
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     project_dir: Path = tmp_path / test_case.project_dir_name
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     monkeypatch.setattr(native_module, "update_sqlbuild_skills", lambda *, project_dir: None)
     use_plain_terminal(monkeypatch)
 
@@ -131,7 +131,7 @@ def test_given_color_terminal_when_running_init_then_it_styles_heading(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     project_dir: Path = tmp_path / test_case.project_dir_name
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     monkeypatch.setattr(native_module, "update_sqlbuild_skills", lambda *, project_dir: None)
     use_color_terminal(monkeypatch)
 

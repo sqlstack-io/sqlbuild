@@ -131,7 +131,7 @@ REGION_PROVIDER_FILES: dict[str, str] = {
         "      - name: code\n"
         "        type: BIGINT\n"
     ),
-    "python/nodes/loaders/regions.py": (
+    "python/nodes/loaders/regions/loader.py": (
         "from python.providers.region import Region\n"
         "from sqlbuild.loaders import loader\n\n\n"
         "@loader\n"
@@ -870,7 +870,7 @@ def snapshot_api(
     directory: Path, *, server_arguments: tuple[str, ...] = (), database_url: str | None = None
 ) -> Iterator[SnapshotApi]:
     """Only this fixture seeds the control database; the code location uses HTTP exclusively."""
-    directory.mkdir()
+    directory.mkdir(parents=True)
     log: Path = directory / "server.log"
     environment: dict[str, str] = os.environ.copy()
     environment.pop("SQLBUILD_CONTROL_DATABASE_URL", None)
@@ -2477,25 +2477,38 @@ def launch_adhoc(worker: ScheduledWorker, command: list[str]) -> dict[str, Any]:
 # A loader after the items tagged `fulfilment`, which a `+raw_steps` reload runs as ingress.
 INGRESS_JOB_SETTINGS: str = "\n[settings]\nreload = true\n"
 INGRESS_LOADER_FILES: dict[str, str] = {
-    "python/nodes/ready.py": (
+    "python/nodes/ready/asset.py": (
         "from sqlbuild.assets import asset\n"
         "from sqlbuild.refs import tag\n\n\n"
         '@asset(depends_on=tag("fulfilment"))\n'
         "def ready(ctx):\n"
         '    """Wait for every step."""\n'
     ),
-    "python/nodes/loads.py": (
-        "from sqlbuild.loaders import loader\n"
-        "from python.nodes.ready import ready\n\n\n"
-        "@loader(depends_on=[ready], write_strategy='table', "
-        "columns=[{'name': 'step', 'type': 'INTEGER'}])\n"
-        "def fetch_steps(ctx):\n"
+    "python/nodes/loads/fetch_steps/loader.py": (
+        'from sqlbuild.loaders import loader\n'
+        'from python.nodes.ready.asset import ready\n'
+        '\n'
+        '\n'
+        "@loader(depends_on=[ready], write_strategy='table', columns=[{'name': 'step', 'type': 'INTEGER'}])\n"
+        'def fetch_steps(ctx):\n'
         '    """Fetch the steps."""\n'
-        '    return [{"step": 1}]\n\n\n'
-        "@loader(depends_on=[fetch_steps])\n"
-        "def raw_steps(ctx):\n"
+        '    return [{"step": 1}]\n'
+    ),
+    "python/nodes/loads/raw_steps/loader.py": (
+        'from sqlbuild.loaders import loader\n'
+        'from python.nodes.ready.asset import ready\n'
+        'from python.nodes.loads.fetch_steps.loader import fetch_steps\n'
+        '\n'
+        '\n'
+        '@loader(depends_on=[fetch_steps])\n'
+        'def raw_steps(ctx):\n'
         '    """Load the steps."""\n'
         '    return [{"step": 1}]\n'
+    ),
+    "python/nodes/loads/__init__.py": (
+        'from .fetch_steps.loader import fetch_steps\n'
+        'from .raw_steps.loader import raw_steps\n'
+    )
     ),
     "sql/sources/raw.yml": (
         "sources:\n  - name: raw_steps\n    description: Steps.\n"

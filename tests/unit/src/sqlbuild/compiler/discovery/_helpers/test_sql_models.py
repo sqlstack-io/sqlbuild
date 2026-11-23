@@ -42,7 +42,7 @@ def test_given_unique_model_headers_when_discovering_then_header_values_and_loca
     test_case: ExpectedCountTestCase,
 ) -> None:
     models_dir: Path = tmp_path / "sql" / "models"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     first_header = 'description "one", columns (café (type INTEGER))'
     second_header = 'description "two", columns (total (type DECIMAL(10,2)))'
     (models_dir / "first.sql").write_text(
@@ -95,7 +95,7 @@ def test_given_multiple_invalid_model_headers_when_discovering_then_fault_order_
     test_case: ExpectedCountTestCase,
 ) -> None:
     models_dir: Path = tmp_path / "sql" / "models"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     (models_dir / "first.sql").write_text(
         'MODEL (schema "unterminated); SELECT 1', encoding="utf-8"
     )
@@ -134,7 +134,7 @@ def test_given_deferred_output_locations_when_discovering_models_then_projection
     test_case: DeferredModelOutputLocationTestCase,
 ) -> None:
     models_dir: Path = tmp_path / "sql" / "models"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     (models_dir / "orders.sql").write_text(
         "MODEL (materialized view);\n\nSELECT 1 AS order_id\n",
         encoding="utf-8",

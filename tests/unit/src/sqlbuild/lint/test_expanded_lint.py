@@ -313,7 +313,7 @@ def test_given_reserved_parent_directories_when_linting_model_then_classificatio
     project_dir.mkdir(parents=True)
     _ = (project_dir / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
     model: Path = project_dir / "sql" / "models" / "demo.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     _ = model.write_text(f"{HEADER}SELECT @@CTX:run_id AS value\n", encoding="utf-8")
 
     with pytest.raises(ProjectCompileError) as error:

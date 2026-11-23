@@ -900,7 +900,7 @@ def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
             "    managed: true\n    write_strategy: table\n"
             "    columns:\n      - name: customer_id\n        type: INTEGER\n"
         ),
-        "python/nodes/loaders/customers.py": (
+        "python/nodes/loaders/customers/loader.py": (
             "from sqlbuild.loaders import loader\n\n\n"
             "@loader\ndef raw_customers(ctx):\n"
             "    '''Test loader raw_customers.'''\n"
@@ -920,7 +920,7 @@ def python_node_selection_project_files(*, orders_sql: str) -> dict[str, str]:
             'materialized table);\nSELECT count(*) AS order_count FROM __ref("orders")\n'
         ),
         **duckshop_orchestration("python_node_jobs"),
-        "python/nodes/tasks/reports.py": (
+        "python/nodes/tasks/reports/asset.py": (
             "from python.nodes.tasks.counts import count_orders\n"
             "from sqlbuild.assets import asset\n\n\n"
             "@asset(depends_on=count_orders)\n"
@@ -1582,7 +1582,7 @@ def ranking_task_files(body: str) -> dict[str, str]:
             "def rank_orders(ctx):\n"
             '    """Rank the orders for the partner."""\n' + body
         ),
-        "python/nodes/loaders/partner.py": _TWO_GATE_LOADER,
+        "python/nodes/loaders/partner/loader.py": _TWO_GATE_LOADER,
     }
 
 

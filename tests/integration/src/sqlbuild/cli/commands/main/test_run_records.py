@@ -209,7 +209,7 @@ def test_given_a_seed_run_when_it_loads_then_it_records_its_start_and_end(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     write_run_record_project(project_dir=tmp_path, settings="")
-    (tmp_path / "sql" / "seeds").mkdir()
+    (tmp_path / "sql" / "seeds").mkdir(parents=True)
     (tmp_path / "sql" / "seeds" / "regions.csv").write_text("region_id\n1\n", encoding="utf-8")
     (tmp_path / "sql" / "seeds" / "regions.yml").write_text(
         "seeds:\n  - name: regions\n    description: Regions.\n    columns:\n"

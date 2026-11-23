@@ -69,7 +69,7 @@ def write_scope_performance_project(
                 macro_name=f"domain_{domain:03d}_identity_{offset:02d}",
             )
         detail_dir: Path = domain_dir / "detail"
-        detail_dir.mkdir()
+        detail_dir.mkdir(parents=True)
         for offset in range(root_model_count, models_in_domain):
             model_index = first_model_index + offset
             _write_scope_model(

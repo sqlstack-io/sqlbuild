@@ -110,7 +110,7 @@ def test_given_directional_selectors_when_expanding_then_depth_and_exclusions_ar
 ) -> None:
     project_dir: Path = prepare_lineage_cache_project(tmp_path=tmp_path)
     staging_dir: Path = project_dir / "sql" / "models" / "staging"
-    staging_dir.mkdir()
+    staging_dir.mkdir(parents=True)
     for name in ("stg_orders.sql", "stg_customers.sql"):
         (project_dir / "sql" / "models" / name).rename(staging_dir / name)
     (project_dir / "sql" / "models" / "fact_orders.sql").write_text(

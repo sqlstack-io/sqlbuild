@@ -36,7 +36,7 @@ def assert_source_only_ingress_dependency_case(
                 ),
                 loader_py=(
                     "from sqlbuild.loaders import loader\n"
-                    "from python.nodes.tasks.prepare import prepare_events\n\n"
+                    "from python.nodes.tasks.prepare.asset import prepare_events\n\n"
                     "@loader(depends_on=[prepare_events], write_strategy='table', columns=[\n"
                     "    {'name': 'event_id', 'type': 'INTEGER'},\n"
                     "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
@@ -53,7 +53,7 @@ def assert_source_only_ingress_dependency_case(
                     "SELECT event_id FROM {events.destination}')\n"
                 ),
             ),
-            "python/nodes/tasks/prepare.py": (
+            "python/nodes/tasks/prepare/asset.py": (
                 "from pathlib import Path\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
@@ -264,100 +264,137 @@ def build_loader_waffle_shop_project_files(*, project_toml: str | None = None) -
             "      - name: load_seq\n"
             "        type: INTEGER\n"
         ),
-        "python/nodes/loaders/waffle_loaders.py": (
-            "from sqlbuild.loaders import loader\n\n"
+        "python/nodes/loaders/waffle_loaders/fetch_order_events/loader.py": (
+            'from sqlbuild.loaders import loader\n'
+            '\n'
+            '\n'
             "@loader(write_strategy='append', cursor_column='load_seq', columns=[\n"
             "    {'name': 'order_id', 'type': 'INTEGER'},\n"
             "    {'name': 'customer_id', 'type': 'INTEGER'},\n"
             "    {'name': 'waffle_type', 'type': 'VARCHAR'},\n"
             "    {'name': 'quantity', 'type': 'INTEGER'},\n"
             "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
-            "])\n"
-            "def fetch_order_events(ctx):\n"
-            "    '''Test loader fetch_order_events.'''\n    if ctx.current_cursor_value is None:\n"
-            "        next_seq = 1\n"
-            "    else:\n"
-            "        next_seq = ctx.current_cursor_value + 1\n"
-            "    first_order = (next_seq - 1) * 2 + 1\n"
-            "    return [\n"
-            "        {\n"
+            '])\n'
+            'def fetch_order_events(ctx):\n'
+            "    '''Test loader fetch_order_events.'''\n"
+            '    if ctx.current_cursor_value is None:\n'
+            '        next_seq = 1\n'
+            '    else:\n'
+            '        next_seq = ctx.current_cursor_value + 1\n'
+            '    first_order = (next_seq - 1) * 2 + 1\n'
+            '    return [\n'
+            '        {\n'
             "            'order_id': first_order,\n"
             "            'customer_id': 1 if next_seq == 1 else 3,\n"
             "            'waffle_type': 'classic',\n"
             "            'quantity': next_seq,\n"
             "            'load_seq': next_seq,\n"
-            "        },\n"
-            "        {\n"
+            '        },\n'
+            '        {\n'
             "            'order_id': first_order + 1,\n"
             "            'customer_id': 2,\n"
             "            'waffle_type': 'blueberry',\n"
             "            'quantity': next_seq + 1,\n"
             "            'load_seq': next_seq,\n"
-            "        },\n"
-            "    ]\n\n"
-            "@loader(\n"
+            '        },\n'
+            '    ]\n'
+        ),
+        "python/nodes/loaders/waffle_loaders/fetch_customers/loader.py": (
+            'from sqlbuild.loaders import loader\n'
+            '\n'
+            '\n'
+            '@loader(\n'
             "    write_strategy='merge',\n"
             "    unique_key='customer_id',\n"
             "    cursor_column='load_seq',\n"
-            "    columns=[\n"
+            '    columns=[\n'
             "    {'name': 'customer_id', 'type': 'INTEGER'},\n"
             "    {'name': 'plan_name', 'type': 'VARCHAR'},\n"
             "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
-            "])\n"
-            "def fetch_customers(ctx):\n"
-            "    '''Test loader fetch_customers.'''\n    if ctx.current_cursor_value is None:\n"
-            "        return [\n"
+            '])\n'
+            'def fetch_customers(ctx):\n'
+            "    '''Test loader fetch_customers.'''\n"
+            '    if ctx.current_cursor_value is None:\n'
+            '        return [\n'
             "            {'customer_id': 1, 'plan_name': 'basic', 'load_seq': 1},\n"
             "            {'customer_id': 2, 'plan_name': 'plus', 'load_seq': 1},\n"
-            "        ]\n"
-            "    return [\n"
+            '        ]\n'
+            '    return [\n'
             "        {'customer_id': 1, 'plan_name': 'pro', 'load_seq': 2},\n"
             "        {'customer_id': 3, 'plan_name': 'enterprise', 'load_seq': 2},\n"
-            "    ]\n\n"
+            '    ]\n'
+        ),
+        "python/nodes/loaders/waffle_loaders/fetch_prices/loader.py": (
+            'from sqlbuild.loaders import loader\n'
+            '\n'
+            '\n'
             "@loader(write_strategy='delete_insert', cursor_column='load_seq', columns=[\n"
             "    {'name': 'waffle_type', 'type': 'VARCHAR'},\n"
             "    {'name': 'price_cents', 'type': 'INTEGER'},\n"
             "    {'name': 'load_seq', 'type': 'INTEGER'},\n"
-            "])\n"
-            "def fetch_prices(ctx):\n"
+            '])\n'
+            'def fetch_prices(ctx):\n'
             "    '''Test loader fetch_prices.'''\n"
-            "    classic_price = 600 if ctx.current_cursor_value is None else 650\n"
-            "    return [\n"
+            '    classic_price = 600 if ctx.current_cursor_value is None else 650\n'
+            '    return [\n'
             "        {'waffle_type': 'classic', 'price_cents': classic_price, 'load_seq': 1},\n"
             "        {'waffle_type': 'blueberry', 'price_cents': 750, 'load_seq': 1},\n"
-            "    ]\n\n"
-            "@loader(depends_on=[fetch_order_events, fetch_prices])\n"
-            "def raw_orders(ctx):\n"
-            "    '''Test loader raw_orders.'''\n    events = ctx.loader(fetch_order_events)\n"
-            "    prices = ctx.loader(fetch_prices)\n"
-            "    cursor = ctx.query(\n"
+            '    ]\n'
+        ),
+        "python/nodes/loaders/waffle_loaders/raw_orders/loader.py": (
+            'from sqlbuild.loaders import loader\n'
+            'from python.nodes.loaders.waffle_loaders.fetch_order_events.loader import fetch_order_events\n'
+            'from python.nodes.loaders.waffle_loaders.fetch_prices.loader import fetch_prices\n'
+            '\n'
+            '\n'
+            '@loader(depends_on=[fetch_order_events, fetch_prices])\n'
+            'def raw_orders(ctx):\n'
+            "    '''Test loader raw_orders.'''\n"
+            '    events = ctx.loader(fetch_order_events)\n'
+            '    prices = ctx.loader(fetch_prices)\n'
+            '    cursor = ctx.query(\n'
             "        f'SELECT e.order_id, e.customer_id, e.waffle_type, e.quantity, '\n"
             "        f'p.price_cents, e.load_seq FROM {events.destination} e '\n"
             "        f'JOIN {prices.destination} p ON e.waffle_type = p.waffle_type '\n"
             "        f'ORDER BY e.order_id'\n"
-            "    )\n"
-            "    return [\n"
-            "        {\n"
+            '    )\n'
+            '    return [\n'
+            '        {\n'
             "            'order_id': row[0],\n"
             "            'customer_id': row[1],\n"
             "            'waffle_type': row[2],\n"
             "            'quantity': row[3],\n"
             "            'price_cents': row[4],\n"
             "            'load_seq': row[5],\n"
-            "        }\n"
-            "        for row in cursor.fetchall()\n"
-            "    ]\n\n"
-            "@loader(depends_on=[fetch_customers])\n"
-            "def raw_customers(ctx):\n"
-            "    '''Test loader raw_customers.'''\n    customers = ctx.loader(fetch_customers)\n"
-            "    cursor = ctx.query(\n"
+            '        }\n'
+            '        for row in cursor.fetchall()\n'
+            '    ]\n'
+        ),
+        "python/nodes/loaders/waffle_loaders/raw_customers/loader.py": (
+            'from sqlbuild.loaders import loader\n'
+            'from python.nodes.loaders.waffle_loaders.fetch_customers.loader import fetch_customers\n'
+            '\n'
+            '\n'
+            '@loader(depends_on=[fetch_customers])\n'
+            'def raw_customers(ctx):\n'
+            "    '''Test loader raw_customers.'''\n"
+            '    customers = ctx.loader(fetch_customers)\n'
+            '    cursor = ctx.query(\n'
             "        f'SELECT customer_id, plan_name, load_seq FROM {customers.destination} '\n"
             "        f'ORDER BY customer_id'\n"
-            "    )\n"
-            "    return [\n"
+            '    )\n'
+            '    return [\n'
             "        {'customer_id': row[0], 'plan_name': row[1], 'load_seq': row[2]}\n"
-            "        for row in cursor.fetchall()\n"
-            "    ]\n"
+            '        for row in cursor.fetchall()\n'
+            '    ]\n'
+        ),
+        "python/nodes/loaders/waffle_loaders/__init__.py": (
+            'from .fetch_order_events.loader import fetch_order_events\n'
+            'from .fetch_customers.loader import fetch_customers\n'
+            'from .fetch_prices.loader import fetch_prices\n'
+            'from .raw_orders.loader import raw_orders\n'
+            'from .raw_customers.loader import raw_customers\n'
+        )
         ),
         "sql/models/fact_waffle_orders.sql": (
             "MODEL (description 'Test model fact_waffle_orders.', materialized table);\n\n"

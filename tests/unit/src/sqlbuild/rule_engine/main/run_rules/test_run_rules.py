@@ -57,7 +57,7 @@ def test_given_sql_analysis_state_when_running_rules_then_type_proof_rules_follo
         encoding="utf-8",
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(
         "MODEL (description 'Test model orders.',\n"
         "  contract enforced,\n"

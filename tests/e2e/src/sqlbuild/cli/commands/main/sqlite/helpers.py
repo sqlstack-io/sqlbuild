@@ -890,7 +890,7 @@ LOADER_PROJECT_FILES: dict[str, str] = {
       - name: logged_at
         type: TIMESTAMP
 """,
-    "python/nodes/loaders/events.py": '''from datetime import date, datetime, timedelta, timezone
+    "python/nodes/loaders/events/loader.py": '''from datetime import date, datetime, timedelta, timezone
 
 from sqlbuild.loaders import loader
 

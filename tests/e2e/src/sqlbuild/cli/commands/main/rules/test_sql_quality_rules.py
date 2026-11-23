@@ -171,7 +171,7 @@ def test_given_quality_rule_violations_when_compiling_and_fixing_then_findings_a
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_PROJECT_TOML, encoding="utf-8")
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "raw_orders.sql").write_text(test_case.upstream_header + _UPSTREAM_SQL)
     (models / "order_summary.sql").write_text(_SUMMARY_HEADER + test_case.query_sql)
 

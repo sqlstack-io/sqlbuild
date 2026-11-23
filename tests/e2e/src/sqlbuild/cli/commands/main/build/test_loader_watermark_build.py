@@ -55,7 +55,7 @@ def test_given_managed_loader_watermark_when_reloaded_then_incremental_consumes_
                 """
             ).strip()
             + "\n",
-            "python/nodes/loaders/raw.py": (
+            "python/nodes/loaders/raw/loader.py": (
                 "from pathlib import Path\n"
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"

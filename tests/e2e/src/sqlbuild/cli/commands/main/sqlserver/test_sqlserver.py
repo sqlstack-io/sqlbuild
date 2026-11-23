@@ -114,7 +114,7 @@ def test_given_managed_source_when_cloning_sqlserver_then_source_precedes_depend
                 "[targets.prod.clone]\n"
                 "allow_as_clone_destination = true\n"
             ),
-            "python/nodes/loaders/raw.py": (
+            "python/nodes/loaders/raw/loader.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_customers(ctx):\n"
@@ -432,15 +432,15 @@ def test_given_python_result_when_running_check_on_sqlserver_then_persists_node_
                 schema_name=schema_name,
                 config=config,
             ),
-            "python/nodes/tasks/results.py": (
+            "python/nodes/tasks/results/asset.py": (
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def produce_result(ctx):\n"
                 "    '''Test task produce_result.'''\n    return ctx.result(payload={'value': 42}, metadata={'source': 'sqlserver'})\n"
             ),
-            "python/nodes/checks/results.py": (
+            "python/nodes/checks/results/checks.py": (
                 "from sqlbuild.checks import check\n"
-                "from python.nodes.tasks.results import produce_result\n\n"
+                "from python.nodes.tasks.results.asset import produce_result\n\n"
                 "@check(depends_on=produce_result)\n"
                 "def check_produce_result(ctx):\n"
                 "    '''Test check check_produce_result.'''\n    return ctx.result_of(node_function=produce_result).payload['value'] == 42\n"
@@ -718,7 +718,7 @@ def test_given_source_loader_project_when_building_on_sqlserver_then_model_reads
                 "      - name: status\n"
                 "        type: NVARCHAR(100)\n"
             ),
-            "python/nodes/loaders/raw_orders.py": (
+            "python/nodes/loaders/raw_orders/loader.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_orders(ctx):\n"
@@ -790,7 +790,7 @@ def test_given_source_deferral_env_when_building_on_sqlserver_then_reads_prod_an
                 "      - name: status\n"
                 "        type: NVARCHAR(100)\n"
             ),
-            "python/nodes/loaders/raw_orders.py": (
+            "python/nodes/loaders/raw_orders/loader.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_orders(ctx):\n"

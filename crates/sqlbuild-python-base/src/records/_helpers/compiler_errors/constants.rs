@@ -62,7 +62,7 @@ pub(crate) const COMPILER_ERRORS: &[ErrorSpec] = &[
     ErrorSpec {
         name: "SourceParseError",
         parent: "DiscoveryError",
-        doc: "Raised when a sources/*.yml file has an invalid shape.",
+        doc: "Raised when a sql/sources/*.yml file has an invalid shape.",
         class_attributes: &[("code", ClassValue::Text("D006"))],
         required: &[],
         optional: &[],

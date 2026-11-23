@@ -251,7 +251,7 @@ def block_stored_compiles(project_dir: Path, monkeypatch: pytest.MonkeyPatch) ->
     del monkeypatch
     for path in stored_compile_files(project_dir=project_dir):
         path.unlink()
-        path.mkdir()
+        path.mkdir(parents=True)
         _ = (path / "keep.txt").write_text("kept\n", encoding="utf-8")
 
 
@@ -259,7 +259,7 @@ def load_helper_module(*, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     """Import a helper module from outside the project, as an installed package would be."""
 
     directory: Path = tmp_path / HELPER_MODULE_DIRECTORY
-    directory.mkdir()
+    directory.mkdir(parents=True)
     _ = (directory / f"{HELPER_MODULE}.py").write_text("ORDERS = 1\n", encoding="utf-8")
     monkeypatch.syspath_prepend(str(directory))
     monkeypatch.delitem(sys.modules, HELPER_MODULE, raising=False)
@@ -311,7 +311,7 @@ def block_artifact(*, project_dir: Path) -> Path:
 
     blocked: Path = project_dir / BLOCKED_ARTIFACT
     blocked.unlink()
-    blocked.mkdir()
+    blocked.mkdir(parents=True)
     _ = (blocked / "keep.txt").write_text("kept\n", encoding="utf-8")
     model: Path = project_dir / EDITED_MODEL
     _ = model.write_text(

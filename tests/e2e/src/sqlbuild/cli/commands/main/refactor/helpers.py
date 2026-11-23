@@ -215,7 +215,7 @@ ORDER_EXPORT: dict[str, str] = {
     ),
 }
 ORDER_AMOUNT_CHECK: dict[str, str] = {
-    "python/nodes/checks/order_amounts.py": (
+    "python/nodes/checks/order_amounts/checks.py": (
         "from sqlbuild.checks import check\n"
         "from sqlbuild.refs import model\n\n\n"
         '@check(depends_on=model("stg_orders"))\n'

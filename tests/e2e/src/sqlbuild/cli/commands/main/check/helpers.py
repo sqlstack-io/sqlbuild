@@ -23,22 +23,29 @@ adapter = "duckdb"
 [connection]
 database = "python_check_project.duckdb"
 """,
-            "python/nodes/tasks/orders.py": """
-from sqlbuild.assets import asset
-
-
-@asset()
-def export_orders(ctx):
-    '''Test task export_orders.'''
-    return ctx.result(payload={"rows": 3}, metadata={"rows": 3})
-
-
-@asset()
-def export_customers(ctx):
-    '''Test task export_customers.'''
-    return ctx.result(payload={"rows": 2}, metadata={"rows": 2})
-""",
-            "python/nodes/assets/orders.py": """
+            "python/nodes/tasks/orders/export_orders/asset.py": (
+                "from sqlbuild.assets import asset\n"
+                "\n"
+                "\n"
+                "@asset()\n"
+                "def export_orders(ctx):\n"
+                "    '''Test task export_orders.'''\n"
+                '    return ctx.result(payload={"rows": 3}, metadata={"rows": 3})\n'
+            ),
+            "python/nodes/tasks/orders/export_customers/asset.py": (
+                "from sqlbuild.assets import asset\n"
+                "\n"
+                "\n"
+                "@asset()\n"
+                "def export_customers(ctx):\n"
+                "    '''Test task export_customers.'''\n"
+                '    return ctx.result(payload={"rows": 2}, metadata={"rows": 2})\n'
+            ),
+            "python/nodes/tasks/orders/__init__.py": (
+                "from .export_orders.asset import export_orders\n"
+                "from .export_customers.asset import export_customers\n"
+            ),
+            "python/nodes/assets/orders/asset.py": """
 from sqlbuild.assets import asset
 from python.nodes.tasks.orders import export_orders
 
@@ -48,9 +55,9 @@ def orders_asset(ctx):
     '''Test asset orders_asset.'''
     return ctx.result(payload={"asset_rows": 3}, metadata={"asset_rows": 3})
 """,
-            "python/nodes/checks/orders.py": """
+            "python/nodes/checks/orders/checks.py": """
 from sqlbuild.checks import check
-from python.nodes.assets.orders import orders_asset
+from python.nodes.assets.orders.asset import orders_asset
 from python.nodes.tasks.orders import export_customers, export_orders
 
 
@@ -115,7 +122,7 @@ adapter = "duckdb"
 [connection]
 database = "terminal_loader_check_project.duckdb"
 """,
-            "python/nodes/loaders/raw.py": """
+            "python/nodes/loaders/raw/loader.py": """
 from sqlbuild.loaders import loader
 
 
@@ -134,9 +141,9 @@ sources:
       - name: order_id
         type: INTEGER
 """,
-            "python/nodes/checks/raw.py": """
+            "python/nodes/checks/raw/checks.py": """
 from sqlbuild.checks import check
-from python.nodes.loaders.raw import raw_orders
+from python.nodes.loaders.raw.loader import raw_orders
 
 
 @check(depends_on=raw_orders)

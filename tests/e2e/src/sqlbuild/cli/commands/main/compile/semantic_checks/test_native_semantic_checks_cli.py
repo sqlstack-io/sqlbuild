@@ -55,7 +55,7 @@ _METADATA_FILES: dict[str, str] = {
         "    columns:\n      - name: event_id\n        type: INTEGER\n"
         "      - name: load_seq\n        type: INTEGER\n"
     ),
-    "python/nodes/loaders/raw_events.py": (
+    "python/nodes/loaders/raw_events/loader.py": (
         "from sqlbuild.loaders import loader\n\n\n@loader\n"
         "def raw_events(ctx):\n    '''Load events.'''\n"
         "    return [{'event_id': 1, 'load_seq': 1}]\n"

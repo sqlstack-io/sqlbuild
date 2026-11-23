@@ -21,14 +21,14 @@ def write_format_performance_project(
 ) -> None:
     """Write a deterministic contract-heavy project with unique SQL test fixtures."""
 
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "format_guard"\nadapter = "duckdb"\n[defaults]\ncontract = "enforced"\n',
         encoding="utf-8",
     )
     models_dir: Path = project_dir / "sql" / "models"
     tests_dir: Path = project_dir / "tests" / "unit" / "orders"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     tests_dir.mkdir(parents=True)
     for model_index in range(model_count):
         models_dir.joinpath(f"orders_{model_index:05d}.sql").write_text(

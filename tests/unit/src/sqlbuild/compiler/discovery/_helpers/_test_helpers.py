@@ -218,7 +218,7 @@ def _random_model_file(rng: random.Random) -> str:
 
 def _add_directory(rng: random.Random, parent: Path, directories: list[Path]) -> None:
     path: Path = parent / rng.choice(_DIRECTORY_NAMES)
-    path.mkdir(exist_ok=True)
+    path.mkdir(parents=True, exist_ok=True)
     directories.append(path)
 
 

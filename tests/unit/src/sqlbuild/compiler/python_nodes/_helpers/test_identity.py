@@ -476,8 +476,8 @@ def test_given_python_node_source_change_when_building_identity_then_hashes_chan
 ) -> None:
     before_dir: Path = tmp_path / "before"
     after_dir: Path = tmp_path / "after"
-    before_dir.mkdir()
-    after_dir.mkdir()
+    before_dir.mkdir(parents=True)
+    after_dir.mkdir(parents=True)
     write_python_identity_repo(project_dir=before_dir, repo_files=test_case.before_repo_files)
     write_python_identity_repo(project_dir=after_dir, repo_files=test_case.after_repo_files)
     before_module: ModuleType = load_python_identity_module(

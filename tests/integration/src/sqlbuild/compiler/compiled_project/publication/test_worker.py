@@ -139,7 +139,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
     test_case: GroupExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     with duckdb.connect(str(project_dir / "warehouse.duckdb")) as warehouse:
         warehouse.execute("CREATE TABLE broken_orders AS SELECT 99 AS amount")
     test_case = replace(

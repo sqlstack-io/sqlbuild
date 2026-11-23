@@ -76,7 +76,7 @@ def write_stale_target_entries(*, compiled_dir: Path, outside_dir: Path) -> dict
     stale_file.write_text("SELECT 'stale'\n", encoding="utf-8")
     empty_directory: Path = compiled_dir / "sql" / "models" / "empty" / "nested"
     empty_directory.mkdir(parents=True)
-    outside_dir.mkdir()
+    outside_dir.mkdir(parents=True)
     (outside_dir / "kept.sql").write_text("SELECT 'kept'\n", encoding="utf-8")
     link: Path = compiled_dir / "sql" / "models" / "linked" / "shared"
     link.parent.mkdir(parents=True)

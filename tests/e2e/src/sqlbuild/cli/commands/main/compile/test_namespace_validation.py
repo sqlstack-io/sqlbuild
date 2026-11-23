@@ -147,7 +147,7 @@ _MANAGED_SOURCE_LOADER: str = (
             repo_files={
                 "sqlbuild_project.toml": _PRESERVE_CONFIG,
                 "sql/sources/raw.yml": _MANAGED_SOURCE,
-                "python/nodes/loaders/raw_events.py": _MANAGED_SOURCE_LOADER,
+                "python/nodes/loaders/raw_events/loader.py": _MANAGED_SOURCE_LOADER,
             },
             expected_exit_code=1,
             expected_stderr_fragment="Managed source 'raw_events' has no logical schema",
@@ -273,7 +273,7 @@ _MANAGED_SOURCE_LOADER: str = (
             repo_files={
                 "sqlbuild_project.toml": _POSTGRES_CONFIG_WITHOUT_SCHEMA,
                 "sql/sources/raw.yml": _MANAGED_SOURCE,
-                "python/nodes/loaders/raw_events.py": _MANAGED_SOURCE_LOADER,
+                "python/nodes/loaders/raw_events/loader.py": _MANAGED_SOURCE_LOADER,
             },
             expected_exit_code=1,
             expected_stderr_fragment=(
@@ -380,7 +380,7 @@ _MANAGED_SOURCE_LOADER: str = (
                     + '\n[targets.dev]\nloader_schema = "raw"\n'
                 ),
                 "sql/sources/raw.yml": _MANAGED_SOURCE,
-                "python/nodes/loaders/raw_events.py": _MANAGED_SOURCE_LOADER,
+                "python/nodes/loaders/raw_events/loader.py": _MANAGED_SOURCE_LOADER,
             },
             expected_exit_code=1,
             expected_stderr_fragment="Named target 'dev' must explicitly set schema",
@@ -398,7 +398,7 @@ _MANAGED_SOURCE_LOADER: str = (
                 "sql/seeds/countries.csv": "code\nGB\n",
                 "sql/functions/sql/answer.sql": "FUNCTION (description 'Test function answer.', returns INTEGER);\n\n42\n",
                 "sql/sources/raw.yml": _MANAGED_SOURCE,
-                "python/nodes/loaders/raw_events.py": _MANAGED_SOURCE_LOADER,
+                "python/nodes/loaders/raw_events/loader.py": _MANAGED_SOURCE_LOADER,
             },
             expected_exit_code=0,
             expected_stderr_fragment="",

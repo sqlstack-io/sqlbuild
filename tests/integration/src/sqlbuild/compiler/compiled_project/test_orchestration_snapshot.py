@@ -462,7 +462,7 @@ def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_s
                     "        None, validation_alias=AliasChoices('SHIP_TIMEOUT', 'TIMEOUT')\n"
                     "    )\n"
                 ),
-                "python/nodes/tasks/publish_orders.py": (
+                "python/nodes/tasks/publish_orders/asset.py": (
                     "from python.providers.fulfillment import FulfillmentApi\n"
                     "from sqlbuild.assets import asset\n\n\n"
                     "@asset\n"

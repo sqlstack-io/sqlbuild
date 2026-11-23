@@ -117,7 +117,7 @@ _READING_ASSET: str = (
             "Value: ",
             _LINE,
             presses=2,
-            files={"python/nodes/assets/reader.py": _READING_ASSET},
+            files={"python/nodes/assets/reader/asset.py": _READING_ASSET},
             expected_within_seconds=5.0,
         ),
     ],

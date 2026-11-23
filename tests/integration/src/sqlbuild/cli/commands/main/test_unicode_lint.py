@@ -91,7 +91,7 @@ def test_given_unicode_before_sql_when_running_rules_then_findings_have_characte
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     contents: str = 'MODEL (description "Orders");\n' + test_case.sql + "\n"
     model.write_text(contents, encoding="utf-8")
     native_payload: dict[str, Any] = json.loads(

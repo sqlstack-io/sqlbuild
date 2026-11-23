@@ -50,7 +50,7 @@ def test_given_empty_project_directory_when_running_init_then_typed_resource_dir
     tmp_path: Path,
 ) -> None:
     project_dir: Path = tmp_path / "init_hooks_project"
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
 
     result: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "init"),
@@ -75,15 +75,15 @@ def test_given_empty_project_directory_when_running_init_then_typed_resource_dir
                     "MODEL (description 'Test model fact_orders.', materialized table);\n\nSELECT 1 AS order_id\n"
                 ),
                 "python/nodes/_helpers.py": "def order_count(rows):\n    return len(rows)\n",
-                "python/nodes/tasks/orders.py": (
+                "python/nodes/tasks/orders/asset.py": (
                     "from python.nodes._helpers import order_count\n"
                     "from sqlbuild.assets import asset\n\n\n"
                     "@asset\n"
                     "def count_orders(ctx):\n"
                     "    '''Test task count_orders.'''\n    return ctx.result(payload={'order_count': order_count([1, 2])})\n"
                 ),
-                "python/nodes/assets/orders_export.py": (
-                    "from python.nodes.tasks.orders import count_orders\n"
+                "python/nodes/assets/orders_export/asset.py": (
+                    "from python.nodes.tasks.orders.asset import count_orders\n"
                     "from sqlbuild.assets import asset\n"
                     "from sqlbuild.refs import model\n\n\n"
                     "@asset(depends_on=(model('fact_orders'), count_orders))\n"
@@ -107,7 +107,7 @@ def test_given_initialized_project_with_python_root_nodes_when_building_then_nod
     tmp_path: Path,
 ) -> None:
     project_dir: Path = tmp_path / "init_python_root_project"
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     init_result: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "init"),
         project_dir=project_dir,

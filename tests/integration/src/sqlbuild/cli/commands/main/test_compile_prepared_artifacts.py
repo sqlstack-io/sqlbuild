@@ -195,7 +195,7 @@ def test_given_existing_artifacts_when_rules_fail_then_staged_changes_are_not_pu
     config: str = 'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = ["SQLCLEAN021"]\n'
     config_path.write_text(config, encoding="utf-8")
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     header: str = "MODEL (description 'Test model.', materialized table, contract enforced, columns (order_id (type INTEGER)));\n"
     for index in range(test_case.model_count):
         (models / f"orders_{index:03}.sql").write_text(
@@ -223,7 +223,7 @@ def test_given_existing_artifacts_when_rules_fail_then_staged_changes_are_not_pu
         header + "SELECT CAST(2 AS INTEGER) AS order_id\n", encoding="utf-8"
     )
     rules: Path = tmp_path / "rules"
-    rules.mkdir()
+    rules.mkdir(parents=True)
     (rules / "orders.py").write_text(
         "from sqlbuild.rules import Finding, Model, RuleContext, rule\n"
         '@rule(code="XSQBRARCH001", message="Model rejected", remediation="Update the model.")\n'
@@ -318,8 +318,8 @@ def test_given_compiled_dir_on_other_filesystem_when_compiling_then_artifacts_ar
     write_prepared_artifacts_project(project_dir=tmp_path, model_count=test_case.model_count)
     with TemporaryDirectory(dir=_SECOND_FILESYSTEM) as other_filesystem:
         compiled: Path = Path(other_filesystem) / "compiled"
-        compiled.mkdir()
-        (tmp_path / "target").mkdir()
+        compiled.mkdir(parents=True)
+        (tmp_path / "target").mkdir(parents=True)
         (tmp_path / "target" / "compiled").symlink_to(compiled, target_is_directory=True)
         exit_code: int = main(["--project-dir", str(tmp_path), "compile", "--no-cache", "--json"])
         published: list[Path] = sorted((compiled / "sql" / "models").glob("*.sql"))

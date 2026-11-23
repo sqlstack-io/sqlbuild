@@ -8506,7 +8506,7 @@ class SchemaParseError(DiscoveryError):
     """Raised when a schema.yml file has an invalid shape."""
 
 class SourceParseError(DiscoveryError):
-    """Raised when a sources/*.yml file has an invalid shape."""
+    """Raised when a sql/sources/*.yml file has an invalid shape."""
 
 class DiscoveryConflictError(DiscoveryError):
     """Raised when discovered project inputs conflict across files."""
@@ -12796,7 +12796,7 @@ class SourceFreshnessConfig(NativeRecord):
     ) -> None: ...
 
 class SourceColumnEntry(NativeRecord):
-    """One source column entry from sources/*.yml."""
+    """One source column entry from sql/sources/*.yml."""
 
     name: str
     type: str | None
@@ -12815,7 +12815,7 @@ class SourceColumnEntry(NativeRecord):
     ) -> None: ...
 
 class SourceEntry(NativeRecord):
-    """One source declaration from sources/*.yml."""
+    """One source declaration from sql/sources/*.yml."""
 
     name: str
     database: str | None

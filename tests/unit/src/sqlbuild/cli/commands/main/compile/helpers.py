@@ -553,7 +553,7 @@ def prepare_rule_gated_compile_project(root: Path, *, test_header: str) -> Path:
     project_dir: Path = prepare_static_compile_project(root)
     with (project_dir / "sqlbuild_project.toml").open("a", encoding="utf-8") as config:
         config.write('\n[rules]\nselect = ["SQBRMODEL102"]\n')
-    (project_dir / "sql" / "sources").mkdir()
+    (project_dir / "sql" / "sources").mkdir(parents=True)
     (project_dir / "sql" / "sources" / "raw.yml").write_text(
         "sources:\n"
         "  - name: raw_orders\n    description: Test source raw_orders.\n"

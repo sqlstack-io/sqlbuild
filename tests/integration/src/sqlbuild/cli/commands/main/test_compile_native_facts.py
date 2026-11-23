@@ -71,7 +71,7 @@ def test_given_derived_native_facts_when_compiling_then_contract_and_execution_a
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_DERIVED_RELATION_PROJECT)
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', contract enforced, columns (order_id (type BIGINT, nullable false)));\n"
         + test_case.query_sql
@@ -121,7 +121,7 @@ def test_given_star_over_inferred_upstream_when_compiling_then_downstream_bindin
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_DERIVED_RELATION_PROJECT)
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "staged_orders.sql").write_text(
         "MODEL (description 'Test model staged_orders.');\nSELECT 1 AS order_id"
     )
@@ -164,7 +164,7 @@ def test_given_star_over_derived_table_when_compiling_then_lineage_matches_proje
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_DERIVED_RELATION_PROJECT)
     seeds: Path = tmp_path / "sql" / "seeds"
-    seeds.mkdir()
+    seeds.mkdir(parents=True)
     (seeds / "order_labels.csv").write_text("order_id,label\n1,first\n")
     (seeds / "order_labels.yml").write_text(
         "seeds:\n  - name: order_labels\n    description: Test seed order_labels.\n    columns:\n"
@@ -172,7 +172,7 @@ def test_given_star_over_derived_table_when_compiling_then_lineage_matches_proje
         "      - name: label\n        type: VARCHAR\n"
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "staged_orders.sql").write_text(
         "MODEL (description 'Test model staged_orders.');\nSELECT 1 AS order_id, CAST(10 AS DOUBLE) AS amount"
     )
@@ -239,7 +239,7 @@ def test_given_snapshot_reader_when_compiling_then_validity_columns_are_known(
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "customer_snapshot.sql").write_text(
         "MODEL (description 'Test model customer_snapshot.', materialized snapshot, unique_key [customer_id], snapshot_strategy timestamp, "
         f"updated_at updated_at{test_case.snapshot_config});\n"
@@ -345,9 +345,9 @@ def test_given_input_and_output_share_name_when_compiling_then_lineage_keeps_inp
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     sources: Path = tmp_path / "sql" / "sources"
-    sources.mkdir()
+    sources.mkdir(parents=True)
     (sources / "orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    contract: enforced\n"
         "    expression: orders_input\n    columns:\n"
@@ -451,7 +451,7 @@ def test_given_bound_wildcard_or_using_join_when_compiling_then_facts_match_exec
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_DERIVED_RELATION_PROJECT)
     sources: Path = tmp_path / "sql" / "sources"
-    sources.mkdir()
+    sources.mkdir(parents=True)
     (sources / "orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    contract: enforced\n"
         "    expression: orders_input\n    columns:\n"
@@ -460,7 +460,7 @@ def test_given_bound_wildcard_or_using_join_when_compiling_then_facts_match_exec
         "      - name: amount\n        type: DOUBLE\n"
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "selected_orders.sql").write_text(
         f"MODEL (description 'Test model selected_orders.', contract enforced, columns ({test_case.output_contract}));\n"
         + test_case.query_sql
@@ -506,7 +506,7 @@ def test_given_object_wildcard_when_compiling_then_lineage_preserves_payload_inp
         'name = "orders"\nadapter = "snowflake"\n[defaults]\ndatabase = "warehouse"\nschema = "analytics"\n'
     )
     sources: Path = tmp_path / "sql" / "sources"
-    sources.mkdir()
+    sources.mkdir(parents=True)
     (sources / "orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    contract: enforced\n"
         "    expression: orders_input\n    columns:\n"
@@ -514,7 +514,7 @@ def test_given_object_wildcard_when_compiling_then_lineage_preserves_payload_inp
         "      - name: amount\n        type: DOUBLE\n"
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "selected_orders.sql").write_text(
         "MODEL (description 'Test model selected_orders.', contract enforced, columns (order_id (type BIGINT, nullable true)));\n"
         + test_case.query_sql

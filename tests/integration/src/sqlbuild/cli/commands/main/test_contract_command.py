@@ -492,7 +492,7 @@ def test_given_shared_schema_when_one_binding_differs_then_write_fails_closed(
 ) -> None:
     _ = prepare_contract_project(tmp_path)
     schema_path: Path = tmp_path / "sql" / "schemas" / "order.sql"
-    schema_path.parent.mkdir()
+    schema_path.parent.mkdir(parents=True)
     _ = schema_path.write_text(
         "SCHEMA (name order, columns (id (type INTEGER)));\n",
         encoding="utf-8",
@@ -693,12 +693,12 @@ def test_given_relative_project_directory_when_diffing_contract_then_private_mac
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     _ = prepare_contract_project(project_dir)
     root_model_path: Path = project_dir / "sql" / "models" / "orders.sql"
     root_model_path.unlink()
     model_path: Path = project_dir / "sql" / "models" / "orders" / "orders.sql"
-    model_path.parent.mkdir()
+    model_path.parent.mkdir(parents=True)
     _ = model_path.write_text(
         "MODEL (description 'Test model orders.', materialized table);\nSELECT @py.order_id() AS id, CAST('a' AS VARCHAR) AS name\n",
         encoding="utf-8",

@@ -23,7 +23,7 @@ from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
         AuditFactoryDiscoveryTestCase(
             description="audit and node factories coexist",
             files={
-                "python/nodes/factories/quality.py": """
+                "python/nodes/factories/quality/assets.py": """
 from sqlbuild.audits import AuditCase, audit_factory
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
@@ -46,7 +46,7 @@ def generated_nodes():
         AuditFactoryDiscoveryTestCase(
             description="audit factory beside a direct task outside a factories folder",
             files={
-                "python/nodes/quality.py": """
+                "python/nodes/quality/asset.py": """
 from sqlbuild.audits import AuditCase, audit_factory
 from sqlbuild.assets import asset
 
@@ -111,7 +111,7 @@ def test_given_invalid_audit_factory_when_discovering_then_clear_error_is_raised
     write_repo_files(
         tmp_path,
         {
-            "python/nodes/factories/quality.py": f"""
+            "python/nodes/factories/quality/assets.py": f"""
 from sqlbuild.audits import audit_factory
 
 @audit_factory

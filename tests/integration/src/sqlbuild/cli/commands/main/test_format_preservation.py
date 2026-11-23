@@ -135,7 +135,7 @@ def test_given_computed_variant_key_when_formatting_then_preserves_syntax_and_co
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "snowflake"\n')
     model: Path = tmp_path / "sql" / "models" / "order_summary.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     original: str = (
         'MODEL (description "Order summary", database warehouse, schema analytics);   \n'
         + test_case.sql
@@ -203,7 +203,7 @@ def test_given_sqlbuild_call_when_formatting_then_authored_spelling_is_preserved
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
     model: Path = tmp_path / "sql" / "models" / "order_summary.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Order summary");\n' + test_case.sql + "\n")
     assert main(["--project-dir", str(tmp_path), "format", "--json"]) == 0
     capsys.readouterr()

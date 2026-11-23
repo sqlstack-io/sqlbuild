@@ -58,7 +58,7 @@ def dbt_profiles_dir(tmp_path: Path) -> Path:
     """Create a dbt profiles directory for DuckDB."""
 
     profiles_dir: Path = tmp_path / "profiles"
-    profiles_dir.mkdir()
+    profiles_dir.mkdir(parents=True)
     profiles_dir.joinpath("profiles.yml").write_text(
         "\n".join(
             (

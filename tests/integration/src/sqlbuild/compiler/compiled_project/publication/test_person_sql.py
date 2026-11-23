@@ -56,9 +56,9 @@ def test_given_published_orders_when_cli_reads_sql_then_only_live_scoped_authori
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     home: Path = tmp_path / "home"
-    home.mkdir()
+    home.mkdir(parents=True)
     empty: Path = tmp_path / "empty"
-    empty.mkdir()
+    empty.mkdir(parents=True)
     client_environment: dict[str, str] = environment({"HOME": str(home)})
     client_environment.pop("DBUS_SESSION_BUS_ADDRESS", None)
     client_environment.pop("XDG_RUNTIME_DIR", None)

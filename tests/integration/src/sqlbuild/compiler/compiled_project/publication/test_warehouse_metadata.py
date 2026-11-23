@@ -1508,7 +1508,7 @@ def test_given_change_tokens_when_a_served_location_resyncs_then_only_changed_or
     )
     write_files(project_dir=project, files={"sql/models/orders.sql": fixture["model"]})
     hook: Path = tmp_path / "token-hook"
-    hook.mkdir()
+    hook.mkdir(parents=True)
     tokens: Path = hook / "tokens.json"
     reads: Path = hook / "reads.log"
     sessions: Path = hook / "sessions.log"
@@ -1678,7 +1678,7 @@ def test_given_a_served_location_when_a_sync_has_many_pages_then_pages_run_back_
     )
     write_files(project_dir=project, files={"sql/models/orders.sql": fixture["model"]})
     shim: Path = tmp_path / "git-shim"
-    shim.mkdir()
+    shim.mkdir(parents=True)
     calls: Path = shim / "calls.log"
     calls.write_text("")
     (shim / "git").write_text(f'#!/bin/sh\necho "$*" >> {calls}\nexec {shutil.which("git")} "$@"\n')

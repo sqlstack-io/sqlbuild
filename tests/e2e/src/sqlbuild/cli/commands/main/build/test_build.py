@@ -675,14 +675,14 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_ingress_failure_project.duckdb"\n'
                 ),
-                "python/nodes/tasks/prepare.py": (
+                "python/nodes/tasks/prepare/asset.py": (
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def prepare_orders(ctx):\n"
                     "    '''Test task prepare_orders.'''\n    raise RuntimeError('prepare failed')\n"
                 ),
-                "python/nodes/loaders/raw.py": (
-                    "from python.nodes.tasks.prepare import prepare_orders\n"
+                "python/nodes/loaders/raw/loader.py": (
+                    "from python.nodes.tasks.prepare.asset import prepare_orders\n"
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader(depends_on=(prepare_orders,))\n"
                     "def raw_orders(ctx):\n"
@@ -721,15 +721,15 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_ingress_skip_project.duckdb"\n'
                 ),
-                "python/nodes/tasks/prepare.py": (
+                "python/nodes/tasks/prepare/asset.py": (
                     "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def prepare_orders(ctx):\n"
                     "    '''Test task prepare_orders.'''\n    return ctx.skip(reason='no input', mode=SkipMode.HARD)\n"
                 ),
-                "python/nodes/loaders/raw.py": (
-                    "from python.nodes.tasks.prepare import prepare_orders\n"
+                "python/nodes/loaders/raw/loader.py": (
+                    "from python.nodes.tasks.prepare.asset import prepare_orders\n"
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader(depends_on=(prepare_orders,))\n"
                     "def raw_orders(ctx):\n"
@@ -768,7 +768,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_non_json_result_project.duckdb"\n'
                 ),
-                "python/nodes/tasks/bad.py": (
+                "python/nodes/tasks/bad/asset.py": (
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def produce_bad_result(ctx):\n"
@@ -792,7 +792,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_non_json_metadata_project.duckdb"\n'
                 ),
-                "python/nodes/tasks/bad.py": (
+                "python/nodes/tasks/bad/asset.py": (
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def produce_bad_metadata(ctx):\n"
@@ -827,7 +827,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
                 ),
-                "python/nodes/tasks/profile.py": (
+                "python/nodes/tasks/profile/asset.py": (
                     "from sqlbuild.refs import model\n"
                     "from sqlbuild.assets import asset\n\n"
                     "@asset(depends_on=model('fact_orders'))\n"
@@ -866,7 +866,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
                 ),
-                "python/nodes/tasks/profile.py": (
+                "python/nodes/tasks/profile/asset.py": (
                     "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
                     "from sqlbuild.refs import model\n"
                     "from sqlbuild.assets import asset\n\n"
@@ -906,7 +906,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
                 ),
-                "python/nodes/tasks/profile.py": (
+                "python/nodes/tasks/profile/asset.py": (
                     "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
                     "from sqlbuild.refs import model\n"
                     "from sqlbuild.assets import asset\n\n"
@@ -935,7 +935,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_no_python_project.duckdb"\n'
                 ),
-                "python/nodes/tasks/prepare.py": (
+                "python/nodes/tasks/prepare/asset.py": (
                     "from pathlib import Path\n"
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
@@ -944,8 +944,8 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "    marker.write_text('prepared')\n"
                     "    return ctx.result(payload={'order_id': 3})\n"
                 ),
-                "python/nodes/loaders/raw.py": (
-                    "from python.nodes.tasks.prepare import prepare_orders\n"
+                "python/nodes/loaders/raw/loader.py": (
+                    "from python.nodes.tasks.prepare.asset import prepare_orders\n"
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader(depends_on=(prepare_orders,))\n"
                     "def raw_orders(ctx):\n"
@@ -963,7 +963,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                 "sql/models/fact_orders.sql": (
                     'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
                 ),
-                "python/nodes/tasks/profile.py": (
+                "python/nodes/tasks/profile/asset.py": (
                     "from pathlib import Path\n"
                     "from sqlbuild.refs import model\n"
                     "from sqlbuild.assets import asset\n\n"
@@ -994,7 +994,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "[connection]\n"
                     'database = "python_build_source_relation_project.duckdb"\n'
                 ),
-                "python/nodes/loaders/raw.py": (
+                "python/nodes/loaders/raw/loader.py": (
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader\n"
                     "def raw_orders(ctx):\n"
@@ -1009,7 +1009,7 @@ def test_given_shared_downstream_failure_when_building_then_blocks_all_source_ap
                     "      - name: order_id\n"
                     "        type: INTEGER\n"
                 ),
-                "python/nodes/tasks/profile.py": (
+                "python/nodes/tasks/profile/asset.py": (
                     "from pathlib import Path\n"
                     "from sqlbuild.refs import source\n"
                     "from sqlbuild.assets import asset\n\n"
@@ -1082,7 +1082,7 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                     "[connection]\n"
                     'database = "direct_build_missing_intermediate_project.duckdb"\n'
                 ),
-                "python/nodes/loaders/raw.py": (
+                "python/nodes/loaders/raw/loader.py": (
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader(write_strategy='table', columns=[\n"
                     "    {'name': 'event_id', 'type': 'INTEGER'},\n"
@@ -1111,7 +1111,7 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                     "[connection]\n"
                     'database = "direct_build_no_python_source_only_project.duckdb"\n'
                 ),
-                "python/nodes/tasks/prepare.py": (
+                "python/nodes/tasks/prepare/asset.py": (
                     "from pathlib import Path\n"
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
@@ -1120,9 +1120,9 @@ def test_given_python_lifecycle_edge_case_when_building_then_direct_build_harden
                     "    marker.write_text('prepared')\n"
                     "    return ctx.result()\n"
                 ),
-                "python/nodes/loaders/raw.py": (
+                "python/nodes/loaders/raw/loader.py": (
                     "from sqlbuild.loaders import loader\n"
-                    "from python.nodes.tasks.prepare import prepare_events\n\n"
+                    "from python.nodes.tasks.prepare.asset import prepare_events\n\n"
                     "@loader(depends_on=[prepare_events])\n"
                     "def raw_events(ctx):\n"
                     "    '''Test loader raw_events.'''\n    return [{'event_id': 1}]\n"
@@ -1188,7 +1188,7 @@ def test_given_direct_source_only_build_when_loader_has_ingress_then_enforces_so
                     "[connection]\n"
                     'database = "direct_build_existing_intermediate_project.duckdb"\n'
                 ),
-                "python/nodes/loaders/raw.py": (
+                "python/nodes/loaders/raw/loader.py": (
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader(write_strategy='table', columns=[\n"
                     "    {'name': 'event_id', 'type': 'INTEGER'},\n"
@@ -1255,7 +1255,7 @@ def test_given_existing_intermediate_target_when_building_source_only_then_reuse
                     "[connection]\n"
                     'database = "python_build_json_project.duckdb"\n'
                 ),
-                "python/nodes/assets/orders.py": (
+                "python/nodes/assets/orders/asset.py": (
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def observed_orders(ctx):\n"
@@ -1360,7 +1360,7 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "[connection]\n"
                 'database = "python_sql_python_spine_build_project.duckdb"\n'
             ),
-            "python/nodes/loaders/window.py": (
+            "python/nodes/loaders/window/loader.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader(\n"
                 "    destination='window_orders',\n"
@@ -1370,17 +1370,17 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "def load_window_orders(ctx):\n"
                 "    '''Test loader load_window_orders.'''\n    return [{'order_id': 7}]\n"
             ),
-            "python/nodes/tasks/prepare.py": (
-                "from python.nodes.loaders.window import load_window_orders\n"
+            "python/nodes/tasks/prepare/asset.py": (
+                "from python.nodes.loaders.window.loader import load_window_orders\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset(depends_on=load_window_orders)\n"
                 "def prepare_orders(ctx):\n"
                 "    '''Test task prepare_orders.'''\n    rows = ctx.query('SELECT order_id FROM window_orders').fetchall()\n"
                 "    return ctx.result(payload={'order_id': rows[0][0]})\n"
             ),
-            "python/nodes/assets/prepare.py": (
+            "python/nodes/assets/prepare/asset.py": (
                 "from pathlib import Path\n"
-                "from python.nodes.tasks.prepare import prepare_orders\n"
+                "from python.nodes.tasks.prepare.asset import prepare_orders\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset(depends_on=prepare_orders)\n"
                 "def publish_prepared_orders(ctx):\n"
@@ -1389,9 +1389,9 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "    marker.write_text(str(payload['order_id']))\n"
                 "    return ctx.result(payload=payload, materialized=True)\n"
             ),
-            "python/nodes/loaders/raw.py": (
+            "python/nodes/loaders/raw/loader.py": (
                 "from pathlib import Path\n"
-                "from python.nodes.assets.prepare import publish_prepared_orders\n"
+                "from python.nodes.assets.prepare.asset import publish_prepared_orders\n"
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader(depends_on=(publish_prepared_orders,))\n"
                 "def raw_orders(ctx):\n"
@@ -1410,7 +1410,7 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
             "sql/models/fact_orders.sql": (
                 'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT * FROM __source("raw_orders")\n'
             ),
-            "python/nodes/tasks/profile.py": (
+            "python/nodes/tasks/profile/asset.py": (
                 "from sqlbuild.refs import model\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset(depends_on=model('fact_orders'))\n"
@@ -1419,17 +1419,17 @@ def test_given_python_sql_python_spine_when_building_then_orders_python_around_s
                 "    order_id = ctx.query(f'SELECT order_id FROM {relation}').fetchall()[0][0]\n"
                 "    return ctx.result(payload={'order_id': order_id}, metadata={'rows': 1})\n"
             ),
-            "python/nodes/assets/export.py": (
-                "from python.nodes.tasks.profile import profile_fact_orders\n"
+            "python/nodes/assets/export/asset.py": (
+                "from python.nodes.tasks.profile.asset import profile_fact_orders\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset(depends_on=profile_fact_orders)\n"
                 "def export_fact_orders(ctx):\n"
                 "    '''Test asset export_fact_orders.'''\n    payload = ctx.result_of(node_function=profile_fact_orders).payload\n"
                 "    return ctx.result(payload=payload, metadata={'exported': True})\n"
             ),
-            "python/nodes/tasks/notify.py": (
+            "python/nodes/tasks/notify/asset.py": (
                 "from pathlib import Path\n"
-                "from python.nodes.assets.export import export_fact_orders\n"
+                "from python.nodes.assets.export.asset import export_fact_orders\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset(depends_on=export_fact_orders)\n"
                 "def notify_fact_orders(ctx):\n"
@@ -1516,7 +1516,7 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
                 "[connection]\n"
                 'database = "python_persisted_result_project.duckdb"\n'
             ),
-            "python/nodes/tasks/produce.py": (
+            "python/nodes/tasks/produce/asset.py": (
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def produce_result(ctx):\n"
@@ -1571,7 +1571,7 @@ def test_given_prior_python_task_result_when_later_task_reads_result_then_uses_p
     (project_dir / "python" / "nodes" / "tasks" / "consume.py").write_text(
         (
             "from pathlib import Path\n"
-            "from python.nodes.tasks.produce import produce_result\n"
+            "from python.nodes.tasks.produce.asset import produce_result\n"
             "from sqlbuild.assets import asset\n\n"
             "@asset\n"
             "def consume_result(ctx):\n"
@@ -1659,7 +1659,7 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                 "[connection]\n"
                 'database = "python_persisted_loader_result_project.duckdb"\n'
             ),
-            "python/nodes/loaders/events.py": (
+            "python/nodes/loaders/events/loader.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_events(ctx):\n"
@@ -1677,9 +1677,9 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
             "sql/models/fact_events.sql": (
                 'MODEL (description "Test model fact_events.", materialized table);\n\nSELECT * FROM __source("raw_events")\n'
             ),
-            "python/nodes/tasks/consume.py": (
+            "python/nodes/tasks/consume/asset.py": (
                 "from pathlib import Path\n"
-                "from python.nodes.loaders.events import raw_events\n"
+                "from python.nodes.loaders.events.loader import raw_events\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def consume_loader_result(ctx):\n"
@@ -1728,7 +1728,7 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                     "[connection]\n"
                     'database = "python_failed_loader_result_project.duckdb"\n'
                 ),
-                "python/nodes/loaders/events.py": (
+                "python/nodes/loaders/events/loader.py": (
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader\n"
                     "def raw_events(ctx):\n"
@@ -1761,15 +1761,15 @@ def test_given_prior_loader_result_when_later_task_reads_result_then_uses_loader
                     "[connection]\n"
                     'database = "python_skipped_loader_result_project.duckdb"\n'
                 ),
-                "python/nodes/tasks/prepare.py": (
+                "python/nodes/tasks/prepare/asset.py": (
                     "from sqlbuild.compiler.python_nodes.types import SkipMode\n"
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def prepare_events(ctx):\n"
                     "    '''Test task prepare_events.'''\n    return ctx.skip(reason='no input', mode=SkipMode.HARD)\n"
                 ),
-                "python/nodes/loaders/events.py": (
-                    "from python.nodes.tasks.prepare import prepare_events\n"
+                "python/nodes/loaders/events/loader.py": (
+                    "from python.nodes.tasks.prepare.asset import prepare_events\n"
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader(depends_on=(prepare_events,))\n"
                     "def raw_events(ctx):\n"
@@ -1898,7 +1898,7 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "    def setup(self, ctx):\n"
                 "        record(ctx, 'provider')\n"
             ),
-            "python/nodes/tasks/configured.py": (
+            "python/nodes/tasks/configured/asset.py": (
                 "from python.providers.target_probe import TargetProbe\n"
                 "from python.nodes.recorder import record\n"
                 "from sqlbuild.assets import asset\n\n"
@@ -1908,7 +1908,7 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "    record(ctx, 'asset')\n"
                 "    return ctx.result()\n"
             ),
-            "python/nodes/loaders/raw.py": (
+            "python/nodes/loaders/raw/loader.py": (
                 "from python.providers.target_probe import TargetProbe\n"
                 "from python.nodes.recorder import record\n"
                 "from sqlbuild.loaders import loader\n\n"
@@ -1918,10 +1918,10 @@ def test_given_local_target_override_when_running_python_then_every_context_sees
                 "    record(ctx, 'loader')\n"
                 "    return [{'order_id': 1}]\n"
             ),
-            "python/nodes/checks/configured.py": (
+            "python/nodes/checks/configured/checks.py": (
                 "from python.providers.target_probe import TargetProbe\n"
                 "from python.nodes.recorder import record\n"
-                "from python.nodes.tasks.configured import configured_task\n"
+                "from python.nodes.tasks.configured.asset import configured_task\n"
                 "from sqlbuild.checks import check\n\n"
                 "@check(depends_on=configured_task)\n"
                 "def configured_check(ctx, target_probe: TargetProbe):\n"
@@ -2081,7 +2081,7 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
             ),
             "sql/models/orders.sql": "MODEL (description 'Test model orders.');\n\nSELECT 1 AS order_id\n",
             "python/nodes/recorder.py": _TARGET_CONFIG_RECORDER,
-            "python/nodes/loaders/raw.py": (
+            "python/nodes/loaders/raw/loader.py": (
                 "from python.nodes.recorder import record\n"
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
@@ -2090,7 +2090,7 @@ def test_given_ctx_templated_target_schema_when_running_then_python_sees_no_load
                 "    record(ctx, 'loader')\n"
                 "    return [{'order_id': 1}]\n"
             ),
-            "python/nodes/tasks/configured.py": (
+            "python/nodes/tasks/configured/asset.py": (
                 "from python.nodes.recorder import record\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
@@ -2178,15 +2178,15 @@ def test_given_same_node_results_in_multiple_targets_when_reading_then_uses_acti
                 "[targets.prod]\n"
                 'schema = "prod"\n'
             ),
-            "python/nodes/tasks/produce.py": (
+            "python/nodes/tasks/produce/asset.py": (
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def produce_result(ctx):\n"
                 "    '''Test task produce_result.'''\n    return ctx.result(payload={'target': ctx.target})\n"
             ),
-            "python/nodes/tasks/consume.py": (
+            "python/nodes/tasks/consume/asset.py": (
                 "from pathlib import Path\n"
-                "from python.nodes.tasks.produce import produce_result\n"
+                "from python.nodes.tasks.produce.asset import produce_result\n"
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def consume_result(ctx):\n"

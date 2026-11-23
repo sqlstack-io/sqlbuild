@@ -34,7 +34,7 @@ def prepare_freshness_project(
         {
             False: {},
             True: {
-                "python/nodes/loaders/raw.py": (
+                "python/nodes/loaders/raw/loader.py": (
                     "from sqlbuild.loaders import loader\n\n"
                     "@loader\n"
                     "def raw_managed(ctx):\n"

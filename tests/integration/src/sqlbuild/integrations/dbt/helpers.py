@@ -26,7 +26,7 @@ def build_sqlbuild_project_with_manifest(
 
     project_dir: Path = tmp_path / "sqlbuild_project"
     project_dir.joinpath("sql", "models").mkdir(parents=True)
-    project_dir.joinpath("target").mkdir()
+    project_dir.joinpath("target").mkdir(parents=True)
     project_dir.joinpath("sqlbuild_project.toml").write_text(
         'name = "demo"\nadapter = "duckdb"\n', encoding="utf-8"
     )

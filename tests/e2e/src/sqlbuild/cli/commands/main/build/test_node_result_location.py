@@ -41,7 +41,7 @@ _TASK: str = (
     "    return ctx.result(payload={'announced': True})\n"
 )
 _CHECK: str = (
-    "from python.nodes.tasks.announce import announce_orders\nfrom sqlbuild.checks import check\n\n\n"
+    "from python.nodes.tasks.announce.asset import announce_orders\nfrom sqlbuild.checks import check\n\n\n"
     "@check(depends_on=announce_orders)\n"
     "def check_orders_announced(ctx):\n"
     '    """The task announced the orders."""\n'
@@ -49,7 +49,7 @@ _CHECK: str = (
     "    return ctx.pass_(message='announced') if announced else ctx.fail(message='silent')\n"
 )
 _COPYING_LOADER: str = (
-    "from python.nodes.loaders.orders import raw_orders\nfrom sqlbuild.loaders import loader\n\n\n"
+    "from python.nodes.loaders.orders.loader import raw_orders\nfrom sqlbuild.loaders import loader\n\n\n"
     "@loader\n"
     "def raw_order_copies(ctx) -> list[dict[str, object]]:\n"
     '    """One order when the orders loader has a result to read, none otherwise."""\n'
@@ -107,10 +107,10 @@ def test_given_target_location_when_building_and_loading_then_node_results_stay_
             "sql/sources/copies.yml": node_result_source_yml(test_case.source_location).replace(
                 "raw_orders", "raw_order_copies"
             ),
-            "python/nodes/loaders/orders.py": _LOADER,
-            "python/nodes/loaders/copies.py": _COPYING_LOADER,
-            "python/nodes/tasks/announce.py": _TASK,
-            "python/nodes/checks/orders.py": _CHECK,
+            "python/nodes/loaders/orders/loader.py": _LOADER,
+            "python/nodes/loaders/copies/loader.py": _COPYING_LOADER,
+            "python/nodes/tasks/announce/asset.py": _TASK,
+            "python/nodes/checks/orders/checks.py": _CHECK,
         },
     )
 
@@ -166,7 +166,7 @@ def test_given_target_location_when_building_and_loading_then_node_results_stay_
         PreservedTargetRefusalE2ETestCase(
             description="a task under a preserved schema needs a loader schema",
             python_files={
-                "python/nodes/tasks/announce.py": _TASK.replace(
+                "python/nodes/tasks/announce/asset.py": _TASK.replace(
                     'depends_on=source("raw_orders")', ""
                 )
             },
@@ -175,7 +175,7 @@ def test_given_target_location_when_building_and_loading_then_node_results_stay_
         PreservedTargetRefusalE2ETestCase(
             description="a loader schema whose var resolves to empty is no loader schema",
             python_files={
-                "python/nodes/tasks/announce.py": _TASK.replace(
+                "python/nodes/tasks/announce/asset.py": _TASK.replace(
                     'depends_on=source("raw_orders")', ""
                 )
             },
@@ -185,7 +185,7 @@ def test_given_target_location_when_building_and_loading_then_node_results_stay_
         PreservedTargetRefusalE2ETestCase(
             description="a loader schema that resolves only inside a model is no loader schema",
             python_files={
-                "python/nodes/tasks/announce.py": _TASK.replace(
+                "python/nodes/tasks/announce/asset.py": _TASK.replace(
                     'depends_on=source("raw_orders")', ""
                 )
             },
@@ -251,8 +251,8 @@ def test_given_two_builds_when_planning_then_python_nodes_are_not_new(
         target_lines=test_case.target_lines,
         files={
             "sql/sources/raw.yml": node_result_source_yml("    schema: raw\n"),
-            "python/nodes/loaders/orders.py": _LOADER,
-            "python/nodes/tasks/announce.py": _TASK,
+            "python/nodes/loaders/orders/loader.py": _LOADER,
+            "python/nodes/tasks/announce/asset.py": _TASK,
         },
     )
     for _ in range(2):
@@ -289,8 +289,8 @@ def test_given_older_named_schema_results_when_planning_preserved_target_then_lo
         target_lines=test_case.earlier_target_lines,
         files={
             "sql/sources/raw.yml": node_result_source_yml("    schema: raw\n"),
-            "python/nodes/loaders/orders.py": _LOADER,
-            "python/nodes/tasks/announce.py": _TASK,
+            "python/nodes/loaders/orders/loader.py": _LOADER,
+            "python/nodes/tasks/announce/asset.py": _TASK,
             "sql/models/staged_orders.sql": (
                 "MODEL (description 'Staged orders.', schema \"staging\");\n\n"
                 "SELECT 1 AS order_id\n"
@@ -309,7 +309,7 @@ def test_given_older_named_schema_results_when_planning_preserved_target_then_lo
     config.write_text(
         config.read_text().replace(test_case.earlier_target_lines, test_case.target_lines)
     )
-    task: Path = project_dir / "python/nodes/tasks/announce.py"
+    task: Path = project_dir / "python/nodes/tasks/announce/asset.py"
     task.write_text(task.read_text().replace("'announced': True", "'announced': 1"))
     for _ in range(2):
         build: subprocess.CompletedProcess[str] = run_sqb(

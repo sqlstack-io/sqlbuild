@@ -284,7 +284,7 @@ pub(crate) fn catalogue() -> Vec<RuleMetadata> {
             "declarations",
             "declaration-domain-placement",
             "public enum and constant files must live under a configured domain folder",
-            "Move this declaration beneath enums/<domain>/ or constants/<domain>/.",
+            "Move this declaration beneath sql/enums/<domain>/ or sql/constants/<domain>/.",
         ),
         rule!(
             "SQBRDECLARATION302",

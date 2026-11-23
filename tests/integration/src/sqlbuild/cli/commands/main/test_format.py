@@ -94,7 +94,7 @@ def test_given_authored_function_spelling_when_formatting_then_only_layout_chang
         f'name = "orders"\nadapter = "{test_case.adapter}"\n'
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Order flags");\n'
         f'select   {test_case.authored_expression} as order_flag from __source("raw_orders")\n'
@@ -122,7 +122,7 @@ def test_given_commented_lateral_alias_when_formatting_then_canonical_sql_is_wri
     """A comment plus generated AS used to decline the entire larger query silently."""
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "snowflake"\n')
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     columns: str = ", ".join(f"parsed.order_attribute_{index}" for index in range(47))
     model.write_text(
         'MODEL (description "Order items");\n'
@@ -177,7 +177,7 @@ def test_given_typed_null_input_when_fixture_formatting_then_canonical_empty_fix
         encoding="utf-8",
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "stg_orders.sql").write_text(
         "MODEL (\n"
         '  description "Staged orders",\n'
@@ -240,7 +240,7 @@ def test_given_sql_test_string_when_formatting_then_project_still_compiles(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\nSELECT order_id, order_label FROM __ref("stg_orders")\n',
         encoding="utf-8",
@@ -300,7 +300,7 @@ SELECT order_id
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "expanded_orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Expanded orders");\nselect expanded.order_id from orders as '
         'source_orders cross join __table_fn("expand_order")(source_orders.order_id) as expanded\n',
@@ -334,7 +334,7 @@ def test_given_explicit_null_ordering_when_formatting_then_clause_is_preserved(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\n'
         'select order_id from __ref("stg_orders") order by order_id nulls last\n',
@@ -372,7 +372,7 @@ def test_given_exact_contract_casts_when_formatting_then_rule_still_passes(
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (\n"
         '  description "Typed orders",\n'
@@ -436,7 +436,7 @@ def test_given_description_width_when_formatting_then_wrapped_model_compiles(
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         f'MODEL (\n  description "{test_case.authored_description}"\n);\nSELECT 1 AS order_id\n',
         encoding="utf-8",
@@ -475,7 +475,7 @@ def test_given_trailing_comments_when_formatting_twice_then_second_run_changes_n
     )
     header: str = 'MODEL (description "Orders placed by customers.");\n\n'
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(header + test_case.body, encoding="utf-8")
 
     first_exit: int = main(["--project-dir", str(tmp_path), "format", "--no-cache"])
@@ -506,7 +506,7 @@ def test_given_schema_column_when_formatting_then_header_remains_valid_and_idemp
         'name = "catalog"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "catalog_objects.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (\n"
         '  description "Catalog objects.",\n'
@@ -553,7 +553,7 @@ def test_given_unparseable_file_when_formatting_then_file_is_untouched_and_fault
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(test_case.authored_sql, encoding="utf-8")
 
     exit_code: int = main(["--project-dir", str(tmp_path), "format"])
@@ -597,7 +597,7 @@ def test_given_native_formatter_decline_when_formatting_then_whole_file_is_uncha
         f'name = "orders"\nadapter = "{test_case.adapter}"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (\n"
         '  description "Orders.",    \n'
@@ -651,7 +651,7 @@ def test_given_inline_typed_null_fixture_when_formatting_then_one_pass_is_idempo
         'name = "customers"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "customers.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (\n"
         '  description "Customers.",\n'
@@ -710,7 +710,7 @@ def test_given_redundant_typed_null_after_multi_projection_when_formatting_then_
         'name = "customer_segments"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "customer_clusters.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (\n"
         '  description "Customer clusters.",\n'
@@ -877,7 +877,7 @@ def test_given_format_selectors_when_scoping_then_paths_and_default_exclusions_a
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "customers.sql").write_text(
         'MODEL (description "Customers.", materialized table, '
         "columns (customer_id (type INTEGER),));\n"
@@ -960,7 +960,7 @@ def test_given_missing_description_when_formatting_then_check_and_write_fault(
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(test_case.authored_sql, encoding="utf-8")
 
     text_exit: int = main(["--project-dir", str(tmp_path), "format", "--check"])
@@ -1094,7 +1094,7 @@ def test_given_leading_cte_comment_when_formatting_then_comment_rule_still_passe
         encoding="utf-8",
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "raw_orders.sql").write_text(
         'MODEL (description "Test model raw_orders.", materialized view);\n\nSELECT 1 AS order_id, 2 AS customer_id\n',
         encoding="utf-8",
@@ -1192,7 +1192,7 @@ def test_given_dollar_quoted_apostrophe_when_formatting_then_reference_survives_
         encoding="utf-8",
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(
         'MODEL (description "Orders", materialized table);\n\nSELECT 1 AS order_id\n',
         encoding="utf-8",
@@ -1240,7 +1240,7 @@ def test_given_select_all_and_implicit_aliases_when_formatting_then_only_layout_
         f'name = "orders"\nadapter = "{test_case.adapter}"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     authored: str = " ".join(test_case.expected_body.lower().split())
     model.write_text(f'MODEL (description "Orders");\n\n{authored}\n', encoding="utf-8")
 
@@ -1355,7 +1355,7 @@ def test_given_project_line_width_when_formatting_then_long_lines_wrap_and_proje
         encoding="utf-8",
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "orders_with_a_long_name.sql").write_text(
         'MODEL (description "Orders", materialized table);\n\n'
         "SELECT\n  1 AS order_id,\n  5 AS amount,\n  NULL AS fallback_amount,\n  1 AS tax\n",

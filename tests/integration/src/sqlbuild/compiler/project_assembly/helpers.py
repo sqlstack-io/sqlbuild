@@ -104,7 +104,7 @@ def generated_assembly_files(*, rng: random.Random, model_count: int) -> dict[st
             f"{rng.choice(_SOURCE_NAMESPACES)}"
             "    columns:\n      - name: n\n        type: INTEGER\n"
         ),
-        "python/nodes/loaders/raw.py": (
+        "python/nodes/loaders/raw/loader.py": (
             "from sqlbuild.loaders import loader\n\n\n"
             "@loader\ndef raw_orders(ctx):\n    '''Load raw orders.'''\n    return [{'n': 1}]\n"
         ),
@@ -313,7 +313,7 @@ def _edge_target(text: str) -> str:
 def _edge_source_files(ns: str = "") -> dict[str, str]:
     return {
         "sql/sources/raw.yml": _EDGE_SOURCE.format(ns=ns),
-        "python/nodes/loaders/raw.py": _EDGE_LOADER,
+        "python/nodes/loaders/raw/loader.py": _EDGE_LOADER,
         "sql/models/orders.sql": _EDGE_MODEL,
     }
 

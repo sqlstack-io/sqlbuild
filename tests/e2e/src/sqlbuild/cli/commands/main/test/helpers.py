@@ -2372,7 +2372,7 @@ def build_since_indirect_files() -> dict[str, str]:
             "),\n"
             "__expected__archive_counts AS (SELECT 1 AS archived)\nSELECT 1\n"
         ),
-        "python/nodes/tasks/report.py": (
+        "python/nodes/tasks/report/asset.py": (
             "from sqlbuild.assets import asset\n\n\n"
             "@asset()\ndef report_orders(ctx):\n"
             '    """Report orders."""\n\n'

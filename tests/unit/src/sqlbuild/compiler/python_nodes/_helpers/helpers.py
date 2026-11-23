@@ -185,7 +185,7 @@ def write_python_identity_repo(*, project_dir: Path, repo_files: dict[str, str])
         file_path: Path = project_dir / relative_path
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(contents, encoding="utf-8")
-    (project_dir / ".git").mkdir(exist_ok=True)
+    (project_dir / ".git").mkdir(parents=True, exist_ok=True)
 
 
 def load_python_identity_module(
@@ -555,7 +555,7 @@ def imported_identity_nodes(
         file_path: Path = package_dir / relative_path
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_bytes(contents)
-    (project_dir / ".git").mkdir()
+    (project_dir / ".git").mkdir(parents=True)
     try:
         with pytest.MonkeyPatch.context() as patch:
             patch.syspath_prepend(str(project_dir))
@@ -709,7 +709,7 @@ def _write_shared_project(
         file_path: Path = project_dir / relative_path
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(contents, encoding="utf-8")
-    (project_dir / ".git").mkdir()
+    (project_dir / ".git").mkdir(parents=True)
     return (
         {str((project_dir / path).resolve()): text for path, text in shared.items()},
         {str((project_dir / path).resolve()): text for path, text in nodes.items()},

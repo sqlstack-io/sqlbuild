@@ -15,7 +15,7 @@ def linked_project_tree(tmp_path: Path) -> ProjectTree:
     outside: Path = tmp_path / "outside"
     (root / "sql" / "models").mkdir(parents=True)
     (root / "rules" / "inputs").mkdir(parents=True)
-    outside.mkdir()
+    outside.mkdir(parents=True)
     (root / "sql" / "models" / "orders.sql").write_text(ORDERS_SQL, encoding="utf-8")
     (root / "sql" / "models" / "notes.txt").write_text("notes\n", encoding="utf-8")
     (root / "rules" / "inputs" / "limits.yaml").write_text(LIMITS_YAML, encoding="utf-8")

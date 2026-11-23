@@ -36,7 +36,10 @@ from sqlbuild.runtime.output_capture.models import (
 def discover_command_output_sink_functions(
     *, project_dir: Path, providers: tuple[DiscoveredProvider, ...] = ()
 ) -> tuple[DiscoveredCommandOutputSink, ...]:
-    """Discover validated command-output sink declarations under sinks/, without Recall's."""
+    """Discover validated command-output event sink declarations, without Recall's.
+
+    They live under python/event_sinks/.
+    """
 
     cached: (
         tuple[

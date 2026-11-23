@@ -68,7 +68,7 @@ def test_given_attached_duckdb_file_when_building_then_models_land_in_it(
         },
     )
     home: Path = tmp_path / "home"
-    home.mkdir()
+    home.mkdir(parents=True)
     built: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "build", "--concurrency", str(test_case.concurrency)),
         project_dir=project_dir,

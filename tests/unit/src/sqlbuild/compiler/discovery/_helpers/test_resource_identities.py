@@ -198,7 +198,7 @@ def test_given_noncanonical_name_when_validating_resource_identity_then_coded_er
         DiscoveredResourceIdentityErrorTestCase(
             description="Python asset name",
             project_files={
-                "python/nodes/tasks/orders.py": (
+                "python/nodes/tasks/orders/asset.py": (
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def DailyTask(ctx):\n"

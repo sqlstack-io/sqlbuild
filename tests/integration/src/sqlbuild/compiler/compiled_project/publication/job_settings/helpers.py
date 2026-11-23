@@ -92,22 +92,59 @@ LOADER_PROJECT_FILES: dict[str, str] = {
         "    write_strategy: table\n    table: raw_inventory\n    columns:\n"
         "      - name: product_id\n        type: BIGINT\n"
     ),
-    "python/nodes/loaders/loaded.py": (
-        '"""Two loaders that record each run in the warehouse log."""\n\n'
-        "import os\nfrom pathlib import Path\n\nfrom sqlbuild.loaders import loader\n\n\n"
-        "def _record(name):\n"
+    "python/nodes/loaders/loaded/raw_customers/loader.py": (
+        '"""Two loaders that record each run in the warehouse log."""\n'
+        'import os\n'
+        'from pathlib import Path\n'
+        'from sqlbuild.loaders import loader\n'
+        'def _record(name):\n'
         '    with Path(os.environ["WAREHOUSE_LOG"]).open("a") as log:\n'
-        '        log.write(f"LOAD {name}\\n")\n\n\n'
-        "@loader\ndef raw_customers(ctx):\n"
-        '    """Load customers."""\n    _record("raw_customers")\n'
-        '    return [{"customer_id": 7}]\n\n\n'
-        "@loader\ndef raw_inventory(ctx):\n"
-        '    """Load inventory."""\n    _record("raw_inventory")\n'
-        '    return [{"product_id": 1}]\n\n\n'
-        '@loader(write_strategy="table")\ndef stage_inventory(ctx):\n'
+        '        log.write(f"LOAD {name}\\n")\n'
+        '\n'
+        '\n'
+        '@loader\n'
+        'def raw_customers(ctx):\n'
+        '    """Load customers."""\n'
+        '    _record("raw_customers")\n'
+        '    return [{"customer_id": 7}]\n'
+    ),
+    "python/nodes/loaders/loaded/raw_inventory/loader.py": (
+        '"""Two loaders that record each run in the warehouse log."""\n'
+        'import os\n'
+        'from pathlib import Path\n'
+        'from sqlbuild.loaders import loader\n'
+        'def _record(name):\n'
+        '    with Path(os.environ["WAREHOUSE_LOG"]).open("a") as log:\n'
+        '        log.write(f"LOAD {name}\\n")\n'
+        '\n'
+        '\n'
+        '@loader\n'
+        'def raw_inventory(ctx):\n'
+        '    """Load inventory."""\n'
+        '    _record("raw_inventory")\n'
+        '    return [{"product_id": 1}]\n'
+    ),
+    "python/nodes/loaders/loaded/stage_inventory/loader.py": (
+        '"""Two loaders that record each run in the warehouse log."""\n'
+        'import os\n'
+        'from pathlib import Path\n'
+        'from sqlbuild.loaders import loader\n'
+        'def _record(name):\n'
+        '    with Path(os.environ["WAREHOUSE_LOG"]).open("a") as log:\n'
+        '        log.write(f"LOAD {name}\\n")\n'
+        '\n'
+        '\n'
+        '@loader(write_strategy="table")\n'
+        'def stage_inventory(ctx):\n'
         '    """Stage inventory in the loader\'s own relation; no source declares it."""\n'
         '    _record("stage_inventory")\n'
         '    return [{"product_id": 2}]\n'
+    ),
+    "python/nodes/loaders/loaded/__init__.py": (
+        'from .raw_customers.loader import raw_customers\n'
+        'from .raw_inventory.loader import raw_inventory\n'
+        'from .stage_inventory.loader import stage_inventory\n'
+    )
     ),
     "sql/models/customers.sql": (
         "MODEL (description 'Loaded customers.', materialized table);\n"

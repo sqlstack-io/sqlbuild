@@ -69,30 +69,30 @@ SELECT 1
 """,
                 "sql/audits/generic/not_null.sql": "AUDIT ();\nSELECT 1\n",
                 "sql/macros/python/name_helpers.py": "def slug() -> str:\n    return 'slug'\n",
-                "python/nodes/loaders/raw_orders.py": """
+                "python/nodes/loaders/raw_orders/loader.py": """
 from sqlbuild.loaders import loader
 
 @loader(name="raw_orders")
 def fetch_orders(ctx):
     return []
 """,
-                "python/nodes/tasks/windows.py": """
+                "python/nodes/tasks/windows/asset.py": """
 from sqlbuild.assets import asset
 
 @asset(tags=("api",), group="ingestion")
 def fetch_window(ctx):
     return {"window": "today"}
 """,
-                "python/nodes/assets/exports.py": """
+                "python/nodes/assets/exports/asset.py": """
 from sqlbuild.assets import asset
 
 @asset(columns=[{"name": "customer_id", "type": "string"}])
 def export_customers(ctx):
     return {"uri": "s3://exports/customers.parquet"}
 """,
-                "python/nodes/checks/exports.py": """
+                "python/nodes/checks/exports/checks.py": """
 from sqlbuild.checks import check
-from python.nodes.assets.exports import export_customers
+from python.nodes.assets.exports.asset import export_customers
 
 @check(depends_on=export_customers, severity="warn")
 def export_customers_exists(ctx):
@@ -405,7 +405,7 @@ def test_given_ignored_siblings_when_discovering_then_count_uses_relevant_collec
             repo_files=base_repo_files()
             | {
                 "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
-                "python/nodes/loaders/generated.py": """
+                "python/nodes/loaders/generated/loaders.py": """
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 
@@ -449,7 +449,7 @@ def generated_nodes():
             description="single-kind factory validates in factories folder",
             repo_files=base_repo_files()
             | {
-                "python/nodes/factories/generated_tasks.py": """
+                "python/nodes/factories/generated_tasks/assets.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -469,7 +469,7 @@ def generated_tasks():
             description="factory returning its own module-level node registers it once",
             repo_files=base_repo_files()
             | {
-                "python/nodes/factories/orders.py": """
+                "python/nodes/factories/orders/assets.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -490,7 +490,7 @@ def order_nodes():
             description="factory binding its generated node to a module global registers it once",
             repo_files=base_repo_files()
             | {
-                "python/nodes/factories/orders.py": """
+                "python/nodes/factories/orders/assets.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -512,8 +512,8 @@ def order_nodes():
             description="factory returning an imported python module node registers it once",
             repo_files=base_repo_files()
             | {
-                "python/nodes/a_factories/orders.py": """
-from python.nodes.tasks.orders import prepare_orders
+                "python/nodes/a_factories/orders/assets.py": """
+from python.nodes.tasks.orders.asset import prepare_orders
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -525,7 +525,7 @@ def order_nodes():
         return None
     return [prepare_orders, publish]
 """,
-                "python/nodes/tasks/orders.py": """
+                "python/nodes/tasks/orders/asset.py": """
 from sqlbuild.assets import asset
 
 
@@ -541,7 +541,7 @@ def prepare_orders(ctx):
             repo_files=base_repo_files()
             | {
                 "python/nodes/factories/orders/_helpers.py": "TASK_NAME = 'prepare_orders'\n",
-                "python/nodes/factories/orders/generated.py": """
+                "python/nodes/factories/orders/generated/assets.py": """
 from python.nodes.factories.orders._helpers import TASK_NAME
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
@@ -777,7 +777,7 @@ def test_given_non_project_with_python_when_discovering_then_missing_config_erro
             description="generated duplicate names fail validation",
             repo_files=base_repo_files()
             | {
-                "python/nodes/tasks/generated.py": """
+                "python/nodes/tasks/generated/assets.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -800,7 +800,7 @@ def generated_tasks():
             description="generated name colliding with top-level node fails validation",
             repo_files=base_repo_files()
             | {
-                "python/nodes/tasks/top_level.py": """
+                "python/nodes/tasks/top_level/asset.py": """
 from sqlbuild.assets import asset
 
 
@@ -808,7 +808,7 @@ from sqlbuild.assets import asset
 def top_level_profile(ctx):
     return None
 """,
-                "python/nodes/assets/generated.py": """
+                "python/nodes/assets/generated/assets.py": """
 from sqlbuild.assets import asset
 from sqlbuild.factories import factory
 
@@ -827,7 +827,7 @@ def generated_assets():
             description="factory returning a distinct node named like a module node fails validation",
             repo_files=base_repo_files()
             | {
-                "python/nodes/factories/orders.py": """
+                "python/nodes/factories/orders/assets.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -851,7 +851,7 @@ def order_nodes():
             description="generated dependency cycle fails validation",
             repo_files=base_repo_files()
             | {
-                "python/nodes/tasks/generated.py": """
+                "python/nodes/tasks/generated/assets.py": """
 from sqlbuild.factories import factory
 from sqlbuild.assets import asset
 
@@ -874,7 +874,7 @@ def generated_tasks():
             description="generated loader SQL dependency fails validation",
             repo_files=base_repo_files()
             | {
-                "python/nodes/loaders/generated.py": """
+                "python/nodes/loaders/generated/loaders.py": """
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 from sqlbuild.refs import model
@@ -895,7 +895,7 @@ def generated_loaders():
             repo_files=base_repo_files()
             | {
                 "sql/sources/raw.yml": "sources:\n  - name: raw_orders\n    managed: true\n",
-                "python/nodes/loaders/generated.py": """
+                "python/nodes/loaders/generated/loaders.py": """
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 
@@ -1133,14 +1133,14 @@ sources:
             description="raises when loader names are duplicated",
             repo_files=base_repo_files()
             | {
-                "python/nodes/loaders/a.py": """
+                "python/nodes/loaders/a/loader.py": """
 from sqlbuild.loaders import loader
 
 @loader
 def raw_orders(ctx):
     return []
 """,
-                "python/nodes/loaders/b.py": """
+                "python/nodes/loaders/b/loader.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -1154,14 +1154,14 @@ def raw_orders(ctx):
             description="raises when explicit loader names are duplicated",
             repo_files=base_repo_files()
             | {
-                "python/nodes/loaders/a.py": """
+                "python/nodes/loaders/a/loader.py": """
 from sqlbuild.loaders import loader
 
 @loader(name="raw_orders")
 def load_a(ctx):
     return []
 """,
-                "python/nodes/loaders/b.py": """
+                "python/nodes/loaders/b/loader.py": """
 from sqlbuild.loaders import loader
 
 @loader(name="raw_orders")
@@ -1181,7 +1181,7 @@ sources:
     table: fetch_orders
 """.strip()
                 + "\n",
-                "python/nodes/loaders/raw_orders.py": """
+                "python/nodes/loaders/raw_orders/loader.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -1201,7 +1201,7 @@ sources:
     table: raw_orders
 """.strip()
                 + "\n",
-                "python/nodes/loaders/raw_orders.py": """
+                "python/nodes/loaders/raw_orders/loader.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -1215,7 +1215,7 @@ def raw_orders(ctx):
             description="raises when loader dependency is not decorated",
             repo_files=base_repo_files()
             | {
-                "python/nodes/loaders/events.py": """
+                "python/nodes/loaders/events/loader.py": """
 from sqlbuild.loaders import loader
 
 def fetch_events(ctx):
@@ -1232,7 +1232,7 @@ def enriched_events(ctx):
             description="raises when loader dependencies contain a cycle",
             repo_files=base_repo_files()
             | {
-                "python/nodes/loaders/events.py": """
+                "python/nodes/loaders/events/loader.py": """
 from sqlbuild.loaders import loader
 
 def fetch_events(ctx):
@@ -1258,7 +1258,7 @@ sources:
     write_strategy: table
 """.strip()
                 + "\n",
-                "python/nodes/loaders/raw_orders.py": """
+                "python/nodes/loaders/raw_orders/loader.py": """
 from sqlbuild.loaders import loader
 
 @loader(write_strategy="table", columns=[{"name": "id", "type": "INTEGER"}])
@@ -1272,14 +1272,14 @@ def raw_orders(ctx):
             description="raises when task and asset names are duplicated",
             repo_files=base_repo_files()
             | {
-                "python/nodes/tasks/export_customers.py": """
+                "python/nodes/tasks/export_customers/asset.py": """
 from sqlbuild.assets import asset
 
 @asset
 def export_customers(ctx):
     return None
 """,
-                "python/nodes/assets/export_customers.py": """
+                "python/nodes/assets/export_customers/asset.py": """
 from sqlbuild.assets import asset
 
 @asset
@@ -1293,16 +1293,16 @@ def export_customers(ctx):
             description="raises when check name collides with task name",
             repo_files=base_repo_files()
             | {
-                "python/nodes/tasks/export_customers.py": """
+                "python/nodes/tasks/export_customers/asset.py": """
 from sqlbuild.assets import asset
 
 @asset
 def export_customers(ctx):
     return None
 """,
-                "python/nodes/checks/export_customers.py": """
+                "python/nodes/checks/export_customers/checks.py": """
 from sqlbuild.checks import check
-from python.nodes.tasks.export_customers import export_customers
+from python.nodes.tasks.export_customers.asset import export_customers
 
 @check(depends_on=export_customers, name="export_customers")
 def export_customers_check(ctx):
@@ -1316,7 +1316,7 @@ def export_customers_check(ctx):
             repo_files=base_repo_files()
             | {
                 "sql/models/marts/export_customers.sql": "MODEL ();\n\nselect 1\n",
-                "python/nodes/tasks/export_customers.py": """
+                "python/nodes/tasks/export_customers/asset.py": """
 from sqlbuild.assets import asset
 
 @asset
@@ -1341,7 +1341,7 @@ seeds:
 """.strip()
                 + "\n",
                 "sql/seeds/export_customers.csv": "customer_id\n1\n",
-                "python/nodes/assets/export_customers.py": """
+                "python/nodes/assets/export_customers/asset.py": """
 from sqlbuild.assets import asset
 
 @asset
@@ -1363,16 +1363,16 @@ sources:
     table: export_customers_exists
 """.strip()
                 + "\n",
-                "python/nodes/tasks/export_customers.py": """
+                "python/nodes/tasks/export_customers/asset.py": """
 from sqlbuild.assets import asset
 
 @asset
 def export_customers(ctx):
     return None
 """,
-                "python/nodes/checks/export_customers.py": """
+                "python/nodes/checks/export_customers/checks.py": """
 from sqlbuild.checks import check
-from python.nodes.tasks.export_customers import export_customers
+from python.nodes.tasks.export_customers.asset import export_customers
 
 @check(depends_on=export_customers)
 def export_customers_exists(ctx):
@@ -1422,7 +1422,7 @@ FUNCTION (
 amount > 100
 """.strip()
                 + "\n",
-                "python/nodes/loaders/fetch_orders.py": """
+                "python/nodes/loaders/fetch_orders/loader.py": """
 from sqlbuild.loaders import loader
 
 @loader
@@ -1490,7 +1490,7 @@ def notify(ctx):
             description="raises when task dependency is not decorated",
             repo_files=base_repo_files()
             | {
-                "python/nodes/tasks/windows.py": """
+                "python/nodes/tasks/windows/asset.py": """
 from sqlbuild.assets import asset
 
 def fetch_window(ctx):
@@ -1507,7 +1507,7 @@ def export_window(ctx):
             description="raises when task and asset dependencies contain a cycle",
             repo_files=base_repo_files()
             | {
-                "python/nodes/tasks/windows.py": """
+                "python/nodes/tasks/windows/asset.py": """
 from sqlbuild.assets import asset
 
 def fetch_window(ctx):
@@ -1526,7 +1526,7 @@ fetch_window = asset(depends_on=enrich_window)(fetch_window)
             description="raises when check dependency is not decorated",
             repo_files=base_repo_files()
             | {
-                "python/nodes/checks/exports.py": """
+                "python/nodes/checks/exports/checks.py": """
 from sqlbuild.checks import check
 
 def export_customers(ctx):
@@ -1543,7 +1543,7 @@ def export_customers_exists(ctx):
             description="raises when loader declares SQL model dependency",
             repo_files=base_repo_files()
             | {
-                "python/nodes/loaders/orders.py": """
+                "python/nodes/loaders/orders/loader.py": """
 from sqlbuild.loaders import loader
 from sqlbuild.refs import model
 
@@ -1558,16 +1558,16 @@ def load_orders(ctx):
             description="raises when check depends on check",
             repo_files=base_repo_files()
             | {
-                "python/nodes/assets/exports.py": """
+                "python/nodes/assets/exports/asset.py": """
 from sqlbuild.assets import asset
 
 @asset
 def export_customers(ctx):
     return None
 """,
-                "python/nodes/checks/exports.py": """
+                "python/nodes/checks/exports/checks.py": """
 from sqlbuild.checks import check
-from python.nodes.assets.exports import export_customers
+from python.nodes.assets.exports.asset import export_customers
 
 @check(depends_on=export_customers)
 def export_customers_exists(ctx):

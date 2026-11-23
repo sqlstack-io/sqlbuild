@@ -92,7 +92,7 @@ def test_given_rule_exception_mechanism_when_compiling_then_only_configuration_a
         encoding="utf-8",
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "customers.sql").write_text(
         "MODEL (description 'Customer sample.');\n"
         "WITH customers AS (SELECT 1 AS customer_id)\n"
@@ -139,7 +139,7 @@ def test_given_exception_policy_when_formatting_then_it_is_validated_like_compil
         encoding="utf-8",
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "customers.sql").write_text(
         "MODEL (description 'Customer sample.');\n"
         "WITH customers AS (\n  SELECT 1 AS customer_id\n)\n\n"

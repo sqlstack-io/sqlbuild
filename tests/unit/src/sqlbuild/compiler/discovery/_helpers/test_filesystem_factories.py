@@ -23,7 +23,7 @@ from tests.unit.src.sqlbuild.compiler.discovery._helpers._test_types import (
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers mixed nodes returned by a factory",
             files={
-                "python/nodes/factories/generated.py": """
+                "python/nodes/factories/generated/factory.py": """
 from sqlbuild.assets import asset
 from sqlbuild.checks import check
 from sqlbuild.factories import factory
@@ -77,7 +77,7 @@ def regional_pipeline():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers tuple nodes returned by a factory",
             files={
-                "python/nodes/loaders/generated.py": """
+                "python/nodes/loaders/generated/loaders.py": """
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 
@@ -123,7 +123,7 @@ def generated_checks():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers single node returned by a factory in assets folder",
             files={
-                "python/nodes/assets/generated.py": """
+                "python/nodes/assets/generated/assets.py": """
 from sqlbuild.assets import asset
 from sqlbuild.factories import factory
 
@@ -144,7 +144,7 @@ def generated_asset():
         DiscoverPythonNodeFactoriesTestCase(
             description="discovers factory in loaders folder",
             files={
-                "python/nodes/loaders/generated.py": """
+                "python/nodes/loaders/generated/loaders.py": """
 from sqlbuild.factories import factory
 from sqlbuild.loaders import loader
 
@@ -185,25 +185,36 @@ def export(ctx):
                 "python/nodes/_helpers.py": """
 REGION = "emea"
 """,
-                "python/nodes/orders/pipeline.py": """
-from python.nodes._helpers import REGION
-from sqlbuild.checks import check
-from sqlbuild.factories import factory
-from sqlbuild.assets import asset
-
-
-@asset(name="prepare_orders")
-def prepare_orders(ctx):
-    return {"region": REGION}
-
-
-@factory
-def regional_checks():
-    @check(name=f"orders_{REGION}_exists", depends_on=prepare_orders)
-    def generated_check(ctx):
-        return True
-    return generated_check
-""",
+                "python/nodes/orders/pipeline/prepare_orders/asset.py": (
+                    "from python.nodes._helpers import REGION\n"
+                    "from sqlbuild.checks import check\n"
+                    "from sqlbuild.factories import factory\n"
+                    "from sqlbuild.assets import asset\n"
+                    "\n"
+                    "\n"
+                    '@asset(name="prepare_orders")\n'
+                    "def prepare_orders(ctx):\n"
+                    '    return {"region": REGION}\n'
+                ),
+                "python/nodes/orders/pipeline/regional_checks/checks.py": (
+                    "from python.nodes._helpers import REGION\n"
+                    "from sqlbuild.checks import check\n"
+                    "from sqlbuild.factories import factory\n"
+                    "from sqlbuild.assets import asset\n"
+                    "from python.nodes.orders.pipeline.prepare_orders.asset import prepare_orders\n"
+                    "\n"
+                    "\n"
+                    "@factory\n"
+                    "def regional_checks():\n"
+                    '    @check(name=f"orders_{REGION}_exists", depends_on=prepare_orders)\n'
+                    "    def generated_check(ctx):\n"
+                    "        return True\n"
+                    "    return generated_check\n"
+                ),
+                "python/nodes/orders/pipeline/__init__.py": (
+                    "from .prepare_orders.asset import prepare_orders\n"
+                    "from .regional_checks.checks import regional_checks\n"
+                ),
             },
             expected_loader_names=(),
             expected_asset_names=("prepare_orders",),

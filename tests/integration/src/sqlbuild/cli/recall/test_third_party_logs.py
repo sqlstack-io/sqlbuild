@@ -84,7 +84,7 @@ def test_given_project_and_library_logs_during_build_when_running_then_only_libr
     hook_path.parent.mkdir(parents=True)
     hook_path.write_text(PROJECT_HOOK, encoding="utf-8")
     library_dir: Path = tmp_path / "installed"
-    library_dir.mkdir()
+    library_dir.mkdir(parents=True)
     (library_dir / "vendor_client.py").write_text(VENDOR_MODULE, encoding="utf-8")
 
     built: subprocess.CompletedProcess[bytes] = run(

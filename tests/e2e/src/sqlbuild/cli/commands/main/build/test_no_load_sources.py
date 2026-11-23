@@ -76,7 +76,7 @@ def test_given_loaded_source_when_building_without_loading_then_only_its_audits_
                 "    managed: true\n    write_strategy: append\n    columns:\n"
                 "      - name: order_id\n        type: INTEGER\n        audits: [not_null]\n"
             ),
-            "python/nodes/loaders/orders.py": (
+            "python/nodes/loaders/orders/loader.py": (
                 "from sqlbuild.loaders import loader\n\n\n"
                 "@loader()\ndef raw_orders(ctx):\n"
                 "    '''Test loader raw_orders.'''\n    return [{'order_id': 1}]\n"

@@ -99,7 +99,7 @@ def test_given_sql_test_planning_running_when_interpreter_finalizes_then_process
         '[connection]\ndatabase = "orders_project.duckdb"\n',
         encoding="utf-8",
     )
-    (project_dir / "sql" / "sources").mkdir()
+    (project_dir / "sql" / "sources").mkdir(parents=True)
     (project_dir / "sql" / "sources" / "raw.yml").write_text(
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n"
         "    schema: raw\n    table: orders\n",

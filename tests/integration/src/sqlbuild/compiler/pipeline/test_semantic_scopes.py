@@ -124,7 +124,7 @@ def test_given_semantic_scope_when_compiling_then_closed_shapes_are_checked(
         downstream_sql=test_case.header + test_case.downstream,
         project_toml=SEMANTIC_BINDING_PROJECT_TOML + '\n[rules]\nignore = ["SQLCLEAN039"]\n',
     )
-    (tmp_path / "sql" / "sources").mkdir(exist_ok=True)
+    (tmp_path / "sql" / "sources").mkdir(parents=True, exist_ok=True)
     (tmp_path / "sql" / "sources" / "orders.yml").write_text(
         "sources:\n"
         "  - name: open_orders\n    description: Test source open_orders.\n    table: orders\n"

@@ -184,7 +184,7 @@ def test_given_framework_cte_context_when_running_rule_then_live_cte_is_not_repo
     test_case: UnusedCteContextTestCase,
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "unused_cte_contexts"\nadapter = "duckdb"\n',
         encoding="utf-8",

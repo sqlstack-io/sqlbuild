@@ -185,7 +185,7 @@ def sqlbuild_module(_root: Path) -> object:
 def write_environment_project(root: Path) -> None:
     """Write a model and a macro for store environment checks."""
 
-    (root / "sql" / "models").mkdir()
+    (root / "sql" / "models").mkdir(parents=True)
     (root / "sql" / "macros" / "python").mkdir(parents=True)
     _ = (root / "sql/models/orders.sql").write_text("SELECT 1\n", encoding="utf-8")
     _ = (root / "sql/macros/python/common.py").write_text("X = 1\n", encoding="utf-8")

@@ -58,7 +58,7 @@ def test_given_case_sensitive_tokens_when_formatting_then_cli_writes_them_exactl
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(test_case.project_toml, encoding="utf-8")
     model: Path = tmp_path / "sql" / "models" / f"{test_case.model_name}.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(test_case.authored_sql, encoding="utf-8")
 
     formatted: subprocess.CompletedProcess[str] = run_sqb(
@@ -101,7 +101,7 @@ def test_given_case_and_line_sensitive_tokens_when_formatting_then_build_keeps_t
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_DUCKDB_PROJECT_TOML, encoding="utf-8")
     model: Path = tmp_path / "sql" / "models" / "order_lines.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(test_case.authored_sql, encoding="utf-8")
 
     formatted: subprocess.CompletedProcess[str] = run_sqb(

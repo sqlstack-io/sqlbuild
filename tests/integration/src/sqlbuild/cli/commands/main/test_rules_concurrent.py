@@ -34,14 +34,14 @@ def test_given_sql_and_custom_exceptions_when_compiling_cold_and_warm_then_both_
         'path = "sql/models/orders.sql"\nreason = "The synthetic model name is intentional."\n'
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(
         "MODEL (description 'Test model orders.');\n"
         "WITH source AS (SELECT 1 AS order_id UNION ALL SELECT 2 AS order_id)\n"
         "SELECT s.order_id FROM source AS s LIMIT 1\n"
     )
     rules: Path = tmp_path / "rules"
-    rules.mkdir()
+    rules.mkdir(parents=True)
     (rules / "architecture.py").write_text(
         "from sqlbuild.rules import Finding, Model, RuleContext, rule\n\n"
         '@rule(code="XSQBRARCH001", message="Review model name", remediation="Rename the model.")\n'

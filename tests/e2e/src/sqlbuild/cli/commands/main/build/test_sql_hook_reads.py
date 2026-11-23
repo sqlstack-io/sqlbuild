@@ -33,7 +33,7 @@ _PROJECT_FILES: dict[str, str] = {
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    managed: true\n    write_strategy: table\n"
         "    columns:\n      - name: order_id\n        type: INTEGER\n"
     ),
-    "python/nodes/loaders/raw.py": (
+    "python/nodes/loaders/raw/loader.py": (
         "from sqlbuild.loaders import loader\n\n\n"
         "@loader\ndef raw_orders(ctx):\n    '''Test loader raw_orders.'''\n    return [{'order_id': 9}]\n"
     ),

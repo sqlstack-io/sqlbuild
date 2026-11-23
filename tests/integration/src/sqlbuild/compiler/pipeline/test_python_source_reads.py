@@ -27,12 +27,12 @@ _PROJECT_FILES: dict[str, str] = {
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    managed: true\n    write_strategy: table\n"
         "    columns:\n      - name: order_id\n        type: INTEGER\n"
     ),
-    "python/nodes/loaders/raw.py": (
+    "python/nodes/loaders/raw/loader.py": (
         "from sqlbuild.loaders import loader\n\n\n"
         "@loader\ndef raw_orders(ctx):\n    '''Test loader raw_orders.'''\n    return [{'order_id': 1}]\n"
     ),
     "sql/models/order_marker.sql": "MODEL (description 'Test model order_marker.', materialized table);\nSELECT 1 AS n\n",
-    "python/nodes/tasks/count.py": (
+    "python/nodes/tasks/count/asset.py": (
         "from sqlbuild.refs import source\nfrom sqlbuild.assets import asset\n\n\n"
         '@asset(depends_on=source("raw_orders"))\n'
         "def count_task(ctx):\n"

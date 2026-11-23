@@ -141,7 +141,7 @@ def test_given_a_node_printing_a_large_log_when_a_worker_runs_it_then_its_lines_
             "partial",
             [(17,)],
             files={
-                "python/nodes/assets/score_orders.py": (
+                "python/nodes/assets/score_orders/asset.py": (
                     "from sqlbuild.assets import asset\n\n\n"
                     "def lookup_0(row):\n"
                     "    return row['customer_segment']\n\n\n"
@@ -267,7 +267,7 @@ def test_given_a_nul_in_a_ctx_log_message_when_a_worker_reports_it_then_the_log_
 
 
 NUL_FAILURE_FILES: dict[str, str] = {
-    "python/nodes/assets/score_orders.py": (
+    "python/nodes/assets/score_orders/asset.py": (
         "from sqlbuild.assets import asset\n\n\n"
         "@asset(description='Scores orders.')\n"
         "def score_orders(ctx):\n"

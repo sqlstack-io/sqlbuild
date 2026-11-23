@@ -275,7 +275,7 @@ def test_given_conflicting_model_layer_metadata_when_compiling_then_rules_report
         encoding="utf-8",
     )
     published_dir: Path = tmp_path / "sql" / "models" / "commerce" / "mart"
-    published_dir.mkdir()
+    published_dir.mkdir(parents=True)
     (published_dir / "commerce__mart__stg_orders.sql").write_text(
         'MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8"
     )
@@ -316,7 +316,7 @@ def test_given_exact_internal_edge_exception_when_compiling_then_live_edge_passe
     )
     project_file.write_text(base_config + live_exception, encoding="utf-8")
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "commerce__stg__orders.sql").write_text(
         'MODEL (description "Test model commerce__stg__orders.");\nSELECT order_id FROM __ref("commerce__int_enriched__orders")\n',
         encoding="utf-8",
@@ -423,7 +423,7 @@ def test_given_numeric_range_or_value_list_when_compiling_then_literal_decisions
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (\n"
         '  description "Orders",\n' + test_case.constants + ");\n\n"
@@ -458,7 +458,7 @@ def test_given_constant_backed_decision_and_numeric_alias_when_compiling_then_ru
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Test model orders.",
   constants (_large_batch 7),
@@ -647,7 +647,7 @@ def test_given_enforced_contract_when_compiling_explicit_output_rule_then_enforc
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.',\n"
         "  contract enforced,\n"
@@ -693,7 +693,7 @@ def test_given_proven_dynamic_pivot_when_compiling_contract_rules_then_wildcard_
         encoding="utf-8",
     )
     models_dir: Path = tmp_path / "sql" / "models"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     (models_dir / "stg_order_amounts.sql").write_text(
         "MODEL (description 'Test model stg_order_amounts.', database analytics, schema analytics, columns (customer_id (type INTEGER), "
         "category (type VARCHAR), "
@@ -783,7 +783,7 @@ def test_given_contract_rules_when_compiling_then_contract_is_enforced_typed_and
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.',\n"
         f"  columns ({test_case.columns_sql}),\n"
@@ -818,7 +818,7 @@ def test_given_selected_sql_rule_when_compiling_then_authored_diagnostic_blocks_
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\nSELECT order_id FROM orders LIMIT 1\n',
         encoding="utf-8",
@@ -862,7 +862,7 @@ def test_given_sql_rule_cache_from_another_native_build_when_compiling_then_rule
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\nSELECT order_id FROM orders LIMIT 1\n',
         encoding="utf-8",
@@ -906,7 +906,7 @@ def test_given_cached_sql_test_rules_when_test_or_macro_changes_then_findings_ar
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     tests_dir: Path = tmp_path / "tests" / "unit"
     macro: Path = tests_dir / "_macros" / "python" / "nodes" / "row_limit.py"
@@ -957,7 +957,7 @@ def test_given_warm_scoped_macro_sql_test_when_compiling_then_rules_reuse_compil
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     tests_dir: Path = tmp_path / "tests" / "unit"
     macro: Path = tests_dir / "_macros" / "python" / "nodes" / "row_limit.py"
@@ -996,7 +996,7 @@ def test_given_cold_scoped_macro_sql_test_when_compiling_then_early_lint_uses_pr
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     tests_dir: Path = tmp_path / "tests" / "unit"
     macro: Path = tests_dir / "_macros" / "python" / "nodes" / "row_limit.py"
@@ -1042,7 +1042,7 @@ def test_given_cold_non_model_sql_finding_when_compiling_twice_then_warm_finding
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     test_file: Path = tmp_path / "tests" / "unit" / "test_orders.sql"
     test_file.parent.mkdir(parents=True)
@@ -1131,7 +1131,7 @@ def test_given_graph_error_when_compiling_then_early_lint_is_stopped_instead_of_
         encoding="utf-8",
     )
     models_dir: Path = tmp_path / "sql" / "models"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     (models_dir / "orders.sql").write_text(
         'MODEL (description "Orders");\nSELECT @py.slow_total("orders") AS order_id\n',
         encoding="utf-8",
@@ -1144,7 +1144,7 @@ def test_given_graph_error_when_compiling_then_early_lint_is_stopped_instead_of_
     )
     macros_dir: Path = tmp_path / "sql" / "macros" / "python"
     macros_dir.mkdir(parents=True)
-    (tmp_path / "sql" / "hooks").mkdir()
+    (tmp_path / "sql" / "hooks").mkdir(parents=True)
     (macros_dir / "slow_total.py").write_text(
         "import orders_lint_probe\n\n\n"
         "def slow_total(name: str) -> str:\n"
@@ -1194,7 +1194,7 @@ def test_given_sql_and_custom_rules_when_compiling_twice_then_custom_host_runs_o
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     test_file: Path = tmp_path / "tests" / "unit" / "test_orders.sql"
     test_file.parent.mkdir(parents=True)
@@ -1205,7 +1205,7 @@ def test_given_sql_and_custom_rules_when_compiling_twice_then_custom_host_runs_o
         encoding="utf-8",
     )
     rule_file: Path = tmp_path / "rules" / "architecture.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     rule_file.write_text(
         """from sqlbuild.rules import Finding, Model, RuleContext, rule
 
@@ -1294,7 +1294,7 @@ def test_given_custom_rules_split_across_hosts_when_compiling_then_output_matche
             encoding="utf-8",
         )
     rule_file: Path = tmp_path / "rules" / "architecture.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     rule_file.write_text(
         """from sqlbuild.rules import Finding, Model, RuleContext, rule
 
@@ -1402,15 +1402,15 @@ def test_given_busy_split_hosts_when_compile_is_interrupted_then_hosts_stop_and_
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     project_dir: Path = tmp_path / "orders"
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     started: Path = tmp_path / "started"
-    started.mkdir()
+    started.mkdir(parents=True)
     write_custom_host_project(
         project_dir=project_dir,
         model_count=test_case.model_count,
         rule_body=(
             "from pathlib import Path\n"
-            f"(Path({str(started)!r}) / model.name).mkdir()\n"
+            f"(Path({str(started)!r}) / model.name).mkdir(parents=True)\n"
             "total = 0\nfor index in range(10_000_000):\n    total += index\nreturn []"
         ),
     )
@@ -1448,10 +1448,10 @@ def test_given_typed_custom_rule_when_compiling_then_same_rule_is_enforced_and_c
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     rule_file: Path = tmp_path / "rules" / "architecture.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     rule_file.write_text(
         """from sqlbuild.rules import Finding, Model, RuleContext, rule
 
@@ -1510,7 +1510,7 @@ def test_given_project_when_running_focused_rule_family_then_only_that_family_ru
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\nSELECT order_id FROM orders LIMIT 1\n',
         encoding="utf-8",
@@ -1548,7 +1548,7 @@ def test_given_inline_query_relation_when_running_readability_rule_then_finding_
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Orders");
 WITH actual_orders AS (
@@ -1597,7 +1597,7 @@ def test_given_scalar_query_with_derived_relation_when_running_readability_rule_
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "order_summary.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Order summary");
 SELECT (
@@ -1700,7 +1700,7 @@ SELECT order_id
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "expanded_orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Expanded orders");
 SELECT expanded.order_id
@@ -1784,7 +1784,7 @@ def test_given_implicit_table_alias_when_running_alias_rule_then_usage_decides_f
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(
         'MODEL (description "Orders");\nSELECT 1 AS order_id, 2 AS customer_id\n',
         encoding="utf-8",
@@ -1822,7 +1822,7 @@ def test_given_ceremonial_sql_test_when_compiling_with_rule_035_then_project_is_
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Orders");
 WITH final AS (SELECT 1 AS order_id)
@@ -1863,7 +1863,7 @@ def test_given_keyword_named_columns_when_running_terminal_rule_then_projection_
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Orders with contextual column names");
 WITH final AS (
@@ -1923,7 +1923,7 @@ def test_given_assertion_expected_dependency_when_compiling_then_compiler_reject
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     test: Path = tmp_path / "tests" / "unit" / "test_orders.sql"
     test.parent.mkdir(parents=True)
@@ -1964,7 +1964,7 @@ def test_given_seed_and_function_references_when_running_source_rule_then_they_a
         encoding="utf-8",
     )
     seed: Path = tmp_path / "sql" / "seeds" / "order_statuses.csv"
-    seed.parent.mkdir()
+    seed.parent.mkdir(parents=True)
     seed.write_text("status\nopen\n", encoding="utf-8")
     (tmp_path / "sql" / "seeds" / "schema.yml").write_text(
         """seeds:
@@ -1989,7 +1989,7 @@ quantity
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "sales__stg__orders__partner.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Partner orders");
 SELECT __udf("normalize_quantity")(1) AS quantity
@@ -2034,7 +2034,7 @@ def test_given_dependency_import_star_when_running_output_shape_rule_then_import
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     staging: Path = tmp_path / "sql" / "models" / "stg_orders.sql"
-    staging.parent.mkdir()
+    staging.parent.mkdir(parents=True)
     staging.write_text(
         'MODEL (description "Staged orders");\nSELECT 1 AS order_id\n',
         encoding="utf-8",
@@ -2086,7 +2086,7 @@ def test_given_invocation_dependent_shapes_when_running_output_shape_rule_then_s
         'name = "orders"\nadapter = "snowflake"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "order_totals.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (
   description "Dynamic order totals",
@@ -2145,7 +2145,7 @@ def test_given_commented_dependency_call_when_running_import_rule_then_comment_i
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     staging: Path = tmp_path / "sql" / "models" / "stg_orders.sql"
-    staging.parent.mkdir()
+    staging.parent.mkdir(parents=True)
     staging.write_text(
         'MODEL (description "Staged orders");\nSELECT 1 AS order_id\n',
         encoding="utf-8",
@@ -2205,7 +2205,7 @@ def test_given_bigquery_quoted_comment_marker_when_running_import_rule_then_repo
         'name = "orders"\nadapter = "bigquery"\n', encoding="utf-8"
     )
     staging: Path = tmp_path / "sql" / "models" / "stg_orders.sql"
-    staging.parent.mkdir()
+    staging.parent.mkdir(parents=True)
     staging.write_text(
         'MODEL (description "Staged orders", database warehouse, schema analytics);\n'
         "SELECT 1 AS order_id\n",
@@ -2264,7 +2264,7 @@ def test_given_postgres_nested_comment_when_running_import_rule_then_comment_is_
         'name = "orders"\nadapter = "postgres"\n', encoding="utf-8"
     )
     staging: Path = tmp_path / "sql" / "models" / "stg_orders.sql"
-    staging.parent.mkdir()
+    staging.parent.mkdir(parents=True)
     staging.write_text(
         'MODEL (description "Staged orders", schema analytics);\nSELECT 1 AS order_id\n',
         encoding="utf-8",
@@ -2322,7 +2322,7 @@ def test_given_cross_join_used_by_filter_when_running_unused_join_rule_then_no_f
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "recent_orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Recent orders");
 SELECT orders.order_id
@@ -2364,7 +2364,7 @@ def test_given_ceremonial_test_select_when_running_alias_rule_then_control_proje
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     test: Path = tmp_path / "tests" / "unit" / "orders_test.sql"
     test.parent.mkdir(parents=True)
@@ -2409,7 +2409,7 @@ def test_given_direct_ceremonial_select_when_running_terminal_rule_then_test_is_
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     test: Path = tmp_path / "tests" / "unit" / "orders_test.sql"
     test.parent.mkdir(parents=True)
@@ -2450,7 +2450,7 @@ def test_given_prior_cte_when_scalar_subquery_is_aliased_then_inner_aggregate_is
         'name = "support"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "ticket_totals.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Support ticket totals");
 WITH products_used AS (
@@ -2498,7 +2498,7 @@ def test_given_cast_and_relation_aliases_when_running_self_alias_rule_then_no_fi
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         """MODEL (description "Orders");
 SELECT CAST(orders.order_id::INTEGER AS INTEGER) AS order_id
@@ -2543,7 +2543,7 @@ def test_given_graph_scoped_rule_ignore_when_running_rules_then_only_matched_res
         encoding="utf-8",
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "base_orders.sql").write_text(
         'MODEL (description "Base orders");\nSELECT 1 AS order_id\n',
         encoding="utf-8",
@@ -2596,10 +2596,10 @@ def test_given_default_off_custom_rule_when_running_exact_and_prefix_then_both_s
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text('MODEL (description "Orders");\nSELECT 1 AS order_id\n', encoding="utf-8")
     rule_file: Path = tmp_path / "rules" / "architecture.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     rule_file.write_text(
         """from sqlbuild.rules import Finding, Model, RuleContext, rule
 
@@ -2640,7 +2640,7 @@ def test_given_sql_rule_exception_when_compiling_then_unified_suppression_is_app
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\nSELECT order_id FROM orders LIMIT 1\n',
         encoding="utf-8",
@@ -2670,12 +2670,12 @@ def test_given_custom_rule_module_constant_edit_when_compiling_then_cached_resul
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
     rule_file: Path = tmp_path / "rules" / "architecture.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     rule_source: str = """from sqlbuild.rules import Finding, Model, RuleContext, rule
 
 FORBIDDEN, UNUSED = ("orders", "unused")
@@ -2721,7 +2721,7 @@ def test_given_focused_project_rule_result_when_compiling_full_project_then_subs
         encoding="utf-8",
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(
         "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
@@ -2729,7 +2729,7 @@ def test_given_focused_project_rule_result_when_compiling_full_project_then_subs
         "MODEL (description 'Test model customers.');\nSELECT 1 AS customer_id\n", encoding="utf-8"
     )
     rule_file: Path = tmp_path / "rules" / "architecture.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     rule_file.write_text(
         """from sqlbuild.rules import Finding, Project, RuleContext, rule
 
@@ -2768,7 +2768,7 @@ def test_given_non_model_sql_violation_when_compiling_then_compile_is_authoritat
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
@@ -2807,7 +2807,7 @@ def test_given_exception_for_other_model_when_compiling_selection_then_exception
         encoding="utf-8",
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(
         "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
@@ -2841,7 +2841,7 @@ def test_given_typed_unselected_model_when_planning_selection_then_rules_use_sel
         encoding="utf-8",
     )
     sources: Path = tmp_path / "sql" / "sources"
-    sources.mkdir()
+    sources.mkdir(parents=True)
     (sources / "customers.yml").write_text(
         """sources:
   - name: raw_customers
@@ -2855,7 +2855,7 @@ def test_given_typed_unselected_model_when_planning_selection_then_rules_use_sel
         encoding="utf-8",
     )
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', contract enforced, columns (order_id (type INTEGER)));\n"
         "SELECT CAST(1 AS INTEGER) AS order_id\n",
@@ -2957,13 +2957,13 @@ def test_given_relative_project_path_when_compiling_twice_then_sql_finding_remai
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN004"]\n',
         encoding="utf-8",
     )
     model: Path = project_dir / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.');\nSELECT order_id FROM orders LIMIT 1\n",
         encoding="utf-8",
@@ -2995,7 +2995,7 @@ def test_given_inline_directive_without_finding_when_compiling_then_directive_is
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.');\n-- sqb: ignore SQLCLEAN004 because this fixture checks stale directives\n"
         "SELECT 1 AS order_id\n",
@@ -3025,12 +3025,12 @@ def test_given_unselected_custom_rule_options_when_compiling_then_configuration_
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
     rule_file: Path = tmp_path / "rules" / "architecture.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     rule_file.write_text(
         """from sqlbuild.rules import Finding, Model, RuleContext, RuleOption, rule
 
@@ -3121,7 +3121,7 @@ def test_given_empty_rule_selection_when_compiling_then_only_configuration_is_va
         encoding="utf-8",
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
@@ -3173,7 +3173,7 @@ def test_given_sql_rule_cache_when_inputs_change_then_only_unchanged_runs_hit(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     observed: list[tuple[int, int]] = []
     for project_toml, model_sql in test_case.steps:
         (tmp_path / "sqlbuild_project.toml").write_text(project_toml, encoding="utf-8")
@@ -3215,9 +3215,9 @@ def test_given_custom_rule_cache_when_inputs_change_then_only_unchanged_runs_hit
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(_CUSTOM_CACHE_TOML, encoding="utf-8")
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     rule_file: Path = tmp_path / "rules" / "layout.py"
-    rule_file.parent.mkdir()
+    rule_file.parent.mkdir(parents=True)
     observed: list[tuple[int, int]] = []
     for rule_source, model_sql in test_case.steps:
         rule_file.write_text(rule_source, encoding="utf-8")
@@ -3377,7 +3377,7 @@ def test_given_star_in_set_operation_branches_when_compiling_then_each_branch_is
         'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRMODEL102"]\n',
         encoding="utf-8",
     )
-    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql" / "models").mkdir(parents=True)
     (tmp_path / "sql" / "models" / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized view);\nSELECT 1 AS order_id\n",
         encoding="utf-8",

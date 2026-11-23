@@ -31,11 +31,11 @@ def test_given_completed_shape_when_an_unrelated_model_changes_then_cached_colum
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "sql" / "sources").mkdir()
+    (tmp_path / "sql" / "sources").mkdir(parents=True)
     (tmp_path / "sql/sources/orders.yml").write_text(
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    table: orders\n    contract: enforced\n    columns:\n      - name: id\n        type: INTEGER\n      - name: quantity\n        type: INTEGER\n"
     )
-    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql" / "models").mkdir(parents=True)
     (tmp_path / "sql/models/order_inputs.sql").write_text(
         'MODEL (description "Test model order_inputs.", materialized view); SELECT id, quantity FROM __source("raw_orders")'
     )

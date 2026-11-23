@@ -64,7 +64,7 @@ def prepare_advisory_placement_dag_project(root: Path) -> Path:
         encoding="utf-8",
     )
     constants_dir: Path = project_dir / "sql" / "constants"
-    constants_dir.mkdir()
+    constants_dir.mkdir(parents=True)
     (constants_dir / "value.sql").write_text("CONSTANT (name value, value 1);\n", encoding="utf-8")
     (project_dir / "sql" / "models" / "orders.sql").write_text(
         'MODEL (description "Test model orders.", '

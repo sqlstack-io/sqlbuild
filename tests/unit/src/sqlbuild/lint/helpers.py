@@ -19,7 +19,7 @@ def write_fixture_format_project(
 
     (tmp_path / "sqlbuild_project.toml").write_text(project_toml, encoding="utf-8")
     staging_model: Path = tmp_path / "sql" / "models" / "stg_rows.sql"
-    staging_model.parent.mkdir()
+    staging_model.parent.mkdir(parents=True)
     staging_model.write_text(
         "MODEL (\n"
         '  description "Staged rows",\n'

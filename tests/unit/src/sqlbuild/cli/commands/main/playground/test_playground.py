@@ -277,7 +277,7 @@ def test_given_existing_target_when_creating_playground_then_it_raises_user_erro
     tmp_path: Path,
 ) -> None:
     target_dir: Path = tmp_path / test_case.target_relative_path
-    target_dir.mkdir()
+    target_dir.mkdir(parents=True)
 
     with pytest.raises(CliUserError) as exc_info:
         _ = run_playground_command(

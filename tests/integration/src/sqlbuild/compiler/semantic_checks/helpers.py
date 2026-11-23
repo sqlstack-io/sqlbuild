@@ -551,7 +551,7 @@ def generated_metadata_files(*, rng: random.Random, model_count: int) -> dict[st
             "sources:\n  - name: raw_orders\n    description: Orders feed.\n"
             f"{_SOURCE_SQL}{columns}{_LOADED_SOURCE.format(cursor=rng.choice(_LOADED_CURSORS))}"
         ),
-        "python/nodes/loaders/raw_events.py": _LOADER,
+        "python/nodes/loaders/raw_events/loader.py": _LOADER,
         "tests/unit/test_orders_model_0.sql": (
             "TEST();\n\nWITH\n__source__raw_orders AS (\n"
             "  SELECT 1 AS order_id, 10 AS customer_id, CAST(5 AS DOUBLE) AS amount,"

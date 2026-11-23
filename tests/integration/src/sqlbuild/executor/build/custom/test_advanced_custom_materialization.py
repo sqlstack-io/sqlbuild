@@ -345,7 +345,7 @@ def test_given_build_with_custom_materialization_when_scheduled_then_routes_corr
 ) -> None:
     adapter: DuckDbAdapter = DuckDbAdapter()
     project_dir: Path = tmp_path / "project"
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     db_path: Path = tmp_path / "test.duckdb"
 
     relative_path: str
@@ -357,7 +357,7 @@ def test_given_build_with_custom_materialization_when_scheduled_then_routes_corr
 
     # Also create the python/materializations/ directory with test_custom.py
     mat_dir: Path = project_dir / "python" / "nodes" / "python" / "materializations"
-    mat_dir.mkdir()
+    mat_dir.mkdir(parents=True)
     (mat_dir / "test_custom.py").write_text(
         "def materialize(ctx):\n"
         "    ctx.adapter.create_table_as(\n"

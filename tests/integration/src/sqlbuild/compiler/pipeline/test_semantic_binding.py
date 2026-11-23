@@ -235,8 +235,8 @@ def test_given_source_contract_default_when_compiling_then_effective_policy_cont
     )
     sources_dir: Path = tmp_path / "sql" / "sources"
     models_dir: Path = tmp_path / "sql" / "models"
-    sources_dir.mkdir()
-    models_dir.mkdir()
+    sources_dir.mkdir(parents=True)
+    models_dir.mkdir(parents=True)
     _ = (sources_dir / "raw.yml").write_text(
         f"""sources:
   - name: raw_orders
@@ -407,7 +407,7 @@ def test_given_cli_analysis_disabled_when_sql_is_unsupported_then_compile_succee
         'name = "semantic_binding"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     models_dir: Path = tmp_path / "sql" / "models"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     _ = (models_dir / "vendor.sql").write_text(
         "MODEL (description 'Test model vendor.', materialized view);\nSELEC unsupported vendor sql\n",
         encoding="utf-8",
@@ -613,8 +613,8 @@ def test_given_untyped_source_when_cast_flows_through_ctes_then_declared_type_ma
     )
     sources_dir: Path = tmp_path / "sql" / "sources"
     models_dir: Path = tmp_path / "sql" / "models"
-    sources_dir.mkdir()
-    models_dir.mkdir()
+    sources_dir.mkdir(parents=True)
+    models_dir.mkdir(parents=True)
     _ = (sources_dir / "raw.yml").write_text(
         """sources:
   - name: raw_orders

@@ -183,7 +183,7 @@ def test_given_a_saved_login_session_when_republishing_then_the_request_names_th
     assert binary is not None
     installation: tuple[Path, Path] = Path(binary), tmp_path
     home: Path = tmp_path / "home"
-    home.mkdir()
+    home.mkdir(parents=True)
     values: dict[str, str] = environment({"HOME": str(home)})
     for name in ("DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "SQLBUILD_API_KEY"):
         values.pop(name, None)

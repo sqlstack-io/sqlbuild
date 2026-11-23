@@ -45,7 +45,7 @@ from .values import STATUS
 def normalize_status(value):
     return f"{value.strip().lower()}:{STATUS}"
 """,
-    "python/nodes/orders.py": """
+    "python/nodes/orders/asset.py": """
 import python.nodes.helpers.clean
 from sqlbuild.assets import asset
 
@@ -63,7 +63,7 @@ def orders(ctx):
         DiscoverAssetFunctionsTestCase(
             description="discovers decorated assets from explicit folders",
             files={
-                "python/nodes/tasks/windows.py": """
+                "python/nodes/tasks/windows/asset.py": """
 from sqlbuild.assets import asset
 
 @asset(tags=("api",), group="ingestion")
@@ -74,9 +74,9 @@ def fetch_window(ctx):
 def helper():
     return None
 """,
-                "python/nodes/assets/exports.py": """
+                "python/nodes/assets/exports/asset.py": """
 from sqlbuild.assets import asset
-from python.nodes.tasks.windows import fetch_window
+from python.nodes.tasks.windows.asset import fetch_window
 
 @asset(
     depends_on=fetch_window,
@@ -182,16 +182,16 @@ def test_given_python_node_import_error_when_discovering_then_raises_clear_error
         DiscoverCheckFunctionsTestCase(
             description="discovers decorated checks from explicit folder",
             files={
-                "python/nodes/assets/exports.py": """
+                "python/nodes/assets/exports/asset.py": """
 from sqlbuild.assets import asset
 
 @asset
 def export_customers(ctx):
     return {"uri": "s3://exports/customers.parquet"}
 """,
-                "python/nodes/checks/exports.py": """
+                "python/nodes/checks/exports/checks.py": """
 from sqlbuild.checks import check
-from python.nodes.assets.exports import export_customers
+from python.nodes.assets.exports.asset import export_customers
 
 @check(depends_on=export_customers, severity="warn", tags=("exports",))
 def export_customers_exists(ctx):
@@ -202,7 +202,7 @@ def helper():
 """,
                 "python/nodes/checks/__init__.py": """
 from sqlbuild.checks import check
-from python.nodes.assets.exports import export_customers
+from python.nodes.assets.exports.asset import export_customers
 
 @check(depends_on=export_customers)
 def ignored_init_check(ctx):
@@ -254,7 +254,7 @@ def test_given_project_dir_when_discovering_checks_then_returns_expected(
         DiscoverPythonRootNodesTestCase(
             description="discovers every node kind in one module directly under python",
             files={
-                "python/nodes/orders.py": """
+                "python/nodes/orders/asset.py": """
 from sqlbuild.assets import asset
 from sqlbuild.checks import check
 from sqlbuild.loaders import loader
@@ -278,10 +278,10 @@ def orders_export_exists(ctx):
 """,
             },
             expected_nodes=(
-                ("loader", "raw_orders", "python/nodes/orders.py"),
-                ("asset", "orders_export", "python/nodes/orders.py"),
-                ("asset", "prepare_orders", "python/nodes/orders.py"),
-                ("check", "orders_export_exists", "python/nodes/orders.py"),
+                ("loader", "raw_orders", "python/nodes/orders/asset.py"),
+                ("asset", "orders_export", "python/nodes/orders/asset.py"),
+                ("asset", "prepare_orders", "python/nodes/orders/asset.py"),
+                ("check", "orders_export_exists", "python/nodes/orders/asset.py"),
             ),
         ),
         DiscoverPythonRootNodesTestCase(
@@ -307,7 +307,7 @@ from sqlbuild.loaders import loader
 def raw_orders(ctx):
     return []
 """,
-                "python/nodes/orders/pipeline/tasks.py": """
+                "python/nodes/orders/pipeline/tasks/asset.py": """
 from python.nodes.orders.utils import order_label
 from sqlbuild.assets import asset
 
@@ -317,7 +317,7 @@ def label_orders(ctx):
 """,
                 "python/nodes/exports/assets.py": """
 from python.nodes._helpers import export_uri
-from python.nodes.orders.pipeline.tasks import label_orders
+from python.nodes.orders.pipeline.tasks.asset import label_orders
 from sqlbuild.assets import asset
 
 @asset(depends_on=label_orders)
@@ -336,7 +336,7 @@ def orders_export_exists(ctx):
             expected_nodes=(
                 ("loader", "raw_orders", "python/nodes/orders/ingest/loaders.py"),
                 ("asset", "orders_export", "python/nodes/exports/assets.py"),
-                ("asset", "label_orders", "python/nodes/orders/pipeline/tasks.py"),
+                ("asset", "label_orders", "python/nodes/orders/pipeline/tasks/asset.py"),
                 ("check", "orders_export_exists", "python/nodes/exports/deep/nested/checks.py"),
             ),
         ),
@@ -389,7 +389,7 @@ from pathlib import Path
 
 Path(__file__).resolve().parents[1].joinpath("init_count.txt").open("a").write("counter\\n")
 """,
-                "python/nodes/tasks/first.py": """
+                "python/nodes/tasks/first/asset.py": """
 import python.nodes._counter
 from sqlbuild.assets import asset
 
@@ -398,7 +398,7 @@ from sqlbuild.assets import asset
 def first_task(ctx):
     return None
 """,
-                "python/nodes/tasks/second.py": """
+                "python/nodes/tasks/second/asset.py": """
 from python import _counter
 from sqlbuild.assets import asset
 
@@ -436,7 +436,7 @@ def test_given_python_root_helpers_when_discovering_then_modules_import_under_pa
             description="second project imports its own python helpers",
             first_files={
                 "python/nodes/_values.py": "STATUS = 'first'\n",
-                "python/nodes/orders.py": """
+                "python/nodes/orders/asset.py": """
 from python.nodes._values import STATUS
 from sqlbuild.assets import asset
 
@@ -448,7 +448,7 @@ def orders(ctx):
             },
             second_files={
                 "python/nodes/_values.py": "STATUS = 'second'\n",
-                "python/nodes/orders.py": """
+                "python/nodes/orders/asset.py": """
 from python.nodes._values import STATUS
 from sqlbuild.assets import asset
 
@@ -560,7 +560,7 @@ class Cleaner:
     def run(self, value):
         return strip_status(value)
 """,
-                "python/nodes/orders.py": """
+                "python/nodes/orders/asset.py": """
 import python.nodes.helpers.cleaner
 from sqlbuild.assets import asset
 
@@ -596,7 +596,7 @@ class Cleaner:
     def run(self, value):
         return strip_status(value)
 """,
-                "python/nodes/orders.py": """
+                "python/nodes/orders/asset.py": """
 import python.nodes.helpers.cleaner
 from sqlbuild.assets import asset
 
@@ -621,11 +621,13 @@ def test_given_unrelated_python_package_restored_when_building_identity_then_hel
     write_repo_files(tmp_path, test_case.unrelated_files)
     write_repo_files(project_dir, test_case.project_files)
     monkeypatch.delitem(sys.modules, "python", raising=False)
-    monkeypatch.delitem(sys.modules, "python.nodes.orders", raising=False)
+    monkeypatch.delitem(sys.modules, "python.nodes.orders.asset", raising=False)
     monkeypatch.syspath_prepend(str(tmp_path / "site"))
     monkeypatch.setitem(sys.modules, "python", importlib.import_module("python"))
     monkeypatch.setitem(
-        sys.modules, "python.nodes.orders", importlib.import_module("python.nodes.orders")
+        sys.modules,
+        "python.nodes.orders.asset",
+        importlib.import_module("python.nodes.orders.asset"),
     )
 
     task: DiscoveredAssetFunction = discover_python_node_functions(project_dir=project_dir).assets[

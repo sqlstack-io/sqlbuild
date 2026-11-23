@@ -932,7 +932,7 @@ def write_shared_query_project(
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = []\n', encoding="utf-8"
     )
     model_dir: Path = project_dir / "sql" / "models"
-    model_dir.mkdir()
+    model_dir.mkdir(parents=True)
     for name, sql in {"orders": upstream_sql, "customers": upstream_sql, **models}.items():
         _ = (model_dir / f"{name}.sql").write_text(sql, encoding="utf-8")
 

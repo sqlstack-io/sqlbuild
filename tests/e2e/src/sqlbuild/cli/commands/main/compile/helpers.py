@@ -1789,7 +1789,7 @@ reason = "The workload mixes nested query shapes on purpose to cover their compi
 
 def _layered_write_sources(*, project_dir: Path, source_count: int) -> None:
     sources_dir: Path = project_dir / "sql" / "sources"
-    sources_dir.mkdir()
+    sources_dir.mkdir(parents=True)
     entries: str = "\n".join(
         f"""  - name: source_{index:05d}
     description: Test source source_{index:05d}.
@@ -1808,7 +1808,7 @@ def _layered_write_sources(*, project_dir: Path, source_count: int) -> None:
 
 def _layered_write_seeds(*, project_dir: Path, seed_count: int) -> None:
     seeds_dir: Path = project_dir / "sql" / "seeds"
-    seeds_dir.mkdir()
+    seeds_dir.mkdir(parents=True)
     schema_entries: str = "\n".join(
         f"""  - name: seed_{index:05d}
     description: Test seed seed_{index:05d}.

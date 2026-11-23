@@ -130,7 +130,7 @@ def test_given_an_item_naming_what_the_project_lacks_when_publishing_then_only_i
             "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
             "sql/models/inventory.sql": "MODEL (description 'Stock.');\nSELECT 1 AS item_id\n",
             "python/nodes/plan/nodes.py": first,
-            "python/nodes/support/nodes.py": _GOOD,
+            "python/nodes/support/nodes/asset.py": _GOOD,
             "sql/sources/raw.yml": (
                 "sources:\n  - name: raw_orders\n    description: Raw orders.\n    schema: main\n"
             ),
@@ -252,7 +252,7 @@ def test_given_an_item_naming_a_tag_no_node_carries_when_publishing_then_nothing
             '[targets.development]\nschema = "main"\n',
             "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
             "python/nodes/plan/nodes.py": _PLAN.format(dependency=test_case.dependency),
-            "python/nodes/support/nodes.py": _GOOD.replace(
+            "python/nodes/support/nodes/asset.py": _GOOD.replace(
                 'after = (model("orders"), source("raw_orders"), seed("regions"), job("orders_job"))',
                 'after = (model("orders"),)',
             ),

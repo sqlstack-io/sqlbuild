@@ -299,7 +299,7 @@ def test_given_invalid_scoped_root_when_discovering_project_inputs_then_strict_d
     config_path: Path = tmp_path / "sqlbuild_project.toml"
     config_path.write_text('name = "demo"\nadapter = "duckdb"\n', encoding="utf-8")
     file_path: Path = tmp_path / test_case.relative_path
-    file_path.parent.mkdir()
+    file_path.parent.mkdir(parents=True)
     file_path.write_text(test_case.contents, encoding="utf-8")
 
     with pytest.raises(DeclarationParseError, match=test_case.expected_error_fragment):

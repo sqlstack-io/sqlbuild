@@ -264,7 +264,7 @@ def test_given_file_edited_while_rules_run_when_rerunning_then_new_contents_are_
         customers_sql=_CUSTOMERS_SQL, customers_config={}
     )
     site: Path = tmp_path.parent / f"{tmp_path.name}-site"
-    site.mkdir()
+    site.mkdir(parents=True)
     _ = (site / "sitecustomize.py").write_text(_STALE_OBSERVATION_SITECUSTOMIZE, encoding="utf-8")
     monkeypatch.setenv("PYTHONPATH", os.pathsep.join((str(site), os.environ.get("PYTHONPATH", ""))))
     during_edit: CustomRulesOutcome = evaluate_cached_custom_rules(

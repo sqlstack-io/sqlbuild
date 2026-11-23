@@ -702,7 +702,7 @@ const R_SOURCE_FRESHNESS_CONFIG: RecordSpec = RecordSpec {
 };
 const R_SOURCE_COLUMN_ENTRY: RecordSpec = RecordSpec {
     name: "SourceColumnEntry",
-    doc: "One source column entry from sources/*.yml.",
+    doc: "One source column entry from sql/sources/*.yml.",
     fields: &[
         FieldSpec::required("name"),
         FieldSpec::new("type", FieldDefault::None),
@@ -714,7 +714,7 @@ const R_SOURCE_COLUMN_ENTRY: RecordSpec = RecordSpec {
 };
 const R_SOURCE_ENTRY: RecordSpec = RecordSpec {
     name: "SourceEntry",
-    doc: "One source declaration from sources/*.yml.",
+    doc: "One source declaration from sql/sources/*.yml.",
     fields: &[
         FieldSpec::required("name"),
         FieldSpec::new("database", FieldDefault::None),

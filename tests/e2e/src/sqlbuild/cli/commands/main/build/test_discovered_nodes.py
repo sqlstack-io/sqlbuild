@@ -112,7 +112,7 @@ def test_given_a_for_each_asset_when_planning_or_building_outside_a_location_the
         repo_files={
             "sqlbuild_project.toml": _PROJECT,
             "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/nodes/plan/nodes.py": _NODES,
+            "python/nodes/plan/nodes/asset.py": _NODES,
         },
     )
     runs_file: Path = project_dir / "runs.txt"
@@ -150,7 +150,7 @@ def test_given_a_for_each_asset_when_compiling_then_the_dag_shows_the_placeholde
         repo_files={
             "sqlbuild_project.toml": _PROJECT,
             "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/nodes/plan/nodes.py": _NODES,
+            "python/nodes/plan/nodes/asset.py": _NODES,
         },
     )
     dag: Path = project_dir / "target" / "sqlbuild_dag.json"
@@ -198,7 +198,7 @@ def test_given_a_set_without_items_when_discovering_for_a_command_then_it_stops_
         repo_files={
             "sqlbuild_project.toml": _PROJECT,
             "sql/models/orders.sql": "MODEL (description 'Orders.');\nSELECT 1 AS order_id\n",
-            "python/nodes/plan/nodes.py": nodes,
+            "python/nodes/plan/nodes/asset.py": nodes,
         },
     )
     result: subprocess.CompletedProcess[str] = run_sqb(

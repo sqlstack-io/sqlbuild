@@ -47,7 +47,7 @@ def build_warehouse_discovered_inputs(
 def write_case_adapter_file(*, project_dir: Path, contents: str) -> None:
     """Write the case's project-local adapter module, which may be empty."""
 
-    (project_dir / "python" / "nodes" / "python" / "adapters").mkdir(exist_ok=True)
+    (project_dir / "python" / "nodes" / "python" / "adapters").mkdir(parents=True, exist_ok=True)
     (project_dir / "python" / "nodes" / "python" / "adapters" / "custom.py").write_text(
         contents, encoding="utf-8"
     )

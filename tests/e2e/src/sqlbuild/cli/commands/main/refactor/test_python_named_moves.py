@@ -57,7 +57,7 @@ def test_given_model_named_by_python_when_moving_then_only_renames_are_refused(
                 "[scopes]\nenforce_placement = false\n"
             ),
             "sql/models/orders.sql": "MODEL (description 'Test model orders.');\nSELECT 1 AS order_id\n",
-            "python/nodes/checks/orders.py": _CHECK,
+            "python/nodes/checks/orders/checks.py": _CHECK,
         },
     )
 
@@ -67,4 +67,6 @@ def test_given_model_named_by_python_when_moving_then_only_renames_are_refused(
 
     assert moved.returncode == test_case.expected_exit_code, moved.stdout + moved.stderr
     assert (project_dir / test_case.expected_model_path).is_file()
-    assert (project_dir / "python/nodes/checks/orders.py").read_text(encoding="utf-8") == _CHECK
+    assert (project_dir / "python/nodes/checks/orders/checks.py").read_text(
+        encoding="utf-8"
+    ) == _CHECK

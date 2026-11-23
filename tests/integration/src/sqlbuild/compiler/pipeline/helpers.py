@@ -157,7 +157,7 @@ def write_semantic_binding_project(
 ) -> None:
     _ = (project_dir / "sqlbuild_project.toml").write_text(project_toml, encoding="utf-8")
     models_dir: Path = project_dir / "sql" / "models"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     _ = (models_dir / "upstream.sql").write_text(upstream_sql, encoding="utf-8")
     _ = (models_dir / "downstream.sql").write_text(downstream_sql, encoding="utf-8")
 
@@ -171,7 +171,7 @@ def compile_reshaped_star_model(
         _RESHAPED_STAR_PROJECT_TOML, encoding="utf-8"
     )
     models: Path = project_dir / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     for name, sql in RESHAPED_STAR_UPSTREAM_MODELS.items():
         (models / f"{name}.sql").write_text(
             f"MODEL (description 'Test model.', materialized table);\n{sql}", encoding="utf-8"

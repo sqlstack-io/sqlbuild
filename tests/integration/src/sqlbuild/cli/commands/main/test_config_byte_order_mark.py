@@ -29,7 +29,7 @@ def test_given_config_with_byte_order_mark_when_running_commands_then_they_succe
     (tmp_path / "sqlbuild_local.toml").write_text(
         "\ufeff[settings]\nsql_analysis = true\n", encoding="utf-8"
     )
-    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql" / "models").mkdir(parents=True)
     (tmp_path / "sql" / "models" / "orders.sql").write_text(
         "MODEL (description 'One row per order.', materialized table);\n\nSELECT 1 AS order_id\n"
     )

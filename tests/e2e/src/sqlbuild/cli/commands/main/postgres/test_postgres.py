@@ -258,15 +258,15 @@ def test_given_python_result_when_running_check_on_postgres_then_persists_node_r
                 schema_name=schema_name,
                 config=postgres_e2e_config,
             ),
-            "python/nodes/tasks/results.py": (
+            "python/nodes/tasks/results/asset.py": (
                 "from sqlbuild.assets import asset\n\n"
                 "@asset\n"
                 "def produce_result(ctx):\n"
                 "    '''Test task produce_result.'''\n    return ctx.result(payload={'value': 42}, metadata={'source': 'postgres'})\n"
             ),
-            "python/nodes/checks/results.py": (
+            "python/nodes/checks/results/checks.py": (
                 "from sqlbuild.checks import check\n"
-                "from python.nodes.tasks.results import produce_result\n\n"
+                "from python.nodes.tasks.results.asset import produce_result\n\n"
                 "@check(depends_on=produce_result)\n"
                 "def check_produce_result(ctx):\n"
                 "    '''Test check check_produce_result.'''\n    return ctx.result_of(node_function=produce_result).payload['value'] == 42\n"
@@ -399,7 +399,7 @@ def test_given_source_deferral_env_when_building_on_postgres_then_reads_prod_and
                 "      - name: status\n"
                 "        type: VARCHAR\n"
             ),
-            "python/nodes/loaders/raw_orders.py": (
+            "python/nodes/loaders/raw_orders/loader.py": (
                 "from sqlbuild.loaders import loader\n\n"
                 "@loader\n"
                 "def raw_orders(ctx):\n"

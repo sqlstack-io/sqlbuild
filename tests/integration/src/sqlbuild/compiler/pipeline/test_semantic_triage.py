@@ -44,8 +44,8 @@ def test_given_cursor_families_when_compiling_then_accepts_temporal_pairs_only(
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "snowflake"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "sql" / "sources").mkdir()
-    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql" / "sources").mkdir(parents=True)
+    (tmp_path / "sql" / "models").mkdir(parents=True)
     (tmp_path / "sql/sources/orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    table: orders\n    contract: enforced\n"
         f"    columns:\n      - name: ordered_at\n        type: {test_case.column_type}\n"
@@ -83,8 +83,8 @@ def test_given_effective_target_when_binding_quotes_then_honours_session_setting
         '[targets.selected]\nschema = "preserve"\n[targets.selected.connection]\n'
         + test_case.setting
     )
-    (tmp_path / "sql" / "sources").mkdir()
-    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql" / "sources").mkdir(parents=True)
+    (tmp_path / "sql" / "models").mkdir(parents=True)
     (tmp_path / "sql/sources/orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    table: orders\n    contract: enforced\n"
         "    columns:\n      - name: customer\n        type: VARCHAR\n"
@@ -139,7 +139,7 @@ def test_given_type_error_root_when_binding_dependants_then_recovers_only_poison
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql" / "models").mkdir(parents=True)
     (tmp_path / "sql/models/orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized view, contract enforced, columns (quantity (type INTEGER), "
         "ordered_at (type TIMESTAMP)));\nSELECT CAST(1 AS INTEGER) AS quantity, "
@@ -182,7 +182,7 @@ def test_given_repetitive_sql_when_mapping_diagnostic_then_preserves_authored_sp
     test_case: SemanticTriageCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql" / "models").mkdir(parents=True)
     (tmp_path / "sql/models/orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized view);\nSELECT CAST(1 AS INTEGER) AS quantity"
     )
@@ -215,8 +215,8 @@ def test_given_cached_validation_when_warm_or_schema_changed_then_reuses_only_ma
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "sql" / "sources").mkdir()
-    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql" / "sources").mkdir(parents=True)
+    (tmp_path / "sql" / "models").mkdir(parents=True)
     source: Path = tmp_path / "sql/sources/orders.yml"
     declaration: str = "sources:\n  - name: orders\n    description: Test source orders.\n    table: orders\n    contract: enforced\n    columns:\n      - name: quantity\n        type: INTEGER\n"
     source.write_text(declaration)
@@ -256,7 +256,7 @@ def test_given_a_type_error_upstream_of_a_model_with_its_own_error_when_compilin
     (tmp_path / "sqlbuild_project.toml").write_text(
         f'name = "orders"\nadapter = "{test_case.adapter}"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql" / "models").mkdir(parents=True)
     header: str = (
         "MODEL (description 'Test model.', materialized view, database warehouse, schema analytics"
     )
@@ -292,7 +292,7 @@ def test_given_repeated_root_messages_when_recovering_then_preserves_each_output
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql" / "models").mkdir(parents=True)
     files: dict[str, str] = {
         "orders": "MODEL (description 'Test model.', materialized view, contract enforced, columns (quantity (type INTEGER), ordered_at (type TIMESTAMP)));\nSELECT CAST(1 AS INTEGER) AS quantity, CAST('2026-04-01' AS TIMESTAMP) AS ordered_at",
         "broken": 'MODEL (description "Test model.", materialized view, contract enforced, columns (total_a (type INTEGER), total_b (type INTEGER), ordered_at (type TIMESTAMP)));\nSELECT quantity + ordered_at AS total_a, quantity + ordered_at AS total_b, ordered_at FROM __ref("orders")',
@@ -353,8 +353,8 @@ def test_given_udf_argument_columns_when_compiling_then_checks_declared_argument
     test_case: FunctionArgumentTypeCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
-    (tmp_path / "sql" / "sources").mkdir()
-    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql" / "sources").mkdir(parents=True)
+    (tmp_path / "sql" / "models").mkdir(parents=True)
     (tmp_path / "sql/functions/sql").mkdir(parents=True)
     (tmp_path / "sql/sources/raw.yml").write_text(
         "sources:\n"

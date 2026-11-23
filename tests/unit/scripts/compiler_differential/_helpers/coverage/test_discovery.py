@@ -240,7 +240,7 @@ def test_given_authored_bytes_when_classifying_then_crlf_counts_only_for_discove
         path.parent.mkdir(parents=True, exist_ok=True)
         _ = path.write_bytes(contents)
     capture: Path = tmp_path / "captures" / "001-discovered_project_inputs.json"
-    capture.parent.mkdir()
+    capture.parent.mkdir(parents=True)
     _ = capture.write_text(
         json.dumps(
             empty_inputs_capture(

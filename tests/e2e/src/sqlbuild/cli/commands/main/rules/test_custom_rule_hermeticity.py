@@ -418,7 +418,7 @@ def test_given_rule_observing_cwd_when_invoked_from_different_directories_then_v
     tmp_path: Path, test_case: WorkingDirectoryCase
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     write_custom_rule_project(
         project_dir=project_dir,
         selected_rules=(test_case.code,),
@@ -553,7 +553,7 @@ def test_given_stateful_and_stateless_rules_when_split_across_hosts_then_finding
     single_dir: Path = tmp_path / "single"
     split_dir: Path = tmp_path / "split"
     for project_dir in (single_dir, split_dir):
-        project_dir.mkdir()
+        project_dir.mkdir(parents=True)
         write_custom_rule_project(
             project_dir=project_dir, selected_rules=test_case.selected_rules, files=test_case.files
         )

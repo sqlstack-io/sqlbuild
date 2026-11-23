@@ -23,11 +23,11 @@ def test_given_inferred_producer_when_binding_consumers_then_binds_and_invalidat
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = []\n'
     )
-    (tmp_path / "sql" / "sources").mkdir()
+    (tmp_path / "sql" / "sources").mkdir(parents=True)
     (tmp_path / "sql/sources/orders.yml").write_text(
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    expression: SELECT 1 AS id, 2 AS quantity\n"
     )
-    (tmp_path / "sql" / "models").mkdir()
+    (tmp_path / "sql" / "models").mkdir(parents=True)
     producer: Path = tmp_path / "sql/models/orders.sql"
     producer.write_text(
         'MODEL (description "Test model orders.", materialized view); SELECT id FROM __source("raw_orders")'

@@ -107,7 +107,7 @@ def write_prepared_artifacts_project(*, project_dir: Path, model_count: int) -> 
         encoding="utf-8",
     )
     models: Path = project_dir / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     for index in range(model_count):
         (models / f"orders_{index:03}.sql").write_text(
             "MODEL (description 'Test model.', materialized table, contract enforced, "
@@ -133,7 +133,7 @@ def write_test_planning_project(
     )
     models: Path = project_dir / "sql" / "models"
     tests: Path = project_dir / "tests" / "unit"
-    models.mkdir()
+    models.mkdir(parents=True)
     tests.mkdir(parents=True)
     header: str = (
         "MODEL (description 'Test model.', materialized table, contract enforced, "
@@ -273,7 +273,7 @@ def write_compile_startup_project(project_dir: Path) -> None:
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     models_dir: Path = project_dir / "sql" / "models"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     (models_dir / "orders.sql").write_text(
         "MODEL (description 'Test model orders.', materialized table);\nSELECT 1 AS order_id\n",
         encoding="utf-8",
@@ -284,13 +284,13 @@ def write_from_values_format_project(*, tmp_path: Path, adapter: str) -> tuple[P
     """Write a format project containing an authored values relation."""
 
     project_dir: Path = tmp_path / adapter
-    project_dir.mkdir()
+    project_dir.mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         f'name = "orders"\nadapter = "{adapter}"\n\n[rules]\nselect = ["SQLCLEAN039"]\n',
         encoding="utf-8",
     )
     models: Path = project_dir / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "customers.sql").write_text(
         'MODEL (description "Customers.");\nSELECT 1 AS customer_key, 1 AS order_count\n',
         encoding="utf-8",
@@ -345,8 +345,8 @@ def prepare_contract_project(tmp_path: Path, *, prod_connection_toml: str = "") 
     )
     models: Path = tmp_path / "sql" / "models"
     sources: Path = tmp_path / "sql" / "sources"
-    models.mkdir()
-    sources.mkdir()
+    models.mkdir(parents=True)
+    sources.mkdir(parents=True)
     _ = (models / "orders.sql").write_text(
         """MODEL (description "Test model orders.",
   materialized table
@@ -661,7 +661,7 @@ def compile_duckdb_query(
 
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "orders.sql").write_text(f"MODEL (description 'Test model orders.');\n{query}")
     exit_code: int = main(["--project-dir", str(tmp_path), "compile", "--json", "--no-cache"])
     result: dict[str, object] = json.loads(capsys.readouterr().out)
@@ -693,7 +693,7 @@ def write_expression_source_project(
     """Write a DuckDB project with one typed expression source and one reading model."""
 
     (project_dir / "sql" / "sources").mkdir(parents=True)
-    (project_dir / "sql" / "models").mkdir()
+    (project_dir / "sql" / "models").mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n[connection]\ndatabase = "orders.duckdb"\n',
         encoding="utf-8",
@@ -841,7 +841,7 @@ def write_snowflake_warehouse_project(
         encoding="utf-8",
     )
     (project_dir / "sqlbuild_local.toml").write_text(local_config, encoding="utf-8")
-    (project_dir / "sql" / "models").mkdir()
+    (project_dir / "sql" / "models").mkdir(parents=True)
     (project_dir / "sql" / "models" / "orders.sql").write_text(
         "MODEL (description 'Orders.', materialized table);\nSELECT 1 AS order_id\n",
         encoding="utf-8",
@@ -851,7 +851,7 @@ def write_snowflake_warehouse_project(
 def write_default_connection_project(*, project_dir: Path, project_toml: str) -> None:
     """Write a one-model DuckDB project with the given project config."""
 
-    (project_dir / "sql" / "models").mkdir()
+    (project_dir / "sql" / "models").mkdir(parents=True)
     _ = (project_dir / "sqlbuild_project.toml").write_text(project_toml, encoding="utf-8")
     _ = (project_dir / "sql" / "models" / "orders.sql").write_text(
         'MODEL (description "Orders.", materialized table);\n\nSELECT 1 AS order_id\n',
@@ -1022,7 +1022,7 @@ def write_header_project(project_dir: Path, models: dict[str, str], project_toml
 
     _ = (project_dir / "sqlbuild_project.toml").write_text(project_toml)
     model_dir: Path = project_dir / "sql" / "models"
-    model_dir.mkdir()
+    model_dir.mkdir(parents=True)
     for name, contents in models.items():
         _ = (model_dir / f"{name}.sql").write_text(contents)
 
@@ -1058,7 +1058,7 @@ def typed_config_reads(*, project_dir: Path, extra_header: str) -> int:
         encoding="utf-8",
     )
     models_dir: Path = project_dir / "sql" / "models"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     for index, own_config in enumerate((', materialized table, tags ["daily"]', "", "")):
         (models_dir / f"orders_{index}.sql").write_text(
             f'MODEL (description "Orders {index}."{own_config}{extra_header});\n\n'
@@ -1101,7 +1101,7 @@ def write_orders_project(project_dir: Path) -> None:
         encoding="utf-8",
     )
     models_dir: Path = project_dir / "sql" / "models"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     (models_dir / "orders.sql").write_text(
         'MODEL (description "Orders.", materialized table, contract enforced, '
         'columns (order_id (type "INTEGER"), loaded_at (type "INTEGER")));\n\n'
@@ -1144,7 +1144,7 @@ def write_formatted_cache_project(*, project_dir: Path) -> None:
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     models_dir: Path = project_dir / "sql" / "models"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     name: str
     sql: str
     for name, sql in FORMAT_CACHE_UNFORMATTED_MODELS.items():
@@ -1255,7 +1255,7 @@ def write_enum_project(*, root: Path, model_sql: str, contract: str) -> None:
     (root / "sql" / "models" / "_enums" / "order_status.sql").write_text(
         'ENUM (name order_status, members (OPEN "open", CLOSED "closed"));\n'
     )
-    (root / "sql" / "sources").mkdir()
+    (root / "sql" / "sources").mkdir(parents=True)
     (root / "sql" / "sources" / "orders.yml").write_text(
         "sources:\n"
         "  - name: web_orders\n    description: Web orders.\n    contract: enforced\n"
@@ -1543,7 +1543,7 @@ RUN_RECORD_PROJECT_FILES: dict[str, str] = {
     "orchestration/jobs/nightly_job.toml": (
         'name = "nightly_job"\ndescription = "Orders."\nselect = "+orders"\n'
     ),
-    "python/nodes/crash.py": (
+    "python/nodes/crash/asset.py": (
         '"""A task that kills its process, as a crash or kill -9 would."""\n\n'
         "import os\n\n"
         "from sqlbuild.assets import asset\n\n\n"
@@ -1552,7 +1552,7 @@ RUN_RECORD_PROJECT_FILES: dict[str, str] = {
         '    """End the process without unwinding."""\n\n'
         "    os._exit(137)\n"
     ),
-    "python/nodes/fail.py": (
+    "python/nodes/fail/asset.py": (
         '"""A task that raises, so the build exits non-zero."""\n\n'
         "from sqlbuild.assets import asset\n\n\n"
         "@asset()\n"
@@ -1572,7 +1572,7 @@ RUN_RECORD_MARTS_FILES: dict[str, str] = {
         "MODEL (description 'Loaded events in the marts schema.', materialized table);\n"
         'SELECT event_id FROM __source("landed_events")\n'
     ),
-    "python/nodes/loaders/events.py": (
+    "python/nodes/loaders/events/loader.py": (
         "from sqlbuild.loaders import loader\n\n\n"
         "@loader\n"
         "def landed_events(ctx):\n"
@@ -1604,7 +1604,7 @@ RUN_RECORD_MARTS_FILES: dict[str, str] = {
         "MODEL (description 'A disabled model in its own schema.', materialized table,\n"
         "  enabled false, schema archive);\nSELECT 1 AS order_id\n"
     ),
-    "python/nodes/noop.py": (
+    "python/nodes/noop/asset.py": (
         '"""An asset that writes no relation."""\n\n'
         "from sqlbuild.assets import asset\n\n\n"
         "@asset()\n"

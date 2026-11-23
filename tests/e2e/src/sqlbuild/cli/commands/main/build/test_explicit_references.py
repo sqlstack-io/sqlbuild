@@ -161,8 +161,8 @@ def test_given_python_seed_and_model_dependencies_when_building_then_graph_selec
         repo_files=explicit_reference_project_files(
             overrides={
                 **_COUNTRY_SEED_FILES,
-                "python/nodes/tasks/countries.py": _SEED_TASK,
-                "python/nodes/checks/orders.py": _MODEL_CHECK,
+                "python/nodes/tasks/countries/asset.py": _SEED_TASK,
+                "python/nodes/checks/orders/checks.py": _MODEL_CHECK,
             }
         ),
     )
@@ -382,7 +382,7 @@ def test_given_typed_macro_references_and_hook_reads_when_building_then_graph_an
         ),
         ExplicitReferenceFailureE2ETestCase(
             description="literal SQL naming a project relation fails compile",
-            overrides={"python/nodes/tasks/export.py": _LITERAL_TASK},
+            overrides={"python/nodes/tasks/export/asset.py": _LITERAL_TASK},
             command=("--no-color", "compile"),
             expected_exit_code=1,
             expected_output_fragments=(
@@ -393,7 +393,7 @@ def test_given_typed_macro_references_and_hook_reads_when_building_then_graph_an
         ),
         ExplicitReferenceFailureE2ETestCase(
             description="check literal SQL naming an undeclared model fails compile",
-            overrides={"python/nodes/checks/orders.py": _LITERAL_CHECK},
+            overrides={"python/nodes/checks/orders/checks.py": _LITERAL_CHECK},
             command=("--no-color", "compile"),
             expected_exit_code=1,
             expected_output_fragments=(
@@ -459,7 +459,7 @@ def test_given_implicit_reference_when_running_command_then_it_fails_with_guidan
     [
         ExplicitReferenceRuntimeWarningE2ETestCase(
             description="run-time hard-coded name warns while the build succeeds",
-            overrides={"python/nodes/tasks/export.py": _RUNTIME_TASK},
+            overrides={"python/nodes/tasks/export/asset.py": _RUNTIME_TASK},
             enforce_explicit=True,
             expected_exit_code=0,
             expected_warning_fragments=(
@@ -470,7 +470,7 @@ def test_given_implicit_reference_when_running_command_then_it_fails_with_guidan
         ExplicitReferenceRuntimeWarningE2ETestCase(
             description="enforcement disabled allows every implicit reference",
             overrides={
-                "python/nodes/tasks/export.py": _RUNTIME_TASK,
+                "python/nodes/tasks/export/asset.py": _RUNTIME_TASK,
                 EXPLICIT_REFERENCE_MACRO_PATH: _EMITTING_MACROS,
                 f"{EXPLICIT_REFERENCE_MODELS}/hidden.sql": _EMITTING_MODEL,
                 "python/nodes/tasks/literal.py": _LITERAL_TASK.replace(
@@ -525,7 +525,7 @@ def test_given_runtime_hard_coded_relation_when_building_then_it_warns_without_f
     [
         ExplicitReferenceRuntimeWarningE2ETestCase(
             description="check naming an undeclared model at run time warns and passes",
-            overrides={"python/nodes/checks/orders.py": _RUNTIME_CHECK},
+            overrides={"python/nodes/checks/orders/checks.py": _RUNTIME_CHECK},
             enforce_explicit=True,
             expected_exit_code=0,
             expected_warning_fragments=(
@@ -578,7 +578,7 @@ def test_given_check_runtime_hard_coded_relation_when_building_then_it_warns_wit
                 f"{EXPLICIT_REFERENCE_MODELS}/hidden_customers.sql": (
                     "MODEL (description 'Test model hidden_customers.', materialized table);\n@py.customers_base()\n"
                 ),
-                "python/nodes/tasks/export.py": _LITERAL_TASK,
+                "python/nodes/tasks/export/asset.py": _LITERAL_TASK,
             },
             expected_output_fragments=(
                 "error[P006]: model:hidden depends on model:stg_orders_eu through macro "

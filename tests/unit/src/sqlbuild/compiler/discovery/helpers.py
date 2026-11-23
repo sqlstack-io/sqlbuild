@@ -89,7 +89,7 @@ SQL_MODEL_HEADER_KEYS: frozenset[str] = frozenset(
 
 
 def write_lifecycle_event_sink_project(*, project_dir: Path, exporter_config: str) -> None:
-    (project_dir / "python" / "event_sinks").mkdir()
+    (project_dir / "python" / "event_sinks").mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "filters"\nadapter = "duckdb"\n' + exporter_config,
         encoding="utf-8",

@@ -36,7 +36,7 @@ pub(crate) fn validate_declared_seed_files(facts: &ProjectFacts) -> Result<(), V
             match matching {
                 [] => {
                     return Err(seed_error(format!(
-                        "Seed declaration '{}' in {} has no matching CSV file under seeds/",
+                        "Seed declaration '{}' in {} has no matching CSV file under sql/seeds/",
                         entry.name, schema.path
                     )));
                 }

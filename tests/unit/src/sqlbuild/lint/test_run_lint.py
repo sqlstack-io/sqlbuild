@@ -308,7 +308,7 @@ def test_given_comment_free_body_when_formatting_twice_then_output_is_canonical_
     _ = test_case
     _ = (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
     target: Path = tmp_path / "sql" / "models" / "messy.sql"
-    target.parent.mkdir()
+    target.parent.mkdir(parents=True)
     _ = target.write_text(
         'MODEL (description "ok");\nselect a,b from items where a=1\n',
         encoding="utf-8",
@@ -341,7 +341,7 @@ def test_given_commented_body_when_formatting_then_comment_is_preserved_in_canon
     _ = (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
     contents: str = 'MODEL (description "ok");\nSELECT a, /* preserve exactly */ b FROM items\n'
     target: Path = tmp_path / "sql" / "models" / "commented_body.sql"
-    target.parent.mkdir()
+    target.parent.mkdir(parents=True)
     _ = target.write_text(contents, encoding="utf-8")
 
     report: dict[str, object] = format_project_json(project_dir=tmp_path, capsys=capsys)
@@ -430,7 +430,7 @@ def test_given_inline_directive_when_linting_then_it_is_a_fault_printing_the_exc
 ) -> None:
     _ = (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_TOML, encoding="utf-8")
     target: Path = tmp_path / "sql" / "models" / "sample.sql"
-    target.parent.mkdir()
+    target.parent.mkdir(parents=True)
     _ = target.write_text(
         'MODEL (description "ok");\n'
         "-- sqb: ignore SQLCLEAN004 because this fixture intentionally samples one row\n"

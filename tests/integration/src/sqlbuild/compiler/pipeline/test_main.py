@@ -135,7 +135,7 @@ def test_given_rule_finding_when_running_shared_compile_pipeline_then_planning_i
         f'{_PROJECT_TOML}\n[rules]\nselect = ["SQLCLEAN004"]\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         'MODEL (description "Orders");\n'
         "WITH orders(order_id) AS (VALUES (1), (2))\nSELECT order_id FROM orders LIMIT 1\n",
@@ -435,7 +435,7 @@ def test_given_project_files_when_running_compile_pipeline_then_produces_valid_o
             project_files={
                 "sqlbuild_project.toml": _PROJECT_TOML,
                 "sql/models/orders.sql": "MODEL (description 'Test model orders.', materialized table);\n\nSELECT 1 AS order_id",
-                "python/nodes/tasks/orders.py": (
+                "python/nodes/tasks/orders/asset.py": (
                     "from sqlbuild.assets import asset\n\n"
                     "@asset\n"
                     "def prepare_orders(ctx):\n"

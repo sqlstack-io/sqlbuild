@@ -353,7 +353,7 @@ def test_given_a_start_up_step_waiting_when_stopped_then_it_stops_cleanly_before
         project_dir=project,
         files=PUBLISHABLE_FILES | {"sqlbuild_project.toml": DEVELOPMENT_PROJECT},
     )
-    (project / ".sqlbuild").mkdir()
+    (project / ".sqlbuild").mkdir(parents=True)
     holder: sqlite3.Connection = sqlite3.connect(
         project / ".sqlbuild/control.sqlite3", isolation_level=None
     )

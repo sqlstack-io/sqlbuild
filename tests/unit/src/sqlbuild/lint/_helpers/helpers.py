@@ -91,7 +91,7 @@ def write_linked_orders_project(*, project_dir: Path) -> None:
     """Write models reached both directly and through file and directory links."""
 
     (project_dir / "sql" / "models" / "orders").mkdir(parents=True)
-    (project_dir / "shared").mkdir()
+    (project_dir / "shared").mkdir(parents=True)
     (project_dir / "sql" / "models" / "orders" / "orders.sql").write_text("SELECT 1 AS order_id\n")
     (project_dir / "shared" / "customers.sql").write_text("SELECT 1 AS customer_id\n")
     (project_dir / "sql" / "models" / "orders" / "customers_link.sql").symlink_to(

@@ -127,7 +127,7 @@ def test_given_duckdb_dbt_project_when_running_dbt_init_then_generated_project_b
     for fragment in test_case.unexpected_toml_fragments:
         assert fragment not in generated_toml
 
-    (sqlbuild_project_dir / "sql" / "models").mkdir()
+    (sqlbuild_project_dir / "sql" / "models").mkdir(parents=True)
     (sqlbuild_project_dir / "sql" / "models" / "local_profile_orders.sql").write_text(
         "MODEL (description 'Test model local_profile_orders.', materialized table);\n\nSELECT 2 AS order_id\n",
         encoding="utf-8",

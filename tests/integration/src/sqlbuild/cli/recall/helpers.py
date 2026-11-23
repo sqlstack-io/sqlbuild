@@ -200,7 +200,7 @@ def build_with_read_only_logs(
     """Two builds while the project's `logs` directory cannot be written."""
 
     logs: Path = project_dir / "logs"
-    logs.mkdir()
+    logs.mkdir(parents=True)
     logs.chmod(stat.S_IRUSR | stat.S_IXUSR)
     try:
         return run(project_dir, "build"), run(project_dir, "build")

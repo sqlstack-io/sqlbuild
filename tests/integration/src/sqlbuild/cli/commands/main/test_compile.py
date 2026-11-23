@@ -45,9 +45,9 @@ def test_given_typed_dependency_when_compiling_cte_then_preserves_binding_and_ou
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
     models: Path = tmp_path / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     sources: Path = tmp_path / "sql" / "sources"
-    sources.mkdir()
+    sources.mkdir(parents=True)
     (sources / "orders.yml").write_text(
         "sources:\n  - name: orders\n    description: Test source orders.\n    contract: enforced\n"
         '    expression: "(SELECT CAST(1 AS BIGINT) AS order_id)"\n'
@@ -81,7 +81,7 @@ def test_given_multiple_typed_model_headers_when_compiling_then_cli_preserves_he
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     models_dir: Path = tmp_path / "sql" / "models"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     (models_dir / "staged_orders.sql").write_text(
         "MODEL (description 'Test model staged_orders.',\n"
         "  materialized table,\n"
@@ -171,7 +171,7 @@ def test_given_unicode_model_when_compiling_twice_then_cli_preserves_unchanged_a
         'name = "inventory"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model_path: Path = tmp_path / "sql" / "models" / "products.sql"
-    model_path.parent.mkdir()
+    model_path.parent.mkdir(parents=True)
     model_path.write_text(
         "MODEL (description 'Test model products.', materialized table);\nSELECT 'café' AS product_name  \n\n",
         encoding="utf-8",
@@ -233,7 +233,7 @@ def test_given_supported_snowflake_aggregation_when_compiling_then_project_succe
         'name = "orders"\nadapter = "snowflake"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "order_summary.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         f"MODEL (description 'Test model order_summary.', database warehouse, schema analytics);\n\n{test_case.query_sql}",
         encoding="utf-8",
@@ -277,7 +277,7 @@ def test_given_nullable_output_when_compiling_contract_then_only_schema_nullabil
         'name = "orders"\nadapter = "duckdb"\n', encoding="utf-8"
     )
     model: Path = tmp_path / "sql" / "models" / "orders.sql"
-    model.parent.mkdir()
+    model.parent.mkdir(parents=True)
     model.write_text(
         "MODEL (description 'Test model orders.',\n"
         "  contract enforced,\n"
@@ -358,7 +358,7 @@ def test_given_sql_test_chain_when_compiling_then_native_planner_writes_complete
         encoding="utf-8",
     )
     models_dir: Path = tmp_path / "sql" / "models"
-    models_dir.mkdir()
+    models_dir.mkdir(parents=True)
     (models_dir / "stg_orders.sql").write_text(
         'MODEL (description "Test model stg_orders.", materialized table);\nSELECT order_id, amount FROM __source("raw_orders")\n',
         encoding="utf-8",
@@ -368,7 +368,7 @@ def test_given_sql_test_chain_when_compiling_then_native_planner_writes_complete
         encoding="utf-8",
     )
     sources_dir: Path = tmp_path / "sql" / "sources"
-    sources_dir.mkdir()
+    sources_dir.mkdir(parents=True)
     (sources_dir / "raw_orders.yml").write_text(
         "sources:\n  - name: raw_orders\n    description: Test source raw_orders.\n    schema: main\n    table: raw_orders\n",
         encoding="utf-8",

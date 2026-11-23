@@ -278,7 +278,7 @@ def write_quality_project(*, project_dir: Path, toml: str, upstream: str, summar
 
     (project_dir / "sqlbuild_project.toml").write_text(toml, encoding="utf-8")
     models: Path = project_dir / "sql" / "models"
-    models.mkdir()
+    models.mkdir(parents=True)
     (models / "raw_orders.sql").write_text(upstream, encoding="utf-8")
     (models / "order_summary.sql").write_text(summary, encoding="utf-8")
 

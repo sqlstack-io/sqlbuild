@@ -139,14 +139,14 @@ def test_given_unreadable_files_when_discovering_then_faults_each_file_or_raises
             discovery_name="command_output_sinks",
             broken_file="python/event_sinks/broken_orders.py",
             expected_error_type=EventExporterDiscoveryError,
-            expected_error_fragment="Failed to import sink file python/event_sinks/broken_orders.py: ",
+            expected_error_fragment="Failed to import event sink file python/event_sinks/broken_orders.py: ",
         ),
         DiscoverModuleImportFailureTestCase(
             description="lifecycle sink import failure identifies the sink file",
             discovery_name="event_exporters",
             broken_file="python/event_sinks/broken_orders.py",
             expected_error_type=EventExporterDiscoveryError,
-            expected_error_fragment="Failed to import sink file python/event_sinks/broken_orders.py: ",
+            expected_error_fragment="Failed to import event sink file python/event_sinks/broken_orders.py: ",
         ),
         DiscoverModuleImportFailureTestCase(
             description="materialization import failure identifies the materialization file",

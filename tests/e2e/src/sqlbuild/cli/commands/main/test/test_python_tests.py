@@ -37,7 +37,7 @@ PROJECT_FILES: dict[str, str] = {
         "__expected__orders AS (SELECT 'open' AS status)\n"
         "SELECT 1\n"
     ),
-    "python/nodes/orders/storefront_import/node.py": (
+    "python/nodes/orders/storefront_import/asset.py": (
         "from sqlbuild.assets import asset\n\n\n"
         "@asset(description='Import storefront orders.', tags=['ingest'])\n"
         "def storefront_import(ctx):\n    return None\n"
@@ -45,7 +45,7 @@ PROJECT_FILES: dict[str, str] = {
     "python/nodes/orders/storefront_import/_helpers/row_mapping.py": (
         "def map_row(raw):\n    return {'status': str(raw['state']).lower()}\n"
     ),
-    "python/nodes/inventory/stock_sync/node.py": (
+    "python/nodes/inventory/stock_sync/asset.py": (
         "from sqlbuild.assets import asset\n\n\n"
         "@asset(description='Sync stock.')\n"
         "def stock_sync(ctx):\n    return None\n"
@@ -313,7 +313,7 @@ def test_given_pytest_missing_when_running_sqb_test_then_only_python_tests_need_
     tmp_path: Path,
 ) -> None:
     hidden: Path = tmp_path / "hidden_pytest"
-    hidden.mkdir()
+    hidden.mkdir(parents=True)
     (hidden / "sitecustomize.py").write_text(HIDDEN_PYTEST_SITECUSTOMIZE, encoding="utf-8")
     project_dir: Path = prepare_inline_project(
         tmp_path=tmp_path,
