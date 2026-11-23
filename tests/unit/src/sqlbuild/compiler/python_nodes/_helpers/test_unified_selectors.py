@@ -98,7 +98,7 @@ from tests.unit.src.sqlbuild.compiler.python_nodes._helpers.helpers import (
         ),
         PythonSqlSelectorTestCase(
             description="selects expanded explicit Python asset leading slash path",
-            select=("+/python/assets",),
+            select=("+/python/nodes/assets",),
             exclude=(),
             expected_sql_names=frozenset(),
             expected_python_node_names=frozenset({"prepare_orders", "export_orders"}),

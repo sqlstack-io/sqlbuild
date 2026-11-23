@@ -670,7 +670,7 @@ def _node_files(domain: str, index: int) -> dict[str, str]:
     name: str = f"{domain}_sync_{index:03d}"
     folder: str = f"python/nodes/{domain}/{name}"
     return {
-        f"{folder}/node.py": f'''"""Sync {domain} batch {index}."""
+        f"{folder}/asset.py": f'''"""Sync {domain} batch {index}."""
 
 from python.providers.warehouse_api.provider import WarehouseApi
 from python.nodes.{domain}._helpers.rows import RowBatch

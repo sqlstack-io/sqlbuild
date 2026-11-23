@@ -189,8 +189,8 @@ def test_given_provider_name_conflicts_with_context_parameter_when_calling_then_
             expected_error_fragment=(
                 "Provider parameter 'marker_provider' is annotated with MarkerProvider imported as "
                 "'alias_marker', but provider 'marker_provider' was discovered as "
-                "python.providers.marker.MarkerProvider. Import project providers using the project-root "
-                "providers package path"
+                "python.providers.marker.MarkerProvider. Import project providers using the project path "
+                "of the providers package"
             ),
         )
     ],

@@ -547,31 +547,30 @@ def test_given_chained_source_loader_when_dagster_selects_source_then_reuses_int
                 'database = "dagster_chained_source_loader.duckdb"\n'
             ),
             "python/nodes/loaders/raw/fetch_events/loader.py": (
-                'from sqlbuild.loaders import loader\n'
-                '\n'
-                '\n'
+                "from sqlbuild.loaders import loader\n"
+                "\n"
+                "\n"
                 "@loader(write_strategy='table', columns=[\n"
                 "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                '])\n'
-                'def fetch_events(ctx):\n'
+                "])\n"
+                "def fetch_events(ctx):\n"
                 "    '''Test loader fetch_events.'''\n"
                 "    return [{'event_id': 1}]\n"
             ),
             "python/nodes/loaders/raw/raw_events/loader.py": (
-                'from sqlbuild.loaders import loader\n'
-                'from python.nodes.loaders.raw.fetch_events.loader import fetch_events\n'
-                '\n'
-                '\n'
-                '@loader(depends_on=[fetch_events])\n'
-                'def raw_events(ctx):\n'
+                "from sqlbuild.loaders import loader\n"
+                "from python.nodes.loaders.raw.fetch_events.loader import fetch_events\n"
+                "\n"
+                "\n"
+                "@loader(depends_on=[fetch_events])\n"
+                "def raw_events(ctx):\n"
                 "    '''Test loader raw_events.'''\n"
-                '    events = ctx.loader(fetch_events)\n'
+                "    events = ctx.loader(fetch_events)\n"
                 "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} AS SELECT event_id FROM {events.destination}')\n"
             ),
             "python/nodes/loaders/raw/__init__.py": (
-                'from .fetch_events.loader import fetch_events\n'
-                'from .raw_events.loader import raw_events\n'
-            )
+                "from .fetch_events.loader import fetch_events\n"
+                "from .raw_events.loader import raw_events\n"
             ),
             "sql/sources/raw.yml": "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n",
         },
@@ -652,31 +651,30 @@ def test_given_chained_source_loader_when_dagster_selects_source_without_interme
                 'database = "dagster_missing_intermediate_source_loader.duckdb"\n'
             ),
             "python/nodes/loaders/raw/fetch_events/loader.py": (
-                'from sqlbuild.loaders import loader\n'
-                '\n'
-                '\n'
+                "from sqlbuild.loaders import loader\n"
+                "\n"
+                "\n"
                 "@loader(write_strategy='table', columns=[\n"
                 "    {'name': 'event_id', 'type': 'INTEGER'},\n"
-                '])\n'
-                'def fetch_events(ctx):\n'
+                "])\n"
+                "def fetch_events(ctx):\n"
                 "    '''Test loader fetch_events.'''\n"
                 "    return [{'event_id': 1}]\n"
             ),
             "python/nodes/loaders/raw/raw_events/loader.py": (
-                'from sqlbuild.loaders import loader\n'
-                'from python.nodes.loaders.raw.fetch_events.loader import fetch_events\n'
-                '\n'
-                '\n'
-                '@loader(depends_on=[fetch_events])\n'
-                'def raw_events(ctx):\n'
+                "from sqlbuild.loaders import loader\n"
+                "from python.nodes.loaders.raw.fetch_events.loader import fetch_events\n"
+                "\n"
+                "\n"
+                "@loader(depends_on=[fetch_events])\n"
+                "def raw_events(ctx):\n"
                 "    '''Test loader raw_events.'''\n"
-                '    events = ctx.loader(fetch_events)\n'
+                "    events = ctx.loader(fetch_events)\n"
                 "    ctx.execute_sql(f'CREATE OR REPLACE TABLE {ctx.destination} AS SELECT event_id FROM {events.destination}')\n"
             ),
             "python/nodes/loaders/raw/__init__.py": (
-                'from .fetch_events.loader import fetch_events\n'
-                'from .raw_events.loader import raw_events\n'
-            )
+                "from .fetch_events.loader import fetch_events\n"
+                "from .raw_events.loader import raw_events\n"
             ),
             "sql/sources/raw.yml": "sources:\n  - name: raw_events\n    description: Test source raw_events.\n    managed: true\n",
         },

@@ -890,7 +890,8 @@ LOADER_PROJECT_FILES: dict[str, str] = {
       - name: logged_at
         type: TIMESTAMP
 """,
-    "python/nodes/loaders/events/loader.py": '''from datetime import date, datetime, timedelta, timezone
+    "python/nodes/loaders/events/loader.py": (
+        '''from datetime import date, datetime, timedelta, timezone
 
 from sqlbuild.loaders import loader
 
@@ -913,7 +914,8 @@ def raw_events(ctx: object) -> list[dict[str, object]]:
             "logged_at": None,
         },
     ]
-''',
+'''
+    ),
     "sql/models/events.sql": """MODEL (description "Events from the source.", materialized table);
 
 SELECT event_id, happened_at, event_day, logged_at FROM __source("raw_events")

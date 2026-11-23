@@ -89,30 +89,29 @@ _STEPS: frozenset[str] = frozenset({"asset:pick", "asset:pack", "asset:ship"})
             job_settings="\n[settings]\nreload = true\n",
             files={
                 "python/nodes/loads/fetch_steps/loader.py": (
-                    'from sqlbuild.loaders import loader\n'
-                    'from python.nodes.steps import ship\n'
-                    '\n'
-                    '\n'
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.steps import ship\n"
+                    "\n"
+                    "\n"
                     "@loader(depends_on=[ship], write_strategy='table', columns=[{'name': 'step', 'type': 'INTEGER'}])\n"
-                    'def fetch_steps(ctx):\n'
+                    "def fetch_steps(ctx):\n"
                     '    """Fetch the steps."""\n'
                     '    return [{"step": 1}]\n'
                 ),
                 "python/nodes/loads/raw_steps/loader.py": (
-                    'from sqlbuild.loaders import loader\n'
-                    'from python.nodes.steps import ship\n'
-                    'from python.nodes.loads.fetch_steps.loader import fetch_steps\n'
-                    '\n'
-                    '\n'
-                    '@loader(depends_on=[fetch_steps])\n'
-                    'def raw_steps(ctx):\n'
+                    "from sqlbuild.loaders import loader\n"
+                    "from python.nodes.steps import ship\n"
+                    "from python.nodes.loads.fetch_steps.loader import fetch_steps\n"
+                    "\n"
+                    "\n"
+                    "@loader(depends_on=[fetch_steps])\n"
+                    "def raw_steps(ctx):\n"
                     '    """Load the steps."""\n'
                     '    return [{"step": 1}]\n'
                 ),
                 "python/nodes/loads/__init__.py": (
-                    'from .fetch_steps.loader import fetch_steps\n'
-                    'from .raw_steps.loader import raw_steps\n'
-                )
+                    "from .fetch_steps.loader import fetch_steps\n"
+                    "from .raw_steps.loader import raw_steps\n"
                 ),
                 "sql/sources/raw.yml": (
                     "sources:\n  - name: raw_steps\n    description: Steps.\n"

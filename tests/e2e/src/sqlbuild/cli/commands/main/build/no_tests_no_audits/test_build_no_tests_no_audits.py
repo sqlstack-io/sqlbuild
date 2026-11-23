@@ -1139,31 +1139,29 @@ def test_given_independent_python_and_sql_selectors_when_running_run_then_all_br
                 'MODEL (description "Test model fact_orders.", materialized table);\n\nSELECT order_id FROM __source("raw_orders")\n'
             ),
             "python/nodes/tasks/branches/branch_a/asset.py": (
-                'from pathlib import Path\n'
-                'from sqlbuild.assets import asset\n'
-                '\n'
-                '\n'
-                '@asset\n'
-                'def branch_a(ctx):\n'
+                "from pathlib import Path\n"
+                "from sqlbuild.assets import asset\n"
+                "\n"
+                "\n"
+                "@asset\n"
+                "def branch_a(ctx):\n"
                 "    '''Test task branch_a.'''\n"
                 "    Path(__file__).parents[2].joinpath('branch_a.txt').write_text('a')\n"
-                '    return ctx.result()\n'
+                "    return ctx.result()\n"
             ),
             "python/nodes/tasks/branches/branch_b/asset.py": (
-                'from pathlib import Path\n'
-                'from sqlbuild.assets import asset\n'
-                '\n'
-                '\n'
-                '@asset\n'
-                'def branch_b(ctx):\n'
+                "from pathlib import Path\n"
+                "from sqlbuild.assets import asset\n"
+                "\n"
+                "\n"
+                "@asset\n"
+                "def branch_b(ctx):\n"
                 "    '''Test task branch_b.'''\n"
                 "    Path(__file__).parents[2].joinpath('branch_b.txt').write_text('b')\n"
-                '    return ctx.result()\n'
+                "    return ctx.result()\n"
             ),
             "python/nodes/tasks/branches/__init__.py": (
-                'from .branch_a.asset import branch_a\n'
-                'from .branch_b.asset import branch_b\n'
-            )
+                "from .branch_a.asset import branch_a\nfrom .branch_b.asset import branch_b\n"
             ),
         },
     )
