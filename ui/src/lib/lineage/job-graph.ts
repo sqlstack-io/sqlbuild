@@ -17,7 +17,7 @@ const COLLAPSED_HEIGHT = HEADER + 2;
 /** Wide enough for a header's name, node count and last run on one line. */
 const COLLAPSED_WIDTH = 380;
 /** Mockup: a collapsed discovered set's header also names its release and status. */
-const DISCOVERED_COLLAPSED_WIDTH = 470;
+const DISCOVERED_COLLAPSED_WIDTH = 560;
 /** Space between cards stacked in one column. */
 const STACK_GAP = 20;
 /** Space dagre leaves between cards, and between boxes and cards outside them. */

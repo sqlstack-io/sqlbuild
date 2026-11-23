@@ -292,7 +292,7 @@
 								<div><dt>Asset</dt><dd class="mono"><BreakableName text={found.item.asset} /></dd></div>
 								{#each Object.entries(found.item.args).filter(([k]) => k !== 'step') as [k, v] (k)}<div><dt class="mono">{k}</dt><dd class="mono">{v}</dd></div>{/each}
 							</dl>
-							<p class="label sub">Discovered</p>
+							<p class="label sub">Discovered set</p>
 							<DiscoveredFacts set={found.set} layout="list" />
 						{/if}
 					{:else if pickedNodes.length > 1}
@@ -302,7 +302,7 @@
 						</ul>
 					{:else}
 						{#if variant === 'b' || variant === 'c'}
-							{#each jobSets as set (set.name)}<InspectorSection title="Discovered"><DiscoveredFacts {set} layout="list" /></InspectorSection>{/each}
+							{#each jobSets as set (set.name)}<InspectorSection title="Discovered set"><DiscoveredFacts {set} layout="list" /></InspectorSection>{/each}
 						{/if}
 						{#if def.description}<InspectorSection title="Description"><p class="about-text">{def.description}</p></InspectorSection>{/if}
 						<InspectorSection title="Recent runs">

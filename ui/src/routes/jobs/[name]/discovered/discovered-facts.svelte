@@ -21,7 +21,7 @@
 
 {#if layout === 'row'}
 	<div class="drow" class:failed>
-		<span class="k">Discovered</span>
+		<span class="k">Discovered set</span>
 		<code title="Discovered set{set.checkEverySeconds ? `, checked every ${set.checkEverySeconds / 60} min` : ''}">{set.name}</code>
 		<span class="fact" title={set.error ?? (set.fetchedAt ? formatStamp(set.fetchedAt) : undefined)}>
 			<i style:background={discoveredStatusTone[set.status]}></i>{discoveredStatusLabel[set.status]}{#if set.fetchedAt}&nbsp;<span class="faint">{formatAgo(set.fetchedAt, app.now)}</span>{/if}
@@ -35,7 +35,7 @@
 	</div>
 {:else}
 	<dl class="dlist">
-		<div><dt>Set</dt><dd class="mono"><BreakableName text={set.name} /></dd></div>
+		<div><dt>Name</dt><dd class="mono"><BreakableName text={set.name} /></dd></div>{#if set.assets.length}<div><dt>Asset</dt><dd class="mono">{set.assets.join(", ")}</dd></div>{/if}
 		<div>
 			<dt>Status</dt>
 			<dd title={set.fetchedAt ? formatStamp(set.fetchedAt) : undefined}><i style:background={discoveredStatusTone[set.status]}></i>{discoveredStatusLabel[set.status]}{set.fetchedAt ? ` · ${formatAgo(set.fetchedAt, app.now)}` : ''}</dd>

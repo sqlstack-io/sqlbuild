@@ -408,7 +408,7 @@ JOB_DEFS.push(
 			key: p.job,
 			kind: 'job',
 			description: `Demand forecast v2 for ${p.region}, one node per step of the release plan`,
-			select: `group:forecast_${p.region.toLowerCase()}`,
+			select: `tag:forecast_${p.region.toLowerCase()}`,
 			exclude: [],
 			members: [],
 			overlap: 'skip',
@@ -420,7 +420,7 @@ JOB_DEFS.push(
 			targets: null,
 			owner: 'forecasting',
 			criticalNodes: [],
-			declaration: decl(`src/forecast_pipelines/definitions/models/regions/${p.region.toLowerCase()}/jobs.py`, 12, `${p.job} = job("${p.job}", select="group:forecast_${p.region.toLowerCase()}")`)
+			declaration: decl(`src/forecast_pipelines/definitions/models/regions/${p.region.toLowerCase()}/jobs.py`, 12, `${p.job} = job("${p.job}", select="tag:forecast_${p.region.toLowerCase()}")`)
 		})
 	)
 );

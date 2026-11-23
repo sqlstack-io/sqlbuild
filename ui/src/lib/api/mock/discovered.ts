@@ -74,9 +74,9 @@ const pathOf = (asset: string) => `src/forecast_pipelines/definitions/models/reg
 /** Every step node and each set's completing node, in the snapshot's shape. */
 export const DISCOVERED_NODES: SnapshotNode[] = DISCOVERED_PLANS.flatMap((p) => {
 	const group = `forecast_${p.region.toLowerCase()}`;
-	const steps = p.steps.map(([step, upstream]): SnapshotNode => ({ key: stepKey(p.asset, step), kind: 'asset', group, tags: ['forecast', 'discovered'], path: pathOf(p.asset), cursor: null, upstream: upstream.map((u) => stepKey(p.asset, u)) }));
+	const steps = p.steps.map(([step, upstream]): SnapshotNode => ({ key: stepKey(p.asset, step), kind: 'asset', group, tags: ['forecast', group, 'discovered'], path: pathOf(p.asset), cursor: null, upstream: upstream.map((u) => stepKey(p.asset, u)) }));
 	const leaves = p.steps.filter(([step]) => !p.steps.some(([, up]) => up.includes(step))).map(([step]) => stepKey(p.asset, step));
-	return [...steps, { key: completeKey(p.asset), kind: 'asset', group, tags: ['forecast'], path: pathOf(p.asset), cursor: null, upstream: leaves }];
+	return [...steps, { key: completeKey(p.asset), kind: 'asset', group, tags: ['forecast', group], path: pathOf(p.asset), cursor: null, upstream: leaves }];
 });
 
 /** The sets as `readDiscovered` would report them, with the nodes each item became. */

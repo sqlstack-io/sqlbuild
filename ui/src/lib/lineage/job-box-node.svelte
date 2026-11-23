@@ -38,6 +38,22 @@
 			<span class="name" title={folder.folder}>{folder.label}</span>
 			<span class="faint">· {plural(folder.nodeCount, folder.noun ?? 'node')}{#if folder.stale} · <span class="stale">{folder.stale} stale</span>{/if}{#if folder.failed} · <span class="failed">{folder.failed} failed</span>{/if}</span>
 		</button>
+	{:else if d.discovered}
+		{@const set = d.discovered}
+		<!-- Mockup: a discovered set's header; the whole header collapses or expands the set. -->
+		<!-- raw-button: the header of a discovered set's frame on the canvas; it must not start a drag -->
+		<button
+			class="head set-head nodrag"
+			aria-expanded={!d.collapsed}
+			aria-label="{d.collapsed ? 'Expand' : 'Collapse'} discovered set {set.set}"
+			title="{d.collapsed ? 'Expand' : 'Collapse'} discovered set {set.set} (asset {d.jobKey})"
+			onclick={() => d.ontoggle?.(d.jobKey)}
+		>
+			{#if d.collapsed}<ChevronRightIcon size={14} class="chevron" />{:else}<ChevronDownIcon size={14} class="chevron" />{/if}
+			<span class="name">{set.set}</span>
+			<span class="faint">· discovered set · {plural(d.nodeCount, 'step')}{#if set.release} · release <span class="mono-faint" title={set.releaseFull ?? undefined}>{set.release}</span>{/if}</span>
+			<span class="last" title="{discoveredStatusLabel[set.status]}{set.error ? ` (${set.error})` : ''}"><i style:background={discoveredStatusTone[set.status]}></i>{discoveredStatusLabel[set.status]}</span>
+		</button>
 	{:else}
 	<div class="head">
 		{#if d.ontoggle}
@@ -46,17 +62,9 @@
 				{#if d.collapsed}<ChevronRightIcon size={14} />{:else}<ChevronDownIcon size={14} />{/if}
 			</button>
 		{/if}
-		{#if d.discovered}
-			{@const set = d.discovered}
-			<!-- Mockup: a discovered set's steps, framed under the asset they belong to. -->
-			<span class="name plain" title="{d.jobKey}, from {set.set}">{d.jobKey}</span>
-			<span class="faint">· {plural(d.nodeCount, 'step')}{#if set.release} · release <span class="mono-faint" title={set.releaseFull ?? undefined}>{set.release}</span>{/if}</span>
-			<span class="last" title="{set.set}: {discoveredStatusLabel[set.status]}{set.error ? ` (${set.error})` : ''}"><i style:background={discoveredStatusTone[set.status]}></i>{discoveredStatusLabel[set.status]}</span>
-		{:else}
 		<a href={to(`/jobs/${d.jobKey}`)} class="name">{d.jobKey}</a>
 		<span class="faint" title={d.drawnElsewhere ? `${d.drawnElsewhere} also in a smaller job` : undefined}>{plural(d.nodeCount, 'node')}</span>
-		{/if}
-		{#if !d.discovered && d.lastRun}
+		{#if d.lastRun}
 			<!-- The dot carries the status, so the header fits a box one card wide. -->
 			<a href={to(`/runs/${d.lastRun.id}`)} class="last" title="Last run of {d.jobKey}: {runStatusLabel[d.lastRun.status]}">
 				<i style:background={runStatusTone[d.lastRun.status]}></i>{d.lastRun.startedAt ? formatAgo(d.lastRun.startedAt, app.now) : runStatusLabel[d.lastRun.status]}
@@ -156,7 +164,25 @@
 	.failed {
 		color: var(--sb-error);
 	}
-	.name.plain:hover {
+	.set-head {
+		width: 100%;
+		gap: 6px;
+		padding-left: 8px;
+		cursor: pointer;
+		text-align: left;
+	}
+	.set-head:hover {
+		background: var(--sb-hover);
+	}
+	.set-head:focus-visible {
+		outline: 2px solid var(--primary);
+		outline-offset: -2px;
+	}
+	.set-head :global(.chevron) {
+		flex: 0 0 auto;
+		color: var(--muted-foreground);
+	}
+	.set-head .name:hover {
 		color: inherit;
 	}
 	.mono-faint {
