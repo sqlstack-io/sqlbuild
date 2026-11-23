@@ -104,6 +104,15 @@ class BookkeepingCancelTestCase:
 
 
 @dataclass(frozen=True)
+class BookkeepingActivityTestCase:
+    description: str
+    marking: Callable[[], AbstractContextManager[None]]
+    expected_activity_during: tuple[bool, bool]
+    expected_activity_after: tuple[bool, bool]
+    expected_cancelled: bool
+
+
+@dataclass(frozen=True)
 class BookkeepingDeadlineTestCase:
     description: str
     expected_expired: bool

@@ -20,6 +20,12 @@ class ActiveConnections:
 
         return self._used, bool(self._connections)
 
+    def note_used(self) -> None:
+        """Count a statement as run here without registering it for cancels."""
+
+        with self._lock:
+            self._used = True
+
     def add(self, *, adapter: Any, connection: Any) -> None:
         with self._lock:
             self._used = True
