@@ -1,5 +1,4 @@
-import type { CatalogNode, CostGroup, RunCostBreakdown, RunCostRow, RunCostStatus } from '$lib/api';
-import { topFolder } from '$lib/lineage/catalog-graph';
+import type { RunCostBreakdown, RunCostRow, RunCostStatus } from '$lib/api';
 
 /** The resource type of the row carrying a collection's totals. */
 export const TOTAL = '_total';
@@ -7,26 +6,11 @@ export const TOTAL = '_total';
 /** The help tip wherever figures read in credits, because the project set no credit price. */
 export const CREDIT_PRICE_HINT = 'Set usd_per_credit under [cost] in sqlbuild_project.toml to see dollars.';
 
-/** Adapters whose runs report query cost; the Overview shows cost only for these. */
+/** Adapters whose runs report query cost; the Overview's cost card and the Cost page show only for these. */
 const COST_ADAPTERS: ReadonlySet<string> = new Set(['snowflake']);
 
 /** Whether a location on `adapter` reports query cost. */
 export const reportsCost = (adapter: string | null | undefined): boolean => !!adapter && COST_ADAPTERS.has(adapter);
-
-/** Node costs summed per top-level folder, most expensive first; nodes no longer deployed count as `other`. */
-export function costByFolder(byNode: CostGroup[], nodes: CatalogNode[]): { key: string; credits: number; usd: number | null; nodes: number }[] {
-	const folders = new Map(nodes.map((n) => [n.key, topFolder(n)]));
-	const totals = new Map<string, { key: string; credits: number; usd: number | null; nodes: number }>();
-	for (const g of byNode) {
-		const key = (g.key && folders.get(g.key)) ?? 'other';
-		const t = totals.get(key) ?? { key, credits: 0, usd: 0, nodes: 0 };
-		t.credits += g.credits;
-		t.usd = sumUsd(t.usd, g.usd);
-		t.nodes += 1;
-		totals.set(key, t);
-	}
-	return [...totals.values()].sort((a, b) => b.credits - a.credits);
-}
 
 /** Least complete first, so a group run shows the weakest of its job runs' collections. */
 const STATUS_RANK: Record<RunCostStatus, number> = { none: 0, collection_failed: 1, unavailable: 2, pending: 3, partial: 4, complete: 5 };

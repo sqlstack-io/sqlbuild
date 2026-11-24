@@ -18,6 +18,7 @@ const PAGES = [
 	'/changes',
 	'/checks',
 	'/connections',
+	'/cost',
 	'/jobs',
 	'/lineage',
 	'/locations',

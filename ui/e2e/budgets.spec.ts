@@ -389,15 +389,17 @@ const BUDGETS: Record<string, Budget> = {
 	// 40 rows' label and wrap classes, the rest the tab switch. Measured layouts 3, styles 12–17.
 	'10K open the folder view': { layouts: 5, styles: 24, mutations: 456, nodes: 7300, drawn: 44, reads: 1 },
 	// Expand all swaps the window's rows for the expanded tree's (316 row insertions and removals) and
-	// rewrites their cells' classes. Measured layouts 1, styles 11–16.
-	'10K expand all': { layouts: 3, styles: 23, mutations: 577, nodes: 5700, drawn: 28, reads: 0 },
+	// rewrites their cells' classes. Measured layouts 1, styles 11–16, mutations 590 since the selection
+	// bar became one row and the tree's window one row taller.
+	'10K expand all': { layouts: 3, styles: 23, mutations: 592, nodes: 5700, drawn: 28, reads: 0 },
 	// Opening one folder inserts its 20 subfolder rows and rewrites the window's cell classes (440).
 	// Measured layouts 1–2, styles 9–15.
 	'10K open one folder': { layouts: 5, styles: 23, mutations: 469, nodes: 7500, drawn: 48, reads: 0 },
 	// 20 wheel steps of 400 px over the expanded tree: like the Checks list, each step swaps rows in and out
 	// of the window (2,142) and rewrites the recycled cells' classes (6,579), one layout per step.
-	// Measured layouts 20, styles 45–53, mutations 8,800.
-	'10K opened tree scroll': { layouts: 22, styles: 63, mutations: 8802, nodes: 5700, drawn: 28, reads: 0 },
+	// Measured layouts 20, styles 45–53, mutations 9,000 (8,800 before the selection bar became one row
+	// and the window one row taller).
+	'10K opened tree scroll': { layouts: 22, styles: 63, mutations: 9002, nodes: 5700, drawn: 28, reads: 0 },
 	// Reads the Overview, its timeline and the cost summary once each, and draws the attention card's 9
 	// items and the timeline. Measured layouts 3–4, styles 22–31, mutations 140–141.
 	'10K back to the Overview': { layouts: 7, styles: 42, mutations: 143, nodes: 4600, drawn: 12, reads: 3 },

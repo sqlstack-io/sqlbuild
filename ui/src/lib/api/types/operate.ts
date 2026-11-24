@@ -397,6 +397,61 @@ export type CostSummary = {
 	byNode: CostGroup[];
 };
 
+/** The price a cost read's dollars use; `source` is `configured` for the project's `usd_per_credit`. */
+export type CostPrice = { usdPerCredit: number; source: string };
+
+/** One job's estimated query cost on one node over a period, and in the period before it. */
+export type CostFact = {
+	/** Null for builds no server run started (by hand or from the command line). */
+	job: string | null;
+	nodeKey: string;
+	/** The node's folder: without `sql/models/` for SQL models (empty at its top), other roots as published, `other` when unknown. */
+	folder: string;
+	credits: number;
+	previousCredits: number;
+	usd: number | null;
+	previousUsd: number | null;
+	seconds: number;
+	runs: number;
+	queries: number;
+	bytesScanned: number;
+};
+
+/** Credits per day of a cost read's period, for one job or top-level folder (`key`). */
+export type CostSeries = { key: string | null; credits: number[] };
+
+/** A selection's estimated query cost over a period of whole UTC days, job by node, with daily series. */
+export type CostSelection = {
+	snapshotId: string | null;
+	since: string;
+	days: number;
+	/** The period's days, `YYYY-MM-DD`, oldest first; every series follows them. */
+	dates: string[];
+	/** Why `sqb` refuses the selection; facts and series are then empty. */
+	error: SelectionProblem | null;
+	/** Null unless every observation had a configured credit price. */
+	price: CostPrice | null;
+	credits: number;
+	previousCredits: number;
+	usd: number | null;
+	previousUsd: number | null;
+	runs: number;
+	incompleteRuns: number;
+	queries: number;
+	seconds: number;
+	bytesScanned: number;
+	/** Most expensive first. */
+	facts: CostFact[];
+	jobDaily: CostSeries[];
+	folderDaily: CostSeries[];
+};
+
+/** A cost read's period and selection, as `sqb build --select … --exclude …` takes it. */
+export type CostSelectionQuery = { days: number; select: string; exclude: string };
+
+/** One group of a batch of daily cost series: selected nodes matching every field given. */
+export type CostSeriesGroup = { job?: string; manual?: boolean; folder?: string; nodeKey?: string };
+
 /** One node's estimated query cost in one build, across every warehouse it used. */
 export type NodeBuildCost = {
 	buildRunId: string;

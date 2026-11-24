@@ -2,6 +2,7 @@ import type { ApiClient } from "./client";
 import { createHttpClient } from "./http-client";
 import { MockApiClient, type MockOptions } from "./mock/mock-client";
 import { largeProject } from "./mock/large-project";
+import { costProject } from "./mock/cost-project";
 import { hugeProject } from "./mock/huge-project";
 import { awkward } from "./mock/awkward";
 import { missingSecrets } from "./mock/missing-secrets";
@@ -92,11 +93,13 @@ export function createClient(
   });
   // `?summary`: the large project with a plan shaped like a large real one's summary (CHI-1563).
   const summary = search.has("summary");
+  // `?costs`: the Cost page's reads and selections answered by a large Snowflake project (cost-project.ts).
+  const costed = search.has("costs") ? costProject(mock) : mock;
   const sized = search.has("huge")
-    ? hugeProject(mock)
+    ? hugeProject(costed)
     : search.has("large") || summary
-      ? largeProject(mock, { summary })
-      : mock;
+      ? largeProject(costed, { summary })
+      : costed;
   const secrets = search.has("secrets")
     ? missingSecrets(sized, { sink: search.get("secrets") === "sink" })
     : sized;

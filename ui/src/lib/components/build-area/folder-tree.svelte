@@ -112,7 +112,7 @@
 			{#if r.kind === 'folder'}
 				{@const f = r.folder}
 				<tr class:quiet={!needsAttention(f)} class:expandable={r.expandable} data-path={f.path} aria-level={f.depth + 1} onclick={(e) => labelClick(e, r)}>
-					<td class="label" class:toggles={r.expandable} data-testid="folder-label">
+					<td class="label" data-testid="folder-label">
 						<div class="inner" style:padding-left="{f.depth * INDENT}px">
 							{#if r.expandable}
 								<Button variant="ghost" size="icon-xs" class="chev {r.expanded ? 'open' : ''}" aria-expanded={r.expanded} aria-label="{r.expanded ? 'Collapse' : 'Expand'} {f.path}" onclick={() => toggle(f.path)} data-testid="folder-toggle"><ChevronRightIcon /></Button>
@@ -120,7 +120,7 @@
 								<span class="chev-space"></span>
 							{/if}
 							{#if r.expanded}<FolderOpenIcon size={14} class="ficon" />{:else}<FolderIcon size={14} class="ficon" />{/if}
-							<a class="row-name" href={href(f.selection)} onclick={(e) => open(e, f.selection)} title="Open {f.path} in the catalog" data-testid="folder-name">{f.group}</a>
+							<a href={href(f.selection)} onclick={(e) => open(e, f.selection)} title="Open {f.path} in the catalog" data-testid="folder-name">{f.group}</a>
 							{#if !r.expanded && f.children.length}<small>{f.children.length} subfolders</small>{/if}
 						</div>
 					</td>
@@ -183,7 +183,8 @@
 	:global(.folders) td { height: 36px; padding-block: 0 !important; }
 	:global(.folders .sort) { color: inherit; font-size: 12px; font-weight: 500; }
 	:global(.folders .sort:hover) { color: var(--foreground); }
-	.label.toggles { cursor: pointer; }
+	/* A folder that opens: its name underlines on the row's hover (the shared `expandable` rules do the rest). */
+	tr:global(.expandable):hover .label a { text-decoration: underline; }
 	.inner { display: flex; min-width: 0; align-items: center; gap: 6px; }
 	.inner a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.label a:hover, .leaf a:hover { color: var(--primary); text-decoration: underline; }

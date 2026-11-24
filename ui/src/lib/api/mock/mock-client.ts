@@ -44,6 +44,9 @@ import type {
 	IgnoredAuditFailure,
 	CostSummary,
 	NodeBuildCost,
+	CostSelection,
+	CostSelectionQuery,
+	CostSeriesGroup,
 	NodeState,
 	NodeStates,
 	RepublishResult, Scope,
@@ -302,6 +305,16 @@ export class MockApiClient implements ApiClient {
 	async getCostSummary(scope: Scope, days: number): Promise<CostSummary> {
 		this.#location(scope);
 		return this.#operate.getCostSummary(scope, days);
+	}
+
+	async readCostSelection(scope: Scope, query: CostSelectionQuery): Promise<CostSelection> {
+		this.#location(scope);
+		return this.#operate.readCostSelection(scope, query);
+	}
+
+	async readCostSeries(scope: Scope, query: CostSelectionQuery, groups: CostSeriesGroup[]): Promise<number[][]> {
+		this.#location(scope);
+		return this.#operate.readCostSeries(scope, query, groups);
 	}
 
 	async listNodeCosts(scope: Scope, nodeKey: string, days: number): Promise<NodeBuildCost[]> {

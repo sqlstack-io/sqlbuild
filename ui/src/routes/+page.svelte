@@ -31,7 +31,6 @@
 	import { nodeChangeLine, summarizeChange } from '$lib/build-area/changes';
 	import { cappedFolders, quietDeployLine, recentDeployRows } from '$lib/build-area/overview-panels';
 	import { pagesBeyondTarget } from '$lib/nav';
-	import OverviewCost from './overview-cost.svelte';
 	import { CREDIT_PRICE_HINT, formatQueryCost, reportsCost } from '$lib/operate/cost';
 
 	const catalog = useCatalogNodes();
@@ -340,7 +339,7 @@
 						<div class="metric" data-testid="cost-card">
 							<span class="metric-label">Cost · 7 days{#if weekCost.usd === null}<HelpTip text={CREDIT_PRICE_HINT} label="Why credits" />{/if}</span>
 							<div><strong>{formatQueryCost(weekCost)}</strong></div>
-							<span>{plural(weekCost.runs, 'run')} · <a class="metric-link" href="#cost">Breakdown</a></span>
+							<span>{plural(weekCost.runs, 'run')} · <a class="metric-link" href={to('/cost')}>By job and folder</a></span>
 						</div>
 					{/if}
 				{/if}
@@ -412,7 +411,6 @@
 				</section>
 			{/if}
 
-			<OverviewCost />
 		</div>
 	{/if}
 </PageBody>

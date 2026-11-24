@@ -1,16 +1,16 @@
 import { expect, test } from '@playwright/test';
 
-// The Overview's top row has a 7-day cost card for a location whose adapter reports cost, and its
+// The Overview's top row has a 7-day cost card, linking to the Cost page, for a location whose adapter reports cost, and its
 // Activity lists the jobs active in the window first, folding the idle ones.
 test.use({ viewport: { width: 1600, height: 1000 } });
 
-test('a Snowflake location shows Cost · 7 days in the top row, linking to the breakdown', async ({ page }) => {
+test('a Snowflake location shows Cost · 7 days in the top row, linking to the Cost page', async ({ page }) => {
 	await page.goto('/?mock');
 	const card = page.getByTestId('cost-card');
 	await expect(card).toContainText('Cost · 7 days', { timeout: 20_000 });
-	await card.getByRole('link', { name: 'Breakdown' }).click();
-	await expect(page).toHaveURL(/#cost$/);
-	await expect(page.locator('#cost')).toBeInViewport();
+	await card.getByRole('link', { name: 'By job and folder' }).click();
+	await expect(page).toHaveURL(/\/cost(\?|$)/);
+	await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible({ timeout: 20_000 });
 });
 
 test('a location whose adapter reports no cost has no cost card', async ({ page }) => {

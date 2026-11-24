@@ -40,6 +40,9 @@ import type {
 	IgnoredAuditFailure,
 	RunCostRow,
 	CostSummary,
+	CostSelection,
+	CostSelectionQuery,
+	CostSeriesGroup,
 	AutomaticWithdrawal,
 	ConditionShape,
 	NodeBuildCost,
@@ -130,6 +133,10 @@ export interface ApiClient extends PlatformApi {
 	listRunCost(scope: Scope, runId: string): Promise<RunCostRow[]>;
 	/** Estimated query cost of the runs that started in the last `days` days, by job, warehouse size and node. */
 	getCostSummary(scope: Scope, days: number): Promise<CostSummary>;
+	/** A selection's estimated query cost over the last `query.days` whole UTC days, job by node. */
+	readCostSelection(scope: Scope, query: CostSelectionQuery): Promise<CostSelection>;
+	/** Daily credits of up to 200 groups of a selection, in the groups' order. */
+	readCostSeries(scope: Scope, query: CostSelectionQuery, groups: CostSeriesGroup[]): Promise<number[][]>;
 	/** One node's estimated query cost per build over the last `days` days, newest first. */
 	listNodeCosts(scope: Scope, nodeKey: string, days: number): Promise<NodeBuildCost[]>;
 	/** One statement's SQL, fetched when its row is expanded. `view.sql` */

@@ -7,7 +7,11 @@ import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import type { ApiClient, Scope, SelectionEvaluation, SelectionVocabulary } from '$lib/api';
 import { readSelectionParams, writeSelectionParams, type Selection } from '$lib/selection/command';
+import { untrack } from 'svelte';
 import { app } from './app.svelte';
+
+/** A selection's text with its spacing evened out, for comparing. */
+const squash = (text: string) => text.split(/\s+/).filter(Boolean).join(' ');
 
 /** Typing pauses this long before a selection is evaluated. */
 export const EVALUATE_DELAY_MS = 150;
@@ -62,8 +66,9 @@ export type SelectionState = ReturnType<typeof createSelection>;
  * A selection bar's state. Must be created during component initialisation. With `url`, the
  * selection starts from (unless `initial` is given) and is kept in the page's `?select=…&exclude=…`;
  * the older parameters in `replaces`, read into `initial` by the page, are dropped from the URL.
+ * With `follow`, links and Back that change the URL's selection change it here too.
  */
-export function createSelection(options: { url?: boolean; initial?: Selection; replaces?: string[] } = {}) {
+export function createSelection(options: { url?: boolean; follow?: boolean; initial?: Selection; replaces?: string[] } = {}) {
 	const start = options.initial ?? (options.url ? readSelectionParams(page.url.searchParams) : { select: '', exclude: '' });
 	let select = $state(start.select);
 	let exclude = $state(start.exclude);
@@ -141,6 +146,20 @@ export function createSelection(options: { url?: boolean; initial?: Selection; r
 		return () => clearTimeout(timer);
 	});
 
+	if (options.follow) {
+		// Links and Back change the URL: take the selection from it, unless it already says the same.
+		let seen = page.url.search;
+		$effect(() => {
+			const search = page.url.search;
+			if (search === seen) return;
+			seen = search;
+			const linked = readSelectionParams(page.url.searchParams);
+			untrack(() => {
+				if (squash(linked.select) !== squash(select)) select = linked.select;
+				if (squash(linked.exclude) !== squash(exclude)) exclude = linked.exclude;
+			});
+		});
+	}
 	if (options.url) {
 		$effect(() => {
 			const params = writeSelectionParams(page.url.searchParams, { select, exclude });

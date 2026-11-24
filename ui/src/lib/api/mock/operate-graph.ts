@@ -200,7 +200,7 @@ function matchPart(part: string): Set<string> | null {
 	const jobKeys = type === 'job' ? new Set(jobNodesOf(value)) : null;
 	const base = SNAPSHOT_NODES.filter((n) =>
 		jobKeys ? jobKeys.has(n.key) :
-		type === 'tag' ? n.tags.includes(value) : type === 'kind' ? selectorKind(n) === value : type === 'path' ? folderOf(n) === value || folderOf(n).startsWith(`${value}/`) : n.key === value
+		type === 'tag' ? n.tags.includes(value) : type === 'kind' ? selectorKind(n) === value : type === 'path' ? folderOf(n) === value.replace(/^sql\//, '') || folderOf(n).startsWith(`${value.replace(/^sql\//, '')}/`) : n.key === value
 	);
 	if (!base.length) return null;
 	const out = new Set(base.map((n) => n.key));
